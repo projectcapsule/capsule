@@ -43,7 +43,16 @@ func (h *userMetadataHandler) OnCreate(
 				return ad.ErroredResponse(err)
 			}
 
-			if response := validateUserMetadata(ns, labels, annotations, tnt.Spec.NamespaceOptions, recorder); response != nil {
+			if response := validateUserMetadata(
+				ctx,
+				req,
+				tnt,
+				ns,
+				labels,
+				annotations,
+				tnt.Spec.NamespaceOptions,
+				recorder,
+			); response != nil {
 				return response
 			}
 		}
@@ -66,17 +75,37 @@ func (h *userMetadataHandler) OnUpdate(
 		if len(tnt.Spec.NodeSelector) > 0 {
 			v, ok := newNs.GetAnnotations()["scheduler.alpha.kubernetes.io/node-selector"]
 			if !ok {
-				msg := "the node-selector annotation is enforced, cannot be removed"
+				msg := "the annotation scheduler.alpha.kubernetes.io/node-selector is enforced via tenant, cannot be removed"
 
-				recorder.Eventf(oldNs, oldNs, corev1.EventTypeWarning, "ForbiddenNodeSelectorDeletion", "Denied", msg)
+				recorder.LabeledEvent(
+					oldNs,
+					corev1.EventTypeWarning,
+					events.ReasonForbiddenNodeSelectorUpdate,
+					events.ActionValidationDenied,
+					msg,
+				).
+					WithRelated(tnt).
+					WithTenantLabel(tnt).
+					WithRequestAnnotations(req).
+					Emit(ctx)
 
 				return ad.Deny(msg)
 			}
 
 			if v != oldNs.GetAnnotations()["scheduler.alpha.kubernetes.io/node-selector"] {
-				msg := "the node-selector annotation is enforced, cannot be updated"
+				msg := "the annotation scheduler.alpha.kubernetes.io/node-selector is enforced via tenant, cannot be updated"
 
-				recorder.Eventf(oldNs, oldNs, corev1.EventTypeWarning, "ForbiddenNodeSelectorUpdate", "Denied", msg)
+				recorder.LabeledEvent(
+					oldNs,
+					corev1.EventTypeWarning,
+					events.ReasonForbiddenNodeSelectorUpdate,
+					events.ActionValidationDenied,
+					msg,
+				).
+					WithRelated(tnt).
+					WithTenantLabel(tnt).
+					WithRequestAnnotations(req).
+					Emit(ctx)
 
 				return ad.Deny(msg)
 			}
@@ -121,7 +150,16 @@ func (h *userMetadataHandler) OnUpdate(
 				return ad.ErroredResponse(err)
 			}
 
-			if response := validateUserMetadata(oldNs, labels, annotations, tnt.Spec.NamespaceOptions, recorder); response != nil {
+			if response := validateUserMetadata(
+				ctx,
+				req,
+				tnt,
+				oldNs,
+				labels,
+				annotations,
+				tnt.Spec.NamespaceOptions,
+				recorder,
+			); response != nil {
 				return response
 			}
 		}
@@ -145,6 +183,9 @@ func (h *userMetadataHandler) OnDelete(
 }
 
 func validateUserMetadata(
+	ctx context.Context,
+	req admission.Request,
+	tnt *capsulev1beta2.Tenant,
 	ns *corev1.Namespace,
 	labels map[string]string,
 	annotations map[string]string,
@@ -154,7 +195,18 @@ func validateUserMetadata(
 	err := api.ValidateForbidden(annotations, options.ForbiddenAnnotations)
 	if err != nil {
 		err = errors.Wrap(err, "namespace annotations validation failed")
-		recorder.Eventf(ns, ns, corev1.EventTypeWarning, events.ReasonForbiddenAnnotation, events.ActionValidationDenied, err.Error())
+
+		recorder.LabeledEvent(
+			ns,
+			corev1.EventTypeWarning,
+			events.ReasonForbiddenAnnotation,
+			events.ActionValidationDenied,
+			err.Error(),
+		).
+			WithRelated(tnt).
+			WithTenantLabel(tnt).
+			WithRequestAnnotations(req).
+			Emit(ctx)
 
 		return ad.Deny(err.Error())
 	}
@@ -162,7 +214,18 @@ func validateUserMetadata(
 	err = api.ValidateForbidden(labels, options.ForbiddenLabels)
 	if err != nil {
 		err = errors.Wrap(err, "namespace labels validation failed")
-		recorder.Eventf(ns, ns, corev1.EventTypeWarning, events.ReasonForbiddenLabel, events.ActionValidationDenied, err.Error())
+
+		recorder.LabeledEvent(
+			ns,
+			corev1.EventTypeWarning,
+			events.ReasonForbiddenLabel,
+			events.ActionValidationDenied,
+			err.Error(),
+		).
+			WithRelated(tnt).
+			WithTenantLabel(tnt).
+			WithRequestAnnotations(req).
+			Emit(ctx)
 
 		return ad.Deny(err.Error())
 	}

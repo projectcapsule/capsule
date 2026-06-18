@@ -12,7 +12,6 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -54,12 +53,30 @@ func (h *freezedEmitterHandler) OnUpdate(
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
 ) handlers.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
+	return func(ctx context.Context, req admission.Request) *admission.Response {
 		switch {
 		case !old.Spec.Cordoned && tnt.Spec.Cordoned:
-			recorder.Eventf(tnt, nil, corev1.EventTypeNormal, evt.ReasonCordoning, evt.ActionCordoned, "Tenant has been cordoned")
+			recorder.LabeledEvent(
+				tnt,
+				corev1.EventTypeNormal,
+				events.ReasonCordoning,
+				events.ActionCordoned,
+				"Tenant has been cordoned",
+			).
+				WithTenantLabel(tnt).
+				WithRequestAnnotations(req).
+				Emit(ctx)
 		case old.Spec.Cordoned && !tnt.Spec.Cordoned:
-			recorder.Eventf(tnt, nil, corev1.EventTypeNormal, evt.ReasonCordoning, evt.ActionUncordoned, "Tenant has been uncordoned")
+			recorder.LabeledEvent(
+				tnt,
+				corev1.EventTypeNormal,
+				events.ReasonCordoning,
+				events.ActionUncordoned,
+				"Tenant has been uncordoned",
+			).
+				WithTenantLabel(tnt).
+				WithRequestAnnotations(req).
+				Emit(ctx)
 		}
 
 		return nil

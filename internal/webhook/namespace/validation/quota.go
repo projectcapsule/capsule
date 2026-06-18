@@ -35,7 +35,7 @@ func (h *quotaHandler) OnCreate(
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(ctx, reader, recorder, ns, tnt)
+		return h.handle(ctx, req, reader, recorder, ns, tnt)
 	}
 }
 
@@ -64,12 +64,13 @@ func (h *quotaHandler) OnUpdate(
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(ctx, reader, recorder, ns, tnt)
+		return h.handle(ctx, req, reader, recorder, ns, tnt)
 	}
 }
 
 func (h *quotaHandler) handle(
 	ctx context.Context,
+	req admission.Request,
 	c client.Reader,
 	recorder events.EventRecorder,
 	ns *corev1.Namespace,
@@ -84,7 +85,17 @@ func (h *quotaHandler) handle(
 			return nil
 		}
 
-		recorder.Eventf(ns, nil, corev1.EventTypeWarning, events.ReasonOverprovision, events.ActionValidationDenied, "Namespace %s cannot be attached, quota exceeded for the current Tenant", ns.GetName())
+		recorder.LabeledEvent(
+			ns,
+			corev1.EventTypeWarning,
+			events.ReasonOverprovision,
+			events.ActionValidationDenied,
+			"namespace cannot be attached, quota exceeded for the elected tenant",
+		).
+			WithRelated(tnt).
+			WithTenantLabel(tnt).
+			WithRequestAnnotations(req).
+			Emit(ctx)
 
 		return ad.Deny(caperrors.NewNamespaceQuotaExceededError().Error())
 	}

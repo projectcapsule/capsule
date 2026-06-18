@@ -80,7 +80,17 @@ func (r *resourceCounterHandler) OnCreate(
 		})
 		if err != nil {
 			if errors.As(err, &caperrors.CustomResourceQuotaError{}) {
-				recorder.Eventf(tnt, nil, corev1.EventTypeWarning, events.ReasonOverprovision, events.ActionValidationDenied, "Resource %s/%s in API group %s cannot be created, limit usage of %d has been reached", req.Namespace, req.Name, kgv, limit)
+				recorder.LabeledEvent(
+					tnt,
+					corev1.EventTypeWarning,
+					events.ReasonOverprovision,
+					events.ActionValidationDenied,
+					fmt.Sprintf("Resource %s/%s in API group %s cannot be created, limit usage of %d has been reached", req.Namespace, req.Name, kgv, limit),
+				).
+					WithRelated(tnt).
+					WithTenantLabel(tnt).
+					WithRequestAnnotations(req).
+					Emit(ctx)
 			}
 
 			return ad.ErroredResponse(err)

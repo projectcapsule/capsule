@@ -10,7 +10,7 @@ import (
 
 	"github.com/projectcapsule/capsule/pkg/api"
 	apirules "github.com/projectcapsule/capsule/pkg/api/rules"
-	ruleengine "github.com/projectcapsule/capsule/pkg/rules"
+	ruleengine "github.com/projectcapsule/capsule/pkg/ruleengine"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 

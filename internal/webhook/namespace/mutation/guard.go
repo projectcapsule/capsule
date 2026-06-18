@@ -78,20 +78,20 @@ func (h *namespacePatchGuardHandler) OnUpdate(
 
 		switch {
 		case oldTenant == nil && newTenant == nil:
-			return denyNamespacePatch(oldNs, recorder, "namespace is not owned by any tenant")
+			return denyNamespacePatch(ctx, req, oldNs, recorder, "namespace is not owned by any tenant")
 
 		case oldTenant == nil && newTenant != nil:
-			return denyNamespacePatch(oldNs, recorder, "namespace can not be patched into a tenant")
+			return denyNamespacePatch(ctx, req, oldNs, recorder, "namespace can not be patched into a tenant")
 
 		case oldTenant != nil && newTenant == nil:
-			return denyNamespacePatch(oldNs, recorder, "namespace can not remove tenant ownership")
+			return denyNamespacePatch(ctx, req, oldNs, recorder, "namespace can not remove tenant ownership")
 
 		case oldTenant.GetName() != newTenant.GetName() || oldTenant.GetUID() != newTenant.GetUID():
-			return denyNamespacePatch(oldNs, recorder, "namespace can not be migrated between tenants")
+			return denyNamespacePatch(ctx, req, oldNs, recorder, "namespace can not be migrated between tenants")
 		}
 
 		if !tenant.NamespaceIsOwned(ctx, reader, h.cfg, oldNs, oldTenant, user) {
-			return denyNamespacePatch(oldNs, recorder, "denied patch request for this namespace")
+			return denyNamespacePatch(ctx, req, oldNs, recorder, "denied patch request for this namespace")
 		}
 
 		return nil
@@ -99,21 +99,22 @@ func (h *namespacePatchGuardHandler) OnUpdate(
 }
 
 func denyNamespacePatch(
+	ctx context.Context,
+	req admission.Request,
 	ns *corev1.Namespace,
 	recorder events.EventRecorder,
 	message string,
 ) *admission.Response {
 	if ns != nil {
-		recorder.Eventf(
+		recorder.LabeledEvent(
 			ns,
-			nil,
 			corev1.EventTypeWarning,
-			"NamespacePatch",
+			events.ReasonNamespaceHijack,
 			events.ActionValidationDenied,
-			"Namespace %s can not be patched: %s",
-			ns.GetName(),
-			message,
-		)
+			"namespace disallows patching relevant metadata",
+		).
+			WithRequestAnnotations(req).
+			Emit(ctx)
 	}
 
 	return ad.Deny(message)

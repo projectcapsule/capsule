@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,7 +16,6 @@ import (
 	k8sevents "k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/go-logr/logr"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 )
 
@@ -56,27 +56,32 @@ func (r *EventRecorder) emitLabeledEvent(
 
 	if r.client == nil {
 		r.log.Error(nil, "cannot emit labeled event: client is nil")
+
 		return
 	}
 
 	if e == nil {
 		r.log.Error(nil, "cannot emit labeled event: event is nil")
+
 		return
 	}
 
 	if e.reason == "" {
 		r.log.Error(nil, "cannot emit labeled event: reason is empty")
+
 		return
 	}
 
 	if e.action == "" {
 		r.log.Error(nil, "cannot emit labeled event: action is empty")
+
 		return
 	}
 
 	regardingRef, metaObj, err := objectReference(e.regarding)
 	if err != nil {
 		r.log.Error(err, "cannot emit labeled event: build regarding reference")
+
 		return
 	}
 
@@ -87,6 +92,7 @@ func (r *EventRecorder) emitLabeledEvent(
 
 	if namespace == "" {
 		r.log.Error(nil, "cannot emit labeled event: namespace is empty")
+
 		return
 	}
 
@@ -111,6 +117,7 @@ func (r *EventRecorder) emitLabeledEvent(
 		relatedRef, _, err := objectReference(e.related)
 		if err != nil {
 			r.log.Error(err, "cannot emit labeled event: build related reference")
+
 			return
 		}
 

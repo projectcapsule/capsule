@@ -36,13 +36,7 @@ func (h *cordoningHandler) OnCreate(
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if tnt.Spec.Cordoned && user.IsCapsule() {
-			recorder.Eventf(ns, nil, corev1.EventTypeWarning, events.ReasonCordoning, events.ActionValidationDenied, "Namespace %s cannot be attached, the current Tenant is cordoned", ns.GetName())
-
-			return ad.Deny("the selected Tenant is cordoned")
-		}
-
-		return nil
+		return h.validate(ctx, req, c, user, ns, recorder, tnt)
 	}
 }
 
@@ -56,13 +50,7 @@ func (h *cordoningHandler) OnDelete(
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if tnt.Spec.Cordoned && user.IsCapsule() {
-			recorder.Eventf(ns, tnt, corev1.EventTypeWarning, "TenantFreezed", "Denied", "Namespace %s cannot be deleted, the current Tenant is cordoned", req.Name)
-
-			return ad.Deny("the selected Tenant is cordoned")
-		}
-
-		return nil
+		return h.validate(ctx, req, c, user, ns, recorder, tnt)
 	}
 }
 
@@ -77,12 +65,34 @@ func (h *cordoningHandler) OnUpdate(
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if tnt.Spec.Cordoned && user.IsCapsule() {
-			recorder.Eventf(ns, tnt, corev1.EventTypeWarning, "TenantFreezed", "Denied", "Namespace %s cannot be updated, the current Tenant is cordoned", ns.GetName())
-
-			return ad.Deny("the selected Tenant is cordoned")
-		}
-
-		return nil
+		return h.validate(ctx, req, c, user, ns, recorder, tnt)
 	}
+}
+
+func (h *cordoningHandler) validate(
+	ctx context.Context,
+	req admission.Request,
+	c client.Client,
+	user users.AdmissionUser,
+	ns *corev1.Namespace,
+	recorder events.EventRecorder,
+	tnt *capsulev1beta2.Tenant,
+) *admission.Response {
+	if tnt.Spec.Cordoned && user.IsCapsule() {
+		recorder.LabeledEvent(
+			ns,
+			corev1.EventTypeWarning,
+			events.ReasonCordoning,
+			events.ActionValidationDenied,
+			"namespace can not be modified because the tenant is cordoned",
+		).
+			WithRelated(tnt).
+			WithTenantLabel(tnt).
+			WithRequestAnnotations(req).
+			Emit(ctx)
+
+		return ad.Deny("the selected tenant is cordoned")
+	}
+
+	return nil
 }

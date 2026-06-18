@@ -5,6 +5,7 @@ package dra
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	corev1 "k8s.io/api/core/v1"
@@ -119,7 +120,17 @@ func (h *deviceClass) validateResourceRequest(
 		case allowed.Match(dc.Name) || selector:
 			return nil
 		default:
-			recorder.Eventf(obj, tnt, corev1.EventTypeWarning, events.ReasonForbiddenDeviceClass, events.ActionValidationDenied, "%s %s/%s DeviceClass %s is forbidden for the current Tenant", req.Kind.Kind, req.Namespace, req.Name, &dc)
+			recorder.LabeledEvent(
+				obj,
+				corev1.EventTypeWarning,
+				events.ReasonForbiddenDeviceClass,
+				events.ActionValidationDenied,
+				fmt.Sprintf("%s %s/%s DeviceClass %s is forbidden for the current tenant", req.Kind.Kind, req.Namespace, req.Name, dc),
+			).
+				WithRelated(tnt).
+				WithTenantLabel(tnt).
+				WithRequestAnnotations(req).
+				Emit(ctx)
 
 			return ad.Deny(caperrors.NewDeviceClassForbidden(dc.Name, *allowed).Error())
 		}

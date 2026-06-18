@@ -5,6 +5,7 @@ package validation
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -59,15 +60,17 @@ func (h *prefixHandler) OnCreate(
 
 		expectedPrefix := tnt.GetName() + "-"
 		if !strings.HasPrefix(ns.GetName(), expectedPrefix) {
-			recorder.Eventf(
+			recorder.LabeledEvent(
 				ns,
-				nil,
 				corev1.EventTypeWarning,
-				events.ReasonInvalidTenantPrefix,
+				events.ReasonNamespaceHijack,
 				events.ActionValidationDenied,
-				"Namespace %s does not match the expected prefix for the current Tenant",
-				ns.GetName(),
-			)
+				fmt.Sprintf("namespace does not match the expected prefix for the elected tenant (%s)", expectedPrefix),
+			).
+				WithRelated(tnt).
+				WithTenantLabel(tnt).
+				WithRequestAnnotations(req).
+				Emit(ctx)
 
 			return ad.Denyf(
 				"The namespace doesn't match the tenant prefix, expected prefix %q",

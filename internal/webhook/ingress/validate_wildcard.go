@@ -5,6 +5,7 @@ package ingress
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -87,8 +88,17 @@ func (h *wildcard) validate(
 		for host := range ingress.HostnamePathsPairs() {
 			// Check if one of the host has wildcard.
 			if strings.HasPrefix(host, "*") {
-				// In case of wildcard, generate an event and then return.
-				recorder.Eventf(ingress.GetClientObject(), &tnt, corev1.EventTypeWarning, events.ReasonWildcardDenied, events.ActionValidationDenied, "%s %s/%s cannot be %s", req.Kind.String(), req.Namespace, req.Name, strings.ToLower(string(req.Operation)))
+				recorder.LabeledEvent(
+					ingress.GetClientObject(),
+					corev1.EventTypeWarning,
+					events.ReasonWildcardDenied,
+					events.ActionValidationDenied,
+					fmt.Sprintf("%s %s/%s cannot be %s", req.Kind.String(), req.Namespace, req.Name, strings.ToLower(string(req.Operation))),
+				).
+					WithRelated(&tnt).
+					WithTenantLabel(&tnt).
+					WithRequestAnnotations(req).
+					Emit(ctx)
 
 				return ad.Denyf("Wildcard denied for tenant %s", tnt.GetName())
 			}

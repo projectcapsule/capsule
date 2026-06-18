@@ -5,6 +5,7 @@ package pod
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	corev1 "k8s.io/api/core/v1"
@@ -73,14 +74,17 @@ func (h *priorityClass) OnCreate(
 		case allowed.Match(priorityClassName) || selector:
 			return nil
 		default:
-			recorder.Eventf(
+			recorder.LabeledEvent(
 				pod,
-				tnt,
 				corev1.EventTypeWarning,
 				events.ReasonForbiddenPriorityClass,
 				events.ActionValidationDenied,
-				"Using Priority Class %s is forbidden for the tenant %s", priorityClassName, tnt.GetName(),
-			)
+				fmt.Sprintf("using priorityclass %s is forbidden for the tenant", priorityClassName),
+			).
+				WithRelated(tnt).
+				WithTenantLabel(tnt).
+				WithRequestAnnotations(req).
+				Emit(ctx)
 
 			return ad.Deny(caperrors.NewPodPriorityClassForbidden(priorityClassName, *allowed).Error())
 		}

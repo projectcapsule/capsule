@@ -60,7 +60,7 @@ func (r *userMetadataHandler) OnUpdate(
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
 ) handlers.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
+	return func(ctx context.Context, req admission.Request) *admission.Response {
 		nodeWebhookSupported, _ := caputils.NodeWebhookSupported(r.version)
 
 		if !nodeWebhookSupported {
@@ -82,7 +82,15 @@ func (r *userMetadataHandler) OnUpdate(
 			newNodeForbiddenLabels := r.getForbiddenNodeLabels(newNode)
 
 			if !reflect.DeepEqual(oldNodeForbiddenLabels, newNodeForbiddenLabels) {
-				recorder.Eventf(newNode, nil, corev1.EventTypeWarning, events.ReasonForbiddenLabel, events.ActionValidationDenied, "Denied modifying forbidden labels on node")
+				recorder.LabeledEvent(
+					newNode,
+					corev1.EventTypeWarning,
+					events.ReasonForbiddenLabel,
+					events.ActionValidationDenied,
+					"denied modifying forbidden labels on node",
+				).
+					WithRequestAnnotations(req).
+					Emit(ctx)
 
 				return ad.Deny(caperrors.NewNodeLabelForbiddenError(r.configuration.ForbiddenUserNodeLabels()).Error())
 			}
@@ -93,7 +101,15 @@ func (r *userMetadataHandler) OnUpdate(
 			newNodeForbiddenAnnotations := r.getForbiddenNodeAnnotations(newNode)
 
 			if !reflect.DeepEqual(oldNodeForbiddenAnnotations, newNodeForbiddenAnnotations) {
-				recorder.Eventf(newNode, nil, corev1.EventTypeWarning, events.ReasonForbiddenLabel, events.ActionValidationDenied, "Denied modifying forbidden annotations on node")
+				recorder.LabeledEvent(
+					newNode,
+					corev1.EventTypeWarning,
+					events.ReasonForbiddenAnnotation,
+					events.ActionValidationDenied,
+					"denied modifying forbidden annotations on node",
+				).
+					WithRequestAnnotations(req).
+					Emit(ctx)
 
 				return ad.Deny(caperrors.NewNodeAnnotationForbiddenError(r.configuration.ForbiddenUserNodeAnnotations()).Error())
 			}

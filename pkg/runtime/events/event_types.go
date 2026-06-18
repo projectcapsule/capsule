@@ -5,12 +5,13 @@ package events
 
 import (
 	"context"
+	"maps"
 
-	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 type LabeledEvent struct {
@@ -57,21 +58,18 @@ func (e *LabeledEvent) Emit(ctx context.Context) {
 
 func (e *LabeledEvent) WithRelated(obj runtime.Object) *LabeledEvent {
 	e.related = obj
+
 	return e
 }
 
 func (e *LabeledEvent) WithLabels(labels map[string]string) *LabeledEvent {
-	for key, value := range labels {
-		e.labels[key] = value
-	}
+	maps.Copy(e.labels, labels)
 
 	return e
 }
 
 func (e *LabeledEvent) WithAnnotations(annotations map[string]string) *LabeledEvent {
-	for key, value := range annotations {
-		e.annotations[key] = value
-	}
+	maps.Copy(e.annotations, annotations)
 
 	return e
 }

@@ -5,6 +5,7 @@ package gateway
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	corev1 "k8s.io/api/core/v1"
@@ -100,7 +101,17 @@ func (r *class) validate(
 	}
 
 	if gatewayClass == nil {
-		recorder.Eventf(gatewayObj, tnt, corev1.EventTypeWarning, events.ReasonMissingGatewayClass, events.ActionValidationDenied, "Gateway %s/%s is missing GatewayClass", req.Namespace, req.Name)
+		recorder.LabeledEvent(
+			gatewayObj,
+			corev1.EventTypeWarning,
+			events.ReasonMissingGatewayClass,
+			events.ActionValidationDenied,
+			fmt.Sprintf("Gateway %s/%s is missing GatewayClass", req.Namespace, req.Name),
+		).
+			WithRelated(tnt).
+			WithTenantLabel(tnt).
+			WithRequestAnnotations(req).
+			Emit(ctx)
 
 		return ad.Deny(caperrors.NewGatewayClassUndefined(*allowed).Error())
 	}
@@ -127,7 +138,17 @@ func (r *class) validate(
 	case allowed.Match(gatewayClass.Name) || selector:
 		return nil
 	default:
-		recorder.Eventf(gatewayObj, tnt, corev1.EventTypeWarning, events.ReasonForbiddenGatewayClass, events.ActionValidationDenied, "Gateway %s/%s GatewayClass %s is forbidden for the current Tenant", req.Namespace, req.Name, &gatewayClass)
+		recorder.LabeledEvent(
+			gatewayObj,
+			corev1.EventTypeWarning,
+			events.ReasonForbiddenGatewayClass,
+			events.ActionValidationDenied,
+			fmt.Sprintf("Gateway %s/%s GatewayClass %s is forbidden for the current Tenant", req.Namespace, req.Name, gatewayClass.GetName()),
+		).
+			WithRelated(tnt).
+			WithTenantLabel(tnt).
+			WithRequestAnnotations(req).
+			Emit(ctx)
 
 		return ad.Deny(caperrors.NewGatewayClassForbidden(gatewayObj.Name, *allowed).Error())
 	}

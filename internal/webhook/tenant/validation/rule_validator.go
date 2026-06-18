@@ -120,7 +120,6 @@ func ValidateRule(tnt *capsulev1beta2.Tenant, req admission.Request) *admission.
 				)
 			}
 		}
-
 	}
 
 	return nil

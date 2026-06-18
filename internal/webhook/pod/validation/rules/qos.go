@@ -7,7 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	apirules "github.com/projectcapsule/capsule/pkg/api/rules"
-	ruleengine "github.com/projectcapsule/capsule/pkg/rules"
+	ruleengine "github.com/projectcapsule/capsule/pkg/ruleengine"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/workloads"
 )

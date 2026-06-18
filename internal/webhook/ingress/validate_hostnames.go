@@ -89,7 +89,17 @@ func (r *hostnames) validate(
 
 	for hostname := range ingress.HostnamePathsPairs() {
 		if len(hostname) == 0 {
-			recorder.Eventf(ingress.GetClientObject(), tnt, corev1.EventTypeWarning, events.ReasonIngressHostnameEmpty, events.ActionValidationDenied, "Ingress %s/%s hostname is empty", ingress.Namespace(), ingress.Name())
+			recorder.LabeledEvent(
+				ingress.GetClientObject(),
+				corev1.EventTypeWarning,
+				events.ReasonIngressHostnameEmpty,
+				events.ActionValidationDenied,
+				"ingress hostname is empty",
+			).
+				WithRelated(tnt).
+				WithTenantLabel(tnt).
+				WithRequestAnnotations(req).
+				Emit(ctx)
 
 			return ad.ErroredResponse(caperrors.NewEmptyIngressHostname(*tnt.Spec.IngressOptions.AllowedHostnames))
 		}
@@ -103,7 +113,17 @@ func (r *hostnames) validate(
 
 	var hostnameNotValidErr *caperrors.IngressHostnameNotValidError
 	if errors.As(err, &hostnameNotValidErr) {
-		recorder.Eventf(ingress.GetClientObject(), tnt, corev1.EventTypeWarning, events.ReasonIngressHostnameNotValid, events.ActionValidationDenied, "Ingress %s/%s hostname is not valid", ingress.Namespace(), ingress.Name())
+		recorder.LabeledEvent(
+			ingress.GetClientObject(),
+			corev1.EventTypeWarning,
+			events.ReasonIngressHostnameNotValid,
+			events.ActionValidationDenied,
+			"ingress hostname is not valid",
+		).
+			WithRelated(tnt).
+			WithTenantLabel(tnt).
+			WithRequestAnnotations(req).
+			Emit(ctx)
 
 		return ad.Deny(err.Error())
 	}

@@ -44,14 +44,17 @@ func (h *persistentVolumeValidatingClass) OnCreate(
 		storageClass := pvc.Spec.StorageClassName
 
 		if storageClass == nil {
-			recorder.Eventf(
+			recorder.LabeledEvent(
 				pvc,
-				tnt,
 				corev1.EventTypeWarning,
 				events.ReasonMissingStorageClass,
 				events.ActionValidationDenied,
-				"Requires a StorageClass",
-			)
+				"persistentvolume must provide a storageclass",
+			).
+				WithRelated(tnt).
+				WithTenantLabel(tnt).
+				WithRequestAnnotations(req).
+				Emit(ctx)
 
 			return ad.Deny(errors.NewStorageClassNotValid(*tnt.Spec.StorageClasses).Error())
 		}

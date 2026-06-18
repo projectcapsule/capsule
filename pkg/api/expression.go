@@ -6,6 +6,7 @@ package api
 import (
 	"fmt"
 	"regexp"
+	"slices"
 )
 
 // At least one of Exact or Exp must be set.
@@ -35,7 +36,7 @@ type ExpressionRegex struct {
 }
 
 type ExpressionRegexMatcher interface {
-	MatchRegex(ExpressionRegex, string) (bool, error)
+	MatchRegex(expression ExpressionRegex, value string) (bool, error)
 }
 
 func (m ExpressionMatch) Matches(value string) (bool, error) {
@@ -100,13 +101,7 @@ func (m ExpressionMatch) matches(value string) (bool, error) {
 }
 
 func containsExact(values []string, value string) bool {
-	for _, exact := range values {
-		if exact == value {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(values, value)
 }
 
 func (m ExpressionMatch) applyNegate(matched bool) bool {

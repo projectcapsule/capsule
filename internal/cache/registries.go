@@ -241,16 +241,19 @@ func (c *RegistryRuleSetCache) HashRules(specRules []rules.OCIRegistry) string {
 		for i := range exact {
 			exact[i] = strings.TrimSpace(exact[i])
 		}
+
 		sort.Strings(exact)
 
 		policies := make([]string, 0, len(r.Policy))
 		for _, p := range r.Policy {
 			policies = append(policies, strings.TrimSpace(string(p)))
 		}
+
 		sort.Strings(policies)
 
 		b.WriteString("exact")
 		b.WriteString(sepField)
+
 		for i, v := range exact {
 			if i > 0 {
 				b.WriteString(sepList)
@@ -267,6 +270,7 @@ func (c *RegistryRuleSetCache) HashRules(specRules []rules.OCIRegistry) string {
 		b.WriteString(sepField)
 		b.WriteString("negate")
 		b.WriteString(sepField)
+
 		if match.Negate {
 			b.WriteString("1")
 		} else {
@@ -276,6 +280,7 @@ func (c *RegistryRuleSetCache) HashRules(specRules []rules.OCIRegistry) string {
 		b.WriteString(sepField)
 		b.WriteString("policy")
 		b.WriteString(sepField)
+
 		for i, p := range policies {
 			if i > 0 {
 				b.WriteString(sepList)

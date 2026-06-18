@@ -12,6 +12,7 @@ const (
 	ReasonForbiddenLabel string = "ForbiddenLabel"
 	// ForbiddenAnnotationReason used as reason string to deny forbidden annotations.
 	ReasonForbiddenAnnotation string = "ForbiddenAnnotation"
+	ReasonAdmissionFailure    string = "AdmissionFailed"
 
 	// RuleStatus.
 	ReasonNamespaceRuleAudit string = "NamespaceRuleAudit"
@@ -36,6 +37,9 @@ const (
 	ReasonMissingGatewayClass    string = "MissingGatewayClass"
 	ReasonMissingDeviceClass     string = "MissingDeviceClass"
 	ReasonForbiddenDeviceClass   string = "ForbiddenDeviceClass"
+
+	// Nodes.
+	ReasonForbiddenNodeSelectorUpdate string = "ForbiddenNodeSelectorUpdate"
 
 	// Pods.
 	ReasonMissingFQCI                string = "MissingFQCI"

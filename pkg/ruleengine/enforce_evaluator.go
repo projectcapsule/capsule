@@ -1,4 +1,7 @@
-package rules
+// Copyright 2020-2026 Project Capsule Authors
+// SPDX-License-Identifier: Apache-2.0
+
+package ruleengine
 
 import (
 	"fmt"
@@ -121,7 +124,7 @@ func EvaluateEnforce[R any, T any](
 			continue
 		}
 
-		hasAllowRule := false
+		hasAuditMatch := false
 
 		var lastDecision *Decision
 
@@ -138,10 +141,7 @@ func EvaluateEnforce[R any, T any](
 			action := enforce.Action.OrDefault()
 
 			switch action {
-			case api.ActionTypeAllow:
-				hasAllowRule = true
-
-			case api.ActionTypeDeny, api.ActionTypeAudit:
+			case api.ActionTypeAllow, api.ActionTypeDeny, api.ActionTypeAudit:
 				// Supported actions.
 
 			default:
@@ -173,6 +173,8 @@ func EvaluateEnforce[R any, T any](
 
 				switch action {
 				case api.ActionTypeAudit:
+					hasAuditMatch = true
+
 					evaluation.Audits = append(evaluation.Audits, decision)
 
 				case api.ActionTypeAllow, api.ActionTypeDeny:
@@ -187,27 +189,17 @@ func EvaluateEnforce[R any, T any](
 
 			if lastDecision.Action == api.ActionTypeDeny {
 				evaluation.Blocking = lastDecision
+
 				return evaluation, nil
 			}
 
 			continue
 		}
 
-		if hasAllowRule {
-			evaluation.Blocking = &Decision{
-				SetName:     set.Name,
-				EventReason: set.EventReason,
-				Action:      api.ActionTypeDeny,
-				Value:       value,
-				Message: fmt.Sprintf(
-					"%s %q at %s is not allowed by namespace rule",
-					set.Name,
-					value.Value,
-					value.Path,
-				),
-			}
-
-			return evaluation, nil
+		// Audit rules are non-blocking. If at least one audit rule matched and
+		// no explicit allow/deny matched, the value is admitted.
+		if hasAuditMatch {
+			continue
 		}
 	}
 

@@ -12,7 +12,7 @@ import (
 
 	"github.com/projectcapsule/capsule/internal/cache"
 	apirules "github.com/projectcapsule/capsule/pkg/api/rules"
-	ruleengine "github.com/projectcapsule/capsule/pkg/rules"
+	ruleengine "github.com/projectcapsule/capsule/pkg/ruleengine"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
@@ -68,6 +68,7 @@ func (h *podRules) validateRegistries(
 			continue
 		}
 
+		//nolint:nilerr
 		if err := evaluation.BlockingError(); err != nil {
 			return out, nil
 		}
@@ -79,6 +80,7 @@ func (h *podRules) validateRegistries(
 		matched, _ := evaluation.Final.MatchedValue.(*cache.CompiledRule)
 		if blocking := registryPullPolicyDecision(ref, matched); blocking != nil {
 			out.Blocking = blocking
+
 			return out, nil
 		}
 	}

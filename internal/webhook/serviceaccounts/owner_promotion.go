@@ -16,7 +16,6 @@ import (
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/users"
 )
@@ -39,7 +38,7 @@ func (h *ownerPromotion) OnCreate(
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(user, recorder, sa, tnt)
+		return h.handle(ctx, req, user, recorder, sa, tnt)
 	}
 }
 
@@ -54,7 +53,7 @@ func (h *ownerPromotion) OnUpdate(
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(user, recorder, sa, tnt)
+		return h.handle(ctx, req, user, recorder, sa, tnt)
 	}
 }
 
@@ -73,6 +72,8 @@ func (h *ownerPromotion) OnDelete(
 }
 
 func (h *ownerPromotion) handle(
+	ctx context.Context,
+	req admission.Request,
 	user users.AdmissionUser,
 	recorder events.EventRecorder,
 	sa *corev1.ServiceAccount,
@@ -98,14 +99,17 @@ func (h *ownerPromotion) handle(
 
 	msg := fmt.Sprintf("%s not allowed to promote serviceaccount to tenant owner", user.Username)
 
-	recorder.Eventf(
+	recorder.LabeledEvent(
 		sa,
-		tnt,
 		corev1.EventTypeWarning,
-		evt.ReasonPromotionDenied,
-		evt.ActionValidationDenied,
+		events.ReasonPromotionDenied,
+		events.ActionValidationDenied,
 		msg,
-	)
+	).
+		WithRelated(tnt).
+		WithTenantLabel(tnt).
+		WithRequestAnnotations(req).
+		Emit(ctx)
 
 	return ad.Deny(msg)
 }

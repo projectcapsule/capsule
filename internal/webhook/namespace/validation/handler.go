@@ -168,15 +168,15 @@ func (h *handler) OnUpdate(
 			}
 
 			if user.IsCapsule() && !tenant.NamespaceIsOwned(ctx, c, h.cfg, oldNs, oldTenant, user) {
-				recorder.Eventf(
-					oldNs,
-					nil,
+				recorder.LabeledEvent(
+					ns,
 					corev1.EventTypeWarning,
-					"NamespacePatch",
+					events.ReasonNamespaceHijack,
 					events.ActionValidationDenied,
-					"Namespace %s can not be patched",
-					oldNs.GetName(),
-				)
+					"namespace can not be patched",
+				).
+					WithRequestAnnotations(req).
+					Emit(ctx)
 
 				return ad.Deny("denied patch request for this namespace")
 			}

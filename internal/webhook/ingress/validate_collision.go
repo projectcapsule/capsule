@@ -96,7 +96,17 @@ func (r *collision) validate(
 
 	var collisionErr *caperrors.IngressHostnameCollisionError
 	if errors.As(err, &collisionErr) {
-		recorder.Eventf(ing.GetClientObject(), tnt, corev1.EventTypeWarning, events.ReasonIngressHostnameCollision, events.ActionValidationDenied, "Ingress %s/%s hostname is colliding", ing.Namespace(), ing.Name())
+		recorder.LabeledEvent(
+			ing.GetClientObject(),
+			corev1.EventTypeWarning,
+			events.ReasonIngressHostnameCollision,
+			events.ActionValidationDenied,
+			"ingress hostname is colliding",
+		).
+			WithRelated(tnt).
+			WithTenantLabel(tnt).
+			WithRequestAnnotations(req).
+			Emit(ctx)
 	}
 
 	return ad.Deny(err.Error())

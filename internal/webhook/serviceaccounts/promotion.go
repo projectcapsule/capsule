@@ -38,7 +38,7 @@ func (h *promotion) OnCreate(
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(user, recorder, sa, tnt)
+		return h.handle(ctx, req, user, recorder, sa, tnt)
 	}
 }
 
@@ -53,7 +53,7 @@ func (h *promotion) OnUpdate(
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(user, recorder, sa, tnt)
+		return h.handle(ctx, req, user, recorder, sa, tnt)
 	}
 }
 
@@ -72,6 +72,8 @@ func (h *promotion) OnDelete(
 }
 
 func (h *promotion) handle(
+	ctx context.Context,
+	req admission.Request,
 	user users.AdmissionUser,
 	recorder events.EventRecorder,
 	sa *corev1.ServiceAccount,
@@ -93,14 +95,17 @@ func (h *promotion) handle(
 
 	msg := fmt.Sprintf("%s not allowed to promote serviceaccount to tenant owner", user.Username)
 
-	recorder.Eventf(
+	recorder.LabeledEvent(
 		sa,
-		tnt,
 		corev1.EventTypeWarning,
 		events.ReasonPromotionDenied,
 		events.ActionValidationDenied,
 		msg,
-	)
+	).
+		WithRelated(tnt).
+		WithTenantLabel(tnt).
+		WithRequestAnnotations(req).
+		Emit(ctx)
 
 	return ad.Deny(msg)
 }
