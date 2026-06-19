@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -18,7 +17,7 @@ import (
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -90,7 +89,17 @@ func (r *hostnames) validate(
 
 	for hostname := range ingress.HostnamePathsPairs() {
 		if len(hostname) == 0 {
-			recorder.Eventf(ingress.GetClientObject(), tnt, corev1.EventTypeWarning, evt.ReasonIngressHostnameEmpty, evt.ActionValidationDenied, "Ingress %s/%s hostname is empty", ingress.Namespace(), ingress.Name())
+			recorder.LabeledEvent(
+				ingress.GetClientObject(),
+				corev1.EventTypeWarning,
+				events.ReasonIngressHostnameEmpty,
+				events.ActionValidationDenied,
+				"ingress hostname is empty",
+			).
+				WithRelated(tnt).
+				WithTenantLabel(tnt).
+				WithRequestAnnotations(req).
+				Emit(ctx)
 
 			return ad.ErroredResponse(caperrors.NewEmptyIngressHostname(*tnt.Spec.IngressOptions.AllowedHostnames))
 		}
@@ -104,7 +113,17 @@ func (r *hostnames) validate(
 
 	var hostnameNotValidErr *caperrors.IngressHostnameNotValidError
 	if errors.As(err, &hostnameNotValidErr) {
-		recorder.Eventf(ingress.GetClientObject(), tnt, corev1.EventTypeWarning, evt.ReasonIngressHostnameNotValid, evt.ActionValidationDenied, "Ingress %s/%s hostname is not valid", ingress.Namespace(), ingress.Name())
+		recorder.LabeledEvent(
+			ingress.GetClientObject(),
+			corev1.EventTypeWarning,
+			events.ReasonIngressHostnameNotValid,
+			events.ActionValidationDenied,
+			"ingress hostname is not valid",
+		).
+			WithRelated(tnt).
+			WithTenantLabel(tnt).
+			WithRequestAnnotations(req).
+			Emit(ctx)
 
 		return ad.Deny(err.Error())
 	}

@@ -5,9 +5,9 @@ package pod
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -16,7 +16,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -40,7 +40,7 @@ func (h *containerRegistryLegacyHandler) OnCreate(
 	_ []*rules.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.validate(req, pod, tnt, recorder)
+		return h.validate(ctx, req, pod, tnt, recorder)
 	}
 }
 
@@ -55,7 +55,7 @@ func (h *containerRegistryLegacyHandler) OnUpdate(
 	_ []*rules.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.validate(req, pod, tnt, recorder)
+		return h.validate(ctx, req, pod, tnt, recorder)
 	}
 }
 
@@ -74,6 +74,7 @@ func (h *containerRegistryLegacyHandler) OnDelete(
 }
 
 func (h *containerRegistryLegacyHandler) validate(
+	ctx context.Context,
 	req admission.Request,
 	pod *corev1.Pod,
 	tnt *capsulev1beta2.Tenant,
@@ -85,19 +86,19 @@ func (h *containerRegistryLegacyHandler) validate(
 	}
 
 	for _, container := range pod.Spec.InitContainers {
-		if response := h.verifyContainerRegistry(recorder, pod, req, container.Image, tnt); response != nil {
+		if response := h.verifyContainerRegistry(ctx, recorder, pod, req, container.Image, tnt); response != nil {
 			return response
 		}
 	}
 
 	for _, container := range pod.Spec.EphemeralContainers {
-		if response := h.verifyContainerRegistry(recorder, pod, req, container.Image, tnt); response != nil {
+		if response := h.verifyContainerRegistry(ctx, recorder, pod, req, container.Image, tnt); response != nil {
 			return response
 		}
 	}
 
 	for _, container := range pod.Spec.Containers {
-		if response := h.verifyContainerRegistry(recorder, pod, req, container.Image, tnt); response != nil {
+		if response := h.verifyContainerRegistry(ctx, recorder, pod, req, container.Image, tnt); response != nil {
 			return response
 		}
 	}
@@ -106,6 +107,7 @@ func (h *containerRegistryLegacyHandler) validate(
 }
 
 func (h *containerRegistryLegacyHandler) verifyContainerRegistry(
+	ctx context.Context,
 	recorder events.EventRecorder,
 	pod *corev1.Pod,
 	req admission.Request,
@@ -117,14 +119,17 @@ func (h *containerRegistryLegacyHandler) verifyContainerRegistry(
 	reg := NewRegistry(image, h.configuration)
 
 	if len(reg.Registry()) == 0 {
-		recorder.Eventf(
+		recorder.LabeledEvent(
 			pod,
-			tnt,
 			corev1.EventTypeWarning,
-			evt.ReasonMissingFQCI,
-			evt.ActionValidationDenied,
-			"Using a fully qualified container image, cannot enforce registry for the tenant %s", reg.Registry(), tnt.GetName(),
-		)
+			events.ReasonMissingFQCI,
+			events.ActionValidationDenied,
+			fmt.Sprintf("container image %q is not fully qualified (missing registry), cannot enforce tenant registry rules", image),
+		).
+			WithRelated(tnt).
+			WithTenantLabel(tnt).
+			WithRequestAnnotations(req).
+			Emit(ctx)
 
 		//nolint:staticcheck
 		return ad.Deny(caperrors.NewContainerRegistryForbidden(image, *tnt.Spec.ContainerRegistries).Error())
@@ -137,14 +142,17 @@ func (h *containerRegistryLegacyHandler) verifyContainerRegistry(
 	matched = tnt.Spec.ContainerRegistries.RegexMatch(reg.Registry())
 
 	if !valid && !matched {
-		recorder.Eventf(
+		recorder.LabeledEvent(
 			pod,
-			tnt,
 			corev1.EventTypeWarning,
-			evt.ReasonForbiddenContainerRegistry,
-			evt.ActionValidationDenied,
-			"Using a container hosted on registry %s that is forbidden for the tenant %s", reg.Registry(), tnt.GetName(),
-		)
+			events.ReasonForbiddenContainerRegistry,
+			events.ActionValidationDenied,
+			fmt.Sprintf("using a container hosted on registry %s that is forbidden for the tenant", reg.Registry()),
+		).
+			WithRelated(tnt).
+			WithTenantLabel(tnt).
+			WithRequestAnnotations(req).
+			Emit(ctx)
 
 		//nolint:staticcheck
 		return ad.Deny(caperrors.NewContainerRegistryForbidden(reg.FQCI(), *tnt.Spec.ContainerRegistries).Error())

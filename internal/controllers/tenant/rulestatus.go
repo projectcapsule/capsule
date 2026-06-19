@@ -25,7 +25,7 @@ func (r *Manager) reconcileRuleStatus(
 	ns *corev1.Namespace,
 ) error {
 	// Collect Rules for namespace
-	ruleBody, err := tenant.BuildNamespaceRuleBodyStatus(ctx, r.Client, ns, tnt)
+	ruleBody, err := tenant.BuildNamespaceRuleBodyStatus(r.Scheme(), ns, tnt)
 	if err != nil {
 		return err
 	}

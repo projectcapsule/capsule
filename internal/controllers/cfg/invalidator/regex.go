@@ -28,7 +28,7 @@ func (r *CacheInvalidator) rebuildRegexCache(ctx context.Context, log logr.Logge
 
 	r.RegexCache.Reset()
 
-	expressions := make(map[string]api.RegExpression)
+	expressions := make(map[string]api.ExpressionRegex)
 
 	for i := range ruleStatuses.Items {
 		rs := &ruleStatuses.Items[i]
@@ -52,7 +52,7 @@ func (r *CacheInvalidator) rebuildRegexCache(ctx context.Context, log logr.Logge
 }
 
 func collectRegexExpressionsFromNamespaceRules(
-	set map[string]api.RegExpression,
+	set map[string]api.ExpressionRegex,
 	r []*rules.NamespaceRuleBodyNamespace,
 ) {
 	for _, rule := range r {
@@ -61,7 +61,7 @@ func collectRegexExpressionsFromNamespaceRules(
 }
 
 func collectRegexExpressionsFromNamespaceRule(
-	set map[string]api.RegExpression,
+	set map[string]api.ExpressionRegex,
 	rule *rules.NamespaceRuleBodyNamespace,
 ) {
 	if rule == nil {
@@ -73,7 +73,16 @@ func collectRegexExpressionsFromNamespaceRule(
 	}
 
 	for _, registry := range rule.Enforce.Workloads.Registries {
-		expr := registry.RegExpression
+		expr := registry.ExpressionRegex
+		if expr.Expression == "" {
+			continue
+		}
+
+		set[cache.HashRegex(expr)] = expr
+	}
+
+	for _, scheduler := range rule.Enforce.Workloads.Schedulers {
+		expr := scheduler.ExpressionRegex
 		if expr.Expression == "" {
 			continue
 		}

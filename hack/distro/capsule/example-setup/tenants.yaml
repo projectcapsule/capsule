@@ -89,40 +89,12 @@ spec:
       kind: User
       name: alice
   rules:
-    - permissions:
-        promotions:
-          - clusterRoles:
-            - "admin"
-            selector:
-              matchLabels:
-                owner.projectcapsule.dev/role: "replication"
-
-    - enforce:
-        action: "allow"
-        workloads:
-          registries:
-          - exp: ".*"
-    - enforce:
-        action: "deny"
-        workloads:
-          registries:
-          - exp: "harbor/.*"
-    - enforce:
-        action: "deny"
-        workloads:
-          registries:
-          - exp: "harbor/customer/.*"
-    - namespaceSelector:
-        matchExpressions:
-          - key: env
-            operator: In
-            values:
-            - "prod"
-      enforce:
-        action: "allow"
-        workloads:
-          registries:
-          - exp: "harbor/customer/prod-image/.*"
+  - enforce:
+      action: "allow"
+      workloads:
+        schedulers:
+        - exact:
+            - "{{ .tenant.metadata.name }}-scheduler"
 ---
 apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant

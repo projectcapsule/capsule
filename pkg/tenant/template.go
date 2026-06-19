@@ -28,6 +28,44 @@ func NewTenantContext(tnt *capsulev1beta2.Tenant, scheme *runtime.Scheme, opts s
 	return context, nil
 }
 
+// NewTenantNamespaceContext returns the context for the tenant and a given namespace.
+func NewTenantNamespaceContext(
+	tnt *capsulev1beta2.Tenant,
+	ns *corev1.Namespace,
+	scheme *runtime.Scheme,
+	opts sanitize.SanitizeOptions,
+) (map[string]any, error) {
+	context := make(map[string]any)
+
+	if tnt != nil {
+		tntCopy := tnt.DeepCopy()
+
+		tCtx, err := NewTenantContext(tntCopy, scheme, opts)
+		if err != nil {
+			return context, err
+		}
+
+		context["tenant"] = tCtx
+	}
+
+	if ns != nil {
+		nsCopy := ns.DeepCopy()
+
+		if err := sanitize.SanitizeObject(nsCopy, scheme, opts); err != nil {
+			return context, err
+		}
+
+		nsMap, err := utils.ToUnstructuredMap(nsCopy)
+		if err != nil {
+			return context, err
+		}
+
+		context["namespace"] = nsMap
+	}
+
+	return context, nil
+}
+
 // TemplateForTenantAndNamespace applies templatingto the provided string.
 func FastContextForTenantAndNamespace(tnt *capsulev1beta2.Tenant, ns *corev1.Namespace) map[string]string {
 	values := map[string]string{}

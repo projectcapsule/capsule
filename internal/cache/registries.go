@@ -23,8 +23,10 @@ type RuleSet struct {
 }
 
 type CompiledRule struct {
-	Expression api.RegExpression
-	RegexID    string
+	Match api.ExpressionMatch
+
+	// RegexID is empty when Match.Expression is empty.
+	RegexID string
 
 	AllowedPolicy map[corev1.PullPolicy]struct{} // nil/empty => allow any
 }
@@ -97,7 +99,7 @@ func (c *RegistryRuleSetCache) GetOrBuild(specRules []rules.OCIRegistry) (rs *Ru
 	return built, false, nil
 }
 
-// Match matches reference, regex and pullPolicy.
+// Match matches reference, expression and pullPolicy.
 // Admission evaluation should usually use MatchReference instead.
 func (c *RegistryRuleSetCache) Match(
 	specRules []rules.OCIRegistry,
@@ -140,12 +142,12 @@ func (c *RegistryRuleSetCache) MatchRuleSet(
 			continue
 		}
 
-		compiled, _, err := c.regexCache.GetOrCompile(rule.Expression)
+		matched, err := rule.Match.MatchesWithExpressionMatcher(c.regexCache, reference)
 		if err != nil {
 			return nil, err
 		}
 
-		if compiled.MatchString(reference) {
+		if matched {
 			return rule, nil
 		}
 	}
@@ -153,7 +155,7 @@ func (c *RegistryRuleSetCache) MatchRuleSet(
 	return nil, nil
 }
 
-// MatchReference matches reference and regex only.
+// MatchReference matches reference only.
 // It intentionally does not check pullPolicy.
 func (c *RegistryRuleSetCache) MatchReference(
 	rs *RuleSet,
@@ -174,12 +176,12 @@ func (c *RegistryRuleSetCache) MatchReference(
 	for i := range rs.Compiled {
 		rule := &rs.Compiled[i]
 
-		compiled, _, err := c.regexCache.GetOrCompile(rule.Expression)
+		matched, err := rule.Match.MatchesWithExpressionMatcher(c.regexCache, reference)
 		if err != nil {
 			return nil, err
 		}
 
-		if compiled.MatchString(reference) {
+		if matched {
 			return rule, nil
 		}
 	}
@@ -224,7 +226,7 @@ func (c *RegistryRuleSetCache) PruneActive(activeIDs map[string]struct{}) int {
 func (c *RegistryRuleSetCache) HashRules(specRules []rules.OCIRegistry) string {
 	var b strings.Builder
 
-	b.Grow(len(specRules) * 96)
+	b.Grow(len(specRules) * 160)
 
 	const (
 		sepRule  = "\n"
@@ -233,7 +235,10 @@ func (c *RegistryRuleSetCache) HashRules(specRules []rules.OCIRegistry) string {
 	)
 
 	for _, r := range specRules {
-		expr := r.Expression()
+		match := r.ExpressionMatch
+
+		exact := append([]string(nil), match.Exact...)
+		sort.Strings(exact)
 
 		policies := make([]string, 0, len(r.Policy))
 		for _, p := range r.Policy {
@@ -242,15 +247,34 @@ func (c *RegistryRuleSetCache) HashRules(specRules []rules.OCIRegistry) string {
 
 		sort.Strings(policies)
 
-		b.WriteString(strings.TrimSpace(expr.Expression))
+		b.WriteString("exact")
 		b.WriteString(sepField)
 
-		if expr.Negate {
+		for i, v := range exact {
+			if i > 0 {
+				b.WriteString(sepList)
+			}
+
+			b.WriteString(v)
+		}
+
+		b.WriteString(sepField)
+		b.WriteString("exp")
+		b.WriteString(sepField)
+		b.WriteString(strings.TrimSpace(match.Expression))
+
+		b.WriteString(sepField)
+		b.WriteString("negate")
+		b.WriteString(sepField)
+
+		if match.Negate {
 			b.WriteString("1")
 		} else {
 			b.WriteString("0")
 		}
 
+		b.WriteString(sepField)
+		b.WriteString("policy")
 		b.WriteString(sepField)
 
 		for i, p := range policies {
@@ -316,16 +340,23 @@ func (c *RegistryRuleSetCache) buildRuleSet(id string, specRules []rules.OCIRegi
 	}
 
 	for _, r := range specRules {
-		expression := r.Expression()
+		match := r.ExpressionMatch
 
-		compiled, _, err := c.regexCache.GetOrCompile(expression)
-		if err != nil {
-			return nil, err
+		if len(match.Exact) == 0 && strings.TrimSpace(match.Expression) == "" {
+			return nil, fmt.Errorf("registry rule must define at least one of exact or exp")
 		}
 
 		cr := CompiledRule{
-			Expression: expression,
-			RegexID:    compiled.ID,
+			Match: match,
+		}
+
+		if strings.TrimSpace(match.Expression) != "" {
+			compiled, _, err := c.regexCache.GetOrCompile(match.ExpressionRegex)
+			if err != nil {
+				return nil, err
+			}
+
+			cr.RegexID = compiled.ID
 		}
 
 		if len(r.Policy) > 0 {

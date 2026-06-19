@@ -14,6 +14,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -53,7 +54,7 @@ func DefaultCapsuleConfiguration() capsulev1beta2.CapsuleConfigurationSpec {
 	}
 }
 
-func NewCapsuleConfiguration(ctx context.Context, c client.Client, rest *rest.Config, name string) Configuration {
+func NewCapsuleConfiguration(ctx context.Context, c client.Client, reader client.Reader, rest *rest.Config, name string) Configuration {
 	return &capsuleConfiguration{
 		client: c,
 		rest:   rest,
@@ -61,7 +62,7 @@ func NewCapsuleConfiguration(ctx context.Context, c client.Client, rest *rest.Co
 			cfg := &capsulev1beta2.CapsuleConfiguration{}
 			key := types.NamespacedName{Name: name}
 
-			if err := c.Get(ctx, key, cfg); err == nil {
+			if err := reader.Get(ctx, key, cfg); err == nil {
 				return cfg
 			} else if !apierrors.IsNotFound(err) {
 				panic(errors.Wrap(err, "cannot retrieve Capsule configuration with name "+name))
@@ -85,7 +86,7 @@ func NewCapsuleConfiguration(ctx context.Context, c client.Client, rest *rest.Co
 
 			if err := c.Create(ctx, cfg); err != nil {
 				if apierrors.IsAlreadyExists(err) {
-					if err := c.Get(ctx, key, cfg); err != nil {
+					if err := reader.Get(ctx, key, cfg); err != nil {
 						panic(errors.Wrap(err, "configuration created concurrently but cannot be retrieved"))
 					}
 
@@ -164,6 +165,18 @@ func (c *capsuleConfiguration) Users() rbac.UserListSpec {
 	out := rbac.UserListSpec{}
 
 	for _, user := range c.UserNames() {
+		// Old Spec.UserNames may contain ServiceAccount usernames.
+		// If SplitUsername succeeds, the value is a ServiceAccount.
+		_, _, err := serviceaccount.SplitUsername(user)
+		if err == nil {
+			out.Upsert(rbac.UserSpec{
+				Kind: rbac.ServiceAccountOwner,
+				Name: user,
+			})
+
+			continue
+		}
+
 		out.Upsert(rbac.UserSpec{
 			Kind: rbac.UserOwner,
 			Name: user,
@@ -217,6 +230,10 @@ func (c *capsuleConfiguration) Administrators() rbac.UserListSpec {
 
 func (c *capsuleConfiguration) Admission() capsulev1beta2.DynamicAdmission {
 	return c.retrievalFn().Spec.Admission
+}
+
+func (c *capsuleConfiguration) Events() capsulev1beta2.EventsConfiguration {
+	return c.retrievalFn().Spec.Events
 }
 
 func (c *capsuleConfiguration) RBAC() *capsulev1beta2.RBACConfiguration {

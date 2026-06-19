@@ -43,6 +43,7 @@ type Configuration interface {
 	ServiceAccountClientProperties() capsulev1beta2.ServiceAccountClient
 	ServiceAccountClient(context.Context) (*rest.Config, error)
 	Admission() capsulev1beta2.DynamicAdmission
+	Events() capsulev1beta2.EventsConfiguration
 	RBAC() *capsulev1beta2.RBACConfiguration
 	CacheInvalidation() metav1.Duration
 }

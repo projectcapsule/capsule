@@ -3,7 +3,11 @@
 
 package rules
 
-import corev1 "k8s.io/api/core/v1"
+import (
+	corev1 "k8s.io/api/core/v1"
+
+	"github.com/projectcapsule/capsule/pkg/api"
+)
 
 // +kubebuilder:validation:Enum=pod/initcontainers;pod/ephemeralcontainers;pod/containers;pod/volumes
 type WorkloadValidationTarget string
@@ -31,5 +35,14 @@ type NamespaceRuleEnforceWorkloadsBody struct {
 
 	// Define registries which are allowed to be used within this tenant
 	// The rules are aggregated, since you can use Regular Expressions the match registry endpoints
+	// +optional
 	Registries []OCIRegistry `json:"registries,omitempty"`
+
+	// Schedulers defines schedulerName matchers for Pod admission.
+	//
+	// The rule is evaluated against pod.spec.schedulerName.
+	// Empty schedulerName is ignored and is not normalized to default-scheduler.
+	//
+	// +optional
+	Schedulers []api.ExpressionMatch `json:"schedulers,omitempty"`
 }

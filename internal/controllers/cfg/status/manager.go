@@ -42,6 +42,8 @@ const tenantEventMarker = "tenant-event"
 type Manager struct {
 	client.Client
 
+	reader client.Reader
+
 	Rest *rest.Config
 
 	configName string
@@ -50,6 +52,7 @@ type Manager struct {
 
 func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) (err error) {
 	r.configName = ctrlConfig.ConfigurationName
+	r.reader = mgr.GetAPIReader()
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("capsule/configuration").
@@ -154,7 +157,7 @@ func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res
 	// refresh overwrites latest.Status.Tenants.
 	didRefreshTenants := false
 
-	cfg := configuration.NewCapsuleConfiguration(ctx, r.Client, r.Rest, request.Name)
+	cfg := configuration.NewCapsuleConfiguration(ctx, r.Client, r.reader, r.Rest, request.Name)
 
 	instance := &capsulev1beta2.CapsuleConfiguration{}
 	if err = r.Get(ctx, types.NamespacedName{Name: request.Name}, instance); err != nil {

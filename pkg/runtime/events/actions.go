@@ -11,4 +11,5 @@ const (
 
 	ActionMutated          string = "Mutated"
 	ActionValidationDenied string = "ValidationDenied"
+	ActionRuleAudit        string = "RuleAudit"
 )

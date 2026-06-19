@@ -46,7 +46,7 @@ func NewRegexCache() *RegexCache {
 	}
 }
 
-func (c *RegexCache) GetOrCompile(expr api.RegExpression) (*CompiledRegex, bool, error) {
+func (c *RegexCache) GetOrCompile(expr api.ExpressionRegex) (*CompiledRegex, bool, error) {
 	if c == nil {
 		return nil, false, fmt.Errorf("regex cache is nil")
 	}
@@ -129,7 +129,16 @@ func (c *RegexCache) Reset() {
 	c.re = make(map[string]*CompiledRegex)
 }
 
-func HashRegex(expr api.RegExpression) string {
+func (c *RegexCache) MatchRegex(expr api.ExpressionRegex, value string) (bool, error) {
+	compiled, _, err := c.GetOrCompile(expr)
+	if err != nil {
+		return false, err
+	}
+
+	return compiled.MatchString(value), nil
+}
+
+func HashRegex(expr api.ExpressionRegex) string {
 	var b strings.Builder
 
 	b.WriteString(strings.TrimSpace(expr.Expression))

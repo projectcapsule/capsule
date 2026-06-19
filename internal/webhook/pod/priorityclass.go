@@ -5,10 +5,10 @@ package pod
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -17,7 +17,7 @@ import (
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -74,14 +74,17 @@ func (h *priorityClass) OnCreate(
 		case allowed.Match(priorityClassName) || selector:
 			return nil
 		default:
-			recorder.Eventf(
+			recorder.LabeledEvent(
 				pod,
-				tnt,
 				corev1.EventTypeWarning,
-				evt.ReasonForbiddenPriorityClass,
-				evt.ActionValidationDenied,
-				"Using Priority Class %s is forbidden for the tenant %s", priorityClassName, tnt.GetName(),
-			)
+				events.ReasonForbiddenPriorityClass,
+				events.ActionValidationDenied,
+				fmt.Sprintf("using priorityclass %s is forbidden for the tenant", priorityClassName),
+			).
+				WithRelated(tnt).
+				WithTenantLabel(tnt).
+				WithRequestAnnotations(req).
+				Emit(ctx)
 
 			return ad.Deny(caperrors.NewPodPriorityClassForbidden(priorityClassName, *allowed).Error())
 		}

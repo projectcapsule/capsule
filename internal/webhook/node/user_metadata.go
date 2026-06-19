@@ -9,14 +9,13 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	caputils "github.com/projectcapsule/capsule/pkg/utils"
 )
@@ -61,7 +60,7 @@ func (r *userMetadataHandler) OnUpdate(
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
 ) handlers.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
+	return func(ctx context.Context, req admission.Request) *admission.Response {
 		nodeWebhookSupported, _ := caputils.NodeWebhookSupported(r.version)
 
 		if !nodeWebhookSupported {
@@ -83,7 +82,15 @@ func (r *userMetadataHandler) OnUpdate(
 			newNodeForbiddenLabels := r.getForbiddenNodeLabels(newNode)
 
 			if !reflect.DeepEqual(oldNodeForbiddenLabels, newNodeForbiddenLabels) {
-				recorder.Eventf(newNode, nil, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, "Denied modifying forbidden labels on node")
+				recorder.LabeledEvent(
+					newNode,
+					corev1.EventTypeWarning,
+					events.ReasonForbiddenLabel,
+					events.ActionValidationDenied,
+					"denied modifying forbidden labels on node",
+				).
+					WithRequestAnnotations(req).
+					Emit(ctx)
 
 				return ad.Deny(caperrors.NewNodeLabelForbiddenError(r.configuration.ForbiddenUserNodeLabels()).Error())
 			}
@@ -94,7 +101,15 @@ func (r *userMetadataHandler) OnUpdate(
 			newNodeForbiddenAnnotations := r.getForbiddenNodeAnnotations(newNode)
 
 			if !reflect.DeepEqual(oldNodeForbiddenAnnotations, newNodeForbiddenAnnotations) {
-				recorder.Eventf(newNode, nil, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, "Denied modifying forbidden annotations on node")
+				recorder.LabeledEvent(
+					newNode,
+					corev1.EventTypeWarning,
+					events.ReasonForbiddenAnnotation,
+					events.ActionValidationDenied,
+					"denied modifying forbidden annotations on node",
+				).
+					WithRequestAnnotations(req).
+					Emit(ctx)
 
 				return ad.Deny(caperrors.NewNodeAnnotationForbiddenError(r.configuration.ForbiddenUserNodeAnnotations()).Error())
 			}

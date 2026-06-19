@@ -202,17 +202,21 @@ var _ = Describe("enforcing pod QoS namespace rules", Ordered, Label("tenant", "
 
 	expectAuditEvent := func(cs kubernetes.Interface, nsName string, podName string, substrings ...string) {
 		Eventually(func() error {
-			events, err := cs.CoreV1().Events(nsName).List(context.Background(), metav1.ListOptions{})
+			events, err := cs.EventsV1().Events(nsName).List(context.Background(), metav1.ListOptions{})
 			if err != nil {
 				return err
 			}
 
 			for _, event := range events.Items {
-				if event.InvolvedObject.Name != podName {
+				if event.Regarding.Name != podName {
 					continue
 				}
 
-				msg := event.Message
+				if event.Reason != "NamespaceRuleAudit" {
+					continue
+				}
+
+				msg := event.Note
 				matched := true
 
 				for _, substring := range substrings {
@@ -470,9 +474,10 @@ var _ = Describe("enforcing pod QoS namespace rules", Ordered, Label("tenant", "
 
 		createPodAndExpectAllowed(cs, ns.Name, pod)
 
-		expectAuditEvent(cs, ns.Name, pod.Name,
-			"Burstable",
-			"audit QoS rule",
+		expectAuditEvent(clusterAdminClient(), ns.Name, pod.Name,
+			`QoS class "Burstable"`,
+			"status.qosClass",
+			"matched audit namespace rule",
 		)
 	})
 
@@ -525,9 +530,10 @@ var _ = Describe("enforcing pod QoS namespace rules", Ordered, Label("tenant", "
 
 		createPodAndExpectAllowed(cs, ns.Name, pod)
 
-		expectAuditEvent(cs, ns.Name, pod.Name,
-			"Burstable",
-			"audit QoS rule",
+		expectAuditEvent(clusterAdminClient(), ns.Name, pod.Name,
+			`QoS class "Burstable"`,
+			"status.qosClass",
+			"matched audit namespace rule",
 		)
 	})
 

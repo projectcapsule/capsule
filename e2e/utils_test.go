@@ -1202,3 +1202,35 @@ func holdNamespaceTerminating(ctx context.Context, name string) func() {
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	}
 }
+
+func hasTenantOwnerReferenceByNameAndUID(
+	obj metav1.Object,
+	tenantName string,
+	tenantUID types.UID,
+) bool {
+	if obj == nil {
+		return false
+	}
+
+	for _, ref := range obj.GetOwnerReferences() {
+		if ref.APIVersion != capsulev1beta2.GroupVersion.String() {
+			continue
+		}
+
+		if ref.Kind != "Tenant" {
+			continue
+		}
+
+		if ref.Name != tenantName {
+			continue
+		}
+
+		if ref.UID != tenantUID {
+			continue
+		}
+
+		return true
+	}
+
+	return false
+}

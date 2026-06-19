@@ -1,45 +1,43 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package validation
+package cfg
 
 import (
 	"context"
-	"regexp"
 
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
-var compiler *regexp.Regexp = regexp.MustCompile(`^.*:.*:.*(:.*)?$`)
+type ownerHandler struct{}
 
-type saNameHandler struct{}
-
-func ServiceAccountNameHandler() handlers.TypedHandler[*capsulev1beta2.Tenant] {
-	return &saNameHandler{}
+func OwnerHandler() handlers.TypedHandler[*capsulev1beta2.CapsuleConfiguration] {
+	return &ownerHandler{}
 }
 
-func (h *saNameHandler) OnCreate(
+func (h *ownerHandler) OnCreate(
 	_ client.Client,
 	_ client.Reader,
-	tnt *capsulev1beta2.Tenant,
+	cfg *capsulev1beta2.CapsuleConfiguration,
 	_ admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
-		return h.validateServiceAccountName(tnt, req)
+		return h.handle(cfg, req)
 	}
 }
 
-func (h *saNameHandler) OnDelete(
+func (h *ownerHandler) OnDelete(
 	client.Client,
 	client.Reader,
-	*capsulev1beta2.Tenant,
+	*capsulev1beta2.CapsuleConfiguration,
 	admission.Decoder,
 	events.EventRecorder,
 ) handlers.Func {
@@ -48,27 +46,25 @@ func (h *saNameHandler) OnDelete(
 	}
 }
 
-func (h *saNameHandler) OnUpdate(
+func (h *ownerHandler) OnUpdate(
 	_ client.Client,
 	_ client.Reader,
-	tnt *capsulev1beta2.Tenant,
-	old *capsulev1beta2.Tenant,
+	cfg *capsulev1beta2.CapsuleConfiguration,
+	old *capsulev1beta2.CapsuleConfiguration,
 	_ admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
-		return h.validateServiceAccountName(tnt, req)
+		return h.handle(cfg, req)
 	}
 }
 
-func (h *saNameHandler) validateServiceAccountName(tnt *capsulev1beta2.Tenant, req admission.Request) *admission.Response {
-	for _, owner := range tnt.Spec.Owners {
-		if owner.Kind != "ServiceAccount" {
-			continue
-		}
-
-		if !compiler.MatchString(owner.Name) {
-			return ad.Denyf("owner name %s is not a valid Service Account name", owner.Name)
+func (h *ownerHandler) handle(config *capsulev1beta2.CapsuleConfiguration, req admission.Request) *admission.Response {
+	for _, owner := range config.Spec.Users {
+		if err := tenant.ValidateTenantOwner(owner); err != nil {
+			return ad.Deny(
+				err.Error(),
+			)
 		}
 	}
 

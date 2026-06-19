@@ -10,13 +10,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
@@ -187,7 +187,7 @@ func (h *TypedTenantWithRulesetHandler[T]) resolveTenant(
 // If not yet present, try to calculate it.
 func (h *TypedTenantWithRulesetHandler[T]) resolveRuleset(
 	ctx context.Context,
-	c client.Reader,
+	c client.Client,
 	req admission.Request,
 	namespace string,
 	tnt *capsulev1beta2.Tenant,
@@ -209,5 +209,5 @@ func (h *TypedTenantWithRulesetHandler[T]) resolveRuleset(
 		return nil, err
 	}
 
-	return tenant.BuildNamespaceRuleBodyStatus(ctx, c, ns, tnt)
+	return tenant.BuildNamespaceRuleBodyStatus(c.Scheme(), ns, tnt)
 }
