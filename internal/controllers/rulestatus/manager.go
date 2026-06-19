@@ -26,6 +26,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
+	"github.com/projectcapsule/capsule/pkg/api"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	meta "github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
@@ -167,6 +168,10 @@ func (r Manager) reconcile(ctx context.Context, instance *capsulev1beta2.RuleSta
 					QoSClasses: append(
 						[]corev1.PodQOSClass(nil),
 						rule.Enforce.Workloads.QoSClasses...,
+					),
+					Schedulers: append(
+						[]api.ExpressionMatch(nil),
+						rule.Enforce.Workloads.Schedulers...,
 					),
 				},
 			},

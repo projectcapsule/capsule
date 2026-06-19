@@ -74,11 +74,13 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/pvc"
 	"github.com/projectcapsule/capsule/internal/webhook/resourcepool"
 	"github.com/projectcapsule/capsule/internal/webhook/route"
+	podrules "github.com/projectcapsule/capsule/internal/webhook/rules/pods/validation"
 	"github.com/projectcapsule/capsule/internal/webhook/service"
 	"github.com/projectcapsule/capsule/internal/webhook/serviceaccounts"
 	tenantmutation "github.com/projectcapsule/capsule/internal/webhook/tenant/mutation"
 	tenantvalidation "github.com/projectcapsule/capsule/internal/webhook/tenant/validation"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers"
 	"github.com/projectcapsule/capsule/pkg/utils"
@@ -294,7 +296,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	directCfg := configuration.NewCapsuleConfiguration(ctx, directClient, restConfig, controllerConfig.ConfigurationName)
+	directCfg := configuration.NewCapsuleConfiguration(ctx, directClient, directClient, restConfig, controllerConfig.ConfigurationName)
 
 	tlsReconciler := &tlscontroller.Reconciler{}
 
@@ -495,7 +497,7 @@ func main() {
 
 	setupLog.Info("initializing capsule configuration")
 
-	cfg := configuration.NewCapsuleConfiguration(ctx, manager.GetClient(), manager.GetConfig(), controllerConfig.ConfigurationName)
+	cfg := configuration.NewCapsuleConfiguration(ctx, manager.GetClient(), manager.GetAPIReader(), manager.GetConfig(), controllerConfig.ConfigurationName)
 
 	setupLog.Info("initializing caches")
 
@@ -560,12 +562,11 @@ func main() {
 		route.GenericManagedHandler(cfg),
 		route.Pod(
 			pod.Handler(
+				podrules.PodRules(regexCache, registryCache),
 				pod.ImagePullPolicy(),
 				pod.ContainerRegistryLegacy(cfg),
-				pod.ContainerRegistry(cfg, registryCache),
 				pod.PriorityClass(),
 				pod.RuntimeClass(),
-				pod.QoSClass(cfg),
 			),
 		),
 		route.Ingress(ingress.Class(cfg, kubeVersion), ingress.Hostnames(cfg), ingress.Collision(cfg), ingress.Wildcard()),
@@ -675,7 +676,14 @@ func main() {
 		setupLog.Info("disabling node labels verification webhook as current Kubernetes version doesn't have fix for CVE-2021-25735")
 	}
 
-	if err = webhook.Register(manager, webhooksList...); err != nil {
+	if err = webhook.Register(
+		manager,
+		*evt.NewEventRecorder(
+			manager.GetClient(),
+			ctrl.Log.WithName("capsule.ctrl").WithName("events"),
+			manager.GetEventRecorder("tenant-controller"),
+			cfg,
+		), webhooksList...); err != nil {
 		setupLog.Error(err, "unable to setup webhooks")
 		os.Exit(1)
 	}

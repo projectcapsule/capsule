@@ -5,17 +5,17 @@ package validation
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/users"
 )
@@ -60,15 +60,17 @@ func (h *prefixHandler) OnCreate(
 
 		expectedPrefix := tnt.GetName() + "-"
 		if !strings.HasPrefix(ns.GetName(), expectedPrefix) {
-			recorder.Eventf(
+			recorder.LabeledEvent(
 				ns,
-				nil,
 				corev1.EventTypeWarning,
-				evt.ReasonInvalidTenantPrefix,
-				evt.ActionValidationDenied,
-				"Namespace %s does not match the expected prefix for the current Tenant",
-				ns.GetName(),
-			)
+				events.ReasonNamespaceHijack,
+				events.ActionValidationDenied,
+				fmt.Sprintf("namespace does not match the expected prefix for the elected tenant (%s)", expectedPrefix),
+			).
+				WithRelated(tnt).
+				WithTenantLabel(tnt).
+				WithRequestAnnotations(req).
+				Emit(ctx)
 
 			return ad.Denyf(
 				"The namespace doesn't match the tenant prefix, expected prefix %q",

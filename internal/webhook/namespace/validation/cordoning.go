@@ -7,14 +7,13 @@ import (
 	"context"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/users"
 )
@@ -37,13 +36,7 @@ func (h *cordoningHandler) OnCreate(
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if tnt.Spec.Cordoned && user.IsCapsule() {
-			recorder.Eventf(ns, nil, corev1.EventTypeWarning, evt.ReasonCordoning, evt.ActionValidationDenied, "Namespace %s cannot be attached, the current Tenant is cordoned", ns.GetName())
-
-			return ad.Deny("the selected Tenant is cordoned")
-		}
-
-		return nil
+		return h.validate(ctx, req, c, user, ns, recorder, tnt)
 	}
 }
 
@@ -57,13 +50,7 @@ func (h *cordoningHandler) OnDelete(
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if tnt.Spec.Cordoned && user.IsCapsule() {
-			recorder.Eventf(ns, tnt, corev1.EventTypeWarning, "TenantFreezed", "Denied", "Namespace %s cannot be deleted, the current Tenant is cordoned", req.Name)
-
-			return ad.Deny("the selected Tenant is cordoned")
-		}
-
-		return nil
+		return h.validate(ctx, req, c, user, ns, recorder, tnt)
 	}
 }
 
@@ -78,12 +65,34 @@ func (h *cordoningHandler) OnUpdate(
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if tnt.Spec.Cordoned && user.IsCapsule() {
-			recorder.Eventf(ns, tnt, corev1.EventTypeWarning, "TenantFreezed", "Denied", "Namespace %s cannot be updated, the current Tenant is cordoned", ns.GetName())
-
-			return ad.Deny("the selected Tenant is cordoned")
-		}
-
-		return nil
+		return h.validate(ctx, req, c, user, ns, recorder, tnt)
 	}
+}
+
+func (h *cordoningHandler) validate(
+	ctx context.Context,
+	req admission.Request,
+	c client.Client,
+	user users.AdmissionUser,
+	ns *corev1.Namespace,
+	recorder events.EventRecorder,
+	tnt *capsulev1beta2.Tenant,
+) *admission.Response {
+	if tnt.Spec.Cordoned && user.IsCapsule() {
+		recorder.LabeledEvent(
+			ns,
+			corev1.EventTypeWarning,
+			events.ReasonCordoning,
+			events.ActionValidationDenied,
+			"namespace can not be modified because the tenant is cordoned",
+		).
+			WithRelated(tnt).
+			WithTenantLabel(tnt).
+			WithRequestAnnotations(req).
+			Emit(ctx)
+
+		return ad.Deny("the selected tenant is cordoned")
+	}
+
+	return nil
 }

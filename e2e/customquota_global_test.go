@@ -1738,7 +1738,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
-					Limit: resource.MustParse("10"),
+					Limit: resource.MustParse("1000"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
 							VersionKind: gvk.VersionKind{
@@ -1754,8 +1754,8 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			},
 		}
 
-		extraA := NewNamespace("gq-nsstatus-all-a", map[string]string{"purpose": "e2e"})
-		extraB := NewNamespace("gq-nsstatus-all-b", map[string]string{"purpose": "e2e"})
+		extraA := NewNamespace("gq-nsstatus-all-a", map[string]string{"purpose": "e2e-global-custom-quota"})
+		extraB := NewNamespace("gq-nsstatus-all-b", map[string]string{"purpose": "e2e-global-custom-quota"})
 
 		EventuallyCreation(func() error { return k8sClient.Create(ctx, quota) }).Should(Succeed())
 		awaitGlobalQuotaReady(ctx, quota.GetName())

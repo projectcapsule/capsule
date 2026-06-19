@@ -7,18 +7,16 @@ import (
 	"context"
 
 	admissionv1 "k8s.io/api/admission/v1"
-	"k8s.io/client-go/tools/events"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
-func Register(manager controllerruntime.Manager, webhookList ...handlers.Webhook) error {
-	recorder := manager.GetEventRecorder("admission")
-
+func Register(manager controllerruntime.Manager, recorder events.EventRecorder, webhookList ...handlers.Webhook) error {
 	server := manager.GetWebhookServer()
 
 	for _, wh := range webhookList {

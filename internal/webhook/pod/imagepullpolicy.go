@@ -5,9 +5,9 @@ package pod
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -15,7 +15,7 @@ import (
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -35,7 +35,7 @@ func (h *imagePullPolicy) OnCreate(
 	_ []*rules.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.validate(req, pod, tnt, recorder)
+		return h.validate(ctx, req, pod, tnt, recorder)
 	}
 }
 
@@ -50,7 +50,7 @@ func (h *imagePullPolicy) OnUpdate(
 	_ []*rules.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.validate(req, pod, tnt, recorder)
+		return h.validate(ctx, req, pod, tnt, recorder)
 	}
 }
 
@@ -69,6 +69,7 @@ func (h *imagePullPolicy) OnDelete(
 }
 
 func (h *imagePullPolicy) validate(
+	ctx context.Context,
 	req admission.Request,
 	pod *corev1.Pod,
 	tnt *capsulev1beta2.Tenant,
@@ -80,19 +81,19 @@ func (h *imagePullPolicy) validate(
 	}
 
 	for _, container := range pod.Spec.InitContainers {
-		if response := h.verifyPullPolicy(recorder, pod, req, policy, string(container.ImagePullPolicy), container.Name, tnt); response != nil {
+		if response := h.verifyPullPolicy(ctx, recorder, pod, req, policy, string(container.ImagePullPolicy), container.Name, tnt); response != nil {
 			return response
 		}
 	}
 
 	for _, container := range pod.Spec.EphemeralContainers {
-		if response := h.verifyPullPolicy(recorder, pod, req, policy, string(container.ImagePullPolicy), container.Name, tnt); response != nil {
+		if response := h.verifyPullPolicy(ctx, recorder, pod, req, policy, string(container.ImagePullPolicy), container.Name, tnt); response != nil {
 			return response
 		}
 	}
 
 	for _, container := range pod.Spec.Containers {
-		if response := h.verifyPullPolicy(recorder, pod, req, policy, string(container.ImagePullPolicy), container.Name, tnt); response != nil {
+		if response := h.verifyPullPolicy(ctx, recorder, pod, req, policy, string(container.ImagePullPolicy), container.Name, tnt); response != nil {
 			return response
 		}
 	}
@@ -101,6 +102,7 @@ func (h *imagePullPolicy) validate(
 }
 
 func (h *imagePullPolicy) verifyPullPolicy(
+	ctx context.Context,
 	recorder events.EventRecorder,
 	pod *corev1.Pod,
 	req admission.Request,
@@ -110,14 +112,17 @@ func (h *imagePullPolicy) verifyPullPolicy(
 	tnt *capsulev1beta2.Tenant,
 ) *admission.Response {
 	if !policy.IsPolicySupported(usedPullPolicy) {
-		recorder.Eventf(
+		recorder.LabeledEvent(
 			pod,
-			tnt,
 			corev1.EventTypeWarning,
-			evt.ReasonForbiddenPullPolicy,
-			evt.ActionValidationDenied,
-			"PullPolicy %s is forbidden for the tenant %s", usedPullPolicy, tnt.GetName(),
-		)
+			events.ReasonForbiddenPullPolicy,
+			events.ActionValidationDenied,
+			fmt.Sprintf("using pullpolicy %s is forbidden for the tenant", usedPullPolicy),
+		).
+			WithRelated(tnt).
+			WithTenantLabel(tnt).
+			WithRequestAnnotations(req).
+			Emit(ctx)
 
 		return ad.Deny(caperrors.NewImagePullPolicyForbidden(usedPullPolicy, container, policy.AllowedPullPolicies()).Error())
 	}

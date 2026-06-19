@@ -5,10 +5,10 @@ package mutation
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -18,7 +18,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 	"github.com/projectcapsule/capsule/pkg/users"
@@ -67,7 +67,7 @@ func (h *ownerReferenceHandler) OnCreate(
 		tenant.AddTenantNameLabel(labels, tnt)
 		ns.SetLabels(labels)
 
-		if err := assignToTenant(c, tnt, ns, recorder); err != nil {
+		if err := assignToTenant(ctx, req, c, tnt, ns, recorder); err != nil {
 			return ad.ErroredResponse(err)
 		}
 
@@ -119,7 +119,7 @@ func (h *ownerReferenceHandler) OnUpdate(
 
 		newNs.OwnerReferences = refs
 
-		if err := assignToTenant(c, tnt, newNs, recorder); err != nil {
+		if err := assignToTenant(ctx, req, c, tnt, newNs, recorder); err != nil {
 			return ad.ErroredResponse(err)
 		}
 
@@ -163,6 +163,8 @@ func resolveTenantForNamespaceUpdate(
 }
 
 func assignToTenant(
+	ctx context.Context,
+	req admission.Request,
 	c client.Client,
 	tnt *capsulev1beta2.Tenant,
 	ns *corev1.Namespace,
@@ -178,12 +180,30 @@ func assignToTenant(
 	}
 
 	if err := controllerutil.SetOwnerReference(tnt, ns, c.Scheme()); err != nil {
-		recorder.Eventf(ns, nil, corev1.EventTypeWarning, evt.ReasonNamespaceHijack, evt.ActionValidationDenied, "Namespace %s cannot be assigned to the desired tenant %s", ns.GetName(), tnt.GetName())
+		recorder.LabeledEvent(
+			ns,
+			corev1.EventTypeWarning,
+			events.ReasonAdmissionFailure,
+			events.ActionValidationDenied,
+			fmt.Sprintf("namespace cannot be assigned to the desired tenant %s", tnt.GetName()),
+		).
+			WithRequestAnnotations(req).
+			Emit(ctx)
 
 		return err
 	}
 
-	recorder.Eventf(ns, nil, corev1.EventTypeNormal, evt.ReasonTenantAssigned, evt.ActionMutated, "Namespace %s has been assigned to the desired tenant %s", ns.GetName(), tnt.GetName())
+	recorder.LabeledEvent(
+		ns,
+		corev1.EventTypeNormal,
+		events.ReasonTenantAssigned,
+		events.ActionMutated,
+		fmt.Sprintf("namespace has been assigned to the desired tenant %s", tnt.GetName()),
+	).
+		WithRelated(tnt).
+		WithTenantLabel(tnt).
+		WithRequestAnnotations(req).
+		Emit(ctx)
 
 	return nil
 }

@@ -94,7 +94,7 @@ func TestRegistryRuleSetCacheGetOrBuild(t *testing.T) {
 		{
 			name: "registry with negated expression builds ruleset",
 			rules: []rules.OCIRegistry{
-				registryWithExpression(api.RegExpression{
+				registryWithExpression(api.ExpressionRegex{
 					Expression: "trusted/.*",
 					Negate:     true,
 				}),
@@ -242,7 +242,7 @@ func TestRegistryRuleSetCacheBuildRuleSet(t *testing.T) {
 	specRules := []rules.OCIRegistry{
 		registry("harbor/.*"),
 		registryWithPolicy("ghcr.io/.*", corev1.PullAlways, corev1.PullIfNotPresent),
-		registryWithExpression(api.RegExpression{
+		registryWithExpression(api.ExpressionRegex{
 			Expression: "trusted/.*",
 			Negate:     true,
 		}),
@@ -267,16 +267,16 @@ func TestRegistryRuleSetCacheBuildRuleSet(t *testing.T) {
 		t.Fatalf("expected %d compiled rules, got %d", len(specRules), len(rs.Compiled))
 	}
 
-	if rs.Compiled[0].Expression.Expression != "harbor/.*" {
-		t.Fatalf("expected first expression harbor/.*, got %q", rs.Compiled[0].Expression.Expression)
+	if rs.Compiled[0].Match.Expression != "harbor/.*" {
+		t.Fatalf("expected first expression harbor/.*, got %q", rs.Compiled[0].Match.Expression)
 	}
 
 	if len(rs.Compiled[0].AllowedPolicy) != 0 {
 		t.Fatal("expected first rule to allow any pull policy")
 	}
 
-	if rs.Compiled[1].Expression.Expression != "ghcr.io/.*" {
-		t.Fatalf("expected second expression ghcr.io/.*, got %q", rs.Compiled[1].Expression.Expression)
+	if rs.Compiled[1].Match.Expression != "ghcr.io/.*" {
+		t.Fatalf("expected second expression ghcr.io/.*, got %q", rs.Compiled[1].Match.Expression)
 	}
 
 	if len(rs.Compiled[1].AllowedPolicy) != 2 {
@@ -291,7 +291,7 @@ func TestRegistryRuleSetCacheBuildRuleSet(t *testing.T) {
 		t.Fatal("expected PullIfNotPresent to be allowed")
 	}
 
-	if !rs.Compiled[2].Expression.Negate {
+	if !rs.Compiled[2].Match.Negate {
 		t.Fatal("expected third expression to be negated")
 	}
 }
@@ -363,7 +363,7 @@ func TestRegistryRuleSetCacheMatchReference(t *testing.T) {
 		{
 			name: "negated expression matches non-matching reference",
 			rules: []rules.OCIRegistry{
-				registryWithExpression(api.RegExpression{
+				registryWithExpression(api.ExpressionRegex{
 					Expression: "trusted/.*",
 					Negate:     true,
 				}),
@@ -377,7 +377,7 @@ func TestRegistryRuleSetCacheMatchReference(t *testing.T) {
 		{
 			name: "negated expression does not match matching reference",
 			rules: []rules.OCIRegistry{
-				registryWithExpression(api.RegExpression{
+				registryWithExpression(api.ExpressionRegex{
 					Expression: "trusted/.*",
 					Negate:     true,
 				}),
@@ -406,7 +406,7 @@ func TestRegistryRuleSetCacheMatchReference(t *testing.T) {
 		{
 			name: "nested regex expression wins over legacy url",
 			rules: []rules.OCIRegistry{
-				registryWithExpression(api.RegExpression{
+				registryWithExpression(api.ExpressionRegex{
 					Expression: "nested/.*",
 				}),
 			},
@@ -417,7 +417,7 @@ func TestRegistryRuleSetCacheMatchReference(t *testing.T) {
 		{
 			name: "legacy url is ignored when nested regex expression is set",
 			rules: []rules.OCIRegistry{
-				registryWithExpression(api.RegExpression{
+				registryWithExpression(api.ExpressionRegex{
 					Expression: "nested/.*",
 				}),
 			},
@@ -449,8 +449,8 @@ func TestRegistryRuleSetCacheMatchReference(t *testing.T) {
 					t.Fatal("expected match, got nil")
 				}
 
-				if got.Expression.Expression != tt.wantExpr {
-					t.Fatalf("expected expression %q, got %q", tt.wantExpr, got.Expression.Expression)
+				if got.Match.Expression != tt.wantExpr {
+					t.Fatalf("expected expression %q, got %q", tt.wantExpr, got.Match.Expression)
 				}
 
 				return
@@ -526,7 +526,7 @@ func TestRegistryRuleSetCacheMatchRuleSetWithPullPolicy(t *testing.T) {
 		{
 			name: "negated expression respects pull policy",
 			rules: []rules.OCIRegistry{
-				registryWithExpressionAndPolicy(api.RegExpression{
+				registryWithExpressionAndPolicy(api.ExpressionRegex{
 					Expression: "trusted/.*",
 					Negate:     true,
 				}, corev1.PullIfNotPresent),
@@ -541,7 +541,7 @@ func TestRegistryRuleSetCacheMatchRuleSetWithPullPolicy(t *testing.T) {
 		{
 			name: "negated expression still rejects forbidden pull policy",
 			rules: []rules.OCIRegistry{
-				registryWithExpressionAndPolicy(api.RegExpression{
+				registryWithExpressionAndPolicy(api.ExpressionRegex{
 					Expression: "trusted/.*",
 					Negate:     true,
 				}, corev1.PullNever),
@@ -577,8 +577,8 @@ func TestRegistryRuleSetCacheMatchRuleSetWithPullPolicy(t *testing.T) {
 					t.Fatal("expected match, got nil")
 				}
 
-				if got.Expression.Expression != tt.wantExpr {
-					t.Fatalf("expected expression %q, got %q", tt.wantExpr, got.Expression.Expression)
+				if got.Match.Expression != tt.wantExpr {
+					t.Fatalf("expected expression %q, got %q", tt.wantExpr, got.Match.Expression)
 				}
 
 				return
@@ -611,8 +611,8 @@ func TestRegistryRuleSetCacheMatch(t *testing.T) {
 		t.Fatal("expected match, got nil")
 	}
 
-	if got.Expression.Expression != "harbor/.*" {
-		t.Fatalf("expected harbor/.*, got %q", got.Expression.Expression)
+	if got.Match.Expression != "harbor/.*" {
+		t.Fatalf("expected harbor/.*, got %q", got.Match.Expression)
 	}
 }
 
@@ -714,14 +714,14 @@ func TestRegistryRuleSetCacheHashRules(t *testing.T) {
 		c := NewRegistryRuleSetCache(nil)
 
 		hashA := c.HashRules([]rules.OCIRegistry{
-			registryWithExpression(api.RegExpression{
+			registryWithExpression(api.ExpressionRegex{
 				Expression: "trusted/.*",
 				Negate:     false,
 			}),
 		})
 
 		hashB := c.HashRules([]rules.OCIRegistry{
-			registryWithExpression(api.RegExpression{
+			registryWithExpression(api.ExpressionRegex{
 				Expression: "trusted/.*",
 				Negate:     true,
 			}),
@@ -924,35 +924,43 @@ func TestRegistryRuleSetCacheInsertForTest(t *testing.T) {
 
 func registry(expression string) rules.OCIRegistry {
 	return rules.OCIRegistry{
-		RegExpression: api.RegExpression{
-			Expression: expression,
-			Negate:     false,
+		ExpressionMatch: api.ExpressionMatch{
+			ExpressionRegex: api.ExpressionRegex{
+				Expression: expression,
+				Negate:     false,
+			},
 		},
 	}
 }
 
 func registryWithPolicy(expression string, policies ...corev1.PullPolicy) rules.OCIRegistry {
 	return rules.OCIRegistry{
-		RegExpression: api.RegExpression{
-			Expression: expression,
-			Negate:     false,
+		ExpressionMatch: api.ExpressionMatch{
+			ExpressionRegex: api.ExpressionRegex{
+				Expression: expression,
+				Negate:     false,
+			},
 		},
 		Policy: policies,
 	}
 }
 
-func registryWithExpression(expression api.RegExpression) rules.OCIRegistry {
+func registryWithExpression(expression api.ExpressionRegex) rules.OCIRegistry {
 	return rules.OCIRegistry{
-		RegExpression: expression,
+		ExpressionMatch: api.ExpressionMatch{
+			ExpressionRegex: expression,
+		},
 	}
 }
 
 func registryWithExpressionAndPolicy(
-	expression api.RegExpression,
+	expression api.ExpressionRegex,
 	policies ...corev1.PullPolicy,
 ) rules.OCIRegistry {
 	return rules.OCIRegistry{
-		RegExpression: expression,
-		Policy:        policies,
+		ExpressionMatch: api.ExpressionMatch{
+			ExpressionRegex: expression,
+		},
+		Policy: policies,
 	}
 }

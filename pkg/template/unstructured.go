@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"text/template"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -61,18 +60,4 @@ func RenderUnstructuredItems(
 	}
 
 	return out, nil
-}
-
-func withLineNumbers(s string) string {
-	lines := strings.Split(s, "\n")
-
-	width := len(fmt.Sprintf("%d", len(lines)))
-
-	var b strings.Builder
-
-	for i, line := range lines {
-		fmt.Fprintf(&b, "%*d | %s\n", width, i+1, line)
-	}
-
-	return b.String()
 }

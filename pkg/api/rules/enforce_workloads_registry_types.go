@@ -18,14 +18,10 @@ func (i ImagePullPolicySpec) String() string {
 
 // +kubebuilder:object:generate=true
 type OCIRegistry struct {
-	api.RegExpression `json:",inline"`
+	api.ExpressionMatch `json:",inline"`
 
 	// Allowed PullPolicy for the given registry. Supplying no value allows all policies.
 	// +optional
 	// +kubebuilder:validation:Items:Enum=Always;Never;IfNotPresent
 	Policy []corev1.PullPolicy `json:"policy,omitempty"`
-}
-
-func (r OCIRegistry) Expression() api.RegExpression {
-	return r.RegExpression
 }

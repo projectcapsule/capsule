@@ -5,19 +5,19 @@ package dra
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	corev1 "k8s.io/api/core/v1"
 	resources "k8s.io/api/resource/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
@@ -120,7 +120,17 @@ func (h *deviceClass) validateResourceRequest(
 		case allowed.Match(dc.Name) || selector:
 			return nil
 		default:
-			recorder.Eventf(obj, tnt, corev1.EventTypeWarning, evt.ReasonForbiddenDeviceClass, evt.ActionValidationDenied, "%s %s/%s DeviceClass %s is forbidden for the current Tenant", req.Kind.Kind, req.Namespace, req.Name, &dc)
+			recorder.LabeledEvent(
+				obj,
+				corev1.EventTypeWarning,
+				events.ReasonForbiddenDeviceClass,
+				events.ActionValidationDenied,
+				fmt.Sprintf("%s %s/%s DeviceClass %s is forbidden for the current tenant", req.Kind.Kind, req.Namespace, req.Name, dc),
+			).
+				WithRelated(tnt).
+				WithTenantLabel(tnt).
+				WithRequestAnnotations(req).
+				Emit(ctx)
 
 			return ad.Deny(caperrors.NewDeviceClassForbidden(dc.Name, *allowed).Error())
 		}

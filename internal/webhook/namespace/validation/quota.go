@@ -8,14 +8,13 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/users"
 )
@@ -36,7 +35,7 @@ func (h *quotaHandler) OnCreate(
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(ctx, reader, recorder, ns, tnt)
+		return h.handle(ctx, req, reader, recorder, ns, tnt)
 	}
 }
 
@@ -65,12 +64,13 @@ func (h *quotaHandler) OnUpdate(
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(ctx, reader, recorder, ns, tnt)
+		return h.handle(ctx, req, reader, recorder, ns, tnt)
 	}
 }
 
 func (h *quotaHandler) handle(
 	ctx context.Context,
+	req admission.Request,
 	c client.Reader,
 	recorder events.EventRecorder,
 	ns *corev1.Namespace,
@@ -85,7 +85,17 @@ func (h *quotaHandler) handle(
 			return nil
 		}
 
-		recorder.Eventf(ns, nil, corev1.EventTypeWarning, evt.ReasonOverprovision, evt.ActionValidationDenied, "Namespace %s cannot be attached, quota exceeded for the current Tenant", ns.GetName())
+		recorder.LabeledEvent(
+			ns,
+			corev1.EventTypeWarning,
+			events.ReasonOverprovision,
+			events.ActionValidationDenied,
+			"namespace cannot be attached, quota exceeded for the elected tenant",
+		).
+			WithRelated(tnt).
+			WithTenantLabel(tnt).
+			WithRequestAnnotations(req).
+			Emit(ctx)
 
 		return ad.Deny(caperrors.NewNamespaceQuotaExceededError().Error())
 	}

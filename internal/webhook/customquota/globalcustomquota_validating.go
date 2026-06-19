@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/cache"
 	controller "github.com/projectcapsule/capsule/internal/controllers/customquotas"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/runtime/quota"
 )

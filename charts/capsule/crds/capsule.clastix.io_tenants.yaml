@@ -2533,8 +2533,16 @@ spec:
                                 The rules are aggregated, since you can use Regular Expressions the match registry endpoints
                               items:
                                 properties:
+                                  exact:
+                                    description: Exact matches one of the provided
+                                      values exactly.
+                                    items:
+                                      type: string
+                                    minItems: 1
+                                    type: array
                                   exp:
-                                    description: Expression used to evaluate regex
+                                    description: Exp matches regular expression.
+                                    minLength: 1
                                     type: string
                                   negate:
                                     default: false
@@ -2549,6 +2557,40 @@ spec:
                                       type: string
                                     type: array
                                 type: object
+                                x-kubernetes-validations:
+                                - message: at least one of exact or exp must be set
+                                  rule: has(self.exact) || has(self.exp)
+                              type: array
+                            schedulers:
+                              description: |-
+                                Schedulers defines schedulerName matchers for Pod admission.
+
+                                The rule is evaluated against pod.spec.schedulerName.
+                                Empty schedulerName is ignored and is not normalized to default-scheduler.
+                              items:
+                                description: |-
+                                  At least one of Exact or Exp must be set.
+                                  Both may be set together.
+                                properties:
+                                  exact:
+                                    description: Exact matches one of the provided
+                                      values exactly.
+                                    items:
+                                      type: string
+                                    minItems: 1
+                                    type: array
+                                  exp:
+                                    description: Exp matches regular expression.
+                                    minLength: 1
+                                    type: string
+                                  negate:
+                                    default: false
+                                    description: Negate regular Expression
+                                    type: boolean
+                                type: object
+                                x-kubernetes-validations:
+                                - message: at least one of exact or exp must be set
+                                  rule: has(self.exact) || has(self.exp)
                               type: array
                             targets:
                               description: |-
@@ -3118,8 +3160,16 @@ spec:
                           description: Registries which are allowed within this namespace
                           items:
                             properties:
+                              exact:
+                                description: Exact matches one of the provided values
+                                  exactly.
+                                items:
+                                  type: string
+                                minItems: 1
+                                type: array
                               exp:
-                                description: Expression used to evaluate regex
+                                description: Exp matches regular expression.
+                                minLength: 1
                                 type: string
                               negate:
                                 default: false
@@ -3134,6 +3184,9 @@ spec:
                                   type: string
                                 type: array
                             type: object
+                            x-kubernetes-validations:
+                            - message: at least one of exact or exp must be set
+                              rule: has(self.exact) || has(self.exp)
                           type: array
                       type: object
                     metadata:

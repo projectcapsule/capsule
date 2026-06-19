@@ -1053,6 +1053,17 @@ spec:
                   Toggles the TLS reconciler, the controller that is able to generate CA and certificates for the webhooks
                   when not using an already provided CA and certificate, or when these are managed externally with Vault, or cert-manager.
                 type: boolean
+              events:
+                default:
+                  namespace: default
+                description: Event (Audit) Configuration
+                properties:
+                  namespace:
+                    default: default
+                    description: Namespace where the events are logged for cluster
+                      scoped resources or deny events (default namespace)
+                    type: string
+                type: object
               forceTenantPrefix:
                 default: false
                 description: |-

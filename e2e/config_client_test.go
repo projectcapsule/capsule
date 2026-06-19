@@ -36,7 +36,7 @@ var _ = Describe("CapsuleConfiguration - ServiceAccountClient", Ordered, Label("
 			}
 		})
 
-		capsuleCfg := configuration.NewCapsuleConfiguration(context.TODO(), k8sClient, cfg, defaultConfigurationName)
+		capsuleCfg := configuration.NewCapsuleConfiguration(context.TODO(), k8sClient, k8sClient, cfg, defaultConfigurationName)
 		clientCfg, err := capsuleCfg.ServiceAccountClient(context.TODO())
 		Expect(err).NotTo(HaveOccurred())
 		Expect(clientCfg.TLSClientConfig.Insecure).To(BeTrue())
@@ -82,7 +82,7 @@ var _ = Describe("CapsuleConfiguration - ServiceAccountClient", Ordered, Label("
 			}
 		})
 
-		cfg := configuration.NewCapsuleConfiguration(context.TODO(), k8sClient, cfg, defaultConfigurationName)
+		cfg := configuration.NewCapsuleConfiguration(context.TODO(), k8sClient, k8sClient, cfg, defaultConfigurationName)
 		clientCfg, err := cfg.ServiceAccountClient(context.TODO())
 		Expect(err).NotTo(HaveOccurred())
 		Expect(clientCfg.TLSClientConfig.CAData).To(Equal(caData))

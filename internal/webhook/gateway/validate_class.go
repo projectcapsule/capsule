@@ -5,11 +5,11 @@ package gateway
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
@@ -19,7 +19,7 @@ import (
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -101,7 +101,17 @@ func (r *class) validate(
 	}
 
 	if gatewayClass == nil {
-		recorder.Eventf(gatewayObj, tnt, corev1.EventTypeWarning, evt.ReasonMissingGatewayClass, evt.ActionValidationDenied, "Gateway %s/%s is missing GatewayClass", req.Namespace, req.Name)
+		recorder.LabeledEvent(
+			gatewayObj,
+			corev1.EventTypeWarning,
+			events.ReasonMissingGatewayClass,
+			events.ActionValidationDenied,
+			fmt.Sprintf("Gateway %s/%s is missing GatewayClass", req.Namespace, req.Name),
+		).
+			WithRelated(tnt).
+			WithTenantLabel(tnt).
+			WithRequestAnnotations(req).
+			Emit(ctx)
 
 		return ad.Deny(caperrors.NewGatewayClassUndefined(*allowed).Error())
 	}
@@ -128,7 +138,17 @@ func (r *class) validate(
 	case allowed.Match(gatewayClass.Name) || selector:
 		return nil
 	default:
-		recorder.Eventf(gatewayObj, tnt, corev1.EventTypeWarning, evt.ReasonForbiddenGatewayClass, evt.ActionValidationDenied, "Gateway %s/%s GatewayClass %s is forbidden for the current Tenant", req.Namespace, req.Name, &gatewayClass)
+		recorder.LabeledEvent(
+			gatewayObj,
+			corev1.EventTypeWarning,
+			events.ReasonForbiddenGatewayClass,
+			events.ActionValidationDenied,
+			fmt.Sprintf("Gateway %s/%s GatewayClass %s is forbidden for the current Tenant", req.Namespace, req.Name, gatewayClass.GetName()),
+		).
+			WithRelated(tnt).
+			WithTenantLabel(tnt).
+			WithRequestAnnotations(req).
+			Emit(ctx)
 
 		return ad.Deny(caperrors.NewGatewayClassForbidden(gatewayObj.Name, *allowed).Error())
 	}
