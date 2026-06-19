@@ -160,7 +160,6 @@ func BuildNamespaceAnnotationsForTenant(tnt *capsulev1beta2.Tenant) map[string]s
 			annotations[meta.AvailableIngressClassesAnnotation] = strings.Join(ic.Exact, ",")
 		}
 
-		//nolint:staticcheck
 		if len(ic.Regex) > 0 {
 			annotations[meta.AvailableIngressClassesRegexpAnnotation] = ic.Regex
 		}
@@ -171,7 +170,6 @@ func BuildNamespaceAnnotationsForTenant(tnt *capsulev1beta2.Tenant) map[string]s
 			annotations[meta.AvailableStorageClassesAnnotation] = strings.Join(sc.Exact, ",")
 		}
 
-		//nolint:staticcheck
 		if len(sc.Regex) > 0 {
 			annotations[meta.AvailableStorageClassesRegexpAnnotation] = sc.Regex
 		}

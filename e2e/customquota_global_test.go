@@ -1737,17 +1737,8 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 				},
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
-				NamespaceSelectors: []selectors.NamespaceSelector{
-					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								"purpose": "e2e-global-custom-quota",
-							},
-						},
-					},
-				},
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
-					Limit: resource.MustParse("10"),
+					Limit: resource.MustParse("1000"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
 							VersionKind: gvk.VersionKind{
