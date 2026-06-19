@@ -296,7 +296,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	directCfg := configuration.NewCapsuleConfiguration(ctx, directClient, restConfig, controllerConfig.ConfigurationName)
+	directCfg := configuration.NewCapsuleConfiguration(ctx, directClient, directClient, restConfig, controllerConfig.ConfigurationName)
 
 	tlsReconciler := &tlscontroller.Reconciler{}
 
@@ -497,7 +497,7 @@ func main() {
 
 	setupLog.Info("initializing capsule configuration")
 
-	cfg := configuration.NewCapsuleConfiguration(ctx, manager.GetClient(), manager.GetConfig(), controllerConfig.ConfigurationName)
+	cfg := configuration.NewCapsuleConfiguration(ctx, manager.GetClient(), manager.GetAPIReader(), manager.GetConfig(), controllerConfig.ConfigurationName)
 
 	setupLog.Info("initializing caches")
 

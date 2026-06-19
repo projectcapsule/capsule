@@ -31,6 +31,8 @@ import (
 type CacheInvalidator struct {
 	client.Client
 
+	reader client.Reader
+
 	Rest *rest.Config
 	Log  logr.Logger
 
@@ -138,7 +140,7 @@ func (r *CacheInvalidator) Reconcile(ctx context.Context, request reconcile.Requ
 
 	log.V(5).Info("invalidating and rebuilding caches")
 
-	cfg := configuration.NewCapsuleConfiguration(ctx, r.Client, r.Rest, request.Name)
+	cfg := configuration.NewCapsuleConfiguration(ctx, r.Client, r.reader, r.Rest, request.Name)
 
 	instance := &capsulev1beta2.CapsuleConfiguration{}
 	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {

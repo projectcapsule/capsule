@@ -54,7 +54,7 @@ func DefaultCapsuleConfiguration() capsulev1beta2.CapsuleConfigurationSpec {
 	}
 }
 
-func NewCapsuleConfiguration(ctx context.Context, c client.Client, rest *rest.Config, name string) Configuration {
+func NewCapsuleConfiguration(ctx context.Context, c client.Client, reader client.Reader, rest *rest.Config, name string) Configuration {
 	return &capsuleConfiguration{
 		client: c,
 		rest:   rest,
@@ -62,7 +62,7 @@ func NewCapsuleConfiguration(ctx context.Context, c client.Client, rest *rest.Co
 			cfg := &capsulev1beta2.CapsuleConfiguration{}
 			key := types.NamespacedName{Name: name}
 
-			if err := c.Get(ctx, key, cfg); err == nil {
+			if err := reader.Get(ctx, key, cfg); err == nil {
 				return cfg
 			} else if !apierrors.IsNotFound(err) {
 				panic(errors.Wrap(err, "cannot retrieve Capsule configuration with name "+name))
@@ -86,7 +86,7 @@ func NewCapsuleConfiguration(ctx context.Context, c client.Client, rest *rest.Co
 
 			if err := c.Create(ctx, cfg); err != nil {
 				if apierrors.IsAlreadyExists(err) {
-					if err := c.Get(ctx, key, cfg); err != nil {
+					if err := reader.Get(ctx, key, cfg); err != nil {
 						panic(errors.Wrap(err, "configuration created concurrently but cannot be retrieved"))
 					}
 
