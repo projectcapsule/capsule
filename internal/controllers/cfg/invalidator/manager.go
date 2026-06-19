@@ -65,6 +65,7 @@ func (r *CacheInvalidator) Start(ctx context.Context) error {
 
 func (r *CacheInvalidator) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) (err error) {
 	r.configName = ctrlConfig.ConfigurationName
+	r.reader = mgr.GetAPIReader()
 
 	err = ctrl.NewControllerManagedBy(mgr).
 		Named("config/caches").

@@ -96,14 +96,12 @@ func BuildNamespaceRuleBodyStatus(
 
 	out := make([]*rules.NamespaceRuleBodyNamespace, 0, len(rendered))
 
-	for i, body := range rendered {
+	for _, body := range rendered {
 		if body == nil || body.Enforce == nil {
 			continue
 		}
 
 		out = append(out, body)
-
-		_ = i
 	}
 
 	return out, nil
