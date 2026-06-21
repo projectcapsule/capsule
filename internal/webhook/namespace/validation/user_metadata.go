@@ -111,39 +111,6 @@ func (h *userMetadataHandler) OnUpdate(
 			}
 		}
 
-		labels := maps.Clone(oldNs.GetLabels())
-		annotations := maps.Clone(oldNs.GetAnnotations())
-
-		for key, value := range newNs.GetLabels() {
-			v, ok := labels[key]
-			if !ok {
-				labels[key] = value
-
-				continue
-			}
-
-			if v != value {
-				continue
-			}
-
-			delete(labels, key)
-		}
-
-		for key, value := range newNs.GetAnnotations() {
-			v, ok := annotations[key]
-			if !ok {
-				annotations[key] = value
-
-				continue
-			}
-
-			if v != value {
-				continue
-			}
-
-			delete(annotations, key)
-		}
-
 		if tnt.Spec.NamespaceOptions != nil {
 			labels, annotations, err := userMetadataForValidation(newNs, oldNs, tnt)
 			if err != nil {
