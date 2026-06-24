@@ -8,6 +8,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
+	rulesutils "github.com/projectcapsule/capsule/internal/webhook/rules"
 	"github.com/projectcapsule/capsule/pkg/api"
 	apirules "github.com/projectcapsule/capsule/pkg/api/rules"
 	ruleengine "github.com/projectcapsule/capsule/pkg/ruleengine"
@@ -49,6 +50,8 @@ func (h *podRules) validateSchedulers(
 					Matched: matched,
 				}, nil
 			},
+			RuleDescription:    rulesutils.DescribeExpressionMatch,
+			AllowedDescription: "Allowed schedulers",
 		},
 	)
 }

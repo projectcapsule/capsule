@@ -14,4 +14,8 @@ type NamespaceRuleEnforceBody struct {
 
 	// Enforcement for Workloads (Pods)
 	Workloads NamespaceRuleEnforceWorkloadsBody `json:"workloads,omitempty"`
+
+	// Enforcement for Services.
+	// +optional
+	Services NamespaceRuleEnforceServicesBody `json:"services,omitempty"`
 }

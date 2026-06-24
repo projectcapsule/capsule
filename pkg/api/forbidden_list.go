@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -17,18 +17,8 @@ type ForbiddenListSpec struct {
 	Regex string   `json:"deniedRegex,omitempty"`
 }
 
-func (in ForbiddenListSpec) ExactMatch(value string) (ok bool) {
-	if len(in.Exact) > 0 {
-		sort.SliceStable(in.Exact, func(i, j int) bool {
-			return strings.ToLower(in.Exact[i]) < strings.ToLower(in.Exact[j])
-		})
-
-		i := sort.SearchStrings(in.Exact, value)
-
-		ok = i < len(in.Exact) && in.Exact[i] == value
-	}
-
-	return ok
+func (in ForbiddenListSpec) ExactMatch(value string) bool {
+	return slices.Contains(in.Exact, value)
 }
 
 func (in ForbiddenListSpec) RegexMatch(value string) (ok bool) {

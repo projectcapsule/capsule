@@ -1,0 +1,13 @@
+{{- if .Values.manager.apiPriorityAndFairness.enabled }}
+---
+apiVersion: {{ .Values.manager.apiPriorityAndFairness.flowApiVersion }}
+kind: PriorityLevelConfiguration
+metadata:
+  name: {{ include "capsule.fullname" $ }}
+  labels:
+    {{- include "capsule.labels" $ | nindent 4 }}
+{{- with .Values.manager.apiPriorityAndFairness.priorityLevelConfigurationSpec }}
+spec:
+  {{- tpl (toYaml .) $ | nindent 2 }}
+{{- end }}
+{{- end }}

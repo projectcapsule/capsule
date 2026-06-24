@@ -42,6 +42,10 @@ func (h *podRules) validateQoSClasses(
 					Matched: string(match) == value.Value,
 				}, nil
 			},
+			RuleDescription: func(rule corev1.PodQOSClass) string {
+				return string(rule)
+			},
+			AllowedDescription: "Allowed QoS classes",
 		},
 	)
 }

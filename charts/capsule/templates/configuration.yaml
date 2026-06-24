@@ -108,6 +108,48 @@ spec:
         timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
         {{- end }}
       {{- end }}
+      {{- with .Values.webhooks.hooks.rulestatus }}
+        {{- if .enabled }}
+          {{- $any = true }}
+      - name: rulestatus.validating.projectcapsule.dev
+        {{- with .opts }}
+        opts:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        admissionReviewVersions:
+          - v1
+          - v1beta1
+        path: "/rulestatus/validating"
+        failurePolicy: {{ .failurePolicy }}
+        matchPolicy: {{ .matchPolicy }}
+        {{- with .namespaceSelector }}
+        namespaceSelector:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with .objectSelector }}
+        objectSelector:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with .matchConditions }}
+        matchConditions:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        rules:
+          - apiGroups:
+              - capsule.clastix.io
+            apiVersions:
+              - v1beta2
+            operations:
+              - CREATE
+              - UPDATE
+              - DELETE
+            resources:
+              - rulestatuses
+            scope: 'Namespaced'
+        sideEffects: None
+        timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+        {{- end }}
+      {{- end }}
       {{- with .Values.webhooks.hooks.customresources }}
         {{- if .enabled }}
           {{- $any = true }}
