@@ -68,18 +68,27 @@ func (h *forbiddenAnnotationsRegexHandler) OnUpdate(
 }
 
 func (h *forbiddenAnnotationsRegexHandler) validate(tnt *capsulev1beta2.Tenant, req admission.Request) *admission.Response {
-	if tnt.Spec.NamespaceOptions == nil {
+	if tnt == nil || tnt.Spec.NamespaceOptions == nil {
 		return nil
 	}
 
-	annotationsToCheck := map[string]string{
+	regexesToCheck := map[string]string{
 		"labels":      tnt.Spec.NamespaceOptions.ForbiddenLabels.Regex,
 		"annotations": tnt.Spec.NamespaceOptions.ForbiddenAnnotations.Regex,
 	}
 
-	for scope, annotation := range annotationsToCheck {
-		if _, err := regexp.Compile(tnt.Spec.NamespaceOptions.ForbiddenLabels.Regex); err != nil {
-			return ad.Denyf("unable to compile %s regex for forbidden %s", annotation, scope)
+	for scope, expression := range regexesToCheck {
+		if expression == "" {
+			continue
+		}
+
+		if _, err := regexp.Compile(expression); err != nil {
+			return ad.Denyf(
+				"unable to compile regex %q for forbidden %s: %v",
+				expression,
+				scope,
+				err,
+			)
 		}
 	}
 
