@@ -113,6 +113,31 @@ rbac:
 
 # Manager Options
 manager:
+  apiPriorityAndFairness:
+    # -- Change to `true` if you want to insulate the API calls made by Capsule admission controller activities.
+    # This will help ensure Capsule stability in busy clusters.
+    # Ref: https://kubernetes.io/docs/concepts/cluster-administration/flow-control/
+    enabled: false
+
+    # -- Only the first matching FlowSchema for a given request matters. If multiple FlowSchemas match a single inbound request, it will be assigned based on the one with the highest matchingPrecedence.
+    # Ref: https://kubernetes.io/docs/concepts/cluster-administration/flow-control/#flowschema
+    matchingPrecedence: 900
+
+    # -- Declare ApiVersion used for Flow
+    flowApiVersion: "flowcontrol.apiserver.k8s.io/v1"
+
+    # -- Priority level configuration.
+    # The block is directly forwarded into the priorityLevelConfiguration, so you can use whatever specification you want.
+    # ref: https://kubernetes.io/docs/concepts/cluster-administration/flow-control/#prioritylevelconfiguration
+    # @default -- See [values.yaml](values.yaml)
+    priorityLevelConfigurationSpec:
+      type: Limited
+      limited:
+        nominalConcurrencyShares: 10
+        limitResponse:
+          queuing:
+            queueLengthLimit: 50
+          type: Queue
 
   # Manager RBAC
   rbac:
@@ -587,7 +612,7 @@ webhooks:
     # -- Webhook for Rule Status ([Read More](https://projectcapsule.dev/docs/resource-management/customquotas/#admission))
     rulestatus:
       # -- Enable the Hook
-      enabled: false
+      enabled: true
       # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
       failurePolicy: Fail
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
@@ -601,8 +626,6 @@ webhooks:
       #      operator: Exists
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchConditions: []
-      # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
-      rules: []
 
     # -- Additional Metadata webhook
     metadata:

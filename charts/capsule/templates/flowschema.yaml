@@ -1,0 +1,135 @@
+{{- if .Values.manager.apiPriorityAndFairness.enabled }}
+---
+apiVersion: {{ .Values.manager.apiPriorityAndFairness.flowApiVersion }}
+kind: FlowSchema
+metadata:
+  name: {{ include "capsule.fullname" $ }}
+  labels:
+    {{- include "capsule.labels" $ | nindent 4 }}
+spec:
+  matchingPrecedence: {{ .Values.manager.apiPriorityAndFairness.matchingPrecedence }}
+  priorityLevelConfiguration:
+    name: {{ include "capsule.fullname" $ }}
+  distinguisherMethod:
+    type: ByNamespace
+  rules:
+    - subjects:
+        - kind: ServiceAccount
+          serviceAccount:
+            namespace: {{ $.Release.Namespace }}
+            name: {{ include "capsule.serviceAccountName" $ }}
+      resourceRules:
+        # Core resources reconciled/read by Capsule.
+        - apiGroups:
+            - ""
+          resources:
+            - namespaces
+            - namespaces/status
+            - pods
+            - services
+            - serviceaccounts
+            - configmaps
+            - secrets
+            - resourcequotas
+            - resourcequotas/status
+            - limitranges
+            - persistentvolumeclaims
+            - events
+          verbs:
+            - get
+            - list
+            - watch
+            - create
+            - update
+            - patch
+            - delete
+
+        - apiGroups:
+            - rbac.authorization.k8s.io
+          resources:
+            - roles
+            - rolebindings
+            - clusterroles
+            - clusterrolebindings
+          verbs:
+            - get
+            - list
+            - watch
+            - create
+            - update
+            - patch
+            - delete
+            - bind
+            - escalate
+
+        - apiGroups:
+            - capsule.clastix.io
+          resources:
+            - tenants
+            - tenants/status
+            - tenantowners
+            - tenantowners/status
+            - rulestatus
+            - rulestatus/status
+            - customquotas
+            - customquotas/status
+            - globalcustomquotas
+            - globalcustomquotas/status
+            - globaltenantresources
+            - globaltenantresources/status
+            - tenantresources
+            - tenantresources/status
+            - resourcepools
+            - resourcepools/status
+            - resourcepoolclaims
+            - resourcepoolclaims/status
+            - quantityledgers
+            - quantityledgers/status
+            - capsuleconfigurations
+            - capsuleconfigurations/status
+          verbs:
+            - get
+            - list
+            - watch
+            - create
+            - update
+            - patch
+            - delete
+        - apiGroups:
+            - networking.k8s.io
+          resources:
+            - networkpolicies
+          verbs:
+            - get
+            - list
+            - watch
+            - create
+            - update
+            - patch
+            - delete
+        - apiGroups:
+            - admissionregistration.k8s.io
+          resources:
+            - mutatingwebhookconfigurations
+            - validatingwebhookconfigurations
+          verbs:
+            - get
+            - list
+            - watch
+            - update
+            - patch
+            - create
+
+        - apiGroups:
+            - coordination.k8s.io
+          resources:
+            - leases
+          verbs:
+            - get
+            - list
+            - watch
+            - create
+            - update
+            - patch
+            - delete
+{{- end }}

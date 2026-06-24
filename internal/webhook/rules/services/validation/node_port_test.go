@@ -294,7 +294,7 @@ func TestServiceRulesValidateNodePorts(t *testing.T) {
 			enforceBodies: []*apirules.NamespaceRuleEnforceBody{
 				nodePortEnforceForTest(apirules.ActionTypeDeny, nodePortRangeForTest(30100, 30000)),
 			},
-			wantErr: `nodePort: invalid rule: invalid nodePort range: from 30100 must be lower than or equal to to 30000`,
+			wantErr: `nodePort: invalid rule: invalid nodePort range: from 30100 must be lower than or equal to 30000`,
 		},
 		{
 			name: "unsupported action returns error",

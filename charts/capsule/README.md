@@ -105,6 +105,10 @@ The following Values have changed key or Value:
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
+| manager.apiPriorityAndFairness.enabled | bool | `false` | Change to `true` if you want to insulate the API calls made by Capsule admission controller activities. This will help ensure Capsule stability in busy clusters. Ref: https://kubernetes.io/docs/concepts/cluster-administration/flow-control/ |
+| manager.apiPriorityAndFairness.flowApiVersion | string | `"flowcontrol.apiserver.k8s.io/v1"` | Declare ApiVersion used for Flow |
+| manager.apiPriorityAndFairness.matchingPrecedence | int | `900` | Only the first matching FlowSchema for a given request matters. If multiple FlowSchemas match a single inbound request, it will be assigned based on the one with the highest matchingPrecedence. Ref: https://kubernetes.io/docs/concepts/cluster-administration/flow-control/#flowschema |
+| manager.apiPriorityAndFairness.priorityLevelConfigurationSpec | object | See [values.yaml](values.yaml) | Priority level configuration. The block is directly forwarded into the priorityLevelConfiguration, so you can use whatever specification you want. ref: https://kubernetes.io/docs/concepts/cluster-administration/flow-control/#prioritylevelconfiguration |
 | manager.daemonsetStrategy | object | `{"type":"RollingUpdate"}` | [Daemonset Strategy](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/#creating-a-daemonset-with-rollingupdate-update-strategy) |
 | manager.deploymentStrategy | object | `{"type":"RollingUpdate"}` | [Deployment Strategy](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy) |
 | manager.env | list | `[]` | Additional Environment Variables |
@@ -348,14 +352,13 @@ The following Values have changed key or Value:
 | webhooks.hooks.resourcepools.pools.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
 | webhooks.hooks.resourcepools.pools.opts | object | `{}` | Capsule Hook Options |
 | webhooks.hooks.resourcepools.pools.reinvocationPolicy | string | `"Never"` | [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy) |
-| webhooks.hooks.rulestatus | object | `{"enabled":false,"failurePolicy":"Fail","matchConditions":[],"matchPolicy":"Equivalent","namespaceSelector":{},"objectSelector":{},"rules":[]}` | Webhook for Rule Status ([Read More](https://projectcapsule.dev/docs/resource-management/customquotas/#admission)) |
-| webhooks.hooks.rulestatus.enabled | bool | `false` | Enable the Hook |
+| webhooks.hooks.rulestatus | object | `{"enabled":true,"failurePolicy":"Fail","matchConditions":[],"matchPolicy":"Equivalent","namespaceSelector":{},"objectSelector":{}}` | Webhook for Rule Status ([Read More](https://projectcapsule.dev/docs/resource-management/customquotas/#admission)) |
+| webhooks.hooks.rulestatus.enabled | bool | `true` | Enable the Hook |
 | webhooks.hooks.rulestatus.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
 | webhooks.hooks.rulestatus.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
 | webhooks.hooks.rulestatus.matchPolicy | string | `"Equivalent"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
 | webhooks.hooks.rulestatus.namespaceSelector | object | `{}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
 | webhooks.hooks.rulestatus.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
-| webhooks.hooks.rulestatus.rules | list | `[]` | [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules) |
 | webhooks.hooks.serviceaccounts.enabled | bool | `true` | Enable the Hook |
 | webhooks.hooks.serviceaccounts.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
 | webhooks.hooks.serviceaccounts.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |

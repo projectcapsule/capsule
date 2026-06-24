@@ -238,7 +238,7 @@ func TestValidateRuleStatusBody(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `rules[0].enforce.services.nodePorts.ports[0] is invalid: from 32767 must be lower than or equal to to 30000`,
+			wantErr: `rules[0].enforce.services.nodePorts.ports[0] is invalid: from 32767 must be lower than or equal to 30000`,
 		},
 		{
 			name: "nodePort from below valid port range",

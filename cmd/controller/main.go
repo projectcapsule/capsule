@@ -684,6 +684,7 @@ func main() {
 				cfgvalidation.OwnerHandler(),
 			),
 		),
+		route.RulesValidating(cfg),
 	)
 
 	nodeWebhookSupported, _ := utils.NodeWebhookSupported(kubeVersion)
