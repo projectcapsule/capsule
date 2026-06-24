@@ -19,12 +19,23 @@ spec:
             namespace: {{ $.Release.Namespace }}
             name: {{ include "capsule.serviceAccountName" $ }}
       resourceRules:
-        # Core resources reconciled/read by Capsule.
         - apiGroups:
             - ""
           resources:
             - namespaces
             - namespaces/status
+          namespaces: []
+          verbs:
+            - get
+            - list
+            - watch
+            - create
+            - update
+            - patch
+            - delete
+        - apiGroups:
+            - ""
+          resources:
             - pods
             - services
             - serviceaccounts
@@ -35,6 +46,8 @@ spec:
             - limitranges
             - persistentvolumeclaims
             - events
+          namespaces:
+            - '*'
           verbs:
             - get
             - list
@@ -43,14 +56,12 @@ spec:
             - update
             - patch
             - delete
-
         - apiGroups:
             - rbac.authorization.k8s.io
           resources:
-            - roles
-            - rolebindings
             - clusterroles
             - clusterrolebindings
+          namespaces: []
           verbs:
             - get
             - list
@@ -61,30 +72,60 @@ spec:
             - delete
             - bind
             - escalate
-
+        - apiGroups:
+            - rbac.authorization.k8s.io
+          resources:
+            - roles
+            - rolebindings
+          namespaces:
+            - '*'
+          verbs:
+            - get
+            - list
+            - watch
+            - create
+            - update
+            - patch
+            - delete
+            - bind
+            - escalate
         - apiGroups:
             - capsule.clastix.io
+          namespaces:
+            - '*'
+          resources:
+            - rulestatus
+            - rulestatus/status
+            - customquotas
+            - customquotas/status
+            - tenantresources
+            - tenantresources/status
+            - resourcepoolclaims
+            - resourcepoolclaims/status
+            - quantityledgers
+            - quantityledgers/status
+          verbs:
+            - get
+            - list
+            - watch
+            - create
+            - update
+            - patch
+            - delete
+        - apiGroups:
+            - capsule.clastix.io
+          namespaces: []
           resources:
             - tenants
             - tenants/status
             - tenantowners
             - tenantowners/status
-            - rulestatus
-            - rulestatus/status
-            - customquotas
-            - customquotas/status
             - globalcustomquotas
             - globalcustomquotas/status
             - globaltenantresources
             - globaltenantresources/status
-            - tenantresources
-            - tenantresources/status
             - resourcepools
             - resourcepools/status
-            - resourcepoolclaims
-            - resourcepoolclaims/status
-            - quantityledgers
-            - quantityledgers/status
             - capsuleconfigurations
             - capsuleconfigurations/status
           verbs:
@@ -99,6 +140,8 @@ spec:
             - networking.k8s.io
           resources:
             - networkpolicies
+          namespaces:
+            - '*'
           verbs:
             - get
             - list
@@ -112,6 +155,7 @@ spec:
           resources:
             - mutatingwebhookconfigurations
             - validatingwebhookconfigurations
+          namespaces: []
           verbs:
             - get
             - list
@@ -119,9 +163,10 @@ spec:
             - update
             - patch
             - create
-
         - apiGroups:
             - coordination.k8s.io
+          namespaces:
+            - {{ $.Release.Namespace }}
           resources:
             - leases
           verbs:
