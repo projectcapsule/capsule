@@ -16,7 +16,6 @@ const (
 
 	// RuleStatus.
 	ReasonNamespaceRuleAudit string = "NamespaceRuleAudit"
-
 	// Namespace.
 	ReasonNamespaceHijack string = "ReasonNamespacePatch"
 
@@ -59,6 +58,8 @@ const (
 	ReasonForbiddenLoadBalancer      string = "ForbiddenLoadBalancer"
 	ReasonForbiddenExternalName      string = "ForbiddenExternalName"
 	ReasonForbiddenNodePort          string = "ForbiddenNodePort"
+	ReasonForbiddenServiceType       string = "ForbiddenServiceType"
+	ReasonForbiddenLoadBalancerCIDR  string = "ForbiddenLoadBalancerCIDR"
 
 	// Storage.
 	ReasonCrossTenantReference string = "CrossTenantReference"

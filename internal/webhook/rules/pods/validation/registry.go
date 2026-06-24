@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/projectcapsule/capsule/internal/cache"
+	rulesutils "github.com/projectcapsule/capsule/internal/webhook/rules"
 	apirules "github.com/projectcapsule/capsule/pkg/api/rules"
 	ruleengine "github.com/projectcapsule/capsule/pkg/ruleengine"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
@@ -153,9 +154,32 @@ func (h *podRules) evaluateRegistryReference(
 					MatchedValue: matched,
 				}, nil
 			},
-			Message: registryDecisionMessage,
+			Message:            registryDecisionMessage,
+			RuleDescription:    describeRegistryRuleSet,
+			AllowedDescription: "Allowed registries",
 		},
 	)
+}
+
+func describeRegistryRuleSet(rule registryRuleSet) string {
+	if len(rule.Registries) == 0 {
+		return ""
+	}
+
+	parts := make([]string, 0, len(rule.Registries))
+
+	for _, registry := range rule.Registries {
+		description := strings.TrimSpace(
+			rulesutils.DescribeExpressionMatch(registry.ExpressionMatch),
+		)
+		if description == "" {
+			continue
+		}
+
+		parts = append(parts, description)
+	}
+
+	return strings.Join(parts, ", ")
 }
 
 func registryReferencesFromPod(pod *corev1.Pod) []registryReference {

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	goRuntime "runtime"
+	"time"
 
 	flag "github.com/spf13/pflag"
 	_ "go.uber.org/automaxprocs"
@@ -75,6 +76,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/resourcepool"
 	"github.com/projectcapsule/capsule/internal/webhook/route"
 	podrules "github.com/projectcapsule/capsule/internal/webhook/rules/pods/validation"
+	servicerules "github.com/projectcapsule/capsule/internal/webhook/rules/services/validation"
 	"github.com/projectcapsule/capsule/internal/webhook/service"
 	"github.com/projectcapsule/capsule/internal/webhook/serviceaccounts"
 	tenantmutation "github.com/projectcapsule/capsule/internal/webhook/tenant/mutation"
@@ -127,6 +129,8 @@ func main() {
 		clientConnectionBurst int32
 
 		webhookPort int
+
+		cacheSyncTimeout time.Duration
 	)
 
 	var goFlagSet goflag.FlagSet
@@ -148,10 +152,16 @@ func main() {
 			"Enabling this will ensure there is only one active controller manager.",
 	)
 	flag.IntVar(
-		&controllerConfig.MaxConcurrentReconciles,
+		&controllerConfig.Runtime.MaxConcurrentReconciles,
 		"workers",
 		1,
 		"MaxConcurrentReconciles is the maximum number of concurrent Reconciles which can be run.",
+	)
+	flag.DurationVar(
+		&cacheSyncTimeout,
+		"cache-sync-timeout",
+		0,
+		"The timeout used when waiting for controller cache synchronization. If unset or 0, the controller-runtime default is used.",
 	)
 	flag.StringVar(
 		&metricsAddr,
@@ -270,6 +280,10 @@ func main() {
 	if serviceAccountName := os.Getenv(configuration.EnvironmentServiceaccountName); len(serviceAccountName) == 0 {
 		setupLog.Error(fmt.Errorf("unable to determinate the ServiceAccount Capsule is running with. Please export %s", configuration.EnvironmentServiceaccountName), "unable to start manager")
 		os.Exit(1)
+	}
+
+	if cacheSyncTimeout > 0 {
+		controllerConfig.Runtime.CacheSyncTimeout = cacheSyncTimeout
 	}
 
 	if len(controllerConfig.ConfigurationName) == 0 {
@@ -583,6 +597,7 @@ func main() {
 		),
 		route.Service(
 			service.Handler(
+				servicerules.ServiceRules(regexCache),
 				service.Validating(),
 			),
 		),
@@ -669,6 +684,7 @@ func main() {
 				cfgvalidation.OwnerHandler(),
 			),
 		),
+		route.RulesValidating(cfg),
 	)
 
 	nodeWebhookSupported, _ := utils.NodeWebhookSupported(kubeVersion)

@@ -18,7 +18,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -40,7 +39,7 @@ type resourceClaimController struct {
 	recorder events.EventRecorder
 }
 
-func (r *resourceClaimController) SetupWithManager(mgr ctrl.Manager, cfg utils.ControllerOptions) error {
+func (r *resourceClaimController) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
 	r.reader = mgr.GetAPIReader()
 
 	return ctrl.NewControllerManagedBy(mgr).
@@ -56,7 +55,7 @@ func (r *resourceClaimController) SetupWithManager(mgr ctrl.Manager, cfg utils.C
 			handler.EnqueueRequestsFromMapFunc(r.claimsWithoutPoolFromNamespaces),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
-		WithOptions(controller.Options{MaxConcurrentReconciles: cfg.MaxConcurrentReconciles}).
+		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
 		Complete(r)
 }
 
@@ -64,7 +63,7 @@ func (r resourceClaimController) Reconcile(ctx context.Context, request ctrl.Req
 	log := r.log.WithValues("Request.Name", request.Name)
 
 	instance := &capsulev1beta2.ResourcePoolClaim{}
-	if err = r.reader.Get(ctx, request.NamespacedName, instance); err != nil {
+	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.V(5).Info("Request object not found, could have been deleted after reconcile request")
 

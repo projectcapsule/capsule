@@ -13,6 +13,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
@@ -305,4 +306,33 @@ var _ = Describe("when Tenant handles Ingress hostnames", Ordered, Label("tenant
 			}
 		})
 	})
+
+	It("should deny updating allowed hostnames with an invalid regex", func() {
+		invalidRegex := "("
+
+		Eventually(func() error {
+			current := &capsulev1beta2.Tenant{}
+			if err := k8sClient.Get(
+				context.TODO(),
+				client.ObjectKeyFromObject(tnt),
+				current,
+			); err != nil {
+				return err
+			}
+
+			if current.Spec.IngressOptions.AllowedHostnames == nil {
+				current.Spec.IngressOptions.AllowedHostnames = &api.AllowedListSpec{}
+			}
+
+			current.Spec.IngressOptions.AllowedHostnames.Regex = invalidRegex
+
+			err := k8sClient.Update(context.TODO(), current)
+			if err == nil {
+				return fmt.Errorf("expected tenant update with invalid allowed hostname regex %q to be denied", invalidRegex)
+			}
+
+			return nil
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	})
+
 })

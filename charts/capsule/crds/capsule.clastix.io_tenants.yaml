@@ -2515,6 +2515,100 @@ spec:
                           - deny
                           - audit
                           type: string
+                        services:
+                          description: Enforcement for Services.
+                          properties:
+                            externalNames:
+                              description: ExternalNames defines additional constraints
+                                for Services of type ExternalName.
+                              properties:
+                                hostnames:
+                                  description: |-
+                                    Hostnames restricts spec.externalName.
+                                    Empty means no additional hostname restriction once ExternalName is allowed by types.
+                                  items:
+                                    description: |-
+                                      At least one of Exact or Exp must be set.
+                                      Both may be set together.
+                                    properties:
+                                      exact:
+                                        description: Exact matches one of the provided
+                                          values exactly.
+                                        items:
+                                          type: string
+                                        minItems: 1
+                                        type: array
+                                      exp:
+                                        description: Exp matches regular expression.
+                                        minLength: 1
+                                        type: string
+                                      negate:
+                                        default: false
+                                        description: Negate regular Expression
+                                        type: boolean
+                                    type: object
+                                    x-kubernetes-validations:
+                                    - message: at least one of exact or exp must be
+                                        set
+                                      rule: has(self.exact) || has(self.exp)
+                                  type: array
+                              type: object
+                            loadBalancers:
+                              description: LoadBalancers defines additional constraints
+                                for Services of type LoadBalancer.
+                              properties:
+                                cidrs:
+                                  description: |-
+                                    CIDRs restricts spec.loadBalancerIP and spec.loadBalancerSourceRanges.
+                                    Empty means no additional CIDR restriction once LoadBalancer is allowed by types.
+                                  items:
+                                    type: string
+                                  type: array
+                              type: object
+                            nodePorts:
+                              description: NodePorts defines additional constraints
+                                for nodePort values.
+                              properties:
+                                ports:
+                                  description: |-
+                                    Ports restricts explicitly requested nodePort values.
+                                    Empty means no additional port restriction once NodePort is allowed by types.
+                                  items:
+                                    properties:
+                                      from:
+                                        format: int32
+                                        maximum: 65535
+                                        minimum: 1
+                                        type: integer
+                                      to:
+                                        format: int32
+                                        maximum: 65535
+                                        minimum: 1
+                                        type: integer
+                                    required:
+                                    - from
+                                    - to
+                                    type: object
+                                  type: array
+                              type: object
+                            types:
+                              description: |-
+                                Types defines the Service types matched by this rule.
+
+                                Supported values:
+                                - ClusterIP
+                                - NodePort
+                                - LoadBalancer
+                                - ExternalName
+                              items:
+                                enum:
+                                - ClusterIP
+                                - NodePort
+                                - LoadBalancer
+                                - ExternalName
+                                type: string
+                              type: array
+                          type: object
                         workloads:
                           description: Enforcement for Workloads (Pods)
                           properties:

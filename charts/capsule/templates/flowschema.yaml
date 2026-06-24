@@ -1,0 +1,180 @@
+{{- if .Values.manager.apiPriorityAndFairness.enabled }}
+---
+apiVersion: {{ .Values.manager.apiPriorityAndFairness.flowApiVersion }}
+kind: FlowSchema
+metadata:
+  name: {{ include "capsule.fullname" $ }}
+  labels:
+    {{- include "capsule.labels" $ | nindent 4 }}
+spec:
+  matchingPrecedence: {{ .Values.manager.apiPriorityAndFairness.matchingPrecedence }}
+  priorityLevelConfiguration:
+    name: {{ include "capsule.fullname" $ }}
+  distinguisherMethod:
+    type: ByNamespace
+  rules:
+    - subjects:
+        - kind: ServiceAccount
+          serviceAccount:
+            namespace: {{ $.Release.Namespace }}
+            name: {{ include "capsule.serviceAccountName" $ }}
+      resourceRules:
+        - apiGroups:
+            - ""
+          resources:
+            - namespaces
+            - namespaces/status
+          clusterScope: true
+          namespaces: []
+          verbs:
+            - get
+            - list
+            - watch
+            - create
+            - update
+            - patch
+            - delete
+        - apiGroups:
+            - ""
+          resources:
+            - pods
+            - services
+            - serviceaccounts
+            - configmaps
+            - secrets
+            - resourcequotas
+            - resourcequotas/status
+            - limitranges
+            - persistentvolumeclaims
+            - events
+          namespaces:
+            - '*'
+          verbs:
+            - get
+            - list
+            - watch
+            - create
+            - update
+            - patch
+            - delete
+        - apiGroups:
+            - rbac.authorization.k8s.io
+          resources:
+            - clusterroles
+            - clusterrolebindings
+          clusterScope: true
+          namespaces: []
+          verbs:
+            - get
+            - list
+            - watch
+            - create
+            - update
+            - patch
+            - delete
+        - apiGroups:
+            - rbac.authorization.k8s.io
+          resources:
+            - roles
+            - rolebindings
+          namespaces:
+            - '*'
+          verbs:
+            - get
+            - list
+            - watch
+            - create
+            - update
+            - patch
+            - delete
+        - apiGroups:
+            - capsule.clastix.io
+          namespaces:
+            - '*'
+          resources:
+            - rulestatus
+            - rulestatus/status
+            - customquotas
+            - customquotas/status
+            - tenantresources
+            - tenantresources/status
+            - resourcepoolclaims
+            - resourcepoolclaims/status
+            - quantityledgers
+            - quantityledgers/status
+          verbs:
+            - get
+            - list
+            - watch
+            - create
+            - update
+            - patch
+            - delete
+        - apiGroups:
+            - capsule.clastix.io
+          clusterScope: true
+          namespaces: []
+          resources:
+            - tenants
+            - tenants/status
+            - tenantowners
+            - tenantowners/status
+            - globalcustomquotas
+            - globalcustomquotas/status
+            - globaltenantresources
+            - globaltenantresources/status
+            - resourcepools
+            - resourcepools/status
+            - capsuleconfigurations
+            - capsuleconfigurations/status
+          verbs:
+            - get
+            - list
+            - watch
+            - create
+            - update
+            - patch
+            - delete
+        - apiGroups:
+            - networking.k8s.io
+          resources:
+            - networkpolicies
+          namespaces:
+            - '*'
+          verbs:
+            - get
+            - list
+            - watch
+            - create
+            - update
+            - patch
+            - delete
+        - apiGroups:
+            - admissionregistration.k8s.io
+          clusterScope: true
+          resources:
+            - mutatingwebhookconfigurations
+            - validatingwebhookconfigurations
+          namespaces: []
+          verbs:
+            - get
+            - list
+            - watch
+            - update
+            - patch
+            - create
+        - apiGroups:
+            - coordination.k8s.io
+          namespaces:
+            - {{ $.Release.Namespace }}
+          resources:
+            - leases
+          verbs:
+            - get
+            - list
+            - watch
+            - create
+            - update
+            - patch
+            - delete
+{{- end }}

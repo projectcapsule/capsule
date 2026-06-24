@@ -5,13 +5,13 @@ package validation
 
 import (
 	"context"
-	"regexp"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/rules"
+	"github.com/projectcapsule/capsule/pkg/ruleengine"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -31,7 +31,7 @@ func (h *RuleValidationHandler) OnCreate(
 	_ events.EventRecorder,
 ) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
-		if err := ValidateRule(tnt, req); err != nil {
+		if err := h.handle(tnt, req); err != nil {
 			return err
 		}
 
@@ -60,7 +60,7 @@ func (h *RuleValidationHandler) OnUpdate(
 	_ events.EventRecorder,
 ) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
-		if response := ValidateRule(tnt, req); response != nil {
+		if response := h.handle(tnt, req); response != nil {
 			return response
 		}
 
@@ -68,7 +68,7 @@ func (h *RuleValidationHandler) OnUpdate(
 	}
 }
 
-func ValidateRule(tnt *capsulev1beta2.Tenant, req admission.Request) *admission.Response {
+func (h *RuleValidationHandler) handle(tnt *capsulev1beta2.Tenant, req admission.Request) *admission.Response {
 	if tnt == nil {
 		return nil
 	}
@@ -77,7 +77,9 @@ func ValidateRule(tnt *capsulev1beta2.Tenant, req admission.Request) *admission.
 		return nil
 	}
 
-	for i, rule := range tnt.Spec.Rules {
+	var bodies []*rules.NamespaceRuleBodyNamespace
+
+	for _, rule := range tnt.Spec.Rules {
 		if rule == nil {
 			continue
 		}
@@ -87,39 +89,11 @@ func ValidateRule(tnt *capsulev1beta2.Tenant, req admission.Request) *admission.
 			continue
 		}
 
-		if rule.Enforce == nil {
-			continue
-		}
+		bodies = append(bodies, body)
+	}
 
-		if rule.NamespaceSelector != nil {
-			if _, err := metav1.LabelSelectorAsSelector(rule.NamespaceSelector); err != nil {
-				return ad.Denyf("rules[%d].namespaceSelector is invalid: %v", i, err)
-			}
-		}
-
-		for j, registry := range rule.Enforce.Workloads.Registries {
-			if _, err := regexp.Compile(registry.Expression); err != nil {
-				return ad.Denyf(
-					"rules[%d].enforce.workloads.registries[%d].exp %q is invalid: %v",
-					i,
-					j,
-					registry.Expression,
-					err,
-				)
-			}
-		}
-
-		for j, scheduler := range rule.Enforce.Workloads.Schedulers {
-			if _, err := regexp.Compile(scheduler.Expression); err != nil {
-				return ad.Denyf(
-					"rules[%d].enforce.workloads.schedulers[%d].exp %q is invalid: %v",
-					i,
-					j,
-					scheduler.Expression,
-					err,
-				)
-			}
-		}
+	if err := ruleengine.ValidateRuleStatusBody(bodies); err != nil {
+		return ad.Deny(err.Error())
 	}
 
 	return nil

@@ -22,7 +22,6 @@ import (
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -47,7 +46,7 @@ type resourcePoolController struct {
 	recorder events.EventRecorder
 }
 
-func (r *resourcePoolController) SetupWithManager(mgr ctrl.Manager, cfg ctrlutils.ControllerOptions) error {
+func (r *resourcePoolController) SetupWithManager(mgr ctrl.Manager, ctrlConfig ctrlutils.ControllerOptions) error {
 	r.reader = mgr.GetAPIReader()
 
 	return ctrl.NewControllerManagedBy(mgr).
@@ -61,7 +60,7 @@ func (r *resourcePoolController) SetupWithManager(mgr ctrl.Manager, cfg ctrlutil
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, _ client.Object) []reconcile.Request {
 				// Fetch all GlobalResourceQuota objects
 				grqList := &capsulev1beta2.ResourcePoolList{}
-				if err := r.reader.List(ctx, grqList); err != nil {
+				if err := r.Client.List(ctx, grqList); err != nil {
 					r.log.Error(err, "Failed to list ResourcePools objects")
 
 					return nil
@@ -78,7 +77,7 @@ func (r *resourcePoolController) SetupWithManager(mgr ctrl.Manager, cfg ctrlutil
 				return requests
 			}),
 		).
-		WithOptions(controller.Options{MaxConcurrentReconciles: cfg.MaxConcurrentReconciles}).
+		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
 		Complete(r)
 }
 

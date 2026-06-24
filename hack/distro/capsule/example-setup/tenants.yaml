@@ -91,10 +91,20 @@ spec:
   rules:
   - enforce:
       action: "allow"
-      workloads:
-        schedulers:
-        - exact:
-            - "{{ .tenant.metadata.name }}-scheduler"
+      services:
+        types: ["ClusterIP", "NodePort", "LoadBalancer", "ExternalName"]
+        loadBalancers:
+          cidrs:
+            - 10.0.0.2/32
+        externalNames:
+          hostnames:
+            - exp: ".*\\.example\\.com"
+              exact:
+                - "internal.git.com"
+        nodePorts:
+          ports:
+            - from: 30000
+              to: 32767
 ---
 apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
