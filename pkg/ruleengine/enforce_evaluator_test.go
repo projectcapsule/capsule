@@ -16,10 +16,11 @@ type testObject struct {
 }
 
 type testRule struct {
-	Name        string
-	ShouldMatch bool
-	MatchValue  any
-	Err         error
+	Name         string
+	ShouldMatch  bool
+	MatchedValue any
+	Detail       string
+	Err          error
 }
 
 type enforceSpec struct {
@@ -35,8 +36,7 @@ func TestEvaluateEnforce_ValidationErrors(t *testing.T) {
 	t.Parallel()
 
 	validFixture := newTestFixture()
-
-	validSet := validFixture.set("test", nil)
+	validSet := validFixture.set("registry", nil)
 
 	tests := []struct {
 		name    string
@@ -55,29 +55,29 @@ func TestEvaluateEnforce_ValidationErrors(t *testing.T) {
 		{
 			name: "nil values extractor",
 			set: Set[testRule, testObject]{
-				Name:    "test",
+				Name:    "registry",
 				Rules:   validSet.Rules,
 				Matches: validSet.Matches,
 			},
-			wantErr: "test: values extractor is nil",
+			wantErr: "registry: values extractor is nil",
 		},
 		{
 			name: "nil rules extractor",
 			set: Set[testRule, testObject]{
-				Name:    "test",
+				Name:    "registry",
 				Values:  validSet.Values,
 				Matches: validSet.Matches,
 			},
-			wantErr: "test: rules extractor is nil",
+			wantErr: "registry: rules extractor is nil",
 		},
 		{
 			name: "nil matcher",
 			set: Set[testRule, testObject]{
-				Name:   "test",
+				Name:   "registry",
 				Values: validSet.Values,
 				Rules:  validSet.Rules,
 			},
-			wantErr: "test: matcher is nil",
+			wantErr: "registry: matcher is nil",
 		},
 	}
 
@@ -88,21 +88,21 @@ func TestEvaluateEnforce_ValidationErrors(t *testing.T) {
 			t.Parallel()
 
 			evaluation, err := EvaluateEnforce(
-				testObject{Values: []Value{{Value: "a", Path: "spec.value"}}},
+				testObject{Values: []Value{{Value: "harbor/app:1", Path: "spec.containers[0].image"}}},
 				[]*api.NamespaceRuleEnforceBody{{Action: api.ActionTypeAllow}},
 				tt.set,
 			)
 
 			if err == nil {
-				t.Fatalf("EvaluateEnforce() expected error, got nil")
+				t.Fatalf("expected error, got nil")
 			}
 
 			if evaluation != nil {
-				t.Fatalf("EvaluateEnforce() evaluation = %#v, want nil on validation error", evaluation)
+				t.Fatalf("expected nil evaluation on setup validation error, got %#v", evaluation)
 			}
 
 			if !strings.Contains(err.Error(), tt.wantErr) {
-				t.Fatalf("EvaluateEnforce() error = %q, want containing %q", err.Error(), tt.wantErr)
+				t.Fatalf("expected error containing %q, got %q", tt.wantErr, err.Error())
 			}
 		})
 	}
@@ -123,47 +123,60 @@ func TestEvaluateEnforce_EmptyInputs(t *testing.T) {
 			enforceSpecs: []enforceSpec{
 				{
 					action: api.ActionTypeDeny,
-					items:  []testRule{{Name: "deny", ShouldMatch: true}},
+					items: []testRule{
+						{Name: "deny", ShouldMatch: true},
+					},
 				},
 			},
 		},
 		{
-			name: "only empty value",
+			name: "empty value is skipped",
 			obj: testObject{
-				Values: []Value{{Value: "", Path: "spec.value"}},
+				Values: []Value{
+					{Value: "", Path: "spec.value"},
+				},
 			},
 			enforceSpecs: []enforceSpec{
 				{
 					action: api.ActionTypeDeny,
-					items:  []testRule{{Name: "deny", ShouldMatch: true}},
+					items: []testRule{
+						{Name: "deny", ShouldMatch: true},
+					},
 				},
 			},
 		},
 		{
 			name: "nil enforce bodies",
 			obj: testObject{
-				Values: []Value{{Value: "a", Path: "spec.value"}},
+				Values: []Value{
+					{Value: "harbor/app:1", Path: "spec.containers[0].image"},
+				},
 			},
-			enforceSpecs: nil,
 		},
 		{
 			name: "empty enforce bodies",
 			obj: testObject{
-				Values: []Value{{Value: "a", Path: "spec.value"}},
+				Values: []Value{
+					{Value: "harbor/app:1", Path: "spec.containers[0].image"},
+				},
 			},
 			enforceSpecs: []enforceSpec{},
 		},
 		{
 			name: "nil enforce body is ignored",
 			obj: testObject{
-				Values: []Value{{Value: "a", Path: "spec.value"}},
+				Values: []Value{
+					{Value: "harbor/app:1", Path: "spec.containers[0].image"},
+				},
 			},
 			includeNilBody: true,
 		},
 		{
 			name: "enforce body without rule items is ignored",
 			obj: testObject{
-				Values: []Value{{Value: "a", Path: "spec.value"}},
+				Values: []Value{
+					{Value: "harbor/app:1", Path: "spec.containers[0].image"},
+				},
 			},
 			enforceSpecs: []enforceSpec{
 				{
@@ -174,12 +187,16 @@ func TestEvaluateEnforce_EmptyInputs(t *testing.T) {
 		{
 			name: "non matching rule item is ignored",
 			obj: testObject{
-				Values: []Value{{Value: "a", Path: "spec.value"}},
+				Values: []Value{
+					{Value: "harbor/app:1", Path: "spec.containers[0].image"},
+				},
 			},
 			enforceSpecs: []enforceSpec{
 				{
 					action: api.ActionTypeDeny,
-					items:  []testRule{{Name: "deny", ShouldMatch: false}},
+					items: []testRule{
+						{Name: "deny", ShouldMatch: false},
+					},
 				},
 			},
 		},
@@ -200,14 +217,14 @@ func TestEvaluateEnforce_EmptyInputs(t *testing.T) {
 
 			evaluation, err := EvaluateEnforce(tt.obj, enforceBodies, fixture.set("registry", nil))
 			if err != nil {
-				t.Fatalf("EvaluateEnforce() unexpected error: %v", err)
+				t.Fatalf("unexpected error: %v", err)
 			}
 
 			assertNoBlocking(t, evaluation)
 			assertNoFinal(t, evaluation)
 
 			if len(evaluation.Audits) != 0 {
-				t.Fatalf("audits = %d, want 0", len(evaluation.Audits))
+				t.Fatalf("expected no audits, got %d", len(evaluation.Audits))
 			}
 		})
 	}
@@ -219,1190 +236,593 @@ func TestEvaluateEnforce_LastMatchingAllowDenyWins(t *testing.T) {
 	tests := []struct {
 		name            string
 		enforceSpecs    []enforceSpec
-		wantBlocking    bool
 		wantFinalAction api.ActionType
+		wantBlocking    bool
+		wantMessage     string
 	}{
 		{
 			name: "single allow allows",
 			enforceSpecs: []enforceSpec{
 				{
 					action: api.ActionTypeAllow,
-					items:  []testRule{{Name: "allow", ShouldMatch: true}},
+					items: []testRule{
+						{Name: "harbor/.*", ShouldMatch: true},
+					},
 				},
 			},
 			wantFinalAction: api.ActionTypeAllow,
+			wantMessage:     `registry "harbor/app:1" at spec.containers[0].image is allowed by namespace rule: matched allowed rule harbor/.*`,
 		},
 		{
 			name: "single deny denies",
 			enforceSpecs: []enforceSpec{
 				{
 					action: api.ActionTypeDeny,
-					items:  []testRule{{Name: "deny", ShouldMatch: true}},
+					items: []testRule{
+						{Name: "harbor/blocked/.*", ShouldMatch: true},
+					},
 				},
 			},
-			wantBlocking:    true,
 			wantFinalAction: api.ActionTypeDeny,
+			wantBlocking:    true,
+			wantMessage:     `registry "harbor/app:1" at spec.containers[0].image is denied by namespace rule: matched denied rule harbor/blocked/.*`,
 		},
 		{
 			name: "deny then allow allows",
 			enforceSpecs: []enforceSpec{
 				{
 					action: api.ActionTypeDeny,
-					items:  []testRule{{Name: "deny", ShouldMatch: true}},
+					items: []testRule{
+						{Name: "harbor/.*", ShouldMatch: true},
+					},
 				},
 				{
 					action: api.ActionTypeAllow,
-					items:  []testRule{{Name: "allow", ShouldMatch: true}},
+					items: []testRule{
+						{Name: "harbor/app:.*", ShouldMatch: true},
+					},
 				},
 			},
 			wantFinalAction: api.ActionTypeAllow,
+			wantMessage:     `registry "harbor/app:1" at spec.containers[0].image is allowed by namespace rule: matched allowed rule harbor/app:.*`,
 		},
 		{
 			name: "allow then deny denies",
 			enforceSpecs: []enforceSpec{
 				{
 					action: api.ActionTypeAllow,
-					items:  []testRule{{Name: "allow", ShouldMatch: true}},
-				},
-				{
-					action: api.ActionTypeDeny,
-					items:  []testRule{{Name: "deny", ShouldMatch: true}},
-				},
-			},
-			wantBlocking:    true,
-			wantFinalAction: api.ActionTypeDeny,
-		},
-		{
-			name: "unmatched later deny does not override previous allow",
-			enforceSpecs: []enforceSpec{
-				{
-					action: api.ActionTypeAllow,
-					items:  []testRule{{Name: "allow", ShouldMatch: true}},
-				},
-				{
-					action: api.ActionTypeDeny,
-					items:  []testRule{{Name: "deny", ShouldMatch: false}},
-				},
-			},
-			wantFinalAction: api.ActionTypeAllow,
-		},
-		{
-			name: "unmatched later allow does not override previous deny",
-			enforceSpecs: []enforceSpec{
-				{
-					action: api.ActionTypeDeny,
-					items:  []testRule{{Name: "deny", ShouldMatch: true}},
-				},
-				{
-					action: api.ActionTypeAllow,
-					items:  []testRule{{Name: "allow", ShouldMatch: false}},
-				},
-			},
-			wantBlocking:    true,
-			wantFinalAction: api.ActionTypeDeny,
-		},
-		{
-			name: "multiple matching decisive rules last allow wins",
-			enforceSpecs: []enforceSpec{
-				{
-					action: api.ActionTypeAllow,
-					items:  []testRule{{Name: "allow-1", ShouldMatch: true}},
-				},
-				{
-					action: api.ActionTypeDeny,
-					items:  []testRule{{Name: "deny", ShouldMatch: true}},
-				},
-				{
-					action: api.ActionTypeAllow,
-					items:  []testRule{{Name: "allow-2", ShouldMatch: true}},
-				},
-			},
-			wantFinalAction: api.ActionTypeAllow,
-		},
-		{
-			name: "multiple matching decisive rules last deny wins",
-			enforceSpecs: []enforceSpec{
-				{
-					action: api.ActionTypeDeny,
-					items:  []testRule{{Name: "deny-1", ShouldMatch: true}},
-				},
-				{
-					action: api.ActionTypeAllow,
-					items:  []testRule{{Name: "allow", ShouldMatch: true}},
-				},
-				{
-					action: api.ActionTypeDeny,
-					items:  []testRule{{Name: "deny-2", ShouldMatch: true}},
-				},
-			},
-			wantBlocking:    true,
-			wantFinalAction: api.ActionTypeDeny,
-		},
-		{
-			name: "only unmatched allow implicitly denies",
-			enforceSpecs: []enforceSpec{
-				{
-					action: api.ActionTypeAllow,
-					items:  []testRule{{Name: "allow", ShouldMatch: false}},
-				},
-			},
-			wantBlocking: true,
-		},
-		{
-			name: "only unmatched deny allows",
-			enforceSpecs: []enforceSpec{
-				{
-					action: api.ActionTypeDeny,
-					items:  []testRule{{Name: "deny", ShouldMatch: false}},
-				},
-			},
-		},
-		{
-			name: "unrelated allow before unrelated deny implicitly denies",
-			enforceSpecs: []enforceSpec{
-				{
-					action: api.ActionTypeAllow,
-					items:  []testRule{{Name: "allow", ShouldMatch: false}},
-				},
-				{
-					action: api.ActionTypeDeny,
-					items:  []testRule{{Name: "deny", ShouldMatch: false}},
-				},
-			},
-			wantBlocking: true,
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			fixture := newTestFixture()
-
-			evaluation, err := EvaluateEnforce(
-				testObject{Values: []Value{{Value: "app:1", Path: "containers[0]"}}},
-				buildEnforceBodies(fixture, tt.enforceSpecs),
-				fixture.set("registry", nil),
-			)
-			if err != nil {
-				t.Fatalf("EvaluateEnforce() unexpected error: %v", err)
-			}
-
-			if tt.wantBlocking {
-				if evaluation.Blocking == nil {
-					t.Fatalf("Blocking = nil, want decision")
-				}
-
-				if evaluation.Blocking.Action != api.ActionTypeDeny {
-					t.Fatalf("Blocking.Action = %q, want %q", evaluation.Blocking.Action, api.ActionTypeDeny)
-				}
-
-				if err := evaluation.BlockingError(); err == nil {
-					t.Fatalf("BlockingError() = nil, want error")
-				}
-			} else {
-				assertNoBlocking(t, evaluation)
-			}
-
-			if tt.wantFinalAction == "" {
-				assertNoFinal(t, evaluation)
-
-				return
-			}
-
-			if evaluation.Final == nil {
-				t.Fatalf("Final = nil, want action %q", tt.wantFinalAction)
-			}
-
-			if evaluation.Final.Action != tt.wantFinalAction {
-				t.Fatalf("Final.Action = %q, want %q", evaluation.Final.Action, tt.wantFinalAction)
-			}
-
-			if tt.wantBlocking && evaluation.Blocking != evaluation.Final {
-				t.Fatalf("Blocking and Final should point to same deny decision")
-			}
-		})
-	}
-}
-
-func TestEvaluateEnforce_AuditSemantics(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name         string
-		enforceSpecs []enforceSpec
-		wantAudits   int
-		wantBlocking bool
-		wantFinal    api.ActionType
-	}{
-		{
-			name: "single audit allows and records audit",
-			enforceSpecs: []enforceSpec{
-				{
-					action: api.ActionTypeAudit,
-					items:  []testRule{{Name: "audit", ShouldMatch: true}},
-				},
-			},
-			wantAudits: 1,
-		},
-		{
-			name: "multiple audits are all recorded",
-			enforceSpecs: []enforceSpec{
-				{
-					action: api.ActionTypeAudit,
-					items:  []testRule{{Name: "audit-1", ShouldMatch: true}},
-				},
-				{
-					action: api.ActionTypeAudit,
-					items:  []testRule{{Name: "audit-2", ShouldMatch: true}},
-				},
-				{
-					action: api.ActionTypeAudit,
-					items:  []testRule{{Name: "audit-3", ShouldMatch: true}},
-				},
-			},
-			wantAudits: 3,
-		},
-		{
-			name: "unmatched audit is ignored",
-			enforceSpecs: []enforceSpec{
-				{
-					action: api.ActionTypeAudit,
-					items:  []testRule{{Name: "audit", ShouldMatch: false}},
-				},
-			},
-			wantAudits: 0,
-		},
-		{
-			name: "audit plus deny records audit and denies",
-			enforceSpecs: []enforceSpec{
-				{
-					action: api.ActionTypeAudit,
-					items:  []testRule{{Name: "audit", ShouldMatch: true}},
-				},
-				{
-					action: api.ActionTypeDeny,
-					items:  []testRule{{Name: "deny", ShouldMatch: true}},
-				},
-			},
-			wantAudits:   1,
-			wantBlocking: true,
-			wantFinal:    api.ActionTypeDeny,
-		},
-		{
-			name: "deny plus audit records audit but final deny remains",
-			enforceSpecs: []enforceSpec{
-				{
-					action: api.ActionTypeDeny,
-					items:  []testRule{{Name: "deny", ShouldMatch: true}},
-				},
-				{
-					action: api.ActionTypeAudit,
-					items:  []testRule{{Name: "audit", ShouldMatch: true}},
-				},
-			},
-			wantAudits:   1,
-			wantBlocking: true,
-			wantFinal:    api.ActionTypeDeny,
-		},
-		{
-			name: "audit plus allow records audit and allows",
-			enforceSpecs: []enforceSpec{
-				{
-					action: api.ActionTypeAudit,
-					items:  []testRule{{Name: "audit", ShouldMatch: true}},
-				},
-				{
-					action: api.ActionTypeAllow,
-					items:  []testRule{{Name: "allow", ShouldMatch: true}},
-				},
-			},
-			wantAudits: 1,
-			wantFinal:  api.ActionTypeAllow,
-		},
-		{
-			name: "allow plus audit records audit and final allow remains",
-			enforceSpecs: []enforceSpec{
-				{
-					action: api.ActionTypeAllow,
-					items:  []testRule{{Name: "allow", ShouldMatch: true}},
-				},
-				{
-					action: api.ActionTypeAudit,
-					items:  []testRule{{Name: "audit", ShouldMatch: true}},
-				},
-			},
-			wantAudits: 1,
-			wantFinal:  api.ActionTypeAllow,
-		},
-		{
-			name: "audit records audit but does not prevent implicit allow-list deny",
-			enforceSpecs: []enforceSpec{
-				{
-					action: api.ActionTypeAllow,
-					items:  []testRule{{Name: "allow", ShouldMatch: false}},
-				},
-				{
-					action: api.ActionTypeAudit,
-					items:  []testRule{{Name: "audit", ShouldMatch: true}},
-				},
-			},
-			wantAudits:   1,
-			wantBlocking: true,
-		},
-		{
-			name: "audit plus allow plus later deny denies and records audit",
-			enforceSpecs: []enforceSpec{
-				{
-					action: api.ActionTypeAudit,
-					items:  []testRule{{Name: "audit", ShouldMatch: true}},
-				},
-				{
-					action: api.ActionTypeAllow,
-					items:  []testRule{{Name: "allow", ShouldMatch: true}},
-				},
-				{
-					action: api.ActionTypeDeny,
-					items:  []testRule{{Name: "deny", ShouldMatch: true}},
-				},
-			},
-			wantAudits:   1,
-			wantBlocking: true,
-			wantFinal:    api.ActionTypeDeny,
-		},
-		{
-			name: "audit plus deny plus later allow allows and records audit",
-			enforceSpecs: []enforceSpec{
-				{
-					action: api.ActionTypeAudit,
-					items:  []testRule{{Name: "audit", ShouldMatch: true}},
-				},
-				{
-					action: api.ActionTypeDeny,
-					items:  []testRule{{Name: "deny", ShouldMatch: true}},
-				},
-				{
-					action: api.ActionTypeAllow,
-					items:  []testRule{{Name: "allow", ShouldMatch: true}},
-				},
-			},
-			wantAudits: 1,
-			wantFinal:  api.ActionTypeAllow,
-		},
-		{
-			name: "unmatched audit after matching allow does not change final allow",
-			enforceSpecs: []enforceSpec{
-				{
-					action: api.ActionTypeAllow,
-					items:  []testRule{{Name: "allow", ShouldMatch: true}},
-				},
-				{
-					action: api.ActionTypeAudit,
-					items:  []testRule{{Name: "audit", ShouldMatch: false}},
-				},
-			},
-			wantAudits: 0,
-			wantFinal:  api.ActionTypeAllow,
-		},
-		{
-			name: "unmatched audit after matching deny does not change final deny",
-			enforceSpecs: []enforceSpec{
-				{
-					action: api.ActionTypeDeny,
-					items:  []testRule{{Name: "deny", ShouldMatch: true}},
-				},
-				{
-					action: api.ActionTypeAudit,
-					items:  []testRule{{Name: "audit", ShouldMatch: false}},
-				},
-			},
-			wantAudits:   0,
-			wantBlocking: true,
-			wantFinal:    api.ActionTypeDeny,
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			fixture := newTestFixture()
-
-			evaluation, err := EvaluateEnforce(
-				testObject{Values: []Value{{Value: "app:1", Path: "containers[0]"}}},
-				buildEnforceBodies(fixture, tt.enforceSpecs),
-				fixture.set("registry", nil),
-			)
-			if err != nil {
-				t.Fatalf("EvaluateEnforce() unexpected error: %v", err)
-			}
-
-			if len(evaluation.Audits) != tt.wantAudits {
-				t.Fatalf("audits = %d, want %d", len(evaluation.Audits), tt.wantAudits)
-			}
-
-			for _, audit := range evaluation.Audits {
-				if audit.Action != api.ActionTypeAudit {
-					t.Fatalf("audit action = %q, want %q", audit.Action, api.ActionTypeAudit)
-				}
-
-				if audit.Message == "" {
-					t.Fatalf("audit message is empty")
-				}
-			}
-
-			if tt.wantBlocking {
-				if evaluation.Blocking == nil {
-					t.Fatalf("Blocking = nil, want decision")
-				}
-
-				if evaluation.Blocking.Action != api.ActionTypeDeny {
-					t.Fatalf("Blocking.Action = %q, want %q", evaluation.Blocking.Action, api.ActionTypeDeny)
-				}
-
-				if err := evaluation.BlockingError(); err == nil {
-					t.Fatalf("BlockingError() = nil, want error")
-				}
-			} else {
-				assertNoBlocking(t, evaluation)
-			}
-
-			if tt.wantFinal == "" {
-				assertNoFinal(t, evaluation)
-
-				return
-			}
-
-			if evaluation.Final == nil {
-				t.Fatalf("Final = nil, want %q", tt.wantFinal)
-			}
-
-			if evaluation.Final.Action != tt.wantFinal {
-				t.Fatalf("Final.Action = %q, want %q", evaluation.Final.Action, tt.wantFinal)
-			}
-		})
-	}
-}
-
-func TestEvaluateEnforce_ListValues(t *testing.T) {
-	t.Parallel()
-
-	t.Run("blocks on first value not matched by allow-list", func(t *testing.T) {
-		t.Parallel()
-
-		set := Set[string, testObject]{
-			Name:        "registry",
-			EventReason: "ForbiddenRegistry",
-			Values: func(obj testObject) []Value {
-				return obj.Values
-			},
-			Rules: func(_ *api.NamespaceRuleEnforceBody) []string {
-				return []string{"allowed"}
-			},
-			Matches: func(rule string, value Value) (Match, error) {
-				return Match{Matched: value.Value == rule}, nil
-			},
-		}
-
-		evaluation, err := EvaluateEnforce(
-			testObject{
-				Values: []Value{
-					{Value: "blocked", Path: "containers[0]"},
-					{Value: "allowed", Path: "containers[1]"},
-				},
-			},
-			[]*api.NamespaceRuleEnforceBody{
-				{Action: api.ActionTypeAllow},
-			},
-			set,
-		)
-		if err != nil {
-			t.Fatalf("EvaluateEnforce() unexpected error: %v", err)
-		}
-
-		if evaluation.Blocking == nil {
-			t.Fatalf("Blocking = nil, want implicit allow-list deny")
-		}
-
-		if evaluation.Blocking.Value.Value != "blocked" {
-			t.Fatalf("Blocking.Value.Value = %q, want blocked", evaluation.Blocking.Value.Value)
-		}
-
-		if evaluation.Blocking.Value.Path != "containers[0]" {
-			t.Fatalf("Blocking.Value.Path = %q, want containers[0]", evaluation.Blocking.Value.Path)
-		}
-
-		if evaluation.Final != nil {
-			t.Fatalf("Final = %#v, want nil because first value was implicitly denied", evaluation.Final)
-		}
-	})
-
-}
-
-func TestEvaluateEnforce_AllowListImplicitDeny(t *testing.T) {
-	t.Parallel()
-
-	t.Run("unmatched allow creates blocking decision without final decision", func(t *testing.T) {
-		t.Parallel()
-
-		fixture := newTestFixture()
-
-		evaluation, err := EvaluateEnforce(
-			testObject{Values: []Value{{Value: "harbor/app:1", Path: "containers[0]"}}},
-			[]*api.NamespaceRuleEnforceBody{
-				fixture.enforce(api.ActionTypeAllow, testRule{
-					Name:        "allow",
-					ShouldMatch: false,
-				}),
-			},
-			fixture.set("registry", nil),
-		)
-		if err != nil {
-			t.Fatalf("EvaluateEnforce() unexpected error: %v", err)
-		}
-
-		if evaluation.Blocking == nil {
-			t.Fatalf("Blocking = nil, want implicit allow-list deny")
-		}
-
-		if evaluation.Blocking.Action != api.ActionTypeDeny {
-			t.Fatalf("Blocking.Action = %q, want %q", evaluation.Blocking.Action, api.ActionTypeDeny)
-		}
-
-		if evaluation.Blocking.Value.Value != "harbor/app:1" {
-			t.Fatalf("Blocking.Value.Value = %q, want harbor/app:1", evaluation.Blocking.Value.Value)
-		}
-
-		if evaluation.Blocking.Value.Path != "containers[0]" {
-			t.Fatalf("Blocking.Value.Path = %q, want containers[0]", evaluation.Blocking.Value.Path)
-		}
-
-		if evaluation.Final != nil {
-			t.Fatalf("Final = %#v, want nil for implicit allow-list deny", evaluation.Final)
-		}
-
-		if !strings.Contains(evaluation.Blocking.Message, "is not allowed by namespace rule") {
-			t.Fatalf("Blocking.Message = %q, want implicit allow-list deny message", evaluation.Blocking.Message)
-		}
-	})
-
-	t.Run("audit-only rules remain observational and do not deny", func(t *testing.T) {
-		t.Parallel()
-
-		fixture := newTestFixture()
-
-		evaluation, err := EvaluateEnforce(
-			testObject{Values: []Value{{Value: "harbor/app:1", Path: "containers[0]"}}},
-			[]*api.NamespaceRuleEnforceBody{
-				fixture.enforce(api.ActionTypeAudit, testRule{
-					Name:        "audit",
-					ShouldMatch: true,
-				}),
-			},
-			fixture.set("registry", nil),
-		)
-		if err != nil {
-			t.Fatalf("EvaluateEnforce() unexpected error: %v", err)
-		}
-
-		if len(evaluation.Audits) != 1 {
-			t.Fatalf("audits = %d, want 1", len(evaluation.Audits))
-		}
-
-		assertNoBlocking(t, evaluation)
-		assertNoFinal(t, evaluation)
-	})
-
-	t.Run("matched audit does not prevent implicit allow-list deny", func(t *testing.T) {
-		t.Parallel()
-
-		fixture := newTestFixture()
-
-		evaluation, err := EvaluateEnforce(
-			testObject{Values: []Value{{Value: "harbor/app:1", Path: "containers[0]"}}},
-			[]*api.NamespaceRuleEnforceBody{
-				fixture.enforce(api.ActionTypeAudit, testRule{
-					Name:        "audit",
-					ShouldMatch: true,
-				}),
-				fixture.enforce(api.ActionTypeAllow, testRule{
-					Name:        "allow",
-					ShouldMatch: false,
-				}),
-			},
-			fixture.set("registry", nil),
-		)
-		if err != nil {
-			t.Fatalf("EvaluateEnforce() unexpected error: %v", err)
-		}
-
-		if len(evaluation.Audits) != 1 {
-			t.Fatalf("audits = %d, want 1", len(evaluation.Audits))
-		}
-
-		if evaluation.Blocking == nil {
-			t.Fatalf("Blocking = nil, want implicit allow-list deny")
-		}
-
-		if evaluation.Blocking.Action != api.ActionTypeDeny {
-			t.Fatalf("Blocking.Action = %q, want %q", evaluation.Blocking.Action, api.ActionTypeDeny)
-		}
-
-		if evaluation.Final != nil {
-			t.Fatalf("Final = %#v, want nil for implicit allow-list deny", evaluation.Final)
-		}
-	})
-}
-
-func TestEvaluateEnforce_MultipleValues(t *testing.T) {
-	t.Parallel()
-
-	t.Run("continues after allowed first value and blocks on second value", func(t *testing.T) {
-		t.Parallel()
-
-		set := Set[string, testObject]{
-			Name:        "registry",
-			EventReason: "ForbiddenRegistry",
-			Values: func(obj testObject) []Value {
-				return obj.Values
-			},
-			Rules: func(_ *api.NamespaceRuleEnforceBody) []string {
-				return []string{"bad"}
-			},
-			Matches: func(rule string, value Value) (Match, error) {
-				return Match{Matched: value.Value == rule}, nil
-			},
-		}
-
-		evaluation, err := EvaluateEnforce(
-			testObject{
-				Values: []Value{
-					{Value: "good", Path: "containers[0]"},
-					{Value: "bad", Path: "containers[1]"},
-				},
-			},
-			[]*api.NamespaceRuleEnforceBody{
-				{Action: api.ActionTypeDeny},
-			},
-			set,
-		)
-		if err != nil {
-			t.Fatalf("EvaluateEnforce() unexpected error: %v", err)
-		}
-
-		if evaluation.Blocking == nil {
-			t.Fatalf("Blocking = nil, want decision")
-		}
-
-		if evaluation.Blocking.Value.Value != "bad" {
-			t.Fatalf("Blocking.Value.Value = %q, want %q", evaluation.Blocking.Value.Value, "bad")
-		}
-
-		if evaluation.Blocking.Value.Path != "containers[1]" {
-			t.Fatalf("Blocking.Value.Path = %q, want %q", evaluation.Blocking.Value.Path, "containers[1]")
-		}
-	})
-
-	t.Run("skips empty values and evaluates non-empty values", func(t *testing.T) {
-		t.Parallel()
-
-		fixture := newTestFixture()
-
-		evaluation, err := EvaluateEnforce(
-			testObject{
-				Values: []Value{
-					{Value: "", Path: "containers[0]"},
-					{Value: "bad", Path: "containers[1]"},
-				},
-			},
-			[]*api.NamespaceRuleEnforceBody{
-				fixture.enforce(api.ActionTypeDeny, testRule{Name: "deny", ShouldMatch: true}),
-			},
-			fixture.set("registry", nil),
-		)
-		if err != nil {
-			t.Fatalf("EvaluateEnforce() unexpected error: %v", err)
-		}
-
-		if evaluation.Blocking == nil {
-			t.Fatalf("Blocking = nil, want decision")
-		}
-
-		if evaluation.Blocking.Value.Path != "containers[1]" {
-			t.Fatalf("Blocking.Value.Path = %q, want containers[1]", evaluation.Blocking.Value.Path)
-		}
-	})
-
-	t.Run("audits all matching values", func(t *testing.T) {
-		t.Parallel()
-
-		fixture := newTestFixture()
-
-		evaluation, err := EvaluateEnforce(
-			testObject{
-				Values: []Value{
-					{Value: "a", Path: "containers[0]"},
-					{Value: "b", Path: "containers[1]"},
-				},
-			},
-			[]*api.NamespaceRuleEnforceBody{
-				fixture.enforce(api.ActionTypeAudit, testRule{Name: "audit", ShouldMatch: true}),
-			},
-			fixture.set("registry", nil),
-		)
-		if err != nil {
-			t.Fatalf("EvaluateEnforce() unexpected error: %v", err)
-		}
-
-		if len(evaluation.Audits) != 2 {
-			t.Fatalf("audits = %d, want 2", len(evaluation.Audits))
-		}
-
-		if evaluation.Audits[0].Value.Path != "containers[0]" {
-			t.Fatalf("first audit path = %q, want containers[0]", evaluation.Audits[0].Value.Path)
-		}
-
-		if evaluation.Audits[1].Value.Path != "containers[1]" {
-			t.Fatalf("second audit path = %q, want containers[1]", evaluation.Audits[1].Value.Path)
-		}
-	})
-
-	t.Run("stops after first blocking value", func(t *testing.T) {
-		t.Parallel()
-
-		set := Set[string, testObject]{
-			Name: "registry",
-			Values: func(obj testObject) []Value {
-				return obj.Values
-			},
-			Rules: func(_ *api.NamespaceRuleEnforceBody) []string {
-				return []string{"bad", "worse"}
-			},
-			Matches: func(rule string, value Value) (Match, error) {
-				return Match{Matched: value.Value == rule}, nil
-			},
-		}
-
-		evaluation, err := EvaluateEnforce(
-			testObject{
-				Values: []Value{
-					{Value: "bad", Path: "containers[0]"},
-					{Value: "worse", Path: "containers[1]"},
-				},
-			},
-			[]*api.NamespaceRuleEnforceBody{
-				{Action: api.ActionTypeDeny},
-			},
-			set,
-		)
-		if err != nil {
-			t.Fatalf("EvaluateEnforce() unexpected error: %v", err)
-		}
-
-		if evaluation.Blocking == nil {
-			t.Fatalf("Blocking = nil, want decision")
-		}
-
-		if evaluation.Blocking.Value.Value != "bad" {
-			t.Fatalf("Blocking.Value.Value = %q, want bad", evaluation.Blocking.Value.Value)
-		}
-	})
-}
-
-func TestEvaluateEnforce_MatchedValueAndMessages(t *testing.T) {
-	t.Parallel()
-
-	t.Run("matched value is propagated to final decision", func(t *testing.T) {
-		t.Parallel()
-
-		fixture := newTestFixture()
-
-		matchedValue := map[string]string{"rule": "compiled-registry-rule"}
-
-		evaluation, err := EvaluateEnforce(
-			testObject{Values: []Value{{Value: "app:1", Path: "containers[0]"}}},
-			[]*api.NamespaceRuleEnforceBody{
-				fixture.enforce(api.ActionTypeAllow, testRule{
-					Name:        "allow",
-					ShouldMatch: true,
-					MatchValue:  matchedValue,
-				}),
-			},
-			fixture.set("registry", nil),
-		)
-		if err != nil {
-			t.Fatalf("EvaluateEnforce() unexpected error: %v", err)
-		}
-
-		if evaluation.Final == nil {
-			t.Fatalf("Final = nil, want decision")
-		}
-
-		got, ok := evaluation.Final.MatchedValue.(map[string]string)
-		if !ok {
-			t.Fatalf("Final.MatchedValue type = %T, want map[string]string", evaluation.Final.MatchedValue)
-		}
-
-		if got["rule"] != "compiled-registry-rule" {
-			t.Fatalf("Final.MatchedValue[rule] = %q", got["rule"])
-		}
-	})
-
-	t.Run("matched value is propagated to blocking decision", func(t *testing.T) {
-		t.Parallel()
-
-		fixture := newTestFixture()
-
-		matchedValue := "compiled-deny-rule"
-
-		evaluation, err := EvaluateEnforce(
-			testObject{Values: []Value{{Value: "app:1", Path: "containers[0]"}}},
-			[]*api.NamespaceRuleEnforceBody{
-				fixture.enforce(api.ActionTypeDeny, testRule{
-					Name:        "deny",
-					ShouldMatch: true,
-					MatchValue:  matchedValue,
-				}),
-			},
-			fixture.set("registry", nil),
-		)
-		if err != nil {
-			t.Fatalf("EvaluateEnforce() unexpected error: %v", err)
-		}
-
-		if evaluation.Blocking == nil {
-			t.Fatalf("Blocking = nil, want decision")
-		}
-
-		if evaluation.Blocking.MatchedValue != matchedValue {
-			t.Fatalf("Blocking.MatchedValue = %#v, want %#v", evaluation.Blocking.MatchedValue, matchedValue)
-		}
-	})
-
-	t.Run("matched value is propagated to audit decision", func(t *testing.T) {
-		t.Parallel()
-
-		fixture := newTestFixture()
-
-		matchedValue := "compiled-audit-rule"
-
-		evaluation, err := EvaluateEnforce(
-			testObject{Values: []Value{{Value: "app:1", Path: "containers[0]"}}},
-			[]*api.NamespaceRuleEnforceBody{
-				fixture.enforce(api.ActionTypeAudit, testRule{
-					Name:        "audit",
-					ShouldMatch: true,
-					MatchValue:  matchedValue,
-				}),
-			},
-			fixture.set("registry", nil),
-		)
-		if err != nil {
-			t.Fatalf("EvaluateEnforce() unexpected error: %v", err)
-		}
-
-		if len(evaluation.Audits) != 1 {
-			t.Fatalf("audits = %d, want 1", len(evaluation.Audits))
-		}
-
-		if evaluation.Audits[0].MatchedValue != matchedValue {
-			t.Fatalf("audit MatchedValue = %#v, want %#v", evaluation.Audits[0].MatchedValue, matchedValue)
-		}
-	})
-
-	t.Run("custom message is used", func(t *testing.T) {
-		t.Parallel()
-
-		fixture := newTestFixture()
-
-		evaluation, err := EvaluateEnforce(
-			testObject{Values: []Value{{Value: "app:1", Path: "containers[0]"}}},
-			[]*api.NamespaceRuleEnforceBody{
-				fixture.enforce(api.ActionTypeDeny, testRule{Name: "deny", ShouldMatch: true}),
-			},
-			fixture.set("registry", func(action api.ActionType, value Value, matchedValue any) string {
-				return "custom: " + string(action) + " " + value.Value
-			}),
-		)
-		if err != nil {
-			t.Fatalf("EvaluateEnforce() unexpected error: %v", err)
-		}
-
-		if evaluation.Blocking == nil {
-			t.Fatalf("Blocking = nil, want decision")
-		}
-
-		if evaluation.Blocking.Message != "custom: deny app:1" {
-			t.Fatalf("Blocking.Message = %q, want custom message", evaluation.Blocking.Message)
-		}
-	})
-
-	t.Run("default messages are populated", func(t *testing.T) {
-		t.Parallel()
-
-		for _, action := range []api.ActionType{
-			api.ActionTypeAllow,
-			api.ActionTypeDeny,
-			api.ActionTypeAudit,
-		} {
-			action := action
-
-			t.Run(string(action), func(t *testing.T) {
-				t.Parallel()
-
-				fixture := newTestFixture()
-
-				evaluation, err := EvaluateEnforce(
-					testObject{Values: []Value{{Value: "app:1", Path: "containers[0]"}}},
-					[]*api.NamespaceRuleEnforceBody{
-						fixture.enforce(action, testRule{Name: string(action), ShouldMatch: true}),
+					items: []testRule{
+						{Name: "harbor/.*", ShouldMatch: true},
 					},
-					fixture.set("registry", nil),
-				)
-				if err != nil {
-					t.Fatalf("EvaluateEnforce() unexpected error: %v", err)
-				}
+				},
+				{
+					action: api.ActionTypeDeny,
+					items: []testRule{
+						{Name: "harbor/app:.*", ShouldMatch: true},
+					},
+				},
+			},
+			wantFinalAction: api.ActionTypeDeny,
+			wantBlocking:    true,
+			wantMessage:     `registry "harbor/app:1" at spec.containers[0].image is denied by namespace rule: matched denied rule harbor/app:.*`,
+		},
+		{
+			name: "last matching rule wins while non matching later rules are ignored",
+			enforceSpecs: []enforceSpec{
+				{
+					action: api.ActionTypeDeny,
+					items: []testRule{
+						{Name: "first-deny", ShouldMatch: true},
+					},
+				},
+				{
+					action: api.ActionTypeAllow,
+					items: []testRule{
+						{Name: "allow", ShouldMatch: true},
+					},
+				},
+				{
+					action: api.ActionTypeDeny,
+					items: []testRule{
+						{Name: "later-non-matching-deny", ShouldMatch: false},
+					},
+				},
+			},
+			wantFinalAction: api.ActionTypeAllow,
+			wantMessage:     `registry "harbor/app:1" at spec.containers[0].image is allowed by namespace rule: matched allowed rule allow`,
+		},
+	}
 
-				switch action {
-				case api.ActionTypeAllow:
-					if evaluation.Final == nil || evaluation.Final.Message == "" {
-						t.Fatalf("allow final message is empty")
-					}
-				case api.ActionTypeDeny:
-					if evaluation.Blocking == nil || evaluation.Blocking.Message == "" {
-						t.Fatalf("deny blocking message is empty")
-					}
-				case api.ActionTypeAudit:
-					if len(evaluation.Audits) != 1 || evaluation.Audits[0].Message == "" {
-						t.Fatalf("audit message is empty")
-					}
-				}
-			})
-		}
-	})
+	for _, tt := range tests {
+		tt := tt
+
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			fixture := newTestFixture()
+			evaluation, err := EvaluateEnforce(
+				testObject{
+					Values: []Value{
+						{Value: "harbor/app:1", Path: "spec.containers[0].image"},
+					},
+				},
+				buildEnforceBodies(fixture, tt.enforceSpecs),
+				fixture.set("registry", nil),
+			)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			assertFinalAction(t, evaluation, tt.wantFinalAction)
+
+			if tt.wantBlocking {
+				assertBlockingAction(t, evaluation, api.ActionTypeDeny)
+			} else {
+				assertNoBlocking(t, evaluation)
+			}
+
+			if evaluation.Final.Message != tt.wantMessage {
+				t.Fatalf("final message = %q, want %q", evaluation.Final.Message, tt.wantMessage)
+			}
+		})
+	}
 }
 
-func TestEvaluateEnforce_DefaultActionAndUnsupportedAction(t *testing.T) {
+func TestEvaluateEnforce_DefaultActionIsDeny(t *testing.T) {
 	t.Parallel()
 
-	t.Run("empty action defaults to deny", func(t *testing.T) {
-		t.Parallel()
+	fixture := newTestFixture()
 
-		fixture := newTestFixture()
-
-		evaluation, err := EvaluateEnforce(
-			testObject{Values: []Value{{Value: "app:1", Path: "containers[0]"}}},
-			[]*api.NamespaceRuleEnforceBody{
-				fixture.enforce("", testRule{Name: "default-deny", ShouldMatch: true}),
+	evaluation, err := EvaluateEnforce(
+		testObject{
+			Values: []Value{
+				{Value: "harbor/app:1", Path: "spec.containers[0].image"},
 			},
-			fixture.set("registry", nil),
-		)
-		if err != nil {
-			t.Fatalf("EvaluateEnforce() unexpected error: %v", err)
-		}
-
-		if evaluation.Blocking == nil {
-			t.Fatalf("Blocking = nil, want default deny decision")
-		}
-
-		if evaluation.Blocking.Action != api.ActionTypeDeny {
-			t.Fatalf("Blocking.Action = %q, want %q", evaluation.Blocking.Action, api.ActionTypeDeny)
-		}
-	})
-
-	t.Run("unsupported action returns error with partial evaluation", func(t *testing.T) {
-		t.Parallel()
-
-		fixture := newTestFixture()
-
-		evaluation, err := EvaluateEnforce(
-			testObject{Values: []Value{{Value: "app:1", Path: "containers[0]"}}},
-			[]*api.NamespaceRuleEnforceBody{
-				fixture.enforce(api.ActionTypeAudit, testRule{Name: "audit", ShouldMatch: true}),
-				fixture.enforce(api.ActionType("unsupported"), testRule{Name: "bad", ShouldMatch: true}),
+		},
+		buildEnforceBodies(fixture, []enforceSpec{
+			{
+				action: "",
+				items: []testRule{
+					{Name: "default-deny", ShouldMatch: true},
+				},
 			},
-			fixture.set("registry", nil),
-		)
-		if err == nil {
-			t.Fatalf("EvaluateEnforce() expected error, got nil")
-		}
+		}),
+		fixture.set("registry", nil),
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
-		if !strings.Contains(err.Error(), `registry: unsupported rule action "unsupported"`) {
-			t.Fatalf("error = %q, want unsupported action message", err.Error())
-		}
+	assertBlockingAction(t, evaluation, api.ActionTypeDeny)
 
-		if evaluation == nil {
-			t.Fatalf("evaluation = nil, want partial evaluation")
-		}
-
-		if len(evaluation.Audits) != 1 {
-			t.Fatalf("audits = %d, want 1 from partial evaluation", len(evaluation.Audits))
-		}
-	})
+	if evaluation.Blocking.Message != `registry "harbor/app:1" at spec.containers[0].image is denied by namespace rule: matched denied rule default-deny` {
+		t.Fatalf("blocking message = %q", evaluation.Blocking.Message)
+	}
 }
 
-func TestEvaluateEnforce_MatcherErrors(t *testing.T) {
+func TestEvaluateEnforce_AllowListMissDenies(t *testing.T) {
 	t.Parallel()
 
-	t.Run("matcher error is wrapped and returns partial evaluation", func(t *testing.T) {
-		t.Parallel()
+	fixture := newTestFixture()
 
-		fixture := newTestFixture()
-
-		wantErr := errors.New("matcher failed")
-
-		evaluation, err := EvaluateEnforce(
-			testObject{Values: []Value{{Value: "app:1", Path: "containers[0]"}}},
-			[]*api.NamespaceRuleEnforceBody{
-				fixture.enforce(api.ActionTypeAllow, testRule{Name: "allow", ShouldMatch: true, Err: wantErr}),
+	evaluation, err := EvaluateEnforce(
+		testObject{
+			Values: []Value{
+				{Value: "docker.io/library/nginx:latest", Path: "spec.containers[0].image"},
 			},
-			fixture.set("registry", nil),
-		)
+		},
+		buildEnforceBodies(fixture, []enforceSpec{
+			{
+				action: api.ActionTypeAllow,
+				items: []testRule{
+					{Name: "harbor/.*", ShouldMatch: false},
+					{Name: "registry.local/.*", ShouldMatch: false},
+				},
+			},
+		}),
+		fixture.set("registry", nil),
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
-		if err == nil {
-			t.Fatalf("EvaluateEnforce() expected error, got nil")
-		}
+	assertBlockingAction(t, evaluation, api.ActionTypeDeny)
+	assertNoFinal(t, evaluation)
 
-		if !errors.Is(err, wantErr) {
-			t.Fatalf("EvaluateEnforce() error = %v, want wrapping %v", err, wantErr)
-		}
+	want := `registry "docker.io/library/nginx:latest" at spec.containers[0].image is not allowed by namespace rule: value did not match any allowed rule. Allowed registries: harbor/.*, registry.local/.*`
+	if evaluation.Blocking.Message != want {
+		t.Fatalf("blocking message = %q, want %q", evaluation.Blocking.Message, want)
+	}
+}
 
-		if !strings.Contains(err.Error(), "registry: invalid rule") {
-			t.Fatalf("EvaluateEnforce() error = %q, want invalid rule context", err.Error())
-		}
+func TestEvaluateEnforce_AllowMissWithoutRuleDescriptionsUsesBaseMessage(t *testing.T) {
+	t.Parallel()
 
-		if evaluation == nil {
-			t.Fatalf("evaluation = nil, want partial evaluation")
+	fixture := newTestFixture()
+
+	set := fixture.set("registry", nil)
+	set.RuleDescription = nil
+	set.AllowedDescription = ""
+
+	evaluation, err := EvaluateEnforce(
+		testObject{
+			Values: []Value{
+				{Value: "docker.io/library/nginx:latest", Path: "spec.containers[0].image"},
+			},
+		},
+		buildEnforceBodies(fixture, []enforceSpec{
+			{
+				action: api.ActionTypeAllow,
+				items: []testRule{
+					{Name: "harbor/.*", ShouldMatch: false},
+				},
+			},
+		}),
+		set,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	assertBlockingAction(t, evaluation, api.ActionTypeDeny)
+
+	want := `registry "docker.io/library/nginx:latest" at spec.containers[0].image is not allowed by namespace rule`
+	if evaluation.Blocking.Message != want {
+		t.Fatalf("blocking message = %q, want %q", evaluation.Blocking.Message, want)
+	}
+}
+
+func TestEvaluateEnforce_AllowMissDescriptionsAreLimited(t *testing.T) {
+	t.Parallel()
+
+	fixture := newTestFixture()
+
+	items := make([]testRule, 0, 12)
+	for i := 0; i < 12; i++ {
+		items = append(items, testRule{
+			Name:        "rule-" + string(rune('a'+i)),
+			ShouldMatch: false,
+		})
+	}
+
+	evaluation, err := EvaluateEnforce(
+		testObject{
+			Values: []Value{
+				{Value: "unmatched", Path: "spec.value"},
+			},
+		},
+		buildEnforceBodies(fixture, []enforceSpec{
+			{
+				action: api.ActionTypeAllow,
+				items:  items,
+			},
+		}),
+		fixture.set("registry", nil),
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	assertBlockingAction(t, evaluation, api.ActionTypeDeny)
+
+	msg := evaluation.Blocking.Message
+
+	for _, expected := range []string{
+		"rule-a",
+		"rule-j",
+		"and 2 more",
+	} {
+		if !strings.Contains(msg, expected) {
+			t.Fatalf("expected message %q to contain %q", msg, expected)
 		}
+	}
+
+	for _, unexpected := range []string{
+		"rule-k",
+		"rule-l",
+	} {
+		if strings.Contains(msg, unexpected) {
+			t.Fatalf("expected message %q not to contain %q", msg, unexpected)
+		}
+	}
+}
+
+func TestEvaluateEnforce_AuditIsObservational(t *testing.T) {
+	t.Parallel()
+
+	fixture := newTestFixture()
+
+	evaluation, err := EvaluateEnforce(
+		testObject{
+			Values: []Value{
+				{Value: "audit/app:1", Path: "spec.containers[0].image"},
+			},
+		},
+		buildEnforceBodies(fixture, []enforceSpec{
+			{
+				action: api.ActionTypeAudit,
+				items: []testRule{
+					{
+						Name:        "audit/.*",
+						ShouldMatch: true,
+						Detail:      `"audit/app:1" matched registry rule audit/.*`,
+					},
+				},
+			},
+		}),
+		fixture.set("registry", nil),
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	assertNoBlocking(t, evaluation)
+	assertNoFinal(t, evaluation)
+
+	if len(evaluation.Audits) != 1 {
+		t.Fatalf("expected 1 audit, got %d", len(evaluation.Audits))
+	}
+
+	audit := evaluation.Audits[0]
+
+	if audit.Action != api.ActionTypeAudit {
+		t.Fatalf("audit action = %q, want %q", audit.Action, api.ActionTypeAudit)
+	}
+
+	if audit.MatchedRule != "audit/.*" {
+		t.Fatalf("audit matched rule = %q, want %q", audit.MatchedRule, "audit/.*")
+	}
+
+	if audit.MatchDetail != `"audit/app:1" matched registry rule audit/.*` {
+		t.Fatalf("audit match detail = %q", audit.MatchDetail)
+	}
+
+	want := `registry "audit/app:1" at spec.containers[0].image matched audit namespace rule: "audit/app:1" matched registry rule audit/.*`
+	if audit.Message != want {
+		t.Fatalf("audit message = %q, want %q", audit.Message, want)
+	}
+}
+
+func TestEvaluateEnforce_AuditDoesNotSatisfyAllowList(t *testing.T) {
+	t.Parallel()
+
+	fixture := newTestFixture()
+
+	evaluation, err := EvaluateEnforce(
+		testObject{
+			Values: []Value{
+				{Value: "audit/app:1", Path: "spec.containers[0].image"},
+			},
+		},
+		buildEnforceBodies(fixture, []enforceSpec{
+			{
+				action: api.ActionTypeAudit,
+				items: []testRule{
+					{Name: "audit/.*", ShouldMatch: true},
+				},
+			},
+			{
+				action: api.ActionTypeAllow,
+				items: []testRule{
+					{Name: "allowed/.*", ShouldMatch: false},
+				},
+			},
+		}),
+		fixture.set("registry", nil),
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(evaluation.Audits) != 1 {
+		t.Fatalf("expected 1 audit, got %d", len(evaluation.Audits))
+	}
+
+	assertBlockingAction(t, evaluation, api.ActionTypeDeny)
+	assertNoFinal(t, evaluation)
+
+	if !strings.Contains(evaluation.Blocking.Message, "Allowed registries: allowed/.*") {
+		t.Fatalf("blocking message = %q", evaluation.Blocking.Message)
+	}
+}
+
+func TestEvaluateEnforce_MatchDetailOverridesMatchedRuleInMessage(t *testing.T) {
+	t.Parallel()
+
+	fixture := newTestFixture()
+
+	evaluation, err := EvaluateEnforce(
+		testObject{
+			Values: []Value{
+				{Value: "10.0.171.239", Path: "spec.loadBalancerIP"},
+			},
+		},
+		buildEnforceBodies(fixture, []enforceSpec{
+			{
+				action: api.ActionTypeDeny,
+				items: []testRule{
+					{
+						Name:         "10.0.0.0/8",
+						ShouldMatch:  true,
+						MatchedValue: "10.0.0.0/8",
+						Detail:       "10.0.171.239 is contained in 10.0.0.0/8",
+					},
+				},
+			},
+		}),
+		fixture.set("loadBalancer CIDR", nil),
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	assertBlockingAction(t, evaluation, api.ActionTypeDeny)
+
+	blocking := evaluation.Blocking
+
+	if blocking.MatchedRule != "10.0.0.0/8" {
+		t.Fatalf("matched rule = %q, want %q", blocking.MatchedRule, "10.0.0.0/8")
+	}
+
+	if blocking.MatchDetail != "10.0.171.239 is contained in 10.0.0.0/8" {
+		t.Fatalf("match detail = %q", blocking.MatchDetail)
+	}
+
+	want := `loadBalancer CIDR "10.0.171.239" at spec.loadBalancerIP is denied by namespace rule: 10.0.171.239 is contained in 10.0.0.0/8`
+	if blocking.Message != want {
+		t.Fatalf("blocking message = %q, want %q", blocking.Message, want)
+	}
+}
+
+func TestEvaluateEnforce_CustomMessageOverridesDefaultMessage(t *testing.T) {
+	t.Parallel()
+
+	fixture := newTestFixture()
+
+	set := fixture.set("registry", func(action api.ActionType, value Value, matched any) string {
+		return "custom message"
 	})
 
-	t.Run("matcher error after audit keeps audit in partial evaluation", func(t *testing.T) {
-		t.Parallel()
-
-		fixture := newTestFixture()
-
-		wantErr := errors.New("matcher failed")
-
-		evaluation, err := EvaluateEnforce(
-			testObject{Values: []Value{{Value: "app:1", Path: "containers[0]"}}},
-			[]*api.NamespaceRuleEnforceBody{
-				fixture.enforce(api.ActionTypeAudit, testRule{Name: "audit", ShouldMatch: true}),
-				fixture.enforce(api.ActionTypeAllow, testRule{Name: "allow", Err: wantErr}),
+	evaluation, err := EvaluateEnforce(
+		testObject{
+			Values: []Value{
+				{Value: "harbor/app:1", Path: "spec.containers[0].image"},
 			},
-			fixture.set("registry", nil),
-		)
+		},
+		buildEnforceBodies(fixture, []enforceSpec{
+			{
+				action: api.ActionTypeDeny,
+				items: []testRule{
+					{Name: "harbor/.*", ShouldMatch: true},
+				},
+			},
+		}),
+		set,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
-		if err == nil {
-			t.Fatalf("EvaluateEnforce() expected error, got nil")
-		}
+	assertBlockingAction(t, evaluation, api.ActionTypeDeny)
 
-		if !errors.Is(err, wantErr) {
-			t.Fatalf("EvaluateEnforce() error = %v, want wrapping %v", err, wantErr)
-		}
+	if evaluation.Blocking.Message != "custom message" {
+		t.Fatalf("blocking message = %q, want custom message", evaluation.Blocking.Message)
+	}
+}
 
-		if evaluation == nil {
-			t.Fatalf("evaluation = nil, want partial evaluation")
-		}
+func TestEvaluateEnforce_MatcherError(t *testing.T) {
+	t.Parallel()
 
-		if len(evaluation.Audits) != 1 {
-			t.Fatalf("audits = %d, want 1", len(evaluation.Audits))
-		}
-	})
+	fixture := newTestFixture()
+	matchErr := errors.New("invalid regex")
+
+	evaluation, err := EvaluateEnforce(
+		testObject{
+			Values: []Value{
+				{Value: "harbor/app:1", Path: "spec.containers[0].image"},
+			},
+		},
+		buildEnforceBodies(fixture, []enforceSpec{
+			{
+				action: api.ActionTypeDeny,
+				items: []testRule{
+					{
+						Name:        "bad-rule",
+						ShouldMatch: true,
+						Err:         matchErr,
+					},
+				},
+			},
+		}),
+		fixture.set("registry", nil),
+	)
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+
+	if evaluation == nil {
+		t.Fatalf("expected non-nil evaluation after runtime matcher error")
+	}
+
+	if !strings.Contains(err.Error(), "registry: invalid rule: invalid regex") {
+		t.Fatalf("error = %q", err.Error())
+	}
+}
+
+func TestEvaluateEnforce_UnsupportedAction(t *testing.T) {
+	t.Parallel()
+
+	fixture := newTestFixture()
+
+	evaluation, err := EvaluateEnforce(
+		testObject{
+			Values: []Value{
+				{Value: "harbor/app:1", Path: "spec.containers[0].image"},
+			},
+		},
+		buildEnforceBodies(fixture, []enforceSpec{
+			{
+				action: api.ActionType("invalid"),
+				items: []testRule{
+					{Name: "harbor/.*", ShouldMatch: true},
+				},
+			},
+		}),
+		fixture.set("registry", nil),
+	)
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+
+	if evaluation == nil {
+		t.Fatalf("expected non-nil evaluation after runtime action error")
+	}
+
+	if !strings.Contains(err.Error(), `registry: unsupported rule action "invalid"`) {
+		t.Fatalf("error = %q", err.Error())
+	}
 }
 
 func TestEvaluation_BlockingError(t *testing.T) {
 	t.Parallel()
 
-	t.Run("nil evaluation has no blocking error", func(t *testing.T) {
-		t.Parallel()
+	if err := (*Evaluation)(nil).BlockingError(); err != nil {
+		t.Fatalf("nil evaluation BlockingError() = %v, want nil", err)
+	}
 
-		var evaluation *Evaluation
+	evaluation := &Evaluation{}
+	if err := evaluation.BlockingError(); err != nil {
+		t.Fatalf("empty evaluation BlockingError() = %v, want nil", err)
+	}
 
-		if err := evaluation.BlockingError(); err != nil {
-			t.Fatalf("BlockingError() = %v, want nil", err)
-		}
-	})
+	evaluation.Blocking = &Decision{
+		Message: "blocked by rule",
+	}
 
-	t.Run("evaluation without blocking has no blocking error", func(t *testing.T) {
-		t.Parallel()
+	err := evaluation.BlockingError()
+	if err == nil {
+		t.Fatalf("expected blocking error, got nil")
+	}
 
-		evaluation := &Evaluation{}
-
-		if err := evaluation.BlockingError(); err != nil {
-			t.Fatalf("BlockingError() = %v, want nil", err)
-		}
-	})
-
-	t.Run("evaluation with blocking returns decision error", func(t *testing.T) {
-		t.Parallel()
-
-		decision := &Decision{
-			SetName: "registry",
-			Action:  api.ActionTypeDeny,
-			Message: "denied",
-		}
-
-		evaluation := &Evaluation{
-			Blocking: decision,
-		}
-
-		err := evaluation.BlockingError()
-		if err == nil {
-			t.Fatalf("BlockingError() = nil, want error")
-		}
-
-		var decisionErr *DecisionError
-		if !errors.As(err, &decisionErr) {
-			t.Fatalf("BlockingError() type = %T, want *DecisionError", err)
-		}
-
-		if decisionErr.Decision != decision {
-			t.Fatalf("DecisionError.Decision = %#v, want original decision", decisionErr.Decision)
-		}
-
-		if err.Error() != "denied" {
-			t.Fatalf("BlockingError().Error() = %q, want denied", err.Error())
-		}
-	})
+	if err.Error() != "blocked by rule" {
+		t.Fatalf("blocking error = %q, want %q", err.Error(), "blocked by rule")
+	}
 }
 
-func TestDecisionError_Error(t *testing.T) {
+func TestDecisionError_ErrorFallback(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name string
 		err  *DecisionError
-		want string
 	}{
 		{
-			name: "nil error receiver",
+			name: "nil error",
 			err:  nil,
-			want: "namespace rule decision denied request",
 		},
 		{
 			name: "nil decision",
 			err:  &DecisionError{},
-			want: "namespace rule decision denied request",
-		},
-		{
-			name: "decision message",
-			err: &DecisionError{
-				Decision: &Decision{
-					Message: "custom denied message",
-				},
-			},
-			want: "custom denied message",
-		},
-		{
-			name: "empty decision message",
-			err: &DecisionError{
-				Decision: &Decision{},
-			},
-			want: "",
 		},
 	}
 
@@ -1412,9 +832,8 @@ func TestDecisionError_Error(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := tt.err.Error()
-			if got != tt.want {
-				t.Fatalf("Error() = %q, want %q", got, tt.want)
+			if tt.err.Error() != "namespace rule decision denied request" {
+				t.Fatalf("Error() = %q", tt.err.Error())
 			}
 		})
 	}
@@ -1423,193 +842,148 @@ func TestDecisionError_Error(t *testing.T) {
 func TestEvaluation_Append(t *testing.T) {
 	t.Parallel()
 
-	t.Run("nil receiver is no-op", func(t *testing.T) {
+	t.Run("nil receiver or nil other does nothing", func(t *testing.T) {
 		t.Parallel()
 
 		var evaluation *Evaluation
+		evaluation.Append(&Evaluation{})
 
-		evaluation.Append(&Evaluation{
-			Audits: []*Decision{{SetName: "audit"}},
-			Final:  &Decision{Action: api.ActionTypeAllow},
-		})
-	})
+		nonNil := &Evaluation{}
+		nonNil.Append(nil)
 
-	t.Run("nil other is no-op", func(t *testing.T) {
-		t.Parallel()
+		assertNoBlocking(t, nonNil)
+		assertNoFinal(t, nonNil)
 
-		evaluation := &Evaluation{
-			Audits: []*Decision{{SetName: "audit-1"}},
-			Final:  &Decision{Action: api.ActionTypeAllow},
-		}
-
-		evaluation.Append(nil)
-
-		if len(evaluation.Audits) != 1 {
-			t.Fatalf("audits = %d, want 1", len(evaluation.Audits))
-		}
-
-		if evaluation.Final == nil || evaluation.Final.Action != api.ActionTypeAllow {
-			t.Fatalf("Final = %#v, want allow", evaluation.Final)
+		if len(nonNil.Audits) != 0 {
+			t.Fatalf("expected no audits, got %d", len(nonNil.Audits))
 		}
 	})
 
-	t.Run("appends audits and replaces final and blocking", func(t *testing.T) {
+	t.Run("appends audits and overrides final and blocking", func(t *testing.T) {
 		t.Parallel()
 
-		initialFinal := &Decision{SetName: "initial", Action: api.ActionTypeAllow}
-		newFinal := &Decision{SetName: "new", Action: api.ActionTypeDeny}
-		newBlocking := &Decision{SetName: "new", Action: api.ActionTypeDeny}
+		firstAudit := &Decision{Action: api.ActionTypeAudit, Message: "audit-1"}
+		secondAudit := &Decision{Action: api.ActionTypeAudit, Message: "audit-2"}
+		final := &Decision{Action: api.ActionTypeAllow, Message: "final"}
+		blocking := &Decision{Action: api.ActionTypeDeny, Message: "blocking"}
 
 		evaluation := &Evaluation{
-			Audits: []*Decision{{SetName: "audit-1"}},
-			Final:  initialFinal,
+			Audits: []*Decision{
+				firstAudit,
+			},
 		}
 
 		evaluation.Append(&Evaluation{
-			Audits:   []*Decision{{SetName: "audit-2"}, {SetName: "audit-3"}},
-			Final:    newFinal,
-			Blocking: newBlocking,
-		})
-
-		if len(evaluation.Audits) != 3 {
-			t.Fatalf("audits = %d, want 3", len(evaluation.Audits))
-		}
-
-		if evaluation.Final != newFinal {
-			t.Fatalf("Final = %#v, want new final", evaluation.Final)
-		}
-
-		if evaluation.Blocking != newBlocking {
-			t.Fatalf("Blocking = %#v, want new blocking", evaluation.Blocking)
-		}
-	})
-
-	t.Run("does not replace final or blocking with nil", func(t *testing.T) {
-		t.Parallel()
-
-		final := &Decision{SetName: "final", Action: api.ActionTypeAllow}
-		blocking := &Decision{SetName: "blocking", Action: api.ActionTypeDeny}
-
-		evaluation := &Evaluation{
+			Audits: []*Decision{
+				secondAudit,
+			},
 			Final:    final,
 			Blocking: blocking,
-		}
-
-		evaluation.Append(&Evaluation{
-			Audits: []*Decision{{SetName: "audit"}},
 		})
 
+		if len(evaluation.Audits) != 2 {
+			t.Fatalf("audits = %d, want 2", len(evaluation.Audits))
+		}
+
+		if evaluation.Audits[0] != firstAudit {
+			t.Fatalf("first audit pointer was not preserved")
+		}
+
+		if evaluation.Audits[1] != secondAudit {
+			t.Fatalf("second audit pointer was not appended")
+		}
+
 		if evaluation.Final != final {
-			t.Fatalf("Final was replaced unexpectedly")
+			t.Fatalf("final was not updated")
 		}
 
 		if evaluation.Blocking != blocking {
-			t.Fatalf("Blocking was replaced unexpectedly")
-		}
-
-		if len(evaluation.Audits) != 1 {
-			t.Fatalf("audits = %d, want 1", len(evaluation.Audits))
+			t.Fatalf("blocking was not updated")
 		}
 	})
 }
 
-func TestDecisionMessage(t *testing.T) {
+func TestMessageHelpers(t *testing.T) {
 	t.Parallel()
 
 	set := Set[testRule, testObject]{
-		Name: "registry",
-	}
-
-	value := Value{
-		Value: "harbor/app:1",
-		Path:  "containers[0]",
-	}
-
-	tests := []struct {
-		name   string
-		action api.ActionType
-		want   string
-	}{
-		{
-			name:   "audit",
-			action: api.ActionTypeAudit,
-			want:   `registry "harbor/app:1" at containers[0] matched audit namespace rule`,
-		},
-		{
-			name:   "deny",
-			action: api.ActionTypeDeny,
-			want:   `registry "harbor/app:1" at containers[0] is denied by namespace rule`,
-		},
-		{
-			name:   "allow",
-			action: api.ActionTypeAllow,
-			want:   `registry "harbor/app:1" at containers[0] is allowed by namespace rule`,
-		},
-		{
-			name:   "unknown",
-			action: api.ActionType("custom"),
-			want:   `registry "harbor/app:1" at containers[0] matched namespace rule action "custom"`,
+		Name:               "registry",
+		AllowedDescription: "Allowed registries",
+		RuleDescription: func(rule testRule) string {
+			return rule.Name
 		},
 	}
 
-	for _, tt := range tests {
-		tt := tt
+	t.Run("allowedLabel default", func(t *testing.T) {
+		t.Parallel()
 
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+		defaultSet := Set[testRule, testObject]{}
 
-			got := decisionMessage(set, tt.action, value, nil)
-			if got != tt.want {
-				t.Fatalf("decisionMessage() = %q, want %q", got, tt.want)
-			}
+		if got := allowedLabel(defaultSet); got != "Allowed values" {
+			t.Fatalf("allowedLabel() = %q, want %q", got, "Allowed values")
+		}
+	})
+
+	t.Run("appendMatchContext uses detail before rule", func(t *testing.T) {
+		t.Parallel()
+
+		got := appendMatchContext("message", "rule", "detail", "matched rule")
+		if got != "message: detail" {
+			t.Fatalf("appendMatchContext() = %q, want %q", got, "message: detail")
+		}
+	})
+
+	t.Run("appendMatchContext uses rule when detail is empty", func(t *testing.T) {
+		t.Parallel()
+
+		got := appendMatchContext("message", "rule", "", "matched rule")
+		if got != "message: matched rule rule" {
+			t.Fatalf("appendMatchContext() = %q", got)
+		}
+	})
+
+	t.Run("appendMatchContext leaves message unchanged without context", func(t *testing.T) {
+		t.Parallel()
+
+		got := appendMatchContext("message", "", "", "matched rule")
+		if got != "message" {
+			t.Fatalf("appendMatchContext() = %q, want message", got)
+		}
+	})
+
+	t.Run("describeRules skips empty descriptions", func(t *testing.T) {
+		t.Parallel()
+
+		got := describeRules(set, []testRule{
+			{Name: "first"},
+			{Name: ""},
+			{Name: "second"},
 		})
-	}
-}
 
-func TestDecisionMessage_CustomMessageReceivesMatchedValue(t *testing.T) {
-	t.Parallel()
-
-	set := Set[testRule, testObject]{
-		Name: "registry",
-		Message: func(action api.ActionType, value Value, matchedValue any) string {
-			return string(action) + ":" + value.Value + ":" + matchedValue.(string)
-		},
-	}
-
-	value := Value{
-		Value: "harbor/app:1",
-		Path:  "containers[0]",
-	}
-
-	got := decisionMessage(set, api.ActionTypeAudit, value, "compiled-rule")
-	want := "audit:harbor/app:1:compiled-rule"
-
-	if got != want {
-		t.Fatalf("decisionMessage() = %q, want %q", got, want)
-	}
+		if got != "first, second" {
+			t.Fatalf("describeRules() = %q, want %q", got, "first, second")
+		}
+	})
 }
 
 func newTestFixture() *testFixture {
 	return &testFixture{
-		items: make(map[*api.NamespaceRuleEnforceBody][]testRule),
+		items: map[*api.NamespaceRuleEnforceBody][]testRule{},
 	}
 }
 
 func (f *testFixture) set(
 	name string,
-	message func(action api.ActionType, value Value, matchedValue any) string,
+	message func(api.ActionType, Value, any) string,
 ) Set[testRule, testObject] {
 	return Set[testRule, testObject]{
-		Name:        name,
-		EventReason: "TestReason",
+		Name:               name,
+		EventReason:        "NamespaceRuleViolation",
+		AllowedDescription: "Allowed registries",
 		Values: func(obj testObject) []Value {
 			return obj.Values
 		},
 		Rules: func(enforce *api.NamespaceRuleEnforceBody) []testRule {
-			if enforce == nil {
-				return nil
-			}
-
 			return f.items[enforce]
 		},
 		Matches: func(rule testRule, value Value) (Match, error) {
@@ -1617,54 +991,91 @@ func (f *testFixture) set(
 				return Match{}, rule.Err
 			}
 
+			if !rule.ShouldMatch {
+				return Match{}, nil
+			}
+
+			matchedValue := rule.MatchedValue
+			if matchedValue == nil {
+				matchedValue = rule.Name
+			}
+
 			return Match{
-				Matched:      rule.ShouldMatch,
-				MatchedValue: rule.MatchValue,
+				Matched:      true,
+				MatchedValue: matchedValue,
+				Detail:       rule.Detail,
 			}, nil
 		},
 		Message: message,
+		RuleDescription: func(rule testRule) string {
+			return rule.Name
+		},
 	}
-}
-
-func (f *testFixture) enforce(
-	action api.ActionType,
-	rules ...testRule,
-) *api.NamespaceRuleEnforceBody {
-	body := &api.NamespaceRuleEnforceBody{
-		Action: action,
-	}
-
-	f.items[body] = rules
-
-	return body
 }
 
 func buildEnforceBodies(
 	fixture *testFixture,
 	specs []enforceSpec,
 ) []*api.NamespaceRuleEnforceBody {
+	if len(specs) == 0 {
+		return nil
+	}
+
 	out := make([]*api.NamespaceRuleEnforceBody, 0, len(specs))
 
 	for _, spec := range specs {
-		out = append(out, fixture.enforce(spec.action, spec.items...))
+		enforce := &api.NamespaceRuleEnforceBody{
+			Action: spec.action,
+		}
+
+		fixture.items[enforce] = spec.items
+		out = append(out, enforce)
 	}
 
 	return out
+}
+
+func assertBlockingAction(t *testing.T, evaluation *Evaluation, action api.ActionType) {
+	t.Helper()
+
+	if evaluation == nil {
+		t.Fatalf("expected evaluation, got nil")
+	}
+
+	if evaluation.Blocking == nil {
+		t.Fatalf("expected blocking decision, got nil")
+	}
+
+	if evaluation.Blocking.Action != action {
+		t.Fatalf("blocking action = %q, want %q", evaluation.Blocking.Action, action)
+	}
 }
 
 func assertNoBlocking(t *testing.T, evaluation *Evaluation) {
 	t.Helper()
 
 	if evaluation == nil {
-		t.Fatalf("evaluation = nil, want non-nil")
+		t.Fatalf("expected evaluation, got nil")
 	}
 
 	if evaluation.Blocking != nil {
-		t.Fatalf("Blocking = %#v, want nil", evaluation.Blocking)
+		t.Fatalf("expected no blocking decision, got %#v", evaluation.Blocking)
+	}
+}
+
+func assertFinalAction(t *testing.T, evaluation *Evaluation, action api.ActionType) {
+	t.Helper()
+
+	if evaluation == nil {
+		t.Fatalf("expected evaluation, got nil")
 	}
 
-	if err := evaluation.BlockingError(); err != nil {
-		t.Fatalf("BlockingError() = %v, want nil", err)
+	if evaluation.Final == nil {
+		t.Fatalf("expected final decision, got nil")
+	}
+
+	if evaluation.Final.Action != action {
+		t.Fatalf("final action = %q, want %q", evaluation.Final.Action, action)
 	}
 }
 
@@ -1672,10 +1083,10 @@ func assertNoFinal(t *testing.T, evaluation *Evaluation) {
 	t.Helper()
 
 	if evaluation == nil {
-		t.Fatalf("evaluation = nil, want non-nil")
+		t.Fatalf("expected evaluation, got nil")
 	}
 
 	if evaluation.Final != nil {
-		t.Fatalf("Final = %#v, want nil", evaluation.Final)
+		t.Fatalf("expected no final decision, got %#v", evaluation.Final)
 	}
 }

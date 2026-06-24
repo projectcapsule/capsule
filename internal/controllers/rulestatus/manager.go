@@ -19,14 +19,12 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
-	"github.com/projectcapsule/capsule/pkg/api"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	meta "github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
@@ -60,7 +58,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 				),
 			),
 		).
-		WithOptions(controller.Options{MaxConcurrentReconciles: ctrlConfig.MaxConcurrentReconciles})
+		WithOptions(ctrlConfig.Runtime.ToControllerOptions())
 
 	return ctrlBuilder.Complete(r)
 }
@@ -145,39 +143,13 @@ func (r Manager) reconcile(ctx context.Context, instance *capsulev1beta2.RuleSta
 	ruleStatus := make([]*rules.NamespaceRuleBodyNamespace, 0, len(instance.Spec))
 
 	for _, rule := range instance.Spec {
-		if rule == nil {
+		if rule == nil || rule.Enforce == nil {
 			continue
 		}
 
-		if rule.Enforce == nil {
-			continue
-		}
-
-		normalized := &rules.NamespaceRuleBodyNamespace{
-			Enforce: &rules.NamespaceRuleEnforceBody{
-				Action: rule.Enforce.Action,
-				Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
-					Targets: append(
-						[]rules.WorkloadValidationTarget(nil),
-						rule.Enforce.Workloads.Targets...,
-					),
-					Registries: append(
-						[]rules.OCIRegistry(nil),
-						rule.Enforce.Workloads.Registries...,
-					),
-					QoSClasses: append(
-						[]corev1.PodQOSClass(nil),
-						rule.Enforce.Workloads.QoSClasses...,
-					),
-					Schedulers: append(
-						[]api.ExpressionMatch(nil),
-						rule.Enforce.Workloads.Schedulers...,
-					),
-				},
-			},
-		}
-
-		ruleStatus = append(ruleStatus, normalized)
+		ruleStatus = append(ruleStatus, &rules.NamespaceRuleBodyNamespace{
+			Enforce: rule.Enforce.DeepCopy(),
+		})
 	}
 
 	instance.Status.Rules = ruleStatus

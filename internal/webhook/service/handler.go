@@ -9,8 +9,8 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
-func Handler(handler ...handlers.TypedHandlerWithTenant[*corev1.Service]) handlers.Handler {
-	return &handlers.TypedTenantHandler[*corev1.Service]{
+func Handler(handler ...handlers.TypedHandlerWithTenantWithRuleset[*corev1.Service]) handlers.Handler {
+	return &handlers.TypedTenantWithRulesetHandler[*corev1.Service]{
 		Factory: func() *corev1.Service {
 			return &corev1.Service{}
 		},

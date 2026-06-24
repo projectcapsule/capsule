@@ -5,6 +5,7 @@ package ruleengine
 
 import (
 	"fmt"
+	"strings"
 
 	api "github.com/projectcapsule/capsule/pkg/api/rules"
 )
@@ -17,15 +18,27 @@ type Value struct {
 type Match struct {
 	Matched      bool
 	MatchedValue any
+
+	// Detail is optional human-readable matcher context.
+	// Example: "10.0.171.239 is contained in 10.0.0.0/16".
+	Detail string
 }
 
 type Decision struct {
-	SetName      string
-	EventReason  string
-	Action       api.ActionType
-	Value        Value
+	SetName     string
+	EventReason string
+	Action      api.ActionType
+	Value       Value
+
 	MatchedValue any
-	Message      string
+
+	// MatchedRule is the human-readable rule description returned by Set.RuleDescription.
+	MatchedRule string
+
+	// MatchDetail is the human-readable detail returned by Match.Detail.
+	MatchDetail string
+
+	Message string
 }
 
 type DecisionError struct {
@@ -77,18 +90,25 @@ func (e *Evaluation) Append(other *Evaluation) {
 	}
 }
 
-type Set[R any, T any] struct {
-	Name string
-
+type Set[R any, O any] struct {
+	Name        string
 	EventReason string
 
-	Values func(T) []Value
-
-	Rules func(*api.NamespaceRuleEnforceBody) []R
-
+	Values  func(O) []Value
+	Rules   func(*api.NamespaceRuleEnforceBody) []R
 	Matches func(R, Value) (Match, error)
 
-	Message func(action api.ActionType, value Value, matchedValue any) string
+	// Message can fully override the default message.
+	// Prefer leaving this nil unless a rule requires very specific wording.
+	Message func(api.ActionType, Value, any) string
+
+	// RuleDescription returns a human-readable representation of one rule.
+	// It is used only for admission/audit messages.
+	RuleDescription func(R) string
+
+	// AllowedDescription optionally overrides the "Allowed values" label.
+	// Example: "Allowed CIDRs", "Allowed ranges", "Allowed hostnames".
+	AllowedDescription string
 }
 
 func EvaluateEnforce[R any, T any](
@@ -125,6 +145,7 @@ func EvaluateEnforce[R any, T any](
 		}
 
 		hasAllowRule := false
+		allowRules := make([]R, 0)
 
 		var lastDecision *Decision
 
@@ -143,6 +164,8 @@ func EvaluateEnforce[R any, T any](
 			switch action {
 			case api.ActionTypeAllow:
 				hasAllowRule = true
+
+				allowRules = append(allowRules, items...)
 
 			case api.ActionTypeDeny, api.ActionTypeAudit:
 				// Supported actions.
@@ -165,13 +188,24 @@ func EvaluateEnforce[R any, T any](
 					continue
 				}
 
+				matchedRule := describeRule(set, item)
+
 				decision := &Decision{
 					SetName:      set.Name,
 					EventReason:  set.EventReason,
 					Action:       action,
 					Value:        value,
 					MatchedValue: match.MatchedValue,
-					Message:      decisionMessage(set, action, value, match.MatchedValue),
+					MatchedRule:  matchedRule,
+					MatchDetail:  strings.TrimSpace(match.Detail),
+					Message: decisionMessage(
+						set,
+						action,
+						value,
+						match.MatchedValue,
+						matchedRule,
+						match.Detail,
+					),
 				}
 
 				switch action {
@@ -205,12 +239,7 @@ func EvaluateEnforce[R any, T any](
 				EventReason: set.EventReason,
 				Action:      api.ActionTypeDeny,
 				Value:       value,
-				Message: fmt.Sprintf(
-					"%s %q at %s is not allowed by namespace rule",
-					set.Name,
-					value.Value,
-					value.Path,
-				),
+				Message:     allowMissMessage(set, value, allowRules),
 			}
 
 			return evaluation, nil
@@ -220,40 +249,122 @@ func EvaluateEnforce[R any, T any](
 	return evaluation, nil
 }
 
+const maxRuleDescriptions = 10
+
+func describeRule[R any, O any](set Set[R, O], rule R) string {
+	if set.RuleDescription == nil {
+		return ""
+	}
+
+	return strings.TrimSpace(set.RuleDescription(rule))
+}
+
+func describeRules[R any, O any](set Set[R, O], rules []R) string {
+	if len(rules) == 0 || set.RuleDescription == nil {
+		return ""
+	}
+
+	limit := min(len(rules), maxRuleDescriptions)
+
+	parts := make([]string, 0, limit)
+
+	for i := range limit {
+		description := describeRule(set, rules[i])
+		if description == "" {
+			continue
+		}
+
+		parts = append(parts, description)
+	}
+
+	if len(parts) == 0 {
+		return ""
+	}
+
+	if len(rules) > maxRuleDescriptions {
+		parts = append(parts, fmt.Sprintf("and %d more", len(rules)-maxRuleDescriptions))
+	}
+
+	return strings.Join(parts, ", ")
+}
+
+func allowedLabel[R any, O any](set Set[R, O]) string {
+	if set.AllowedDescription != "" {
+		return set.AllowedDescription
+	}
+
+	return "Allowed values"
+}
+
+func allowMissMessage[R any, T any](
+	set Set[R, T],
+	value Value,
+	allowRules []R,
+) string {
+	message := fmt.Sprintf(
+		"%s %q at %s is not allowed by namespace rule",
+		set.Name,
+		value.Value,
+		value.Path,
+	)
+
+	descriptions := describeRules(set, allowRules)
+	if descriptions == "" {
+		return message
+	}
+
+	return fmt.Sprintf(
+		"%s: value did not match any allowed rule. %s: %s",
+		message,
+		allowedLabel(set),
+		descriptions,
+	)
+}
+
 func decisionMessage[R any, T any](
 	set Set[R, T],
 	action api.ActionType,
 	value Value,
 	matchedValue any,
+	matchedRule string,
+	matchDetail string,
 ) string {
 	if set.Message != nil {
 		return set.Message(action, value, matchedValue)
 	}
 
+	matchDetail = strings.TrimSpace(matchDetail)
+
 	switch action {
 	case api.ActionTypeAudit:
-		return fmt.Sprintf(
+		message := fmt.Sprintf(
 			"%s %q at %s matched audit namespace rule",
 			set.Name,
 			value.Value,
 			value.Path,
 		)
 
+		return appendMatchContext(message, matchedRule, matchDetail, "matched audit rule")
+
 	case api.ActionTypeDeny:
-		return fmt.Sprintf(
+		message := fmt.Sprintf(
 			"%s %q at %s is denied by namespace rule",
 			set.Name,
 			value.Value,
 			value.Path,
 		)
 
+		return appendMatchContext(message, matchedRule, matchDetail, "matched denied rule")
+
 	case api.ActionTypeAllow:
-		return fmt.Sprintf(
+		message := fmt.Sprintf(
 			"%s %q at %s is allowed by namespace rule",
 			set.Name,
 			value.Value,
 			value.Path,
 		)
+
+		return appendMatchContext(message, matchedRule, matchDetail, "matched allowed rule")
 
 	default:
 		return fmt.Sprintf(
@@ -264,4 +375,21 @@ func decisionMessage[R any, T any](
 			action,
 		)
 	}
+}
+
+func appendMatchContext(
+	message string,
+	matchedRule string,
+	matchDetail string,
+	rulePrefix string,
+) string {
+	if matchDetail != "" {
+		return fmt.Sprintf("%s: %s", message, matchDetail)
+	}
+
+	if matchedRule != "" {
+		return fmt.Sprintf("%s: %s %s", message, rulePrefix, matchedRule)
+	}
+
+	return message
 }

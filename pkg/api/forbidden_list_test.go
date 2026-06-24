@@ -11,6 +11,16 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 )
 
+func denied() api.ForbiddenListSpec {
+	return api.ForbiddenListSpec{
+		Exact: []string{
+			"kubernetes.io/metadata.name",
+			"pod-security.kubernetes.io/enforce",
+			"NetworkPolicy",
+		},
+	}
+}
+
 func TestForbiddenListSpec_ExactMatch(t *testing.T) {
 	type tc struct {
 		In    []string
@@ -118,5 +128,40 @@ func TestValidateForbidden(t *testing.T) {
 		if !tc.HasError {
 			assert.NoError(t, api.ValidateForbidden(tc.Keys, tc.ForbiddenSpec))
 		}
+	}
+}
+
+func TestForbiddenKeysBypassed(t *testing.T) {
+	for _, k := range []string{"NetworkPolicy", "kubernetes.io/metadata.name"} {
+		if err := api.ValidateForbidden(map[string]string{k: "owned"}, denied()); err == nil {
+			t.Errorf("BYPASS CONFIRMED: ValidateForbidden ALLOWED denied key %q (list=%v)", k, denied().Exact)
+		} else {
+			t.Logf("(no bypass) correctly denied %q: %v", k, err)
+		}
+	}
+}
+
+// Positive control: a third denied key in the SAME list is still correctly
+// blocked — proving the policy genuinely forbids these keys and the harness is
+// wired right (i.e. the bypass above is selective, not a dead enforcement path).
+func TestPositiveControl_StillBlocked(t *testing.T) {
+	if err := api.ValidateForbidden(map[string]string{"pod-security.kubernetes.io/enforce": "privileged"}, denied()); err == nil {
+		t.Errorf("control failure: denied key 'pod-security.kubernetes.io/enforce' was NOT blocked")
+	}
+}
+
+// Negative control: a key the admin did NOT deny is correctly allowed,
+// proving the webhook is not simply denying everything.
+func TestPoC_NegativeControl_BenignAllowed(t *testing.T) {
+	if err := api.ValidateForbidden(map[string]string{"app.kubernetes.io/name": "frontend"}, denied()); err != nil {
+		t.Errorf("control failure: benign key was wrongly denied: %v", err)
+	}
+}
+
+// Direct primitive check, minimal repro of the root cause.
+func TestExactMatch_RootCause(t *testing.T) {
+	spec := api.ForbiddenListSpec{Exact: []string{"B", "a"}} // mixed case
+	if !spec.ExactMatch("B") {
+		t.Errorf("ROOT CAUSE: ExactMatch(%q) returned false though %q is in %v", "B", "B", spec.Exact)
 	}
 }

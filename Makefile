@@ -48,8 +48,13 @@ all: manager
 
 # Run tests
 .PHONY: test
-test: test-clean generate manifests test-clean
-	@GO111MODULE=on go test -race -v $(shell go list ./... | grep -v "e2e") -coverprofile coverage.out
+test: gotestsum test-clean generate manifests test-clean
+	@GO111MODULE=on $(GOTEST) \
+		--format pkgname-and-test-fails \
+		--packages="$(shell go list ./... | grep -v "e2e")" \
+		-- \
+		-race \
+		-coverprofile coverage.out
 
 .PHONY: test-clean
 test-clean: ## Clean tests cache
@@ -679,6 +684,13 @@ SYFT_LOOKUP   := anchore/syft
 syft: ## Download syft locally if necessary.
 		test -s $(SYFT) && $(SYFT) --version | grep -q $(SYFT_VERSION) ||  \
 	$(call go-install-tool,$(SYFT),github.com/$(SYFT_LOOKUP)/cmd/syft@v$(SYFT_VERSION))
+
+GOTEST         := $(LOCALBIN)/gotestsum
+GOTEST_VERSION := 1.13.0
+GOTEST_LOOKUP  := gotestyourself/gotestsum
+gotestsum:
+		test -s $(GOTEST) && $(GOTEST) --version | grep -q $(GOTEST_VERSION) ||  \
+	$(call go-install-tool,$(GOTEST),gotest.tools/gotestsum@v$(GOTEST_VERSION))
 
 HARPOON         := $(LOCALBIN)/harpoon
 HARPOON_VERSION := v0.10.2

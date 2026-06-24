@@ -20,7 +20,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
@@ -53,7 +52,7 @@ type globalResourceController struct {
 	impersonation *cache.ImpersonationCache
 }
 
-func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, cfg utils.ControllerOptions) error {
+func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
 	r.client = mgr.GetClient()
 	r.reader = mgr.GetAPIReader()
 
@@ -83,7 +82,7 @@ func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, cfg utils.
 			handler.EnqueueRequestsFromMapFunc(r.enqueueAllResources),
 			builder.WithPredicates(
 				predicates.CapsuleConfigSpecImpersonationChangedPredicate{},
-				predicates.NamesMatchingPredicate{Names: []string{cfg.ConfigurationName}},
+				predicates.NamesMatchingPredicate{Names: []string{ctrlConfig.ConfigurationName}},
 			),
 		).
 		Watches(
@@ -94,7 +93,7 @@ func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, cfg utils.
 			&capsulev1beta2.Tenant{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueRequestFromTenant),
 		).
-		WithOptions(controller.Options{MaxConcurrentReconciles: cfg.MaxConcurrentReconciles}).
+		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
 		Complete(r)
 }
 

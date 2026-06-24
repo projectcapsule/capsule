@@ -111,6 +111,7 @@ func (r *TenantOwnerManager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils
 				},
 			},
 		).
+		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
 		Complete(r)
 }
 

@@ -21,7 +21,7 @@ import (
 var _ = Describe("creating a Namespace for a Tenant with additional metadata", Ordered, Label("namespace", "metadata"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-tenant-metadata",
+			Name: "e2e-tenant-ns-metadata",
 			Labels: map[string]string{
 				"env": "e2e",
 			},
