@@ -54,8 +54,8 @@ func (h *hostnameRegexHandler) OnDelete(
 func (h *hostnameRegexHandler) OnUpdate(
 	_ client.Client,
 	_ client.Reader,
-	old *capsulev1beta2.Tenant,
 	tnt *capsulev1beta2.Tenant,
+	_ *capsulev1beta2.Tenant,
 	decoder admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
