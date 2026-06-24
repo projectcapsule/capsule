@@ -24,6 +24,7 @@ spec:
           resources:
             - namespaces
             - namespaces/status
+          clusterScope: true
           namespaces: []
           verbs:
             - get
@@ -61,6 +62,7 @@ spec:
           resources:
             - clusterroles
             - clusterrolebindings
+          clusterScope: true
           namespaces: []
           verbs:
             - get
@@ -70,8 +72,6 @@ spec:
             - update
             - patch
             - delete
-            - bind
-            - escalate
         - apiGroups:
             - rbac.authorization.k8s.io
           resources:
@@ -87,8 +87,6 @@ spec:
             - update
             - patch
             - delete
-            - bind
-            - escalate
         - apiGroups:
             - capsule.clastix.io
           namespaces:
@@ -114,6 +112,7 @@ spec:
             - delete
         - apiGroups:
             - capsule.clastix.io
+          clusterScope: true
           namespaces: []
           resources:
             - tenants
@@ -152,6 +151,7 @@ spec:
             - delete
         - apiGroups:
             - admissionregistration.k8s.io
+          clusterScope: true
           resources:
             - mutatingwebhookconfigurations
             - validatingwebhookconfigurations
