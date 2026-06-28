@@ -476,6 +476,8 @@ e2e-install: helm-controller-version ko-build-all dev-install-gw-api-crds
 		--create-namespace \
 		--set 'replicaCount=2'\
 		--set 'certManager.generateCertificates=false' \
+		--set 'proxy.certManager.generateCertificates=false' \
+		--set 'proxy.options.generateCertificates=true' \
 		--set 'tls.enableController=true' \
 		--set 'tls.create=true' \
 		--set 'manager.image.pullPolicy=Never' \
