@@ -1,0 +1,100 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.21.0
+  name: breakrequesttemplates.capsule.clastix.io
+spec:
+  group: capsule.clastix.io
+  names:
+    kind: BreakRequestTemplate
+    listKind: BreakRequestTemplateList
+    plural: breakrequesttemplates
+    singular: breakrequesttemplate
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.autoApprove
+      name: AutoApprove
+      type: boolean
+    - jsonPath: .spec.approvalCondition
+      name: Condition
+      priority: 10
+      type: string
+    name: v1beta2
+    schema:
+      openAPIV3Schema:
+        description: BreakRequestTemplate is the Schema for the breakrequesttemplates
+          API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: BreakRequestTemplateSpec defines the desired state of BreakRequestTemplate.
+            properties:
+              approvalCondition:
+                description: ApprovalCondition an optional CEL expression that must
+                  be successful for the request to be approved.
+                type: string
+              autoApprove:
+                description: AutoApprove requests created by this template will be
+                  automatically approved.
+                type: boolean
+              defaultDuration:
+                description: |-
+                  The default duration of the BreakRequest referencing this template should be valid for. If not set,
+                  the resource will be kept until the request is deleted.
+                type: string
+              items:
+                additionalProperties:
+                  description: TemplateItem defines an item to be applied by a break
+                    request.
+                  properties:
+                    manifestTemplate:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                    paramSchema:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                  required:
+                  - manifestTemplate
+                  type: object
+                description: Actual Items being created by this template
+                type: object
+              keepFor:
+                description: |-
+                  The duration of this AccessRequest will be kept in the system after it has been expired (eg. auditing purposes)
+                  If not set, the AccessRequest will be deleted after expiring.
+                pattern: ^(([0-9]+(\.[0-9]+)?)+(m|h|d|w))+$
+                type: string
+              maxDuration:
+                description: The max allowed duration of the BreakRequest referencing
+                  this template should be valid for.
+                type: string
+            required:
+            - items
+            type: object
+          status:
+            description: BreakRequestTemplateStatus defines the observed state of
+              BreakRequestTemplate.
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources: {}
