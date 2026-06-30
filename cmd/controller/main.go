@@ -694,7 +694,7 @@ func main() {
 
 	if err = webhook.Register(
 		manager,
-		*evt.NewEventRecorder(
+		evt.NewEventRecorder(
 			manager.GetClient(),
 			ctrl.Log.WithName("capsule.ctrl").WithName("events"),
 			manager.GetEventRecorder("tenant-controller"),
