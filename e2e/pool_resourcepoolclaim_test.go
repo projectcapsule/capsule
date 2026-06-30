@@ -511,7 +511,7 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 
-		By("Allow on patching resources for claim (Increase)", func() {
+		By("Error on patching resources for claim (Increase) while allocated but unused", func() {
 			Eventually(func() error {
 				stat := &capsulev1beta2.ResourcePoolClaim{}
 				err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, stat)
@@ -525,10 +525,10 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 				}
 
 				return k8sClient.Update(context.TODO(), stat)
-			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
 		})
 
-		By("Allow on patching resources for claim (Decrease)", func() {
+		By("Error on patching resources for claim (Decrease) while allocated but unused", func() {
 			Eventually(func() error {
 				stat := &capsulev1beta2.ResourcePoolClaim{}
 				if err := k8sClient.Get(
@@ -547,10 +547,10 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 				}
 
 				return k8sClient.Update(context.TODO(), stat)
-			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
 		})
 
-		By("Allow on patching pool name", func() {
+		By("Error on patching pool name while allocated but unused", func() {
 			Eventually(func() error {
 				stat := &capsulev1beta2.ResourcePoolClaim{}
 
@@ -560,7 +560,7 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 				stat.Spec.Pool = "some-random-pool"
 
 				return k8sClient.Update(context.TODO(), stat)
-			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
 		})
 
 		By("Delete Pool", func() {

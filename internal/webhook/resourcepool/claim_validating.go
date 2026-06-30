@@ -76,7 +76,7 @@ func (h *claimValidationHandler) OnUpdate(
 			return ad.ErroredResponse(fmt.Errorf("failed to decode new object: %w", err))
 		}
 
-		if oldClaim.IsBoundInResourcePool() {
+		if oldClaim.Status.Pool.UID != "" {
 			if oldClaim.Spec.Pool != newClaim.Spec.Pool || !reflect.DeepEqual(oldClaim.Spec.ResourceClaims, newClaim.Spec.ResourceClaims) {
 				return ad.Denyf("cannot change the requested resources while claim is allocated to a resourcepool %s", oldClaim.Status.Pool.Name)
 			}
