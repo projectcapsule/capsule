@@ -2519,11 +2519,8 @@ spec:
                           description: Enforcement for object metadata on namespaced
                             resources.
                           items:
-                            description: |-
-                              MetadataRule defines metadata constraints for namespaced resources.
-
-                              APIVersion and Kind support '*' wildcard matching without regular expressions.
-                              Empty APIVersion or Kind is treated as '*'.
+                            description: MetadataRule defines metadata constraints
+                              for namespaced resources.
                             properties:
                               annotations:
                                 additionalProperties:

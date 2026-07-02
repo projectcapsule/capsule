@@ -9,9 +9,6 @@ import (
 
 // MetadataRule defines metadata constraints for namespaced resources.
 //
-// APIVersion and Kind support '*' wildcard matching without regular expressions.
-// Empty APIVersion or Kind is treated as '*'.
-//
 // +kubebuilder:object:generate=true
 // +kubebuilder:validation:XValidation:rule="has(self.labels) || has(self.annotations)",message="at least one of labels or annotations must be set"
 type MetadataRule struct {
