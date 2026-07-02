@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 
 	"github.com/projectcapsule/capsule/pkg/api/rules"
@@ -283,18 +282,9 @@ func validateMetadataTargets(
 		return nil
 	}
 
-	if err := rule.VersionKinds.ValidateKnownKinds(mapper, fieldPath); err != nil {
+	if err := rule.ValidateKnownKinds(mapper, fieldPath); err != nil {
 		return err
 	}
 
 	return nil
-}
-
-func validateKnownGroupVersionKind(
-	mapper k8smeta.RESTMapper,
-	gvk schema.GroupVersionKind,
-) error {
-	_, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
-
-	return err
 }
