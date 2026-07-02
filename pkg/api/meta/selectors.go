@@ -10,10 +10,10 @@ import (
 
 var WithoutCapsuleManagedResourcesLabelSelector = func() string {
 	req, _ := labels.NewRequirement(
-		ResourceOriginLabel,
+		NewManagedByCapsuleLabel,
 		selection.NotIn,
 		[]string{
-			ValueControllerResources,
+			ValueController,
 		},
 	)
 
@@ -22,10 +22,10 @@ var WithoutCapsuleManagedResourcesLabelSelector = func() string {
 
 var WithCapsuleManagedResourcesLabelSelector = func() string {
 	req, _ := labels.NewRequirement(
-		ResourceOriginLabel,
+		NewManagedByCapsuleLabel,
 		selection.In,
 		[]string{
-			ValueControllerResources,
+			ValueController,
 		},
 	)
 

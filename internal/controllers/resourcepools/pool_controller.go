@@ -659,7 +659,7 @@ func (r *resourcePoolController) syncResourceQuota(
 
 			targetLabels[quotaLabel] = pool.Name
 			targetLabels[meta.ResourceOriginLabel] = meta.ValueControllerResources
-			delete(targetLabels, meta.NewManagedByCapsuleLabel)
+			targetLabels[meta.NewManagedByCapsuleLabel] = meta.ValueController
 
 			target.SetLabels(targetLabels)
 			target.Spec.Scopes = pool.Spec.Quota.Scopes

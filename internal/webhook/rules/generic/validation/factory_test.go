@@ -11,6 +11,7 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -172,7 +173,7 @@ func TestValidateGenericRules(t *testing.T) {
 			nil,
 			baseGVK,
 			testTenant(),
-			events.EventRecorder{},
+			testEventRecorder{},
 			nil,
 		)
 		if err != nil {
@@ -213,7 +214,7 @@ func TestValidateGenericRules(t *testing.T) {
 			obj,
 			baseGVK,
 			testTenant(),
-			events.EventRecorder{},
+			testEventRecorder{},
 			nil,
 		)
 		if err != nil {
@@ -269,7 +270,7 @@ func TestValidateGenericRules(t *testing.T) {
 					Name: "tenant-a",
 				},
 			},
-			events.EventRecorder{},
+			testEventRecorder{},
 			[]*apirules.NamespaceRuleEnforceBody{
 				{
 					Action: apirules.ActionTypeAllow,
@@ -310,7 +311,7 @@ func TestValidateGenericRules(t *testing.T) {
 			}, nil),
 			baseGVK,
 			testTenant(),
-			events.EventRecorder{},
+			testEventRecorder{},
 			nil,
 		)
 		if err != nil {
@@ -349,7 +350,7 @@ func TestValidateGenericRules(t *testing.T) {
 			genericMetadataObject(nil, nil),
 			baseGVK,
 			testTenant(),
-			events.EventRecorder{},
+			testEventRecorder{},
 			nil,
 		)
 		if err != nil {
@@ -393,7 +394,7 @@ func TestValidateGenericRules(t *testing.T) {
 			genericMetadataObject(nil, nil),
 			baseGVK,
 			testTenant(),
-			events.EventRecorder{},
+			testEventRecorder{},
 			enforceBodies,
 		)
 		if err != nil {
@@ -428,7 +429,7 @@ func TestValidateGenericRules(t *testing.T) {
 			genericMetadataObject(nil, nil),
 			baseGVK,
 			testTenant(),
-			events.EventRecorder{},
+			testEventRecorder{},
 			nil,
 		)
 		if !errors.Is(err, expected) {
@@ -480,7 +481,7 @@ func TestValidateGenericRules(t *testing.T) {
 			genericMetadataObject(nil, nil),
 			baseGVK,
 			testTenant(),
-			events.EventRecorder{},
+			testEventRecorder{},
 			nil,
 		)
 		if err != nil {
@@ -528,7 +529,7 @@ func TestValidateGenericRules(t *testing.T) {
 			genericMetadataObject(nil, nil),
 			baseGVK,
 			testTenant(),
-			events.EventRecorder{},
+			testEventRecorder{},
 			nil,
 		)
 		if err == nil {
@@ -575,7 +576,7 @@ func TestGenericRulesOnCreate(t *testing.T) {
 			nil,
 			genericMetadataObject(nil, nil),
 			nil,
-			events.EventRecorder{},
+			testEventRecorder{},
 			testTenant(),
 			[]*apirules.NamespaceRuleBodyNamespace{
 				{
@@ -608,7 +609,7 @@ func TestGenericRulesOnCreate(t *testing.T) {
 			nil,
 			genericMetadataObject(nil, nil),
 			nil,
-			events.EventRecorder{},
+			testEventRecorder{},
 			testTenant(),
 			nil,
 		)
@@ -650,7 +651,7 @@ func TestGenericRulesOnCreate(t *testing.T) {
 			nil,
 			genericMetadataObject(nil, nil),
 			nil,
-			events.EventRecorder{},
+			testEventRecorder{},
 			testTenant(),
 			nil,
 		)
@@ -697,7 +698,7 @@ func TestGenericRulesOnUpdate(t *testing.T) {
 			oldObj,
 			newObj,
 			nil,
-			events.EventRecorder{},
+			testEventRecorder{},
 			testTenant(),
 			nil,
 		)
@@ -725,7 +726,7 @@ func TestGenericRulesOnUpdate(t *testing.T) {
 			genericMetadataObject(nil, nil),
 			genericMetadataObject(nil, nil),
 			nil,
-			events.EventRecorder{},
+			testEventRecorder{},
 			testTenant(),
 			nil,
 		)
@@ -761,7 +762,7 @@ func TestGenericRulesOnDelete(t *testing.T) {
 		nil,
 		genericMetadataObject(nil, nil),
 		nil,
-		events.EventRecorder{},
+		testEventRecorder{},
 		testTenant(),
 		nil,
 	)
@@ -879,6 +880,131 @@ func genericMetadataObject(
 			Annotations: annotations,
 		},
 	}
+}
+
+var (
+	_ events.EventRecorder = testEventRecorder{}
+	_ events.LabeledEvent  = (*testLabeledEvent)(nil)
+)
+
+type testEventRecorder struct{}
+
+func (testEventRecorder) Eventf(
+	k8sruntime.Object,
+	k8sruntime.Object,
+	string,
+	string,
+	string,
+	string,
+	...interface{},
+) {
+}
+
+func (testEventRecorder) LabeledEvent(
+	regarding k8sruntime.Object,
+	eventType string,
+	reason string,
+	action string,
+	note string,
+) events.LabeledEvent {
+	return &testLabeledEvent{
+		regarding:   regarding,
+		eventType:   eventType,
+		reason:      reason,
+		action:      action,
+		note:        note,
+		labels:      map[string]string{},
+		annotations: map[string]string{},
+	}
+}
+
+type testLabeledEvent struct {
+	regarding k8sruntime.Object
+	related   k8sruntime.Object
+
+	eventType string
+	reason    string
+	action    string
+	note      string
+
+	labels      map[string]string
+	annotations map[string]string
+}
+
+func (*testLabeledEvent) Emit(context.Context) {}
+
+func (e *testLabeledEvent) WithRelated(obj k8sruntime.Object) events.LabeledEvent {
+	e.related = obj
+
+	return e
+}
+
+func (e *testLabeledEvent) WithLabels(labels map[string]string) events.LabeledEvent {
+	for key, value := range labels {
+		e.labels[key] = value
+	}
+
+	return e
+}
+
+func (e *testLabeledEvent) WithAnnotations(annotations map[string]string) events.LabeledEvent {
+	for key, value := range annotations {
+		e.annotations[key] = value
+	}
+
+	return e
+}
+
+func (e *testLabeledEvent) WithTenantLabel(tnt *capsulev1beta2.Tenant) events.LabeledEvent {
+	if tnt != nil {
+		e.labels[meta.NewTenantLabel] = tnt.Name
+	}
+
+	return e
+}
+
+func (e *testLabeledEvent) WithRequestAnnotations(req admission.Request) events.LabeledEvent {
+	if req.UID != "" {
+		e.annotations[meta.AuditRequestUID] = string(req.UID)
+	}
+
+	if req.UserInfo.Username != "" {
+		e.annotations[meta.AuditUsername] = req.UserInfo.Username
+	}
+
+	return e
+}
+
+func (e *testLabeledEvent) Reason() string {
+	return e.reason
+}
+
+func (e *testLabeledEvent) Action() string {
+	return e.action
+}
+
+func (e *testLabeledEvent) Regarding() k8sruntime.Object {
+	return e.regarding
+}
+
+func (e *testLabeledEvent) Labels() map[string]string {
+	return e.labels
+}
+
+func (e *testLabeledEvent) Annotations() map[string]string {
+	return e.annotations
+}
+
+func (e *testLabeledEvent) Note() string {
+	return e.note
+}
+
+func (e *testLabeledEvent) EventType() string {
+	return e.eventType
+}
+
+func (e *testLabeledEvent) Related() k8sruntime.Object {
+	return e.related
 }
 
 func admissionRequest(

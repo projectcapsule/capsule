@@ -59,9 +59,8 @@ func (r *Manager) ensureRuleStatus(
 			labels = make(map[string]string)
 		}
 
-		labels[meta.ResourceOriginLabel] = meta.ValueControllerResources
+		labels[meta.NewManagedByCapsuleLabel] = meta.ValueController
 		labels[meta.CapsuleNameLabel] = rule.GetName()
-		delete(labels, meta.NewManagedByCapsuleLabel)
 
 		rule.SetLabels(labels)
 

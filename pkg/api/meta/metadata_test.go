@@ -31,7 +31,6 @@ func TestNewManagedMetadata(t *testing.T) {
 			CapsuleNameLabel,
 			CreatedByCapsuleLabel,
 			CustomResourcesLabel,
-			ResourceOriginLabel,
 			NewManagedByCapsuleLabel,
 			ManagedByCapsuleLabel,
 			LimitRangeLabel,
@@ -647,7 +646,7 @@ func TestDefaultObjectSkipRules(t *testing.T) {
 	t.Parallel()
 
 	rules := DefaultObjectSkipRules()
-	if len(rules) != 3 {
+	if len(rules) != 2 {
 		t.Fatalf("expected three default skip rules, got %d", len(rules))
 	}
 
@@ -657,10 +656,6 @@ func TestDefaultObjectSkipRules(t *testing.T) {
 
 	if got := rules[1].Labels[NewManagedByCapsuleLabel]; got != ValueControllerResources {
 		t.Fatalf("expected legacy default skip label %q=%q, got %q", NewManagedByCapsuleLabel, ValueControllerResources, got)
-	}
-
-	if got := rules[2].Labels[ResourceOriginLabel]; got != ValueControllerResources {
-		t.Fatalf("expected default skip label %q=%q, got %q", ResourceOriginLabel, ValueControllerResources, got)
 	}
 
 	for _, rule := range rules {
@@ -723,17 +718,6 @@ func TestShouldSkipObjectByRules(t *testing.T) {
 			obj: objectWithMetadata(
 				map[string]string{
 					NewManagedByCapsuleLabel: ValueControllerResources,
-				},
-				nil,
-			),
-			rules: DefaultObjectSkipRules(),
-			want:  true,
-		},
-		{
-			name: "Capsule resource-origin object skips",
-			obj: objectWithMetadata(
-				map[string]string{
-					ResourceOriginLabel: ValueControllerResources,
 				},
 				nil,
 			),

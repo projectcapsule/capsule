@@ -33,7 +33,6 @@ func NewManagedMetadata(
 			CapsuleNameLabel,
 			CreatedByCapsuleLabel,
 			CustomResourcesLabel,
-			ResourceOriginLabel,
 			NewManagedByCapsuleLabel,
 			ManagedByCapsuleLabel,
 			LimitRangeLabel,
@@ -188,11 +187,6 @@ func DefaultObjectSkipRules() []ObjectSkipRule {
 		{
 			Labels: map[string]string{
 				NewManagedByCapsuleLabel: ValueControllerResources,
-			},
-		},
-		{
-			Labels: map[string]string{
-				ResourceOriginLabel: ValueControllerResources,
 			},
 		},
 	}
