@@ -283,30 +283,8 @@ func validateMetadataTargets(
 		return nil
 	}
 
-	for i, target := range rule.VersionKinds.VersionKinds() {
-		if target.HasWildcard() {
-			continue
-		}
-
-		gvk := target.GroupVersionKind()
-		if gvk.Version == "" || gvk.Kind == "" {
-			return fmt.Errorf(
-				"%s.kinds[%d] %q is invalid",
-				fieldPath,
-				i,
-				target.Kind,
-			)
-		}
-
-		if err := validateKnownGroupVersionKind(mapper, gvk); err != nil {
-			return fmt.Errorf(
-				"%s.kinds[%d] %s is invalid: %w",
-				fieldPath,
-				i,
-				gvk.String(),
-				err,
-			)
-		}
+	if err := rule.VersionKinds.ValidateKnownKinds(mapper, fieldPath); err != nil {
+		return err
 	}
 
 	return nil
