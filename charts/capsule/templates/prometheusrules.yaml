@@ -22,6 +22,7 @@
         {{- $_ := set $outGroup "rules" $outRules }}
         {{- $groups = append $groups $outGroup }}
       {{- end }}
+---
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:

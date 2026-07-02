@@ -523,213 +523,204 @@ monitoring:
     # -- Prometheus Rules definitions. The block is directly forwarded into the PrometheusRule, so you can use whatever specification you want.
     # @default -- See [values.yaml](values.yaml)
     rules: # @schema itemProperties:{}
-    - name: capsule.customquotas
-      rules:
-        - alert: CapsuleGlobalCustomQuotaNotReady
-          expr: |
-            capsule_global_custom_quota_condition{condition="Ready"} != 1
-          for: 10m
-          labels:
-            severity: warning
-            app: capsule
-            component: customquota
-          annotations:
-            summary: Capsule GlobalCustomQuota {{ $labels.custom_quota }} is not ready
-            description: "GlobalCustomQuota {{ $labels.custom_quota }} is not in Ready state for the last 10 minutes."
-        - alert: CapsuleGlobalCustomQuotaHighUsageWarning
-          expr: |
-            capsule_global_custom_quota_resource_usage_percentage > 90
-          for: 10m
-          labels:
-            severity: warning
-            app: capsule
-            component: customquota
-          annotations:
-            summary: "High resource usage in GlobalCustomQuota {{ $labels.custom_quota }}"
-            description: "Usage for GlobalCustomQuota {{ $labels.custom_quota }} is at {{ $value }}% usage for the last 10 minutes."
-        - alert: CapsuleGlobalCustomQuotaHighUsageCritical
-          expr: |
-            capsule_global_custom_quota_resource_usage_percentage > 95
-          for: 10m
-          labels:
-            severity: critical
-            app: capsule
-            component: customquota
-          annotations:
-            summary: "Critical resource usage in GlobalCustomQuota {{ $labels.custom_quota }}"
-            description: "Usage for GlobalCustomQuota {{ $labels.custom_quota }} has exceeded 95% usage for the last 10 minutes."
-
-        - alert: CapsuleCustomQuotaNotReady
-          expr: |
-            capsule_custom_quota_condition{condition="Ready"} != 1
-          for: 10m
-          labels:
-            severity: warning
-            app: capsule
-            component: customquotas
-          annotations:
-            summary: "Capsule CustomQuota {{ $labels.target_namespace }}/{{ $labels.custom_quota }} is not ready"
-            description: "CustomQuota {{ $labels.target_namespace }}/{{ $labels.custom_quota }} is not in Ready state for the last 10 minutes."
-        - alert: CapsuleCustomQuotaHighUsageWarning
-          expr: |
-            capsule_custom_quota_resource_usage_percentage > 90
-          for: 10m
-          labels:
-            severity: warning
-            app: capsule
-            component: customquota
-          annotations:
-            summary: "High resource usage in CustomQuota {{ $labels.target_namespace }}/{{ $labels.custom_quota }}"
-            description: "Usage for CustomQuota {{ $labels.target_namespace }}/{{ $labels.custom_quota }} is at {{ $value }}% usage for the last 10 minutes."
-        - alert: CapsuleCustomQuotaHighUsageCritical
-          expr: |
-            capsule_custom_quota_resource_usage_percentage > 95
-          for: 10m
-          labels:
-            severity: critical
-            app: capsule
-            component: customquota
-          annotations:
-            summary: "Critical resource usage in CustomQuota {{ $labels.target_namespace }}/{{ $labels.custom_quota }}"
-            description: "Usage for CustomQuota {{ $labels.target_namespace }}/{{ $labels.custom_quota }} has exceeded 95% usage for the last 10 minutes."
-
-    - name: capsule.resourcepools
-      rules:
-        - alert: CapsuleResourcePoolNotReady
-          expr: |
-            capsule_pool_condition{condition="Ready"} != 1
-          for: 10m
-          labels:
-            severity: warning
-            app: capsule
-            component: resourcepool
-          annotations:
-            summary: Capsule ResourcePool {{ $labels.pool }} is not ready
-            description: "ResourcePool {{ $labels.pool }} is not in Ready state for the last 10 minutes."
-        - alert: CapsuleResourcePoolClaimNotReady
-          expr: |
-            capsule_claim_condition{condition="Ready"} != 1
-          for: 10m
-          labels:
-            severity: warning
-            app: capsule
-            component: resourcepool
-          annotations:
-            summary: Capsule ResourcePoolClaim {{ $labels.target_namespace }}/{{ $labels.name }} is not ready
-            description: "ResourcePoolClaim {{ $labels.target_namespace }}/{{ $labels.name }} is not in Ready state for the last 10 minutes."
-        - alert: CapsulePoolHighUsageWarning
-          expr: |
-            capsule_pool_usage_percentage > 90
-          for: 10m
-          labels:
-            severity: warning
-            app: capsule
-            component: resourcepool
-          annotations:
-            summary: High resource usage in Resourcepool
-            description: "Resource {{ $labels.resource }} in pool {{ $labels.pool }} is at {{ $value }}% usage for the last 10 minutes."
-        - alert: CapsulePoolHighUsageCritical
-          expr: |
-            capsule_pool_usage_percentage > 95
-          for: 10m
-          labels:
-            severity: critical
-            app: capsule
-            component: resourcepool
-          annotations:
-            summary: Critical resource usage in Resourcepool
-            description: "Resource {{ $labels.resource }} in pool {{ $labels.pool }} has exceeded 95% usage for the last 10 minutes."
-
-    - name: capsule.replications
-      rules:
-        - alert: CapsuleGlobalTenantResourceNotReady
-          expr: |
-            capsule_global_resource_condition{condition="Ready"} != 1
-          for: 10m
-          labels:
-            severity: warning
-            app: capsule
-            component: replications
-          annotations:
-            summary: Capsule GlobalTenantResource {{ $labels.name }} is not ready
-            description: "GlobalTenantResource {{ $labels.name }} is not in Ready state for the last 10 minutes."
-
-        - alert: CapsuleTenantResourceNotReady
-          expr: |
-            capsule_resource_condition{condition="Ready"} != 1
-          for: 10m
-          labels:
-            severity: warning
-            app: capsule
-            component: replications
-          annotations:
-            summary: Capsule TenantResource {{ $labels.target_namespace }}/{{ $labels.name }} is not ready
-            description: "TenantResource {{ $labels.target_namespace }}/{{ $labels.name }} is not in Ready state for the last 10 minutes."
-
-    - name: capsule.tenants
-      rules:
-        - alert: CapsuleTenantNamespaceQuotaExceeded
-          expr: |
-            capsule_tenant_namespaces_current >= capsule_tenant_namespaces_max
-          for: "5m"
-          labels:
-            severity: warning
-            app: capsule
-            component: controller
-          annotations:
-            summary: "Capsule Tenant {{ $labels.tenant }} has reached namespace quota"
-            description: "Tenant {{ $labels.tenant }} has {{ $value }} namespaces and has reached or exceeded its maximum quota of {{ $labels.max_namespaces }}."
-
-        - alert: CapsuleTenantNotReady
-          expr: |
-            capsule_tenant_condition{condition="Ready"} != 1
-          for: "5m"
-          labels:
-            severity: critical
-            app: capsule
-            component: controller
-          annotations:
-            summary: "Capsule Tenant {{ $labels.tenant }} is missing or not active"
-            description: "Tenant {{ $labels.tenant }} is either missing or not in Active state. This may prevent users from accessing their namespaces."
-
-        - alert: CapsuleTenantNamespaceNotReady
-          expr: |
-            capsule_tenant_namespace_condition{condition="Ready"} != 1
-          for: "5m"
-          labels:
-            severity: critical
-            app: capsule
-            component: controller
-          annotations:
-            summary: "Namespace {{ $labels.target_namespace }} from Tenant {{ $labels.tenant }} is not Ready."
-            description: "Namespace {{ $labels.target_namespace }} from Tenant {{ $labels.tenant }} is not Ready state for the last 10 minutes."
-
-    - name: capsule.controller
-      rules:
-        # Alert when Capsule controller is down
-        - alert: CapsuleControllerDown
-          expr: |
-            up{job="capsule-controller-manager"} == 0
-          for: "5m"
-          labels:
-            severity: critical
-            app: capsule
-            component: controller
-          annotations:
-            summary: "Capsule controller is down"
-            description: "The Capsule controller manager has been down for more than 5 minutes. Tenant operations may be impacted."
-
-        - alert: CapsuleWebhookHighErrorRate
-          expr: |
-            rate(capsule_webhook_requests_total{status=~"5.."}[5m]) / rate(capsule_webhook_requests_total[5m]) > 0.05
-          for: "5m"
-          labels:
-            severity: warning
-            app: capsule
-            component: controller
-          annotations:
-            summary: "Capsule webhook experiencing high error rate"
-            description: "Capsule webhook has an error rate of {{ $value | humanizePercentage }} over the last 5 minutes. This may block tenant operations."
+      - name: capsule.customquotas
+        rules:
+          - alert: CapsuleGlobalCustomQuotaNotReady
+            expr: |
+              capsule_global_custom_quota_condition{condition="Ready"} != 1
+            for: 10m
+            labels:
+              severity: warning
+              app: capsule
+              component: customquota
+            annotations:
+              summary: Capsule GlobalCustomQuota {{ $labels.custom_quota }} is not ready
+              description: "GlobalCustomQuota {{ $labels.custom_quota }} is not in Ready state for the last 10 minutes."
+          - alert: CapsuleGlobalCustomQuotaHighUsageWarning
+            expr: |
+              capsule_global_custom_quota_resource_usage_percentage > 90
+            for: 10m
+            labels:
+              severity: warning
+              app: capsule
+              component: customquota
+            annotations:
+              summary: "High resource usage in GlobalCustomQuota {{ $labels.custom_quota }}"
+              description: "Usage for GlobalCustomQuota {{ $labels.custom_quota }} is at {{ $value }}% usage for the last 10 minutes."
+          - alert: CapsuleGlobalCustomQuotaHighUsageCritical
+            expr: |
+              capsule_global_custom_quota_resource_usage_percentage > 95
+            for: 10m
+            labels:
+              severity: critical
+              app: capsule
+              component: customquota
+            annotations:
+              summary: "Critical resource usage in GlobalCustomQuota {{ $labels.custom_quota }}"
+              description: "Usage for GlobalCustomQuota {{ $labels.custom_quota }} has exceeded 95% usage for the last 10 minutes."
+          - alert: CapsuleCustomQuotaNotReady
+            expr: |
+              capsule_custom_quota_condition{condition="Ready"} != 1
+            for: 10m
+            labels:
+              severity: warning
+              app: capsule
+              component: customquotas
+            annotations:
+              summary: "Capsule CustomQuota {{ $labels.target_namespace }}/{{ $labels.custom_quota }} is not ready"
+              description: "CustomQuota {{ $labels.target_namespace }}/{{ $labels.custom_quota }} is not in Ready state for the last 10 minutes."
+          - alert: CapsuleCustomQuotaHighUsageWarning
+            expr: |
+              capsule_custom_quota_resource_usage_percentage > 90
+            for: 10m
+            labels:
+              severity: warning
+              app: capsule
+              component: customquota
+            annotations:
+              summary: "High resource usage in CustomQuota {{ $labels.target_namespace }}/{{ $labels.custom_quota }}"
+              description: "Usage for CustomQuota {{ $labels.target_namespace }}/{{ $labels.custom_quota }} is at {{ $value }}% usage for the last 10 minutes."
+          - alert: CapsuleCustomQuotaHighUsageCritical
+            expr: |
+              capsule_custom_quota_resource_usage_percentage > 95
+            for: 10m
+            labels:
+              severity: critical
+              app: capsule
+              component: customquota
+            annotations:
+              summary: "Critical resource usage in CustomQuota {{ $labels.target_namespace }}/{{ $labels.custom_quota }}"
+              description: "Usage for CustomQuota {{ $labels.target_namespace }}/{{ $labels.custom_quota }} has exceeded 95% usage for the last 10 minutes."
+      - name: capsule.resourcepools
+        rules:
+          - alert: CapsuleResourcePoolNotReady
+            expr: |
+              capsule_pool_condition{condition="Ready"} != 1
+            for: 10m
+            labels:
+              severity: warning
+              app: capsule
+              component: resourcepool
+            annotations:
+              summary: Capsule ResourcePool {{ $labels.pool }} is not ready
+              description: "ResourcePool {{ $labels.pool }} is not in Ready state for the last 10 minutes."
+          - alert: CapsuleResourcePoolClaimNotReady
+            expr: |
+              capsule_claim_condition{condition="Ready"} != 1
+            for: 10m
+            labels:
+              severity: warning
+              app: capsule
+              component: resourcepool
+            annotations:
+              summary: Capsule ResourcePoolClaim {{ $labels.target_namespace }}/{{ $labels.name }} is not ready
+              description: "ResourcePoolClaim {{ $labels.target_namespace }}/{{ $labels.name }} is not in Ready state for the last 10 minutes."
+          - alert: CapsulePoolHighUsageWarning
+            expr: |
+              capsule_pool_usage_percentage > 90
+            for: 10m
+            labels:
+              severity: warning
+              app: capsule
+              component: resourcepool
+            annotations:
+              summary: High resource usage in Resourcepool
+              description: "Resource {{ $labels.resource }} in pool {{ $labels.pool }} is at {{ $value }}% usage for the last 10 minutes."
+          - alert: CapsulePoolHighUsageCritical
+            expr: |
+              capsule_pool_usage_percentage > 95
+            for: 10m
+            labels:
+              severity: critical
+              app: capsule
+              component: resourcepool
+            annotations:
+              summary: Critical resource usage in Resourcepool
+              description: "Resource {{ $labels.resource }} in pool {{ $labels.pool }} has exceeded 95% usage for the last 10 minutes."
+      - name: capsule.replications
+        rules:
+          - alert: CapsuleGlobalTenantResourceNotReady
+            expr: |
+              capsule_global_resource_condition{condition="Ready"} != 1
+            for: 10m
+            labels:
+              severity: warning
+              app: capsule
+              component: replications
+            annotations:
+              summary: Capsule GlobalTenantResource {{ $labels.name }} is not ready
+              description: "GlobalTenantResource {{ $labels.name }} is not in Ready state for the last 10 minutes."
+          - alert: CapsuleTenantResourceNotReady
+            expr: |
+              capsule_resource_condition{condition="Ready"} != 1
+            for: 10m
+            labels:
+              severity: warning
+              app: capsule
+              component: replications
+            annotations:
+              summary: Capsule TenantResource {{ $labels.target_namespace }}/{{ $labels.name }} is not ready
+              description: "TenantResource {{ $labels.target_namespace }}/{{ $labels.name }} is not in Ready state for the last 10 minutes."
+      - name: capsule.tenants
+        rules:
+          - alert: CapsuleTenantNamespaceQuotaExceeded
+            expr: |
+              capsule_tenant_namespaces_current >= capsule_tenant_namespaces_max
+            for: "5m"
+            labels:
+              severity: warning
+              app: capsule
+              component: controller
+            annotations:
+              summary: "Capsule Tenant {{ $labels.tenant }} has reached namespace quota"
+              description: "Tenant {{ $labels.tenant }} has {{ $value }} namespaces and has reached or exceeded its maximum quota of {{ $labels.max_namespaces }}."
+          - alert: CapsuleTenantNotReady
+            expr: |
+              capsule_tenant_condition{condition="Ready"} != 1
+            for: "5m"
+            labels:
+              severity: critical
+              app: capsule
+              component: controller
+            annotations:
+              summary: "Capsule Tenant {{ $labels.tenant }} is missing or not active"
+              description: "Tenant {{ $labels.tenant }} is either missing or not in Active state. This may prevent users from accessing their namespaces."
+          - alert: CapsuleTenantNamespaceNotReady
+            expr: |
+              capsule_tenant_namespace_condition{condition="Ready"} != 1
+            for: "5m"
+            labels:
+              severity: critical
+              app: capsule
+              component: controller
+            annotations:
+              summary: "Namespace {{ $labels.target_namespace }} from Tenant {{ $labels.tenant }} is not Ready."
+              description: "Namespace {{ $labels.target_namespace }} from Tenant {{ $labels.tenant }} is not Ready state for the last 10 minutes."
+      - name: capsule.controller
+        rules:
+          # Alert when Capsule controller is down
+          - alert: CapsuleControllerDown
+            expr: |
+              up{job="capsule-controller-manager"} == 0
+            for: "5m"
+            labels:
+              severity: critical
+              app: capsule
+              component: controller
+            annotations:
+              summary: "Capsule controller is down"
+              description: "The Capsule controller manager has been down for more than 5 minutes. Tenant operations may be impacted."
+          - alert: CapsuleWebhookHighErrorRate
+            expr: |
+              rate(capsule_webhook_requests_total{status=~"5.."}[5m]) / rate(capsule_webhook_requests_total[5m]) > 0.05
+            for: "5m"
+            labels:
+              severity: warning
+              app: capsule
+              component: controller
+            annotations:
+              summary: "Capsule webhook experiencing high error rate"
+              description: "Capsule webhook has an error rate of {{ $value | humanizePercentage }} over the last 5 minutes. This may block tenant operations."
 
 # Conversions Webhook configurations
 conversions:
