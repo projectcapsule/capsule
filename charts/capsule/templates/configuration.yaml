@@ -849,6 +849,7 @@ spec:
             apiVersions:
               - v1beta2
             operations:
+              - CREATE
               - UPDATE
             resources:
               - capsuleconfigurations

@@ -634,6 +634,7 @@ func main() {
 				tenantvalidation.ForbiddenAnnotationsRegexHandler(),
 				tenantvalidation.ProtectedHandler(),
 				tenantvalidation.RequiredMetadataHandler(),
+				// Must run last, because always returns response
 				tenantvalidation.WarningHandler(cfg),
 			),
 		),
@@ -681,10 +682,11 @@ func main() {
 		),
 		route.ConfigValidation(
 			cfgvalidation.Handler(cfg,
-				cfgvalidation.WarningHandler(),
 				cfgvalidation.ValidationHandler(regexCache),
 				cfgvalidation.ServiceAccountHandler(),
 				cfgvalidation.OwnerHandler(),
+				// Must run last, because always returns response
+				cfgvalidation.WarningHandler(),
 			),
 		),
 		route.RulesValidating(manager.GetRESTMapper(), cfg),
