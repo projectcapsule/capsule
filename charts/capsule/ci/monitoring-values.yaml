@@ -1,4 +1,8 @@
 monitoring:
+  prometheusRules:
+    enabled: true
+    ruleLabels:
+      team: platform
   dashboards:
     enabled: true
     annotations:

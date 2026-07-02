@@ -1,0 +1,44 @@
+{{- if not $.Values.crds.exclusive }}
+  {{- with .Values.monitoring.prometheusRules }}
+    {{- if .enabled }}
+      {{- $groups := list }}
+      {{- $ruleLabels := default dict .ruleLabels }}
+      {{- $ruleAnnotations := default dict .ruleAnnotations }}
+      {{- range $group := .rules }}
+        {{- $outGroup := deepCopy $group }}
+        {{- $outRules := list }}
+        {{- range $rule := default list $group.rules }}
+          {{- $outRule := deepCopy $rule }}
+          {{- $labels := mergeOverwrite (deepCopy $ruleLabels) (default dict $rule.labels) }}
+          {{- $annotations := mergeOverwrite (deepCopy $ruleAnnotations) (default dict $rule.annotations) }}
+          {{- if $labels }}
+            {{- $_ := set $outRule "labels" $labels }}
+          {{- end }}
+          {{- if $annotations }}
+            {{- $_ := set $outRule "annotations" $annotations }}
+          {{- end }}
+          {{- $outRules = append $outRules $outRule }}
+        {{- end }}
+        {{- $_ := set $outGroup "rules" $outRules }}
+        {{- $groups = append $groups $outGroup }}
+      {{- end }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "capsule.fullname" $ }}
+  namespace: {{ .namespace | default $.Release.Namespace }}
+  labels:
+    {{- include "capsule.labels" $ | nindent 4 }}
+    {{- with .labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  groups:
+    {{- toYaml $groups | nindent 4 }}
+    {{- end }}
+  {{- end }}
+{{- end }}

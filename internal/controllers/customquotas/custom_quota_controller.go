@@ -256,6 +256,7 @@ func (r *customQuotaClaimController) emitMetrics(
 
 	// Usage Metrics
 	r.metrics.ResourceUsageGauge.WithLabelValues(instance.GetName(), instance.GetNamespace()).Set(float64(instance.Status.Usage.Used.MilliValue()) / 1000)
+	r.metrics.ResourceUsagePercentageGauge.WithLabelValues(instance.GetName(), instance.GetNamespace()).Set(usagePercentage(instance.Status.Usage.Used, instance.Spec.Limit))
 	r.metrics.ResourceAvailableGauge.WithLabelValues(instance.GetName(), instance.GetNamespace()).Set(float64(instance.Status.Usage.Available.MilliValue()) / 1000)
 	r.metrics.ResourceLimitGauge.WithLabelValues(instance.GetName(), instance.GetNamespace()).Set(float64(instance.Spec.Limit.MilliValue()) / 1000)
 

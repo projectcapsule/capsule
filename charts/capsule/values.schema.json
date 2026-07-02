@@ -178,7 +178,8 @@
                                                 }
                                             }
                                         }
-                                    }
+                                    },
+                                    "additionalProperties": true
                                 },
                                 "priorityClassName": {
                                     "description": "Set a pod priorityClassName",
@@ -225,7 +226,8 @@
                                         "runAsUser": {
                                             "type": "integer"
                                         }
-                                    }
+                                    },
+                                    "additionalProperties": true
                                 },
                                 "tolerations": {
                                     "description": "Set list of tolerations",
@@ -326,7 +328,8 @@
                                 "type": {
                                     "type": "string"
                                 }
-                            }
+                            },
+                            "additionalProperties": true
                         }
                     }
                 },
@@ -411,7 +414,8 @@
                                 }
                             }
                         }
-                    }
+                    },
+                    "additionalProperties": true
                 },
                 "options": {
                     "type": "object",
@@ -619,7 +623,8 @@
                                 }
                             }
                         }
-                    }
+                    },
+                    "additionalProperties": true
                 },
                 "resources": {
                     "description": "Set the resource requests/limits for the Capsule manager container",
@@ -744,6 +749,42 @@
                         }
                     }
                 },
+                "prometheusRules": {
+                    "type": "object",
+                    "properties": {
+                        "annotations": {
+                            "description": "Assign additional Annotations",
+                            "type": "object"
+                        },
+                        "enabled": {
+                            "description": "Enable PrometheusRules",
+                            "type": "boolean"
+                        },
+                        "labels": {
+                            "description": "Assign additional labels according to Prometheus' serviceMonitorSelector matching labels",
+                            "type": "object"
+                        },
+                        "namespace": {
+                            "description": "Install the ServiceMonitor into a different Namespace, as the monitoring stack one (default: the release one)",
+                            "type": "string"
+                        },
+                        "ruleAnnotations": {
+                            "description": "Annotations add to all Rules",
+                            "type": "object"
+                        },
+                        "ruleLabels": {
+                            "description": "Labels add to all Rules",
+                            "type": "object"
+                        },
+                        "rules": {
+                            "description": "Prometheus Rules definitions. The block is directly forwarded into the PrometheusRule, so you can use whatever specification you want.",
+                            "type": "array",
+                            "items": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
                 "serviceMonitor": {
                     "type": "object",
                     "properties": {
@@ -832,7 +873,8 @@
                         }
                     }
                 }
-            }
+            },
+            "additionalProperties": true
         },
         "ports": {
             "description": "Set additional ports for the deployment",
@@ -918,7 +960,8 @@
                 "readOnlyRootFilesystem": {
                     "type": "boolean"
                 }
-            }
+            },
+            "additionalProperties": true
         },
         "serviceAccount": {
             "type": "object",
