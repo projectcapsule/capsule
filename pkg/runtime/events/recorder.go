@@ -24,7 +24,16 @@ const (
 	ReportingInstance   = "capsule-admission"
 )
 
-type EventRecorder struct {
+type EventRecorder interface {
+	k8sevents.EventRecorder
+	LabeledEvent(regarding runtime.Object, eventType string, reason string, action string, note string) LabeledEvent
+}
+
+type eventEmitter interface {
+	Emit(ctx context.Context, e LabeledEvent)
+}
+
+type eventRecorder struct {
 	k8sevents.EventRecorder
 
 	client        client.Client
@@ -37,8 +46,8 @@ func NewEventRecorder(
 	log logr.Logger,
 	recorder k8sevents.EventRecorder,
 	configuration configuration.Configuration,
-) *EventRecorder {
-	return &EventRecorder{
+) EventRecorder {
+	return &eventRecorder{
 		EventRecorder: recorder,
 		client:        c,
 		log:           log.WithName("event-recorder"),
@@ -46,10 +55,7 @@ func NewEventRecorder(
 	}
 }
 
-func (r *EventRecorder) emitLabeledEvent(
-	ctx context.Context,
-	e *LabeledEvent,
-) {
+func (r *eventRecorder) Emit(ctx context.Context, e LabeledEvent) {
 	if r == nil {
 		return
 	}
@@ -66,19 +72,19 @@ func (r *EventRecorder) emitLabeledEvent(
 		return
 	}
 
-	if e.reason == "" {
+	if e.Reason() == "" {
 		r.log.Error(nil, "cannot emit labeled event: reason is empty")
 
 		return
 	}
 
-	if e.action == "" {
+	if e.Action() == "" {
 		r.log.Error(nil, "cannot emit labeled event: action is empty")
 
 		return
 	}
 
-	regardingRef, metaObj, err := objectReference(e.regarding)
+	regardingRef, metaObj, err := objectReference(e.Regarding())
 	if err != nil {
 		r.log.Error(err, "cannot emit labeled event: build regarding reference")
 
@@ -100,21 +106,21 @@ func (r *EventRecorder) emitLabeledEvent(
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: metaObj.GetName(),
 			Namespace:    namespace,
-			Labels:       e.labels,
-			Annotations:  e.annotations,
+			Labels:       e.Labels(),
+			Annotations:  e.Annotations(),
 		},
 		EventTime:           metav1.MicroTime{Time: time.Now()},
 		ReportingController: ReportingController,
 		ReportingInstance:   ReportingInstance,
-		Action:              e.action,
-		Reason:              e.reason,
+		Action:              e.Action(),
+		Reason:              e.Reason(),
 		Regarding:           regardingRef,
-		Note:                e.note,
-		Type:                e.eventType,
+		Note:                e.Note(),
+		Type:                e.EventType(),
 	}
 
-	if e.related != nil {
-		relatedRef, _, err := objectReference(e.related)
+	if e.Related() != nil {
+		relatedRef, _, err := objectReference(e.Related())
 		if err != nil {
 			r.log.Error(err, "cannot emit labeled event: build related reference")
 
@@ -128,9 +134,9 @@ func (r *EventRecorder) emitLabeledEvent(
 		r.log.Error(
 			err,
 			"cannot emit labeled event",
-			"reason", e.reason,
-			"action", e.action,
-			"type", e.eventType,
+			"reason", e.Reason(),
+			"action", e.Action(),
+			"type", e.EventType(),
 			"regarding", regardingRef.Name,
 			"namespace", namespace,
 		)
