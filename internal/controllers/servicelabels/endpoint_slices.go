@@ -9,6 +9,8 @@ import (
 	"github.com/go-logr/logr"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+
+	"github.com/projectcapsule/capsule/internal/controllers/utils"
 )
 
 type EndpointSlicesLabelsReconciler struct {
@@ -19,7 +21,7 @@ type EndpointSlicesLabelsReconciler struct {
 	VersionMajor uint
 }
 
-func (r *EndpointSlicesLabelsReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+func (r *EndpointSlicesLabelsReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
 	r.abstractServiceLabelsReconciler = abstractServiceLabelsReconciler{
 		obj:    &discoveryv1.EndpointSlice{},
 		client: mgr.GetClient(),
@@ -30,5 +32,6 @@ func (r *EndpointSlicesLabelsReconciler) SetupWithManager(ctx context.Context, m
 		Named("endpointslices").
 		For(r.abstractServiceLabelsReconciler.obj, r.abstractServiceLabelsReconciler.forOptionPerInstanceName(ctx)).
 		Named("capsule/endpointslices").
+		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
 		Complete(r)
 }

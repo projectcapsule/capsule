@@ -3,16 +3,23 @@
 package ruleengine
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"regexp"
 	"strings"
 
-	"github.com/projectcapsule/capsule/pkg/api"
+	k8smeta "k8s.io/apimachinery/pkg/api/meta"
+	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
+
 	"github.com/projectcapsule/capsule/pkg/api/rules"
+	"github.com/projectcapsule/capsule/pkg/api/runtime"
 )
 
-func ValidateRuleStatusBody(bodies []*rules.NamespaceRuleBodyNamespace) error {
+func ValidateRuleStatusBody(
+	mapper k8smeta.RESTMapper,
+	bodies []*rules.NamespaceRuleBodyNamespace,
+) error {
 	for i, rule := range bodies {
 		if rule == nil || rule.Enforce == nil {
 			continue
@@ -23,6 +30,10 @@ func ValidateRuleStatusBody(bodies []*rules.NamespaceRuleBodyNamespace) error {
 		}
 
 		if err := validateServiceRules(i, rule.Enforce.Services); err != nil {
+			return err
+		}
+
+		if err := validateMetadataRules(i, rule.Enforce.Metadata, mapper); err != nil {
 			return err
 		}
 	}
@@ -112,7 +123,76 @@ func validateServiceRules(
 	return nil
 }
 
-func validateExpressionMatch(match api.ExpressionMatch, fieldPath string) error {
+func validateMetadataRules(
+	ruleIndex int,
+	metadata []rules.MetadataRule,
+	mapper k8smeta.RESTMapper,
+) error {
+	for j, rule := range metadata {
+		fieldPath := fmt.Sprintf("rules[%d].enforce.metadata[%d]", ruleIndex, j)
+
+		if err := validateMetadataTargets(fieldPath, rule, mapper); err != nil {
+			return err
+		}
+
+		for key, policy := range rule.Labels {
+			if err := validateMetadataKey(key); err != nil {
+				return fmt.Errorf(
+					"%s.labels[%q] is invalid: %w",
+					fieldPath,
+					key,
+					err,
+				)
+			}
+
+			for k, matcher := range policy.Values {
+				if err := validateExpressionMatch(
+					matcher,
+					fmt.Sprintf("%s.labels[%q].values[%d]", fieldPath, key, k),
+				); err != nil {
+					return err
+				}
+			}
+		}
+
+		for key, policy := range rule.Annotations {
+			if err := validateMetadataKey(key); err != nil {
+				return fmt.Errorf(
+					"%s.annotations[%q] is invalid: %w",
+					fieldPath,
+					key,
+					err,
+				)
+			}
+
+			for k, matcher := range policy.Values {
+				if err := validateExpressionMatch(
+					matcher,
+					fmt.Sprintf("%s.annotations[%q].values[%d]", fieldPath, key, k),
+				); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func validateMetadataKey(key string) error {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return errors.New("key is empty")
+	}
+
+	if errs := k8svalidation.IsQualifiedName(key); len(errs) > 0 {
+		return errors.New(strings.Join(errs, ", "))
+	}
+
+	return nil
+}
+
+func validateExpressionMatch(match runtime.ExpressionMatch, fieldPath string) error {
 	if err := validateExpression(match.Expression, fieldPath+".exp"); err != nil {
 		return err
 	}
@@ -177,6 +257,33 @@ func validateNodePortRange(portRange rules.ServiceNodePortRange) error {
 
 	if portRange.From > portRange.To {
 		return fmt.Errorf("from %d must be lower than or equal to %d", portRange.From, portRange.To)
+	}
+
+	return nil
+}
+
+func validateMetadataTargets(
+	fieldPath string,
+	rule rules.MetadataRule,
+	mapper k8smeta.RESTMapper,
+) error {
+	if len(rule.Kinds) == 0 {
+		return fmt.Errorf("%s.kinds is invalid: at least one kind must be configured", fieldPath)
+	}
+
+	for i, kind := range rule.Kinds {
+		kind = strings.TrimSpace(kind)
+		if kind == "" {
+			return fmt.Errorf("%s.kinds[%d] is invalid: kind is empty", fieldPath, i)
+		}
+	}
+
+	if mapper == nil {
+		return nil
+	}
+
+	if err := rule.ValidateKnownKinds(mapper, fieldPath); err != nil {
+		return err
 	}
 
 	return nil

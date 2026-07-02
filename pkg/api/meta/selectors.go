@@ -14,7 +14,6 @@ var WithoutCapsuleManagedResourcesLabelSelector = func() string {
 		selection.NotIn,
 		[]string{
 			ValueController,
-			ValueControllerResources,
 		},
 	)
 
@@ -27,7 +26,6 @@ var WithCapsuleManagedResourcesLabelSelector = func() string {
 		selection.In,
 		[]string{
 			ValueController,
-			ValueControllerResources,
 		},
 	)
 

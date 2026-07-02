@@ -11,8 +11,8 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
+	"github.com/projectcapsule/capsule/pkg/api/runtime"
 )
 
 func (r *CacheInvalidator) rebuildRegexCache(ctx context.Context, log logr.Logger) error {
@@ -28,7 +28,7 @@ func (r *CacheInvalidator) rebuildRegexCache(ctx context.Context, log logr.Logge
 
 	r.RegexCache.Reset()
 
-	expressions := make(map[string]api.ExpressionRegex)
+	expressions := make(map[string]runtime.ExpressionRegex)
 
 	for i := range ruleStatuses.Items {
 		rs := &ruleStatuses.Items[i]
@@ -52,7 +52,7 @@ func (r *CacheInvalidator) rebuildRegexCache(ctx context.Context, log logr.Logge
 }
 
 func collectRegexExpressionsFromNamespaceRules(
-	set map[string]api.ExpressionRegex,
+	set map[string]runtime.ExpressionRegex,
 	r []*rules.NamespaceRuleBodyNamespace,
 ) {
 	for _, rule := range r {
@@ -61,7 +61,7 @@ func collectRegexExpressionsFromNamespaceRules(
 }
 
 func collectRegexExpressionsFromNamespaceRule(
-	set map[string]api.ExpressionRegex,
+	set map[string]runtime.ExpressionRegex,
 	rule *rules.NamespaceRuleBodyNamespace,
 ) {
 	if rule == nil {

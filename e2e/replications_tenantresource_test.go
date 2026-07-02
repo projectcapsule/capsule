@@ -21,6 +21,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 	apimeta "github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
+	capruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 	"github.com/projectcapsule/capsule/pkg/template"
 )
@@ -238,7 +239,7 @@ var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace
 								Resources: []*template.TemplateResourceReference{{
 									Index: "secrets",
 									ResourceReference: template.ResourceReference{
-										VersionKind: gvk.VersionKind{
+										VersionKind: capruntime.VersionKind{
 											APIVersion: "v1",
 											Kind:       "Secret",
 										},
@@ -371,7 +372,7 @@ data:
 								Resources: []*template.TemplateResourceReference{{
 									Index: "secrets",
 									ResourceReference: template.ResourceReference{
-										VersionKind: gvk.VersionKind{
+										VersionKind: capruntime.VersionKind{
 											APIVersion: "v1",
 											Kind:       "Secret",
 										},
@@ -423,7 +424,7 @@ data:
 								Resources: []*template.TemplateResourceReference{{
 									Index: "secrets",
 									ResourceReference: template.ResourceReference{
-										VersionKind: gvk.VersionKind{
+										VersionKind: capruntime.VersionKind{
 											APIVersion: "v1",
 											Kind:       "Secret",
 										},
@@ -488,7 +489,7 @@ data:
 								Resources: []*template.TemplateResourceReference{{
 									Index: "secrets",
 									ResourceReference: template.ResourceReference{
-										VersionKind: gvk.VersionKind{
+										VersionKind: capruntime.VersionKind{
 											APIVersion: "v1",
 											Kind:       "Secret",
 										},
@@ -554,7 +555,7 @@ data:
 								Resources: []*template.TemplateResourceReference{{
 									Index: "secrets",
 									ResourceReference: template.ResourceReference{
-										VersionKind: gvk.VersionKind{
+										VersionKind: capruntime.VersionKind{
 											APIVersion: "v1",
 											Kind:       "Secret",
 										},
@@ -630,7 +631,7 @@ data:
 						ResyncPeriod:    resyncPeriod,
 						Resources: []capsulev1beta2.ResourceSpec{{
 							NamespacedItems: []template.ResourceReference{{
-								VersionKind: gvk.VersionKind{
+								VersionKind: capruntime.VersionKind{
 									APIVersion: "v1",
 									Kind:       "Secret",
 								},
@@ -804,7 +805,7 @@ data:
 						ResyncPeriod:    resyncPeriod,
 						Resources: []capsulev1beta2.ResourceSpec{{
 							NamespacedItems: []template.ResourceReference{{
-								VersionKind: gvk.VersionKind{
+								VersionKind: capruntime.VersionKind{
 									APIVersion: "v1",
 									Kind:       "Secret",
 								},
@@ -1258,7 +1259,7 @@ data:
 								Resources: []*template.TemplateResourceReference{{
 									Index: "secrets",
 									ResourceReference: template.ResourceReference{
-										VersionKind: gvk.VersionKind{
+										VersionKind: capruntime.VersionKind{
 											APIVersion: "v1",
 											Kind:       "Secret",
 										},
@@ -1392,7 +1393,7 @@ data:
 						PruningOnDelete: ptr.To(true),
 						Resources: []capsulev1beta2.ResourceSpec{{
 							NamespacedItems: []template.ResourceReference{{
-								VersionKind: gvk.VersionKind{
+								VersionKind: capruntime.VersionKind{
 									APIVersion: "v1",
 									Kind:       "Secret",
 								},

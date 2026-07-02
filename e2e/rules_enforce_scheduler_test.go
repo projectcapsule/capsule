@@ -18,10 +18,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
+	"github.com/projectcapsule/capsule/pkg/api/runtime"
 )
 
 var _ = Describe("enforcing pod schedulerName namespace rules", Ordered, Label("tenant", "rules", "enforce", "workloads", "scheduler"), func() {
@@ -54,7 +54,7 @@ var _ = Describe("enforcing pod schedulerName namespace rules", Ordered, Label("
 							Enforce: &rules.NamespaceRuleEnforceBody{
 								Action: rules.ActionTypeDeny,
 								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
-									Schedulers: []api.ExpressionMatch{
+									Schedulers: []runtime.ExpressionMatch{
 										{
 											Exact: []string{
 												"forbidden-scheduler",
@@ -71,7 +71,7 @@ var _ = Describe("enforcing pod schedulerName namespace rules", Ordered, Label("
 							Enforce: &rules.NamespaceRuleEnforceBody{
 								Action: rules.ActionTypeAudit,
 								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
-									Schedulers: []api.ExpressionMatch{
+									Schedulers: []runtime.ExpressionMatch{
 										{
 											Exact: []string{
 												"audited-scheduler",
@@ -92,7 +92,7 @@ var _ = Describe("enforcing pod schedulerName namespace rules", Ordered, Label("
 							Enforce: &rules.NamespaceRuleEnforceBody{
 								Action: rules.ActionTypeAllow,
 								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
-									Schedulers: []api.ExpressionMatch{
+									Schedulers: []runtime.ExpressionMatch{
 										{
 											Exact: []string{
 												"forbidden-scheduler",
@@ -113,7 +113,7 @@ var _ = Describe("enforcing pod schedulerName namespace rules", Ordered, Label("
 							Enforce: &rules.NamespaceRuleEnforceBody{
 								Action: rules.ActionTypeDeny,
 								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
-									Schedulers: []api.ExpressionMatch{
+									Schedulers: []runtime.ExpressionMatch{
 										{
 											Exact: []string{
 												"audited-scheduler",
@@ -134,9 +134,9 @@ var _ = Describe("enforcing pod schedulerName namespace rules", Ordered, Label("
 							Enforce: &rules.NamespaceRuleEnforceBody{
 								Action: rules.ActionTypeAllow,
 								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
-									Schedulers: []api.ExpressionMatch{
+									Schedulers: []runtime.ExpressionMatch{
 										{
-											ExpressionRegex: api.ExpressionRegex{
+											ExpressionRegex: runtime.ExpressionRegex{
 												Expression: "^team-[a-z0-9-]+$",
 											},
 										},
@@ -155,9 +155,9 @@ var _ = Describe("enforcing pod schedulerName namespace rules", Ordered, Label("
 							Enforce: &rules.NamespaceRuleEnforceBody{
 								Action: rules.ActionTypeDeny,
 								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
-									Schedulers: []api.ExpressionMatch{
+									Schedulers: []runtime.ExpressionMatch{
 										{
-											ExpressionRegex: api.ExpressionRegex{
+											ExpressionRegex: runtime.ExpressionRegex{
 												Expression: "^team-blocked-[a-z0-9-]+$",
 											},
 										},
@@ -174,7 +174,7 @@ var _ = Describe("enforcing pod schedulerName namespace rules", Ordered, Label("
 	type expectedSchedulerStatusRule struct {
 		action     rules.ActionType
 		targets    []rules.WorkloadValidationTarget
-		schedulers []api.ExpressionMatch
+		schedulers []runtime.ExpressionMatch
 	}
 
 	expectNamespaceStatusRules := func(nsName string, want []expectedSchedulerStatusRule) {
@@ -322,7 +322,7 @@ var _ = Describe("enforcing pod schedulerName namespace rules", Ordered, Label("
 		expectNamespaceStatusRules(ns.GetName(), []expectedSchedulerStatusRule{
 			{
 				action: rules.ActionTypeDeny,
-				schedulers: []api.ExpressionMatch{
+				schedulers: []runtime.ExpressionMatch{
 					{
 						Exact: []string{
 							"forbidden-scheduler",
@@ -333,7 +333,7 @@ var _ = Describe("enforcing pod schedulerName namespace rules", Ordered, Label("
 			},
 			{
 				action: rules.ActionTypeAudit,
-				schedulers: []api.ExpressionMatch{
+				schedulers: []runtime.ExpressionMatch{
 					{
 						Exact: []string{
 							"audited-scheduler",
@@ -356,7 +356,7 @@ var _ = Describe("enforcing pod schedulerName namespace rules", Ordered, Label("
 		expectNamespaceStatusRules(ns.GetName(), []expectedSchedulerStatusRule{
 			{
 				action: rules.ActionTypeDeny,
-				schedulers: []api.ExpressionMatch{
+				schedulers: []runtime.ExpressionMatch{
 					{
 						Exact: []string{
 							"forbidden-scheduler",
@@ -367,7 +367,7 @@ var _ = Describe("enforcing pod schedulerName namespace rules", Ordered, Label("
 			},
 			{
 				action: rules.ActionTypeAudit,
-				schedulers: []api.ExpressionMatch{
+				schedulers: []runtime.ExpressionMatch{
 					{
 						Exact: []string{
 							"audited-scheduler",
@@ -377,7 +377,7 @@ var _ = Describe("enforcing pod schedulerName namespace rules", Ordered, Label("
 			},
 			{
 				action: rules.ActionTypeAllow,
-				schedulers: []api.ExpressionMatch{
+				schedulers: []runtime.ExpressionMatch{
 					{
 						Exact: []string{
 							"forbidden-scheduler",

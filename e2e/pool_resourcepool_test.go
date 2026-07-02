@@ -924,6 +924,223 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 		})
 	})
 
+	It("ResourcePool Claim Resize - Recalculates Allocation", func() {
+		pool := &capsulev1beta2.ResourcePool{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "claim-resize-recalculation",
+				Labels: map[string]string{
+					"e2e-resourcepool": "test",
+				},
+			},
+			Spec: capsulev1beta2.ResourcePoolSpec{
+				Selectors: []selectors.NamespaceSelector{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"e2e.capsule.dev/test-suite": "claim-resize-recalculation",
+							},
+						},
+					},
+				},
+				Quota: corev1.ResourceQuotaSpec{
+					Hard: corev1.ResourceList{
+						corev1.ResourceRequestsCPU: resource.MustParse("10"),
+					},
+				},
+			},
+		}
+
+		namespace := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "ns-claim-resize-recalculation",
+				Labels: map[string]string{
+					"e2e-resourcepool":           "test",
+					"e2e.capsule.dev/test-suite": "claim-resize-recalculation",
+				},
+			},
+		}
+
+		claim := &capsulev1beta2.ResourcePoolClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "resize",
+				Namespace: namespace.Name,
+			},
+			Spec: capsulev1beta2.ResourcePoolClaimSpec{
+				Pool: pool.Name,
+				ResourceClaims: corev1.ResourceList{
+					corev1.ResourceRequestsCPU: resource.MustParse("5"),
+				},
+			},
+		}
+
+		By("Create the ResourcePool", func() {
+			EventuallyCreation(func() error {
+				pool.ResourceVersion = ""
+
+				return k8sClient.Create(context.TODO(), pool)
+			}).Should(Succeed(), "Failed to create ResourcePool %s", pool)
+		})
+
+		By("Create source namespace", func() {
+			Expect(k8sClient.Create(context.TODO(), namespace)).To(Succeed(), "Failed to create Namespace %s", namespace)
+		})
+
+		By("Create an initially valid claim", func() {
+			Expect(k8sClient.Create(context.TODO(), claim)).To(Succeed(), "Failed to create Claim %s", claim)
+
+			isSuccessfullyBoundAndUnsedToPool(pool, claim)
+
+			ExpectPoolAllocation(pool.Name, capsulev1beta2.ResourcePoolQuotaStatus{
+				Hard: pool.Spec.Quota.Hard,
+				Claimed: corev1.ResourceList{
+					corev1.ResourceRequestsCPU: resource.MustParse("5"),
+				},
+				Available: corev1.ResourceList{
+					corev1.ResourceRequestsCPU: resource.MustParse("5"),
+				},
+			})
+		})
+
+		By("Resize the unused claim within pool capacity", func() {
+			Eventually(func() error {
+				current := &capsulev1beta2.ResourcePoolClaim{}
+				if err := k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(claim), current); err != nil {
+					return err
+				}
+
+				current.Spec.ResourceClaims = corev1.ResourceList{
+					corev1.ResourceRequestsCPU: resource.MustParse("8"),
+				}
+
+				return k8sClient.Update(context.TODO(), current)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+			claim.Spec.ResourceClaims = corev1.ResourceList{
+				corev1.ResourceRequestsCPU: resource.MustParse("8"),
+			}
+
+			isSuccessfullyBoundAndUnsedToPool(pool, claim)
+
+			ExpectPoolAllocation(pool.Name, capsulev1beta2.ResourcePoolQuotaStatus{
+				Hard: pool.Spec.Quota.Hard,
+				Claimed: corev1.ResourceList{
+					corev1.ResourceRequestsCPU: resource.MustParse("8"),
+				},
+				Available: corev1.ResourceList{
+					corev1.ResourceRequestsCPU: resource.MustParse("2"),
+				},
+			})
+		})
+
+		By("Resize the unused claim beyond pool capacity", func() {
+			Eventually(func() error {
+				current := &capsulev1beta2.ResourcePoolClaim{}
+				if err := k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(claim), current); err != nil {
+					return err
+				}
+
+				current.Spec.ResourceClaims = corev1.ResourceList{
+					corev1.ResourceRequestsCPU: resource.MustParse("55"),
+				}
+
+				return k8sClient.Update(context.TODO(), current)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+			claim.Spec.ResourceClaims = corev1.ResourceList{
+				corev1.ResourceRequestsCPU: resource.MustParse("55"),
+			}
+
+			assertClaimExhausted(pool, claim, meta.PoolExhaustedReason, []string{
+				"requested.requests.cpu=55",
+				"available.requests.cpu=10",
+			})
+
+			ExpectPoolAllocation(pool.Name, capsulev1beta2.ResourcePoolQuotaStatus{
+				Hard: pool.Spec.Quota.Hard,
+				Claimed: corev1.ResourceList{
+					corev1.ResourceRequestsCPU: resource.MustParse("0"),
+				},
+				Available: corev1.ResourceList{
+					corev1.ResourceRequestsCPU: resource.MustParse("10"),
+				},
+			})
+		})
+
+		By("Resize the exhausted claim back within pool capacity", func() {
+			Eventually(func() error {
+				current := &capsulev1beta2.ResourcePoolClaim{}
+				if err := k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(claim), current); err != nil {
+					return err
+				}
+
+				current.Spec.ResourceClaims = corev1.ResourceList{
+					corev1.ResourceRequestsCPU: resource.MustParse("8"),
+				}
+
+				return k8sClient.Update(context.TODO(), current)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+			claim.Spec.ResourceClaims = corev1.ResourceList{
+				corev1.ResourceRequestsCPU: resource.MustParse("8"),
+			}
+
+			isSuccessfullyBoundAndUnsedToPool(pool, claim)
+		})
+
+		By("Create workload usage for the claim", func() {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "resize-claim-pod",
+					Namespace: namespace.Name,
+				},
+				Spec: corev1.PodSpec{
+					SecurityContext: nobodyPodSecurityContext(),
+					RestartPolicy:   corev1.RestartPolicyNever,
+					Containers: []corev1.Container{
+						{
+							Name:            "pause",
+							Image:           "registry.k8s.io/pause:3.9",
+							SecurityContext: restrictedContainerSecurityContext(),
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU: resource.MustParse("100m"),
+								},
+							},
+						},
+					},
+				},
+			}
+
+			Expect(k8sClient.Create(context.TODO(), pod)).To(Succeed())
+			isSuccessfullyBoundAndUsedToPool(pool, claim)
+		})
+
+		By("Deny resizing a claim that is in use", func() {
+			Eventually(func() error {
+				current := &capsulev1beta2.ResourcePoolClaim{}
+				if err := k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(claim), current); err != nil {
+					return err
+				}
+
+				current.Spec.ResourceClaims = corev1.ResourceList{
+					corev1.ResourceRequestsCPU: resource.MustParse("9"),
+				}
+
+				return k8sClient.Update(context.TODO(), current)
+			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
+
+			ExpectPoolAllocation(pool.Name, capsulev1beta2.ResourcePoolQuotaStatus{
+				Hard: pool.Spec.Quota.Hard,
+				Claimed: corev1.ResourceList{
+					corev1.ResourceRequestsCPU: resource.MustParse("8"),
+				},
+				Available: corev1.ResourceList{
+					corev1.ResourceRequestsCPU: resource.MustParse("2"),
+				},
+			})
+		})
+	})
+
 	It("ResourcePool Scheduling - Ordered", func() {
 		pool := &capsulev1beta2.ResourcePool{
 			ObjectMeta: metav1.ObjectMeta{

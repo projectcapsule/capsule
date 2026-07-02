@@ -268,8 +268,6 @@ func (r *Manager) Reconcile(ctx context.Context, request ctrl.Request) (result c
 	reconcileError := r.reconcile(ctx, log, instance)
 
 	defer func() {
-		r.syncTenantStatusMetrics(instance)
-
 		if statusErr := r.updateTenantStatus(ctx, instance, reconcileError); statusErr != nil {
 			statusErr = fmt.Errorf("cannot update tenant status: %w", statusErr)
 
@@ -278,7 +276,11 @@ func (r *Manager) Reconcile(ctx context.Context, request ctrl.Request) (result c
 			} else {
 				err = errors.Join(err, statusErr)
 			}
+
+			return
 		}
+
+		r.syncTenantStatusMetrics(instance)
 	}()
 
 	if e := patchHelper.Patch(ctx, instance); e != nil {

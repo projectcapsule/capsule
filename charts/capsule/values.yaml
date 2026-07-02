@@ -133,11 +133,13 @@ manager:
     priorityLevelConfigurationSpec:
       type: Limited
       limited:
-        nominalConcurrencyShares: 10
+        nominalConcurrencyShares: 100
         limitResponse:
-          queuing:
-            queueLengthLimit: 50
           type: Queue
+          queuing:
+            queues: 64
+            handSize: 6
+            queueLengthLimit: 100
 
   # Manager RBAC
   rbac:
@@ -230,6 +232,8 @@ manager:
     clientConnectionQPS: 20.0
     # -- Burst to use for interacting with kubernetes apiserver
     clientConnectionBurst: 30
+    # -- Timeout used when waiting for controller cache synchronization. Empty uses controller-runtime's default.
+    cacheSyncTimeout: "4m"
     # -- Define entities which are considered part of the Capsule construct.
     # Users not mentioned here will be ignored by Capsule
     users:
@@ -665,6 +669,46 @@ webhooks:
         resources:
           - '*'
         scope: Namespaced
+
+    # -- Generic Rules API
+    generic:
+      # -- Enable the Hook
+      enabled: true
+      # -- Capsule Hook Options
+      opts: {}
+      # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
+      failurePolicy: Fail
+      # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
+      matchPolicy: Equivalent
+      # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
+      objectSelector: {}
+      # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
+      namespaceSelector:
+        matchExpressions:
+          - key: capsule.clastix.io/tenant
+            operator: Exists
+      # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
+      matchConditions:
+        - name: ignore-subresources
+          expression: '!has(request.subResource) || request.subResource == ""'
+        - name: ignore-events
+          expression: 'request.resource.resource != "events"'
+
+      # -- [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy)
+      reinvocationPolicy: Never
+      # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
+      rules:
+      - apiGroups:
+          - '*'
+        apiVersions:
+          - '*'
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - '*'
+        scope: Namespaced
+
 
     resourcepools:
       pools:

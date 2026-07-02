@@ -147,8 +147,14 @@ func (r Manager) reconcile(ctx context.Context, instance *capsulev1beta2.RuleSta
 			continue
 		}
 
+		enforce := rule.Enforce.DeepCopy()
+
+		for i := range enforce.Metadata {
+			enforce.Metadata[i].APIGroups = enforce.Metadata[i].StatusAPIGroups()
+		}
+
 		ruleStatus = append(ruleStatus, &rules.NamespaceRuleBodyNamespace{
-			Enforce: rule.Enforce.DeepCopy(),
+			Enforce: enforce,
 		})
 	}
 

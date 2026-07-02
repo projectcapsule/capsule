@@ -21,6 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	controllerutils "github.com/projectcapsule/capsule/internal/controllers/utils"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 	"github.com/projectcapsule/capsule/pkg/utils"
@@ -31,10 +32,11 @@ type MetadataReconciler struct {
 	Log    logr.Logger
 }
 
-func (m *MetadataReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+func (m *MetadataReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlConfig controllerutils.ControllerOptions) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("capsule/pod").
 		For(&corev1.Pod{}, m.forOptionPerInstanceName(ctx)).
+		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
 		Complete(m)
 }
 

@@ -187,7 +187,7 @@ func (r *clusterCustomQuotaClaimController) mapNamespaceToGlobalCustomQuotas(
 	}
 
 	var quotaList capsulev1beta2.GlobalCustomQuotaList
-	if err := r.List(ctx, &quotaList); err != nil {
+	if err := r.reader.List(ctx, &quotaList); err != nil {
 		r.log.Error(err, "cannot list GlobalCustomQuota objects for namespace event", "namespace", ns.Name)
 
 		return nil

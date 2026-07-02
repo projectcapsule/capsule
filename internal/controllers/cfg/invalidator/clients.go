@@ -137,7 +137,7 @@ func (r *CacheInvalidator) rebuildImpersonationCache(
 
 func (r *CacheInvalidator) invalidateServiceAccount(
 	ctx context.Context,
-	sa *corev1.ServiceAccount,
+	sa client.Object,
 ) error {
 	hasReference, err := r.checkServiceAccountReferences(ctx, sa)
 	if err != nil {
@@ -155,7 +155,7 @@ func (r *CacheInvalidator) invalidateServiceAccount(
 
 func (r *CacheInvalidator) checkServiceAccountReferences(
 	ctx context.Context,
-	sa *corev1.ServiceAccount,
+	sa client.Object,
 ) (ref bool, err error) {
 	key := sa.GetNamespace() + "/" + sa.GetName()
 

@@ -16,7 +16,10 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
-func Handler(configuration configuration.Configuration, handlers ...handlers.TypedHandler[*capsulev1beta2.CapsuleConfiguration]) handlers.Handler {
+func Handler(
+	configuration configuration.Configuration,
+	handlers ...handlers.TypedHandler[*capsulev1beta2.CapsuleConfiguration],
+) handlers.Handler {
 	return &handler{
 		cfg:      configuration,
 		handlers: handlers,

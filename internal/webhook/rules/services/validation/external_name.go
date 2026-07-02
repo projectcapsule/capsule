@@ -9,8 +9,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/projectcapsule/capsule/pkg/api"
 	apirules "github.com/projectcapsule/capsule/pkg/api/rules"
+	"github.com/projectcapsule/capsule/pkg/api/runtime"
 	ruleengine "github.com/projectcapsule/capsule/pkg/ruleengine"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 )
@@ -27,10 +27,10 @@ func (h *serviceRules) validateExternalNames(
 		return nil, nil
 	}
 
-	return evaluateServiceRules[api.ExpressionMatch](
+	return evaluateServiceRules[runtime.ExpressionMatch](
 		svc,
 		enforceBodies,
-		serviceRuleSet[api.ExpressionMatch]{
+		serviceRuleSet[runtime.ExpressionMatch]{
 			Name:        "externalName hostname",
 			EventReason: events.ReasonForbiddenExternalName,
 			Values: func(svc *corev1.Service) []ruleengine.Value {
@@ -41,14 +41,14 @@ func (h *serviceRules) validateExternalNames(
 					},
 				}
 			},
-			Rules: func(enforce *apirules.NamespaceRuleEnforceBody) []api.ExpressionMatch {
+			Rules: func(enforce *apirules.NamespaceRuleEnforceBody) []runtime.ExpressionMatch {
 				if enforce == nil || enforce.Services.ExternalNames == nil {
 					return nil
 				}
 
 				return enforce.Services.ExternalNames.Hostnames
 			},
-			Matches: func(match api.ExpressionMatch, value ruleengine.Value) (ruleengine.Match, error) {
+			Matches: func(match runtime.ExpressionMatch, value ruleengine.Value) (ruleengine.Match, error) {
 				matched, err := match.MatchesWithExpressionMatcher(h.regexCache, value.Value)
 				if err != nil {
 					return ruleengine.Match{}, err
@@ -71,7 +71,7 @@ func (h *serviceRules) validateExternalNames(
 	)
 }
 
-func describeExpressionMatch(match api.ExpressionMatch) string {
+func describeExpressionMatch(match runtime.ExpressionMatch) string {
 	parts := make([]string, 0, 2)
 
 	if len(match.Exact) > 0 {

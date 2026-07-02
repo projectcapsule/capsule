@@ -286,4 +286,40 @@ var _ = Describe("modifying node labels and annotations", Ordered, Label("config
 			}).ShouldNot(Succeed())
 		})
 	})
+
+	It("should reject malformed node metadata forbidden label regex", func() {
+		ExpectCapsuleConfigurationUpdateDenied(
+			func(configuration *capsulev1beta2.CapsuleConfiguration) {
+				configuration.Spec.NodeMetadata = &capsulev1beta2.NodeMetadata{
+					ForbiddenLabels: api.ForbiddenListSpec{
+						Regex: "[",
+					},
+					ForbiddenAnnotations: api.ForbiddenListSpec{
+						Regex: "^valid-annotation-.*$",
+					},
+				}
+			},
+			"spec.nodeMetadata.forbiddenLabels.regex",
+			"[",
+			"not a valid regular expression",
+		)
+	})
+
+	It("should reject malformed node metadata forbidden annotation regex", func() {
+		ExpectCapsuleConfigurationUpdateDenied(
+			func(configuration *capsulev1beta2.CapsuleConfiguration) {
+				configuration.Spec.NodeMetadata = &capsulev1beta2.NodeMetadata{
+					ForbiddenLabels: api.ForbiddenListSpec{
+						Regex: "^valid-label-.*$",
+					},
+					ForbiddenAnnotations: api.ForbiddenListSpec{
+						Regex: "[",
+					},
+				}
+			},
+			"spec.nodeMetadata.forbiddenAnnotations.regex",
+			"[",
+			"not a valid regular expression",
+		)
+	})
 })

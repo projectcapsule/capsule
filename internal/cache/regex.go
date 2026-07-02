@@ -11,7 +11,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/runtime"
 )
 
 type CompiledRegex struct {
@@ -46,7 +46,7 @@ func NewRegexCache() *RegexCache {
 	}
 }
 
-func (c *RegexCache) GetOrCompile(expr api.ExpressionRegex) (*CompiledRegex, bool, error) {
+func (c *RegexCache) GetOrCompile(expr runtime.ExpressionRegex) (*CompiledRegex, bool, error) {
 	if c == nil {
 		return nil, false, fmt.Errorf("regex cache is nil")
 	}
@@ -129,7 +129,7 @@ func (c *RegexCache) Reset() {
 	c.re = make(map[string]*CompiledRegex)
 }
 
-func (c *RegexCache) MatchRegex(expr api.ExpressionRegex, value string) (bool, error) {
+func (c *RegexCache) MatchRegex(expr runtime.ExpressionRegex, value string) (bool, error) {
 	compiled, _, err := c.GetOrCompile(expr)
 	if err != nil {
 		return false, err
@@ -138,7 +138,7 @@ func (c *RegexCache) MatchRegex(expr api.ExpressionRegex, value string) (bool, e
 	return compiled.MatchString(value), nil
 }
 
-func HashRegex(expr api.ExpressionRegex) string {
+func HashRegex(expr runtime.ExpressionRegex) string {
 	var b strings.Builder
 
 	b.WriteString(strings.TrimSpace(expr.Expression))

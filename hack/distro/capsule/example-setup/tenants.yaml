@@ -105,6 +105,35 @@ spec:
           ports:
             - from: 30000
               to: 32767
+  - enforce:
+      action: "allow"
+      # generic:
+      #   - kinds:
+      #       - "ConfigMap"
+      #     path: ".data.key"
+      #     entity: "Any/TenantOwner/CapsuleUser"
+      #     operator: "Equals/Truthy"
+      #     values:
+      #       - exact:
+      #         - "sad"
+      #         from: ".status.classes.ingress"
+      metadata:
+        - kinds:
+            - "ConfigMap"
+          labels:
+            "corp.com/tenant":
+              required: true
+              values:
+                - exact:
+                    - test
+          annotations:
+            "example.corp/cost-center":
+              required: true
+              values:
+                - exp: "^INV-[0-9]{4}$"
+                  exact:
+                    - prod
+                    - test
 ---
 apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant

@@ -903,6 +903,234 @@ func TestEvaluation_Append(t *testing.T) {
 	})
 }
 
+func TestEvaluateEnforce_SkipsEmptyExtractedValues(t *testing.T) {
+	t.Parallel()
+
+	type testCase struct {
+		name             string
+		action           api.ActionType
+		values           []Value
+		rules            []string
+		wantMatcherCalls int
+		wantBlocking     bool
+		wantFinal        bool
+		wantAudits       int
+		wantBlockingPath string
+	}
+
+	tests := []testCase{
+		{
+			name:   "empty value is skipped before deny evaluation",
+			action: api.ActionTypeDeny,
+			values: []Value{
+				{
+					Value: "",
+					Path:  "spec.value",
+				},
+			},
+			rules: []string{
+				"",
+			},
+			wantMatcherCalls: 0,
+			wantBlocking:     false,
+			wantFinal:        false,
+			wantAudits:       0,
+		},
+		{
+			name:   "empty value is skipped before allow miss",
+			action: api.ActionTypeAllow,
+			values: []Value{
+				{
+					Value: "",
+					Path:  "spec.value",
+				},
+			},
+			rules: []string{
+				"allowed",
+			},
+			wantMatcherCalls: 0,
+			wantBlocking:     false,
+			wantFinal:        false,
+			wantAudits:       0,
+		},
+		{
+			name:   "empty value is skipped before audit evaluation",
+			action: api.ActionTypeAudit,
+			values: []Value{
+				{
+					Value: "",
+					Path:  "spec.value",
+				},
+			},
+			rules: []string{
+				"",
+			},
+			wantMatcherCalls: 0,
+			wantBlocking:     false,
+			wantFinal:        false,
+			wantAudits:       0,
+		},
+		{
+			name:   "empty value is skipped but later non empty value is evaluated",
+			action: api.ActionTypeDeny,
+			values: []Value{
+				{
+					Value: "",
+					Path:  "spec.empty",
+				},
+				{
+					Value: "deny",
+					Path:  "spec.nonEmpty",
+				},
+			},
+			rules: []string{
+				"deny",
+			},
+			wantMatcherCalls: 1,
+			wantBlocking:     true,
+			wantFinal:        true,
+			wantAudits:       0,
+			wantBlockingPath: "spec.nonEmpty",
+		},
+		{
+			name:   "whitespace value is not skipped",
+			action: api.ActionTypeDeny,
+			values: []Value{
+				{
+					Value: " ",
+					Path:  "spec.value",
+				},
+			},
+			rules: []string{
+				" ",
+			},
+			wantMatcherCalls: 1,
+			wantBlocking:     true,
+			wantFinal:        true,
+			wantAudits:       0,
+			wantBlockingPath: "spec.value",
+		},
+		{
+			name:   "empty values are skipped before non matching allow value triggers allow miss",
+			action: api.ActionTypeAllow,
+			values: []Value{
+				{
+					Value: "",
+					Path:  "spec.empty",
+				},
+				{
+					Value: "actual",
+					Path:  "spec.actual",
+				},
+			},
+			rules: []string{
+				"allowed",
+			},
+			wantMatcherCalls: 1,
+			wantBlocking:     true,
+			wantFinal:        false,
+			wantAudits:       0,
+			wantBlockingPath: "spec.actual",
+		},
+		{
+			name:   "all empty values are skipped",
+			action: api.ActionTypeDeny,
+			values: []Value{
+				{
+					Value: "",
+					Path:  "spec.first",
+				},
+				{
+					Value: "",
+					Path:  "spec.second",
+				},
+			},
+			rules: []string{
+				"",
+			},
+			wantMatcherCalls: 0,
+			wantBlocking:     false,
+			wantFinal:        false,
+			wantAudits:       0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			matcherCalls := 0
+
+			evaluation, err := EvaluateEnforce(
+				struct{}{},
+				[]*api.NamespaceRuleEnforceBody{
+					{
+						Action: tt.action,
+					},
+				},
+				Set[string, struct{}]{
+					Name:        "registry",
+					EventReason: "NamespaceRuleViolation",
+
+					Values: func(struct{}) []Value {
+						return tt.values
+					},
+
+					Rules: func(*api.NamespaceRuleEnforceBody) []string {
+						return tt.rules
+					},
+
+					Matches: func(rule string, value Value) (Match, error) {
+						matcherCalls++
+
+						return Match{
+							Matched:      value.Value == rule,
+							MatchedValue: rule,
+						}, nil
+					},
+
+					RuleDescription: func(rule string) string {
+						return rule
+					},
+				},
+			)
+			if err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+
+			if evaluation == nil {
+				t.Fatalf("expected evaluation")
+			}
+
+			if matcherCalls != tt.wantMatcherCalls {
+				t.Fatalf("expected %d matcher calls, got %d", tt.wantMatcherCalls, matcherCalls)
+			}
+
+			if got := evaluation.Blocking != nil; got != tt.wantBlocking {
+				t.Fatalf("expected blocking=%t, got %t: %#v", tt.wantBlocking, got, evaluation.Blocking)
+			}
+
+			if got := evaluation.Final != nil; got != tt.wantFinal {
+				t.Fatalf("expected final=%t, got %t: %#v", tt.wantFinal, got, evaluation.Final)
+			}
+
+			if len(evaluation.Audits) != tt.wantAudits {
+				t.Fatalf("expected %d audits, got %d", tt.wantAudits, len(evaluation.Audits))
+			}
+
+			if tt.wantBlockingPath != "" {
+				if evaluation.Blocking == nil {
+					t.Fatalf("expected blocking decision")
+				}
+
+				if evaluation.Blocking.Value.Path != tt.wantBlockingPath {
+					t.Fatalf("expected blocking path %q, got %q", tt.wantBlockingPath, evaluation.Blocking.Value.Path)
+				}
+			}
+		})
+	}
+}
+
 func TestMessageHelpers(t *testing.T) {
 	t.Parallel()
 

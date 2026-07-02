@@ -16,14 +16,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
+	"github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
 
 // Reference
 // +kubebuilder:object:generate=true
 type ResourceReference struct {
-	gvk.VersionKind `json:",inline"`
+	runtime.VersionKind `json:",inline"`
 
 	// Name of the values referent. This is useful
 	// when you traying to get a specific resource

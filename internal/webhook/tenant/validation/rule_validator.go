@@ -6,6 +6,7 @@ package validation
 import (
 	"context"
 
+	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -17,10 +18,14 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
-type RuleValidationHandler struct{}
+type RuleValidationHandler struct {
+	mapper k8smeta.RESTMapper
+}
 
-func RuleHandler() handlers.TypedHandler[*capsulev1beta2.Tenant] {
-	return &RuleValidationHandler{}
+func RuleHandler(mapper k8smeta.RESTMapper) handlers.TypedHandler[*capsulev1beta2.Tenant] {
+	return &RuleValidationHandler{
+		mapper: mapper,
+	}
 }
 
 func (h *RuleValidationHandler) OnCreate(
@@ -68,31 +73,34 @@ func (h *RuleValidationHandler) OnUpdate(
 	}
 }
 
-func (h *RuleValidationHandler) handle(tnt *capsulev1beta2.Tenant, req admission.Request) *admission.Response {
-	if tnt == nil {
+func (h *RuleValidationHandler) handle(
+	tnt *capsulev1beta2.Tenant,
+	req admission.Request,
+) *admission.Response {
+	if tnt == nil || len(tnt.Spec.Rules) == 0 {
 		return nil
 	}
 
-	if len(tnt.Spec.Rules) == 0 {
-		return nil
-	}
-
-	var bodies []*rules.NamespaceRuleBodyNamespace
+	bodies := make([]*rules.NamespaceRuleBodyNamespace, 0, len(tnt.Spec.Rules))
 
 	for _, rule := range tnt.Spec.Rules {
-		if rule == nil {
+		if rule == nil || rule.NamespaceRuleBodyNamespace == nil {
 			continue
 		}
 
 		body := rule.NamespaceRuleBodyNamespace
-		if body == nil {
+		if body.Enforce == nil {
 			continue
 		}
 
 		bodies = append(bodies, body)
 	}
 
-	if err := ruleengine.ValidateRuleStatusBody(bodies); err != nil {
+	if len(bodies) == 0 {
+		return nil
+	}
+
+	if err := ruleengine.ValidateRuleStatusBody(h.mapper, bodies); err != nil {
 		return ad.Deny(err.Error())
 	}
 
