@@ -68,6 +68,141 @@ spec:
                       - deny
                       - audit
                       type: string
+                    metadata:
+                      description: Enforcement for object metadata on namespaced resources.
+                      items:
+                        description: |-
+                          MetadataRule defines metadata constraints for namespaced resources.
+
+                          APIVersion and Kind support '*' wildcard matching without regular expressions.
+                          Empty APIVersion or Kind is treated as '*'.
+                        properties:
+                          annotations:
+                            additionalProperties:
+                              properties:
+                                required:
+                                  default: false
+                                  description: |-
+                                    Required enforces that the metadata key must be present.
+
+                                    This is mainly meaningful with action=allow. Deny and audit rules remain
+                                    value matchers and do not require missing metadata to exist.
+                                  type: boolean
+                                values:
+                                  description: |-
+                                    Values defines allowed, denied, or audited values for the metadata key.
+
+                                    If Required=true and Values is empty, only presence is enforced.
+                                  items:
+                                    description: |-
+                                      At least one of Exact or Exp must be set.
+                                      Both may be set together.
+                                    properties:
+                                      exact:
+                                        description: Exact matches one of the provided
+                                          values exactly.
+                                        items:
+                                          type: string
+                                        minItems: 1
+                                        type: array
+                                      exp:
+                                        description: Exp matches regular expression.
+                                        minLength: 1
+                                        type: string
+                                      negate:
+                                        default: false
+                                        description: Negate regular Expression
+                                        type: boolean
+                                    type: object
+                                    x-kubernetes-validations:
+                                    - message: at least one of exact or exp must be
+                                        set
+                                      rule: has(self.exact) || has(self.exp)
+                                  type: array
+                              type: object
+                            description: Annotations defines metadata policies by
+                              annotation key.
+                            type: object
+                          apiGroups:
+                            description: |-
+                              API groups or API group/version selectors of the referents.
+
+                              Empty or omitted APIGroups means the core Kubernetes API version "v1".
+                              Use "*" to match all API groups and versions.
+
+                              Examples:
+                              - [] or [""] means core "v1".
+                              - ["v1"] means core "v1".
+                              - ["apps"] means any version in the "apps" API group.
+                              - ["apps/v1"] means only "apps/v1".
+                              - ["apps", "batch/v1"] means any "apps" version and "batch/v1".
+                              - ["*"] means all API groups and versions.
+                            items:
+                              type: string
+                            type: array
+                          kinds:
+                            description: |-
+                              Kinds of the referents.
+
+                              Use "*" to match all kinds.
+                            items:
+                              minLength: 1
+                              type: string
+                            minItems: 1
+                            type: array
+                          labels:
+                            additionalProperties:
+                              properties:
+                                required:
+                                  default: false
+                                  description: |-
+                                    Required enforces that the metadata key must be present.
+
+                                    This is mainly meaningful with action=allow. Deny and audit rules remain
+                                    value matchers and do not require missing metadata to exist.
+                                  type: boolean
+                                values:
+                                  description: |-
+                                    Values defines allowed, denied, or audited values for the metadata key.
+
+                                    If Required=true and Values is empty, only presence is enforced.
+                                  items:
+                                    description: |-
+                                      At least one of Exact or Exp must be set.
+                                      Both may be set together.
+                                    properties:
+                                      exact:
+                                        description: Exact matches one of the provided
+                                          values exactly.
+                                        items:
+                                          type: string
+                                        minItems: 1
+                                        type: array
+                                      exp:
+                                        description: Exp matches regular expression.
+                                        minLength: 1
+                                        type: string
+                                      negate:
+                                        default: false
+                                        description: Negate regular Expression
+                                        type: boolean
+                                    type: object
+                                    x-kubernetes-validations:
+                                    - message: at least one of exact or exp must be
+                                        set
+                                      rule: has(self.exact) || has(self.exp)
+                                  type: array
+                              type: object
+                            description: Labels defines metadata policies by label
+                              key.
+                            type: object
+                        required:
+                        - kinds
+                        type: object
+                        x-kubernetes-validations:
+                        - message: at least one of labels or annotations must be set
+                          rule: has(self.labels) || has(self.annotations)
+                      type: array
                     services:
                       description: Enforcement for Services.
                       properties:
@@ -340,6 +475,143 @@ spec:
                         - deny
                         - audit
                         type: string
+                      metadata:
+                        description: Enforcement for object metadata on namespaced
+                          resources.
+                        items:
+                          description: |-
+                            MetadataRule defines metadata constraints for namespaced resources.
+
+                            APIVersion and Kind support '*' wildcard matching without regular expressions.
+                            Empty APIVersion or Kind is treated as '*'.
+                          properties:
+                            annotations:
+                              additionalProperties:
+                                properties:
+                                  required:
+                                    default: false
+                                    description: |-
+                                      Required enforces that the metadata key must be present.
+
+                                      This is mainly meaningful with action=allow. Deny and audit rules remain
+                                      value matchers and do not require missing metadata to exist.
+                                    type: boolean
+                                  values:
+                                    description: |-
+                                      Values defines allowed, denied, or audited values for the metadata key.
+
+                                      If Required=true and Values is empty, only presence is enforced.
+                                    items:
+                                      description: |-
+                                        At least one of Exact or Exp must be set.
+                                        Both may be set together.
+                                      properties:
+                                        exact:
+                                          description: Exact matches one of the provided
+                                            values exactly.
+                                          items:
+                                            type: string
+                                          minItems: 1
+                                          type: array
+                                        exp:
+                                          description: Exp matches regular expression.
+                                          minLength: 1
+                                          type: string
+                                        negate:
+                                          default: false
+                                          description: Negate regular Expression
+                                          type: boolean
+                                      type: object
+                                      x-kubernetes-validations:
+                                      - message: at least one of exact or exp must
+                                          be set
+                                        rule: has(self.exact) || has(self.exp)
+                                    type: array
+                                type: object
+                              description: Annotations defines metadata policies by
+                                annotation key.
+                              type: object
+                            apiGroups:
+                              description: |-
+                                API groups or API group/version selectors of the referents.
+
+                                Empty or omitted APIGroups means the core Kubernetes API version "v1".
+                                Use "*" to match all API groups and versions.
+
+                                Examples:
+                                - [] or [""] means core "v1".
+                                - ["v1"] means core "v1".
+                                - ["apps"] means any version in the "apps" API group.
+                                - ["apps/v1"] means only "apps/v1".
+                                - ["apps", "batch/v1"] means any "apps" version and "batch/v1".
+                                - ["*"] means all API groups and versions.
+                              items:
+                                type: string
+                              type: array
+                            kinds:
+                              description: |-
+                                Kinds of the referents.
+
+                                Use "*" to match all kinds.
+                              items:
+                                minLength: 1
+                                type: string
+                              minItems: 1
+                              type: array
+                            labels:
+                              additionalProperties:
+                                properties:
+                                  required:
+                                    default: false
+                                    description: |-
+                                      Required enforces that the metadata key must be present.
+
+                                      This is mainly meaningful with action=allow. Deny and audit rules remain
+                                      value matchers and do not require missing metadata to exist.
+                                    type: boolean
+                                  values:
+                                    description: |-
+                                      Values defines allowed, denied, or audited values for the metadata key.
+
+                                      If Required=true and Values is empty, only presence is enforced.
+                                    items:
+                                      description: |-
+                                        At least one of Exact or Exp must be set.
+                                        Both may be set together.
+                                      properties:
+                                        exact:
+                                          description: Exact matches one of the provided
+                                            values exactly.
+                                          items:
+                                            type: string
+                                          minItems: 1
+                                          type: array
+                                        exp:
+                                          description: Exp matches regular expression.
+                                          minLength: 1
+                                          type: string
+                                        negate:
+                                          default: false
+                                          description: Negate regular Expression
+                                          type: boolean
+                                      type: object
+                                      x-kubernetes-validations:
+                                      - message: at least one of exact or exp must
+                                          be set
+                                        rule: has(self.exact) || has(self.exp)
+                                    type: array
+                                type: object
+                              description: Labels defines metadata policies by label
+                                key.
+                              type: object
+                          required:
+                          - kinds
+                          type: object
+                          x-kubernetes-validations:
+                          - message: at least one of labels or annotations must be
+                              set
+                            rule: has(self.labels) || has(self.annotations)
+                        type: array
                       services:
                         description: Enforcement for Services.
                         properties:
@@ -549,6 +821,143 @@ spec:
                           - deny
                           - audit
                           type: string
+                        metadata:
+                          description: Enforcement for object metadata on namespaced
+                            resources.
+                          items:
+                            description: |-
+                              MetadataRule defines metadata constraints for namespaced resources.
+
+                              APIVersion and Kind support '*' wildcard matching without regular expressions.
+                              Empty APIVersion or Kind is treated as '*'.
+                            properties:
+                              annotations:
+                                additionalProperties:
+                                  properties:
+                                    required:
+                                      default: false
+                                      description: |-
+                                        Required enforces that the metadata key must be present.
+
+                                        This is mainly meaningful with action=allow. Deny and audit rules remain
+                                        value matchers and do not require missing metadata to exist.
+                                      type: boolean
+                                    values:
+                                      description: |-
+                                        Values defines allowed, denied, or audited values for the metadata key.
+
+                                        If Required=true and Values is empty, only presence is enforced.
+                                      items:
+                                        description: |-
+                                          At least one of Exact or Exp must be set.
+                                          Both may be set together.
+                                        properties:
+                                          exact:
+                                            description: Exact matches one of the
+                                              provided values exactly.
+                                            items:
+                                              type: string
+                                            minItems: 1
+                                            type: array
+                                          exp:
+                                            description: Exp matches regular expression.
+                                            minLength: 1
+                                            type: string
+                                          negate:
+                                            default: false
+                                            description: Negate regular Expression
+                                            type: boolean
+                                        type: object
+                                        x-kubernetes-validations:
+                                        - message: at least one of exact or exp must
+                                            be set
+                                          rule: has(self.exact) || has(self.exp)
+                                      type: array
+                                  type: object
+                                description: Annotations defines metadata policies
+                                  by annotation key.
+                                type: object
+                              apiGroups:
+                                description: |-
+                                  API groups or API group/version selectors of the referents.
+
+                                  Empty or omitted APIGroups means the core Kubernetes API version "v1".
+                                  Use "*" to match all API groups and versions.
+
+                                  Examples:
+                                  - [] or [""] means core "v1".
+                                  - ["v1"] means core "v1".
+                                  - ["apps"] means any version in the "apps" API group.
+                                  - ["apps/v1"] means only "apps/v1".
+                                  - ["apps", "batch/v1"] means any "apps" version and "batch/v1".
+                                  - ["*"] means all API groups and versions.
+                                items:
+                                  type: string
+                                type: array
+                              kinds:
+                                description: |-
+                                  Kinds of the referents.
+
+                                  Use "*" to match all kinds.
+                                items:
+                                  minLength: 1
+                                  type: string
+                                minItems: 1
+                                type: array
+                              labels:
+                                additionalProperties:
+                                  properties:
+                                    required:
+                                      default: false
+                                      description: |-
+                                        Required enforces that the metadata key must be present.
+
+                                        This is mainly meaningful with action=allow. Deny and audit rules remain
+                                        value matchers and do not require missing metadata to exist.
+                                      type: boolean
+                                    values:
+                                      description: |-
+                                        Values defines allowed, denied, or audited values for the metadata key.
+
+                                        If Required=true and Values is empty, only presence is enforced.
+                                      items:
+                                        description: |-
+                                          At least one of Exact or Exp must be set.
+                                          Both may be set together.
+                                        properties:
+                                          exact:
+                                            description: Exact matches one of the
+                                              provided values exactly.
+                                            items:
+                                              type: string
+                                            minItems: 1
+                                            type: array
+                                          exp:
+                                            description: Exp matches regular expression.
+                                            minLength: 1
+                                            type: string
+                                          negate:
+                                            default: false
+                                            description: Negate regular Expression
+                                            type: boolean
+                                        type: object
+                                        x-kubernetes-validations:
+                                        - message: at least one of exact or exp must
+                                            be set
+                                          rule: has(self.exact) || has(self.exp)
+                                      type: array
+                                  type: object
+                                description: Labels defines metadata policies by label
+                                  key.
+                                type: object
+                            required:
+                            - kinds
+                            type: object
+                            x-kubernetes-validations:
+                            - message: at least one of labels or annotations must
+                                be set
+                              rule: has(self.labels) || has(self.annotations)
+                          type: array
                         services:
                           description: Enforcement for Services.
                           properties:

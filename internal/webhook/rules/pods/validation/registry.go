@@ -11,8 +11,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/projectcapsule/capsule/internal/cache"
-	rulesutils "github.com/projectcapsule/capsule/internal/webhook/rules"
 	apirules "github.com/projectcapsule/capsule/pkg/api/rules"
+	"github.com/projectcapsule/capsule/pkg/api/runtime"
 	ruleengine "github.com/projectcapsule/capsule/pkg/ruleengine"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 )
@@ -170,7 +170,7 @@ func describeRegistryRuleSet(rule registryRuleSet) string {
 
 	for _, registry := range rule.Registries {
 		description := strings.TrimSpace(
-			rulesutils.DescribeExpressionMatch(registry.ExpressionMatch),
+			runtime.DescribeExpressionMatch(registry.ExpressionMatch),
 		)
 		if description == "" {
 			continue

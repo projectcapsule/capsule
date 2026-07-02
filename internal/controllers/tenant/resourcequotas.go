@@ -253,10 +253,11 @@ func (r *Manager) syncResourceQuota(ctx context.Context, log logr.Logger, tenant
 
 				targetLabels[meta.NewTenantLabel] = tenant.Name
 				targetLabels[typeLabel] = strconv.Itoa(index)
-				targetLabels[meta.NewManagedByCapsuleLabel] = meta.ValueController
+				targetLabels[meta.ResourceOriginLabel] = meta.ValueControllerResources
 
 				// Remove Legacy labels
 				delete(targetLabels, meta.TenantLabel)
+				delete(targetLabels, meta.NewManagedByCapsuleLabel)
 
 				target.SetLabels(targetLabels)
 

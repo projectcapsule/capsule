@@ -6,7 +6,7 @@ package rules
 import (
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/runtime"
 )
 
 // +kubebuilder:validation:Enum=pod/initcontainers;pod/ephemeralcontainers;pod/containers;pod/volumes
@@ -44,5 +44,5 @@ type NamespaceRuleEnforceWorkloadsBody struct {
 	// Empty schedulerName is ignored and is not normalized to default-scheduler.
 	//
 	// +optional
-	Schedulers []api.ExpressionMatch `json:"schedulers,omitempty"`
+	Schedulers []runtime.ExpressionMatch `json:"schedulers,omitempty"`
 }

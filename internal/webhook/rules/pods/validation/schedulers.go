@@ -8,9 +8,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	rulesutils "github.com/projectcapsule/capsule/internal/webhook/rules"
-	"github.com/projectcapsule/capsule/pkg/api"
 	apirules "github.com/projectcapsule/capsule/pkg/api/rules"
+	"github.com/projectcapsule/capsule/pkg/api/runtime"
 	ruleengine "github.com/projectcapsule/capsule/pkg/ruleengine"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 )
@@ -19,28 +18,33 @@ func (h *podRules) validateSchedulers(
 	pod *corev1.Pod,
 	enforceBodies []*apirules.NamespaceRuleEnforceBody,
 ) (*ruleengine.Evaluation, error) {
-	return evaluatePodRules[api.ExpressionMatch](
+	return evaluatePodRules[runtime.ExpressionMatch](
 		pod,
 		enforceBodies,
-		podRuleSet[api.ExpressionMatch]{
+		podRuleSet[runtime.ExpressionMatch]{
 			Name:        "scheduler",
 			EventReason: events.ReasonForbiddenPodScheduler,
 			Values: func(pod *corev1.Pod) []ruleengine.Value {
+				schedulerName := strings.TrimSpace(pod.Spec.SchedulerName)
+				if schedulerName == "" {
+					return nil
+				}
+
 				return []ruleengine.Value{
 					{
-						Value: strings.TrimSpace(pod.Spec.SchedulerName),
+						Value: schedulerName,
 						Path:  "spec.schedulerName",
 					},
 				}
 			},
-			Rules: func(enforce *apirules.NamespaceRuleEnforceBody) []api.ExpressionMatch {
+			Rules: func(enforce *apirules.NamespaceRuleEnforceBody) []runtime.ExpressionMatch {
 				if enforce == nil {
 					return nil
 				}
 
 				return enforce.Workloads.Schedulers
 			},
-			Matches: func(match api.ExpressionMatch, value ruleengine.Value) (ruleengine.Match, error) {
+			Matches: func(match runtime.ExpressionMatch, value ruleengine.Value) (ruleengine.Match, error) {
 				matched, err := match.MatchesWithExpressionMatcher(h.regexCache, value.Value)
 				if err != nil {
 					return ruleengine.Match{}, err
@@ -50,7 +54,7 @@ func (h *podRules) validateSchedulers(
 					Matched: matched,
 				}, nil
 			},
-			RuleDescription:    rulesutils.DescribeExpressionMatch,
+			RuleDescription:    runtime.DescribeExpressionMatch,
 			AllowedDescription: "Allowed schedulers",
 		},
 	)

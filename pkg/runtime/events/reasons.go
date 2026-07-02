@@ -8,11 +8,14 @@ const (
 	ReasonTenantResourceWriteOp string = "TenantResourceWriteOp"
 	ReasonOverprovision         string = "Overprovisioned"
 	ReasonCordoning             string = "Cordoned"
+
 	// ForbiddenLabelReason used as reason string to deny forbidden labels.
 	ReasonForbiddenLabel string = "ForbiddenLabel"
 	// ForbiddenAnnotationReason used as reason string to deny forbidden annotations.
 	ReasonForbiddenAnnotation string = "ForbiddenAnnotation"
-	ReasonAdmissionFailure    string = "AdmissionFailed"
+	ReasonForbiddenMetadata   string = "ForbiddenMetadata"
+
+	ReasonAdmissionFailure string = "AdmissionFailed"
 
 	// RuleStatus.
 	ReasonNamespaceRuleAudit string = "NamespaceRuleAudit"

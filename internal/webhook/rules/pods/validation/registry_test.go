@@ -10,8 +10,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/projectcapsule/capsule/internal/cache"
-	"github.com/projectcapsule/capsule/pkg/api"
 	apirules "github.com/projectcapsule/capsule/pkg/api/rules"
+	"github.com/projectcapsule/capsule/pkg/api/runtime"
 	ruleengine "github.com/projectcapsule/capsule/pkg/ruleengine"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 )
@@ -545,11 +545,11 @@ func TestDescribeRegistryRuleSet(t *testing.T) {
 			rule: registryRuleSet{
 				Registries: []apirules.OCIRegistry{
 					{
-						ExpressionMatch: api.ExpressionMatch{
+						ExpressionMatch: runtime.ExpressionMatch{
 							Exact: []string{
 								"harbor/platform/app:1.0.0",
 							},
-							ExpressionRegex: api.ExpressionRegex{
+							ExpressionRegex: runtime.ExpressionRegex{
 								Expression: "harbor/shared/.*",
 							},
 						},
@@ -583,8 +583,8 @@ func TestDescribeRegistryRuleSet(t *testing.T) {
 			rule: registryRuleSet{
 				Registries: []apirules.OCIRegistry{
 					{
-						ExpressionMatch: api.ExpressionMatch{
-							ExpressionRegex: api.ExpressionRegex{
+						ExpressionMatch: runtime.ExpressionMatch{
+							ExpressionRegex: runtime.ExpressionRegex{
 								Expression: "trusted/.*",
 								Negate:     true,
 							},
@@ -797,7 +797,7 @@ func TestRegistryRuleDescription(t *testing.T) {
 		{
 			name: "unknown empty rule",
 			matched: &cache.CompiledRule{
-				Match: api.ExpressionMatch{},
+				Match: runtime.ExpressionMatch{},
 			},
 			want: "<unknown>",
 		},
@@ -821,8 +821,8 @@ func TestRegistryRuleDescription(t *testing.T) {
 			name: "negated expression",
 			matched: compiledRegistryRuleForTest(
 				apirules.OCIRegistry{
-					ExpressionMatch: api.ExpressionMatch{
-						ExpressionRegex: api.ExpressionRegex{
+					ExpressionMatch: runtime.ExpressionMatch{
+						ExpressionRegex: runtime.ExpressionRegex{
 							Expression: "trusted/.*",
 							Negate:     true,
 						},
@@ -836,11 +836,11 @@ func TestRegistryRuleDescription(t *testing.T) {
 			name: "exact and expression",
 			matched: compiledRegistryRuleForTest(
 				apirules.OCIRegistry{
-					ExpressionMatch: api.ExpressionMatch{
+					ExpressionMatch: runtime.ExpressionMatch{
 						Exact: []string{
 							"harbor/platform/app:1.0.0",
 						},
-						ExpressionRegex: api.ExpressionRegex{
+						ExpressionRegex: runtime.ExpressionRegex{
 							Expression: "harbor/shared/.*",
 						},
 					},
@@ -1087,7 +1087,7 @@ func registryEnforceForTest(
 
 func registryExactForTest(values ...string) apirules.OCIRegistry {
 	return apirules.OCIRegistry{
-		ExpressionMatch: api.ExpressionMatch{
+		ExpressionMatch: runtime.ExpressionMatch{
 			Exact: values,
 		},
 	}
@@ -1095,8 +1095,8 @@ func registryExactForTest(values ...string) apirules.OCIRegistry {
 
 func registryExpressionForTest(expression string) apirules.OCIRegistry {
 	return apirules.OCIRegistry{
-		ExpressionMatch: api.ExpressionMatch{
-			ExpressionRegex: api.ExpressionRegex{
+		ExpressionMatch: runtime.ExpressionMatch{
+			ExpressionRegex: runtime.ExpressionRegex{
 				Expression: expression,
 			},
 		},

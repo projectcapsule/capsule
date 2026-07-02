@@ -18,10 +18,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
+	"github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
@@ -47,8 +47,8 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 
 	registryByExpression := func(expression string) rules.OCIRegistry {
 		return rules.OCIRegistry{
-			ExpressionMatch: api.ExpressionMatch{
-				ExpressionRegex: api.ExpressionRegex{
+			ExpressionMatch: runtime.ExpressionMatch{
+				ExpressionRegex: runtime.ExpressionRegex{
 					Expression: expression,
 				},
 			},
@@ -57,8 +57,8 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 
 	registryByNegatedExpression := func(expression string) rules.OCIRegistry {
 		return rules.OCIRegistry{
-			ExpressionMatch: api.ExpressionMatch{
-				ExpressionRegex: api.ExpressionRegex{
+			ExpressionMatch: runtime.ExpressionMatch{
+				ExpressionRegex: runtime.ExpressionRegex{
 					Expression: expression,
 					Negate:     true,
 				},
@@ -68,7 +68,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 
 	registryByExact := func(exact ...string) rules.OCIRegistry {
 		return rules.OCIRegistry{
-			ExpressionMatch: api.ExpressionMatch{
+			ExpressionMatch: runtime.ExpressionMatch{
 				Exact: exact,
 			},
 		}
@@ -76,8 +76,8 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 
 	registryByMatch := func(exact []string, expression string) rules.OCIRegistry {
 		return rules.OCIRegistry{
-			ExpressionMatch: api.ExpressionMatch{
-				ExpressionRegex: api.ExpressionRegex{
+			ExpressionMatch: runtime.ExpressionMatch{
+				ExpressionRegex: runtime.ExpressionRegex{
 					Expression: expression,
 				},
 				Exact: exact,
@@ -284,8 +284,8 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 									Targets: targetContainers,
 									Registries: []rules.OCIRegistry{
 										{
-											ExpressionMatch: api.ExpressionMatch{
-												ExpressionRegex: api.ExpressionRegex{
+											ExpressionMatch: runtime.ExpressionMatch{
+												ExpressionRegex: runtime.ExpressionRegex{
 													Expression: "policy/.*",
 												},
 											},

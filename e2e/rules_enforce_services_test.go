@@ -24,6 +24,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
+	"github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
@@ -35,32 +36,32 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 		tenantRules []*rules.NamespaceRuleBodyTenant
 	)
 
-	externalNameByExpression := func(expression string) capsuleapi.ExpressionMatch {
-		return capsuleapi.ExpressionMatch{
-			ExpressionRegex: capsuleapi.ExpressionRegex{
+	externalNameByExpression := func(expression string) runtime.ExpressionMatch {
+		return runtime.ExpressionMatch{
+			ExpressionRegex: runtime.ExpressionRegex{
 				Expression: expression,
 			},
 		}
 	}
 
-	externalNameByNegatedExpression := func(expression string) capsuleapi.ExpressionMatch {
-		return capsuleapi.ExpressionMatch{
-			ExpressionRegex: capsuleapi.ExpressionRegex{
+	externalNameByNegatedExpression := func(expression string) runtime.ExpressionMatch {
+		return runtime.ExpressionMatch{
+			ExpressionRegex: runtime.ExpressionRegex{
 				Expression: expression,
 				Negate:     true,
 			},
 		}
 	}
 
-	externalNameByExact := func(exact ...string) capsuleapi.ExpressionMatch {
-		return capsuleapi.ExpressionMatch{
+	externalNameByExact := func(exact ...string) runtime.ExpressionMatch {
+		return runtime.ExpressionMatch{
 			Exact: exact,
 		}
 	}
 
-	externalNameByMatch := func(exact []string, expression string) capsuleapi.ExpressionMatch {
-		return capsuleapi.ExpressionMatch{
-			ExpressionRegex: capsuleapi.ExpressionRegex{
+	externalNameByMatch := func(exact []string, expression string) runtime.ExpressionMatch {
+		return runtime.ExpressionMatch{
+			ExpressionRegex: runtime.ExpressionRegex{
 				Expression: expression,
 			},
 			Exact: exact,
@@ -95,7 +96,7 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 		}
 	}
 
-	externalNameRule := func(action rules.ActionType, hostnames ...capsuleapi.ExpressionMatch) *rules.NamespaceRuleBodyTenant {
+	externalNameRule := func(action rules.ActionType, hostnames ...runtime.ExpressionMatch) *rules.NamespaceRuleBodyTenant {
 		return &rules.NamespaceRuleBodyTenant{
 			NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
 				Enforce: &rules.NamespaceRuleEnforceBody{

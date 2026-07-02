@@ -75,6 +75,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/pvc"
 	"github.com/projectcapsule/capsule/internal/webhook/resourcepool"
 	"github.com/projectcapsule/capsule/internal/webhook/route"
+	rulesgenericvalidation "github.com/projectcapsule/capsule/internal/webhook/rules/generic/validation"
 	podrules "github.com/projectcapsule/capsule/internal/webhook/rules/pods/validation"
 	servicerules "github.com/projectcapsule/capsule/internal/webhook/rules/services/validation"
 	"github.com/projectcapsule/capsule/internal/webhook/service"
@@ -528,7 +529,7 @@ func main() {
 	targetsCache := cache.NewCompiledTargetsCache[string]()
 
 	if directCfg.EnableTLSConfiguration() {
-		if err = tlsReconciler.SetupWithManager(manager); err != nil {
+		if err = tlsReconciler.SetupWithManager(manager, controllerConfig); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Namespace")
 			os.Exit(1)
 		}
@@ -572,6 +573,7 @@ func main() {
 	// webhooks: the order matters, don't change it and just append
 	webhooksList := append(
 		make([]handlers.Webhook, 0),
+		rulesgenericvalidation.Register(regexCache),
 		route.GenericReplicasHandler(),
 		route.GenericManagedHandler(cfg),
 		route.Pod(
@@ -625,7 +627,7 @@ func main() {
 				tenantvalidation.IngressClassRegexHandler(),
 				tenantvalidation.StorageClassRegexHandler(),
 				tenantvalidation.ContainerRegistryRegexHandler(),
-				tenantvalidation.RuleHandler(),
+				tenantvalidation.RuleHandler(manager.GetRESTMapper()),
 				tenantvalidation.HostnameRegexHandler(),
 				tenantvalidation.FreezedEmitter(),
 				tenantvalidation.OwnersHandler(),
@@ -680,11 +682,12 @@ func main() {
 		route.ConfigValidation(
 			cfgvalidation.Handler(cfg,
 				cfgvalidation.WarningHandler(),
+				cfgvalidation.ValidationHandler(regexCache),
 				cfgvalidation.ServiceAccountHandler(),
 				cfgvalidation.OwnerHandler(),
 			),
 		),
-		route.RulesValidating(cfg),
+		route.RulesValidating(manager.GetRESTMapper(), cfg),
 	)
 
 	nodeWebhookSupported, _ := utils.NodeWebhookSupported(kubeVersion)
@@ -730,21 +733,21 @@ func main() {
 
 	if err = (&servicelabelscontroller.ServicesLabelsReconciler{
 		Log: ctrl.Log.WithName("capsule.ctrl").WithName("services"),
-	}).SetupWithManager(ctx, manager); err != nil {
+	}).SetupWithManager(ctx, manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ServiceLabels")
 		os.Exit(1)
 	}
 
 	if err = (&servicelabelscontroller.EndpointSlicesLabelsReconciler{
 		Log: ctrl.Log.WithName("capsule.ctrl").WithName("endpointslices"),
-	}).SetupWithManager(ctx, manager); err != nil {
+	}).SetupWithManager(ctx, manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "EndpointSliceLabels")
 	}
 
 	if err = (&podlabelscontroller.MetadataReconciler{
 		Client: manager.GetClient(),
 		Log:    ctrl.Log.WithName("capsule.ctrl").WithName("pods"),
-	}).SetupWithManager(ctx, manager); err != nil {
+	}).SetupWithManager(ctx, manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PodLabels")
 		os.Exit(1)
 	}

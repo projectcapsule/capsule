@@ -90,7 +90,7 @@ func (r *CacheInvalidator) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.C
 				predicates.NamesMatchingPredicate{Names: []string{ctrlConfig.ConfigurationName}},
 			),
 		).
-		Watches(
+		WatchesMetadata(
 			&corev1.ServiceAccount{},
 			handler.Funcs{
 				DeleteFunc: func(
@@ -98,15 +98,10 @@ func (r *CacheInvalidator) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.C
 					e event.TypedDeleteEvent[client.Object],
 					q workqueue.TypedRateLimitingInterface[reconcile.Request],
 				) {
-					sa, ok := e.Object.(*corev1.ServiceAccount)
-					if !ok {
-						return
-					}
-
-					if err := r.invalidateServiceAccount(ctx, sa); err != nil {
+					if err := r.invalidateServiceAccount(ctx, e.Object); err != nil {
 						r.Log.Error(err, "unable to invalidate serviceaccount cache",
-							"namespace", sa.GetNamespace(),
-							"name", sa.GetName(),
+							"namespace", e.Object.GetNamespace(),
+							"name", e.Object.GetName(),
 						)
 					}
 				},
@@ -127,6 +122,7 @@ func (r *CacheInvalidator) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.C
 			},
 			),
 		).
+		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
 		Complete(r)
 	if err != nil {
 		return err

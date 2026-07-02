@@ -25,7 +25,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	apimeta "github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
-	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
+	capruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/template"
 )
 
@@ -270,7 +270,7 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 					PruningOnDelete: ptr.To(true),
 					Resources: []capsulev1beta2.ResourceSpec{{
 						NamespacedItems: []template.ResourceReference{{
-							VersionKind: gvk.VersionKind{
+							VersionKind: capruntime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Secret",
 							},
@@ -539,7 +539,7 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 								Resources: []*template.TemplateResourceReference{{
 									Index: "secrets",
 									ResourceReference: template.ResourceReference{
-										VersionKind: gvk.VersionKind{
+										VersionKind: capruntime.VersionKind{
 											APIVersion: "v1",
 											Kind:       "Secret",
 										},
@@ -626,7 +626,7 @@ data:
 						PruningOnDelete: ptr.To(true),
 						Resources: []capsulev1beta2.ResourceSpec{{
 							NamespacedItems: []template.ResourceReference{{
-								VersionKind: gvk.VersionKind{
+								VersionKind: capruntime.VersionKind{
 									APIVersion: "v1",
 									Kind:       "Secret",
 								},
@@ -1224,7 +1224,7 @@ data:
 								Resources: []*template.TemplateResourceReference{{
 									Index: "secrets",
 									ResourceReference: template.ResourceReference{
-										VersionKind: gvk.VersionKind{
+										VersionKind: capruntime.VersionKind{
 											APIVersion: "v1",
 											Kind:       "Secret",
 										},

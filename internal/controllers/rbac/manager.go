@@ -65,7 +65,7 @@ func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlCo
 				}
 			},
 		}).
-		Watches(&corev1.ServiceAccount{}, handler.Funcs{
+		WatchesMetadata(&corev1.ServiceAccount{}, handler.Funcs{
 			CreateFunc: func(ctx context.Context, e event.TypedCreateEvent[client.Object], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 				r.handleSAChange(ctx, e.Object)
 			},

@@ -6,6 +6,7 @@ package status
 import (
 	"context"
 
+	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -19,9 +20,10 @@ import (
 
 type ruleStatusHandler struct {
 	configuration configuration.Configuration
+	mapper        k8smeta.RESTMapper
 }
 
-func RuleStatusValidationHandler(configuration configuration.Configuration) handlers.Handler {
+func RuleStatusValidationHandler(mapper k8smeta.RESTMapper, configuration configuration.Configuration) handlers.Handler {
 	return &ruleStatusHandler{
 		configuration: configuration,
 	}
@@ -71,7 +73,7 @@ func (r *ruleStatusHandler) OnUpdate(
 }
 
 func (r *ruleStatusHandler) handle(rs *capsulev1beta2.RuleStatus) *admission.Response {
-	err := ruleengine.ValidateRuleStatusBody(rs.Spec)
+	err := ruleengine.ValidateRuleStatusBody(r.mapper, rs.Spec)
 	if err != nil {
 		return ad.Deny(err.Error())
 	}

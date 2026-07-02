@@ -52,18 +52,20 @@ func (r *Manager) syncNetworkPolicy(ctx context.Context, log logr.Logger, tenant
 
 		var res controllerutil.OperationResult
 
+		//nolint:dupl
 		res, err = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() (err error) {
 			labels := target.GetLabels()
 			if labels == nil {
 				labels = map[string]string{}
 			}
 
-			labels[meta.NewManagedByCapsuleLabel] = meta.ValueController
+			labels[meta.ResourceOriginLabel] = meta.ValueControllerResources
 			labels[meta.NewTenantLabel] = tenant.Name
 			labels[meta.NetworkPolicyLabel] = strconv.Itoa(i)
 
 			// Remove Legacy labels
 			delete(labels, meta.TenantLabel)
+			delete(labels, meta.NewManagedByCapsuleLabel)
 
 			target.SetLabels(labels)
 			target.Spec = spec

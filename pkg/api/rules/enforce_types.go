@@ -18,4 +18,9 @@ type NamespaceRuleEnforceBody struct {
 	// Enforcement for Services.
 	// +optional
 	Services NamespaceRuleEnforceServicesBody `json:"services,omitempty"`
+
+	// Enforcement for object metadata on namespaced resources.
+	//
+	// +optional
+	Metadata []MetadataRule `json:"metadata,omitempty"`
 }

@@ -84,6 +84,7 @@ func NewCollector(c client.Reader, mapper k8smeta.RESTMapper) Collector {
 		reservedLabelSet: map[string]struct{}{
 			meta.ResourcesLabel:           {},
 			meta.CreatedByCapsuleLabel:    {},
+			meta.ResourceOriginLabel:      {},
 			meta.ManagedByCapsuleLabel:    {},
 			meta.NewManagedByCapsuleLabel: {},
 		},
