@@ -184,8 +184,8 @@ The following Values have changed key or Value:
 | monitoring.diagnostics.operator.resyncPeriod | string | `"10m"` | How often the resource is synced, defaults to 10m0s if not set |
 | monitoring.prometheusRules.annotations | object | `{}` | Assign additional Annotations |
 | monitoring.prometheusRules.enabled | bool | `false` | Enable PrometheusRules |
-| monitoring.prometheusRules.labels | object | `{}` | Assign additional labels according to Prometheus' serviceMonitorSelector matching labels |
-| monitoring.prometheusRules.namespace | string | `""` | Install the ServiceMonitor into a different Namespace, as the monitoring stack one (default: the release one) |
+| monitoring.prometheusRules.labels | object | `{}` | Assign additional labels according to Prometheus selector matching labels |
+| monitoring.prometheusRules.namespace | string | `""` | Install the PrometheusRules into a different Namespace, as the monitoring stack one (default: the release one) |
 | monitoring.prometheusRules.ruleAnnotations | object | `{}` | Annotations add to all Rules |
 | monitoring.prometheusRules.ruleLabels | object | `{}` | Labels add to all Rules |
 | monitoring.prometheusRules.rules | list | See [values.yaml](values.yaml) | Prometheus Rules definitions. The block is directly forwarded into the PrometheusRule, so you can use whatever specification you want. |
