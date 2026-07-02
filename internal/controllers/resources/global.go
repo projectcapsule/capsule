@@ -60,7 +60,8 @@ func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, ctrlConfig
 		Configuration:                r.configuration,
 		GatherClient:                 mgr.GetAPIReader(),
 		AllowCrossNamespaceSelection: true,
-		Mapper:                       mgr.GetRESTMapper(),
+
+		Mapper: mgr.GetRESTMapper(),
 	}
 	r.collector = NewCollector(
 		mgr.GetAPIReader(),
@@ -413,6 +414,7 @@ func (r *globalResourceController) gatherResources(
 	opts := CollectorOptions{
 		Accumulator:                  acc,
 		AllowCrossNamespaceSelection: true,
+		AllowClusterScopedObjects:    true,
 	}
 
 	// Collect Available Generated Items

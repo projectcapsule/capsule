@@ -135,6 +135,125 @@ var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace
 		})
 	})
 
+	Context("cluster-scoped object protection", func() {
+		It("rejects cluster-scoped rawItems", func() {
+			clusterRoleName := "tr-raw-cluster-scoped"
+			defer func() {
+				ignoreNotFound(k8sClient.Delete(ctx, &rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: clusterRoleName}}))
+			}()
+
+			tr := &capsulev1beta2.TenantResource{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "rawitems-cluster-scoped",
+					Namespace: baseNamespace,
+				},
+				Spec: capsulev1beta2.TenantResourceSpec{
+					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
+						PruningOnDelete: ptr.To(true),
+						ResyncPeriod:    resyncPeriod,
+						Resources: []capsulev1beta2.ResourceSpec{{
+							RawItems: []capsulev1beta2.RawExtension{{
+								RawExtension: runtime.RawExtension{
+									Object: &rbacv1.ClusterRole{
+										TypeMeta: metav1.TypeMeta{
+											APIVersion: rbacv1.SchemeGroupVersion.String(),
+											Kind:       "ClusterRole",
+										},
+										ObjectMeta: metav1.ObjectMeta{
+											Name: clusterRoleName,
+										},
+										Rules: []rbacv1.PolicyRule{{
+											APIGroups: []string{""},
+											Resources: []string{"configmaps"},
+											Verbs:     []string{"get"},
+										}},
+									},
+								},
+							}},
+						}},
+					},
+				},
+			}
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
+			expectTenantResourceFailed(baseNamespace, tr.Name, "cluster-scoped kind rbac.authorization.k8s.io/v1/ClusterRole is not allowed")
+			expectClusterRoleAbsent(clusterRoleName)
+		})
+
+		It("rejects cluster-scoped generator output", func() {
+			clusterRoleName := "tr-generator-cluster-scoped"
+			defer func() {
+				ignoreNotFound(k8sClient.Delete(ctx, &rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: clusterRoleName}}))
+			}()
+
+			tr := newGeneratorConfigMapTenantResource(baseNamespace, "generator-cluster-scoped", fmt.Sprintf(`---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: %s
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get"]
+`, clusterRoleName))
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
+			expectTenantResourceFailed(baseNamespace, tr.Name, "cluster-scoped kind rbac.authorization.k8s.io/v1/ClusterRole is not allowed")
+			expectClusterRoleAbsent(clusterRoleName)
+		})
+
+		It("rejects cluster-scoped namespacedItems", func() {
+			clusterRoleName := "tr-source-cluster-scoped"
+			source := &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: clusterRoleName,
+					Labels: map[string]string{
+						"replicate": "cluster-scoped",
+					},
+				},
+				Rules: []rbacv1.PolicyRule{{
+					APIGroups: []string{""},
+					Resources: []string{"configmaps"},
+					Verbs:     []string{"get"},
+				}},
+			}
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, source) }).Should(Succeed())
+			defer func() {
+				ignoreNotFound(k8sClient.Delete(ctx, source))
+			}()
+
+			tr := &capsulev1beta2.TenantResource{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "namespaceditems-cluster-scoped",
+					Namespace: baseNamespace,
+				},
+				Spec: capsulev1beta2.TenantResourceSpec{
+					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
+						PruningOnDelete: ptr.To(true),
+						ResyncPeriod:    resyncPeriod,
+						Resources: []capsulev1beta2.ResourceSpec{{
+							NamespacedItems: []template.ResourceReference{{
+								VersionKind: capruntime.VersionKind{
+									APIVersion: rbacv1.SchemeGroupVersion.String(),
+									Kind:       "ClusterRole",
+								},
+								Selector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"replicate": "cluster-scoped",
+									},
+								},
+							}},
+						}},
+					},
+				},
+			}
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
+			expectTenantResourceFailed(baseNamespace, tr.Name, "cluster-scoped kind rbac.authorization.k8s.io/v1/ClusterRole is not allowed")
+		})
+	})
+
 	It("skips applying resources to terminating namespaces and removes them from processedItems", func() {
 		terminatingNamespace := targetNamespaces[2]
 		releaseNamespace := holdNamespaceTerminating(ctx, terminatingNamespace)
@@ -1836,6 +1955,12 @@ func expectSecretAbsent(namespace, name string) {
 			Name:      name,
 			Namespace: namespace,
 		}, &corev1.Secret{})
+	}, 5*time.Second, defaultPollInterval).Should(HaveOccurred())
+}
+
+func expectClusterRoleAbsent(name string) {
+	Consistently(func() error {
+		return k8sClient.Get(context.Background(), types.NamespacedName{Name: name}, &rbacv1.ClusterRole{})
 	}, 5*time.Second, defaultPollInterval).Should(HaveOccurred())
 }
 
