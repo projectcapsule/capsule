@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -354,7 +355,26 @@ func (r *resourcePoolController) reconcileResourceClaim(
 ) (err error) {
 	t := pool.GetClaimFromStatus(claim)
 	if t != nil {
-		// TBD: Future Implementation for Claim Resizing here
+		if reflect.DeepEqual(t.Claims, claim.Spec.ResourceClaims) {
+			return r.handleClaimToPoolBinding(ctx, pool, claim)
+		}
+
+		exhaustions := canClaimWithinPoolExcludingClaim(log, pool, claim, t)
+		if len(exhaustions) != 0 {
+			log.V(5).Info("resized claim exhausts resources", "amount", len(exhaustions))
+
+			pool.RemoveClaimFromStatus(claim)
+			pool.CalculateClaimedResources()
+
+			return r.handleClaimResourceExhaustion(
+				ctx,
+				pool,
+				claim,
+				exhaustions,
+				exhaustion,
+			)
+		}
+
 		return r.handleClaimToPoolBinding(ctx, pool, claim)
 	}
 
@@ -401,7 +421,25 @@ func (r *resourcePoolController) canClaimWithinNamespace(
 	pool *capsulev1beta2.ResourcePool,
 	claim *capsulev1beta2.ResourcePoolClaim,
 ) (res map[string]api.PoolExhaustionResource) {
+	return canClaimWithinPoolExcludingClaim(log, pool, claim, nil)
+}
+
+func canClaimWithinPoolExcludingClaim(
+	log logr.Logger,
+	pool *capsulev1beta2.ResourcePool,
+	claim *capsulev1beta2.ResourcePoolClaim,
+	excluded *capsulev1beta2.ResourcePoolClaimsItem,
+) (res map[string]api.PoolExhaustionResource) {
 	claimable := pool.GetAvailableClaimableResources()
+
+	if excluded != nil {
+		for resourceName, qt := range excluded.Claims {
+			available := claimable[resourceName]
+			available.Add(qt)
+			claimable[resourceName] = available
+		}
+	}
+
 	log.V(5).Info("claimable resources", "claimable", claimable)
 
 	_, namespaceClaimed := pool.GetNamespaceClaims(claim.Namespace)
@@ -658,7 +696,6 @@ func (r *resourcePoolController) syncResourceQuota(
 			}
 
 			targetLabels[quotaLabel] = pool.Name
-			targetLabels[meta.ResourceOriginLabel] = meta.ValueControllerResources
 			targetLabels[meta.NewManagedByCapsuleLabel] = meta.ValueController
 
 			target.SetLabels(targetLabels)

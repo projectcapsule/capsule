@@ -291,8 +291,6 @@ func (r *Manager) reconcileNamespace(
 		}
 
 		stat.Conditions.UpdateConditionByType(cordonedCondition)
-
-		r.syncNamespaceStatusMetrics(tnt, namespace)
 	}()
 
 	// Verify if namespace is still active or terminating.

@@ -4,7 +4,6 @@
 package tenant
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -16,6 +15,10 @@ func (r *Manager) syncTenantStatusMetrics(tenant *capsulev1beta2.Tenant) {
 	// Expose namespace-tenant relationship
 	for _, ns := range tenant.Status.Namespaces {
 		r.Metrics.TenantNamespaceRelationshipGauge.WithLabelValues(tenant.GetName(), ns).Set(1)
+	}
+
+	for _, namespace := range tenant.Status.Spaces {
+		r.syncNamespaceStatusMetrics(tenant, namespace)
 	}
 
 	// Expose cordoned status
@@ -41,11 +44,11 @@ func (r *Manager) syncTenantStatusMetrics(tenant *capsulev1beta2.Tenant) {
 }
 
 // Exposing Status Metrics for tenant.
-func (r *Manager) syncNamespaceStatusMetrics(tenant *capsulev1beta2.Tenant, namespace *corev1.Namespace) {
+func (r *Manager) syncNamespaceStatusMetrics(tenant *capsulev1beta2.Tenant, namespace *capsulev1beta2.TenantStatusNamespaceItem) {
 	for _, status := range []string{meta.ReadyCondition, meta.CordonedCondition} {
 		var value float64
 
-		cond := tenant.Status.Conditions.GetConditionByType(status)
+		cond := namespace.Conditions.GetConditionByType(status)
 		if cond == nil {
 			r.Metrics.DeleteTenantNamespaceConditionMetricByType(namespace.Name, status)
 
@@ -56,6 +59,6 @@ func (r *Manager) syncNamespaceStatusMetrics(tenant *capsulev1beta2.Tenant, name
 			value = 1
 		}
 
-		r.Metrics.TenantNamespaceConditionGauge.WithLabelValues(tenant.GetName(), namespace.GetName(), status).Set(value)
+		r.Metrics.TenantNamespaceConditionGauge.WithLabelValues(tenant.GetName(), namespace.Name, status).Set(value)
 	}
 }

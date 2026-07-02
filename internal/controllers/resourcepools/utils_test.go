@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,6 +55,22 @@ func setEq(got map[string]struct{}, want []string) bool {
 		}
 	}
 	return true
+}
+
+func poolWithClaims(hard corev1.ResourceList, claims ...capsulev1beta2.ResourcePoolClaim) *capsulev1beta2.ResourcePool {
+	pool := &capsulev1beta2.ResourcePool{
+		Status: capsulev1beta2.ResourcePoolStatus{
+			Allocation: capsulev1beta2.ResourcePoolQuotaStatus{
+				Hard: hard,
+			},
+		},
+	}
+
+	for i := range claims {
+		pool.AddClaimToStatus(&claims[i])
+	}
+
+	return pool
 }
 
 // ---------- filterResourceListByKeys tests ----------
@@ -127,6 +144,81 @@ func TestFilterResourceListByKeys(t *testing.T) {
 		}
 		if _, ok := got[corev1.ResourceMemory]; ok {
 			t.Fatalf("did not expect memory key present")
+		}
+	})
+}
+
+func TestCanClaimWithinPoolExcludingClaim(t *testing.T) {
+	t.Parallel()
+
+	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	t.Run("allows resize when new claim fits after excluding previous allocation", func(t *testing.T) {
+		t.Parallel()
+
+		existing := claim(t, "u1", "ns", "claim", base, rl(map[corev1.ResourceName]string{corev1.ResourceCPU: "5"}))
+		pool := poolWithClaims(
+			rl(map[corev1.ResourceName]string{corev1.ResourceCPU: "10"}),
+			existing,
+		)
+
+		resized := existing
+		resized.Spec.ResourceClaims = rl(map[corev1.ResourceName]string{corev1.ResourceCPU: "10"})
+
+		got := canClaimWithinPoolExcludingClaim(logr.Discard(), pool, &resized, pool.GetClaimFromStatus(&existing))
+		if len(got) != 0 {
+			t.Fatalf("expected resize to fit, got exhaustions=%v", got)
+		}
+	})
+
+	t.Run("rejects resize that would exceed pool capacity", func(t *testing.T) {
+		t.Parallel()
+
+		existing := claim(t, "u1", "ns", "claim", base, rl(map[corev1.ResourceName]string{corev1.ResourceCPU: "5"}))
+		pool := poolWithClaims(
+			rl(map[corev1.ResourceName]string{corev1.ResourceCPU: "10"}),
+			existing,
+		)
+
+		resized := existing
+		resized.Spec.ResourceClaims = rl(map[corev1.ResourceName]string{corev1.ResourceCPU: "55"})
+
+		got := canClaimWithinPoolExcludingClaim(logr.Discard(), pool, &resized, pool.GetClaimFromStatus(&existing))
+		if len(got) != 1 {
+			t.Fatalf("expected one exhaustion, got=%v", got)
+		}
+
+		exhaustion := got[string(corev1.ResourceCPU)]
+		if exhaustion.Available.Cmp(q("10")) != 0 {
+			t.Fatalf("expected available=10, got=%s", exhaustion.Available.String())
+		}
+		if exhaustion.Requesting.Cmp(q("55")) != 0 {
+			t.Fatalf("expected requesting=55, got=%s", exhaustion.Requesting.String())
+		}
+	})
+
+	t.Run("accounts for other claims in the pool", func(t *testing.T) {
+		t.Parallel()
+
+		existing := claim(t, "u1", "ns", "claim", base, rl(map[corev1.ResourceName]string{corev1.ResourceCPU: "5"}))
+		other := claim(t, "u2", "ns", "other", base.Add(time.Second), rl(map[corev1.ResourceName]string{corev1.ResourceCPU: "4"}))
+		pool := poolWithClaims(
+			rl(map[corev1.ResourceName]string{corev1.ResourceCPU: "10"}),
+			existing,
+			other,
+		)
+
+		resized := existing
+		resized.Spec.ResourceClaims = rl(map[corev1.ResourceName]string{corev1.ResourceCPU: "7"})
+
+		got := canClaimWithinPoolExcludingClaim(logr.Discard(), pool, &resized, pool.GetClaimFromStatus(&existing))
+		if len(got) != 1 {
+			t.Fatalf("expected resize to exhaust remaining capacity, got=%v", got)
+		}
+
+		exhaustion := got[string(corev1.ResourceCPU)]
+		if exhaustion.Available.Cmp(q("6")) != 0 {
+			t.Fatalf("expected available=6, got=%s", exhaustion.Available.String())
 		}
 	})
 }
