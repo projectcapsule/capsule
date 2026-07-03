@@ -1168,7 +1168,10 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 			_, err = cs.CoreV1().Namespaces().Patch(context.TODO(), unmanaged.Name, types.StrategicMergePatchType, removeLabel, metav1.PatchOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
-			expectNoTenantOwnership(unmanaged.Name, tenant)
+			// ensure the null patch actually removes the label key, not just changes its value
+			retrievedNs = getNamespace(unmanaged.Name)
+			Expect(retrievedNs.Labels).ToNot(HaveKey(meta.TenantLabel))
+			Expect(hasTenantOwnerReference(retrievedNs, tenant)).To(BeFalse(), "Namespace should not have Tenant ownerReference")
 		}
 	})
 
