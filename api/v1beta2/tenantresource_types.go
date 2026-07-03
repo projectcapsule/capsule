@@ -4,11 +4,17 @@
 package v1beta2
 
 import (
+	"slices"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	capruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
+	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
 )
 
@@ -58,6 +64,110 @@ type TenantResourceCommonSpec struct {
 	Cordoned *bool `json:"cordoned,omitempty"`
 	// Defines the rules to select targeting Namespace, along with the objects that must be replicated.
 	Resources []ResourceSpec `json:"resources"`
+	// Triggers re-render this resource (near-)immediately when matching cluster
+	// objects change, instead of only waiting for resyncPeriod. This lets you keep
+	// a high resyncPeriod while still reacting quickly to changes of the objects
+	// the rendering depends on (e.g. Secrets or ServiceAccounts referenced through
+	// a resource's context). Each trigger installs a metadata-only watch per
+	// referenced kind; a watch is torn down automatically once no resource
+	// references its kind anymore.
+	// +optional
+	// +kubebuilder:validation:MaxItems=100
+	Triggers []TriggerSpec `json:"triggers,omitempty"`
+}
+
+// TriggerOperation is the object lifecycle event a trigger reacts to.
+// +kubebuilder:validation:Enum=CREATE;UPDATE;DELETE
+type TriggerOperation string
+
+const (
+	// TriggerOperationCreate reacts to creations of matching objects.
+	TriggerOperationCreate TriggerOperation = "CREATE"
+	// TriggerOperationUpdate reacts to updates of matching objects.
+	TriggerOperationUpdate TriggerOperation = "UPDATE"
+	// TriggerOperationDelete reacts to deletions of matching objects.
+	TriggerOperationDelete TriggerOperation = "DELETE"
+)
+
+// TriggerSpec declares the cluster object kinds whose changes cause the owning
+// TenantResource / GlobalTenantResource to be re-rendered.
+//
+// Wildcards are rejected: every kind selected by a trigger is armed as a
+// dedicated watch, so the selection must be a bounded, concrete set.
+//
+// +kubebuilder:validation:XValidation:rule="!self.kinds.exists(k, k.contains('*'))",message="wildcard kinds are not supported in triggers"
+// +kubebuilder:validation:XValidation:rule="!has(self.apiGroups) || !self.apiGroups.exists(g, g.contains('*'))",message="wildcard apiGroups are not supported in triggers"
+type TriggerSpec struct {
+	capruntime.VersionKinds `json:",inline"`
+
+	// Operations that cause a re-render. When empty, all operations
+	// (CREATE, UPDATE and DELETE) are considered.
+	// +optional
+	Operations []TriggerOperation `json:"operations,omitempty"`
+	// Selector narrows the trigger to objects whose labels match. When omitted,
+	// every object of the referenced kind matches.
+	// +optional
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
+	// NamespaceSelector narrows the trigger to objects living in namespaces whose
+	// labels match. It is only honored for the cluster-scoped GlobalTenantResource;
+	// for the namespaced TenantResource it is ignored, as the trigger is always
+	// scoped to the namespaces of the owning Tenant.
+	// +optional
+	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty"`
+}
+
+// MatchesOperation reports whether the trigger reacts to the given operation.
+// An empty operation list matches every operation.
+func (t TriggerSpec) MatchesOperation(op TriggerOperation) bool {
+	if len(t.Operations) == 0 {
+		return true
+	}
+
+	return slices.Contains(t.Operations, op)
+}
+
+// Matches reports whether the trigger reacts to a change of the given kind and
+// operation whose object carries the given labels. Namespace scoping
+// (NamespaceSelector, tenant scoping) is consumer policy and not evaluated here.
+func (t TriggerSpec) Matches(gvk schema.GroupVersionKind, op TriggerOperation, lbls map[string]string) bool {
+	if !t.MatchesGroupVersionKind(gvk) || !t.MatchesOperation(op) {
+		return false
+	}
+
+	if t.Selector == nil {
+		return true
+	}
+
+	ok, err := selectors.MatchesSelector(labels.Set(lbls), *t.Selector)
+
+	return err == nil && ok
+}
+
+// TriggerVersionKinds returns the de-duplicated set of kind selectors
+// referenced by the resource's triggers. Selectors without a concrete version
+// (e.g. apiGroups: ["apps"]) are resolved to a watchable GroupVersionKind by
+// the trigger watch manager via the REST mapper.
+func (s *TenantResourceCommonSpec) TriggerVersionKinds() []capruntime.VersionKind {
+	seen := make(map[capruntime.VersionKind]struct{}, len(s.Triggers))
+	out := make([]capruntime.VersionKind, 0, len(s.Triggers))
+
+	for _, t := range s.Triggers {
+		for _, vk := range t.VersionKinds.VersionKinds() {
+			if vk.Kind == "" {
+				continue
+			}
+
+			if _, ok := seen[vk]; ok {
+				continue
+			}
+
+			seen[vk] = struct{}{}
+
+			out = append(out, vk)
+		}
+	}
+
+	return out
 }
 
 type TenantResourceCommonSpecSettings struct {

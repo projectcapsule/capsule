@@ -19,6 +19,10 @@ const (
 	BoundCondition     string = "Bound"
 	ExhaustedCondition string = "Exhausted"
 
+	// TriggersCondition reports the state of the dynamic trigger watches armed
+	// for a TenantResource / GlobalTenantResource.
+	TriggersCondition string = "Triggers"
+
 	// FailedReason indicates a condition or event observed a failure (Claim Rejected).
 	SucceededReason               string = "Succeeded"
 	FailedReason                  string = "Failed"
@@ -150,6 +154,16 @@ func NewAssignedCondition(obj client.Object) Condition {
 		ObservedGeneration: obj.GetGeneration(),
 		LastTransitionTime: metav1.Now(),
 		Message:            "assigned to pool",
+	}
+}
+
+func NewTriggersCondition(obj client.Object) Condition {
+	return Condition{
+		Type:               TriggersCondition,
+		Status:             metav1.ConditionTrue,
+		Reason:             ActiveReason,
+		ObservedGeneration: obj.GetGeneration(),
+		LastTransitionTime: metav1.Now(),
 	}
 }
 

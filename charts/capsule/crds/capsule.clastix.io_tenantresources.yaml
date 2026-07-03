@@ -415,6 +415,175 @@ spec:
                       You may create collisions with this.
                     type: boolean
                 type: object
+              triggers:
+                description: |-
+                  Triggers re-render this resource (near-)immediately when matching cluster
+                  objects change, instead of only waiting for resyncPeriod. This lets you keep
+                  a high resyncPeriod while still reacting quickly to changes of the objects
+                  the rendering depends on (e.g. Secrets or ServiceAccounts referenced through
+                  a resource's context). Each trigger installs a metadata-only watch per
+                  referenced kind; a watch is torn down automatically once no resource
+                  references its kind anymore.
+                items:
+                  description: |-
+                    TriggerSpec declares the cluster object kinds whose changes cause the owning
+                    TenantResource / GlobalTenantResource to be re-rendered.
+
+                    Wildcards are rejected: every kind selected by a trigger is armed as a
+                    dedicated watch, so the selection must be a bounded, concrete set.
+                  properties:
+                    apiGroups:
+                      description: |-
+                        API groups or API group/version selectors of the referents.
+
+                        Empty or omitted APIGroups means the core Kubernetes API version "v1".
+                        Use "*" to match all API groups and versions.
+
+                        Examples:
+                        - [] or [""] means core "v1".
+                        - ["v1"] means core "v1".
+                        - ["apps"] means any version in the "apps" API group.
+                        - ["apps/v1"] means only "apps/v1".
+                        - ["apps", "batch/v1"] means any "apps" version and "batch/v1".
+                        - ["*"] means all API groups and versions.
+                      items:
+                        maxLength: 317
+                        type: string
+                      maxItems: 100
+                      type: array
+                    kinds:
+                      description: |-
+                        Kinds of the referents.
+
+                        Use "*" to match all kinds.
+                      items:
+                        maxLength: 63
+                        minLength: 1
+                        type: string
+                      maxItems: 100
+                      minItems: 1
+                      type: array
+                    namespaceSelector:
+                      description: |-
+                        NamespaceSelector narrows the trigger to objects living in namespaces whose
+                        labels match. It is only honored for the cluster-scoped GlobalTenantResource;
+                        for the namespaced TenantResource it is ignored, as the trigger is always
+                        scoped to the namespaces of the owning Tenant.
+                      properties:
+                        matchExpressions:
+                          description: matchExpressions is a list of label selector
+                            requirements. The requirements are ANDed.
+                          items:
+                            description: |-
+                              A label selector requirement is a selector that contains values, a key, and an operator that
+                              relates the key and values.
+                            properties:
+                              key:
+                                description: key is the label key that the selector
+                                  applies to.
+                                type: string
+                              operator:
+                                description: |-
+                                  operator represents a key's relationship to a set of values.
+                                  Valid operators are In, NotIn, Exists and DoesNotExist.
+                                type: string
+                              values:
+                                description: |-
+                                  values is an array of string values. If the operator is In or NotIn,
+                                  the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                  the values array must be empty. This array is replaced during a strategic
+                                  merge patch.
+                                items:
+                                  type: string
+                                type: array
+                                x-kubernetes-list-type: atomic
+                            required:
+                            - key
+                            - operator
+                            type: object
+                          type: array
+                          x-kubernetes-list-type: atomic
+                        matchLabels:
+                          additionalProperties:
+                            type: string
+                          description: |-
+                            matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                            map is equivalent to an element of matchExpressions, whose key field is "key", the
+                            operator is "In", and the values array contains only "value". The requirements are ANDed.
+                          type: object
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    operations:
+                      description: |-
+                        Operations that cause a re-render. When empty, all operations
+                        (CREATE, UPDATE and DELETE) are considered.
+                      items:
+                        description: TriggerOperation is the object lifecycle event
+                          a trigger reacts to.
+                        enum:
+                        - CREATE
+                        - UPDATE
+                        - DELETE
+                        type: string
+                      type: array
+                    selector:
+                      description: |-
+                        Selector narrows the trigger to objects whose labels match. When omitted,
+                        every object of the referenced kind matches.
+                      properties:
+                        matchExpressions:
+                          description: matchExpressions is a list of label selector
+                            requirements. The requirements are ANDed.
+                          items:
+                            description: |-
+                              A label selector requirement is a selector that contains values, a key, and an operator that
+                              relates the key and values.
+                            properties:
+                              key:
+                                description: key is the label key that the selector
+                                  applies to.
+                                type: string
+                              operator:
+                                description: |-
+                                  operator represents a key's relationship to a set of values.
+                                  Valid operators are In, NotIn, Exists and DoesNotExist.
+                                type: string
+                              values:
+                                description: |-
+                                  values is an array of string values. If the operator is In or NotIn,
+                                  the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                  the values array must be empty. This array is replaced during a strategic
+                                  merge patch.
+                                items:
+                                  type: string
+                                type: array
+                                x-kubernetes-list-type: atomic
+                            required:
+                            - key
+                            - operator
+                            type: object
+                          type: array
+                          x-kubernetes-list-type: atomic
+                        matchLabels:
+                          additionalProperties:
+                            type: string
+                          description: |-
+                            matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                            map is equivalent to an element of matchExpressions, whose key field is "key", the
+                            operator is "In", and the values array contains only "value". The requirements are ANDed.
+                          type: object
+                      type: object
+                      x-kubernetes-map-type: atomic
+                  required:
+                  - kinds
+                  type: object
+                  x-kubernetes-validations:
+                  - message: wildcard kinds are not supported in triggers
+                    rule: '!self.kinds.exists(k, k.contains(''*''))'
+                  - message: wildcard apiGroups are not supported in triggers
+                    rule: '!has(self.apiGroups) || !self.apiGroups.exists(g, g.contains(''*''))'
+                maxItems: 100
+                type: array
             required:
             - resources
             - resyncPeriod

@@ -27,6 +27,7 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
@@ -38,6 +39,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 	"github.com/projectcapsule/capsule/pkg/runtime/sanitize"
+	"github.com/projectcapsule/capsule/pkg/runtime/watch"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
@@ -53,6 +55,9 @@ type namespacedResourceController struct {
 	metrics       *metrics.TenantResourceRecorder
 
 	impersonation *cache.ImpersonationCache
+
+	triggers   *watch.Manager
+	triggerSrc source.Source
 }
 
 func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager, ctrlConfig cutils.ControllerOptions) error {
@@ -130,6 +135,7 @@ func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager, ctrlCo
 				},
 			),
 		).
+		WatchesRawSource(r.triggerSrc).
 		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
 		Complete(r)
 }
@@ -145,6 +151,11 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 			log.V(5).Info("Request object not found, could have been deleted after reconcile request")
 
 			r.metrics.DeleteMetrics(request.Name, request.Namespace)
+
+			// Release any trigger watches this resource was keeping alive.
+			if serr := r.triggers.Sync(ctx, namespacedTriggerOwnerKey(request.Namespace, request.Name), nil); serr != nil {
+				log.V(2).Error(serr, "failed to release trigger watches")
+			}
 
 			return reconcile.Result{}, nil
 		}
@@ -164,9 +175,13 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 
 	var statusErr error
 
+	var triggerCond meta.Condition
+
 	//nolint:dupl
 	defer func() {
 		meta.RemoveReconcileTriggerAnnotation(tntResource)
+
+		tntResource.Status.Conditions.UpdateConditionByType(triggerCond)
 
 		reconcileErr := err
 		if statusErr != nil {
@@ -203,6 +218,18 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 		// Controller-runtime should not receive handled reconciliation errors.
 		err = nil
 	}()
+
+	// Arm (or, while terminating, release) the dynamic trigger watches for the
+	// kinds this resource depends on, independent of cordon/dependency state.
+	// Cluster-scoped kinds are rejected: a namespaced TenantResource can only
+	// observe objects inside Tenant namespaces. The watches are shared across
+	// tenants and narrowed server-side to objects carrying the tenant label the
+	// metadata webhook stamps on every namespaced object in a Tenant namespace;
+	// the sink routes each event to the right owner via the indexed lookup.
+	triggerCond = syncTriggers(
+		ctx, r.triggers, namespacedTriggerOwnerKey(tntResource.Namespace, tntResource.Name),
+		tntResource, tntResource.Spec.TenantResourceCommonSpec, true, log,
+	)
 
 	// On Deletion these checks are skipped.
 	//nolint:nestif

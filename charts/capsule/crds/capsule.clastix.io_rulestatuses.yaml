@@ -135,7 +135,9 @@ spec:
                               - ["apps", "batch/v1"] means any "apps" version and "batch/v1".
                               - ["*"] means all API groups and versions.
                             items:
+                              maxLength: 317
                               type: string
+                            maxItems: 100
                             type: array
                           kinds:
                             description: |-
@@ -143,8 +145,10 @@ spec:
 
                               Use "*" to match all kinds.
                             items:
+                              maxLength: 63
                               minLength: 1
                               type: string
+                            maxItems: 100
                             minItems: 1
                             type: array
                           labels:
@@ -540,7 +544,9 @@ spec:
                                 - ["apps", "batch/v1"] means any "apps" version and "batch/v1".
                                 - ["*"] means all API groups and versions.
                               items:
+                                maxLength: 317
                                 type: string
+                              maxItems: 100
                               type: array
                             kinds:
                               description: |-
@@ -548,8 +554,10 @@ spec:
 
                                 Use "*" to match all kinds.
                               items:
+                                maxLength: 63
                                 minLength: 1
                                 type: string
+                              maxItems: 100
                               minItems: 1
                               type: array
                             labels:
@@ -883,7 +891,9 @@ spec:
                                   - ["apps", "batch/v1"] means any "apps" version and "batch/v1".
                                   - ["*"] means all API groups and versions.
                                 items:
+                                  maxLength: 317
                                   type: string
+                                maxItems: 100
                                 type: array
                               kinds:
                                 description: |-
@@ -891,8 +901,10 @@ spec:
 
                                   Use "*" to match all kinds.
                                 items:
+                                  maxLength: 63
                                   minLength: 1
                                   type: string
+                                maxItems: 100
                                 minItems: 1
                                 type: array
                               labels:
