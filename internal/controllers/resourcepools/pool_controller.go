@@ -146,13 +146,15 @@ func (r *resourcePoolController) finalize(
 	ctx context.Context,
 	pool *capsulev1beta2.ResourcePool,
 ) {
-	// Case: all claims are gone, remove finalizer
-	if pool.Status.ClaimSize == 0 && controllerutil.ContainsFinalizer(pool, meta.ControllerFinalizer) {
+	managedResources := pool.Status.ClaimSize + pool.Status.NamespaceSize
+
+	// Case: all managed resources are gone, remove finalizer
+	if managedResources == 0 && controllerutil.ContainsFinalizer(pool, meta.ControllerFinalizer) {
 		controllerutil.RemoveFinalizer(pool, meta.ControllerFinalizer)
 	}
 
-	// Case: claims still exist, add finalizer if not already present
-	if pool.Status.ClaimSize > 0 && !controllerutil.ContainsFinalizer(pool, meta.ControllerFinalizer) {
+	// Case: managed resources still exist, add finalizer if not already present
+	if managedResources > 0 && !controllerutil.ContainsFinalizer(pool, meta.ControllerFinalizer) {
 		controllerutil.AddFinalizer(pool, meta.ControllerFinalizer)
 	}
 }
