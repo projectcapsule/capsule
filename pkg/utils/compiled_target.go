@@ -21,6 +21,22 @@ func CompileFieldSelector(
 		return selectors.CompiledFieldSelector{}, fmt.Errorf("field selector must not be empty")
 	}
 
+	// Check != before == so that "!=" is not misidentified as a bare "=" match.
+	if path, value, ok := jsonpath.SplitFieldSelectorNotEquals(raw); ok {
+		compiledPath, err := cache.GetOrCompile(path)
+		if err != nil {
+			return selectors.CompiledFieldSelector{}, err
+		}
+
+		return selectors.CompiledFieldSelector{
+			Raw:      raw,
+			Path:     path,
+			Operator: selectors.FieldSelectorNotEquals,
+			Value:    value,
+			Compiled: compiledPath,
+		}, nil
+	}
+
 	path, value, ok := jsonpath.SplitFieldSelectorEquals(raw)
 	if !ok {
 		compiledPath, err := cache.GetOrCompile(raw)

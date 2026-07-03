@@ -133,6 +133,101 @@ func findTopLevelEquals(raw string) (idx int, width int) {
 	return -1, 0
 }
 
+// SplitFieldSelectorNotEquals parses a raw field selector of the form "path!=value"
+// and returns the path, value, and whether the not-equal operator was found at the top level.
+func SplitFieldSelectorNotEquals(raw string) (path string, value string, ok bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", "", false
+	}
+
+	idx, width := findTopLevelNotEquals(raw)
+	if idx < 0 {
+		return "", "", false
+	}
+
+	path = strings.TrimSpace(raw[:idx])
+	value = strings.TrimSpace(raw[idx+width:])
+
+	if path == "" || value == "" {
+		return "", "", false
+	}
+
+	value = trimMatchingQuotes(value)
+
+	return path, value, true
+}
+
+// findTopLevelNotEquals finds the index and width of a top-level "!=" operator,
+// skipping any operators nested inside brackets, braces, parentheses or quotes.
+func findTopLevelNotEquals(raw string) (idx int, width int) {
+	var (
+		bracketDepth int
+		braceDepth   int
+		parenDepth   int
+		quote        byte
+		escaped      bool
+	)
+
+	for i := range len(raw) {
+		ch := raw[i]
+
+		if escaped {
+			escaped = false
+
+			continue
+		}
+
+		if quote != 0 {
+			switch ch {
+			case '\\':
+				escaped = true
+			case quote:
+				quote = 0
+			}
+
+			continue
+		}
+
+		switch ch {
+		case '\'', '"':
+			quote = ch
+
+		case '[':
+			bracketDepth++
+		case ']':
+			if bracketDepth > 0 {
+				bracketDepth--
+			}
+
+		case '{':
+			braceDepth++
+		case '}':
+			if braceDepth > 0 {
+				braceDepth--
+			}
+
+		case '(':
+			parenDepth++
+		case ')':
+			if parenDepth > 0 {
+				parenDepth--
+			}
+
+		case '!':
+			if bracketDepth != 0 || braceDepth != 0 || parenDepth != 0 {
+				continue
+			}
+
+			if i+1 < len(raw) && raw[i+1] == '=' {
+				return i, 2
+			}
+		}
+	}
+
+	return -1, 0
+}
+
 func trimMatchingQuotes(value string) string {
 	if len(value) < 2 {
 		return value
