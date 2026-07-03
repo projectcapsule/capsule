@@ -37,7 +37,7 @@ type Manager struct {
 
 	reader client.Reader
 
-	Metrics       *metrics.TenantRecorder
+	Metrics       *metrics.RuleStatusRecorder
 	Log           logr.Logger
 	Recorder      events.EventRecorder
 	Configuration configuration.Configuration
@@ -71,6 +71,8 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 		if apierrors.IsNotFound(err) {
 			log.V(5).Info("request object not found, could have been deleted after reconcile request")
 
+			r.Metrics.DeleteMetrics(request.Name, request.Namespace)
+
 			return reconcile.Result{}, nil
 		}
 
@@ -96,6 +98,8 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 
 			return
 		}
+
+		r.Metrics.RecordConditions(instance)
 
 		if e := patchHelper.Patch(ctx, instance); err != nil {
 			if apierrors.IsNotFound(e) || apierrors.HasStatusCause(e, corev1.NamespaceTerminatingCause) {
