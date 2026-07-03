@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.8.0 (upcoming)
+## 1.0.0 (upcoming)
 
-* Pending changelog
+* [PLT-4328] Upgrade de Capsule
 
 ## Previous development
 
