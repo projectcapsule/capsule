@@ -1309,7 +1309,7 @@ spec:
           - apiGroups:
               - capsule.clastix.io
             apiVersions:
-              - "*"
+              - v1beta2
             operations:
               - CREATE
               - UPDATE
