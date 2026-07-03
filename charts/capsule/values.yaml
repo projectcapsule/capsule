@@ -1059,6 +1059,8 @@ webhooks:
       failurePolicy: Fail
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Equivalent
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector: {}
       # @schema type: object
@@ -1070,8 +1072,6 @@ webhooks:
             operator: Exists
           - key: projectcapsule.dev/custom-resources
             operator: Exists
-      # @schema type: object
-      # @schema additionalProperties: true
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchConditions:
         - name: ignore-subresources
