@@ -3,6 +3,9 @@
 ## 1.0.0 (upcoming)
 
 * [PLT-4328] Upgrade de Capsule
+* Capsule upstream version: 0.13.7
+
+Based on projectcapsule/capsule v0.13.7 plus Stratio modifications.
 
 ## Previous development
 
