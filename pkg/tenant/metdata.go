@@ -25,10 +25,6 @@ func TenanLabelValue(ns *corev1.Namespace) string {
 }
 
 func HasTenantReference(ns *corev1.Namespace) bool {
-	if ns.Labels != nil && ns.Labels[meta.TenantLabel] != "" {
-		return true
-	}
-
 	//nolint:modernize
 	for _, ref := range ns.OwnerReferences {
 		if IsTenantOwnerReference(ref) {
@@ -66,11 +62,11 @@ func TenantOwnerReferenceName(ns *corev1.Namespace) string {
 }
 
 func HasTenantOwnership(ns *corev1.Namespace) bool {
-	return TenanLabelValue(ns) != "" || TenantOwnerReferenceName(ns) != ""
+	return TenantOwnerReferenceName(ns) != ""
 }
 
 func TenantOwnershipChanged(oldNs, newNs *corev1.Namespace) bool {
-	return TenanLabelValue(oldNs) != TenanLabelValue(newNs) ||
+	return TenantOwnerReferenceName(oldNs) != TenantOwnerReferenceName(newNs) ||
 		HasTenantOwnership(oldNs) != HasTenantOwnership(newNs)
 }
 
