@@ -502,6 +502,10 @@ spec:
                       type: string
                     status:
                       properties:
+                        clusterScoped:
+                          description: Indicates whether the referenced resource is
+                            cluster-scoped.
+                          type: boolean
                         created:
                           description: Indicates wether the resource was created or
                             adopted

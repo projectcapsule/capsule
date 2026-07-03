@@ -25,7 +25,7 @@ func (g NamespacedProcessedItems) Func() client.IndexerFunc {
 
 		out := make([]string, 0, len(tgr.Status.ProcessedItems))
 		for _, pi := range tgr.Status.ProcessedItems {
-			out = append(out, pi.GetGVKKey(""))
+			out = append(out, processedItemKey(pi))
 		}
 
 		return out
