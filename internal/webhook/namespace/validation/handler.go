@@ -136,6 +136,12 @@ func (h *handler) OnUpdate(
 
 		oldHasTenantReference := tenant.HasTenantReference(oldNs)
 		newHasTenantReference := tenant.HasTenantReference(ns)
+		oldTenantLabel := tenant.TenanLabelValue(oldNs)
+		newTenantLabel := tenant.TenanLabelValue(ns)
+
+		if !oldHasTenantReference && !newHasTenantReference && oldTenantLabel != "" && newTenantLabel == "" {
+			return nil
+		}
 
 		if !user.IsAdmin() {
 			switch {
@@ -143,8 +149,10 @@ func (h *handler) OnUpdate(
 				return ad.Deny("namespace can not be patched into a tenant")
 			case oldHasTenantReference && !newHasTenantReference:
 				return ad.Deny("namespace can not remove tenant ownership")
-			case !oldHasTenantReference && !newHasTenantReference:
+			case !oldHasTenantReference && !newHasTenantReference && oldTenantLabel == "" && newTenantLabel == "":
 				return nil
+			case !oldHasTenantReference && !newHasTenantReference:
+				return ad.Deny("namespace can not be patched into a tenant")
 			}
 		}
 

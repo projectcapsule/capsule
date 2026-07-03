@@ -1137,7 +1137,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 		}
 	})
 
-	It("Owners can remove tenant labels from namespaces without Tenant ownerReferences", func() {
+	It("Owners can not add tenant labels to namespaces without Tenant ownerReferences", func() {
 		tenant := getTenant(t1.Name)
 
 		for _, owner := range t1.Spec.Owners {
@@ -1153,21 +1153,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 			))
 
 			_, err := cs.CoreV1().Namespaces().Patch(context.TODO(), unmanaged.Name, types.StrategicMergePatchType, patchLabel, metav1.PatchOptions{})
-			Expect(err).ToNot(HaveOccurred())
-
-			retrievedNs := getNamespace(unmanaged.Name)
-
-			Expect(retrievedNs.Labels).To(HaveKeyWithValue(meta.TenantLabel, tenant.GetName()))
-			Expect(hasTenantOwnerReference(retrievedNs, tenant)).To(BeFalse(), "Tenant label alone must not create ownership")
-
-			removeLabel := []byte(fmt.Sprintf(
-				`{"metadata":{"labels":{"%s":null}}}`,
-				meta.TenantLabel,
-			))
-
-			_, err = cs.CoreV1().Namespaces().Patch(context.TODO(), unmanaged.Name, types.StrategicMergePatchType, removeLabel, metav1.PatchOptions{})
-			Expect(err).ToNot(HaveOccurred())
-
+			Expect(err).To(HaveOccurred())
 			expectNoTenantOwnership(unmanaged.Name, tenant)
 		}
 	})

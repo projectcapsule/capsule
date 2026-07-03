@@ -243,14 +243,14 @@ func ResolveNamespaceTenant(
 	case label == "" && len(refs) == 0:
 		return nil, nil
 
-	case label != "" && len(refs) == 0:
-		return nil, nil
-
 	case len(refs) > 1:
 		return nil, fmt.Errorf("namespace can not have multiple Tenant ownerReferences")
 
 	case label == "" && len(refs) == 1:
 		return nil, fmt.Errorf("namespace has Tenant ownerReference %q but no tenant label", refs[0].Name)
+
+	case label != "" && len(refs) == 0:
+		return nil, fmt.Errorf("namespace has tenant label %q but no Tenant ownerReference", label)
 	}
 
 	tnt, err := GetTenantByOwnerreferences(ctx, reader, refs)

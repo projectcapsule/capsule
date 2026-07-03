@@ -141,7 +141,7 @@ func TestHasTenantReferenceRequiresTenantOwnerReference(t *testing.T) {
 	}
 }
 
-func TestResolveNamespaceTenantTreatsTenantLabelWithoutOwnerReferenceAsUnowned(t *testing.T) {
+func TestResolveNamespaceTenantRejectsTenantLabelWithoutOwnerReference(t *testing.T) {
 	t.Parallel()
 
 	scheme := runtime.NewScheme()
@@ -171,8 +171,8 @@ func TestResolveNamespaceTenantTreatsTenantLabelWithoutOwnerReferenceAsUnowned(t
 	}
 
 	tnt, err := tenant.ResolveNamespaceTenant(context.Background(), c, ns)
-	if err != nil {
-		t.Fatalf("ResolveNamespaceTenant() unexpected error: %v", err)
+	if err == nil {
+		t.Fatalf("ResolveNamespaceTenant() expected error, got nil")
 	}
 	if tnt != nil {
 		t.Fatalf("ResolveNamespaceTenant() = %s, want nil", tnt.GetName())
