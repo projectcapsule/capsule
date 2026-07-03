@@ -58,6 +58,41 @@ type TenantResourceCommonSpec struct {
 	Cordoned *bool `json:"cordoned,omitempty"`
 	// Defines the rules to select targeting Namespace, along with the objects that must be replicated.
 	Resources []ResourceSpec `json:"resources"`
+	// Define health checks against the replicated resources. Objects matching an
+	// entry (by apiVersion and kind) are evaluated with the given CEL expressions;
+	// objects without a matching entry are evaluated using kstatus. The outcome is
+	// aggregated into the Healthy condition and is re-evaluated on each resyncPeriod.
+	// +optional
+	HealthChecks []HealthCheckSpec `json:"healthChecks,omitempty"`
+}
+
+// HealthCheckSpec defines how objects of a given apiVersion/kind are evaluated
+// for health. The CEL expressions follow the Flux healthCheckExprs convention:
+// the object's top-level fields (status, metadata, spec, ...) are exposed
+// directly, so an expression such as
+// `status.conditions.filter(e, e.type == 'Ready').all(e, e.status == 'True')`
+// can be used as-is. Expressions must evaluate to a boolean.
+type HealthCheckSpec struct {
+	// APIVersion of the objects this health check applies to (e.g. "apps/v1").
+	// +required
+	APIVersion string `json:"apiVersion"`
+	// Kind of the objects this health check applies to (e.g. "Deployment").
+	// +required
+	Kind string `json:"kind"`
+	// Current is a CEL expression which is true when the object has reached its
+	// desired state (healthy).
+	// +optional
+	Current string `json:"current,omitempty"`
+	// Failed is a CEL expression which is true when the object has permanently
+	// failed (unhealthy).
+	// +optional
+	Failed string `json:"failed,omitempty"`
+	// InProgress is a CEL expression which is true when the object is still
+	// progressing. It is evaluated after failed and before current, so a matching
+	// inProgress holds back a premature healthy verdict. Optional; when omitted,
+	// "not failed and not current" is already treated as in progress.
+	// +optional
+	InProgress string `json:"inProgress,omitempty"`
 }
 
 type TenantResourceCommonSpecSettings struct {

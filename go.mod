@@ -5,10 +5,12 @@ go 1.26.4
 require (
 	filippo.io/age v1.3.1
 	github.com/BurntSushi/toml v1.6.0
+	github.com/fluxcd/cli-utils v0.37.1-flux.1
 	github.com/fluxcd/pkg/apis/kustomize v1.15.0
 	github.com/fluxcd/pkg/ssa v0.64.0
 	github.com/go-logr/logr v1.4.3
 	github.com/go-sprout/sprout v1.0.3
+	github.com/google/cel-go v0.26.1
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
 	github.com/pkg/errors v0.9.1
@@ -18,9 +20,9 @@ require (
 	github.com/valyala/fasttemplate v1.2.2
 	go.uber.org/automaxprocs v1.6.0
 	go.uber.org/zap v1.28.0
+	go.yaml.in/yaml/v2 v2.4.3
 	golang.org/x/sync v0.20.0
 	gomodules.xyz/jsonpatch/v2 v2.5.0
-	gomodules.xyz/jsonpatch/v3 v3.0.1
 	k8s.io/api v0.35.5
 	k8s.io/apiextensions-apiserver v0.35.5
 	k8s.io/apimachinery v0.35.5
@@ -41,7 +43,6 @@ require (
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
-	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chai2010/gettext-go v1.0.3 // indirect
@@ -49,7 +50,6 @@ require (
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
-	github.com/fluxcd/cli-utils v0.37.1-flux.1 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
 	github.com/go-errors/errors v1.5.1 // indirect
@@ -72,7 +72,6 @@ require (
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/gobuffalo/flect v1.0.3 // indirect
 	github.com/google/btree v1.1.3 // indirect
-	github.com/google/cel-go v0.26.1 // indirect
 	github.com/google/gnostic-models v0.7.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/pprof v0.0.0-20260115054156-294ebfa9ad83 // indirect
@@ -112,7 +111,6 @@ require (
 	go.opentelemetry.io/otel/trace v1.43.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.51.0 // indirect
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0 // indirect

@@ -186,4 +186,16 @@ type ObjectReferenceStatusCondition struct {
 
 	// Indicates wether the resource was created or adopted
 	Created bool `json:"created,omitempty"`
+
+	// Healthy reports the health of this individual replicated object, as evaluated
+	// via the resource's healthChecks (CEL) or the kstatus fallback. One of True,
+	// False, Unknown. Unset when no health evaluation has run yet.
+	// +optional
+	// +kubebuilder:validation:Enum=True;False;Unknown
+	Healthy metav1.ConditionStatus `json:"healthy,omitempty"`
+
+	// HealthMessage is a human readable message with details about the health of
+	// this individual replicated object.
+	// +optional
+	HealthMessage string `json:"healthMessage,omitempty"`
 }

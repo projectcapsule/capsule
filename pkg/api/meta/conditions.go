@@ -10,7 +10,10 @@ import (
 
 const (
 	// ReadyCondition indicates the resource is ready and fully reconciled.
-	ReadyCondition       string = "Ready"
+	ReadyCondition string = "Ready"
+	// HealthyCondition reflects whether the objects produced by the resource are
+	// actually healthy (as opposed to merely being applied, which Ready tracks).
+	HealthyCondition     string = "Healthy"
 	CordonedCondition    string = "Cordoned"
 	TerminatingCondition string = "Terminating"
 	NotReadyCondition    string = "NotReady"
@@ -26,6 +29,7 @@ const (
 	CordonedReason                string = "Cordoned"
 	TerminatingReason             string = "Terminating"
 	ReconcilingReason             string = "Reconciling"
+	ProgressingReason             string = "Progressing"
 	PoolExhaustedReason           string = "PoolExhausted"
 	QueueExhaustedReason          string = "QueueExhausted"
 	NamespaceExhaustedReason      string = "NamespaceExhausted"
@@ -110,6 +114,32 @@ func NewReadyCondition(obj client.Object) Condition {
 		Status:             metav1.ConditionTrue,
 		Reason:             SucceededReason,
 		Message:            "reconciled",
+		LastTransitionTime: metav1.Now(),
+	}
+}
+
+// NewHealthyCondition returns a Healthy condition set to True/Succeeded. Callers
+// override Status/Reason/Message when objects are unhealthy or still progressing.
+func NewHealthyCondition(obj client.Object) Condition {
+	return Condition{
+		Type:               HealthyCondition,
+		Status:             metav1.ConditionTrue,
+		Reason:             SucceededReason,
+		Message:            "all replicated objects are healthy",
+		ObservedGeneration: obj.GetGeneration(),
+		LastTransitionTime: metav1.Now(),
+	}
+}
+
+// NewHealthyConditionUnknown returns a Healthy condition set to Unknown/Reconciling,
+// used while the resource is reconciling, cordoned or being deleted.
+func NewHealthyConditionUnknown(obj client.Object) Condition {
+	return Condition{
+		Type:               HealthyCondition,
+		Status:             metav1.ConditionUnknown,
+		Reason:             ReconcilingReason,
+		Message:            "processing",
+		ObservedGeneration: obj.GetGeneration(),
 		LastTransitionTime: metav1.Now(),
 	}
 }

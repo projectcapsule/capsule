@@ -127,6 +127,10 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 
 	var statusErr error
 
+	// Aggregate health condition computed after a successful apply (nil until then,
+	// meaning "Unknown" — e.g. while cordoned, gated on dependencies or deleting).
+	var healthCond *meta.Condition
+
 	//nolint:dupl
 	defer func() {
 		meta.RemoveReconcileTriggerAnnotation(tntResource)
@@ -136,7 +140,7 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 			reconcileErr = statusErr
 		}
 
-		if uerr := r.updateStatus(ctx, tntResource, reconcileErr); uerr != nil {
+		if uerr := r.updateStatus(ctx, tntResource, reconcileErr, healthCond); uerr != nil {
 			if caperrors.IgnoreGone(uerr) {
 				err = nil
 
@@ -223,6 +227,13 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 	}
 
 	statusErr = r.reconcile(ctx, c, tntResource)
+
+	// Evaluate the health of the replicated objects (skipped while deleting, where
+	// items are being pruned and Healthy stays Unknown).
+	if tntResource.DeletionTimestamp.IsZero() {
+		cond := evaluateHealthCondition(ctx, c, tntResource, tntResource.Spec.HealthChecks, tntResource.Status.ProcessedItems)
+		healthCond = &cond
+	}
 
 	if len(tntResource.Status.ProcessedItems) > 0 {
 		controllerutil.AddFinalizer(tntResource, meta.ControllerFinalizer)
@@ -625,6 +636,7 @@ func (r *globalResourceController) updateReconcilingStatus(ctx context.Context, 
 		latest.Status.ServiceAccount = instance.Status.ServiceAccount
 
 		latest.Status.Conditions.UpdateConditionByType(meta.NewReadyConditionReconcilingReason(instance))
+		latest.Status.Conditions.UpdateConditionByType(meta.NewHealthyConditionUnknown(instance))
 
 		if err := r.client.Status().Update(ctx, latest); err != nil {
 			if apierrors.IsNotFound(err) {
@@ -641,7 +653,7 @@ func (r *globalResourceController) updateReconcilingStatus(ctx context.Context, 
 	})
 }
 
-func (r *globalResourceController) updateStatus(ctx context.Context, instance *capsulev1beta2.GlobalTenantResource, reconcileError error) error {
+func (r *globalResourceController) updateStatus(ctx context.Context, instance *capsulev1beta2.GlobalTenantResource, reconcileError error, healthCondition *meta.Condition) error {
 	instance.Status.UpdateStats()
 
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
@@ -677,6 +689,14 @@ func (r *globalResourceController) updateStatus(ctx context.Context, instance *c
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(cordonedCondition)
+
+		// Set Healthy Condition. A nil condition means health was not evaluated
+		// this reconcile (cordoned, gated on dependencies or deleting) -> Unknown.
+		if healthCondition != nil {
+			latest.Status.Conditions.UpdateConditionByType(*healthCondition)
+		} else {
+			latest.Status.Conditions.UpdateConditionByType(meta.NewHealthyConditionUnknown(instance))
+		}
 
 		if err := r.client.Status().Update(ctx, latest); err != nil {
 			return err

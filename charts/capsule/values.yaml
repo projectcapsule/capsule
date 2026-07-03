@@ -589,6 +589,43 @@ webhooks:
             - globalcustomquotas
           scope: 'Cluster'
 
+    # -- Webhook for TenantResource/GlobalTenantResource healthChecks validation
+    tenantresources:
+      # -- Enable the Hook
+      enabled: true
+      # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
+      failurePolicy: Fail
+      # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
+      matchPolicy: Equivalent
+      # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
+      objectSelector: {}
+      # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
+      namespaceSelector: {}
+      # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
+      matchConditions: []
+      # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
+      rules:
+        - apiGroups:
+            - capsule.clastix.io
+          apiVersions:
+            - v1beta2
+          operations:
+            - CREATE
+            - UPDATE
+          resources:
+            - tenantresources
+          scope: 'Namespaced'
+        - apiGroups:
+            - capsule.clastix.io
+          apiVersions:
+            - v1beta2
+          operations:
+            - CREATE
+            - UPDATE
+          resources:
+            - globaltenantresources
+          scope: 'Cluster'
+
     # -- Webhook for Custom Quota Calculations ([Read More](https://projectcapsule.dev/docs/resource-management/customquotas/#admission))
     calculations:
       # -- Enable the Hook

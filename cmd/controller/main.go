@@ -81,6 +81,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/serviceaccounts"
 	tenantmutation "github.com/projectcapsule/capsule/internal/webhook/tenant/mutation"
 	tenantvalidation "github.com/projectcapsule/capsule/internal/webhook/tenant/validation"
+	tenantresourcewebhook "github.com/projectcapsule/capsule/internal/webhook/tenantresource"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -685,6 +686,7 @@ func main() {
 			),
 		),
 		route.RulesValidating(cfg),
+		route.TenantResourceValidation(tenantresourcewebhook.HealthChecksValidationHandler()),
 	)
 
 	nodeWebhookSupported, _ := utils.NodeWebhookSupported(kubeVersion)

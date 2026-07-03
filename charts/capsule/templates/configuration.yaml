@@ -889,6 +889,38 @@ spec:
         timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
         {{- end }}
       {{- end }}
+      {{- with .Values.webhooks.hooks.tenantresources }}
+        {{- if .enabled }}
+          {{- $any = true }}
+      - name: tenantresources.validating.projectcapsule.dev
+        {{- with .opts }}
+        opts:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        admissionReviewVersions:
+          - v1
+          - v1beta1
+        path: "/tenantresources/validating"
+        failurePolicy:  {{ .failurePolicy }}
+        matchPolicy: {{ .matchPolicy }}
+        {{- with .namespaceSelector }}
+        namespaceSelector:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with .objectSelector }}
+        objectSelector:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with .matchConditions }}
+        matchConditions:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        rules:
+          {{- toYaml .rules | nindent 10 }}
+        sideEffects: None
+        timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+        {{- end }}
+      {{- end }}
       {{- with .Values.webhooks.hooks.calculations }}
         {{- if .enabled }}
           {{- $any = true }}

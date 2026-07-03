@@ -25,6 +25,10 @@ spec:
       jsonPath: .status.conditions[?(@.type=="Ready")].status
       name: Ready
       type: string
+    - description: Health Status of the replicated objects
+      jsonPath: .status.conditions[?(@.type=="Healthy")].status
+      name: Healthy
+      type: string
     - description: Reconcile Message for the tenant
       jsonPath: .status.conditions[?(@.type=="Ready")].message
       name: Status
@@ -81,6 +85,51 @@ spec:
                       type: string
                   required:
                   - name
+                  type: object
+                type: array
+              healthChecks:
+                description: |-
+                  Define health checks against the replicated resources. Objects matching an
+                  entry (by apiVersion and kind) are evaluated with the given CEL expressions;
+                  objects without a matching entry are evaluated using kstatus. The outcome is
+                  aggregated into the Healthy condition and is re-evaluated on each resyncPeriod.
+                items:
+                  description: |-
+                    HealthCheckSpec defines how objects of a given apiVersion/kind are evaluated
+                    for health. The CEL expressions follow the Flux healthCheckExprs convention:
+                    the object's top-level fields (status, metadata, spec, ...) are exposed
+                    directly, so an expression such as
+                    `status.conditions.filter(e, e.type == 'Ready').all(e, e.status == 'True')`
+                    can be used as-is. Expressions must evaluate to a boolean.
+                  properties:
+                    apiVersion:
+                      description: APIVersion of the objects this health check applies
+                        to (e.g. "apps/v1").
+                      type: string
+                    current:
+                      description: |-
+                        Current is a CEL expression which is true when the object has reached its
+                        desired state (healthy).
+                      type: string
+                    failed:
+                      description: |-
+                        Failed is a CEL expression which is true when the object has permanently
+                        failed (unhealthy).
+                      type: string
+                    inProgress:
+                      description: |-
+                        InProgress is a CEL expression which is true when the object is still
+                        progressing. It is evaluated after failed and before current, so a matching
+                        inProgress holds back a premature healthy verdict. Optional; when omitted,
+                        "not failed and not current" is already treated as in progress.
+                      type: string
+                    kind:
+                      description: Kind of the objects this health check applies to
+                        (e.g. "Deployment").
+                      type: string
+                  required:
+                  - apiVersion
+                  - kind
                   type: object
                 type: array
               pruningOnDelete:
@@ -547,6 +596,21 @@ spec:
                           description: Indicates wether the resource was created or
                             adopted
                           type: boolean
+                        healthMessage:
+                          description: |-
+                            HealthMessage is a human readable message with details about the health of
+                            this individual replicated object.
+                          type: string
+                        healthy:
+                          description: |-
+                            Healthy reports the health of this individual replicated object, as evaluated
+                            via the resource's healthChecks (CEL) or the kstatus fallback. One of True,
+                            False, Unknown. Unset when no health evaluation has run yet.
+                          enum:
+                          - "True"
+                          - "False"
+                          - Unknown
+                          type: string
                         lastApply:
                           description: |-
                             An opaque value that represents the internal version of this object that can

@@ -28,6 +28,7 @@ type TenantResourceStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Items",type="integer",JSONPath=".status.size",description="The total amount of items being replicated"
 // +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].status",description="Reconcile Status for the tenant"
+// +kubebuilder:printcolumn:name="Healthy",type="string",JSONPath=".status.conditions[?(@.type==\"Healthy\")].status",description="Health Status of the replicated objects"
 // +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].message",description="Reconcile Message for the tenant"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Age"
 
