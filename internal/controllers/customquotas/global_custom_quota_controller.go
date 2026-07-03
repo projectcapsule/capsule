@@ -349,6 +349,7 @@ func (r *clusterCustomQuotaClaimController) emitMetrics(
 
 	// Usage Metrics
 	r.metrics.ResourceUsageGauge.WithLabelValues(instance.GetName()).Set(float64(instance.Status.Usage.Used.MilliValue()) / 1000)
+	r.metrics.ResourceUsagePercentageGauge.WithLabelValues(instance.GetName()).Set(usagePercentage(instance.Status.Usage.Used, instance.Spec.Limit))
 	r.metrics.ResourceAvailableGauge.WithLabelValues(instance.GetName()).Set(float64(instance.Status.Usage.Available.MilliValue()) / 1000)
 	r.metrics.ResourceLimitGauge.WithLabelValues(instance.GetName()).Set(float64(instance.Spec.Limit.MilliValue()) / 1000)
 

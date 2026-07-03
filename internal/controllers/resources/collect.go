@@ -41,6 +41,7 @@ type Collector struct {
 }
 
 type CollectorOptions struct {
+	AllowClusterScopedObjects    bool
 	AllowCrossNamespaceSelection bool
 	Accumulator                  processor.Accumulator
 	Iterator                     CollectorIteratorOptions
@@ -216,6 +217,10 @@ func (co *Collector) AddToAccumulation(
 		return err
 	}
 
+	if err := co.validateClusterScopedObjectAllowed(opts, obj); err != nil {
+		return err
+	}
+
 	tntName := ""
 	if tnt != nil {
 		tntName = tnt.GetName()
@@ -305,7 +310,7 @@ func (co *Collector) CollectNamespacedItems(
 	}
 
 	for _, item := range spec.NamespacedItems {
-		p, err := item.LoadResources(ctx, c, co.mapper, namespace, []labels.Selector{selector}, opts.Iterator.FastContext, false, opts.ValidatorNamespaces)
+		p, err := item.LoadResources(ctx, c, co.mapper, namespace, []labels.Selector{selector}, opts.Iterator.FastContext, opts.AllowClusterScopedObjects, opts.ValidatorNamespaces)
 		if err != nil {
 			totalError = errors.Join(totalError, err)
 
@@ -376,6 +381,26 @@ func GatherAdditionalMetadata(
 	}
 
 	return labels, annotations
+}
+
+func (co *Collector) validateClusterScopedObjectAllowed(
+	opts CollectorOptions,
+	obj *unstructured.Unstructured,
+) error {
+	if opts.AllowClusterScopedObjects {
+		return nil
+	}
+
+	isNamespaced, err := tpl.IsNamespacedGVK(co.mapper, obj.GetAPIVersion(), obj.GetKind())
+	if err != nil {
+		return err
+	}
+
+	if !isNamespaced {
+		return fmt.Errorf("cluster-scoped kind %s/%s is not allowed", obj.GetAPIVersion(), obj.GetKind())
+	}
+
+	return nil
 }
 
 // Handles a single generator item.
