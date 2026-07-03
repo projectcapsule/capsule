@@ -184,6 +184,46 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 	})
 
 	Context("cluster-scoped objects", func() {
+		const (
+			controllerClusterResourceRoleName    = "gtr-controller-cluster-resource-writer"
+			controllerClusterResourceBindingName = "gtr-controller-cluster-resource-writer-binding"
+		)
+
+		BeforeEach(func() {
+			bindServiceAccountToClusterResources(
+				ControllerNamespace,
+				ControllerServiceAccount,
+				controllerClusterResourceRoleName,
+				controllerClusterResourceBindingName,
+				[]rbacv1.PolicyRule{
+					{
+						APIGroups: []string{rbacv1.GroupName},
+						Resources: []string{"clusterroles"},
+						Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
+					},
+					{
+						APIGroups: []string{""},
+						Resources: []string{"configmaps"},
+						Verbs:     []string{"get", "list"},
+					},
+					{
+						APIGroups: []string{""},
+						Resources: []string{"secrets"},
+						Verbs:     []string{"get"},
+					},
+				},
+			)
+		})
+
+		AfterEach(func() {
+			ignoreNotFound(k8sClient.Delete(ctx, &rbacv1.ClusterRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{Name: controllerClusterResourceBindingName},
+			}))
+			ignoreNotFound(k8sClient.Delete(ctx, &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{Name: controllerClusterResourceRoleName},
+			}))
+		})
+
 		It("applies raw cluster-scoped items", func() {
 			gtr := newRawClusterRoleGlobalTenantResource("gtr-cluster-raw", "gtr-cluster-raw-role")
 
@@ -226,13 +266,23 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 			}))
 
 			ensureServiceAccount("capsule-system", saName)
-			bindServiceAccountToClusterResource(
+			bindServiceAccountToClusterResources(
 				"capsule-system",
 				saName,
 				writerRoleName,
 				writerBindingName,
-				[]string{"clusterroles"},
-				[]string{"get", "list", "watch", "create", "update", "patch"},
+				[]rbacv1.PolicyRule{
+					{
+						APIGroups: []string{rbacv1.GroupName},
+						Resources: []string{"clusterroles"},
+						Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
+					},
+					{
+						APIGroups: []string{""},
+						Resources: []string{"configmaps"},
+						Verbs:     []string{"get", "list"},
+					},
+				},
 			)
 
 			gtr := newRawClusterRoleGlobalTenantResource("gtr-cluster-admission", clusterRoleName)
@@ -1657,6 +1707,23 @@ func bindServiceAccountToClusterResource(
 	saNamespace, saName, clusterRoleName, clusterRoleBindingName string,
 	resources, verbs []string,
 ) {
+	bindServiceAccountToClusterResources(
+		saNamespace,
+		saName,
+		clusterRoleName,
+		clusterRoleBindingName,
+		[]rbacv1.PolicyRule{{
+			APIGroups: []string{rbacv1.GroupName},
+			Resources: resources,
+			Verbs:     verbs,
+		}},
+	)
+}
+
+func bindServiceAccountToClusterResources(
+	saNamespace, saName, clusterRoleName, clusterRoleBindingName string,
+	rules []rbacv1.PolicyRule,
+) {
 	ctx := context.Background()
 
 	clusterRole := &rbacv1.ClusterRole{
@@ -1666,11 +1733,7 @@ func bindServiceAccountToClusterResource(
 				"e2e.capsule.dev/test-suite": "true",
 			},
 		},
-		Rules: []rbacv1.PolicyRule{{
-			APIGroups: []string{rbacv1.GroupName},
-			Resources: resources,
-			Verbs:     verbs,
-		}},
+		Rules: rules,
 	}
 
 	clusterRoleBinding := &rbacv1.ClusterRoleBinding{
