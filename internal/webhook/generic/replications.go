@@ -18,7 +18,6 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
-	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 type replicaHandler struct{}
@@ -39,13 +38,13 @@ func (h *replicaHandler) OnCreate(
 }
 
 func (h *replicaHandler) OnDelete(
-	_ client.Client,
+	c client.Client,
 	reader client.Reader,
 	_ admission.Decoder,
 	recorder events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return nil
+		return h.handler(ctx, c, req, recorder)
 	}
 }
 
@@ -66,15 +65,6 @@ func (h *replicaHandler) handler(
 	req admission.Request,
 	recorder events.EventRecorder,
 ) *admission.Response {
-	tnt, err := tenant.TenantByStatusNamespace(ctx, c, req.Namespace)
-	if err != nil {
-		return ad.ErroredResponse(err)
-	}
-
-	if tnt == nil {
-		return nil
-	}
-
 	// Checking if the object is managed by a TenantResource, local or global
 	ref := gvk.ResourceID{
 		Group:     req.Kind.Group,

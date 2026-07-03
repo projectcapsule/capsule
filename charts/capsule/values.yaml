@@ -851,7 +851,10 @@ webhooks:
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector: {}
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
-      namespaceSelector: {}
+      namespaceSelector:
+        matchExpressions:
+          - key: "capsule.clastix.io/tenant"
+            operator: Exists
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchConditions: []
       # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
@@ -1287,10 +1290,7 @@ webhooks:
             values:
               - "controller"
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
-      namespaceSelector:
-        matchExpressions:
-          - key: "capsule.clastix.io/tenant"
-            operator: Exists
+      namespaceSelector: {}
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchConditions: []
       # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
@@ -1324,10 +1324,7 @@ webhooks:
             values:
               - "replications"
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
-      namespaceSelector:
-        matchExpressions:
-          - key: "capsule.clastix.io/tenant"
-            operator: Exists
+      namespaceSelector: {}
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchConditions: []
       #  - name: "exclude-privileged-users"

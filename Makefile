@@ -165,7 +165,7 @@ endef
 export TLS_CNF
 CHART           ?= "./charts/capsule"
 CHART_VERSION   ?= "./charts/capsule"
-dev-setup:
+dev-setup: dev-setup-cert-manager
 	$(KUBECTL) -n capsule-system scale deployment capsule-controller-manager --replicas=0 || true
 	mkdir -p /tmp/k8s-webhook-server/serving-certs
 	echo "$${TLS_CNF}" > _tls.cnf

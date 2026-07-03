@@ -78,9 +78,5 @@ func (r *ConfigRecorder) DeleteConditionMetricByType(name string, condition stri
 
 // DeleteCondition deletes the condition metrics for the ref.
 func (r *ConfigRecorder) DeleteMetrics(resourceName string) {
-	r.resourceConditionGauge.DeletePartialMatch(map[string]string{
-		"name": resourceName,
-	})
-
 	r.DeleteConditionMetrics(resourceName)
 }
