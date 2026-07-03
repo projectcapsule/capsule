@@ -80,10 +80,5 @@ func (r *RuleStatusRecorder) DeleteConditionMetricByType(name string, namespace 
 
 // DeleteCondition deletes the condition metrics for the ref.
 func (r *RuleStatusRecorder) DeleteMetrics(resourceName string, resourceNamespace string) {
-	r.resourceConditionGauge.DeletePartialMatch(map[string]string{
-		"name":             resourceName,
-		"target_namespace": resourceNamespace,
-	})
-
 	r.DeleteConditionMetrics(resourceName, resourceNamespace)
 }

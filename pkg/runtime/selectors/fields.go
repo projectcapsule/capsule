@@ -13,8 +13,9 @@ import (
 type FieldSelectorOperator string
 
 const (
-	FieldSelectorTruthy FieldSelectorOperator = "truthy"
-	FieldSelectorEquals FieldSelectorOperator = "equals"
+	FieldSelectorTruthy    FieldSelectorOperator = "truthy"
+	FieldSelectorEquals    FieldSelectorOperator = "equals"
+	FieldSelectorNotEquals FieldSelectorOperator = "not-equals"
 )
 
 // +kubebuilder:object:generate=true

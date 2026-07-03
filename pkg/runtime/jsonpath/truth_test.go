@@ -583,6 +583,283 @@ func TestTrimMatchingQuotes(t *testing.T) {
 	}
 }
 
+func TestSplitFieldSelectorNotEquals(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		raw       string
+		wantPath  string
+		wantValue string
+		wantOK    bool
+	}{
+		{
+			name:      "simple not-equals",
+			raw:       `.status.phase!=Succeeded`,
+			wantPath:  `.status.phase`,
+			wantValue: `Succeeded`,
+			wantOK:    true,
+		},
+		{
+			name:      "not-equals with double-quoted value",
+			raw:       `.status.phase!="Succeeded"`,
+			wantPath:  `.status.phase`,
+			wantValue: `Succeeded`,
+			wantOK:    true,
+		},
+		{
+			name:      "not-equals with single-quoted value",
+			raw:       `.status.phase!='Succeeded'`,
+			wantPath:  `.status.phase`,
+			wantValue: `Succeeded`,
+			wantOK:    true,
+		},
+		{
+			name:      "trims whitespace around expression",
+			raw:       `  .status.phase != "Succeeded"  `,
+			wantPath:  `.status.phase`,
+			wantValue: `Succeeded`,
+			wantOK:    true,
+		},
+		{
+			name:      "keeps spaces inside quoted value",
+			raw:       `.metadata.annotations["example.com/value"]!="hello world"`,
+			wantPath:  `.metadata.annotations["example.com/value"]`,
+			wantValue: `hello world`,
+			wantOK:    true,
+		},
+		{
+			name:      "value containing not-equals in quotes",
+			raw:       `.metadata.annotations["example.com/check"]!="a!=b"`,
+			wantPath:  `.metadata.annotations["example.com/check"]`,
+			wantValue: `a!=b`,
+			wantOK:    true,
+		},
+		{
+			name:      "top level not-equals after bracket expression",
+			raw:       `.metadata.labels["app.kubernetes.io/name"]!="nginx"`,
+			wantPath:  `.metadata.labels["app.kubernetes.io/name"]`,
+			wantValue: `nginx`,
+			wantOK:    true,
+		},
+		{
+			name:   "bang without equals is not not-equals",
+			raw:    `.spec.type!ClusterIP`,
+			wantOK: false,
+		},
+		{
+			name:   "truthy path without not-equals",
+			raw:    `.spec.storageClassName`,
+			wantOK: false,
+		},
+		{
+			name:   "plain equals is not not-equals",
+			raw:    `.spec.type=ClusterIP`,
+			wantOK: false,
+		},
+		{
+			name:   "double equals is not not-equals",
+			raw:    `.spec.type==ClusterIP`,
+			wantOK: false,
+		},
+		{
+			name:   "empty string",
+			raw:    ``,
+			wantOK: false,
+		},
+		{
+			name:   "whitespace string",
+			raw:    `   `,
+			wantOK: false,
+		},
+		{
+			name:   "missing path",
+			raw:    `!=Succeeded`,
+			wantOK: false,
+		},
+		{
+			name:   "missing value",
+			raw:    `.status.phase!=`,
+			wantOK: false,
+		},
+		{
+			name:      "does not split not-equals inside double-quoted path segment",
+			raw:       `.metadata.annotations["example.com/a!=b"]!="value"`,
+			wantPath:  `.metadata.annotations["example.com/a!=b"]`,
+			wantValue: `value`,
+			wantOK:    true,
+		},
+		{
+			name:      "does not split not-equals inside single-quoted path segment",
+			raw:       `.metadata.annotations['example.com/a!=b']!="value"`,
+			wantPath:  `.metadata.annotations['example.com/a!=b']`,
+			wantValue: `value`,
+			wantOK:    true,
+		},
+		{
+			name:      "does not split not-equals inside brackets",
+			raw:       `.spec.accessModes[?(@!="ReadWriteOnce")]!="value"`,
+			wantPath:  `.spec.accessModes[?(@!="ReadWriteOnce")]`,
+			wantValue: `value`,
+			wantOK:    true,
+		},
+		{
+			name:      "does not split not-equals inside parentheses",
+			raw:       `.spec.values(@!="ignored")!="value"`,
+			wantPath:  `.spec.values(@!="ignored")`,
+			wantValue: `value`,
+			wantOK:    true,
+		},
+		{
+			name:      "does not split not-equals inside braces",
+			raw:       `.spec.values{"a!=b"}!="value"`,
+			wantPath:  `.spec.values{"a!=b"}`,
+			wantValue: `value`,
+			wantOK:    true,
+		},
+		{
+			name:   "unmatched bracket suppresses split",
+			raw:    `.metadata.annotations["key"!="value"`,
+			wantOK: false,
+		},
+		{
+			name:      "unmatched quote after not-equals remains part of value",
+			raw:       `.status.phase!="Succeeded`,
+			wantPath:  `.status.phase`,
+			wantValue: `"Succeeded`,
+			wantOK:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			gotPath, gotValue, gotOK := SplitFieldSelectorNotEquals(tt.raw)
+			if gotOK != tt.wantOK {
+				t.Fatalf("expected ok=%t, got %t", tt.wantOK, gotOK)
+			}
+
+			if gotPath != tt.wantPath {
+				t.Fatalf("expected path %q, got %q", tt.wantPath, gotPath)
+			}
+
+			if gotValue != tt.wantValue {
+				t.Fatalf("expected value %q, got %q", tt.wantValue, gotValue)
+			}
+		})
+	}
+}
+
+func TestFindTopLevelNotEquals(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		raw       string
+		wantIdx   int
+		wantWidth int
+	}{
+		{
+			name:      "simple not-equals",
+			raw:       `.status.phase!=Succeeded`,
+			wantIdx:   len(`.status.phase`),
+			wantWidth: 2,
+		},
+		{
+			name:      "ignores not-equals inside brackets",
+			raw:       `.spec.accessModes[?(@!="ReadWriteOnce")]`,
+			wantIdx:   -1,
+			wantWidth: 0,
+		},
+		{
+			name:      "finds top level not-equals after brackets",
+			raw:       `.metadata.labels["app.kubernetes.io/name"]!="nginx"`,
+			wantIdx:   len(`.metadata.labels["app.kubernetes.io/name"]`),
+			wantWidth: 2,
+		},
+		{
+			name:      "ignores not-equals inside double quotes",
+			raw:       `.metadata.annotations["a!=b"]`,
+			wantIdx:   -1,
+			wantWidth: 0,
+		},
+		{
+			name:      "ignores not-equals inside single quotes",
+			raw:       `.metadata.annotations['a!=b']`,
+			wantIdx:   -1,
+			wantWidth: 0,
+		},
+		{
+			name:      "ignores escaped quote before not-equals inside quoted string",
+			raw:       `.metadata.annotations["a\"!=b"]`,
+			wantIdx:   -1,
+			wantWidth: 0,
+		},
+		{
+			name:      "ignores not-equals inside parentheses",
+			raw:       `.spec.values(@!="ignored")`,
+			wantIdx:   -1,
+			wantWidth: 0,
+		},
+		{
+			name:      "ignores not-equals inside braces",
+			raw:       `.spec.values{"a!=b"}`,
+			wantIdx:   -1,
+			wantWidth: 0,
+		},
+		{
+			name:      "finds first top level not-equals",
+			raw:       `.status.phase!=Succeeded!=ignored`,
+			wantIdx:   len(`.status.phase`),
+			wantWidth: 2,
+		},
+		{
+			name:      "bang without equals is not not-equals",
+			raw:       `.spec.type!ClusterIP`,
+			wantIdx:   -1,
+			wantWidth: 0,
+		},
+		{
+			name:      "plain equals is not found",
+			raw:       `.spec.type=ClusterIP`,
+			wantIdx:   -1,
+			wantWidth: 0,
+		},
+		{
+			name:      "empty string",
+			raw:       ``,
+			wantIdx:   -1,
+			wantWidth: 0,
+		},
+		{
+			name:      "no operator",
+			raw:       `.spec.type`,
+			wantIdx:   -1,
+			wantWidth: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			gotIdx, gotWidth := findTopLevelNotEquals(tt.raw)
+			if gotIdx != tt.wantIdx {
+				t.Fatalf("expected idx %d, got %d", tt.wantIdx, gotIdx)
+			}
+
+			if gotWidth != tt.wantWidth {
+				t.Fatalf("expected width %d, got %d", tt.wantWidth, gotWidth)
+			}
+		})
+	}
+}
+
 func newUnstructured(object map[string]any) unstructured.Unstructured {
 	return unstructured.Unstructured{
 		Object: object,

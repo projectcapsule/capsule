@@ -1417,6 +1417,79 @@ data:
 			}
 		})
 
+		It("only allows the managing TenantResource service account to update created objects", func() {
+			saName := "tr-update-guard"
+			targetNamespace := targetNamespaces[0]
+			configMapName := "tr-admission-protected"
+
+			ensureServiceAccount(baseNamespace, saName)
+			for _, ns := range append(targetNamespaces, baseNamespace) {
+				bindServiceAccountToConfigMapWriter(baseNamespace, saName, ns)
+			}
+
+			tr := newRawConfigMapTenantResource(baseNamespace, "sa-update-guard", map[string]string{
+				"mode": "managed",
+			})
+			tr.Spec.ServiceAccount = &apimeta.LocalRFC1123ObjectReference{
+				Name: apimeta.RFC1123Name(saName),
+			}
+			renameFirstTenantResourceRawConfigMap(tr, configMapName)
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
+			expectTenantResourceReady(baseNamespace, tr.Name)
+			expectConfigMapData(targetNamespace, configMapName, map[string]string{"mode": "managed"})
+			expectManagedLabelsOnConfigMap(targetNamespace, configMapName, true)
+			expectProcessedItemStatus(
+				baseNamespace,
+				tr.Name,
+				configMapRID(tnt.Name, targetNamespace, configMapName, "0/raw-0"),
+				metav1.ConditionTrue,
+				true,
+				"",
+			)
+
+			tenantOwnerClient := impersonationClient(tenantOwner.Name, withDefaultGroups([]string{tenantOwner.Name}))
+			Eventually(func() error {
+				cm := &corev1.ConfigMap{}
+				if err := tenantOwnerClient.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: targetNamespace}, cm); err != nil {
+					return err
+				}
+
+				cm.Data["mode"] = "tenant-owner"
+
+				err := tenantOwnerClient.Update(ctx, cm)
+				if err == nil {
+					return fmt.Errorf("expected tenant owner update to be denied")
+				}
+				if apierrors.IsConflict(err) {
+					return err
+				}
+				if !apierrors.IsForbidden(err) {
+					return fmt.Errorf("expected forbidden error, got: %w", err)
+				}
+				if !strings.Contains(err.Error(), "managed by a tenant capsule replication") {
+					return fmt.Errorf("expected tenant replication admission denial, got: %w", err)
+				}
+
+				return nil
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+			replicationClient := impersonationClient(
+				serviceAccountUsername(baseNamespace, saName),
+				serviceAccountGroups(baseNamespace),
+			)
+			Eventually(func() error {
+				cm := &corev1.ConfigMap{}
+				if err := replicationClient.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: targetNamespace}, cm); err != nil {
+					return err
+				}
+
+				cm.Data["mode"] = "service-account"
+
+				return replicationClient.Update(ctx, cm)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		})
+
 		It("fails to prune replicated resources when the impersonated service account cannot delete them", func() {
 			saCreate := "creator-ok"
 			saNoDelete := "creator-no-delete"
@@ -2108,4 +2181,16 @@ func ensureServiceAccount(namespace, name string) {
 		}
 		return err
 	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func serviceAccountUsername(namespace, name string) string {
+	return fmt.Sprintf("system:serviceaccount:%s:%s", namespace, name)
+}
+
+func serviceAccountGroups(namespace string) []string {
+	return []string{
+		"system:authenticated",
+		"system:serviceaccounts",
+		fmt.Sprintf("system:serviceaccounts:%s", namespace),
+	}
 }

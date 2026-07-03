@@ -157,6 +157,14 @@ func evaluateCompiledFieldSelector(
 
 		return strings.TrimSpace(actual) == matcher.Value, nil
 
+	case selectors.FieldSelectorNotEquals:
+		actual, err := matcher.Compiled.Execute(u)
+		if err != nil {
+			return false, err
+		}
+
+		return strings.TrimSpace(actual) != matcher.Value, nil
+
 	default:
 		return false, fmt.Errorf("unsupported field selector operator %q", matcher.Operator)
 	}

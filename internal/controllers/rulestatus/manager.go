@@ -101,7 +101,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 
 		r.Metrics.RecordConditions(instance)
 
-		if e := patchHelper.Patch(ctx, instance); err != nil {
+		if e := patchHelper.Patch(ctx, instance); e != nil {
 			if apierrors.IsNotFound(e) || apierrors.HasStatusCause(e, corev1.NamespaceTerminatingCause) {
 				err = nil
 

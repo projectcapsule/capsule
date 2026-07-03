@@ -80,10 +80,5 @@ func (r *TenantResourceRecorder) DeleteConditionMetricByType(name string, namesp
 
 // DeleteCondition deletes the condition metrics for the ref.
 func (r *TenantResourceRecorder) DeleteMetrics(resourceName string, resourceNamespace string) {
-	r.resourceConditionGauge.DeletePartialMatch(map[string]string{
-		"name":             resourceName,
-		"target_namespace": resourceNamespace,
-	})
-
 	r.DeleteConditionMetrics(resourceName, resourceNamespace)
 }
