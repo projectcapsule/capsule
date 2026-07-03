@@ -13,37 +13,38 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
-type GlobalTenantResourceRecorder struct {
+type TenantOwnerRecorder struct {
 	resourceConditionGauge *prometheus.GaugeVec
 }
 
-func MustMakeGlobalTenantResourceRecorder() *GlobalTenantResourceRecorder {
-	metricsRecorder := NewGlobalTenantResourceRecorder()
+func MustMakeTenantOwnerRecorder() *TenantOwnerRecorder {
+	metricsRecorder := NewTenantOwnerRecorder()
 	crtlmetrics.Registry.MustRegister(metricsRecorder.Collectors()...)
 
 	return metricsRecorder
 }
 
-func NewGlobalTenantResourceRecorder() *GlobalTenantResourceRecorder {
-	return &GlobalTenantResourceRecorder{
+func NewTenantOwnerRecorder() *TenantOwnerRecorder {
+	return &TenantOwnerRecorder{
 		resourceConditionGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: metricsPrefix,
-				Name:      "global_resource_condition",
-				Help:      "The current condition status of a global tenant resource.",
+				Name:      "tenantowner_condition",
+				Help:      "The current condition status of a tenantowner resource.",
 			},
 			[]string{"name", "condition"},
 		),
 	}
 }
 
-func (r *GlobalTenantResourceRecorder) Collectors() []prometheus.Collector {
+func (r *TenantOwnerRecorder) Collectors() []prometheus.Collector {
 	return []prometheus.Collector{
 		r.resourceConditionGauge,
 	}
 }
 
-func (r *GlobalTenantResourceRecorder) RecordConditions(resource *capsulev1beta2.GlobalTenantResource) {
+// RecordCondition records the condition as given for the ref.
+func (r *TenantOwnerRecorder) RecordConditions(resource *capsulev1beta2.TenantOwner) {
 	for _, status := range []string{meta.ReadyCondition, meta.CordonedCondition} {
 		var value float64
 
@@ -62,13 +63,13 @@ func (r *GlobalTenantResourceRecorder) RecordConditions(resource *capsulev1beta2
 	}
 }
 
-func (r *GlobalTenantResourceRecorder) DeleteConditionMetrics(name string) {
+func (r *TenantOwnerRecorder) DeleteConditionMetrics(name string) {
 	r.resourceConditionGauge.DeletePartialMatch(map[string]string{
 		"name": name,
 	})
 }
 
-func (r *GlobalTenantResourceRecorder) DeleteConditionMetricByType(name string, condition string) {
+func (r *TenantOwnerRecorder) DeleteConditionMetricByType(name string, condition string) {
 	r.resourceConditionGauge.DeletePartialMatch(map[string]string{
 		"name":      name,
 		"condition": condition,
@@ -76,7 +77,7 @@ func (r *GlobalTenantResourceRecorder) DeleteConditionMetricByType(name string, 
 }
 
 // DeleteCondition deletes the condition metrics for the ref.
-func (r *GlobalTenantResourceRecorder) DeleteMetrics(resourceName string) {
+func (r *TenantOwnerRecorder) DeleteMetrics(resourceName string) {
 	r.resourceConditionGauge.DeletePartialMatch(map[string]string{
 		"name": resourceName,
 	})

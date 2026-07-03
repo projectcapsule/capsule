@@ -728,7 +728,7 @@ func main() {
 	if err = (&tenantownercontroller.TenantOwnerManager{
 		Log:    ctrl.Log.WithName("capsule.ctrl").WithName("tenantowners"),
 		Client: manager.GetClient(),
-	}).SetupWithManager(manager, controllerConfig); err != nil {
+	}).SetupWithManager(manager, controllerConfig, metrics.MustMakeTenantOwnerRecorder()); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "TenantOwners")
 		os.Exit(1)
 	}
@@ -759,18 +759,21 @@ func main() {
 		os.Exit(1)
 	}
 
+	configrecorder := metrics.MustMakeConfigRecorder()
+
 	if err = (&configcontroller.Manager{
 		Rest:   manager.GetConfig(),
 		Client: manager.GetClient(),
 		Log:    ctrl.Log.WithName("capsule.ctrl").WithName("configuration"),
-	}).SetupWithManager(manager, controllerConfig); err != nil {
+	}).SetupWithManager(manager, controllerConfig, configrecorder); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "CapsuleConfiguration")
 		os.Exit(1)
 	}
 
 	if err = (&rulestatuscontroller.Manager{
-		Client: manager.GetClient(),
-		Log:    ctrl.Log.WithName("capsule.ctrl").WithName("ruleset"),
+		Client:  manager.GetClient(),
+		Log:     ctrl.Log.WithName("capsule.ctrl").WithName("ruleset"),
+		Metrics: metrics.MustMakeRuleStatusRecorder(),
 	}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RuleSet")
 		os.Exit(1)
@@ -789,7 +792,7 @@ func main() {
 		RegexCache:         regexCache,
 	}
 
-	if err := localInvalidator.SetupWithManager(manager, controllerConfig); err != nil {
+	if err := localInvalidator.SetupWithManager(manager, controllerConfig, configrecorder); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "invalidator")
 		os.Exit(1)
 	}

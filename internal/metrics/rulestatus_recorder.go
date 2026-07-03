@@ -13,38 +13,38 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
-type TenantResourceRecorder struct {
+type RuleStatusRecorder struct {
 	resourceConditionGauge *prometheus.GaugeVec
 }
 
-func MustMakeTenantResourceRecorder() *TenantResourceRecorder {
-	metricsRecorder := NewTenantResourceRecorder()
+func MustMakeRuleStatusRecorder() *RuleStatusRecorder {
+	metricsRecorder := NewRuleStatusRecorder()
 	crtlmetrics.Registry.MustRegister(metricsRecorder.Collectors()...)
 
 	return metricsRecorder
 }
 
-func NewTenantResourceRecorder() *TenantResourceRecorder {
-	return &TenantResourceRecorder{
+func NewRuleStatusRecorder() *RuleStatusRecorder {
+	return &RuleStatusRecorder{
 		resourceConditionGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: metricsPrefix,
-				Name:      "resource_condition",
-				Help:      "The current condition status of a tenant resource.",
+				Name:      "rulestatus_condition",
+				Help:      "The current condition status of a rulestatus resource.",
 			},
 			[]string{"name", "target_namespace", "condition"},
 		),
 	}
 }
 
-func (r *TenantResourceRecorder) Collectors() []prometheus.Collector {
+func (r *RuleStatusRecorder) Collectors() []prometheus.Collector {
 	return []prometheus.Collector{
 		r.resourceConditionGauge,
 	}
 }
 
 // RecordCondition records the condition as given for the ref.
-func (r *TenantResourceRecorder) RecordConditions(resource *capsulev1beta2.TenantResource) {
+func (r *RuleStatusRecorder) RecordConditions(resource *capsulev1beta2.RuleStatus) {
 	for _, status := range []string{meta.ReadyCondition, meta.CordonedCondition} {
 		var value float64
 
@@ -63,14 +63,14 @@ func (r *TenantResourceRecorder) RecordConditions(resource *capsulev1beta2.Tenan
 	}
 }
 
-func (r *TenantResourceRecorder) DeleteConditionMetrics(name string, namespace string) {
+func (r *RuleStatusRecorder) DeleteConditionMetrics(name string, namespace string) {
 	r.resourceConditionGauge.DeletePartialMatch(map[string]string{
 		"name":             name,
 		"target_namespace": namespace,
 	})
 }
 
-func (r *TenantResourceRecorder) DeleteConditionMetricByType(name string, namespace string, condition string) {
+func (r *RuleStatusRecorder) DeleteConditionMetricByType(name string, namespace string, condition string) {
 	r.resourceConditionGauge.DeletePartialMatch(map[string]string{
 		"name":             name,
 		"target_namespace": namespace,
@@ -79,7 +79,7 @@ func (r *TenantResourceRecorder) DeleteConditionMetricByType(name string, namesp
 }
 
 // DeleteCondition deletes the condition metrics for the ref.
-func (r *TenantResourceRecorder) DeleteMetrics(resourceName string, resourceNamespace string) {
+func (r *RuleStatusRecorder) DeleteMetrics(resourceName string, resourceNamespace string) {
 	r.resourceConditionGauge.DeletePartialMatch(map[string]string{
 		"name":             resourceName,
 		"target_namespace": resourceNamespace,

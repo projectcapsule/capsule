@@ -24,6 +24,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
+	"github.com/projectcapsule/capsule/internal/metrics"
 	capmeta "github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	indexer "github.com/projectcapsule/capsule/pkg/runtime/indexers/tenant"
@@ -39,12 +40,17 @@ import (
 type TenantOwnerManager struct {
 	client.Client
 
-	reader client.Reader
-
-	Log logr.Logger
+	reader  client.Reader
+	metrics *metrics.TenantOwnerRecorder
+	Log     logr.Logger
 }
 
-func (r *TenantOwnerManager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
+func (r *TenantOwnerManager) SetupWithManager(
+	mgr ctrl.Manager,
+	ctrlConfig utils.ControllerOptions,
+	metrics *metrics.TenantOwnerRecorder,
+) error {
+	r.metrics = metrics
 	r.reader = mgr.GetAPIReader()
 
 	return ctrl.NewControllerManagedBy(mgr).
@@ -121,6 +127,8 @@ func (r *TenantOwnerManager) Reconcile(ctx context.Context, req ctrl.Request) (r
 	instance := &capsulev1beta2.TenantOwner{}
 	if err = r.Get(ctx, req.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
+			r.metrics.DeleteMetrics(req.Name)
+
 			return reconcile.Result{}, nil
 		}
 
@@ -138,6 +146,8 @@ func (r *TenantOwnerManager) Reconcile(ctx context.Context, req ctrl.Request) (r
 
 		return reconcile.Result{}, fmt.Errorf("cannot update TenantOwner status: %w", statusErr)
 	}
+
+	r.metrics.RecordConditions(instance)
 
 	return reconcile.Result{}, reconcileErr
 }

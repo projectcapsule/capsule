@@ -33,6 +33,14 @@ import (
 
 const immediatePendingDeleteRequeue = 500 * time.Millisecond
 
+func usagePercentage(used, limit resource.Quantity) float64 {
+	if limit.MilliValue() <= 0 {
+		return 0
+	}
+
+	return (float64(used.MilliValue()) / float64(limit.MilliValue())) * 100
+}
+
 type GroupedTarget struct {
 	GVK     schema.GroupVersionKind
 	Targets []capsulev1beta2.CustomQuotaStatusTarget

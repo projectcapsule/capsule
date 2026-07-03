@@ -155,6 +155,22 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 		}, "30s", "5s").Should(Succeed())
 
 		Eventually(func() error {
+			clusterRoleList := &rbacv1.ClusterRoleList{}
+			labelSelector := client.MatchingLabels{"e2e.capsule.dev/test-suite": "true"}
+			if err := k8sClient.List(context.TODO(), clusterRoleList, labelSelector); err != nil {
+				return err
+			}
+
+			for _, clusterRole := range clusterRoleList.Items {
+				if err := k8sClient.Delete(context.TODO(), &clusterRole); err != nil {
+					return err
+				}
+			}
+
+			return nil
+		}, "30s", "5s").Should(Succeed())
+
+		Eventually(func() error {
 			cfg := &capsulev1beta2.CapsuleConfiguration{}
 			if err := k8sClient.Get(ctx, client.ObjectKey{Name: originConfig.Name}, cfg); err != nil {
 				return err
@@ -163,6 +179,36 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 			return k8sClient.Update(ctx, cfg)
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
+	})
+
+	Context("cluster-scoped objects", func() {
+		It("applies raw cluster-scoped items", func() {
+			gtr := newRawClusterRoleGlobalTenantResource("gtr-cluster-raw", "gtr-cluster-raw-role")
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+
+			expectGlobalTenantResourceReady("gtr-cluster-raw")
+			expectClusterRoleRules("gtr-cluster-raw-role", []rbacv1.PolicyRule{{
+				APIGroups: []string{""},
+				Resources: []string{"configmaps"},
+				Verbs:     []string{"get", "list"},
+			}})
+			expectGlobalTenantResourceProcessedClusterRole("gtr-cluster-raw", "gtr-cluster-raw-role")
+		})
+
+		It("applies generated cluster-scoped items", func() {
+			gtr := newGeneratedClusterRoleGlobalTenantResource("gtr-cluster-generator", "gtr-cluster-generator-role")
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+
+			expectGlobalTenantResourceReady("gtr-cluster-generator")
+			expectClusterRoleRules("gtr-cluster-generator-role", []rbacv1.PolicyRule{{
+				APIGroups: []string{""},
+				Resources: []string{"secrets"},
+				Verbs:     []string{"get"},
+			}})
+			expectGlobalTenantResourceProcessedClusterRole("gtr-cluster-generator", "gtr-cluster-generator-role")
+		})
 	})
 
 	It("skips applying resources to terminating namespaces and removes them from processedItems", func() {
@@ -1324,6 +1370,85 @@ func newRawConfigMapGlobalTenantResourceWithScope(name string, scope api.Resourc
 	return gtr
 }
 
+func newRawClusterRoleGlobalTenantResource(name, clusterRoleName string) *capsulev1beta2.GlobalTenantResource {
+	return &capsulev1beta2.GlobalTenantResource{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "true",
+			},
+		},
+		Spec: capsulev1beta2.GlobalTenantResourceSpec{
+			Scope: api.ResourceScopeNone,
+			TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
+				ResyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+				PruningOnDelete: ptr.To(true),
+				Resources: []capsulev1beta2.ResourceSpec{{
+					RawItems: []capsulev1beta2.RawExtension{{
+						RawExtension: runtime.RawExtension{
+							Object: &rbacv1.ClusterRole{
+								TypeMeta: metav1.TypeMeta{
+									APIVersion: "rbac.authorization.k8s.io/v1",
+									Kind:       "ClusterRole",
+								},
+								ObjectMeta: metav1.ObjectMeta{
+									Name: clusterRoleName,
+									Labels: map[string]string{
+										"e2e.capsule.dev/test-suite": "true",
+									},
+								},
+								Rules: []rbacv1.PolicyRule{{
+									APIGroups: []string{""},
+									Resources: []string{"configmaps"},
+									Verbs:     []string{"get", "list"},
+								}},
+							},
+						},
+					}},
+				}},
+			},
+		},
+	}
+}
+
+func newGeneratedClusterRoleGlobalTenantResource(name, clusterRoleName string) *capsulev1beta2.GlobalTenantResource {
+	return &capsulev1beta2.GlobalTenantResource{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "true",
+			},
+		},
+		Spec: capsulev1beta2.GlobalTenantResourceSpec{
+			Scope: api.ResourceScopeNone,
+			TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
+				ResyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+				PruningOnDelete: ptr.To(true),
+				Resources: []capsulev1beta2.ResourceSpec{{
+					Generators: []capsulev1beta2.TemplateItemSpec{{
+						MissingKey: "error",
+						Template: fmt.Sprintf(`---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: %s
+  labels:
+    e2e.capsule.dev/test-suite: "true"
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+`, clusterRoleName),
+					}},
+				}},
+			},
+		},
+	}
+}
+
 func expectGlobalTenantResourceReady(name string) {
 	Eventually(func(g Gomega) {
 		current := &capsulev1beta2.GlobalTenantResource{}
@@ -1344,5 +1469,29 @@ func expectGlobalTenantResourceFailed(name, msgContains string) {
 		g.Expect(rdy).ToNot(BeNil())
 		g.Expect(rdy.Status).To(Equal(metav1.ConditionFalse))
 		g.Expect(rdy.Message).To(ContainSubstring(msgContains))
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func expectClusterRoleRules(name string, expected []rbacv1.PolicyRule) {
+	Eventually(func(g Gomega) {
+		clusterRole := &rbacv1.ClusterRole{}
+		g.Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: name}, clusterRole)).To(Succeed())
+		g.Expect(clusterRole.Namespace).To(BeEmpty())
+		g.Expect(clusterRole.Labels).To(HaveKeyWithValue("e2e.capsule.dev/test-suite", "true"))
+		g.Expect(clusterRole.Labels).To(HaveKeyWithValue(managedByLabel, meta.ValueControllerReplications))
+		g.Expect(clusterRole.Rules).To(ConsistOf(expected))
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func expectGlobalTenantResourceProcessedClusterRole(gtrName, clusterRoleName string) {
+	Eventually(func(g Gomega) {
+		current := &capsulev1beta2.GlobalTenantResource{}
+		g.Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: gtrName}, current)).To(Succeed())
+		g.Expect(current.Status.ProcessedItems).To(ContainElement(SatisfyAll(
+			HaveField("Kind", "ClusterRole"),
+			HaveField("Name", clusterRoleName),
+			HaveField("Namespace", ""),
+			HaveField("Status", metav1.ConditionTrue),
+		)))
 	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 }

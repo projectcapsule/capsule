@@ -501,6 +501,7 @@ func (r *namespacedResourceController) gatherResources(
 	opts := CollectorOptions{
 		Accumulator:                  acc,
 		AllowCrossNamespaceSelection: false,
+		AllowClusterScopedObjects:    false,
 		ValidatorNamespaces:          tpl.NewNamespaceValidator(false, sets.New[string](tnt.Status.Namespaces...)),
 	}
 

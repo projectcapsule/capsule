@@ -128,21 +128,27 @@ func (t ResourceReference) LoadResources(
 func (t ResourceReference) IsNamespacedGVK(
 	restMapper k8smeta.RESTMapper,
 ) (bool, error) {
-	gv, err := schema.ParseGroupVersion(t.APIVersion)
+	return IsNamespacedGVK(restMapper, t.APIVersion, t.Kind)
+}
+
+func IsNamespacedGVK(
+	restMapper k8smeta.RESTMapper,
+	apiVersion string,
+	kind string,
+) (bool, error) {
+	gv, err := schema.ParseGroupVersion(apiVersion)
 	if err != nil {
-		return false, fmt.Errorf("invalid apiVersion %q: %w", t.APIVersion, err)
+		return false, fmt.Errorf("invalid apiVersion %q: %w", apiVersion, err)
 	}
 
-	gvk := gv.WithKind(t.Kind)
+	gvk := gv.WithKind(kind)
 
 	mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
 		return false, fmt.Errorf("failed to resolve GVK %s: %w", gvk.String(), err)
 	}
 
-	isNamespaced := mapping.Scope.Name() == k8smeta.RESTScopeNameNamespace
-
-	return isNamespaced, nil
+	return mapping.Scope.Name() == k8smeta.RESTScopeNameNamespace, nil
 }
 
 func (t ResourceReference) loadResources(
