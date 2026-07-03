@@ -1077,6 +1077,13 @@ spec:
                 items:
                   type: string
                 type: array
+              excludeUserGroups:
+                description: Names of the groups to exclude from Capsule entirely.
+                  Users in these groups are never treated as Capsule users, regardless
+                  of other group memberships.
+                items:
+                  type: string
+                type: array
               impersonation:
                 description: Service Account Client configuration for impersonation
                   properties

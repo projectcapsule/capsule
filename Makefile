@@ -708,3 +708,10 @@ define go-install-tool
     GOBIN=$(LOCALBIN) go install $(2) ;\
 }
 endef
+
+# Stratio CICD flow
+change-version:
+	bin/change-version.sh $(version)
+
+chart:
+	bin/chart.sh $(version)

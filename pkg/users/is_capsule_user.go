@@ -23,6 +23,14 @@ func IsCapsuleUser(
 	groups []string,
 ) bool {
 	groupList := NewUserGroupList(groups)
+
+	// Users in excluded groups are never treated as Capsule users
+	for _, group := range cfg.ExcludeUserGroups() {
+		if groupList.Find(group) {
+			return false
+		}
+	}
+
 	// if the user is a ServiceAccount belonging to the kube-system namespace, definitely, it's not a Capsule user
 	// and we can skip the check in case of Capsule user group assigned to system:authenticated
 	// (ref: https://github.com/projectcapsule/capsule/issues/234)

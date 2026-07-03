@@ -39,6 +39,13 @@ func IsTenantOwnerByStatus(
 		return true
 	}
 
+	// Capsule controller SA is always treated as a tenant owner
+	if name, namespace, err := serviceaccount.SplitUsername(user.Username); err == nil {
+		if configuration.IsControllerServiceAccount(name, namespace) {
+			return true
+		}
+	}
+
 	return tnt.Status.Owners.IsOwner(user.Username, user.Groups)
 }
 
@@ -52,6 +59,13 @@ func IsCommonOwner(
 	// Administrators are always Owners
 	if cfg.Administrators().IsPresent(userInfo.Username, userInfo.Groups) {
 		return true, nil
+	}
+
+	// Capsule controller SA is always treated as a tenant owner
+	if name, namespace, err := serviceaccount.SplitUsername(userInfo.Username); err == nil {
+		if configuration.IsControllerServiceAccount(name, namespace) {
+			return true, nil
+		}
 	}
 
 	if cfg.AllowServiceAccountPromotion() {

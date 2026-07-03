@@ -100,7 +100,7 @@ Create the name of the service account to use
 Create the manager fully-qualified Docker image to use
 */}}
 {{- define "capsule.managerFullyQualifiedDockerImage" -}}
-{{- printf "%s/%s:%s" .Values.manager.image.registry  .Values.manager.image.repository ( .Values.manager.image.tag | default (printf "v%s" .Chart.AppVersion) ) -}}
+{{- printf "%s/%s:%s" .Values.manager.image.registry  .Values.manager.image.repository ( .Values.manager.image.tag | default .Chart.AppVersion ) -}}
 {{- end }}
 
 {{/*

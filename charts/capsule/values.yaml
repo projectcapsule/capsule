@@ -292,6 +292,8 @@ manager:
     # -- DEPRECATED: use users properties.
     # Names of the users considered as Capsule users.
     capsuleUserGroups: []
+    # -- Names of the groups to exclude from Capsule entirely. Users in these groups are never treated as Capsule users.
+    capsuleExcludeUserGroups: []
 
   # -- A list of extra arguments for the capsule controller
   extraArgs:

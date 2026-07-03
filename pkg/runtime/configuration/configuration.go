@@ -37,6 +37,7 @@ type Configuration interface {
 	Users() rbac.UserListSpec
 	GetUsersByStatus() rbac.UserListSpec
 	IgnoreUserWithGroups() []string
+	ExcludeUserGroups() []string
 	ForbiddenUserNodeLabels() *capsuleapi.ForbiddenListSpec
 	ForbiddenUserNodeAnnotations() *capsuleapi.ForbiddenListSpec
 	Administrators() rbac.UserListSpec

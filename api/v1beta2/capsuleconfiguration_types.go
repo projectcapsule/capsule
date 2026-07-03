@@ -20,6 +20,9 @@ type CapsuleConfigurationSpec struct {
 	// Define groups which when found in the request of a user will be ignored by the Capsule
 	// this might be useful if you have one group where all the users are in, but you want to separate administrators from normal users with additional groups.
 	IgnoreUserWithGroups []string `json:"ignoreUserWithGroups,omitempty"`
+	// Names of the groups to exclude from Capsule entirely. Users in these groups are never treated as Capsule users,
+	// regardless of other group memberships.
+	ExcludeUserGroups []string `json:"excludeUserGroups,omitempty"`
 	// ServiceAccounts within tenant namespaces can be promoted to owners of the given tenant
 	// this can be achieved by labeling the serviceaccount and then they are considered owners. This can only be done by other owners of the tenant.
 	// However ServiceAccounts which have been promoted to owner can not promote further serviceAccounts.

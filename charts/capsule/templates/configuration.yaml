@@ -43,6 +43,12 @@ spec:
   allowServiceAccountPromotion: {{ .Values.manager.options.allowServiceAccountPromotion }}
   ignoreUserWithGroups:
     {{- toYaml .Values.manager.options.ignoreUserWithGroups | nindent 4 }}
+  {{- if .Values.manager.options.capsuleExcludeUserGroups }}
+  excludeUserGroups:
+  {{- range .Values.manager.options.capsuleExcludeUserGroups }}
+    - {{ . }}
+  {{- end }}
+  {{- end }}
   protectedNamespaceRegex: {{ .Values.manager.options.protectedNamespaceRegex | quote }}
   {{- with .Values.manager.options.nodeMetadata }}
   nodeMetadata:

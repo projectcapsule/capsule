@@ -5,8 +5,8 @@
 *.dll
 *.so
 *.dylib
-bin
 dist/
+target/
 config/
 builds/
 hack/generated/
