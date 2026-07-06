@@ -87,6 +87,36 @@ func TestNamespaceValidationDeniesAddingTenantLabelWithoutOwnerReference(t *test
 	}
 }
 
+func TestNamespaceValidationAllowsDeletingStaleTenantLabelWithoutOwnerReference(t *testing.T) {
+	t.Parallel()
+
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("AddToScheme(corev1): %v", err)
+	}
+	if err := capsulev1beta2.AddToScheme(scheme); err != nil {
+		t.Fatalf("AddToScheme(capsule): %v", err)
+	}
+
+	c := fake.NewClientBuilder().WithScheme(scheme).Build()
+	cfg := configuration.NewCapsuleConfiguration(context.Background(), c, c, nil, "default")
+	decoder := admission.NewDecoder(scheme)
+	h := NamespaceHandler(cfg)
+
+	oldNs := &corev1.Namespace{}
+	oldNs.SetName("stale")
+	oldNs.SetUID(types.UID("stale-uid"))
+	oldNs.SetLabels(map[string]string{
+		meta.TenantLabel: "tenant-a",
+	})
+
+	req := namespaceDeleteRequest(t, oldNs)
+	resp := h.OnDelete(c, c, decoder, nil)(context.Background(), req)
+	if resp != nil && !resp.Allowed {
+		t.Fatalf("expected stale tenant label namespace deletion to be allowed, got denial: %s", resp.Result.Message)
+	}
+}
+
 func namespaceUpdateRequest(t *testing.T, oldNs *corev1.Namespace, newNs *corev1.Namespace) admission.Request {
 	t.Helper()
 
@@ -101,6 +131,25 @@ func namespaceUpdateRequest(t *testing.T, oldNs *corev1.Namespace, newNs *corev1
 			},
 			Object: runtime.RawExtension{
 				Raw: encodeNamespace(t, newNs),
+			},
+			OldObject: runtime.RawExtension{
+				Raw: encodeNamespace(t, oldNs),
+			},
+		},
+	}
+}
+
+func namespaceDeleteRequest(t *testing.T, oldNs *corev1.Namespace) admission.Request {
+	t.Helper()
+
+	return admission.Request{
+		AdmissionRequest: admissionv1.AdmissionRequest{
+			Kind: metav1.GroupVersionKind{
+				Version: "v1",
+				Kind:    "Namespace",
+			},
+			UserInfo: authenticationv1.UserInfo{
+				Username: "tenant-owner",
 			},
 			OldObject: runtime.RawExtension{
 				Raw: encodeNamespace(t, oldNs),

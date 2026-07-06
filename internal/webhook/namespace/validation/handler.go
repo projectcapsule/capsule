@@ -96,6 +96,10 @@ func (h *handler) OnDelete(
 			return ad.ErroredResponse(err)
 		}
 
+		if !tenant.HasTenantReference(oldNs) {
+			return nil
+		}
+
 		tnt, err := tenant.ResolveNamespaceTenant(ctx, reader, oldNs)
 		if err != nil {
 			return ad.ErroredResponse(err)
@@ -115,6 +119,7 @@ func (h *handler) OnDelete(
 	}
 }
 
+//nolint:gocyclo,cyclop
 func (h *handler) OnUpdate(
 	c client.Client,
 	reader client.Reader,
