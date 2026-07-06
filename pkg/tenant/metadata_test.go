@@ -4,11 +4,15 @@
 package tenant_test
 
 import (
+	"context"
 	"sync"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
@@ -78,6 +82,100 @@ func TestAddTenantNameLabel(t *testing.T) {
 
 	if got := labels[meta.TenantLabel]; got != "mytenant" {
 		t.Fatalf("expected %s to be %q, got %q", meta.TenantLabel, "mytenant", got)
+	}
+}
+
+func TestHasTenantReferenceRequiresTenantOwnerReference(t *testing.T) {
+	t.Parallel()
+
+	capsuleGroup := capsulev1beta2.GroupVersion.Group
+
+	tests := []struct {
+		name string
+		ns   *corev1.Namespace
+		want bool
+	}{
+		{
+			name: "no label and no owner reference",
+			ns:   &corev1.Namespace{},
+			want: false,
+		},
+		{
+			name: "tenant label only",
+			ns: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						meta.TenantLabel: "tenant-a",
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "tenant owner reference",
+			ns: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion: capsuleGroup + "/v1beta2",
+							Kind:       tenant.ObjectReferenceTenantKind,
+							Name:       "tenant-a",
+						},
+					},
+				},
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := tenant.HasTenantReference(tt.ns)
+			if got != tt.want {
+				t.Fatalf("HasTenantReference() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestResolveNamespaceTenantRejectsTenantLabelWithoutOwnerReference(t *testing.T) {
+	t.Parallel()
+
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("AddToScheme(corev1): %v", err)
+	}
+	if err := capsulev1beta2.AddToScheme(scheme); err != nil {
+		t.Fatalf("AddToScheme(capsule): %v", err)
+	}
+
+	c := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(&capsulev1beta2.Tenant{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "tenant-a",
+			},
+		}).
+		Build()
+
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "label-only",
+			Labels: map[string]string{
+				meta.TenantLabel: "tenant-a",
+			},
+		},
+	}
+
+	tnt, err := tenant.ResolveNamespaceTenant(context.Background(), c, ns)
+	if err == nil {
+		t.Fatalf("ResolveNamespaceTenant() expected error, got nil")
+	}
+	if tnt != nil {
+		t.Fatalf("ResolveNamespaceTenant() = %s, want nil", tnt.GetName())
 	}
 }
 

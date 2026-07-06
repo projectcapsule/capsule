@@ -1067,7 +1067,8 @@ spec:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         admissionReviewVersions:
-        - v1
+          - v1
+          - v1beta1
         path: "/defaults"
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
@@ -1107,7 +1108,8 @@ spec:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         admissionReviewVersions:
-        - v1
+          - v1
+          - v1beta1
         path: "/defaults"
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
@@ -1147,7 +1149,8 @@ spec:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         admissionReviewVersions:
-        - v1
+          - v1
+          - v1beta1
         path: "/defaults"
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
@@ -1189,7 +1192,8 @@ spec:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         admissionReviewVersions:
-        - v1
+          - v1
+          - v1beta1
         path: "/defaults"
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}

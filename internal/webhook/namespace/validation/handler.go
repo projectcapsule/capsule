@@ -96,6 +96,10 @@ func (h *handler) OnDelete(
 			return ad.ErroredResponse(err)
 		}
 
+		if !tenant.HasTenantReference(oldNs) {
+			return nil
+		}
+
 		tnt, err := tenant.ResolveNamespaceTenant(ctx, reader, oldNs)
 		if err != nil {
 			return ad.ErroredResponse(err)
@@ -115,6 +119,7 @@ func (h *handler) OnDelete(
 	}
 }
 
+//nolint:gocyclo,cyclop
 func (h *handler) OnUpdate(
 	c client.Client,
 	reader client.Reader,
@@ -136,6 +141,12 @@ func (h *handler) OnUpdate(
 
 		oldHasTenantReference := tenant.HasTenantReference(oldNs)
 		newHasTenantReference := tenant.HasTenantReference(ns)
+		oldTenantLabel := tenant.TenanLabelValue(oldNs)
+		newTenantLabel := tenant.TenanLabelValue(ns)
+
+		if !oldHasTenantReference && !newHasTenantReference && oldTenantLabel != "" && newTenantLabel == "" {
+			return nil
+		}
 
 		if !user.IsAdmin() {
 			switch {
@@ -143,8 +154,10 @@ func (h *handler) OnUpdate(
 				return ad.Deny("namespace can not be patched into a tenant")
 			case oldHasTenantReference && !newHasTenantReference:
 				return ad.Deny("namespace can not remove tenant ownership")
-			case !oldHasTenantReference && !newHasTenantReference:
+			case !oldHasTenantReference && !newHasTenantReference && oldTenantLabel == "" && newTenantLabel == "":
 				return nil
+			case !oldHasTenantReference && !newHasTenantReference:
+				return ad.Deny("namespace can not be patched into a tenant")
 			}
 		}
 

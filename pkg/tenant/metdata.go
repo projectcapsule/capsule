@@ -25,10 +25,6 @@ func TenanLabelValue(ns *corev1.Namespace) string {
 }
 
 func HasTenantReference(ns *corev1.Namespace) bool {
-	if ns.Labels != nil && ns.Labels[meta.TenantLabel] != "" {
-		return true
-	}
-
 	//nolint:modernize
 	for _, ref := range ns.OwnerReferences {
 		if IsTenantOwnerReference(ref) {
@@ -66,11 +62,11 @@ func TenantOwnerReferenceName(ns *corev1.Namespace) string {
 }
 
 func HasTenantOwnership(ns *corev1.Namespace) bool {
-	return TenanLabelValue(ns) != "" || TenantOwnerReferenceName(ns) != ""
+	return TenantOwnerReferenceName(ns) != ""
 }
 
 func TenantOwnershipChanged(oldNs, newNs *corev1.Namespace) bool {
-	return TenanLabelValue(oldNs) != TenanLabelValue(newNs) ||
+	return TenantOwnerReferenceName(oldNs) != TenantOwnerReferenceName(newNs) ||
 		HasTenantOwnership(oldNs) != HasTenantOwnership(newNs)
 }
 
@@ -160,7 +156,6 @@ func BuildNamespaceAnnotationsForTenant(tnt *capsulev1beta2.Tenant) map[string]s
 			annotations[meta.AvailableIngressClassesAnnotation] = strings.Join(ic.Exact, ",")
 		}
 
-		//nolint:staticcheck
 		if len(ic.Regex) > 0 {
 			annotations[meta.AvailableIngressClassesRegexpAnnotation] = ic.Regex
 		}
@@ -171,7 +166,6 @@ func BuildNamespaceAnnotationsForTenant(tnt *capsulev1beta2.Tenant) map[string]s
 			annotations[meta.AvailableStorageClassesAnnotation] = strings.Join(sc.Exact, ",")
 		}
 
-		//nolint:staticcheck
 		if len(sc.Regex) > 0 {
 			annotations[meta.AvailableStorageClassesRegexpAnnotation] = sc.Regex
 		}

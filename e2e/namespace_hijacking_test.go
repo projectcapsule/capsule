@@ -253,6 +253,12 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 		Expect(hasTenantOwnerReference(retrievedNs, tenant)).To(BeFalse(), "Namespace should not have Tenant ownerReference")
 	}
 
+	expectNoTenantOwnerReference := func(nsName string, tenant *capsulev1beta2.Tenant) {
+		retrievedNs := getNamespace(nsName)
+
+		Expect(hasTenantOwnerReference(retrievedNs, tenant)).To(BeFalse(), "Namespace should not have Tenant ownerReference")
+	}
+
 	randomTenantReference := func() (string, types.UID) {
 		return fmt.Sprintf("random-tenant-%d", rand.Int()), types.UID(fmt.Sprintf("%d", rand.Int()))
 	}
@@ -1131,14 +1137,14 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 		}
 	})
 
-	It("Owners can not patch unmanaged namespaces into a Tenant", func() {
+	It("Owners can not add tenant labels to namespaces without Tenant ownerReferences", func() {
 		tenant := getTenant(t1.Name)
-
-		unmanaged := NewNamespace("")
-		Expect(k8sClient.Create(context.TODO(), unmanaged)).Should(Succeed())
 
 		for _, owner := range t1.Spec.Owners {
 			cs := ownerClient(owner.UserSpec)
+
+			unmanaged := NewNamespace("")
+			Expect(k8sClient.Create(context.TODO(), unmanaged)).Should(Succeed())
 
 			patchLabel := []byte(fmt.Sprintf(
 				`{"metadata":{"labels":{"%s":"%s"}}}`,
@@ -1148,6 +1154,18 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 
 			_, err := cs.CoreV1().Namespaces().Patch(context.TODO(), unmanaged.Name, types.StrategicMergePatchType, patchLabel, metav1.PatchOptions{})
 			Expect(err).To(HaveOccurred())
+			expectNoTenantOwnership(unmanaged.Name, tenant)
+		}
+	})
+
+	It("Owners can not patch unmanaged namespaces into a Tenant with ownerReferences", func() {
+		tenant := getTenant(t1.Name)
+
+		for _, owner := range t1.Spec.Owners {
+			cs := ownerClient(owner.UserSpec)
+
+			unmanaged := NewNamespace("")
+			Expect(k8sClient.Create(context.TODO(), unmanaged)).Should(Succeed())
 
 			patchOwnerReference := []byte(fmt.Sprintf(
 				`{"metadata":{"ownerReferences":[{"apiVersion":"%s","kind":"Tenant","name":"%s","uid":"%s"}]}}`,
@@ -1156,10 +1174,10 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 				tenant.GetUID(),
 			))
 
-			_, err = cs.CoreV1().Namespaces().Patch(context.TODO(), unmanaged.Name, types.StrategicMergePatchType, patchOwnerReference, metav1.PatchOptions{})
+			_, err := cs.CoreV1().Namespaces().Patch(context.TODO(), unmanaged.Name, types.StrategicMergePatchType, patchOwnerReference, metav1.PatchOptions{})
 			Expect(err).To(HaveOccurred())
 
-			expectNoTenantOwnership(unmanaged.Name, tenant)
+			expectNoTenantOwnerReference(unmanaged.Name, tenant)
 		}
 	})
 
