@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
@@ -179,5 +180,71 @@ func TestMapEqual(t *testing.T) {
 			g := NewWithT(t)
 			g.Expect(utils.MapEqual(tt.a, tt.b)).To(Equal(tt.want))
 		})
+	}
+}
+
+func TestToUnstructuredMap(t *testing.T) {
+	t.Parallel()
+
+	got, err := utils.ToUnstructuredMap(&corev1.ConfigMap{
+		Data: map[string]string{"key": "value"},
+	})
+	if err != nil {
+		t.Fatalf("ToUnstructuredMap() unexpected error: %v", err)
+	}
+	if got["data"].(map[string]any)["key"] != "value" {
+		t.Fatalf("ToUnstructuredMap() data = %#v", got["data"])
+	}
+}
+
+func TestMapify(t *testing.T) {
+	t.Parallel()
+
+	type nested struct {
+		Value string
+	}
+	type sample struct {
+		Name    string
+		Nested  nested
+		Pointer *nested
+		Items   []nested
+		Labels  map[string]string
+		hidden  string
+	}
+
+	got := utils.Mapify(sample{
+		Name:    "example",
+		Nested:  nested{Value: "nested"},
+		Pointer: &nested{Value: "pointer"},
+		Items:   []nested{{Value: "one"}},
+		Labels:  map[string]string{"app": "api"},
+		hidden:  "ignored",
+	})
+
+	if got["Name"] != "example" {
+		t.Fatalf("Mapify() Name = %#v", got["Name"])
+	}
+	if _, ok := got["hidden"]; ok {
+		t.Fatalf("Mapify() included unexported field")
+	}
+	if got["Nested"].(map[string]any)["Value"] != "nested" {
+		t.Fatalf("Mapify() nested = %#v", got["Nested"])
+	}
+	if got["Pointer"].(map[string]any)["Value"] != "pointer" {
+		t.Fatalf("Mapify() pointer = %#v", got["Pointer"])
+	}
+	if got["Items"].([]any)[0].(map[string]any)["Value"] != "one" {
+		t.Fatalf("Mapify() slice = %#v", got["Items"])
+	}
+	if got["Labels"].(map[string]any)["app"] != "api" {
+		t.Fatalf("Mapify() map = %#v", got["Labels"])
+	}
+
+	var nilSample *sample
+	if got := utils.Mapify(nilSample); len(got) != 0 {
+		t.Fatalf("Mapify(nil pointer) = %#v, want empty map", got)
+	}
+	if got := utils.Mapify("not-a-struct"); len(got) != 0 {
+		t.Fatalf("Mapify(non-struct) = %#v, want empty map", got)
 	}
 }

@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/projectcapsule/capsule/pkg/api"
 )
@@ -73,4 +75,72 @@ func TestAllowedListSpec_RegexMatch(t *testing.T) {
 			assert.False(t, a.RegexMatch(ko))
 		}
 	}
+}
+
+func TestAllowedListSpec_Match(t *testing.T) {
+	t.Parallel()
+
+	spec := api.AllowedListSpec{
+		Exact: []string{"exact"},
+		Regex: "regex-.*",
+	}
+
+	assert.True(t, spec.Match("exact"))
+	assert.True(t, spec.Match("regex-value"))
+	assert.False(t, spec.Match("other"))
+}
+
+func TestDefaultAllowedListSpec_MatchDefault(t *testing.T) {
+	t.Parallel()
+
+	spec := api.DefaultAllowedListSpec{Default: "standard"}
+
+	assert.True(t, spec.MatchDefault("standard"))
+	assert.False(t, spec.MatchDefault("premium"))
+}
+
+func TestSelectorAllowedListSpec(t *testing.T) {
+	t.Parallel()
+
+	obj := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+		Name:   "by-name",
+		Labels: map[string]string{"tier": "backend"},
+	}}
+
+	byName := api.SelectorAllowedListSpec{
+		AllowedListSpec: api.AllowedListSpec{Exact: []string{"by-name"}},
+	}
+	assert.True(t, byName.MatchSelectByName(obj))
+
+	bySelector := api.SelectorAllowedListSpec{
+		LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"tier": "backend"}},
+	}
+	assert.True(t, bySelector.SelectorMatch(obj))
+	assert.True(t, bySelector.MatchSelectByName(obj))
+
+	invalidSelector := api.SelectorAllowedListSpec{
+		LabelSelector: metav1.LabelSelector{
+			MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "tier", Operator: "invalid"}},
+		},
+	}
+	assert.False(t, invalidSelector.SelectorMatch(obj))
+	assert.False(t, invalidSelector.MatchSelectByName(nil))
+}
+
+func TestSelectionListWithDefaultSpec(t *testing.T) {
+	t.Parallel()
+
+	spec := api.SelectionListWithDefaultSpec{Default: "standard"}
+	assert.True(t, spec.MatchDefault("standard"))
+	assert.False(t, spec.MatchDefault("premium"))
+
+	obj := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+		Labels: map[string]string{"class": "gold"},
+	}}
+
+	selector := api.SelectionListWithSpec{
+		LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"class": "gold"}},
+	}
+	assert.True(t, selector.SelectorMatch(obj))
+	assert.False(t, selector.SelectorMatch(nil))
 }
