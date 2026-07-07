@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -145,13 +146,15 @@ func (r *resourcePoolController) finalize(
 	ctx context.Context,
 	pool *capsulev1beta2.ResourcePool,
 ) {
-	// Case: all claims are gone, remove finalizer
-	if pool.Status.ClaimSize == 0 && controllerutil.ContainsFinalizer(pool, meta.ControllerFinalizer) {
+	managedResources := pool.Status.ClaimSize + pool.Status.NamespaceSize
+
+	// Case: all managed resources are gone, remove finalizer
+	if managedResources == 0 && controllerutil.ContainsFinalizer(pool, meta.ControllerFinalizer) {
 		controllerutil.RemoveFinalizer(pool, meta.ControllerFinalizer)
 	}
 
-	// Case: claims still exist, add finalizer if not already present
-	if pool.Status.ClaimSize > 0 && !controllerutil.ContainsFinalizer(pool, meta.ControllerFinalizer) {
+	// Case: managed resources still exist, add finalizer if not already present
+	if managedResources > 0 && !controllerutil.ContainsFinalizer(pool, meta.ControllerFinalizer) {
 		controllerutil.AddFinalizer(pool, meta.ControllerFinalizer)
 	}
 }
@@ -354,7 +357,26 @@ func (r *resourcePoolController) reconcileResourceClaim(
 ) (err error) {
 	t := pool.GetClaimFromStatus(claim)
 	if t != nil {
-		// TBD: Future Implementation for Claim Resizing here
+		if reflect.DeepEqual(t.Claims, claim.Spec.ResourceClaims) {
+			return r.handleClaimToPoolBinding(ctx, pool, claim)
+		}
+
+		exhaustions := canClaimWithinPoolExcludingClaim(log, pool, claim, t)
+		if len(exhaustions) != 0 {
+			log.V(5).Info("resized claim exhausts resources", "amount", len(exhaustions))
+
+			pool.RemoveClaimFromStatus(claim)
+			pool.CalculateClaimedResources()
+
+			return r.handleClaimResourceExhaustion(
+				ctx,
+				pool,
+				claim,
+				exhaustions,
+				exhaustion,
+			)
+		}
+
 		return r.handleClaimToPoolBinding(ctx, pool, claim)
 	}
 
@@ -401,7 +423,25 @@ func (r *resourcePoolController) canClaimWithinNamespace(
 	pool *capsulev1beta2.ResourcePool,
 	claim *capsulev1beta2.ResourcePoolClaim,
 ) (res map[string]api.PoolExhaustionResource) {
+	return canClaimWithinPoolExcludingClaim(log, pool, claim, nil)
+}
+
+func canClaimWithinPoolExcludingClaim(
+	log logr.Logger,
+	pool *capsulev1beta2.ResourcePool,
+	claim *capsulev1beta2.ResourcePoolClaim,
+	excluded *capsulev1beta2.ResourcePoolClaimsItem,
+) (res map[string]api.PoolExhaustionResource) {
 	claimable := pool.GetAvailableClaimableResources()
+
+	if excluded != nil {
+		for resourceName, qt := range excluded.Claims {
+			available := claimable[resourceName]
+			available.Add(qt)
+			claimable[resourceName] = available
+		}
+	}
+
 	log.V(5).Info("claimable resources", "claimable", claimable)
 
 	_, namespaceClaimed := pool.GetNamespaceClaims(claim.Namespace)

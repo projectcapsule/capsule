@@ -186,4 +186,7 @@ type ObjectReferenceStatusCondition struct {
 
 	// Indicates wether the resource was created or adopted
 	Created bool `json:"created,omitempty"`
+
+	// Indicates whether the referenced resource is cluster-scoped.
+	ClusterScoped bool `json:"clusterScoped,omitempty"`
 }

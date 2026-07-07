@@ -126,6 +126,7 @@ The following Values have changed key or Value:
 | manager.options.allowServiceAccountPromotion | bool | `false` | ServiceAccounts within tenant namespaces can be promoted to owners of the given tenant this can be achieved by labeling the serviceaccount and then they are considered owners. This can only be done by other owners of the tenant. However ServiceAccounts which have been promoted to owner can not promote further serviceAccounts. |
 | manager.options.annotations | object | `{}` | Additional annotations to add to the CapsuleConfiguration resource |
 | manager.options.cacheInvalidation | string | `"0h30m0s"` | Duration after which the in-memory cache is invalidated (based on usaage) and re-fetched from the API server |
+| manager.options.cacheSyncTimeout | string | `"4m"` | Timeout used when waiting for controller cache synchronization. Empty uses controller-runtime's default. |
 | manager.options.capsuleConfiguration | string | `"default"` | Change the default name of the capsule configuration name |
 | manager.options.capsuleUserGroups | list | `[]` | DEPRECATED: use users properties. Names of the users considered as Capsule users. |
 | manager.options.clientConnectionBurst | int | `30` | Burst to use for interacting with kubernetes apiserver |
@@ -181,6 +182,13 @@ The following Values have changed key or Value:
 | monitoring.diagnostics.operator.folder | string | `""` | folder assignment for dashboard |
 | monitoring.diagnostics.operator.instanceSelector | object | `{}` | Selects Grafana instances for import |
 | monitoring.diagnostics.operator.resyncPeriod | string | `"10m"` | How often the resource is synced, defaults to 10m0s if not set |
+| monitoring.prometheusRules.annotations | object | `{}` | Assign additional Annotations |
+| monitoring.prometheusRules.enabled | bool | `false` | Enable PrometheusRules |
+| monitoring.prometheusRules.labels | object | `{}` | Assign additional labels according to Prometheus selector matching labels |
+| monitoring.prometheusRules.namespace | string | `""` | Install the PrometheusRules into a different Namespace, as the monitoring stack one (default: the release one) |
+| monitoring.prometheusRules.ruleAnnotations | object | `{}` | Annotations add to all Rules |
+| monitoring.prometheusRules.ruleLabels | object | `{}` | Labels add to all Rules |
+| monitoring.prometheusRules.rules | list | See [values.yaml](values.yaml) | Prometheus Rules definitions. The block is directly forwarded into the PrometheusRule, so you can use whatever specification you want. |
 | monitoring.serviceMonitor.annotations | object | `{}` | Assign additional Annotations |
 | monitoring.serviceMonitor.enabled | bool | `false` | Enable ServiceMonitor |
 | monitoring.serviceMonitor.endpoint.interval | string | `"15s"` | Set the scrape interval for the endpoint of the serviceMonitor |
@@ -255,6 +263,16 @@ The following Values have changed key or Value:
 | webhooks.hooks.gateways.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
 | webhooks.hooks.gateways.opts | object | `{}` | Capsule Hook Options |
 | webhooks.hooks.gateways.reinvocationPolicy | string | `"Never"` | [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy) |
+| webhooks.hooks.generic | object | `{"enabled":true,"failurePolicy":"Fail","matchConditions":[{"expression":"!has(request.subResource) || request.subResource == \"\"","name":"ignore-subresources"},{"expression":"request.resource.resource != \"events\"","name":"ignore-events"}],"matchPolicy":"Equivalent","namespaceSelector":{"matchExpressions":[{"key":"capsule.clastix.io/tenant","operator":"Exists"}]},"objectSelector":{},"opts":{},"reinvocationPolicy":"Never","rules":[{"apiGroups":["*"],"apiVersions":["*"],"operations":["CREATE","UPDATE"],"resources":["*"],"scope":"Namespaced"}]}` | Generic Rules API |
+| webhooks.hooks.generic.enabled | bool | `true` | Enable the Hook |
+| webhooks.hooks.generic.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
+| webhooks.hooks.generic.matchConditions | list | `[{"expression":"!has(request.subResource) || request.subResource == \"\"","name":"ignore-subresources"},{"expression":"request.resource.resource != \"events\"","name":"ignore-events"}]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.generic.matchPolicy | string | `"Equivalent"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.generic.namespaceSelector | object | `{"matchExpressions":[{"key":"capsule.clastix.io/tenant","operator":"Exists"}]}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
+| webhooks.hooks.generic.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
+| webhooks.hooks.generic.opts | object | `{}` | Capsule Hook Options |
+| webhooks.hooks.generic.reinvocationPolicy | string | `"Never"` | [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy) |
+| webhooks.hooks.generic.rules | list | `[{"apiGroups":["*"],"apiVersions":["*"],"operations":["CREATE","UPDATE"],"resources":["*"],"scope":"Namespaced"}]` | [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules) |
 | webhooks.hooks.globalcustomquotas.enabled | bool | `true` | Enable the Hook |
 | webhooks.hooks.globalcustomquotas.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
 | webhooks.hooks.globalcustomquotas.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
@@ -274,7 +292,7 @@ The following Values have changed key or Value:
 | webhooks.hooks.managed.failurePolicy | string | `"Ignore"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
 | webhooks.hooks.managed.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
 | webhooks.hooks.managed.matchPolicy | string | `"Equivalent"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
-| webhooks.hooks.managed.namespaceSelector | object | `{"matchExpressions":[{"key":"capsule.clastix.io/tenant","operator":"Exists"}]}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
+| webhooks.hooks.managed.namespaceSelector | object | `{}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
 | webhooks.hooks.managed.objectSelector | object | `{"matchExpressions":[{"key":"projectcapsule.dev/managed-by","operator":"In","values":["controller"]}]}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
 | webhooks.hooks.managed.opts | object | `{}` | Capsule Hook Options |
 | webhooks.hooks.managed.rules | list | `[{"apiGroups":["*"],"apiVersions":["*"],"operations":["CREATE","UPDATE","DELETE"],"resources":["*"],"scope":"Namespaced"}]` | [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules) |
@@ -332,7 +350,7 @@ The following Values have changed key or Value:
 | webhooks.hooks.replications.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
 | webhooks.hooks.replications.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
 | webhooks.hooks.replications.matchPolicy | string | `"Equivalent"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
-| webhooks.hooks.replications.namespaceSelector | object | `{"matchExpressions":[{"key":"capsule.clastix.io/tenant","operator":"Exists"}]}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
+| webhooks.hooks.replications.namespaceSelector | object | `{}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
 | webhooks.hooks.replications.objectSelector | object | `{"matchExpressions":[{"key":"projectcapsule.dev/created-by","operator":"In","values":["replications"]}]}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
 | webhooks.hooks.replications.opts | object | `{}` | Capsule Hook Options |
 | webhooks.hooks.replications.rules | list | `[{"apiGroups":["*"],"apiVersions":["*"],"operations":["UPDATE","DELETE"],"resources":["*"],"scope":"*"}]` | [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules) |

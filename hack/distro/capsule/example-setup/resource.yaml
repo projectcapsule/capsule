@@ -5,8 +5,6 @@ metadata:
   name: gitops-owners
 spec:
   resyncPeriod: 60s
-  dependsOn:
-    - name: custom-cm-2
   resources:
     - additionalMetadata:
         labels:
@@ -29,7 +27,6 @@ metadata:
   name: cluster-replication
 spec:
   resyncPeriod: 60s
-  scope: None
   resources:
     - generators:
         - template: |

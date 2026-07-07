@@ -9,7 +9,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
+	"github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/quota"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 	corev1 "k8s.io/api/core/v1"
@@ -98,7 +98,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("10Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -149,7 +149,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("10Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -191,7 +191,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("10"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -274,7 +274,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 					Limit: resource.MustParse("500m"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -309,7 +309,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("2Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -360,7 +360,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("10Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -370,7 +370,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 						},
 					},
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "PersistentVolumeClaim",
 						},
@@ -417,7 +417,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("500m"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -480,7 +480,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("5"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -530,7 +530,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("10"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -582,7 +582,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("10"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -641,7 +641,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("10"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -691,7 +691,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("10"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -742,7 +742,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("3Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -752,7 +752,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 						},
 					},
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "PersistentVolumeClaim",
 						},
@@ -800,7 +800,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("10Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -819,7 +819,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 						},
 					},
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "PersistentVolumeClaim",
 						},
@@ -888,7 +888,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("10Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "PersistentVolumeClaim",
 						},
@@ -929,7 +929,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("10Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -939,7 +939,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 						},
 					},
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "PersistentVolumeClaim",
 						},
@@ -986,7 +986,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("10Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -996,7 +996,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 						},
 					},
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "PersistentVolumeClaim",
 						},
@@ -1043,7 +1043,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("10Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -1053,7 +1053,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 						},
 					},
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "PersistentVolumeClaim",
 						},
@@ -1122,7 +1122,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("10Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -1132,7 +1132,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 						},
 					},
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "PersistentVolumeClaim",
 						},
@@ -1183,7 +1183,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("2"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -1207,7 +1207,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("5"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -1263,7 +1263,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("200m"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -1288,7 +1288,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("500m"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -1345,7 +1345,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("5"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -1378,7 +1378,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("2"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -1450,7 +1450,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("400m"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -1475,7 +1475,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("2Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -1526,7 +1526,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("3"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -1550,7 +1550,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("10"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -1611,7 +1611,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 					Limit: resource.MustParse("5"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -1645,7 +1645,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("2"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -1695,7 +1695,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 					Limit: resource.MustParse("500m"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -1730,7 +1730,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("200m"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -1781,7 +1781,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("10Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -1800,7 +1800,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 						},
 					},
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "PersistentVolumeClaim",
 						},
@@ -1855,7 +1855,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("10"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -1907,7 +1907,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("10Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -1960,7 +1960,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("10"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -1993,7 +1993,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("10"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -2045,7 +2045,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("3"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -2069,7 +2069,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("4"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -2123,7 +2123,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("300m"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -2148,7 +2148,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("3Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -2192,7 +2192,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Limit: resource.MustParse("10"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},

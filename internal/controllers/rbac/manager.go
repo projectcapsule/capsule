@@ -48,6 +48,7 @@ func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlCo
 	crErr := ctrl.NewControllerManagedBy(mgr).
 		Named("capsule/rbac/roles").
 		For(&rbacv1.ClusterRole{}, namesPredicate).
+		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
 		Complete(r)
 	if crErr != nil {
 		err = errors.Join(err, crErr)
@@ -65,7 +66,7 @@ func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlCo
 				}
 			},
 		}).
-		Watches(&corev1.ServiceAccount{}, handler.Funcs{
+		WatchesMetadata(&corev1.ServiceAccount{}, handler.Funcs{
 			CreateFunc: func(ctx context.Context, e event.TypedCreateEvent[client.Object], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 				r.handleSAChange(ctx, e.Object)
 			},
@@ -78,6 +79,7 @@ func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlCo
 				r.handleSAChange(ctx, e.Object)
 			},
 		}).
+		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
 		Complete(r)
 	if crbErr != nil {
 		err = errors.Join(err, crbErr)

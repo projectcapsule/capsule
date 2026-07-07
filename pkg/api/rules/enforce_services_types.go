@@ -3,7 +3,7 @@
 
 package rules
 
-import "github.com/projectcapsule/capsule/pkg/api"
+import "github.com/projectcapsule/capsule/pkg/api/runtime"
 
 // +kubebuilder:object:generate=true
 type NamespaceRuleEnforceServicesBody struct {
@@ -55,7 +55,7 @@ type ServiceExternalNameRule struct {
 	// Hostnames restricts spec.externalName.
 	// Empty means no additional hostname restriction once ExternalName is allowed by types.
 	// +optional
-	Hostnames []api.ExpressionMatch `json:"hostnames,omitempty"`
+	Hostnames []runtime.ExpressionMatch `json:"hostnames,omitempty"`
 }
 
 // +kubebuilder:object:generate=true

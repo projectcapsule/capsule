@@ -33,6 +33,7 @@ const (
 
 	CreatedByCapsuleLabel = "projectcapsule.dev/created-by"
 	CustomResourcesLabel  = "projectcapsule.dev/custom-resources"
+	ResourceOriginLabel   = "projectcapsule.dev/resource-origin"
 
 	NewManagedByCapsuleLabel = "projectcapsule.dev/managed-by"
 	ManagedByCapsuleLabel    = "capsule.clastix.io/managed-by"

@@ -1,6 +1,7 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
+//nolint:dupl
 package metrics
 
 import (
@@ -79,10 +80,5 @@ func (r *TenantResourceRecorder) DeleteConditionMetricByType(name string, namesp
 
 // DeleteCondition deletes the condition metrics for the ref.
 func (r *TenantResourceRecorder) DeleteMetrics(resourceName string, resourceNamespace string) {
-	r.resourceConditionGauge.DeletePartialMatch(map[string]string{
-		"name":             resourceName,
-		"target_namespace": resourceNamespace,
-	})
-
 	r.DeleteConditionMetrics(resourceName, resourceNamespace)
 }

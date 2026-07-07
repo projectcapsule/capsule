@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/pkg/runtime/cert"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
@@ -46,7 +47,7 @@ type Reconciler struct {
 	Configuration configuration.Configuration
 }
 
-func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *Reconciler) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
 	enqueueFn := handler.EnqueueRequestsFromMapFunc(func(context.Context, client.Object) []reconcile.Request {
 		return []reconcile.Request{
 			{
@@ -68,7 +69,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 			),
 		).
 		Named("capsule/tls").
-		Watches(
+		WatchesMetadata(
 			&admissionregistrationv1.ValidatingWebhookConfiguration{},
 			enqueueFn,
 			builder.WithPredicates(
@@ -77,7 +78,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 				},
 			),
 		).
-		Watches(
+		WatchesMetadata(
 			&admissionregistrationv1.MutatingWebhookConfiguration{},
 			enqueueFn,
 			builder.WithPredicates(
@@ -86,7 +87,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 				},
 			),
 		).
-		Watches(
+		WatchesMetadata(
 			&apiextensionsv1.CustomResourceDefinition{},
 			enqueueFn,
 			builder.WithPredicates(
@@ -95,6 +96,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 				},
 			),
 		).
+		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
 		Complete(r)
 }
 

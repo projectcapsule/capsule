@@ -13,6 +13,7 @@ import (
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -22,7 +23,6 @@ import (
 	clt "github.com/projectcapsule/capsule/pkg/runtime/client"
 )
 
-//nolint:gocognit
 func (p *Processor) Reconcile(
 	ctx context.Context,
 	log logr.Logger,
@@ -31,177 +31,15 @@ func (p *Processor) Reconcile(
 	acc Accumulator,
 	opts ProcessorOptions,
 ) (err error) {
-	itemErrors := 0
-
 	log.V(5).Info("starting pruning items", "present", len(*processed))
 
-	failAndContinue := func(i meta.ObjectReferenceStatus, msg string, err error) bool { // replace ItemType
-		if err == nil {
-			return false
-		}
-
-		itemErrors++
-		i.Status = metav1.ConditionFalse
-		i.Message = msg + err.Error()
-		processed.UpdateItem(i)
-
-		return true
-	}
-
-	terminatingNamespaces := map[string]bool{}
-
-	for _, i := range *processed {
-		if _, exists := acc[i.GetKey("")]; exists {
-			continue
-		}
-
-		obj := &unstructured.Unstructured{}
-		obj.SetGroupVersionKind(i.GetGVK())
-		obj.SetName(i.GetName())
-
-		ns := i.GetNamespace()
-		if ns != "" {
-			obj.SetNamespace(ns)
-		}
-
-		if i.LastApply.IsZero() {
-			processed.RemoveItem(i)
-
-			continue
-		}
-
-		if opts.Prune {
-			log.V(4).Info("pruning resources", "Kind", i.Kind, "Name", i.Name, "Namespace", i.Namespace)
-
-			fieldOwner := opts.FieldOwnerPrefix + "/" + i.FieldOwner("")
-
-			deleted, reconErr := p.Prune(ctx, c, obj, fieldOwner, &i)
-			if failAndContinue(i, "pruning failed for item: ", reconErr) {
-				continue
-			}
-
-			if deleted {
-				processed.RemoveItem(i)
-
-				continue
-			}
-		}
-
-		// Disown item (only when GET succeeded)
-		patches, err := p.handleRemoveManagedMetadata(ctx, c, obj, opts.Owner)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				processed.RemoveItem(i)
-
-				continue
-			}
-
-			if failAndContinue(i, "disowning failed for item: ", err) {
-				continue
-			}
-		}
-
-		//nolint:nestif
-		if len(patches) > 0 {
-			err = clt.ApplyPatches(ctx, c, obj, patches, meta.ResourceControllerFieldOwnerPrefix())
-			if err != nil {
-				if apierrors.IsNotFound(err) {
-					processed.RemoveItem(i)
-
-					continue
-				}
-
-				if failAndContinue(i, "removing metdata failed for item: ", err) {
-					continue
-				}
-			}
-		}
-
-		processed.RemoveItem(i)
-	}
-
-	if itemErrors > 0 {
+	if itemErrors := p.pruneProcessedItems(ctx, log, c, processed, acc, opts); itemErrors > 0 {
 		return fmt.Errorf("pruning of %d resources failed", itemErrors)
 	}
 
 	log.V(5).Info("accumulation after pruning", "items", len(acc))
 
-	for _, item := range acc {
-		or := meta.ObjectReferenceStatus{
-			ResourceID: item.Resource,
-			ObjectReferenceStatusCondition: meta.ObjectReferenceStatusCondition{
-				Type: meta.ReadyCondition,
-			},
-		}
-
-		hadError := false
-
-		for _, obj := range *item.Objects {
-			fieldOwner := opts.FieldOwnerPrefix + "/" + item.Resource.FieldOwner("")
-
-			terminating, namespace, err := p.isNamespaceTerminatingForObject(ctx, obj.Object, terminatingNamespaces)
-			if err != nil {
-				hadError = true
-				or.Status = metav1.ConditionFalse
-				or.Message = "checking namespace termination failed for item " + obj.Origin.Origin + ": " + err.Error()
-
-				processed.UpdateItem(or)
-
-				continue
-			}
-
-			if terminating {
-				log.V(4).Info(
-					"skipping apply because namespace is terminating",
-					"item", obj.Origin.Origin,
-					"namespace", namespace,
-					"Kind", obj.Object.GetKind(),
-					"Name", obj.Object.GetName(),
-				)
-
-				processed.RemoveItem(or)
-
-				continue
-			}
-
-			ver, created, err := p.Apply(
-				ctx,
-				c,
-				obj.Object,
-				fieldOwner,
-				opts.Force,
-				opts.Adopt,
-				opts.Owner,
-				processed.GetItem(item.Resource),
-			)
-
-			or.Created = created
-
-			if err != nil {
-				hadError = true
-				or.Status = metav1.ConditionFalse
-				or.Message = "apply failed for item " + obj.Origin.Origin + ": " + err.Error()
-
-				log.V(4).Info("failed to apply item", "item", obj.Origin.Origin)
-			} else {
-				if ver != nil {
-					or.LastApply = *ver
-				}
-
-				or.Status = metav1.ConditionTrue
-
-				log.V(4).Info("successfully applied item", "item", obj.Origin.Origin, "version", ver)
-			}
-
-			processed.UpdateItem(or)
-		}
-
-		if hadError {
-			itemErrors++
-		}
-	}
-
-	if itemErrors > 0 {
+	if itemErrors := p.applyAccumulatedItems(ctx, log, c, processed, acc, opts); itemErrors > 0 {
 		return fmt.Errorf("applying of %d resources failed", itemErrors)
 	}
 
@@ -210,6 +48,285 @@ func (p *Processor) Reconcile(
 	log.V(4).Info("processing completed")
 
 	return nil
+}
+
+func (p *Processor) pruneProcessedItems(
+	ctx context.Context,
+	log logr.Logger,
+	c client.Client,
+	processed *meta.ProcessedItems,
+	acc Accumulator,
+	opts ProcessorOptions,
+) int {
+	itemErrors := 0
+
+	for _, item := range *processed {
+		if _, exists := acc[item.GetKey("")]; exists {
+			continue
+		}
+
+		if item.LastApply.IsZero() {
+			processed.RemoveItem(item)
+
+			continue
+		}
+
+		obj, err := p.objectForProcessedItem(item)
+		if failAndRecord(processed, &itemErrors, item, "resolving resource scope failed: ", err) {
+			continue
+		}
+
+		if p.pruneProcessedItem(ctx, log, c, processed, opts, item, obj, &itemErrors) {
+			continue
+		}
+
+		p.disownProcessedItem(ctx, c, processed, opts, item, obj, &itemErrors)
+	}
+
+	return itemErrors
+}
+
+func (p *Processor) pruneProcessedItem(
+	ctx context.Context,
+	log logr.Logger,
+	c client.Client,
+	processed *meta.ProcessedItems,
+	opts ProcessorOptions,
+	item meta.ObjectReferenceStatus,
+	obj *unstructured.Unstructured,
+	itemErrors *int,
+) bool {
+	if !opts.Prune {
+		return false
+	}
+
+	log.V(4).Info("pruning resources", "Kind", item.Kind, "Name", item.Name, "Namespace", item.Namespace)
+
+	fieldOwner := opts.FieldOwnerPrefix + "/" + item.FieldOwner("")
+
+	deleted, err := p.Prune(ctx, c, obj, fieldOwner, &item)
+	if failAndRecord(processed, itemErrors, item, "pruning failed for item: ", err) {
+		return true
+	}
+
+	if deleted {
+		processed.RemoveItem(item)
+
+		return true
+	}
+
+	return false
+}
+
+func (p *Processor) disownProcessedItem(
+	ctx context.Context,
+	c client.Client,
+	processed *meta.ProcessedItems,
+	opts ProcessorOptions,
+	item meta.ObjectReferenceStatus,
+	obj *unstructured.Unstructured,
+	itemErrors *int,
+) {
+	patches, err := p.handleRemoveManagedMetadata(ctx, c, obj, opts.Owner)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			processed.RemoveItem(item)
+
+			return
+		}
+
+		if failAndRecord(processed, itemErrors, item, "disowning failed for item: ", err) {
+			return
+		}
+	}
+
+	//nolint:nestif
+	if len(patches) > 0 {
+		err = clt.ApplyPatches(ctx, c, obj, patches, meta.ResourceControllerFieldOwnerPrefix())
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				processed.RemoveItem(item)
+
+				return
+			}
+
+			if failAndRecord(processed, itemErrors, item, "removing metdata failed for item: ", err) {
+				return
+			}
+		}
+	}
+
+	processed.RemoveItem(item)
+}
+
+func (p *Processor) applyAccumulatedItems(
+	ctx context.Context,
+	log logr.Logger,
+	c client.Client,
+	processed *meta.ProcessedItems,
+	acc Accumulator,
+	opts ProcessorOptions,
+) int {
+	itemErrors := 0
+	terminatingNamespaces := map[string]bool{}
+
+	for _, item := range acc {
+		if p.applyAccumulatedItem(ctx, log, c, processed, item, opts, terminatingNamespaces) {
+			itemErrors++
+		}
+	}
+
+	return itemErrors
+}
+
+func (p *Processor) applyAccumulatedItem(
+	ctx context.Context,
+	log logr.Logger,
+	c client.Client,
+	processed *meta.ProcessedItems,
+	item *AccumulatorItem,
+	opts ProcessorOptions,
+	terminatingNamespaces map[string]bool,
+) bool {
+	or := meta.ObjectReferenceStatus{
+		ResourceID: item.Resource,
+		ObjectReferenceStatusCondition: meta.ObjectReferenceStatusCondition{
+			Type: meta.ReadyCondition,
+		},
+	}
+
+	clusterScoped, err := p.isClusterScoped(item.Resource.GetGVK())
+	if err != nil {
+		or.Status = metav1.ConditionFalse
+		or.Message = "resolving resource scope failed: " + err.Error()
+		processed.UpdateItem(or)
+
+		return true
+	}
+
+	or.ClusterScoped = clusterScoped
+
+	hadError := false
+
+	for _, obj := range *item.Objects {
+		if p.applyAccumulatorObject(ctx, log, c, processed, item, obj, opts, terminatingNamespaces, &or) {
+			hadError = true
+		}
+	}
+
+	return hadError
+}
+
+func (p *Processor) applyAccumulatorObject(
+	ctx context.Context,
+	log logr.Logger,
+	c client.Client,
+	processed *meta.ProcessedItems,
+	item *AccumulatorItem,
+	obj AccumulatorObject,
+	opts ProcessorOptions,
+	terminatingNamespaces map[string]bool,
+	or *meta.ObjectReferenceStatus,
+) bool {
+	fieldOwner := opts.FieldOwnerPrefix + "/" + item.Resource.FieldOwner("")
+
+	terminating, namespace, err := p.isNamespaceTerminatingForObject(ctx, obj.Object, terminatingNamespaces)
+	if err != nil {
+		or.Status = metav1.ConditionFalse
+		or.Message = "checking namespace termination failed for item " + obj.Origin.Origin + ": " + err.Error()
+
+		processed.UpdateItem(*or)
+
+		return true
+	}
+
+	if terminating {
+		log.V(4).Info(
+			"skipping apply because namespace is terminating",
+			"item", obj.Origin.Origin,
+			"namespace", namespace,
+			"Kind", obj.Object.GetKind(),
+			"Name", obj.Object.GetName(),
+		)
+
+		processed.RemoveItem(*or)
+
+		return false
+	}
+
+	ver, created, err := p.Apply(
+		ctx,
+		c,
+		obj.Object,
+		fieldOwner,
+		opts.Force,
+		opts.Adopt,
+		opts.Owner,
+		processed.GetItem(item.Resource),
+	)
+
+	or.Created = created
+
+	if err != nil {
+		or.Status = metav1.ConditionFalse
+		or.Message = "apply failed for item " + obj.Origin.Origin + ": " + err.Error()
+
+		log.V(4).Info("failed to apply item", "item", obj.Origin.Origin)
+	} else {
+		if ver != nil {
+			or.LastApply = *ver
+		}
+
+		or.Status = metav1.ConditionTrue
+
+		log.V(4).Info("successfully applied item", "item", obj.Origin.Origin, "version", ver)
+	}
+
+	processed.UpdateItem(*or)
+
+	return err != nil
+}
+
+func (p *Processor) objectForProcessedItem(item meta.ObjectReferenceStatus) (*unstructured.Unstructured, error) {
+	obj := &unstructured.Unstructured{}
+	obj.SetGroupVersionKind(item.GetGVK())
+	obj.SetName(item.GetName())
+
+	clusterScoped := item.ClusterScoped
+	if !clusterScoped {
+		var err error
+
+		clusterScoped, err = p.isClusterScoped(item.GetGVK())
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	ns := item.GetNamespace()
+	if ns != "" && !clusterScoped {
+		obj.SetNamespace(ns)
+	}
+
+	return obj, nil
+}
+
+func failAndRecord(
+	processed *meta.ProcessedItems,
+	itemErrors *int,
+	item meta.ObjectReferenceStatus,
+	msg string,
+	err error,
+) bool {
+	if err == nil {
+		return false
+	}
+
+	(*itemErrors)++
+	item.Status = metav1.ConditionFalse
+	item.Message = msg + err.Error()
+	processed.UpdateItem(item)
+
+	return true
 }
 
 // Prune by reverting the patch by the given fieldOwner
@@ -280,6 +397,15 @@ func (r *Processor) Prune(
 	}
 
 	return false, err
+}
+
+func (r *Processor) isClusterScoped(gvk schema.GroupVersionKind) (bool, error) {
+	mapping, err := r.Mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err != nil {
+		return false, err
+	}
+
+	return mapping.Scope.Name() == k8smeta.RESTScopeNameRoot, nil
 }
 
 // Completely prune the resource when there's no more managers and the resource was created by the controller.

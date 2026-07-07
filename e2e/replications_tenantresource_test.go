@@ -21,6 +21,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 	apimeta "github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
+	capruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 	"github.com/projectcapsule/capsule/pkg/template"
 )
@@ -134,6 +135,125 @@ var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace
 		})
 	})
 
+	Context("cluster-scoped object protection", func() {
+		It("rejects cluster-scoped rawItems", func() {
+			clusterRoleName := "tr-raw-cluster-scoped"
+			defer func() {
+				ignoreNotFound(k8sClient.Delete(ctx, &rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: clusterRoleName}}))
+			}()
+
+			tr := &capsulev1beta2.TenantResource{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "rawitems-cluster-scoped",
+					Namespace: baseNamespace,
+				},
+				Spec: capsulev1beta2.TenantResourceSpec{
+					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
+						PruningOnDelete: ptr.To(true),
+						ResyncPeriod:    resyncPeriod,
+						Resources: []capsulev1beta2.ResourceSpec{{
+							RawItems: []capsulev1beta2.RawExtension{{
+								RawExtension: runtime.RawExtension{
+									Object: &rbacv1.ClusterRole{
+										TypeMeta: metav1.TypeMeta{
+											APIVersion: rbacv1.SchemeGroupVersion.String(),
+											Kind:       "ClusterRole",
+										},
+										ObjectMeta: metav1.ObjectMeta{
+											Name: clusterRoleName,
+										},
+										Rules: []rbacv1.PolicyRule{{
+											APIGroups: []string{""},
+											Resources: []string{"configmaps"},
+											Verbs:     []string{"get"},
+										}},
+									},
+								},
+							}},
+						}},
+					},
+				},
+			}
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
+			expectTenantResourceFailed(baseNamespace, tr.Name, "cluster-scoped kind rbac.authorization.k8s.io/v1/ClusterRole is not allowed")
+			expectClusterRoleAbsent(clusterRoleName)
+		})
+
+		It("rejects cluster-scoped generator output", func() {
+			clusterRoleName := "tr-generator-cluster-scoped"
+			defer func() {
+				ignoreNotFound(k8sClient.Delete(ctx, &rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: clusterRoleName}}))
+			}()
+
+			tr := newGeneratorConfigMapTenantResource(baseNamespace, "generator-cluster-scoped", fmt.Sprintf(`---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: %s
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get"]
+`, clusterRoleName))
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
+			expectTenantResourceFailed(baseNamespace, tr.Name, "cluster-scoped kind rbac.authorization.k8s.io/v1/ClusterRole is not allowed")
+			expectClusterRoleAbsent(clusterRoleName)
+		})
+
+		It("rejects cluster-scoped namespacedItems", func() {
+			clusterRoleName := "tr-source-cluster-scoped"
+			source := &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: clusterRoleName,
+					Labels: map[string]string{
+						"replicate": "cluster-scoped",
+					},
+				},
+				Rules: []rbacv1.PolicyRule{{
+					APIGroups: []string{""},
+					Resources: []string{"configmaps"},
+					Verbs:     []string{"get"},
+				}},
+			}
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, source) }).Should(Succeed())
+			defer func() {
+				ignoreNotFound(k8sClient.Delete(ctx, source))
+			}()
+
+			tr := &capsulev1beta2.TenantResource{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "namespaceditems-cluster-scoped",
+					Namespace: baseNamespace,
+				},
+				Spec: capsulev1beta2.TenantResourceSpec{
+					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
+						PruningOnDelete: ptr.To(true),
+						ResyncPeriod:    resyncPeriod,
+						Resources: []capsulev1beta2.ResourceSpec{{
+							NamespacedItems: []template.ResourceReference{{
+								VersionKind: capruntime.VersionKind{
+									APIVersion: rbacv1.SchemeGroupVersion.String(),
+									Kind:       "ClusterRole",
+								},
+								Selector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"replicate": "cluster-scoped",
+									},
+								},
+							}},
+						}},
+					},
+				},
+			}
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
+			expectTenantResourceFailed(baseNamespace, tr.Name, "cluster-scoped kind rbac.authorization.k8s.io/v1/ClusterRole is not allowed")
+		})
+	})
+
 	It("skips applying resources to terminating namespaces and removes them from processedItems", func() {
 		terminatingNamespace := targetNamespaces[2]
 		releaseNamespace := holdNamespaceTerminating(ctx, terminatingNamespace)
@@ -238,7 +358,7 @@ var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace
 								Resources: []*template.TemplateResourceReference{{
 									Index: "secrets",
 									ResourceReference: template.ResourceReference{
-										VersionKind: gvk.VersionKind{
+										VersionKind: capruntime.VersionKind{
 											APIVersion: "v1",
 											Kind:       "Secret",
 										},
@@ -371,7 +491,7 @@ data:
 								Resources: []*template.TemplateResourceReference{{
 									Index: "secrets",
 									ResourceReference: template.ResourceReference{
-										VersionKind: gvk.VersionKind{
+										VersionKind: capruntime.VersionKind{
 											APIVersion: "v1",
 											Kind:       "Secret",
 										},
@@ -423,7 +543,7 @@ data:
 								Resources: []*template.TemplateResourceReference{{
 									Index: "secrets",
 									ResourceReference: template.ResourceReference{
-										VersionKind: gvk.VersionKind{
+										VersionKind: capruntime.VersionKind{
 											APIVersion: "v1",
 											Kind:       "Secret",
 										},
@@ -488,7 +608,7 @@ data:
 								Resources: []*template.TemplateResourceReference{{
 									Index: "secrets",
 									ResourceReference: template.ResourceReference{
-										VersionKind: gvk.VersionKind{
+										VersionKind: capruntime.VersionKind{
 											APIVersion: "v1",
 											Kind:       "Secret",
 										},
@@ -554,7 +674,7 @@ data:
 								Resources: []*template.TemplateResourceReference{{
 									Index: "secrets",
 									ResourceReference: template.ResourceReference{
-										VersionKind: gvk.VersionKind{
+										VersionKind: capruntime.VersionKind{
 											APIVersion: "v1",
 											Kind:       "Secret",
 										},
@@ -630,7 +750,7 @@ data:
 						ResyncPeriod:    resyncPeriod,
 						Resources: []capsulev1beta2.ResourceSpec{{
 							NamespacedItems: []template.ResourceReference{{
-								VersionKind: gvk.VersionKind{
+								VersionKind: capruntime.VersionKind{
 									APIVersion: "v1",
 									Kind:       "Secret",
 								},
@@ -804,7 +924,7 @@ data:
 						ResyncPeriod:    resyncPeriod,
 						Resources: []capsulev1beta2.ResourceSpec{{
 							NamespacedItems: []template.ResourceReference{{
-								VersionKind: gvk.VersionKind{
+								VersionKind: capruntime.VersionKind{
 									APIVersion: "v1",
 									Kind:       "Secret",
 								},
@@ -1258,7 +1378,7 @@ data:
 								Resources: []*template.TemplateResourceReference{{
 									Index: "secrets",
 									ResourceReference: template.ResourceReference{
-										VersionKind: gvk.VersionKind{
+										VersionKind: capruntime.VersionKind{
 											APIVersion: "v1",
 											Kind:       "Secret",
 										},
@@ -1295,6 +1415,79 @@ data:
 			for _, ns := range targetNamespaces {
 				expectConfigMapAbsent(ns, "blocked-context")
 			}
+		})
+
+		It("only allows the managing TenantResource service account to update created objects", func() {
+			saName := "tr-update-guard"
+			targetNamespace := targetNamespaces[0]
+			configMapName := "tr-admission-protected"
+
+			ensureServiceAccount(baseNamespace, saName)
+			for _, ns := range append(targetNamespaces, baseNamespace) {
+				bindServiceAccountToConfigMapWriter(baseNamespace, saName, ns)
+			}
+
+			tr := newRawConfigMapTenantResource(baseNamespace, "sa-update-guard", map[string]string{
+				"mode": "managed",
+			})
+			tr.Spec.ServiceAccount = &apimeta.LocalRFC1123ObjectReference{
+				Name: apimeta.RFC1123Name(saName),
+			}
+			renameFirstTenantResourceRawConfigMap(tr, configMapName)
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
+			expectTenantResourceReady(baseNamespace, tr.Name)
+			expectConfigMapData(targetNamespace, configMapName, map[string]string{"mode": "managed"})
+			expectManagedLabelsOnConfigMap(targetNamespace, configMapName, true)
+			expectProcessedItemStatus(
+				baseNamespace,
+				tr.Name,
+				configMapRID(tnt.Name, targetNamespace, configMapName, "0/raw-0"),
+				metav1.ConditionTrue,
+				true,
+				"",
+			)
+
+			tenantOwnerClient := impersonationClient(tenantOwner.Name, withDefaultGroups([]string{tenantOwner.Name}))
+			Eventually(func() error {
+				cm := &corev1.ConfigMap{}
+				if err := tenantOwnerClient.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: targetNamespace}, cm); err != nil {
+					return err
+				}
+
+				cm.Data["mode"] = "tenant-owner"
+
+				err := tenantOwnerClient.Update(ctx, cm)
+				if err == nil {
+					return fmt.Errorf("expected tenant owner update to be denied")
+				}
+				if apierrors.IsConflict(err) {
+					return err
+				}
+				if !apierrors.IsForbidden(err) {
+					return fmt.Errorf("expected forbidden error, got: %w", err)
+				}
+				if !strings.Contains(err.Error(), "managed by a tenant capsule replication") {
+					return fmt.Errorf("expected tenant replication admission denial, got: %w", err)
+				}
+
+				return nil
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+			replicationClient := impersonationClient(
+				serviceAccountUsername(baseNamespace, saName),
+				serviceAccountGroups(baseNamespace),
+			)
+			Eventually(func() error {
+				cm := &corev1.ConfigMap{}
+				if err := replicationClient.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: targetNamespace}, cm); err != nil {
+					return err
+				}
+
+				cm.Data["mode"] = "service-account"
+
+				return replicationClient.Update(ctx, cm)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 
 		It("fails to prune replicated resources when the impersonated service account cannot delete them", func() {
@@ -1392,7 +1585,7 @@ data:
 						PruningOnDelete: ptr.To(true),
 						Resources: []capsulev1beta2.ResourceSpec{{
 							NamespacedItems: []template.ResourceReference{{
-								VersionKind: gvk.VersionKind{
+								VersionKind: capruntime.VersionKind{
 									APIVersion: "v1",
 									Kind:       "Secret",
 								},
@@ -1838,6 +2031,12 @@ func expectSecretAbsent(namespace, name string) {
 	}, 5*time.Second, defaultPollInterval).Should(HaveOccurred())
 }
 
+func expectClusterRoleAbsent(name string) {
+	Consistently(func() error {
+		return k8sClient.Get(context.Background(), types.NamespacedName{Name: name}, &rbacv1.ClusterRole{})
+	}, 5*time.Second, defaultPollInterval).Should(HaveOccurred())
+}
+
 func renameFirstTenantResourceRawConfigMap(tr *capsulev1beta2.TenantResource, name string) {
 	tr.Spec.Resources[0].RawItems[0] = capsulev1beta2.RawExtension{
 		RawExtension: runtime.RawExtension{
@@ -1982,4 +2181,16 @@ func ensureServiceAccount(namespace, name string) {
 		}
 		return err
 	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func serviceAccountUsername(namespace, name string) string {
+	return fmt.Sprintf("system:serviceaccount:%s:%s", namespace, name)
+}
+
+func serviceAccountGroups(namespace string) []string {
+	return []string{
+		"system:authenticated",
+		"system:serviceaccounts",
+		fmt.Sprintf("system:serviceaccounts:%s", namespace),
+	}
 }

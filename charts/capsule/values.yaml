@@ -34,11 +34,15 @@ global:
       restartPolicy: Never
       # -- Sets the ttl in seconds after a finished certgen job is deleted. Set to -1 to never delete.
       ttlSecondsAfterFinished: 60
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- Security context for the job pods.
       podSecurityContext:
         enabled: true
         seccompProfile:
           type: "RuntimeDefault"
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- Security context for the job containers.
       securityContext:
         enabled: true
@@ -126,6 +130,8 @@ manager:
     # -- Declare ApiVersion used for Flow
     flowApiVersion: "flowcontrol.apiserver.k8s.io/v1"
 
+    # @schema type: object
+    # @schema additionalProperties: true
     # -- Priority level configuration.
     # The block is directly forwarded into the priorityLevelConfiguration, so you can use whatever specification you want.
     # ref: https://kubernetes.io/docs/concepts/cluster-administration/flow-control/#prioritylevelconfiguration
@@ -133,11 +139,13 @@ manager:
     priorityLevelConfigurationSpec:
       type: Limited
       limited:
-        nominalConcurrencyShares: 10
+        nominalConcurrencyShares: 100
         limitResponse:
-          queuing:
-            queueLengthLimit: 50
           type: Queue
+          queuing:
+            queues: 64
+            handSize: 6
+            queueLengthLimit: 100
 
   # Manager RBAC
   rbac:
@@ -230,6 +238,8 @@ manager:
     clientConnectionQPS: 20.0
     # -- Burst to use for interacting with kubernetes apiserver
     clientConnectionBurst: 30
+    # -- Timeout used when waiting for controller cache synchronization. Empty uses controller-runtime's default.
+    cacheSyncTimeout: "4m"
     # -- Define entities which are considered part of the Capsule construct.
     # Users not mentioned here will be ignored by Capsule
     users:
@@ -300,12 +310,16 @@ manager:
   # -- Additional Environment Variables
   env: []
 
+  # @schema type: object
+  # @schema additionalProperties: true
   # -- Configure the liveness probe using Deployment probe spec
   livenessProbe:
     httpGet:
       path: /healthz
       port: 10080
 
+  # @schema type: object
+  # @schema additionalProperties: true
   # -- Configure the readiness probe using Deployment probe spec
   readinessProbe:
     httpGet:
@@ -339,6 +353,8 @@ podAnnotations: {}
 # -- Set the priority class name of the Capsule pod
 priorityClassName: '' # system-cluster-critical
 
+# @schema type: object
+# @schema additionalProperties: true
 # -- Set the securityContext for the Capsule pod
 podSecurityContext:
   enabled: true
@@ -348,6 +364,8 @@ podSecurityContext:
   runAsNonRoot: true
   runAsUser: 1002
 
+# @schema type: object
+# @schema additionalProperties: true
 # -- Set the securityContext for the Capsule container
 securityContext:
   enabled: true
@@ -488,6 +506,267 @@ monitoring:
       # -- Set relabelings for the endpoint of the serviceMonitor
       relabelings: []
 
+  # PrometheusRules
+  prometheusRules:
+    # -- Enable PrometheusRules
+    enabled: false
+    # -- Install the PrometheusRules into a different Namespace, as the monitoring stack one (default: the release one)
+    namespace: ''
+    # -- Assign additional labels according to Prometheus selector matching labels
+    labels: {}
+    # -- Assign additional Annotations
+    annotations: {}
+    # -- Labels add to all Rules
+    ruleLabels: {}
+    # -- Annotations add to all Rules
+    ruleAnnotations: {}
+    # -- Prometheus Rules definitions. The block is directly forwarded into the PrometheusRule, so you can use whatever specification you want.
+    # @default -- See [values.yaml](values.yaml)
+    rules: # @schema itemProperties:{}
+      - name: capsule.customquotas
+        rules:
+          - alert: CapsuleGlobalCustomQuotaNotReady
+            expr: |
+              capsule_global_custom_quota_condition{condition="Ready"} != 1
+            for: 10m
+            labels:
+              severity: warning
+              app: capsule
+              component: customquotas
+            annotations:
+              summary: Capsule GlobalCustomQuota {{ $labels.custom_quota }} is not ready
+              description: "GlobalCustomQuota {{ $labels.custom_quota }} is not in Ready state for the last 10 minutes."
+          - alert: CapsuleGlobalCustomQuotaHighUsageWarning
+            expr: |
+              capsule_global_custom_quota_resource_usage_percentage > 90
+            for: 10m
+            labels:
+              severity: warning
+              app: capsule
+              component: customquotas
+            annotations:
+              summary: "High resource usage in GlobalCustomQuota {{ $labels.custom_quota }}"
+              description: "Usage for GlobalCustomQuota {{ $labels.custom_quota }} is at {{ $value }}% usage for the last 10 minutes."
+          - alert: CapsuleGlobalCustomQuotaHighUsageCritical
+            expr: |
+              capsule_global_custom_quota_resource_usage_percentage > 95
+            for: 10m
+            labels:
+              severity: critical
+              app: capsule
+              component: customquotas
+            annotations:
+              summary: "Critical resource usage in GlobalCustomQuota {{ $labels.custom_quota }}"
+              description: "Usage for GlobalCustomQuota {{ $labels.custom_quota }} has exceeded 95% usage for the last 10 minutes."
+          - alert: CapsuleCustomQuotaNotReady
+            expr: |
+              capsule_custom_quota_condition{condition="Ready"} != 1
+            for: 10m
+            labels:
+              severity: warning
+              app: capsule
+              component: customquotas
+            annotations:
+              summary: "Capsule CustomQuota {{ $labels.target_namespace }}/{{ $labels.custom_quota }} is not ready"
+              description: "CustomQuota {{ $labels.target_namespace }}/{{ $labels.custom_quota }} is not in Ready state for the last 10 minutes."
+          - alert: CapsuleCustomQuotaHighUsageWarning
+            expr: |
+              capsule_custom_quota_resource_usage_percentage > 90
+            for: 10m
+            labels:
+              severity: warning
+              app: capsule
+              component: customquotas
+            annotations:
+              summary: "High resource usage in CustomQuota {{ $labels.target_namespace }}/{{ $labels.custom_quota }}"
+              description: "Usage for CustomQuota {{ $labels.target_namespace }}/{{ $labels.custom_quota }} is at {{ $value }}% usage for the last 10 minutes."
+          - alert: CapsuleCustomQuotaHighUsageCritical
+            expr: |
+              capsule_custom_quota_resource_usage_percentage > 95
+            for: 10m
+            labels:
+              severity: critical
+              app: capsule
+              component: customquotas
+            annotations:
+              summary: "Critical resource usage in CustomQuota {{ $labels.target_namespace }}/{{ $labels.custom_quota }}"
+              description: "Usage for CustomQuota {{ $labels.target_namespace }}/{{ $labels.custom_quota }} has exceeded 95% usage for the last 10 minutes."
+
+      - name: capsule.resourcepools
+        rules:
+          - alert: CapsuleResourcePoolNotReady
+            expr: |
+              capsule_pool_condition{condition="Ready"} != 1
+            for: 10m
+            labels:
+              severity: warning
+              app: capsule
+              component: resourcepools
+            annotations:
+              summary: "Capsule ResourcePool {{ $labels.pool }} is not ready"
+              description: "ResourcePool {{ $labels.pool }} is not in Ready state for the last 10 minutes."
+          - alert: CapsuleResourcePoolClaimNotReady
+            expr: |
+              capsule_claim_condition{condition="Ready"} != 1
+            for: 10m
+            labels:
+              severity: warning
+              app: capsule
+              component: resourcepools
+            annotations:
+              summary: "Capsule ResourcePoolClaim {{ $labels.target_namespace }}/{{ $labels.name }} is not ready"
+              description: "ResourcePoolClaim {{ $labels.target_namespace }}/{{ $labels.name }} is not in Ready state for the last 10 minutes."
+          - alert: CapsulePoolHighUsageWarning
+            expr: |
+              capsule_pool_usage_percentage > 90
+            for: 10m
+            labels:
+              severity: warning
+              app: capsule
+              component: resourcepools
+            annotations:
+              summary: "High resource usage in Resourcepool {{ $labels.pool }}"
+              description: "Resource {{ $labels.resource }} in pool {{ $labels.pool }} is at {{ $value }}% usage for the last 10 minutes."
+          - alert: CapsulePoolHighUsageCritical
+            expr: |
+              capsule_pool_usage_percentage > 95
+            for: 10m
+            labels:
+              severity: critical
+              app: capsule
+              component: resourcepools
+            annotations:
+              summary: "Critical resource usage in Resourcepool {{ $labels.pool }}"
+              description: "Resource {{ $labels.resource }} in pool {{ $labels.pool }} has exceeded 95% usage for the last 10 minutes."
+
+      - name: capsule.replications
+        rules:
+          - alert: CapsuleGlobalTenantResourceNotReady
+            expr: |
+              capsule_global_resource_condition{condition="Ready"} != 1
+            for: 10m
+            labels:
+              severity: warning
+              app: capsule
+              component: replications
+            annotations:
+              summary: Capsule GlobalTenantResource {{ $labels.name }} is not ready
+              description: "GlobalTenantResource {{ $labels.name }} is not in Ready state for the last 10 minutes."
+          - alert: CapsuleTenantResourceNotReady
+            expr: |
+              capsule_resource_condition{condition="Ready"} != 1
+            for: 10m
+            labels:
+              severity: warning
+              app: capsule
+              component: replications
+            annotations:
+              summary: Capsule TenantResource {{ $labels.target_namespace }}/{{ $labels.name }} is not ready
+              description: "TenantResource {{ $labels.target_namespace }}/{{ $labels.name }} is not in Ready state for the last 10 minutes."
+
+      - name: capsule.tenants
+        rules:
+          - alert: CapsuleTenantNamespaceQuotaExceeded
+            expr: |
+              capsule_tenant_namespaces_current >= capsule_tenant_namespaces_max
+            for: "5m"
+            labels:
+              severity: warning
+              app: capsule
+              component: tenants
+            annotations:
+              summary: "Capsule Tenant {{ $labels.tenant }} has reached namespace quota"
+              description: "Tenant {{ $labels.tenant }} has {{ $value }} namespaces and has reached or exceeded its maximum quota of {{ $labels.max_namespaces }}."
+          - alert: CapsuleTenantNotReady
+            expr: |
+              capsule_tenant_condition{condition="Ready"} != 1
+            for: "5m"
+            labels:
+              severity: critical
+              app: capsule
+              component: tenants
+            annotations:
+              summary: "Capsule Tenant {{ $labels.tenant }} is missing or not active"
+              description: "Tenant {{ $labels.tenant }} is either missing or not in Active state. This may prevent users from accessing their namespaces."
+          - alert: CapsuleTenantNamespaceNotReady
+            expr: |
+              capsule_tenant_namespace_condition{condition="Ready"} != 1
+            for: "5m"
+            labels:
+              severity: critical
+              app: capsule
+              component: tenants
+            annotations:
+              summary: "Namespace {{ $labels.target_namespace }} from Tenant {{ $labels.tenant }} is not Ready."
+              description: "Namespace {{ $labels.target_namespace }} from Tenant {{ $labels.tenant }} is not Ready state for the last 10 minutes."
+
+      - name: capsule.rulestatus
+        rules:
+          - alert: CapsuleRuleStatusNotReady
+            expr: |
+              capsule_rulestatus_condition{condition="Ready"} != 1
+            for: 10m
+            labels:
+              severity: warning
+              app: capsule
+              component: rulestatus
+            annotations:
+              summary: Capsule RuleStatus {{ $labels.target_namespace }}/{{ $labels.name }} is not ready
+              description: "RuleStatus {{ $labels.target_namespace }}/{{ $labels.name }} is not in Ready state for the last 10 minutes."
+
+      - name: capsule.tenantowners
+        rules:
+          - alert: CapsuleTenantOwnerNotReady
+            expr: |
+              capsule_tenantowner_condition{condition="Ready"} != 1
+            for: 10m
+            labels:
+              severity: warning
+              app: capsule
+              component: tenantowners
+            annotations:
+              summary: Capsule TenantOwner {{ $labels.name }} is not ready
+              description: "TenantOwner {{ $labels.name }} is not in Ready state for the last 10 minutes."
+
+      - name: capsule.config
+        rules:
+          - alert: CapsuleConfigurationNotReady
+            expr: |
+              capsule_config_condition{condition="Ready"} != 1
+            for: 10m
+            labels:
+              severity: warning
+              app: capsule
+              component: config
+            annotations:
+              summary: "CapsuleConfiguration {{ $labels.name }} is not ready"
+              description: "CapsuleConfiguration {{ $labels.name }} is not in Ready state for the last 10 minutes."
+
+      - name: capsule.controller
+        rules:
+          # Alert when Capsule controller is down
+          - alert: CapsuleControllerDown
+            expr: |
+              up{job="capsule-controller-manager"} == 0
+            for: "5m"
+            labels:
+              severity: critical
+              app: capsule
+              component: controller
+            annotations:
+              summary: "Capsule controller is down"
+              description: "The Capsule controller manager has been down for more than 5 minutes. Tenant operations may be impacted."
+          - alert: CapsuleWebhookHighErrorRate
+            expr: |
+              rate(capsule_webhook_requests_total{status=~"5.."}[5m]) / rate(capsule_webhook_requests_total[5m]) > 0.05
+            for: "5m"
+            labels:
+              severity: warning
+              app: capsule
+              component: controller
+            annotations:
+              summary: "Capsule webhook experiencing high error rate"
+              description: "Capsule webhook has an error rate of {{ $value | humanizePercentage }} over the last 5 minutes. This may block tenant operations."
 
 # Conversions Webhook configurations
 conversions:
@@ -535,7 +814,6 @@ webhooks:
 
   # Admission Webhook Configuration
   hooks:
-
     customquotas:
       # -- Enable the Hook
       enabled: true
@@ -543,8 +821,12 @@ webhooks:
       failurePolicy: Fail
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Equivalent
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector: {}
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
       namespaceSelector: {}
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
@@ -569,8 +851,12 @@ webhooks:
       failurePolicy: Fail
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Equivalent
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector: {}
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
       namespaceSelector: {}
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
@@ -597,8 +883,12 @@ webhooks:
       failurePolicy: Fail
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Equivalent
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector: {}
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
       namespaceSelector: {}
       #  matchExpressions:
@@ -617,8 +907,12 @@ webhooks:
       failurePolicy: Fail
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Equivalent
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector: {}
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
       namespaceSelector: {}
       #  matchExpressions:
@@ -637,8 +931,12 @@ webhooks:
       failurePolicy: Ignore
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Equivalent
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector: {}
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
       namespaceSelector:
         matchExpressions:
@@ -665,6 +963,50 @@ webhooks:
         resources:
           - '*'
         scope: Namespaced
+
+    # -- Generic Rules API
+    generic:
+      # -- Enable the Hook
+      enabled: true
+      # -- Capsule Hook Options
+      opts: {}
+      # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
+      failurePolicy: Fail
+      # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
+      matchPolicy: Equivalent
+      # @schema type: object
+      # @schema additionalProperties: true
+      # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
+      objectSelector: {}
+      # @schema type: object
+      # @schema additionalProperties: true
+      # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
+      namespaceSelector:
+        matchExpressions:
+          - key: capsule.clastix.io/tenant
+            operator: Exists
+      # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
+      matchConditions:
+        - name: ignore-subresources
+          expression: '!has(request.subResource) || request.subResource == ""'
+        - name: ignore-events
+          expression: 'request.resource.resource != "events"'
+
+      # -- [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy)
+      reinvocationPolicy: Never
+      # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
+      rules:
+      - apiGroups:
+          - '*'
+        apiVersions:
+          - '*'
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - '*'
+        scope: Namespaced
+
 
     resourcepools:
       pools:
@@ -694,8 +1036,12 @@ webhooks:
         failurePolicy: Fail
         # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
         matchPolicy: Equivalent
+      # @schema type: object
+      # @schema additionalProperties: true
         # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
         objectSelector: {}
+      # @schema type: object
+      # @schema additionalProperties: true
         # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
         namespaceSelector: {}
         # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
@@ -713,8 +1059,12 @@ webhooks:
       failurePolicy: Fail
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Equivalent
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector: {}
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
       namespaceSelector:
         matchExpressions:
@@ -722,7 +1072,6 @@ webhooks:
             operator: Exists
           - key: projectcapsule.dev/custom-resources
             operator: Exists
-
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchConditions:
         - name: ignore-subresources
@@ -739,8 +1088,12 @@ webhooks:
       failurePolicy: Fail
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Equivalent
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector: {}
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
       namespaceSelector: {}
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
@@ -757,8 +1110,12 @@ webhooks:
       failurePolicy: Fail
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Equivalent
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector: {}
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
       namespaceSelector:
         matchExpressions:
@@ -797,8 +1154,12 @@ webhooks:
       failurePolicy: Fail
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Equivalent
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector: {}
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
       namespaceSelector:
         matchExpressions:
@@ -819,8 +1180,12 @@ webhooks:
       failurePolicy: Fail
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Equivalent
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector: {}
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
       namespaceSelector:
         matchExpressions:
@@ -841,8 +1206,12 @@ webhooks:
       failurePolicy: Fail
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Equivalent
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector: {}
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
       namespaceSelector:
         matchExpressions:
@@ -862,8 +1231,12 @@ webhooks:
       failurePolicy: Fail
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Exact
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector: {}
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
       namespaceSelector:
         matchExpressions:
@@ -883,8 +1256,12 @@ webhooks:
       failurePolicy: Fail
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Equivalent
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector: {}
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
       namespaceSelector:
         matchExpressions:
@@ -904,8 +1281,12 @@ webhooks:
       failurePolicy: Fail
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Exact
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector: {}
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
       namespaceSelector: {}
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
@@ -923,8 +1304,12 @@ webhooks:
       failurePolicy: Fail
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Exact
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector: {}
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
       namespaceSelector: {}
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
@@ -942,8 +1327,12 @@ webhooks:
       failurePolicy: Ignore
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Exact
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector: {}
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
       namespaceSelector: {}
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
@@ -960,6 +1349,8 @@ webhooks:
       failurePolicy: Ignore
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Equivalent
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector:
         matchExpressions:
@@ -967,11 +1358,10 @@ webhooks:
             operator: In
             values:
               - "controller"
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
-      namespaceSelector:
-        matchExpressions:
-          - key: "capsule.clastix.io/tenant"
-            operator: Exists
+      namespaceSelector: {}
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchConditions: []
       # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
@@ -997,6 +1387,8 @@ webhooks:
       failurePolicy: Fail
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Equivalent
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector:
         matchExpressions:
@@ -1004,11 +1396,10 @@ webhooks:
             operator: In
             values:
               - "replications"
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
-      namespaceSelector:
-        matchExpressions:
-          - key: "capsule.clastix.io/tenant"
-            operator: Exists
+      namespaceSelector: {}
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchConditions: []
       #  - name: "exclude-privileged-users"
@@ -1041,8 +1432,12 @@ webhooks:
       failurePolicy: Fail
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Exact
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector: {}
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
       namespaceSelector:
         matchExpressions:
@@ -1060,8 +1455,12 @@ webhooks:
       failurePolicy: Fail
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Exact
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector: {}
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
       namespaceSelector: {}
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
@@ -1076,8 +1475,12 @@ webhooks:
       failurePolicy: Fail
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Exact
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector: {}
+      # @schema type: object
+      # @schema additionalProperties: true
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
       namespaceSelector:
         matchExpressions:

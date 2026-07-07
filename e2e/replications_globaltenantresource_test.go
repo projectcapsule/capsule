@@ -6,6 +6,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -13,6 +14,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -25,7 +27,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	apimeta "github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
-	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
+	capruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/template"
 )
 
@@ -155,6 +157,22 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 		}, "30s", "5s").Should(Succeed())
 
 		Eventually(func() error {
+			clusterRoleList := &rbacv1.ClusterRoleList{}
+			labelSelector := client.MatchingLabels{"e2e.capsule.dev/test-suite": "true"}
+			if err := k8sClient.List(context.TODO(), clusterRoleList, labelSelector); err != nil {
+				return err
+			}
+
+			for _, clusterRole := range clusterRoleList.Items {
+				if err := k8sClient.Delete(context.TODO(), &clusterRole); err != nil {
+					return err
+				}
+			}
+
+			return nil
+		}, "30s", "5s").Should(Succeed())
+
+		Eventually(func() error {
 			cfg := &capsulev1beta2.CapsuleConfiguration{}
 			if err := k8sClient.Get(ctx, client.ObjectKey{Name: originConfig.Name}, cfg); err != nil {
 				return err
@@ -163,6 +181,171 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 			return k8sClient.Update(ctx, cfg)
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
+	})
+
+	Context("cluster-scoped objects", func() {
+		const (
+			controllerClusterResourceRoleName    = "gtr-controller-cluster-resource-writer"
+			controllerClusterResourceBindingName = "gtr-controller-cluster-resource-writer-binding"
+		)
+
+		BeforeEach(func() {
+			bindServiceAccountToClusterResources(
+				ControllerNamespace,
+				ControllerServiceAccount,
+				controllerClusterResourceRoleName,
+				controllerClusterResourceBindingName,
+				[]rbacv1.PolicyRule{
+					{
+						APIGroups: []string{rbacv1.GroupName},
+						Resources: []string{"clusterroles"},
+						Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
+					},
+					{
+						APIGroups: []string{""},
+						Resources: []string{"configmaps"},
+						Verbs:     []string{"get", "list"},
+					},
+					{
+						APIGroups: []string{""},
+						Resources: []string{"secrets"},
+						Verbs:     []string{"get"},
+					},
+				},
+			)
+		})
+
+		AfterEach(func() {
+			ignoreNotFound(k8sClient.Delete(ctx, &rbacv1.ClusterRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{Name: controllerClusterResourceBindingName},
+			}))
+			ignoreNotFound(k8sClient.Delete(ctx, &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{Name: controllerClusterResourceRoleName},
+			}))
+		})
+
+		It("applies raw cluster-scoped items", func() {
+			gtr := newRawClusterRoleGlobalTenantResource("gtr-cluster-raw", "gtr-cluster-raw-role")
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+
+			expectGlobalTenantResourceReady("gtr-cluster-raw")
+			expectClusterRoleRules("gtr-cluster-raw-role", []rbacv1.PolicyRule{{
+				APIGroups: []string{""},
+				Resources: []string{"configmaps"},
+				Verbs:     []string{"get", "list"},
+			}})
+			expectGlobalTenantResourceProcessedClusterRole("gtr-cluster-raw", "gtr-cluster-raw-role")
+		})
+
+		It("applies generated cluster-scoped items", func() {
+			gtr := newGeneratedClusterRoleGlobalTenantResource("gtr-cluster-generator", "gtr-cluster-generator-role")
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+
+			expectGlobalTenantResourceReady("gtr-cluster-generator")
+			expectClusterRoleRules("gtr-cluster-generator-role", []rbacv1.PolicyRule{{
+				APIGroups: []string{""},
+				Resources: []string{"secrets"},
+				Verbs:     []string{"get"},
+			}})
+			expectGlobalTenantResourceProcessedClusterRole("gtr-cluster-generator", "gtr-cluster-generator-role")
+		})
+
+		It("only allows the managing GlobalTenantResource service account to update created cluster-scoped objects", func() {
+			saName := "gtr-cluster-update-guard"
+			clusterRoleName := "gtr-cluster-admission-role"
+			writerRoleName := "gtr-cluster-admission-writer"
+			writerBindingName := "gtr-cluster-admission-writer-binding"
+
+			defer ignoreNotFound(k8sClient.Delete(ctx, &rbacv1.ClusterRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{Name: writerBindingName},
+			}))
+			defer ignoreNotFound(k8sClient.Delete(ctx, &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{Name: writerRoleName},
+			}))
+
+			ensureServiceAccount("capsule-system", saName)
+			bindServiceAccountToClusterResources(
+				"capsule-system",
+				saName,
+				writerRoleName,
+				writerBindingName,
+				[]rbacv1.PolicyRule{
+					{
+						APIGroups: []string{rbacv1.GroupName},
+						Resources: []string{"clusterroles"},
+						Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
+					},
+					{
+						APIGroups: []string{""},
+						Resources: []string{"configmaps"},
+						Verbs:     []string{"get", "list"},
+					},
+				},
+			)
+
+			gtr := newRawClusterRoleGlobalTenantResource("gtr-cluster-admission", clusterRoleName)
+			gtr.Spec.ServiceAccount = &apimeta.NamespacedRFC1123ObjectReferenceWithNamespace{
+				Name:      apimeta.RFC1123Name(saName),
+				Namespace: apimeta.RFC1123SubdomainName("capsule-system"),
+			}
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+			expectGlobalTenantResourceReady(gtr.Name)
+			expectClusterRoleRules(clusterRoleName, []rbacv1.PolicyRule{{
+				APIGroups: []string{""},
+				Resources: []string{"configmaps"},
+				Verbs:     []string{"get", "list"},
+			}})
+			expectGlobalTenantResourceProcessedClusterRole(gtr.Name, clusterRoleName)
+
+			Eventually(func() error {
+				clusterRole := &rbacv1.ClusterRole{}
+				if err := k8sClient.Get(ctx, types.NamespacedName{Name: clusterRoleName}, clusterRole); err != nil {
+					return err
+				}
+
+				if clusterRole.Annotations == nil {
+					clusterRole.Annotations = map[string]string{}
+				}
+				clusterRole.Annotations["e2e.capsule.dev/update-attempt"] = "admin"
+
+				err := k8sClient.Update(ctx, clusterRole)
+				if err == nil {
+					return fmt.Errorf("expected cluster role update to be denied")
+				}
+				if apierrors.IsConflict(err) {
+					return err
+				}
+				if !apierrors.IsForbidden(err) {
+					return fmt.Errorf("expected forbidden error, got: %w", err)
+				}
+				if !strings.Contains(err.Error(), "managed by a global capsule replication") {
+					return fmt.Errorf("expected global replication admission denial, got: %w", err)
+				}
+
+				return nil
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+			replicationClient := impersonationClient(
+				serviceAccountUsername("capsule-system", saName),
+				serviceAccountGroups("capsule-system"),
+			)
+			Eventually(func() error {
+				clusterRole := &rbacv1.ClusterRole{}
+				if err := replicationClient.Get(ctx, types.NamespacedName{Name: clusterRoleName}, clusterRole); err != nil {
+					return err
+				}
+
+				if clusterRole.Annotations == nil {
+					clusterRole.Annotations = map[string]string{}
+				}
+				clusterRole.Annotations["e2e.capsule.dev/updated-by"] = "manager"
+
+				return replicationClient.Update(ctx, clusterRole)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		})
 	})
 
 	It("skips applying resources to terminating namespaces and removes them from processedItems", func() {
@@ -270,7 +453,7 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 					PruningOnDelete: ptr.To(true),
 					Resources: []capsulev1beta2.ResourceSpec{{
 						NamespacedItems: []template.ResourceReference{{
-							VersionKind: gvk.VersionKind{
+							VersionKind: capruntime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Secret",
 							},
@@ -539,7 +722,7 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 								Resources: []*template.TemplateResourceReference{{
 									Index: "secrets",
 									ResourceReference: template.ResourceReference{
-										VersionKind: gvk.VersionKind{
+										VersionKind: capruntime.VersionKind{
 											APIVersion: "v1",
 											Kind:       "Secret",
 										},
@@ -626,7 +809,7 @@ data:
 						PruningOnDelete: ptr.To(true),
 						Resources: []capsulev1beta2.ResourceSpec{{
 							NamespacedItems: []template.ResourceReference{{
-								VersionKind: gvk.VersionKind{
+								VersionKind: capruntime.VersionKind{
 									APIVersion: "v1",
 									Kind:       "Secret",
 								},
@@ -649,6 +832,75 @@ data:
 			for _, ns := range tenantANamespaces {
 				expectSecretAbsent(ns, "source-secret")
 			}
+		})
+
+		It("only allows the managing GlobalTenantResource service account to update created objects", func() {
+			saName := "gtr-update-guard"
+			targetNamespace := tenantANamespaces[0]
+			configMapName := "gtr-admission-protected"
+
+			ensureServiceAccount("capsule-system", saName)
+			for _, ns := range tenantANamespaces {
+				bindServiceAccountToConfigMapWriter("capsule-system", saName, ns)
+			}
+
+			gtr := newRawConfigMapGlobalTenantResource("gtr-sa-update-guard", map[string]string{
+				"mode": "managed",
+			})
+			gtr.Spec.ServiceAccount = &apimeta.NamespacedRFC1123ObjectReferenceWithNamespace{
+				Name:      apimeta.RFC1123Name(saName),
+				Namespace: apimeta.RFC1123SubdomainName("capsule-system"),
+			}
+			gtr.Spec.TenantSelector = metav1.LabelSelector{
+				MatchLabels: map[string]string{"energy": "solar"},
+			}
+			renameFirstRawConfigMap(gtr, configMapName)
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+			expectGlobalTenantResourceReady(gtr.Name)
+			expectConfigMapData(targetNamespace, configMapName, map[string]string{"mode": "managed"})
+			expectManagedLabelsOnConfigMap(targetNamespace, configMapName, true)
+
+			tenantOwnerClient := impersonationClient(tenantAOwner.Name, withDefaultGroups([]string{tenantAOwner.Name}))
+			Eventually(func() error {
+				cm := &corev1.ConfigMap{}
+				if err := tenantOwnerClient.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: targetNamespace}, cm); err != nil {
+					return err
+				}
+
+				cm.Data["mode"] = "tenant-owner"
+
+				err := tenantOwnerClient.Update(ctx, cm)
+				if err == nil {
+					return fmt.Errorf("expected tenant owner update to be denied")
+				}
+				if apierrors.IsConflict(err) {
+					return err
+				}
+				if !apierrors.IsForbidden(err) {
+					return fmt.Errorf("expected forbidden error, got: %w", err)
+				}
+				if !strings.Contains(err.Error(), "managed by a global capsule replication") {
+					return fmt.Errorf("expected global replication admission denial, got: %w", err)
+				}
+
+				return nil
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+			replicationClient := impersonationClient(
+				serviceAccountUsername("capsule-system", saName),
+				serviceAccountGroups("capsule-system"),
+			)
+			Eventually(func() error {
+				cm := &corev1.ConfigMap{}
+				if err := replicationClient.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: targetNamespace}, cm); err != nil {
+					return err
+				}
+
+				cm.Data["mode"] = "service-account"
+
+				return replicationClient.Update(ctx, cm)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 
 		It("fails to prune replicated resources when the impersonated service account cannot delete them", func() {
@@ -1224,7 +1476,7 @@ data:
 								Resources: []*template.TemplateResourceReference{{
 									Index: "secrets",
 									ResourceReference: template.ResourceReference{
-										VersionKind: gvk.VersionKind{
+										VersionKind: capruntime.VersionKind{
 											APIVersion: "v1",
 											Kind:       "Secret",
 										},
@@ -1324,6 +1576,85 @@ func newRawConfigMapGlobalTenantResourceWithScope(name string, scope api.Resourc
 	return gtr
 }
 
+func newRawClusterRoleGlobalTenantResource(name, clusterRoleName string) *capsulev1beta2.GlobalTenantResource {
+	return &capsulev1beta2.GlobalTenantResource{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "true",
+			},
+		},
+		Spec: capsulev1beta2.GlobalTenantResourceSpec{
+			Scope: api.ResourceScopeNone,
+			TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
+				ResyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+				PruningOnDelete: ptr.To(true),
+				Resources: []capsulev1beta2.ResourceSpec{{
+					RawItems: []capsulev1beta2.RawExtension{{
+						RawExtension: runtime.RawExtension{
+							Object: &rbacv1.ClusterRole{
+								TypeMeta: metav1.TypeMeta{
+									APIVersion: "rbac.authorization.k8s.io/v1",
+									Kind:       "ClusterRole",
+								},
+								ObjectMeta: metav1.ObjectMeta{
+									Name: clusterRoleName,
+									Labels: map[string]string{
+										"e2e.capsule.dev/test-suite": "true",
+									},
+								},
+								Rules: []rbacv1.PolicyRule{{
+									APIGroups: []string{""},
+									Resources: []string{"configmaps"},
+									Verbs:     []string{"get", "list"},
+								}},
+							},
+						},
+					}},
+				}},
+			},
+		},
+	}
+}
+
+func newGeneratedClusterRoleGlobalTenantResource(name, clusterRoleName string) *capsulev1beta2.GlobalTenantResource {
+	return &capsulev1beta2.GlobalTenantResource{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "true",
+			},
+		},
+		Spec: capsulev1beta2.GlobalTenantResourceSpec{
+			Scope: api.ResourceScopeNone,
+			TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
+				ResyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+				PruningOnDelete: ptr.To(true),
+				Resources: []capsulev1beta2.ResourceSpec{{
+					Generators: []capsulev1beta2.TemplateItemSpec{{
+						MissingKey: "error",
+						Template: fmt.Sprintf(`---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: %s
+  labels:
+    e2e.capsule.dev/test-suite: "true"
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+`, clusterRoleName),
+					}},
+				}},
+			},
+		},
+	}
+}
+
 func expectGlobalTenantResourceReady(name string) {
 	Eventually(func(g Gomega) {
 		current := &capsulev1beta2.GlobalTenantResource{}
@@ -1344,5 +1675,112 @@ func expectGlobalTenantResourceFailed(name, msgContains string) {
 		g.Expect(rdy).ToNot(BeNil())
 		g.Expect(rdy.Status).To(Equal(metav1.ConditionFalse))
 		g.Expect(rdy.Message).To(ContainSubstring(msgContains))
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func expectClusterRoleRules(name string, expected []rbacv1.PolicyRule) {
+	Eventually(func(g Gomega) {
+		clusterRole := &rbacv1.ClusterRole{}
+		g.Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: name}, clusterRole)).To(Succeed())
+		g.Expect(clusterRole.Namespace).To(BeEmpty())
+		g.Expect(clusterRole.Labels).To(HaveKeyWithValue("e2e.capsule.dev/test-suite", "true"))
+		g.Expect(clusterRole.Labels).To(HaveKeyWithValue(managedByLabel, meta.ValueControllerReplications))
+		g.Expect(clusterRole.Labels).To(HaveKeyWithValue(createdByLabel, meta.ValueControllerReplications))
+		g.Expect(clusterRole.Rules).To(ConsistOf(expected))
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func expectGlobalTenantResourceProcessedClusterRole(gtrName, clusterRoleName string) {
+	Eventually(func(g Gomega) {
+		current := &capsulev1beta2.GlobalTenantResource{}
+		g.Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: gtrName}, current)).To(Succeed())
+		g.Expect(current.Status.ProcessedItems).To(ContainElement(SatisfyAll(
+			HaveField("Kind", "ClusterRole"),
+			HaveField("Name", clusterRoleName),
+			HaveField("Namespace", ""),
+			HaveField("Status", metav1.ConditionTrue),
+		)))
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func bindServiceAccountToClusterResource(
+	saNamespace, saName, clusterRoleName, clusterRoleBindingName string,
+	resources, verbs []string,
+) {
+	bindServiceAccountToClusterResources(
+		saNamespace,
+		saName,
+		clusterRoleName,
+		clusterRoleBindingName,
+		[]rbacv1.PolicyRule{{
+			APIGroups: []string{rbacv1.GroupName},
+			Resources: resources,
+			Verbs:     verbs,
+		}},
+	)
+}
+
+func bindServiceAccountToClusterResources(
+	saNamespace, saName, clusterRoleName, clusterRoleBindingName string,
+	rules []rbacv1.PolicyRule,
+) {
+	ctx := context.Background()
+
+	clusterRole := &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: clusterRoleName,
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "true",
+			},
+		},
+		Rules: rules,
+	}
+
+	clusterRoleBinding := &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: clusterRoleBindingName,
+		},
+		Subjects: []rbacv1.Subject{{
+			Kind:      "ServiceAccount",
+			Name:      saName,
+			Namespace: saNamespace,
+		}},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "ClusterRole",
+			Name:     clusterRoleName,
+		},
+	}
+
+	Eventually(func() error {
+		current := &rbacv1.ClusterRole{}
+		err := k8sClient.Get(ctx, types.NamespacedName{Name: clusterRoleName}, current)
+		if apierrors.IsNotFound(err) {
+			return k8sClient.Create(ctx, clusterRole)
+		}
+		if err != nil {
+			return err
+		}
+
+		current.Labels = clusterRole.Labels
+		current.Rules = clusterRole.Rules
+
+		return k8sClient.Update(ctx, current)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+	Eventually(func() error {
+		current := &rbacv1.ClusterRoleBinding{}
+		err := k8sClient.Get(ctx, types.NamespacedName{Name: clusterRoleBindingName}, current)
+		if apierrors.IsNotFound(err) {
+			return k8sClient.Create(ctx, clusterRoleBinding)
+		}
+		if err != nil {
+			return err
+		}
+
+		current.Subjects = clusterRoleBinding.Subjects
+		current.RoleRef = clusterRoleBinding.RoleRef
+
+		return k8sClient.Update(ctx, current)
 	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 }

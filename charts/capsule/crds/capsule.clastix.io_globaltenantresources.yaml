@@ -117,7 +117,18 @@ spec:
                           items:
                             properties:
                               apiVersion:
-                                description: API version of the referent.
+                                description: |-
+                                  API version, API group, or API group/version selector of the referent.
+
+                                  Empty APIVersion means the core Kubernetes API version "v1".
+                                  Use "*" to explicitly match all API groups and versions.
+
+                                  Examples:
+                                  - "" means core "v1".
+                                  - "v1" means core "v1".
+                                  - "apps" means any version in the "apps" API group.
+                                  - "apps/v1" means the "apps/v1" API group/version.
+                                  - "apps/*" means any version in the "apps" API group.
                                 type: string
                               index:
                                 description: Index to mount the resource in the template
@@ -126,7 +137,9 @@ spec:
                               kind:
                                 description: |-
                                   Kind of the referent.
-                                  More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+
+                                  Use "*" to match all kinds.
+                                minLength: 1
                                 type: string
                               name:
                                 description: |-
@@ -193,7 +206,6 @@ spec:
                                 type: object
                                 x-kubernetes-map-type: atomic
                             required:
-                            - apiVersion
                             - kind
                             type: object
                           type: array
@@ -272,12 +284,25 @@ spec:
                         description: Reference
                         properties:
                           apiVersion:
-                            description: API version of the referent.
+                            description: |-
+                              API version, API group, or API group/version selector of the referent.
+
+                              Empty APIVersion means the core Kubernetes API version "v1".
+                              Use "*" to explicitly match all API groups and versions.
+
+                              Examples:
+                              - "" means core "v1".
+                              - "v1" means core "v1".
+                              - "apps" means any version in the "apps" API group.
+                              - "apps/v1" means the "apps/v1" API group/version.
+                              - "apps/*" means any version in the "apps" API group.
                             type: string
                           kind:
                             description: |-
                               Kind of the referent.
-                              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+
+                              Use "*" to match all kinds.
+                            minLength: 1
                             type: string
                           name:
                             description: |-
@@ -343,7 +368,6 @@ spec:
                             type: object
                             x-kubernetes-map-type: atomic
                         required:
-                        - apiVersion
                         - kind
                         type: object
                       type: array
@@ -543,6 +567,10 @@ spec:
                       type: string
                     status:
                       properties:
+                        clusterScoped:
+                          description: Indicates whether the referenced resource is
+                            cluster-scoped.
+                          type: boolean
                         created:
                           description: Indicates wether the resource was created or
                             adopted

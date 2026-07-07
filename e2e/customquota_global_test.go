@@ -19,11 +19,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/ptr"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	capmeta "github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
+	"github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/quota"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
@@ -328,7 +329,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("500m"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -394,7 +395,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("10Gi"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -452,7 +453,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("10Gi"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -504,7 +505,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -666,7 +667,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("5"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -700,7 +701,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 				Limit: resource.MustParse("2"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -759,7 +760,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("500m"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -794,7 +795,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 				Limit: resource.MustParse("200m"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -851,7 +852,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -894,7 +895,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 				Limit: resource.MustParse("2"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -956,7 +957,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("500m"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -991,7 +992,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 				Limit: resource.MustParse("2Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -1042,7 +1043,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -1076,7 +1077,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 				Limit: resource.MustParse("3"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: gvk.VersionKind{
+						VersionKind: runtime.VersionKind{
 							APIVersion: "v1",
 							Kind:       "Pod",
 						},
@@ -1132,7 +1133,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("10Gi"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "PersistentVolumeClaim",
 							},
@@ -1183,7 +1184,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("10Gi"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -1193,7 +1194,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 							},
 						},
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "PersistentVolumeClaim",
 							},
@@ -1250,7 +1251,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("10Gi"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -1260,7 +1261,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 							},
 						},
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "PersistentVolumeClaim",
 							},
@@ -1317,7 +1318,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("10Gi"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -1327,7 +1328,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 							},
 						},
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "PersistentVolumeClaim",
 							},
@@ -1406,7 +1407,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("10Gi"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -1416,7 +1417,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 							},
 						},
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "PersistentVolumeClaim",
 							},
@@ -1477,7 +1478,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -1486,7 +1487,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 							},
 						},
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -1544,7 +1545,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -1553,7 +1554,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 							},
 						},
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -1613,7 +1614,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("2"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -1622,7 +1623,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 							},
 						},
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -1657,7 +1658,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("5"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -1666,7 +1667,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 							},
 						},
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -1741,7 +1742,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("1000"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -1797,7 +1798,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -1861,7 +1862,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -1910,7 +1911,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -1979,7 +1980,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("5"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -2039,7 +2040,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -2100,7 +2101,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -2168,7 +2169,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -2227,7 +2228,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -2287,7 +2288,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("3Gi"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -2297,7 +2298,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 							},
 						},
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "PersistentVolumeClaim",
 							},
@@ -2354,7 +2355,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -2414,7 +2415,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("10Gi"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -2433,7 +2434,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 							},
 						},
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "PersistentVolumeClaim",
 							},
@@ -2511,7 +2512,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("10Gi"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -2530,7 +2531,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 							},
 						},
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "PersistentVolumeClaim",
 							},
@@ -2593,7 +2594,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -2649,7 +2650,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("2"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -2683,7 +2684,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("5"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -2748,7 +2749,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("200m"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -2783,7 +2784,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("500m"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -2850,7 +2851,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("5"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -2893,7 +2894,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("2"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -2977,7 +2978,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("400m"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -3012,7 +3013,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("2Gi"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -3072,7 +3073,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -3115,7 +3116,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -3176,7 +3177,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("3"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -3210,7 +3211,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("4"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -3282,7 +3283,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("300m"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -3317,7 +3318,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					Limit: resource.MustParse("3Gi"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: gvk.VersionKind{
+							VersionKind: runtime.VersionKind{
 								APIVersion: "v1",
 								Kind:       "Pod",
 							},
@@ -3364,5 +3365,281 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 		expectGlobalQuotaUsedAndClaims(ctx, cpuQuota.GetName(), "200m", 2)
 		expectGlobalQuotaUsedAndClaims(ctx, emptyDirQuota.GetName(), "2Gi", 2)
+	})
+
+	It("excludes succeeded pods from cpu limit quota using not-equals field selector", func() {
+		q := &capsulev1beta2.GlobalCustomQuota{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "gq-not-equals-succeeded",
+				Labels: map[string]string{
+					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				},
+			},
+			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
+				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
+					Limit: resource.MustParse("2"),
+					Sources: []capsulev1beta2.CustomQuotaSpecSource{
+						{
+							VersionKind: runtime.VersionKind{
+								APIVersion: "v1",
+								Kind:       "Pod",
+							},
+							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+								Operation: quota.OpAdd,
+								Path:      ".spec.containers[*].resources.limits.cpu",
+								Selectors: []selectors.SelectorWithFields{
+									{
+										FieldSelectors: []string{
+											".status.phase!=Succeeded",
+											".status.phase!=Failed",
+											".status.phase!=Unknown",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				NamespaceSelectors: []selectors.NamespaceSelector{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								tenantLabel: tenantValue,
+							},
+						},
+					},
+				},
+			},
+		}
+
+		EventuallyCreation(func() error {
+			return k8sClient.Create(ctx, q)
+		}).Should(Succeed())
+		awaitGlobalQuotaReady(ctx, q.GetName())
+
+		// Running pod with 1 CPU limit — should be counted.
+		runningPod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "ne-running",
+				Namespace: testNamespace,
+			},
+			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
+				Containers: []corev1.Container{
+					{
+						Name:            "main",
+						Image:           "nginx:1.27.0",
+						SecurityContext: restrictedContainerSecurityContext(),
+						Resources: corev1.ResourceRequirements{
+							Limits: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("1"),
+								corev1.ResourceMemory: resource.MustParse("64Mi"),
+							},
+						},
+					},
+				},
+				RestartPolicy: corev1.RestartPolicyAlways,
+			},
+		}
+		EventuallyCreation(func() error {
+			runningPod.ResourceVersion = ""
+			return k8sClient.Create(ctx, runningPod)
+		}).Should(Succeed())
+		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "1", 1)
+
+		// Succeeded pod with 1 CPU limit — must be excluded after completion.
+		succeededPod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "ne-succeeded",
+				Namespace: testNamespace,
+			},
+			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
+				Containers: []corev1.Container{
+					{
+						Name:            "main",
+						Image:           "busybox:1.36",
+						Command:         []string{"sh", "-c", "exit 0"},
+						SecurityContext: restrictedContainerSecurityContext(),
+						Resources: corev1.ResourceRequirements{
+							Limits: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("1"),
+								corev1.ResourceMemory: resource.MustParse("64Mi"),
+							},
+						},
+					},
+				},
+				RestartPolicy:                 corev1.RestartPolicyNever,
+				TerminationGracePeriodSeconds: ptr.To(int64(0)),
+			},
+		}
+		EventuallyCreation(func() error {
+			succeededPod.ResourceVersion = ""
+			return k8sClient.Create(ctx, succeededPod)
+		}).Should(Succeed())
+
+		// Wait for the pod to complete.
+		Eventually(func(g Gomega) {
+			obj := &corev1.Pod{}
+			g.Expect(k8sClient.Get(ctx, types.NamespacedName{
+				Name:      succeededPod.Name,
+				Namespace: testNamespace,
+			}, obj)).To(Succeed())
+			g.Expect(obj.Status.Phase).To(Equal(corev1.PodSucceeded))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		// Succeeded pod must be excluded; only the running pod should count.
+		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "1", 1)
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
+
+		// Admission: 1 existing CPU + 2 requested > limit 2 — must be denied.
+		expectPodCreationDeniedContaining(func(name string) *corev1.Pod {
+			return &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: testNamespace},
+				Spec: corev1.PodSpec{
+					SecurityContext: nobodyPodSecurityContext(),
+					Containers: []corev1.Container{
+						{
+							Name:            "main",
+							Image:           "nginx:1.27.0",
+							SecurityContext: restrictedContainerSecurityContext(),
+							Resources: corev1.ResourceRequirements{
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("2"),
+									corev1.ResourceMemory: resource.MustParse("64Mi"),
+								},
+							},
+						},
+					},
+					RestartPolicy: corev1.RestartPolicyAlways,
+				},
+			}
+		}, q.GetName())
+	})
+
+	It("excludes failed pods from cpu limit quota using not-equals field selector", func() {
+		q := &capsulev1beta2.GlobalCustomQuota{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "gq-not-equals-failed",
+				Labels: map[string]string{
+					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				},
+			},
+			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
+				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
+					Limit: resource.MustParse("2"),
+					Sources: []capsulev1beta2.CustomQuotaSpecSource{
+						{
+							VersionKind: runtime.VersionKind{
+								APIVersion: "v1",
+								Kind:       "Pod",
+							},
+							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+								Operation: quota.OpAdd,
+								Path:      ".spec.containers[*].resources.limits.cpu",
+								Selectors: []selectors.SelectorWithFields{
+									{
+										FieldSelectors: []string{
+											".status.phase!=Succeeded",
+											".status.phase!=Failed",
+											".status.phase!=Unknown",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				NamespaceSelectors: []selectors.NamespaceSelector{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								tenantLabel: tenantValue,
+							},
+						},
+					},
+				},
+			},
+		}
+
+		EventuallyCreation(func() error {
+			return k8sClient.Create(ctx, q)
+		}).Should(Succeed())
+		awaitGlobalQuotaReady(ctx, q.GetName())
+
+		// Running pod with 1 CPU limit — should be counted.
+		runningPod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "ne-failed-running",
+				Namespace: testNamespace,
+			},
+			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
+				Containers: []corev1.Container{
+					{
+						Name:            "main",
+						Image:           "nginx:1.27.0",
+						SecurityContext: restrictedContainerSecurityContext(),
+						Resources: corev1.ResourceRequirements{
+							Limits: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("1"),
+								corev1.ResourceMemory: resource.MustParse("64Mi"),
+							},
+						},
+					},
+				},
+				RestartPolicy: corev1.RestartPolicyAlways,
+			},
+		}
+		EventuallyCreation(func() error {
+			runningPod.ResourceVersion = ""
+			return k8sClient.Create(ctx, runningPod)
+		}).Should(Succeed())
+		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "1", 1)
+
+		// Failed pod with 1 CPU limit — must be excluded after failure.
+		failedPod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "ne-failed-terminal",
+				Namespace: testNamespace,
+			},
+			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
+				Containers: []corev1.Container{
+					{
+						Name:            "main",
+						Image:           "busybox:1.36",
+						Command:         []string{"sh", "-c", "exit 1"},
+						SecurityContext: restrictedContainerSecurityContext(),
+						Resources: corev1.ResourceRequirements{
+							Limits: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("1"),
+								corev1.ResourceMemory: resource.MustParse("64Mi"),
+							},
+						},
+					},
+				},
+				RestartPolicy:                 corev1.RestartPolicyNever,
+				TerminationGracePeriodSeconds: ptr.To(int64(0)),
+			},
+		}
+		EventuallyCreation(func() error {
+			failedPod.ResourceVersion = ""
+			return k8sClient.Create(ctx, failedPod)
+		}).Should(Succeed())
+
+		// Wait for the pod to fail.
+		Eventually(func(g Gomega) {
+			obj := &corev1.Pod{}
+			g.Expect(k8sClient.Get(ctx, types.NamespacedName{
+				Name:      failedPod.Name,
+				Namespace: testNamespace,
+			}, obj)).To(Succeed())
+			g.Expect(obj.Status.Phase).To(Equal(corev1.PodFailed))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		// Failed pod must be excluded; only the running pod should count.
+		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "1", 1)
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 	})
 })

@@ -6,7 +6,7 @@ package cache
 import (
 	"testing"
 
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/runtime"
 )
 
 func TestCompiledRegexMatchString(t *testing.T) {
@@ -14,13 +14,13 @@ func TestCompiledRegexMatchString(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		expression api.ExpressionRegex
+		expression runtime.ExpressionRegex
 		value      string
 		want       bool
 	}{
 		{
 			name: "normal expression matches matching value",
-			expression: api.ExpressionRegex{
+			expression: runtime.ExpressionRegex{
 				Expression: "trusted/.*",
 			},
 			value: "trusted/team/app:1",
@@ -28,7 +28,7 @@ func TestCompiledRegexMatchString(t *testing.T) {
 		},
 		{
 			name: "normal expression does not match non matching value",
-			expression: api.ExpressionRegex{
+			expression: runtime.ExpressionRegex{
 				Expression: "trusted/.*",
 			},
 			value: "docker.io/team/app:1",
@@ -36,7 +36,7 @@ func TestCompiledRegexMatchString(t *testing.T) {
 		},
 		{
 			name: "negated expression does not match matching value",
-			expression: api.ExpressionRegex{
+			expression: runtime.ExpressionRegex{
 				Expression: "trusted/.*",
 				Negate:     true,
 			},
@@ -45,7 +45,7 @@ func TestCompiledRegexMatchString(t *testing.T) {
 		},
 		{
 			name: "negated expression matches non matching value",
-			expression: api.ExpressionRegex{
+			expression: runtime.ExpressionRegex{
 				Expression: "trusted/.*",
 				Negate:     true,
 			},
@@ -79,7 +79,7 @@ func TestRegexCache_GetOrCompile(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		expression  api.ExpressionRegex
+		expression  runtime.ExpressionRegex
 		value       string
 		wantMatch   bool
 		wantErr     bool
@@ -88,7 +88,7 @@ func TestRegexCache_GetOrCompile(t *testing.T) {
 	}{
 		{
 			name: "compile matching regex",
-			expression: api.ExpressionRegex{
+			expression: runtime.ExpressionRegex{
 				Expression: `^ghcr\.io/projectcapsule/.*`,
 			},
 			value:       "ghcr.io/projectcapsule/capsule:latest",
@@ -99,7 +99,7 @@ func TestRegexCache_GetOrCompile(t *testing.T) {
 		},
 		{
 			name: "compile non matching regex",
-			expression: api.ExpressionRegex{
+			expression: runtime.ExpressionRegex{
 				Expression: `^ghcr\.io/projectcapsule/.*`,
 			},
 			value:       "docker.io/library/nginx:latest",
@@ -110,7 +110,7 @@ func TestRegexCache_GetOrCompile(t *testing.T) {
 		},
 		{
 			name: "compile negated matching regex",
-			expression: api.ExpressionRegex{
+			expression: runtime.ExpressionRegex{
 				Expression: `^ghcr\.io/projectcapsule/.*`,
 				Negate:     true,
 			},
@@ -122,7 +122,7 @@ func TestRegexCache_GetOrCompile(t *testing.T) {
 		},
 		{
 			name: "compile negated non matching regex",
-			expression: api.ExpressionRegex{
+			expression: runtime.ExpressionRegex{
 				Expression: `^ghcr\.io/projectcapsule/.*`,
 				Negate:     true,
 			},
@@ -134,7 +134,7 @@ func TestRegexCache_GetOrCompile(t *testing.T) {
 		},
 		{
 			name: "reject empty expression",
-			expression: api.ExpressionRegex{
+			expression: runtime.ExpressionRegex{
 				Expression: "",
 			},
 			value:       "ghcr.io/projectcapsule/capsule:latest",
@@ -143,7 +143,7 @@ func TestRegexCache_GetOrCompile(t *testing.T) {
 		},
 		{
 			name: "reject invalid regex",
-			expression: api.ExpressionRegex{
+			expression: runtime.ExpressionRegex{
 				Expression: `[`,
 			},
 			value:       "ghcr.io/projectcapsule/capsule:latest",
@@ -207,7 +207,7 @@ func TestRegexCache_GetOrCompile_ReusesCachedRegex(t *testing.T) {
 
 	c := NewRegexCache()
 
-	expr := api.ExpressionRegex{
+	expr := runtime.ExpressionRegex{
 		Expression: `^ghcr\.io/projectcapsule/.*`,
 	}
 
@@ -241,11 +241,11 @@ func TestRegexCache_GetOrCompile_ReusesCachedRegex(t *testing.T) {
 func TestRegexCache_HashRegex_UsesNegate(t *testing.T) {
 	t.Parallel()
 
-	positive := HashRegex(api.ExpressionRegex{
+	positive := HashRegex(runtime.ExpressionRegex{
 		Expression: `^ghcr\.io/.*`,
 	})
 
-	negative := HashRegex(api.ExpressionRegex{
+	negative := HashRegex(runtime.ExpressionRegex{
 		Expression: `^ghcr\.io/.*`,
 		Negate:     true,
 	})
@@ -260,7 +260,7 @@ func TestRegexCache_Reset(t *testing.T) {
 
 	c := NewRegexCache()
 
-	compiled, _, err := c.GetOrCompile(api.ExpressionRegex{
+	compiled, _, err := c.GetOrCompile(runtime.ExpressionRegex{
 		Expression: `^ghcr\.io/.*`,
 	})
 	if err != nil {

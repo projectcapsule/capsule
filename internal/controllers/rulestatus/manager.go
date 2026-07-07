@@ -37,7 +37,7 @@ type Manager struct {
 
 	reader client.Reader
 
-	Metrics       *metrics.TenantRecorder
+	Metrics       *metrics.RuleStatusRecorder
 	Log           logr.Logger
 	Recorder      events.EventRecorder
 	Configuration configuration.Configuration
@@ -71,6 +71,8 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 		if apierrors.IsNotFound(err) {
 			log.V(5).Info("request object not found, could have been deleted after reconcile request")
 
+			r.Metrics.DeleteMetrics(request.Name, request.Namespace)
+
 			return reconcile.Result{}, nil
 		}
 
@@ -97,7 +99,9 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 			return
 		}
 
-		if e := patchHelper.Patch(ctx, instance); err != nil {
+		r.Metrics.RecordConditions(instance)
+
+		if e := patchHelper.Patch(ctx, instance); e != nil {
 			if apierrors.IsNotFound(e) || apierrors.HasStatusCause(e, corev1.NamespaceTerminatingCause) {
 				err = nil
 
@@ -147,8 +151,14 @@ func (r Manager) reconcile(ctx context.Context, instance *capsulev1beta2.RuleSta
 			continue
 		}
 
+		enforce := rule.Enforce.DeepCopy()
+
+		for i := range enforce.Metadata {
+			enforce.Metadata[i].APIGroups = enforce.Metadata[i].StatusAPIGroups()
+		}
+
 		ruleStatus = append(ruleStatus, &rules.NamespaceRuleBodyNamespace{
-			Enforce: rule.Enforce.DeepCopy(),
+			Enforce: enforce,
 		})
 	}
 

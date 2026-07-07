@@ -24,6 +24,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
+	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 )
@@ -31,12 +32,13 @@ import (
 type CacheInvalidator struct {
 	client.Client
 
-	reader client.Reader
-
 	Rest *rest.Config
 	Log  logr.Logger
 
-	configName    string
+	reader     client.Reader
+	configName string
+	metrics    *metrics.ConfigRecorder
+
 	Configuration configuration.Configuration
 
 	RegistryCache      *cache.RegistryRuleSetCache
@@ -63,9 +65,14 @@ func (r *CacheInvalidator) Start(ctx context.Context) error {
 	return nil
 }
 
-func (r *CacheInvalidator) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) (err error) {
+func (r *CacheInvalidator) SetupWithManager(
+	mgr ctrl.Manager,
+	ctrlConfig utils.ControllerOptions,
+	metrics *metrics.ConfigRecorder,
+) (err error) {
 	r.configName = ctrlConfig.ConfigurationName
 	r.reader = mgr.GetAPIReader()
+	r.metrics = metrics
 
 	err = ctrl.NewControllerManagedBy(mgr).
 		Named("config/caches").
@@ -90,7 +97,7 @@ func (r *CacheInvalidator) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.C
 				predicates.NamesMatchingPredicate{Names: []string{ctrlConfig.ConfigurationName}},
 			),
 		).
-		Watches(
+		WatchesMetadata(
 			&corev1.ServiceAccount{},
 			handler.Funcs{
 				DeleteFunc: func(
@@ -98,15 +105,10 @@ func (r *CacheInvalidator) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.C
 					e event.TypedDeleteEvent[client.Object],
 					q workqueue.TypedRateLimitingInterface[reconcile.Request],
 				) {
-					sa, ok := e.Object.(*corev1.ServiceAccount)
-					if !ok {
-						return
-					}
-
-					if err := r.invalidateServiceAccount(ctx, sa); err != nil {
+					if err := r.invalidateServiceAccount(ctx, e.Object); err != nil {
 						r.Log.Error(err, "unable to invalidate serviceaccount cache",
-							"namespace", sa.GetNamespace(),
-							"name", sa.GetName(),
+							"namespace", e.Object.GetNamespace(),
+							"name", e.Object.GetName(),
 						)
 					}
 				},
@@ -127,6 +129,7 @@ func (r *CacheInvalidator) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.C
 			},
 			),
 		).
+		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
 		Complete(r)
 	if err != nil {
 		return err

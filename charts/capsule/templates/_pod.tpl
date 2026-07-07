@@ -67,6 +67,9 @@ spec:
         - --workers={{ .Values.manager.options.workers }}
         - --client-connection-qps={{ .Values.manager.options.clientConnectionQPS }}
         - --client-connection-burst={{ .Values.manager.options.clientConnectionBurst }}
+        {{- with .Values.manager.options.cacheSyncTimeout }}
+        - --cache-sync-timeout={{ . }}
+        {{- end }}
         {{- with .Values.manager.extraArgs }}
           {{- toYaml . | nindent 8 }}
         {{- end }}

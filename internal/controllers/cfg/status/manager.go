@@ -27,6 +27,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
+	"github.com/projectcapsule/capsule/internal/metrics"
 	capmeta "github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
@@ -42,17 +43,22 @@ const tenantEventMarker = "tenant-event"
 type Manager struct {
 	client.Client
 
-	reader client.Reader
-
 	Rest *rest.Config
 
+	reader     client.Reader
 	configName string
 	Log        logr.Logger
+	metrics    *metrics.ConfigRecorder
 }
 
-func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) (err error) {
+func (r *Manager) SetupWithManager(
+	mgr ctrl.Manager,
+	ctrlConfig utils.ControllerOptions,
+	metrics *metrics.ConfigRecorder,
+) (err error) {
 	r.configName = ctrlConfig.ConfigurationName
 	r.reader = mgr.GetAPIReader()
+	r.metrics = metrics
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("capsule/configuration").
@@ -141,6 +147,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 				},
 			}),
 		).
+		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
 		Complete(r)
 }
 
@@ -164,6 +171,8 @@ func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res
 		if apierrors.IsNotFound(err) {
 			log.V(5).Info("requested object not found, could have been deleted after reconcile request")
 
+			r.metrics.DeleteMetrics(request.Name)
+
 			return reconcile.Result{}, nil
 		}
 
@@ -178,6 +187,8 @@ func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res
 
 			return
 		}
+
+		r.metrics.RecordConditions(instance)
 	}()
 
 	// Validating the Capsule Configuration options.

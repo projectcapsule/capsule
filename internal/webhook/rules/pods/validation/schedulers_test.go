@@ -9,8 +9,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/projectcapsule/capsule/pkg/api"
 	apirules "github.com/projectcapsule/capsule/pkg/api/rules"
+	"github.com/projectcapsule/capsule/pkg/api/runtime"
 	ruleengine "github.com/projectcapsule/capsule/pkg/ruleengine"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 )
@@ -116,11 +116,11 @@ func TestPodRulesValidateSchedulers(t *testing.T) {
 			enforceBodies: []*apirules.NamespaceRuleEnforceBody{
 				schedulerEnforceForTest(
 					apirules.ActionTypeAllow,
-					api.ExpressionMatch{
+					runtime.ExpressionMatch{
 						Exact: []string{
 							"default-scheduler",
 						},
-						ExpressionRegex: api.ExpressionRegex{
+						ExpressionRegex: runtime.ExpressionRegex{
 							Expression: "tenant-[a-z0-9-]+",
 						},
 					},
@@ -445,7 +445,7 @@ func TestPodRulesValidateSchedulers(t *testing.T) {
 
 func schedulerEnforceForTest(
 	action apirules.ActionType,
-	schedulers ...api.ExpressionMatch,
+	schedulers ...runtime.ExpressionMatch,
 ) *apirules.NamespaceRuleEnforceBody {
 	return &apirules.NamespaceRuleEnforceBody{
 		Action: action,
@@ -469,32 +469,32 @@ func schedulerPodForTest(schedulerName string) *corev1.Pod {
 	}
 }
 
-func schedulerExactForTest(values ...string) api.ExpressionMatch {
-	return api.ExpressionMatch{
+func schedulerExactForTest(values ...string) runtime.ExpressionMatch {
+	return runtime.ExpressionMatch{
 		Exact: values,
 	}
 }
 
-func schedulerExpressionForTest(expression string) api.ExpressionMatch {
-	return api.ExpressionMatch{
-		ExpressionRegex: api.ExpressionRegex{
+func schedulerExpressionForTest(expression string) runtime.ExpressionMatch {
+	return runtime.ExpressionMatch{
+		ExpressionRegex: runtime.ExpressionRegex{
 			Expression: expression,
 		},
 	}
 }
 
-func schedulerNegatedExactForTest(values ...string) api.ExpressionMatch {
-	return api.ExpressionMatch{
+func schedulerNegatedExactForTest(values ...string) runtime.ExpressionMatch {
+	return runtime.ExpressionMatch{
 		Exact: values,
-		ExpressionRegex: api.ExpressionRegex{
+		ExpressionRegex: runtime.ExpressionRegex{
 			Negate: true,
 		},
 	}
 }
 
-func schedulerNegatedExpressionForTest(expression string) api.ExpressionMatch {
-	return api.ExpressionMatch{
-		ExpressionRegex: api.ExpressionRegex{
+func schedulerNegatedExpressionForTest(expression string) runtime.ExpressionMatch {
+	return runtime.ExpressionMatch{
+		ExpressionRegex: runtime.ExpressionRegex{
 			Expression: expression,
 			Negate:     true,
 		},

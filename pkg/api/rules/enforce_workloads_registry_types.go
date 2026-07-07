@@ -6,7 +6,7 @@ package rules
 import (
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/runtime"
 )
 
 // +kubebuilder:validation:Enum=Always;Never;IfNotPresent
@@ -18,7 +18,7 @@ func (i ImagePullPolicySpec) String() string {
 
 // +kubebuilder:object:generate=true
 type OCIRegistry struct {
-	api.ExpressionMatch `json:",inline"`
+	runtime.ExpressionMatch `json:",inline"`
 
 	// Allowed PullPolicy for the given registry. Supplying no value allows all policies.
 	// +optional

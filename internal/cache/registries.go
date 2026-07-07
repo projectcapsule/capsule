@@ -13,8 +13,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
+	"github.com/projectcapsule/capsule/pkg/api/runtime"
 )
 
 type RuleSet struct {
@@ -23,7 +23,7 @@ type RuleSet struct {
 }
 
 type CompiledRule struct {
-	Match api.ExpressionMatch
+	Match runtime.ExpressionMatch
 
 	// RegexID is empty when Match.Expression is empty.
 	RegexID string

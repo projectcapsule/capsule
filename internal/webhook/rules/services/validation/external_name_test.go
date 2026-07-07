@@ -10,8 +10,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"github.com/projectcapsule/capsule/pkg/api"
 	apirules "github.com/projectcapsule/capsule/pkg/api/rules"
+	"github.com/projectcapsule/capsule/pkg/api/runtime"
 	ruleengine "github.com/projectcapsule/capsule/pkg/ruleengine"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 )
@@ -98,11 +98,11 @@ func TestServiceRulesValidateExternalNames(t *testing.T) {
 			enforceBodies: []*apirules.NamespaceRuleEnforceBody{
 				externalNameEnforceForTest(
 					apirules.ActionTypeAllow,
-					api.ExpressionMatch{
+					runtime.ExpressionMatch{
 						Exact: []string{
 							"combined.internal.git.com",
 						},
-						ExpressionRegex: api.ExpressionRegex{
+						ExpressionRegex: runtime.ExpressionRegex{
 							Expression: "combined\\..*\\.example\\.com",
 						},
 					},
@@ -382,17 +382,17 @@ func TestServiceRulesValidateExternalNames(t *testing.T) {
 func TestDescribeExpressionMatch(t *testing.T) {
 	tests := []struct {
 		name  string
-		match api.ExpressionMatch
+		match runtime.ExpressionMatch
 		want  string
 	}{
 		{
 			name:  "empty matcher",
-			match: api.ExpressionMatch{},
+			match: runtime.ExpressionMatch{},
 			want:  "",
 		},
 		{
 			name: "exact only",
-			match: api.ExpressionMatch{
+			match: runtime.ExpressionMatch{
 				Exact: []string{
 					"internal.git.com",
 					"api.example.com",
@@ -402,8 +402,8 @@ func TestDescribeExpressionMatch(t *testing.T) {
 		},
 		{
 			name: "expression only",
-			match: api.ExpressionMatch{
-				ExpressionRegex: api.ExpressionRegex{
+			match: runtime.ExpressionMatch{
+				ExpressionRegex: runtime.ExpressionRegex{
 					Expression: ".*\\.example\\.com",
 				},
 			},
@@ -411,11 +411,11 @@ func TestDescribeExpressionMatch(t *testing.T) {
 		},
 		{
 			name: "exact and expression",
-			match: api.ExpressionMatch{
+			match: runtime.ExpressionMatch{
 				Exact: []string{
 					"internal.git.com",
 				},
-				ExpressionRegex: api.ExpressionRegex{
+				ExpressionRegex: runtime.ExpressionRegex{
 					Expression: ".*\\.example\\.com",
 				},
 			},
@@ -423,8 +423,8 @@ func TestDescribeExpressionMatch(t *testing.T) {
 		},
 		{
 			name: "negate is currently not included in description",
-			match: api.ExpressionMatch{
-				ExpressionRegex: api.ExpressionRegex{
+			match: runtime.ExpressionMatch{
+				ExpressionRegex: runtime.ExpressionRegex{
 					Expression: "trusted\\..*",
 					Negate:     true,
 				},
@@ -445,7 +445,7 @@ func TestDescribeExpressionMatch(t *testing.T) {
 
 func externalNameEnforceForTest(
 	action apirules.ActionType,
-	hostnames ...api.ExpressionMatch,
+	hostnames ...runtime.ExpressionMatch,
 ) *apirules.NamespaceRuleEnforceBody {
 	return &apirules.NamespaceRuleEnforceBody{
 		Action: action,
@@ -488,23 +488,23 @@ func clusterIPServiceForExternalNameTest(name string) *corev1.Service {
 	}
 }
 
-func exactMatchForTest(values ...string) api.ExpressionMatch {
-	return api.ExpressionMatch{
+func exactMatchForTest(values ...string) runtime.ExpressionMatch {
+	return runtime.ExpressionMatch{
 		Exact: values,
 	}
 }
 
-func expressionMatchForTest(expression string) api.ExpressionMatch {
-	return api.ExpressionMatch{
-		ExpressionRegex: api.ExpressionRegex{
+func expressionMatchForTest(expression string) runtime.ExpressionMatch {
+	return runtime.ExpressionMatch{
+		ExpressionRegex: runtime.ExpressionRegex{
 			Expression: expression,
 		},
 	}
 }
 
-func negatedExpressionMatchForTest(expression string) api.ExpressionMatch {
-	return api.ExpressionMatch{
-		ExpressionRegex: api.ExpressionRegex{
+func negatedExpressionMatchForTest(expression string) runtime.ExpressionMatch {
+	return runtime.ExpressionMatch{
+		ExpressionRegex: runtime.ExpressionRegex{
 			Expression: expression,
 			Negate:     true,
 		},

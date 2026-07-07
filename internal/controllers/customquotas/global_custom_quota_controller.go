@@ -187,7 +187,7 @@ func (r *clusterCustomQuotaClaimController) mapNamespaceToGlobalCustomQuotas(
 	}
 
 	var quotaList capsulev1beta2.GlobalCustomQuotaList
-	if err := r.List(ctx, &quotaList); err != nil {
+	if err := r.reader.List(ctx, &quotaList); err != nil {
 		r.log.Error(err, "cannot list GlobalCustomQuota objects for namespace event", "namespace", ns.Name)
 
 		return nil
@@ -349,6 +349,7 @@ func (r *clusterCustomQuotaClaimController) emitMetrics(
 
 	// Usage Metrics
 	r.metrics.ResourceUsageGauge.WithLabelValues(instance.GetName()).Set(float64(instance.Status.Usage.Used.MilliValue()) / 1000)
+	r.metrics.ResourceUsagePercentageGauge.WithLabelValues(instance.GetName()).Set(usagePercentage(instance.Status.Usage.Used, instance.Spec.Limit))
 	r.metrics.ResourceAvailableGauge.WithLabelValues(instance.GetName()).Set(float64(instance.Status.Usage.Available.MilliValue()) / 1000)
 	r.metrics.ResourceLimitGauge.WithLabelValues(instance.GetName()).Set(float64(instance.Spec.Limit.MilliValue()) / 1000)
 

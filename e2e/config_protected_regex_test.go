@@ -88,4 +88,15 @@ var _ = Describe("creating a Namespace with a protected Namespace regex enabled"
 			configuration.Spec.ProtectedNamespaceRegexpString = ""
 		})
 	})
+
+	It("should reject malformed protected namespace regex", func() {
+		ExpectCapsuleConfigurationUpdateDenied(
+			func(configuration *capsulev1beta2.CapsuleConfiguration) {
+				configuration.Spec.ProtectedNamespaceRegexpString = "["
+			},
+			"spec.protectedNamespaceRegex",
+			"[",
+			"not a valid regular expression",
+		)
+	})
 })

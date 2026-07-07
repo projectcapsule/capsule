@@ -27,7 +27,7 @@ func (g GlobalCreatedItems) Func() client.IndexerFunc {
 
 		for _, pi := range tgr.Status.ProcessedItems {
 			if pi.Created {
-				out = append(out, pi.GetGVKKey(""))
+				out = append(out, processedItemKey(pi))
 			}
 		}
 

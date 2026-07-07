@@ -571,6 +571,46 @@ func ModifyCapsuleConfigurationOpts(fn func(configuration *capsulev1beta2.Capsul
 	Expect(err).ToNot(HaveOccurred())
 }
 
+func ExpectCapsuleConfigurationUpdateDenied(
+	mutate func(*capsulev1beta2.CapsuleConfiguration),
+	expectedSubstrings ...string,
+) {
+	Eventually(func() error {
+		configuration := &capsulev1beta2.CapsuleConfiguration{}
+		if err := k8sClient.Get(
+			context.Background(),
+			client.ObjectKey{Name: defaultConfigurationName},
+			configuration,
+		); err != nil {
+			return err
+		}
+
+		mutate(configuration)
+
+		err := k8sClient.Update(context.Background(), configuration)
+		if err == nil {
+			return fmt.Errorf("expected CapsuleConfiguration update to be denied, but it succeeded")
+		}
+
+		if apierrors.IsConflict(err) {
+			return err
+		}
+
+		if !apierrors.IsForbidden(err) {
+			return fmt.Errorf("expected forbidden error, got: %w", err)
+		}
+
+		message := err.Error()
+		for _, expected := range expectedSubstrings {
+			if !strings.Contains(message, expected) {
+				return fmt.Errorf("expected error to contain %q, got: %s", expected, message)
+			}
+		}
+
+		return nil
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
 func CheckForOwnerRoleBindings(ns *corev1.Namespace, owner rbac.OwnerSpec, roles map[string]bool) func() error {
 	if roles == nil {
 		roles = map[string]bool{
