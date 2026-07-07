@@ -456,6 +456,18 @@
                             "description": "QPS to use for interacting with kubernetes apiserver",
                             "type": "number"
                         },
+                        "leaderElectionLeaseDuration": {
+                            "description": "Leader election lease duration. Empty uses controller-runtime's default.",
+                            "type": "string"
+                        },
+                        "leaderElectionRenewDeadline": {
+                            "description": "Leader election renew deadline. Empty uses controller-runtime's default.",
+                            "type": "string"
+                        },
+                        "leaderElectionRetryPeriod": {
+                            "description": "Leader election retry period. Empty uses controller-runtime's default.",
+                            "type": "string"
+                        },
                         "createConfiguration": {
                             "description": "Create Configuration",
                             "type": "boolean"

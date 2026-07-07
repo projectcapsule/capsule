@@ -486,6 +486,9 @@ e2e-install: helm-controller-version ko-build-all dev-install-gw-api-crds
 		--set 'manager.options.workers=4' \
 		--set 'manager.options.clientConnectionQPS=2000' \
 		--set 'manager.options.clientConnectionBurst=1000' \
+		--set 'manager.options.leaderElectionLeaseDuration=60s' \
+		--set 'manager.options.leaderElectionRenewDeadline=40s' \
+		--set 'manager.options.leaderElectionRenewDeadline=5s' \
 		--set 'manager.rbac.minimal=true' \
 		--set 'webhooks.hooks.nodes.enabled=true' \
 		--set "webhooks.exclusive=true"\
@@ -516,6 +519,9 @@ e2e-install-openshift: helm-controller-version ko-build-all
 		--set 'manager.resources=null'\
 		--set "manager.image.tag=$(VERSION)" \
 		--set 'manager.livenessProbe.failureThreshold=10' \
+		--set 'manager.options.leaderElectionLeaseDuration=60s' \
+		--set 'manager.options.leaderElectionRenewDeadline=40s' \
+		--set 'manager.options.leaderElectionRenewDeadline=5s' \
 		--set 'webhooks.hooks.nodes.enabled=true' \
 		--set "webhooks.exclusive=true"\
 		--set "manager.options.logLevel=debug"\

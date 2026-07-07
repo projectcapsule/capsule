@@ -132,6 +132,10 @@ func main() {
 		webhookPort int
 
 		cacheSyncTimeout time.Duration
+
+		leaderElectionLeaseDuration time.Duration
+		leaderElectionRenewDeadline time.Duration
+		leaderElectionRetryPeriod   time.Duration
 	)
 
 	var goFlagSet goflag.FlagSet
@@ -163,6 +167,24 @@ func main() {
 		"cache-sync-timeout",
 		0,
 		"The timeout used when waiting for controller cache synchronization. If unset or 0, the controller-runtime default is used.",
+	)
+	flag.DurationVar(
+		&leaderElectionLeaseDuration,
+		"leader-election-lease-duration",
+		0,
+		"The duration that non-leader candidates wait to force acquire leadership. If unset or 0, the controller-runtime default is used.",
+	)
+	flag.DurationVar(
+		&leaderElectionRenewDeadline,
+		"leader-election-renew-deadline",
+		0,
+		"The duration that the acting leader retries refreshing leadership before giving up. If unset or 0, the controller-runtime default is used.",
+	)
+	flag.DurationVar(
+		&leaderElectionRetryPeriod,
+		"leader-election-retry-period",
+		0,
+		"The duration that leader election clients wait between retries. If unset or 0, the controller-runtime default is used.",
 	)
 	flag.StringVar(
 		&metricsAddr,
@@ -462,6 +484,18 @@ func main() {
 
 			return client.New(config, options)
 		},
+	}
+
+	if leaderElectionLeaseDuration > 0 {
+		ctrlOpts.LeaseDuration = &leaderElectionLeaseDuration
+	}
+
+	if leaderElectionRenewDeadline > 0 {
+		ctrlOpts.RenewDeadline = &leaderElectionRenewDeadline
+	}
+
+	if leaderElectionRetryPeriod > 0 {
+		ctrlOpts.RetryPeriod = &leaderElectionRetryPeriod
 	}
 
 	if enablePprof {

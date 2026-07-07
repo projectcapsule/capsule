@@ -70,6 +70,15 @@ spec:
         {{- with .Values.manager.options.cacheSyncTimeout }}
         - --cache-sync-timeout={{ . }}
         {{- end }}
+        {{- with .Values.manager.options.leaderElectionLeaseDuration }}
+        - --leader-election-lease-duration={{ . }}
+        {{- end }}
+        {{- with .Values.manager.options.leaderElectionRenewDeadline }}
+        - --leader-election-renew-deadline={{ . }}
+        {{- end }}
+        {{- with .Values.manager.options.leaderElectionRetryPeriod }}
+        - --leader-election-retry-period={{ . }}
+        {{- end }}
         {{- with .Values.manager.extraArgs }}
           {{- toYaml . | nindent 8 }}
         {{- end }}

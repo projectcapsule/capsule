@@ -240,6 +240,12 @@ manager:
     clientConnectionBurst: 30
     # -- Timeout used when waiting for controller cache synchronization. Empty uses controller-runtime's default.
     cacheSyncTimeout: "4m"
+    # -- Leader election lease duration. Empty uses controller-runtime's default.
+    leaderElectionLeaseDuration: ""
+    # -- Leader election renew deadline. Empty uses controller-runtime's default.
+    leaderElectionRenewDeadline: ""
+    # -- Leader election retry period. Empty uses controller-runtime's default.
+    leaderElectionRetryPeriod: ""
     # -- Define entities which are considered part of the Capsule construct.
     # Users not mentioned here will be ignored by Capsule
     users:
