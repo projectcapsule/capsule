@@ -70,6 +70,37 @@ spec:
         {{- with .Values.manager.options.cacheSyncTimeout }}
         - --cache-sync-timeout={{ . }}
         {{- end }}
+        - --enable-leader-election={{ .Values.manager.options.leaderElection.enabled }}
+        {{- with .Values.manager.options.leaderElection.leaseDuration }}
+        - --leader-election-lease-duration={{ . }}
+        {{- end }}
+        {{- with .Values.manager.options.leaderElection.renewDeadline }}
+        - --leader-election-renew-deadline={{ . }}
+        {{- end }}
+        {{- with .Values.manager.options.leaderElection.retryPeriod }}
+        - --leader-election-retry-period={{ . }}
+        {{- end }}
+        {{- if .Values.manager.options.tracing.enabled }}
+        - --enable-tracing=true
+        {{- with .Values.manager.options.tracing.endpoint }}
+        - --tracing-otlp-endpoint={{ . }}
+        {{- end }}
+        - --tracing-otlp-insecure={{ .Values.manager.options.tracing.insecure }}
+        - --tracing-sample-ratio={{ .Values.manager.options.tracing.sampleRatio }}
+        {{- range $key, $value := .Values.manager.options.tracing.headers }}
+        - --tracing-otlp-header={{ $key }}={{ $value }}
+        {{- end }}
+        {{- with .Values.manager.options.tracing.timeout }}
+        - --tracing-otlp-timeout={{ . }}
+        {{- end }}
+        {{- with .Values.manager.options.tracing.compression }}
+        - --tracing-otlp-compression={{ . }}
+        {{- end }}
+        {{- with .Values.manager.options.tracing.tls.serverName }}
+        - --tracing-otlp-tls-server-name={{ . }}
+        {{- end }}
+        - --tracing-otlp-tls-insecure-skip-verify={{ .Values.manager.options.tracing.tls.insecureSkipVerify }}
+        {{- end }}
         {{- with .Values.manager.extraArgs }}
           {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -84,8 +115,32 @@ spec:
         valueFrom:
           fieldRef:
             fieldPath: spec.serviceAccountName
+      {{- if .Values.manager.options.tracing.enabled }}
+      {{- if or .Values.manager.options.tracing.basicAuth.username .Values.manager.options.tracing.basicAuth.existingSecret.name }}
+      - name: CAPSULE_TRACING_OTLP_BASIC_AUTH_USERNAME
+        {{- if .Values.manager.options.tracing.basicAuth.existingSecret.name }}
+        valueFrom:
+          secretKeyRef:
+            name: {{ .Values.manager.options.tracing.basicAuth.existingSecret.name }}
+            key: {{ .Values.manager.options.tracing.basicAuth.existingSecret.usernameKey }}
+        {{- else }}
+        value: {{ .Values.manager.options.tracing.basicAuth.username | quote }}
+        {{- end }}
+      {{- end }}
+      {{- if or .Values.manager.options.tracing.basicAuth.password .Values.manager.options.tracing.basicAuth.existingSecret.name }}
+      - name: CAPSULE_TRACING_OTLP_BASIC_AUTH_PASSWORD
+        {{- if .Values.manager.options.tracing.basicAuth.existingSecret.name }}
+        valueFrom:
+          secretKeyRef:
+            name: {{ .Values.manager.options.tracing.basicAuth.existingSecret.name }}
+            key: {{ .Values.manager.options.tracing.basicAuth.existingSecret.passwordKey }}
+        {{- else }}
+        value: {{ .Values.manager.options.tracing.basicAuth.password | quote }}
+        {{- end }}
+      {{- end }}
+      {{- end }}
       {{- with .Values.manager.env }}
-        {{- toYaml . | nindent 6 }}
+      {{- toYaml . | nindent 6 }}
       {{- end }}
       ports:
         {{- if not (.Values.manager.hostNetwork) }}

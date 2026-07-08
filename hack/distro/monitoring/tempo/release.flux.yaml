@@ -1,0 +1,58 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: tempo
+  namespace: flux-system
+spec:
+  serviceAccountName: kustomize-controller
+  interval: 30s
+  timeout: 10m
+  targetNamespace: monitoring-system
+  releaseName: "tempo"
+  chart:
+    spec:
+      chart: tempo
+      version: "2.2.3"
+      sourceRef:
+        kind: HelmRepository
+        name: tempo
+      interval: 24h
+  install:
+    createNamespace: true
+    remediation:
+      retries: -1
+  upgrade:
+    remediation:
+      remediateLastFailure: true
+      retries: -1
+  driftDetection:
+    mode: enabled
+  values:
+    global:
+      dnsService: "kube-dns"
+      dnsNamespace: "kube-system"
+      clusterLabelOverride: "kind"
+    tempo:
+      metricsGenerator:
+        enabled: true
+        remoteWriteUrl: http://kube-prometheus-stack-prometheus.monitoring-system.svc.cluster.local:9090/api/v1/write
+      overrides:
+        defaults:
+          metrics_generator:
+            processors:
+              - service-graphs
+              - span-metrics
+    podAnnotations:
+      profiles.grafana.com/memory.scrape: "false"
+      profiles.grafana.com/goroutine.scrape: "false"
+      profiles.grafana.com/cpu.scrape: "false"
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: tempo
+  namespace: flux-system
+spec:
+  interval: 24h0m0s
+  url: https://grafana-community.github.io/helm-charts/

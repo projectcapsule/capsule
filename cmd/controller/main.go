@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	goflag "flag"
 	"fmt"
@@ -122,9 +123,21 @@ func main() {
 
 		enableLeaderElection bool
 		enablePprof          bool
+		enableTracing        bool
 		version              bool
 		secureMetrics        bool
 		enableHTTP2          bool
+
+		tracingEndpoint              string
+		tracingSampleRatio           float64
+		tracingInsecure              bool
+		tracingHeaders               = tracingHeadersFlag{}
+		tracingBasicAuthUsername     string
+		tracingBasicAuthPassword     string
+		tracingTimeout               time.Duration
+		tracingCompression           string
+		tracingTLSServerName         string
+		tracingTLSInsecureSkipVerify bool
 
 		clientConnectionQPS   float32
 		clientConnectionBurst int32
@@ -132,6 +145,10 @@ func main() {
 		webhookPort int
 
 		cacheSyncTimeout time.Duration
+
+		leaderElectionLeaseDuration time.Duration
+		leaderElectionRenewDeadline time.Duration
+		leaderElectionRetryPeriod   time.Duration
 	)
 
 	var goFlagSet goflag.FlagSet
@@ -152,6 +169,71 @@ func main() {
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.",
 	)
+	flag.BoolVar(
+		&enableTracing,
+		"enable-tracing",
+		false,
+		"Enable OpenTelemetry tracing for admission webhook requests.",
+	)
+	flag.StringVar(
+		&tracingEndpoint,
+		"tracing-otlp-endpoint",
+		"",
+		"OTLP gRPC endpoint for exporting traces, for example otel-collector.observability.svc:4317. If unset, OpenTelemetry environment variables are used.",
+	)
+	flag.BoolVar(
+		&tracingInsecure,
+		"tracing-otlp-insecure",
+		true,
+		"Disable transport security for the OTLP gRPC trace exporter.",
+	)
+	flag.Float64Var(
+		&tracingSampleRatio,
+		"tracing-sample-ratio",
+		1.0,
+		"Trace sampling ratio for admission webhook requests. Must be between 0 and 1.",
+	)
+	flag.Var(
+		tracingHeaders,
+		"tracing-otlp-header",
+		"OTLP gRPC metadata header in key=value format. Can be set multiple times.",
+	)
+	flag.StringVar(
+		&tracingBasicAuthUsername,
+		"tracing-otlp-basic-auth-username",
+		"",
+		"Basic auth username for the OTLP gRPC trace exporter. Can also be set with CAPSULE_TRACING_OTLP_BASIC_AUTH_USERNAME.",
+	)
+	flag.StringVar(
+		&tracingBasicAuthPassword,
+		"tracing-otlp-basic-auth-password",
+		"",
+		"Basic auth password for the OTLP gRPC trace exporter. Can also be set with CAPSULE_TRACING_OTLP_BASIC_AUTH_PASSWORD.",
+	)
+	flag.DurationVar(
+		&tracingTimeout,
+		"tracing-otlp-timeout",
+		0,
+		"Timeout for exporting a batch of spans. Empty or 0 uses OpenTelemetry's default.",
+	)
+	flag.StringVar(
+		&tracingCompression,
+		"tracing-otlp-compression",
+		"",
+		"Compression for OTLP gRPC trace exports. Supported value: gzip. Empty disables compression.",
+	)
+	flag.StringVar(
+		&tracingTLSServerName,
+		"tracing-otlp-tls-server-name",
+		"",
+		"TLS server name override for the OTLP gRPC trace exporter.",
+	)
+	flag.BoolVar(
+		&tracingTLSInsecureSkipVerify,
+		"tracing-otlp-tls-insecure-skip-verify",
+		false,
+		"Skip OTLP gRPC trace exporter TLS certificate verification. Not recommended for production.",
+	)
 	flag.IntVar(
 		&controllerConfig.Runtime.MaxConcurrentReconciles,
 		"workers",
@@ -163,6 +245,24 @@ func main() {
 		"cache-sync-timeout",
 		0,
 		"The timeout used when waiting for controller cache synchronization. If unset or 0, the controller-runtime default is used.",
+	)
+	flag.DurationVar(
+		&leaderElectionLeaseDuration,
+		"leader-election-lease-duration",
+		0,
+		"The duration that non-leader candidates wait to force acquire leadership. If unset or 0, the controller-runtime default is used.",
+	)
+	flag.DurationVar(
+		&leaderElectionRenewDeadline,
+		"leader-election-renew-deadline",
+		0,
+		"The duration that the acting leader retries refreshing leadership before giving up. If unset or 0, the controller-runtime default is used.",
+	)
+	flag.DurationVar(
+		&leaderElectionRetryPeriod,
+		"leader-election-retry-period",
+		0,
+		"The duration that leader election clients wait between retries. If unset or 0, the controller-runtime default is used.",
 	)
 	flag.StringVar(
 		&metricsAddr,
@@ -464,6 +564,18 @@ func main() {
 		},
 	}
 
+	if leaderElectionLeaseDuration > 0 {
+		ctrlOpts.LeaseDuration = &leaderElectionLeaseDuration
+	}
+
+	if leaderElectionRenewDeadline > 0 {
+		ctrlOpts.RenewDeadline = &leaderElectionRenewDeadline
+	}
+
+	if leaderElectionRetryPeriod > 0 {
+		ctrlOpts.RetryPeriod = &leaderElectionRetryPeriod
+	}
+
 	if enablePprof {
 		ctrlOpts.PprofBindAddress = ":8082"
 	}
@@ -704,7 +816,11 @@ func main() {
 			ctrl.Log.WithName("capsule.ctrl").WithName("events"),
 			manager.GetEventRecorder("tenant-controller"),
 			cfg,
-		), webhooksList...); err != nil {
+		),
+		webhook.RegistrationOptions{
+			EnableTracing: enableTracing,
+		},
+		webhooksList...); err != nil {
 		setupLog.Error(err, "unable to setup webhooks")
 		os.Exit(1)
 	}
@@ -845,8 +961,49 @@ func main() {
 
 	setupLog.Info("starting manager")
 
-	if err = manager.Start(ctx); err != nil {
-		setupLog.Error(err, "problem running manager")
+	if tracingBasicAuthUsername == "" {
+		tracingBasicAuthUsername = os.Getenv("CAPSULE_TRACING_OTLP_BASIC_AUTH_USERNAME")
+	}
+
+	if tracingBasicAuthPassword == "" {
+		tracingBasicAuthPassword = os.Getenv("CAPSULE_TRACING_OTLP_BASIC_AUTH_PASSWORD")
+	}
+
+	tracingShutdown, err := setupTracing(ctx, tracingOptions{
+		enabled:               enableTracing,
+		endpoint:              tracingEndpoint,
+		insecure:              tracingInsecure,
+		sampleRatio:           tracingSampleRatio,
+		headers:               tracingHeaders,
+		basicAuthUsername:     tracingBasicAuthUsername,
+		basicAuthPassword:     tracingBasicAuthPassword,
+		timeout:               tracingTimeout,
+		compression:           tracingCompression,
+		tlsServerName:         tracingTLSServerName,
+		tlsInsecureSkipVerify: tracingTLSInsecureSkipVerify,
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to initialize tracing")
 		os.Exit(1)
 	}
+
+	if err = manager.Start(ctx); err != nil {
+		setupLog.Error(err, "problem running manager")
+
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		if shutdownErr := tracingShutdown(shutdownCtx); shutdownErr != nil {
+			setupLog.Error(shutdownErr, "unable to shutdown tracing")
+		}
+
+		cancel()
+
+		os.Exit(1)
+	}
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	if err := tracingShutdown(shutdownCtx); err != nil {
+		setupLog.Error(err, "unable to shutdown tracing")
+	}
+
+	cancel()
 }

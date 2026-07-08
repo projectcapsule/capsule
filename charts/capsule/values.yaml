@@ -240,6 +240,18 @@ manager:
     clientConnectionBurst: 30
     # -- Timeout used when waiting for controller cache synchronization. Empty uses controller-runtime's default.
     cacheSyncTimeout: "4m"
+    # -- Duration after which the in-memory cache is invalidated (based on usaage) and re-fetched from the API server
+    cacheInvalidation: 0h30m0s
+    # Leader Election
+    leaderElection:
+      # -- Enable Leader Election for capsule controller
+      enabled: true
+      # -- Leader election lease duration. Empty uses controller-runtime's default.
+      leaseDuration: ""
+      # -- Leader election renew deadline. Empty uses controller-runtime's default.
+      renewDeadline: ""
+      # -- Leader election retry period. Empty uses controller-runtime's default.
+      retryPeriod: ""
     # -- Define entities which are considered part of the Capsule construct.
     # Users not mentioned here will be ignored by Capsule
     users:
@@ -275,10 +287,6 @@ manager:
       forbiddenAnnotations:
         denied: []
         deniedRegex: ""
-
-    # -- Duration after which the in-memory cache is invalidated (based on usaage) and re-fetched from the API server
-    cacheInvalidation: 0h30m0s
-
     # -- Managed RBAC configuration for the controller
     rbac:
       # -- The ClusterRoles applied for Administrators
@@ -292,9 +300,41 @@ manager:
       deleter: capsule-namespace-deleter
       # -- Name for the ClusterRole required to grant Namespace Provision permissions.
       provisioner: capsule-namespace-provisioner
-
     # -- Impersonation
     impersonation: {}
+    # Tracing Configuration
+    tracing:
+      # -- Enable OpenTelemetry tracing for admission webhook requests.
+      enabled: false
+      # -- OTLP gRPC endpoint for exporting traces. If empty, OpenTelemetry environment variables are used.
+      endpoint: ""
+      # -- Disable transport security for the OTLP gRPC trace exporter.
+      insecure: true
+      # -- Trace sampling ratio for admission webhook requests. Must be between 0 and 1.
+      sampleRatio: 1.0
+      # -- OTLP gRPC metadata headers to send with each trace export request.
+      headers: {}
+      basicAuth:
+        # -- Basic auth username for the OTLP gRPC trace exporter. Prefer existingSecret for production.
+        username: ""
+        # -- Basic auth password for the OTLP gRPC trace exporter. Prefer existingSecret for production.
+        password: ""
+        existingSecret:
+          # -- Existing Secret containing OTLP basic auth credentials.
+          name: ""
+          # -- Secret key containing the basic auth username.
+          usernameKey: username
+          # -- Secret key containing the basic auth password.
+          passwordKey: password
+      # -- Timeout for exporting a batch of spans. Empty uses OpenTelemetry's default.
+      timeout: ""
+      # -- Compression for OTLP gRPC trace exports. Supported value: gzip. Empty disables compression.
+      compression: ""
+      tls:
+        # -- TLS server name override for the OTLP gRPC trace exporter.
+        serverName: ""
+        # -- Skip OTLP gRPC trace exporter TLS certificate verification. Not recommended for production.
+        insecureSkipVerify: false
 
     # -- DEPRECATED: use users properties.
     # Names of the users considered as Capsule users.
@@ -304,8 +344,7 @@ manager:
     capsuleUserGroups: []
 
   # -- A list of extra arguments for the capsule controller
-  extraArgs:
-  - "--enable-leader-election=true"
+  extraArgs: []
 
   # -- Additional Environment Variables
   env: []
