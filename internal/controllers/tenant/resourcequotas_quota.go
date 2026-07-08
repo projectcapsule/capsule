@@ -119,12 +119,19 @@ func (r *Manager) syncCustomResourceQuotaUsages(ctx context.Context, tenant *cap
 			for _, ns := range namespaces {
 				var list *unstructured.UnstructuredList
 
-				list, scopeErr = dynamicClient.Resource(schema.GroupVersionResource{Group: res.group, Version: res.version, Resource: res.kind}).List(ctx, metav1.ListOptions{
-					FieldSelector: fmt.Sprintf("metadata.namespace==%s", ns),
-				})
+				list, scopeErr = dynamicClient.
+					Resource(schema.GroupVersionResource{
+						Group:    res.group,
+						Version:  res.version,
+						Resource: res.kind,
+					}).
+					Namespace(ns).
+					List(ctx, metav1.ListOptions{})
 				if scopeErr != nil {
 					if caperrors.IgnoreGone(scopeErr) || apierrors.HasStatusCause(scopeErr, corev1.NamespaceTerminatingCause) {
-						return nil
+						scopeErr = nil
+
+						continue
 					}
 
 					return scopeErr

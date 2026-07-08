@@ -59,10 +59,9 @@ func TestSyncCustomResourceQuotaUsagesCountsReadyNamespacesOnly(t *testing.T) {
 	dynamicClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
 		gvr: "WidgetList",
 	})
-	var selectors []string
+	var listedNamespaces []string
 	dynamicClient.PrependReactor("list", "widgets", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
-		listAction := action.(k8stesting.ListAction)
-		selectors = append(selectors, listAction.GetListRestrictions().Fields.String())
+		listedNamespaces = append(listedNamespaces, action.GetNamespace())
 
 		active := unstructured.Unstructured{}
 		active.SetName("active")
@@ -85,12 +84,12 @@ func TestSyncCustomResourceQuotaUsagesCountsReadyNamespacesOnly(t *testing.T) {
 		t.Fatalf("syncCustomResourceQuotaUsages() unexpected error: %v", err)
 	}
 
-	if len(selectors) != 1 {
-		t.Fatalf("expected one resource list call, got %d: %v", len(selectors), selectors)
+	if len(listedNamespaces) != 1 {
+		t.Fatalf("expected one resource list call, got %d: %v", len(listedNamespaces), listedNamespaces)
 	}
 
-	if selectors[0] != "metadata.namespace=ready" {
-		t.Fatalf("unexpected field selector %q", selectors[0])
+	if listedNamespaces[0] != "ready" {
+		t.Fatalf("unexpected list namespace %q", listedNamespaces[0])
 	}
 
 	updated := &capsulev1beta2.Tenant{}

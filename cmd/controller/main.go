@@ -128,9 +128,16 @@ func main() {
 		secureMetrics        bool
 		enableHTTP2          bool
 
-		tracingEndpoint    string
-		tracingSampleRatio float64
-		tracingInsecure    bool
+		tracingEndpoint              string
+		tracingSampleRatio           float64
+		tracingInsecure              bool
+		tracingHeaders               = tracingHeadersFlag{}
+		tracingBasicAuthUsername     string
+		tracingBasicAuthPassword     string
+		tracingTimeout               time.Duration
+		tracingCompression           string
+		tracingTLSServerName         string
+		tracingTLSInsecureSkipVerify bool
 
 		clientConnectionQPS   float32
 		clientConnectionBurst int32
@@ -185,6 +192,47 @@ func main() {
 		"tracing-sample-ratio",
 		1.0,
 		"Trace sampling ratio for admission webhook requests. Must be between 0 and 1.",
+	)
+	flag.Var(
+		tracingHeaders,
+		"tracing-otlp-header",
+		"OTLP gRPC metadata header in key=value format. Can be set multiple times.",
+	)
+	flag.StringVar(
+		&tracingBasicAuthUsername,
+		"tracing-otlp-basic-auth-username",
+		"",
+		"Basic auth username for the OTLP gRPC trace exporter. Can also be set with CAPSULE_TRACING_OTLP_BASIC_AUTH_USERNAME.",
+	)
+	flag.StringVar(
+		&tracingBasicAuthPassword,
+		"tracing-otlp-basic-auth-password",
+		"",
+		"Basic auth password for the OTLP gRPC trace exporter. Can also be set with CAPSULE_TRACING_OTLP_BASIC_AUTH_PASSWORD.",
+	)
+	flag.DurationVar(
+		&tracingTimeout,
+		"tracing-otlp-timeout",
+		0,
+		"Timeout for exporting a batch of spans. Empty or 0 uses OpenTelemetry's default.",
+	)
+	flag.StringVar(
+		&tracingCompression,
+		"tracing-otlp-compression",
+		"",
+		"Compression for OTLP gRPC trace exports. Supported value: gzip. Empty disables compression.",
+	)
+	flag.StringVar(
+		&tracingTLSServerName,
+		"tracing-otlp-tls-server-name",
+		"",
+		"TLS server name override for the OTLP gRPC trace exporter.",
+	)
+	flag.BoolVar(
+		&tracingTLSInsecureSkipVerify,
+		"tracing-otlp-tls-insecure-skip-verify",
+		false,
+		"Skip OTLP gRPC trace exporter TLS certificate verification. Not recommended for production.",
 	)
 	flag.IntVar(
 		&controllerConfig.Runtime.MaxConcurrentReconciles,
@@ -320,26 +368,6 @@ func main() {
 	}
 
 	ctx := ctrl.SetupSignalHandler()
-
-	tracingShutdown, err := setupTracing(ctx, tracingOptions{
-		enabled:     enableTracing,
-		endpoint:    tracingEndpoint,
-		insecure:    tracingInsecure,
-		sampleRatio: tracingSampleRatio,
-	})
-	if err != nil {
-		setupLog.Error(err, "unable to initialize tracing")
-		os.Exit(1)
-	}
-
-	defer func() {
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		if err := tracingShutdown(shutdownCtx); err != nil {
-			setupLog.Error(err, "unable to shutdown tracing")
-		}
-	}()
 
 	setupLog.V(5).Info("Controller", "Options", controllerConfig)
 
@@ -933,8 +961,49 @@ func main() {
 
 	setupLog.Info("starting manager")
 
-	if err = manager.Start(ctx); err != nil {
-		setupLog.Error(err, "problem running manager")
+	if tracingBasicAuthUsername == "" {
+		tracingBasicAuthUsername = os.Getenv("CAPSULE_TRACING_OTLP_BASIC_AUTH_USERNAME")
+	}
+
+	if tracingBasicAuthPassword == "" {
+		tracingBasicAuthPassword = os.Getenv("CAPSULE_TRACING_OTLP_BASIC_AUTH_PASSWORD")
+	}
+
+	tracingShutdown, err := setupTracing(ctx, tracingOptions{
+		enabled:               enableTracing,
+		endpoint:              tracingEndpoint,
+		insecure:              tracingInsecure,
+		sampleRatio:           tracingSampleRatio,
+		headers:               tracingHeaders,
+		basicAuthUsername:     tracingBasicAuthUsername,
+		basicAuthPassword:     tracingBasicAuthPassword,
+		timeout:               tracingTimeout,
+		compression:           tracingCompression,
+		tlsServerName:         tracingTLSServerName,
+		tlsInsecureSkipVerify: tracingTLSInsecureSkipVerify,
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to initialize tracing")
 		os.Exit(1)
 	}
+
+	if err = manager.Start(ctx); err != nil {
+		setupLog.Error(err, "problem running manager")
+
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		if shutdownErr := tracingShutdown(shutdownCtx); shutdownErr != nil {
+			setupLog.Error(shutdownErr, "unable to shutdown tracing")
+		}
+
+		cancel()
+
+		os.Exit(1)
+	}
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	if err := tracingShutdown(shutdownCtx); err != nil {
+		setupLog.Error(err, "unable to shutdown tracing")
+	}
+
+	cancel()
 }

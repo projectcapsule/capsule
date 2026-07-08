@@ -111,6 +111,7 @@ func (r *handlerRouter) Handle(ctx context.Context, req admission.Request) admis
 
 func (r *handlerRouter) recordResponse(span trace.Span, response admission.Response) admission.Response {
 	span.SetAttributes(attribute.Bool("admission.allowed", response.Allowed))
+
 	if response.Result != nil {
 		span.SetAttributes(
 			attribute.Int64("admission.response.code", int64(response.Result.Code)),

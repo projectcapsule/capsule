@@ -357,10 +357,7 @@
                 },
                 "extraArgs": {
                     "description": "A list of extra arguments for the capsule controller",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
+                    "type": "array"
                 },
                 "hostNetwork": {
                     "description": "Specifies if the container should be started in hostNetwork mode.  Required for use in some managed kubernetes clusters (such as AWS EKS) with custom CNI (such as calico), because control-plane managed by AWS cannot communicate with pods' IP CIDR and admission webhooks are not working",
@@ -480,39 +477,24 @@
                             "description": "Additional labels to add to the CapsuleConfiguration resource",
                             "type": "object"
                         },
-                        "leaderElectionLeaseDuration": {
-                            "description": "Leader election lease duration. Empty uses controller-runtime's default.",
-                            "type": "string"
-                        },
-                        "leaderElectionRenewDeadline": {
-                            "description": "Leader election renew deadline. Empty uses controller-runtime's default.",
-                            "type": "string"
-                        },
-                        "leaderElectionRetryPeriod": {
-                            "description": "Leader election retry period. Empty uses controller-runtime's default.",
-                            "type": "string"
-                        },
-                        "tracing": {
-                            "description": "OpenTelemetry tracing for admission webhook requests.",
+                        "leaderElection": {
                             "type": "object",
                             "properties": {
                                 "enabled": {
-                                    "description": "Enable OpenTelemetry tracing for admission webhook requests.",
+                                    "description": "Enable Leader Election for capsule controller",
                                     "type": "boolean"
                                 },
-                                "endpoint": {
-                                    "description": "OTLP gRPC endpoint for exporting traces. If empty, OpenTelemetry environment variables are used.",
+                                "leaseDuration": {
+                                    "description": "Leader election lease duration. Empty uses controller-runtime's default.",
                                     "type": "string"
                                 },
-                                "insecure": {
-                                    "description": "Disable transport security for the OTLP gRPC trace exporter.",
-                                    "type": "boolean"
+                                "renewDeadline": {
+                                    "description": "Leader election renew deadline. Empty uses controller-runtime's default.",
+                                    "type": "string"
                                 },
-                                "sampleRatio": {
-                                    "description": "Trace sampling ratio for admission webhook requests. Must be between 0 and 1.",
-                                    "type": "number",
-                                    "minimum": 0,
-                                    "maximum": 1
+                                "retryPeriod": {
+                                    "description": "Leader election retry period. Empty uses controller-runtime's default.",
+                                    "type": "string"
                                 }
                             }
                         },
@@ -577,6 +559,82 @@
                                 "provisioner": {
                                     "description": "Name for the ClusterRole required to grant Namespace Provision permissions.",
                                     "type": "string"
+                                }
+                            }
+                        },
+                        "tracing": {
+                            "type": "object",
+                            "properties": {
+                                "basicAuth": {
+                                    "type": "object",
+                                    "properties": {
+                                        "existingSecret": {
+                                            "type": "object",
+                                            "properties": {
+                                                "name": {
+                                                    "description": "Existing Secret containing OTLP basic auth credentials.",
+                                                    "type": "string"
+                                                },
+                                                "passwordKey": {
+                                                    "description": "Secret key containing the basic auth password.",
+                                                    "type": "string"
+                                                },
+                                                "usernameKey": {
+                                                    "description": "Secret key containing the basic auth username.",
+                                                    "type": "string"
+                                                }
+                                            }
+                                        },
+                                        "password": {
+                                            "description": "Basic auth password for the OTLP gRPC trace exporter. Prefer existingSecret for production.",
+                                            "type": "string"
+                                        },
+                                        "username": {
+                                            "description": "Basic auth username for the OTLP gRPC trace exporter. Prefer existingSecret for production.",
+                                            "type": "string"
+                                        }
+                                    }
+                                },
+                                "compression": {
+                                    "description": "Compression for OTLP gRPC trace exports. Supported value: gzip. Empty disables compression.",
+                                    "type": "string"
+                                },
+                                "enabled": {
+                                    "description": "Enable OpenTelemetry tracing for admission webhook requests.",
+                                    "type": "boolean"
+                                },
+                                "endpoint": {
+                                    "description": "OTLP gRPC endpoint for exporting traces. If empty, OpenTelemetry environment variables are used.",
+                                    "type": "string"
+                                },
+                                "headers": {
+                                    "description": "OTLP gRPC metadata headers to send with each trace export request.",
+                                    "type": "object"
+                                },
+                                "insecure": {
+                                    "description": "Disable transport security for the OTLP gRPC trace exporter.",
+                                    "type": "boolean"
+                                },
+                                "sampleRatio": {
+                                    "description": "Trace sampling ratio for admission webhook requests. Must be between 0 and 1.",
+                                    "type": "number"
+                                },
+                                "timeout": {
+                                    "description": "Timeout for exporting a batch of spans. Empty uses OpenTelemetry's default.",
+                                    "type": "string"
+                                },
+                                "tls": {
+                                    "type": "object",
+                                    "properties": {
+                                        "insecureSkipVerify": {
+                                            "description": "Skip OTLP gRPC trace exporter TLS certificate verification. Not recommended for production.",
+                                            "type": "boolean"
+                                        },
+                                        "serverName": {
+                                            "description": "TLS server name override for the OTLP gRPC trace exporter.",
+                                            "type": "string"
+                                        }
+                                    }
                                 }
                             }
                         },
