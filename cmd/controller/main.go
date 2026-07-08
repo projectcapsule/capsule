@@ -573,7 +573,7 @@ func main() {
 	// webhooks: the order matters, don't change it and just append
 	webhooksList := append(
 		make([]handlers.Webhook, 0),
-		rulesgenericvalidation.Register(regexCache),
+		rulesgenericvalidation.Register(regexCache, jsonPathCache),
 		route.GenericReplicasHandler(),
 		route.GenericManagedHandler(cfg),
 		route.Pod(

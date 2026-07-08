@@ -14,6 +14,8 @@ const (
 	// ForbiddenAnnotationReason used as reason string to deny forbidden annotations.
 	ReasonForbiddenAnnotation string = "ForbiddenAnnotation"
 	ReasonForbiddenMetadata   string = "ForbiddenMetadata"
+	// ForbiddenFieldReason used as reason string to deny forbidden field values.
+	ReasonForbiddenField string = "ForbiddenField"
 
 	ReasonAdmissionFailure string = "AdmissionFailed"
 

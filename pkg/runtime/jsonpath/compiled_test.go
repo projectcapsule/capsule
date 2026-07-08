@@ -4,6 +4,7 @@
 package jsonpath
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -62,6 +63,24 @@ func TestCompileJSONPath(t *testing.T) {
 			sourcePath: ".spec[",
 			wantErr:    true,
 			errMsg:     "parse usage jsonpath",
+		},
+		{
+			name:       "wrapped in braces",
+			sourcePath: "{.spec.storageClassName}",
+			wantErr:    true,
+			errMsg:     "sourcePath must start with '.'",
+		},
+		{
+			name:       "template injection via braces",
+			sourcePath: ".spec.foo}{.spec.bar",
+			wantErr:    true,
+			errMsg:     "sourcePath must not contain curly braces",
+		},
+		{
+			name:       "stray brace",
+			sourcePath: ".spec.name}",
+			wantErr:    true,
+			errMsg:     "sourcePath must not contain curly braces",
 		},
 	}
 
@@ -254,5 +273,138 @@ func TestCompiledJSONPath_Execute_NilReceiver(t *testing.T) {
 	_, err := compiled.Execute(u)
 	if err == nil {
 		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestCompiledJSONPathFindScalars(t *testing.T) {
+	t.Parallel()
+
+	deployment := map[string]any{
+		"spec": map[string]any{
+			"replicas": int64(3),
+			"template": map[string]any{
+				"spec": map[string]any{
+					"hostNetwork": true,
+					"containers": []any{
+						map[string]any{"image": "docker.io/nginx"},
+						map[string]any{"image": "ghcr.io/app"},
+						map[string]any{"name": "no-image"},
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name       string
+		sourcePath string
+		content    map[string]any
+		want       []string
+	}{
+		{
+			name:       "array expansion over scalar strings",
+			sourcePath: ".spec.template.spec.containers[*].image",
+			content:    deployment,
+			want:       []string{"docker.io/nginx", "ghcr.io/app"},
+		},
+		{
+			name:       "indexed access",
+			sourcePath: ".spec.template.spec.containers[1].image",
+			content:    deployment,
+			want:       []string{"ghcr.io/app"},
+		},
+		{
+			name:       "bool value",
+			sourcePath: ".spec.template.spec.hostNetwork",
+			content:    deployment,
+			want:       []string{"true"},
+		},
+		{
+			name:       "integer value",
+			sourcePath: ".spec.replicas",
+			content:    deployment,
+			want:       []string{"3"},
+		},
+		{
+			name:       "float value",
+			sourcePath: ".spec.weight",
+			content: map[string]any{
+				"spec": map[string]any{
+					"weight": 1.5,
+				},
+			},
+			want: []string{"1.5"},
+		},
+		{
+			name:       "scalar array elements",
+			sourcePath: ".spec.hosts[*]",
+			content: map[string]any{
+				"spec": map[string]any{
+					"hosts": []any{"a.example.com", "b.example.com"},
+				},
+			},
+			want: []string{"a.example.com", "b.example.com"},
+		},
+		{
+			name:       "missing field",
+			sourcePath: ".spec.storageClassName",
+			content:    deployment,
+			want:       nil,
+		},
+		{
+			name:       "path terminating at a map yields nothing",
+			sourcePath: ".spec.template",
+			content:    deployment,
+			want:       nil,
+		},
+		{
+			name:       "path terminating at an array without expansion yields nothing",
+			sourcePath: ".spec.template.spec.containers",
+			content:    deployment,
+			want:       nil,
+		},
+		{
+			name:       "null value yields nothing",
+			sourcePath: ".spec.storageClassName",
+			content: map[string]any{
+				"spec": map[string]any{
+					"storageClassName": nil,
+				},
+			},
+			want: nil,
+		},
+		{
+			name:       "nil content",
+			sourcePath: ".spec.name",
+			content:    nil,
+			want:       nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			compiled, err := CompileJSONPath(tt.sourcePath)
+			if err != nil {
+				t.Fatalf("expected no compile error, got %v", err)
+			}
+
+			got := compiled.FindScalars(tt.content)
+
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("expected %#v, got %#v", tt.want, got)
+			}
+		})
+	}
+}
+
+func TestCompiledJSONPath_FindScalars_NilReceiver(t *testing.T) {
+	t.Parallel()
+
+	var compiled *CompiledJSONPath
+
+	if got := compiled.FindScalars(map[string]any{}); got != nil {
+		t.Fatalf("expected nil, got %#v", got)
 	}
 }

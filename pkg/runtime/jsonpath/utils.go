@@ -29,5 +29,12 @@ func validateSourcePath(sourcePath string) error {
 		return fmt.Errorf("sourcePath must not contain control whitespace")
 	}
 
+	// Braces would be swallowed as jsonpath template delimiters when the
+	// path is wrapped, letting ".spec.foo}{.spec.bar" smuggle in a second
+	// expression.
+	if strings.ContainsAny(sourcePath, "{}") {
+		return fmt.Errorf("sourcePath must not contain curly braces")
+	}
+
 	return nil
 }

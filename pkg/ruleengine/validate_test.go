@@ -1193,3 +1193,139 @@ func newRuleValidationRESTMapper() apimeta.RESTMapper {
 
 	return mapper
 }
+
+func TestValidateFieldRulesBody(t *testing.T) {
+	t.Parallel()
+
+	mapper := newRuleValidationRESTMapper()
+
+	validMatch := []runtime.ExpressionMatch{
+		{
+			Exact: []string{"fast-ssd"},
+		},
+	}
+
+	makeBody := func(rule rules.FieldRule) []*rules.NamespaceRuleBodyNamespace {
+		return []*rules.NamespaceRuleBodyNamespace{
+			{
+				Enforce: &rules.NamespaceRuleEnforceBody{
+					Action: rules.ActionTypeAllow,
+					Fields: []rules.FieldRule{rule},
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name    string
+		rule    rules.FieldRule
+		wantErr string
+	}{
+		{
+			name: "valid field rule",
+			rule: rules.FieldRule{
+				VersionKinds: runtime.VersionKinds{
+					APIGroups: []string{"apps"},
+					Kinds:     []string{"Deployment"},
+				},
+				Path:  ".spec.template.spec.containers[*].image",
+				Match: validMatch,
+			},
+		},
+		{
+			name: "wildcard kinds are valid",
+			rule: rules.FieldRule{
+				VersionKinds: runtime.VersionKinds{
+					APIGroups: []string{"*"},
+					Kinds:     []string{"*"},
+				},
+				Path:  ".spec.storageClassName",
+				Match: validMatch,
+			},
+		},
+		{
+			name: "missing kinds",
+			rule: rules.FieldRule{
+				Path:  ".spec.storageClassName",
+				Match: validMatch,
+			},
+			wantErr: "rules[0].enforce.fields[0].kinds is invalid",
+		},
+		{
+			name: "unknown kind",
+			rule: rules.FieldRule{
+				VersionKinds: runtime.VersionKinds{
+					APIGroups: []string{"apps"},
+					Kinds:     []string{"DoesNotExist"},
+				},
+				Path:  ".spec.storageClassName",
+				Match: validMatch,
+			},
+			wantErr: "rules[0].enforce.fields[0].kinds[0]",
+		},
+		{
+			name: "invalid path",
+			rule: rules.FieldRule{
+				VersionKinds: runtime.VersionKinds{
+					APIGroups: []string{"apps"},
+					Kinds:     []string{"Deployment"},
+				},
+				Path:  ".spec.containers[",
+				Match: validMatch,
+			},
+			wantErr: "rules[0].enforce.fields[0].path",
+		},
+		{
+			name: "empty match",
+			rule: rules.FieldRule{
+				VersionKinds: runtime.VersionKinds{
+					APIGroups: []string{"apps"},
+					Kinds:     []string{"Deployment"},
+				},
+				Path: ".spec.storageClassName",
+			},
+			wantErr: "rules[0].enforce.fields[0].match is invalid",
+		},
+		{
+			name: "invalid match expression",
+			rule: rules.FieldRule{
+				VersionKinds: runtime.VersionKinds{
+					APIGroups: []string{"apps"},
+					Kinds:     []string{"Deployment"},
+				},
+				Path: ".spec.storageClassName",
+				Match: []runtime.ExpressionMatch{
+					{
+						ExpressionRegex: runtime.ExpressionRegex{
+							Expression: "([",
+						},
+					},
+				},
+			},
+			wantErr: "rules[0].enforce.fields[0].match[0].exp",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := ValidateRuleStatusBody(mapper, makeBody(tt.rule))
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("expected no error, got %v", err)
+				}
+
+				return
+			}
+
+			if err == nil {
+				t.Fatalf("expected error containing %q", tt.wantErr)
+			}
+
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("expected error containing %q, got %v", tt.wantErr, err)
+			}
+		})
+	}
+}
