@@ -148,6 +148,10 @@ The following Values have changed key or Value:
 | manager.options.rbac.deleter | string | `"capsule-namespace-deleter"` | Name for the ClusterRole required to grant Namespace Deletion permissions. |
 | manager.options.rbac.promotionClusterRoles | list | `["capsule-namespace-provisioner","capsule-namespace-deleter"]` | The ClusterRoles applied for ServiceAccounts which had owner Promotion |
 | manager.options.rbac.provisioner | string | `"capsule-namespace-provisioner"` | Name for the ClusterRole required to grant Namespace Provision permissions. |
+| manager.options.tracing.enabled | bool | `false` | Enable OpenTelemetry tracing for admission webhook requests. |
+| manager.options.tracing.endpoint | string | `""` | OTLP gRPC endpoint for exporting traces. If empty, OpenTelemetry environment variables are used. |
+| manager.options.tracing.insecure | bool | `true` | Disable transport security for the OTLP gRPC trace exporter. |
+| manager.options.tracing.sampleRatio | float | `1` | Trace sampling ratio for admission webhook requests. Must be between 0 and 1. |
 | manager.options.userNames | list | `[]` | DEPRECATED: use users properties. Names of the users considered as Capsule users. |
 | manager.options.users | list | `[{"kind":"Group","name":"projectcapsule.dev"}]` | Define entities which are considered part of the Capsule construct. Users not mentioned here will be ignored by Capsule |
 | manager.options.workers | int | `1` | Workers (MaxConcurrentReconciles) is the maximum number of concurrent Reconciles which can be run (ALPHA). |

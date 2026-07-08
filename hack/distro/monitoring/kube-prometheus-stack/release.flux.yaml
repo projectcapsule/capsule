@@ -34,6 +34,24 @@ spec:
           type: grafana-pyroscope-datasource
           uid: pyroscope
           url: http://pyroscope.{{ $.Release.Namespace }}.svc.cluster.local.:4040/
+        - name: Tempo
+          type: tempo
+          uid: tempo
+          url: http://tempo.{{ $.Release.Namespace }}.svc.cluster.local.:3200/
+          jsonData:
+            tracesToMetrics:
+              datasourceUid: prometheus
+              spanStartTimeShift: -10m
+              spanEndTimeShift: 10m
+              tags:
+                - key: service.name
+                  value: service
+                - key: job
+              queries:
+                - name: Span latency
+                  query: 'sum(rate(traces_spanmetrics_latency_bucket{$$__tags}[5m]))'
+                - name: Span calls
+                  query: 'sum(rate(traces_spanmetrics_calls_total{$$__tags}[5m]))'
       adminPassword: admin
       global:
         dnsService: "kube-dns"
@@ -88,6 +106,9 @@ spec:
           auto_assign_org: true
         server:
           root_url: "http://localhost:9090"
+    prometheus:
+      prometheusSpec:
+        enableRemoteWriteReceiver: true
 ---
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository

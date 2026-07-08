@@ -456,18 +456,6 @@
                             "description": "QPS to use for interacting with kubernetes apiserver",
                             "type": "number"
                         },
-                        "leaderElectionLeaseDuration": {
-                            "description": "Leader election lease duration. Empty uses controller-runtime's default.",
-                            "type": "string"
-                        },
-                        "leaderElectionRenewDeadline": {
-                            "description": "Leader election renew deadline. Empty uses controller-runtime's default.",
-                            "type": "string"
-                        },
-                        "leaderElectionRetryPeriod": {
-                            "description": "Leader election retry period. Empty uses controller-runtime's default.",
-                            "type": "string"
-                        },
                         "createConfiguration": {
                             "description": "Create Configuration",
                             "type": "boolean"
@@ -491,6 +479,42 @@
                         "labels": {
                             "description": "Additional labels to add to the CapsuleConfiguration resource",
                             "type": "object"
+                        },
+                        "leaderElectionLeaseDuration": {
+                            "description": "Leader election lease duration. Empty uses controller-runtime's default.",
+                            "type": "string"
+                        },
+                        "leaderElectionRenewDeadline": {
+                            "description": "Leader election renew deadline. Empty uses controller-runtime's default.",
+                            "type": "string"
+                        },
+                        "leaderElectionRetryPeriod": {
+                            "description": "Leader election retry period. Empty uses controller-runtime's default.",
+                            "type": "string"
+                        },
+                        "tracing": {
+                            "description": "OpenTelemetry tracing for admission webhook requests.",
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "description": "Enable OpenTelemetry tracing for admission webhook requests.",
+                                    "type": "boolean"
+                                },
+                                "endpoint": {
+                                    "description": "OTLP gRPC endpoint for exporting traces. If empty, OpenTelemetry environment variables are used.",
+                                    "type": "string"
+                                },
+                                "insecure": {
+                                    "description": "Disable transport security for the OTLP gRPC trace exporter.",
+                                    "type": "boolean"
+                                },
+                                "sampleRatio": {
+                                    "description": "Trace sampling ratio for admission webhook requests. Must be between 0 and 1.",
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 1
+                                }
+                            }
                         },
                         "logLevel": {
                             "description": "Set the log verbosity of the capsule with a value from 1 to 5",

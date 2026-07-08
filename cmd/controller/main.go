@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	goflag "flag"
 	"fmt"
@@ -122,9 +123,14 @@ func main() {
 
 		enableLeaderElection bool
 		enablePprof          bool
+		enableTracing        bool
 		version              bool
 		secureMetrics        bool
 		enableHTTP2          bool
+
+		tracingEndpoint    string
+		tracingSampleRatio float64
+		tracingInsecure    bool
 
 		clientConnectionQPS   float32
 		clientConnectionBurst int32
@@ -155,6 +161,30 @@ func main() {
 		false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.",
+	)
+	flag.BoolVar(
+		&enableTracing,
+		"enable-tracing",
+		false,
+		"Enable OpenTelemetry tracing for admission webhook requests.",
+	)
+	flag.StringVar(
+		&tracingEndpoint,
+		"tracing-otlp-endpoint",
+		"",
+		"OTLP gRPC endpoint for exporting traces, for example otel-collector.observability.svc:4317. If unset, OpenTelemetry environment variables are used.",
+	)
+	flag.BoolVar(
+		&tracingInsecure,
+		"tracing-otlp-insecure",
+		true,
+		"Disable transport security for the OTLP gRPC trace exporter.",
+	)
+	flag.Float64Var(
+		&tracingSampleRatio,
+		"tracing-sample-ratio",
+		1.0,
+		"Trace sampling ratio for admission webhook requests. Must be between 0 and 1.",
 	)
 	flag.IntVar(
 		&controllerConfig.Runtime.MaxConcurrentReconciles,
@@ -290,6 +320,26 @@ func main() {
 	}
 
 	ctx := ctrl.SetupSignalHandler()
+
+	tracingShutdown, err := setupTracing(ctx, tracingOptions{
+		enabled:     enableTracing,
+		endpoint:    tracingEndpoint,
+		insecure:    tracingInsecure,
+		sampleRatio: tracingSampleRatio,
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to initialize tracing")
+		os.Exit(1)
+	}
+
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		if err := tracingShutdown(shutdownCtx); err != nil {
+			setupLog.Error(err, "unable to shutdown tracing")
+		}
+	}()
 
 	setupLog.V(5).Info("Controller", "Options", controllerConfig)
 
@@ -738,7 +788,11 @@ func main() {
 			ctrl.Log.WithName("capsule.ctrl").WithName("events"),
 			manager.GetEventRecorder("tenant-controller"),
 			cfg,
-		), webhooksList...); err != nil {
+		),
+		webhook.RegistrationOptions{
+			EnableTracing: enableTracing,
+		},
+		webhooksList...); err != nil {
 		setupLog.Error(err, "unable to setup webhooks")
 		os.Exit(1)
 	}

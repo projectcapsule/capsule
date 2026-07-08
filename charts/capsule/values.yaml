@@ -246,6 +246,15 @@ manager:
     leaderElectionRenewDeadline: ""
     # -- Leader election retry period. Empty uses controller-runtime's default.
     leaderElectionRetryPeriod: ""
+    tracing:
+      # -- Enable OpenTelemetry tracing for admission webhook requests.
+      enabled: false
+      # -- OTLP gRPC endpoint for exporting traces. If empty, OpenTelemetry environment variables are used.
+      endpoint: ""
+      # -- Disable transport security for the OTLP gRPC trace exporter.
+      insecure: true
+      # -- Trace sampling ratio for admission webhook requests. Must be between 0 and 1.
+      sampleRatio: 1.0
     # -- Define entities which are considered part of the Capsule construct.
     # Users not mentioned here will be ignored by Capsule
     users:

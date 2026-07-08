@@ -79,6 +79,14 @@ spec:
         {{- with .Values.manager.options.leaderElectionRetryPeriod }}
         - --leader-election-retry-period={{ . }}
         {{- end }}
+        {{- if .Values.manager.options.tracing.enabled }}
+        - --enable-tracing=true
+        {{- with .Values.manager.options.tracing.endpoint }}
+        - --tracing-otlp-endpoint={{ . }}
+        {{- end }}
+        - --tracing-otlp-insecure={{ .Values.manager.options.tracing.insecure }}
+        - --tracing-sample-ratio={{ .Values.manager.options.tracing.sampleRatio }}
+        {{- end }}
         {{- with .Values.manager.extraArgs }}
           {{- toYaml . | nindent 8 }}
         {{- end }}

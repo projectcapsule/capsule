@@ -7,8 +7,11 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"golang.org/x/sync/errgroup"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -17,10 +20,15 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 func (r *Manager) syncCustomResourceQuotaUsages(ctx context.Context, tenant *capsulev1beta2.Tenant) error {
+	if tenant.DeletionTimestamp != nil {
+		return nil
+	}
+
 	type resource struct {
 		kind    string
 		group   string
@@ -63,9 +71,14 @@ func (r *Manager) syncCustomResourceQuotaUsages(ctx context.Context, tenant *cap
 		})
 	}
 
+	if len(resourceList) == 0 {
+		return nil
+	}
+
 	errGroup := new(errgroup.Group)
 
 	usedMap := make(map[string]int)
+	usedMapMu := sync.Mutex{}
 
 	defer func() {
 		for gvk, used := range usedMap {
@@ -89,29 +102,33 @@ func (r *Manager) syncCustomResourceQuotaUsages(ctx context.Context, tenant *cap
 		}
 	}()
 
+	dynamicClient := r.DynamicClient
+	if dynamicClient == nil {
+		dynamicClient = dynamic.NewForConfigOrDie(r.RESTConfig)
+	}
+
+	namespaces := readyTenantNamespaces(tenant)
+
 	for _, item := range resourceList {
 		res := item
+		key := fmt.Sprintf("%s.%s_%s", res.kind, res.group, res.version)
 
 		errGroup.Go(func() (scopeErr error) {
-			dynamicClient := dynamic.NewForConfigOrDie(r.RESTConfig)
+			var used int
 
-			for _, ns := range tenant.Status.Namespaces {
+			for _, ns := range namespaces {
 				var list *unstructured.UnstructuredList
 
 				list, scopeErr = dynamicClient.Resource(schema.GroupVersionResource{Group: res.group, Version: res.version, Resource: res.kind}).List(ctx, metav1.ListOptions{
 					FieldSelector: fmt.Sprintf("metadata.namespace==%s", ns),
 				})
 				if scopeErr != nil {
+					if caperrors.IgnoreGone(scopeErr) || apierrors.HasStatusCause(scopeErr, corev1.NamespaceTerminatingCause) {
+						return nil
+					}
+
 					return scopeErr
 				}
-
-				key := fmt.Sprintf("%s.%s_%s", res.kind, res.group, res.version)
-
-				if _, ok := usedMap[key]; !ok {
-					usedMap[key] = 0
-				}
-
-				var used int
 
 				for _, k := range list.Items {
 					if k.GetDeletionTimestamp() != nil {
@@ -120,9 +137,11 @@ func (r *Manager) syncCustomResourceQuotaUsages(ctx context.Context, tenant *cap
 
 					used++
 				}
-
-				usedMap[key] += used
 			}
+
+			usedMapMu.Lock()
+			usedMap[key] += used
+			usedMapMu.Unlock()
 
 			return scopeErr
 		})
