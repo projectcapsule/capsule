@@ -80,7 +80,7 @@ func TestErrorConstructors(t *testing.T) {
 		{name: "ingress forbidden", err: apierrors.NewIngressClassForbidden("nginx", allowed), want: "Ingress Class nginx is forbidden"},
 		{name: "ingress collision", err: apierrors.NewIngressHostnameCollision("example.com"), want: "example.com is already used"},
 		{name: "empty ingress hostname", err: apierrors.NewEmptyIngressHostname(api.AllowedListSpec{Exact: []string{"example.com"}, Regex: ".*\\.example\\.com"}), want: "empty hostname is not allowed"},
-		{name: "ingress hostnames invalid", err: apierrors.NewIngressHostnamesNotValid([]string{"bad_host"}, []string{"other.com"}, api.AllowedListSpec{Exact: []string{"example.com"}}), want: "Hostnames [bad_host] are not valid"},
+		{name: "ingress hostnames invalid", err: apierrors.NewIngressHostnamesNotValid([]string{"bad_host"}, api.AllowedListSpec{Exact: []string{"example.com"}}), want: "Hostnames [bad_host] are not valid"},
 		{name: "ingress undefined", err: apierrors.NewIngressClassUndefined(allowed), want: "No Ingress Class is forbidden"},
 		{name: "ingress not valid", err: apierrors.NewIngressClassNotValid("nginx", allowed), want: "Ingress Class nginx is forbidden"},
 		{name: "namespace quota", err: apierrors.NewNamespaceQuotaExceededError(), want: "Cannot exceed Namespace quota"},
