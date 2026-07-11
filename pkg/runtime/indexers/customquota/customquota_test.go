@@ -9,6 +9,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	capruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers/customquota"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -19,6 +20,9 @@ func TestCustomQuotaIndexers(t *testing.T) {
 
 	target := capsulev1beta2.CustomQuotaStatusTarget{
 		GroupVersionKind: metav1.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
+	}
+	globalSource := capsulev1beta2.CustomQuotaSpecSource{
+		VersionKind: capruntime.VersionKind{APIVersion: "apps/v1", Kind: "Deployment"},
 	}
 	claim := capsulev1beta2.CustomQuotaClaimItem{
 		NamespacedObjectWithUIDReference: meta.NamespacedObjectWithUIDReference{UID: types.UID("claim-uid")},
@@ -50,8 +54,10 @@ func TestCustomQuotaIndexers(t *testing.T) {
 			name:  "global target",
 			field: customquota.GlobalTargetReference{}.Field(),
 			got: customquota.GlobalTargetReference{}.Func()(&capsulev1beta2.GlobalCustomQuota{
-				Status: capsulev1beta2.GlobalCustomQuotaStatus{
-					CustomQuotaStatus: capsulev1beta2.CustomQuotaStatus{Targets: []capsulev1beta2.CustomQuotaStatusTarget{target}},
+				Spec: capsulev1beta2.GlobalCustomQuotaSpec{
+					CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
+						Sources: []capsulev1beta2.CustomQuotaSpecSource{globalSource},
+					},
 				},
 			}),
 			want: []string{target.String()},
