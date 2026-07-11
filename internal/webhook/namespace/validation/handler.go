@@ -5,6 +5,7 @@ package validation
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -101,7 +102,9 @@ func (h *handler) OnDelete(
 			// Administrators must be able to delete namespaces carrying an
 			// inconsistent tenant reference (they could otherwise never get
 			// rid of them): treat such namespaces as tenant-less for them.
-			if !user.IsAdmin() {
+			// Transient API errors while resolving the Tenant still fail
+			// closed for everybody.
+			if !user.IsAdmin() || !errors.Is(err, tenant.ErrInconsistentTenantReference) {
 				return ad.ErroredResponse(err)
 			}
 
@@ -155,19 +158,20 @@ func (h *handler) OnUpdate(
 			}
 		}
 
-		// Resolution errors (an inconsistent tenant reference, e.g. a tenant
-		// label without the matching Tenant ownerReference, as left behind by
-		// a webhook outage) are only fatal for non-administrators: admins may
-		// repair such namespaces — including the update that restores the
-		// missing ownerReference — the affected object being treated as
-		// tenant-less until consistent again.
+		// Inconsistent tenant references (e.g. a tenant label without the
+		// matching Tenant ownerReference, as left behind by a webhook outage)
+		// are only fatal for non-administrators: admins may repair such
+		// namespaces — including the update that restores the missing
+		// ownerReference — the affected object being treated as tenant-less
+		// until consistent again. Transient API errors while resolving the
+		// Tenant still fail closed for everybody.
 		oldTenant, oldErr := tenant.ResolveNamespaceTenant(ctx, reader, oldNs)
-		if oldErr != nil && !user.IsAdmin() {
+		if oldErr != nil && (!user.IsAdmin() || !errors.Is(oldErr, tenant.ErrInconsistentTenantReference)) {
 			return ad.ErroredResponse(oldErr)
 		}
 
 		newTenant, newErr := tenant.ResolveNamespaceTenant(ctx, reader, ns)
-		if newErr != nil && !user.IsAdmin() {
+		if newErr != nil && (!user.IsAdmin() || !errors.Is(newErr, tenant.ErrInconsistentTenantReference)) {
 			return ad.ErroredResponse(newErr)
 		}
 

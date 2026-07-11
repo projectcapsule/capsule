@@ -332,6 +332,9 @@ var _ = Describe("Administrators", Ordered, Label("namespace", "permissions", "a
 
 			err := impersonationClient(tnt1.Spec.Owners[0].Name, nil).Patch(ctx, current, client.MergeFrom(original))
 			Expect(err).To(HaveOccurred())
+			// The denial must come from the webhook detecting the inconsistent
+			// tenant reference, not from something unrelated (e.g. RBAC).
+			Expect(err.Error()).To(ContainSubstring("no Tenant ownerReference"))
 		})
 
 		By("updating the inconsistent namespace as administrator succeeds", func() {
@@ -379,6 +382,17 @@ var _ = Describe("Administrators", Ordered, Label("namespace", "permissions", "a
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 			NamespaceIsPartOfTenant(tnt1, ns1).Should(Succeed())
+
+			// Verify the repair outcome directly on the namespace: the Tenant
+			// ownerReference is restored and consistent with the tenant label.
+			Eventually(func(g Gomega) {
+				current := NewNamespace(ns1.Name)
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: ns1.Name}, current)).To(Succeed())
+				g.Expect(current.Labels[meta.TenantLabel]).To(Equal(tnt1.GetName()))
+				g.Expect(current.OwnerReferences).To(HaveLen(1))
+				g.Expect(current.OwnerReferences[0].Kind).To(Equal("Tenant"))
+				g.Expect(current.OwnerReferences[0].Name).To(Equal(tnt1.GetName()))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 
 		ns2 := NewNamespace("", map[string]string{

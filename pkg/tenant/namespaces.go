@@ -25,6 +25,13 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
+// ErrInconsistentTenantReference marks the *semantic* namespace↔tenant
+// reference inconsistencies detected by ResolveNamespaceTenant (tenant label
+// without Tenant ownerReference and the other mismatch states), as opposed to
+// transient API errors while resolving the Tenant. Callers can rely on
+// errors.Is to distinguish a repairable inconsistency from a lookup failure.
+var ErrInconsistentTenantReference = errors.New("inconsistent tenant reference")
+
 type NamespacedResourceCache interface {
 	Get(disco discovery.DiscoveryInterface) ([]schema.GroupVersionResource, error)
 }
@@ -244,13 +251,13 @@ func ResolveNamespaceTenant(
 		return nil, nil
 
 	case len(refs) > 1:
-		return nil, fmt.Errorf("namespace can not have multiple Tenant ownerReferences")
+		return nil, fmt.Errorf("%w: namespace can not have multiple Tenant ownerReferences", ErrInconsistentTenantReference)
 
 	case label == "" && len(refs) == 1:
-		return nil, fmt.Errorf("namespace has Tenant ownerReference %q but no tenant label", refs[0].Name)
+		return nil, fmt.Errorf("%w: namespace has Tenant ownerReference %q but no tenant label", ErrInconsistentTenantReference, refs[0].Name)
 
 	case label != "" && len(refs) == 0:
-		return nil, fmt.Errorf("namespace has tenant label %q but no Tenant ownerReference", label)
+		return nil, fmt.Errorf("%w: namespace has tenant label %q but no Tenant ownerReference", ErrInconsistentTenantReference, label)
 	}
 
 	tnt, err := GetTenantByOwnerreferences(ctx, reader, refs)
@@ -259,11 +266,11 @@ func ResolveNamespaceTenant(
 	}
 
 	if tnt == nil {
-		return nil, fmt.Errorf("namespace references unknown Tenant %q", refs[0].Name)
+		return nil, fmt.Errorf("%w: namespace references unknown Tenant %q", ErrInconsistentTenantReference, refs[0].Name)
 	}
 
 	if tnt.GetName() != label {
-		return nil, fmt.Errorf("namespace label %q does not match owner reference %q", label, tnt.GetName())
+		return nil, fmt.Errorf("%w: namespace label %q does not match owner reference %q", ErrInconsistentTenantReference, label, tnt.GetName())
 	}
 
 	return tnt, nil
