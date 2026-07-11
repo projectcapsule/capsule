@@ -98,7 +98,14 @@ func (h *handler) OnDelete(
 
 		tnt, err := tenant.ResolveNamespaceTenant(ctx, reader, oldNs)
 		if err != nil {
-			return ad.ErroredResponse(err)
+			// Administrators must be able to delete namespaces carrying an
+			// inconsistent tenant reference (they could otherwise never get
+			// rid of them): treat such namespaces as tenant-less for them.
+			if !user.IsAdmin() {
+				return ad.ErroredResponse(err)
+			}
+
+			tnt = nil
 		}
 
 		if tnt == nil {
@@ -148,14 +155,20 @@ func (h *handler) OnUpdate(
 			}
 		}
 
-		oldTenant, err := tenant.ResolveNamespaceTenant(ctx, reader, oldNs)
-		if err != nil {
-			return ad.ErroredResponse(err)
+		// Resolution errors (an inconsistent tenant reference, e.g. a tenant
+		// label without the matching Tenant ownerReference, as left behind by
+		// a webhook outage) are only fatal for non-administrators: admins may
+		// repair such namespaces — including the update that restores the
+		// missing ownerReference — the affected object being treated as
+		// tenant-less until consistent again.
+		oldTenant, oldErr := tenant.ResolveNamespaceTenant(ctx, reader, oldNs)
+		if oldErr != nil && !user.IsAdmin() {
+			return ad.ErroredResponse(oldErr)
 		}
 
-		newTenant, err := tenant.ResolveNamespaceTenant(ctx, reader, ns)
-		if err != nil {
-			return ad.ErroredResponse(err)
+		newTenant, newErr := tenant.ResolveNamespaceTenant(ctx, reader, ns)
+		if newErr != nil && !user.IsAdmin() {
+			return ad.ErroredResponse(newErr)
 		}
 
 		if !user.IsAdmin() {

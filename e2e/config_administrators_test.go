@@ -284,4 +284,139 @@ var _ = Describe("Administrators", Ordered, Label("namespace", "permissions", "a
 		})
 
 	})
+
+	It("repairing namespaces with an inconsistent tenant reference as administrator", func() {
+		ctx := context.TODO()
+
+		ns1 := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt1.GetName(),
+		})
+
+		By("creating a namespace assigned to the tenant", func() {
+			NamespaceCreation(ns1, admin, defaultTimeoutInterval).Should(Succeed())
+			NamespaceIsPartOfTenant(tnt1, ns1).Should(Succeed())
+		})
+
+		By("stripping the Tenant ownerReference as administrator (simulates the leftover of a webhook outage)", func() {
+			Eventually(func() error {
+				current := NewNamespace(ns1.Name)
+
+				if err := k8sClient.Get(ctx, types.NamespacedName{Name: ns1.Name}, current); err != nil {
+					return err
+				}
+
+				original := current.DeepCopy()
+				current.OwnerReferences = nil
+
+				return impersonationClient(admin.Name, nil).Patch(ctx, current, client.MergeFrom(original))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		})
+
+		By("verifying the namespace is inconsistent (tenant label without Tenant ownerReference)", func() {
+			current := NewNamespace(ns1.Name)
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: ns1.Name}, current)).To(Succeed())
+			Expect(current.Labels[meta.TenantLabel]).To(Equal(tnt1.GetName()))
+			Expect(current.OwnerReferences).To(BeEmpty())
+		})
+
+		By("updating the inconsistent namespace as tenant owner is still denied", func() {
+			current := NewNamespace(ns1.Name)
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: ns1.Name}, current)).To(Succeed())
+
+			original := current.DeepCopy()
+			if current.Annotations == nil {
+				current.Annotations = map[string]string{}
+			}
+
+			current.Annotations["e2e.capsule.clastix.io/owner-update"] = "true"
+
+			err := impersonationClient(tnt1.Spec.Owners[0].Name, nil).Patch(ctx, current, client.MergeFrom(original))
+			Expect(err).To(HaveOccurred())
+		})
+
+		By("updating the inconsistent namespace as administrator succeeds", func() {
+			Eventually(func() error {
+				current := NewNamespace(ns1.Name)
+
+				if err := k8sClient.Get(ctx, types.NamespacedName{Name: ns1.Name}, current); err != nil {
+					return err
+				}
+
+				original := current.DeepCopy()
+				if current.Annotations == nil {
+					current.Annotations = map[string]string{}
+				}
+
+				current.Annotations["e2e.capsule.clastix.io/admin-inconsistent-update"] = "true"
+
+				return impersonationClient(admin.Name, nil).Patch(ctx, current, client.MergeFrom(original))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		})
+
+		By("repairing the namespace by restoring the Tenant ownerReference as administrator", func() {
+			Eventually(func() error {
+				tnt := &capsulev1beta2.Tenant{}
+				if err := k8sClient.Get(ctx, types.NamespacedName{Name: tnt1.GetName()}, tnt); err != nil {
+					return err
+				}
+
+				current := NewNamespace(ns1.Name)
+				if err := k8sClient.Get(ctx, types.NamespacedName{Name: ns1.Name}, current); err != nil {
+					return err
+				}
+
+				original := current.DeepCopy()
+				current.OwnerReferences = []metav1.OwnerReference{
+					{
+						APIVersion: capsulev1beta2.GroupVersion.String(),
+						Kind:       "Tenant",
+						Name:       tnt.GetName(),
+						UID:        tnt.GetUID(),
+					},
+				}
+
+				return impersonationClient(admin.Name, nil).Patch(ctx, current, client.MergeFrom(original))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+			NamespaceIsPartOfTenant(tnt1, ns1).Should(Succeed())
+		})
+
+		ns2 := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt1.GetName(),
+		})
+
+		By("creating a second namespace assigned to the tenant and making it inconsistent", func() {
+			NamespaceCreation(ns2, admin, defaultTimeoutInterval).Should(Succeed())
+			NamespaceIsPartOfTenant(tnt1, ns2).Should(Succeed())
+
+			Eventually(func() error {
+				current := NewNamespace(ns2.Name)
+
+				if err := k8sClient.Get(ctx, types.NamespacedName{Name: ns2.Name}, current); err != nil {
+					return err
+				}
+
+				original := current.DeepCopy()
+				current.OwnerReferences = nil
+
+				return impersonationClient(admin.Name, nil).Patch(ctx, current, client.MergeFrom(original))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		})
+
+		By("deleting the inconsistent namespace as administrator succeeds", func() {
+			Eventually(func() error {
+				current := NewNamespace(ns2.Name)
+
+				if err := k8sClient.Get(ctx, types.NamespacedName{Name: ns2.Name}, current); err != nil {
+					return err
+				}
+
+				return impersonationClient(admin.Name, nil).Delete(ctx, current)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		})
+
+		By("deleting namespace", func() {
+			Expect(k8sClient.Delete(ctx, ns1)).Should(Succeed())
+		})
+	})
 })
