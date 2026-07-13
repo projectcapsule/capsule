@@ -159,9 +159,9 @@ func (r *ResourcePool) CalculateAvailableResources() {
 	available := corev1.ResourceList{}
 
 	for res, qt := range r.Status.Allocation.Hard {
-		// Copy qt before subtracting: ranging over the map yields live
-		// references, so mutating it in place would corrupt Hard.
-		remaining := qt.DeepCopy()
+		// Deep-copy qt before subtracting: resource.Quantity contains internal pointers,
+		// so a shallow copy can alias the map entry and Sub() could mutate Hard.
+		// Using DeepCopy() ensures Hard remains unchanged.
 
 		amount, exists := r.Status.Allocation.Claimed[res]
 		if exists {
