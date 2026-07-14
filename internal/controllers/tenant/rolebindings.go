@@ -6,12 +6,14 @@ package tenant
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -38,6 +40,37 @@ func (r *Manager) syncRoleBindings(ctx context.Context, log logr.Logger, tenant 
 
 		for namespace := range namespaceBindings {
 			namespaceBindings[namespace][hash] = binding
+		}
+	}
+
+	for i, rule := range tenant.Spec.Rules {
+		if rule == nil || len(rule.Permissions.Bindings) == 0 {
+			continue
+		}
+
+		for namespace := range namespaceBindings {
+			ns := &corev1.Namespace{}
+			if err := r.Get(ctx, client.ObjectKey{Name: namespace}, ns); err != nil {
+				if apierrors.IsNotFound(err) {
+					continue
+				}
+
+				return fmt.Errorf("get namespace %q for rules[%d]: %w", namespace, i, err)
+			}
+
+			matches, err := utils.IsNamespaceSelectedBySelector(ns, rule.NamespaceSelector)
+			if err != nil {
+				return fmt.Errorf("invalid namespaceSelector in rules[%d]: %w", i, err)
+			}
+
+			if !matches {
+				continue
+			}
+
+			for _, binding := range rule.Permissions.Bindings {
+				hash := utils.RoleBindingHashFunc(binding)
+				namespaceBindings[namespace][hash] = binding
+			}
 		}
 	}
 
@@ -88,9 +121,7 @@ func (r *Manager) syncAdditionalRoleBinding(
 			target.Labels = map[string]string{}
 			target.Annotations = map[string]string{}
 
-			if roleBinding.Labels != nil {
-				target.Labels = roleBinding.Labels
-			}
+			maps.Copy(target.Labels, roleBinding.Labels)
 
 			target.Labels[meta.NewTenantLabel] = tenant.Name
 			target.Labels[meta.RolebindingLabel] = hash
@@ -99,9 +130,7 @@ func (r *Manager) syncAdditionalRoleBinding(
 			// Remove Legacy labels
 			delete(target.Labels, meta.TenantLabel)
 
-			if roleBinding.Annotations != nil {
-				target.Annotations = roleBinding.Annotations
-			}
+			maps.Copy(target.Annotations, roleBinding.Annotations)
 
 			target.RoleRef = rbacv1.RoleRef{
 				APIGroup: rbacv1.GroupName,

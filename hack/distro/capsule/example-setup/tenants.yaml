@@ -14,6 +14,14 @@ spec:
         promotions:
           - clusterRoles:
             - "configmap-replicator"
+        bindings:
+          - clusterRoleName: 'view'
+            subjects:
+            - apiGroup: rbac.authorization.k8s.io
+              kind: User
+              name: joe
+            labels:
+              reflection.proxy.projectcapsule.dev/enabled: "true"
     - namespaceSelector:
         matchExpressions:
           - key: env
@@ -49,12 +57,6 @@ spec:
     additionalMetadataList:
       - labels:
           customer: a
-  additionalRoleBindings:
-  - clusterRoleName: 'view'
-    subjects:
-    - apiGroup: rbac.authorization.k8s.io
-      kind: User
-      name: joe
   resourceQuotas:
     scope: Tenant
     items:
@@ -82,13 +84,17 @@ spec:
   owners:
   - name: bob
     kind: User
-  additionalRoleBindings:
-  - clusterRoleName: 'view'
-    subjects:
-    - apiGroup: rbac.authorization.k8s.io
-      kind: User
-      name: alice
   rules:
+  - permissions:
+      bindings:
+        - clusterRoleName: 'custom:proxy-viewer'
+          subjects:
+          - apiGroup: rbac.authorization.k8s.io
+            kind: User
+            name: alice
+          labels:
+            reflection.proxy.projectcapsule.dev/enabled: "true"
+
   - enforce:
       action: "allow"
       services:
@@ -149,9 +155,11 @@ spec:
   owners:
   - name: joe
     kind: User
-  additionalRoleBindings:
-  - clusterRoleName: 'view'
-    subjects:
-    - apiGroup: rbac.authorization.k8s.io
-      kind: Group
-      name: wind-users
+  rules:
+  - permissions:
+      bindings:
+        - clusterRoleName: 'view'
+          subjects:
+            - apiGroup: rbac.authorization.k8s.io
+              kind: Group
+              name: wind-users
