@@ -293,8 +293,15 @@ manager:
       # -- Name for the ClusterRole required to grant Namespace Provision permissions.
       provisioner: capsule-namespace-provisioner
 
+    # @schema type: object
+    # @schema additionalProperties: true
     # -- Impersonation
-    impersonation: {}
+    impersonation:
+      # Default ServiceAccount for tenant resources (TenantResource) [Namespaced Scope]
+      # When defined, users are required to use this ServiceAccount anywhere in the cluster
+      # unless they explicitly provide their own. Once this is set, Capsule will add this ServiceAccount
+      # for all GlobalTenantResources, if they don't already have a ServiceAccount defined.
+      tenantDefaultServiceAccount: "default"
 
     # -- DEPRECATED: use users properties.
     # Names of the users considered as Capsule users.
