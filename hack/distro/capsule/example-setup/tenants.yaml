@@ -11,17 +11,25 @@ spec:
     kind: User
   rules:
     - permissions:
-        promotions:
-          - clusterRoles:
-            - "configmap-replicator"
         bindings:
-          - clusterRoleName: 'view'
+          - clusterRoleName: 'custom:proxy-viewer'
             subjects:
             - apiGroup: rbac.authorization.k8s.io
               kind: User
               name: joe
             labels:
               reflection.proxy.projectcapsule.dev/enabled: "true"
+      enforce:
+        action: deny
+        metadata:
+          - apiGroups:
+              - "rbac.authorization.k8s.io/v1"
+            kinds:
+              - "RoleBinding"
+            labels:
+              reflection.proxy.projectcapsule.dev/enabled:
+                values:
+                  - exp: ".*"
     - namespaceSelector:
         matchExpressions:
           - key: env

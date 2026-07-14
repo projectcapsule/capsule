@@ -43,19 +43,48 @@ func (r *Manager) syncRoleBindings(ctx context.Context, log logr.Logger, tenant 
 		}
 	}
 
+	nsCache := make(map[string]*corev1.Namespace, len(namespaceBindings))
+
 	for i, rule := range tenant.Spec.Rules {
 		if rule == nil || len(rule.Permissions.Bindings) == 0 {
 			continue
 		}
 
+		// A rule without a selector applies to every tenant namespace and does not
+		// require resolving Namespace objects.
+		if rule.NamespaceSelector == nil {
+			for namespace := range namespaceBindings {
+				for _, binding := range rule.Permissions.Bindings {
+					hash := utils.RoleBindingHashFunc(binding)
+
+					namespaceBindings[namespace][hash] = binding
+				}
+			}
+
+			continue
+		}
+
 		for namespace := range namespaceBindings {
-			ns := &corev1.Namespace{}
-			if err := r.Get(ctx, client.ObjectKey{Name: namespace}, ns); err != nil {
-				if apierrors.IsNotFound(err) {
-					continue
+			ns, ok := nsCache[namespace]
+			if !ok {
+				ns = &corev1.Namespace{}
+				if err := r.Get(ctx, client.ObjectKey{Name: namespace}, ns); err != nil {
+					if apierrors.IsNotFound(err) {
+						// Cache missing namespaces as well to avoid repeating the GET for
+						// subsequent selector-based rules in this reconciliation.
+						nsCache[namespace] = nil
+
+						continue
+					}
+
+					return fmt.Errorf("get namespace %q for rules[%d]: %w", namespace, i, err)
 				}
 
-				return fmt.Errorf("get namespace %q for rules[%d]: %w", namespace, i, err)
+				nsCache[namespace] = ns
+			}
+
+			if ns == nil {
+				continue
 			}
 
 			matches, err := utils.IsNamespaceSelectedBySelector(ns, rule.NamespaceSelector)
