@@ -130,7 +130,6 @@ func (e *labeledEvent) WithTenantLabel(tnt *capsulev1beta2.Tenant) LabeledEvent 
 	}
 
 	e.labels[meta.ManagedByCapsuleLabel] = tnt.Name
-	e.labels[meta.NewManagedByCapsuleLabel] = tnt.Name
 	e.labels[meta.NewTenantLabel] = tnt.Name
 
 	return e
