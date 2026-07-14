@@ -683,7 +683,7 @@ goreleaser: ## Download goreleaser locally if necessary.
 	$(call go-install-tool,$(GORELEASER),github.com/$(GORELEASER_LOOKUP)/v2@v$(GORELEASER_VERSION))
 
 SYFT          := $(LOCALBIN)/syft
-SYFT_VERSION  := 1.45.1
+SYFT_VERSION  := 1.46.0
 SYFT_LOOKUP   := anchore/syft
 syft: ## Download syft locally if necessary.
 		test -s $(SYFT) && $(SYFT) --version | grep -q $(SYFT_VERSION) ||  \
