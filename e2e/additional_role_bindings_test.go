@@ -94,6 +94,7 @@ var _ = Describe("creating additional RoleBindings from namespace rules", Ordere
 	const (
 		customLabel      = "reflection.proxy.projectcapsule.dev/enabled"
 		customAnnotation = "projectcapsule.dev/e2e-rule-binding"
+		selectorLabel    = "projectcapsule.dev/e2e-role-binding-environment"
 	)
 
 	globalBinding := rbac.AdditionalRoleBindingsSpec{
@@ -142,7 +143,7 @@ var _ = Describe("creating additional RoleBindings from namespace rules", Ordere
 				},
 				{
 					NamespaceSelector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"env": "prod"},
+						MatchLabels: map[string]string{selectorLabel: "prod"},
 					},
 					Permissions: rules.NamespaceRulePermissionBody{
 						Bindings: []rbac.AdditionalRoleBindingsSpec{selectedBinding},
@@ -168,13 +169,13 @@ var _ = Describe("creating additional RoleBindings from namespace rules", Ordere
 	It("applies bindings according to each rule's namespace selector without mutating their metadata", func() {
 		prod := NewNamespace("", map[string]string{
 			meta.TenantLabel: tnt.GetName(),
-			"env":            "prod",
+			selectorLabel:    "prod",
 		})
 		NamespaceCreation(prod, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
 		dev := NewNamespace("", map[string]string{
 			meta.TenantLabel: tnt.GetName(),
-			"env":            "dev",
+			selectorLabel:    "dev",
 		})
 		NamespaceCreation(dev, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
