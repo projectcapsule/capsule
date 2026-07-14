@@ -136,40 +136,32 @@ func (r *hostnames) validateHostnames(tenant capsulev1beta2.Tenant, hostnames se
 		return nil
 	}
 
-	var valid, matched bool
-
 	tenantHostnameSet := sets.New[string](tenant.Spec.IngressOptions.AllowedHostnames.Exact...)
 
-	var invalidHostnames []string
-
-	if len(hostnames) > 0 {
-		if diff := hostnames.Difference(tenantHostnameSet); len(diff) > 0 {
-			invalidHostnames = append(invalidHostnames, diff.UnsortedList()...)
-		}
-
-		if len(invalidHostnames) == 0 {
-			valid = true
-		}
-	}
-
-	var notMatchingHostnames []string
+	// Only hostnames outside the exact allow-list still need to be checked.
+	notAllowedHostnames := hostnames.Difference(tenantHostnameSet).UnsortedList()
 
 	//nolint:staticcheck
-	if allowedRegex := tenant.Spec.IngressOptions.AllowedHostnames.Regex; len(allowedRegex) > 0 {
-		for currentHostname := range hostnames {
-			matched, _ = regexp.MatchString(allowedRegex, currentHostname)
-			if !matched {
-				notMatchingHostnames = append(notMatchingHostnames, currentHostname)
+	if allowedRegex := tenant.Spec.IngressOptions.AllowedHostnames.Regex; len(allowedRegex) > 0 && len(notAllowedHostnames) > 0 {
+		var failedRegexHostnames []string
+
+		// compile regex once. if compilation fails, the remaining hostnames are not allowed
+		re, err := regexp.Compile(allowedRegex)
+		if err != nil {
+			return caperrors.NewIngressHostnamesNotValid(notAllowedHostnames, *tenant.Spec.IngressOptions.AllowedHostnames)
+		}
+
+		for _, currentHostname := range notAllowedHostnames {
+			if ok := re.MatchString(currentHostname); !ok {
+				failedRegexHostnames = append(failedRegexHostnames, currentHostname)
 			}
 		}
 
-		if len(notMatchingHostnames) == 0 {
-			matched = true
-		}
+		notAllowedHostnames = failedRegexHostnames
 	}
 
-	if !valid && !matched {
-		return caperrors.NewIngressHostnamesNotValid(invalidHostnames, notMatchingHostnames, *tenant.Spec.IngressOptions.AllowedHostnames)
+	if len(notAllowedHostnames) > 0 {
+		return caperrors.NewIngressHostnamesNotValid(notAllowedHostnames, *tenant.Spec.IngressOptions.AllowedHostnames)
 	}
 
 	return nil

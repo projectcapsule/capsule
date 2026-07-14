@@ -4,3 +4,4 @@ resources:
   - ns.yaml
   - kube-prometheus-stack/
   - pyroscope/
+  - tempo/
