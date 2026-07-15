@@ -242,7 +242,7 @@ dev-setup-argocd: dev-setup-fluxcd
 	@printf "  \033[1mkubectl get secret -n argocd argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d\033[0m\n\n"
 	@printf "  \033[1mkubectl port-forward svc/argocd-server 9091:80 -n argocd\033[0m\n\n"
 
-dev-setup-cert-manager:
+dev-setup-cert-manager: dev-setup-fluxcd
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/cert-manager | envsubst | kubectl apply -f -
 
 dev-setup-fluxcd:
@@ -261,7 +261,7 @@ dev-setup-capsule: dev-setup-fluxcd
 	@$(MAKE) wait-for-helmreleases
 	@$(MAKE) dev-setup-capsule-example
 
-dev-setup-capsule-example: dev-setup-fluxcd
+dev-setup-capsule-example:
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/capsule/example-setup | envsubst | kubectl apply -f -
 	@$(KUBECTL) create ns wind-uat --as joe --as-group projectcapsule.dev || true
 	@$(KUBECTL) label ns wind-uat env=test

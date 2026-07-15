@@ -86,6 +86,76 @@ func TestRoleBindingHashFunc_ChangesWhenSubjectNameChanges(t *testing.T) {
 	}
 }
 
+func TestRoleBindingHashFunc_ChangesWhenSubjectNamespaceChanges(t *testing.T) {
+	b1 := rbac.AdditionalRoleBindingsSpec{
+		ClusterRoleName: "admin",
+		Subjects: []rbacv1.Subject{{
+			Kind:      rbacv1.ServiceAccountKind,
+			Namespace: "team-a",
+			Name:      "deployer",
+		}},
+	}
+	b2 := rbac.AdditionalRoleBindingsSpec{
+		ClusterRoleName: "admin",
+		Subjects: []rbacv1.Subject{{
+			Kind:      rbacv1.ServiceAccountKind,
+			Namespace: "team-b",
+			Name:      "deployer",
+		}},
+	}
+
+	h1 := utils.RoleBindingHashFunc(b1)
+	h2 := utils.RoleBindingHashFunc(b2)
+
+	if h1 == h2 {
+		t.Fatalf("expected different hashes when subject Namespace changes, got %q", h1)
+	}
+}
+
+func TestRoleBindingHashFunc_ChangesWhenSubjectAPIGroupChanges(t *testing.T) {
+	b1 := rbac.AdditionalRoleBindingsSpec{
+		ClusterRoleName: "admin",
+		Subjects: []rbacv1.Subject{{
+			APIGroup: rbacv1.GroupName,
+			Kind:     rbacv1.UserKind,
+			Name:     "alice",
+		}},
+	}
+	b2 := rbac.AdditionalRoleBindingsSpec{
+		ClusterRoleName: "admin",
+		Subjects: []rbacv1.Subject{{
+			APIGroup: "example.com",
+			Kind:     rbacv1.UserKind,
+			Name:     "alice",
+		}},
+	}
+
+	h1 := utils.RoleBindingHashFunc(b1)
+	h2 := utils.RoleBindingHashFunc(b2)
+
+	if h1 == h2 {
+		t.Fatalf("expected different hashes when subject APIGroup changes, got %q", h1)
+	}
+}
+
+func TestRoleBindingHashFunc_UsesUnambiguousFieldBoundaries(t *testing.T) {
+	b1 := rbac.AdditionalRoleBindingsSpec{
+		ClusterRoleName: "ab",
+		Subjects:        []rbacv1.Subject{{Kind: "c", Name: "d"}},
+	}
+	b2 := rbac.AdditionalRoleBindingsSpec{
+		ClusterRoleName: "a",
+		Subjects:        []rbacv1.Subject{{Kind: "bc", Name: "d"}},
+	}
+
+	h1 := utils.RoleBindingHashFunc(b1)
+	h2 := utils.RoleBindingHashFunc(b2)
+
+	if h1 == h2 {
+		t.Fatalf("expected different hashes for differently bounded fields, got %q", h1)
+	}
+}
+
 func TestRoleBindingHashFunc_EmptyInputsStillProduceHash(t *testing.T) {
 	b := rbac.AdditionalRoleBindingsSpec{
 		ClusterRoleName: "",
@@ -98,9 +168,7 @@ func TestRoleBindingHashFunc_EmptyInputsStillProduceHash(t *testing.T) {
 	}
 }
 
-func TestRoleBindingHashFunc_SubjectOrderMatters_CurrentBehavior(t *testing.T) {
-	// This test documents the CURRENT behavior:
-	// the hash is order-dependent because subjects are written in slice order.
+func TestRoleBindingHashFunc_SubjectOrderMatters(t *testing.T) {
 	b1 := rbac.AdditionalRoleBindingsSpec{
 		ClusterRoleName: "admin",
 		Subjects: []rbacv1.Subject{
@@ -120,6 +188,6 @@ func TestRoleBindingHashFunc_SubjectOrderMatters_CurrentBehavior(t *testing.T) {
 	h2 := utils.RoleBindingHashFunc(b2)
 
 	if h1 == h2 {
-		t.Fatalf("expected different hashes when subject order changes (current behavior), got %q", h1)
+		t.Fatalf("expected different hashes when subject order changes, got %q", h1)
 	}
 }
