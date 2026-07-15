@@ -81,7 +81,6 @@ spec:
                       description: Additional Labels for the synchronized rolebindings
                       type: object
                     subjects:
-                      description: kubebuilder:validation:Minimum=1
                       items:
                         description: |-
                           Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference,
@@ -111,6 +110,7 @@ spec:
                         - name
                         type: object
                         x-kubernetes-map-type: atomic
+                      minItems: 1
                       type: array
                   required:
                   - clusterRoleName
@@ -1154,7 +1154,6 @@ spec:
                       description: Additional Labels for the synchronized rolebindings
                       type: object
                     subjects:
-                      description: kubebuilder:validation:Minimum=1
                       items:
                         description: |-
                           Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference,
@@ -1184,6 +1183,7 @@ spec:
                         - name
                         type: object
                         x-kubernetes-map-type: atomic
+                      minItems: 1
                       type: array
                   required:
                   - clusterRoleName
@@ -2904,7 +2904,6 @@ spec:
                                   rolebindings
                                 type: object
                               subjects:
-                                description: kubebuilder:validation:Minimum=1
                                 items:
                                   description: |-
                                     Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference,
@@ -2934,6 +2933,7 @@ spec:
                                   - name
                                   type: object
                                   x-kubernetes-map-type: atomic
+                                minItems: 1
                                 type: array
                             required:
                             - clusterRoleName
