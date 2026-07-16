@@ -16,7 +16,7 @@ var expireCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Example: `
   # expire an existing BreakRequest
-  capsule expire grant-admin --namespace default
+  capsule break-the-glass expire grant-admin --namespace default
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name = args[0]
