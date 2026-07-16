@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"text/template"
 
 	"github.com/santhosh-tekuri/jsonschema/v5"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -21,12 +22,16 @@ func ValidateItems(schema runtime.RawExtension, tis []runtime.RawExtension) erro
 	}
 
 	for i, tpl := range tis {
-		if _, err := ValidateTemplate(tpl.Raw); err != nil {
+		if _, err := validateTemplate(tpl.Raw); err != nil {
 			return fmt.Errorf("template %d is invalid: %w", i, err)
 		}
 	}
 
 	return nil
+}
+
+func validateTemplate(tpl []byte) (*template.Template, error) {
+	return template.New("item").Option("missingkey=error").Parse(string(tpl))
 }
 
 func Validate(schemaData []byte, params []byte) error {

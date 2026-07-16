@@ -4,9 +4,11 @@
 package template
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -86,4 +88,17 @@ func TestValidate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func y2j(in string) []byte {
+	m := make(map[string]any)
+	err := yaml.Unmarshal([]byte(in), &m)
+	if err != nil {
+		panic(err)
+	}
+	b, err := json.Marshal(m)
+	if err != nil {
+		panic(err)
+	}
+	return b
 }
