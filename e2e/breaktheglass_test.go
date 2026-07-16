@@ -37,21 +37,18 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 				DefaultDuration: &metav1.Duration{
 					Duration: defaultDuration,
 				},
-				Items: map[string]breaktheglass.TemplateItem{
-					"config": {
-						ManifestTemplate: runtime.RawExtension{
-							Object: &corev1.ConfigMap{
-								TypeMeta: metav1.TypeMeta{
-									Kind:       "ConfigMap",
-									APIVersion: "v1",
-								},
-								ObjectMeta: metav1.ObjectMeta{
-									Name: "e2e-btg-cm",
-								},
-								Data: map[string]string{"key": "value"},
-							},
+				Templates: []runtime.RawExtension{{
+					Object: &corev1.ConfigMap{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       "ConfigMap",
+							APIVersion: "v1",
 						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "e2e-btg-cm",
+						},
+						Data: map[string]string{"key": "value"},
 					},
+				},
 				},
 			},
 		}
@@ -233,23 +230,21 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 
 	Describe("Template with parameter", func() {
 		BeforeEach(func() {
-			brt.Spec.Items = map[string]breaktheglass.TemplateItem{
-				"config": {
-					ParamSchema: runtime.RawExtension{Raw: []byte(`{"type": "object", "required": ["value"], "properties": {"value": {"type": "string"}}}`)},
-					ManifestTemplate: runtime.RawExtension{
-						Object: &corev1.ConfigMap{
-							TypeMeta: metav1.TypeMeta{
-								Kind:       "ConfigMap",
-								APIVersion: "v1",
-							},
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "e2e-btg-cm",
-							},
-							Data: map[string]string{"key": "{{.value}}"},
+			brt.Spec.Templates = []runtime.RawExtension{
+				{
+					Object: &corev1.ConfigMap{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       "ConfigMap",
+							APIVersion: "v1",
 						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "e2e-btg-cm",
+						},
+						Data: map[string]string{"key": "{{.value}}"},
 					},
 				},
 			}
+			brt.Spec.ParamSchema = runtime.RawExtension{Raw: []byte(`{"type": "object", "required": ["value"], "properties": {"value": {"type": "string"}}}`)}
 		})
 		It("should create correct a ConfigMap data", func() {
 			br := &capsulev1beta2.BreakRequest{
@@ -259,7 +254,7 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 				},
 				Spec: capsulev1beta2.BreakRequestSpec{
 					TemplateName: brt.GetName(),
-					Params:       map[string]runtime.RawExtension{"config": {Raw: []byte(`{"value": "test-value"}`)}},
+					Params:       &runtime.RawExtension{Raw: []byte(`{"value": "test-value"}`)},
 				},
 			}
 			defer EventuallyDeletion(br)

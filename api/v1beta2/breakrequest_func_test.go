@@ -101,7 +101,7 @@ func TestInitializeFromTemplate(t *testing.T) {
 	br := &BreakRequest{}
 	brt := &BreakRequestTemplate{
 		Spec: BreakRequestTemplateSpec{
-			Items:           breaktheglass.TemplateItems{"key": {}},
+			Templates:       []runtime.RawExtension{},
 			DefaultDuration: &metav1.Duration{Duration: time.Minute},
 			MaxDuration:     metav1.Duration{Duration: time.Hour},
 			KeepFor:         5,
@@ -110,7 +110,7 @@ func TestInitializeFromTemplate(t *testing.T) {
 
 	br.InitializeFromTemplate(brt)
 	assert.NotNil(t, br.Status.Template)
-	assert.Equal(t, brt.Spec.Items, br.Status.Template.Items)
+	assert.Equal(t, brt.Spec.Templates, br.Status.Template.Templates)
 	assert.Equal(t, brt.Spec.DefaultDuration, br.Status.Template.DefaultDuration)
 	assert.Equal(t, brt.Spec.MaxDuration, br.Status.Template.MaxDuration)
 	assert.Equal(t, brt.Spec.KeepFor, br.Status.Template.KeepFor)
@@ -140,21 +140,15 @@ func TestDenyRequest(t *testing.T) {
 func TestRenderItems(t *testing.T) {
 	br := &BreakRequest{
 		Spec: BreakRequestSpec{
-			Params: map[string]runtime.RawExtension{
-				"test": {Raw: []byte(`{"key":"value"}`)},
-			},
+			Params: &runtime.RawExtension{Raw: []byte(`{"key":"value"}`)},
 		},
 	}
-	ti := breaktheglass.TemplateItems{
-		"test": {
-			ParamSchema:      runtime.RawExtension{Raw: []byte(`{"type":"object","properties":{"key":{"type":"string"}}}`)},
-			ManifestTemplate: runtime.RawExtension{Raw: []byte(`{"kind":"ConfigMap"}`)},
-		},
-	}
+	schema := runtime.RawExtension{Raw: []byte(`{"type":"object","properties":{"key":{"type":"string"}}}`)}
+	tpl := runtime.RawExtension{Raw: []byte(`{"kind":"ConfigMap"}`)}
 
-	items, err := br.RenderItems(ti)
+	items, err := br.RenderItems(schema, []runtime.RawExtension{tpl})
 	require.NoError(t, err)
-	assert.NotNil(t, items["test"])
+	assert.Len(t, items, 1)
 }
 func TestActiveRequest(t *testing.T) {
 	tests := []struct {

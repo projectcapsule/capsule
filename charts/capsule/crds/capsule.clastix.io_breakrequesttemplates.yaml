@@ -61,22 +61,6 @@ spec:
                   The default duration of the BreakRequest referencing this template should be valid for. If not set,
                   the resource will be kept until the request is deleted.
                 type: string
-              items:
-                additionalProperties:
-                  description: TemplateItem defines an item to be applied by a break
-                    request.
-                  properties:
-                    manifestTemplate:
-                      type: object
-                      x-kubernetes-preserve-unknown-fields: true
-                    paramSchema:
-                      type: object
-                      x-kubernetes-preserve-unknown-fields: true
-                  required:
-                  - manifestTemplate
-                  type: object
-                description: Actual Items being created by this template
-                type: object
               keepFor:
                 description: |-
                   The duration of this BreakRequest will be kept in the system after it has been expired (eg. auditing purposes)
@@ -87,8 +71,19 @@ spec:
                 description: The max allowed duration of the BreakRequest referencing
                   this template should be valid for.
                 type: string
+              paramSchema:
+                description: ParamSchema template parameter schema
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+              templates:
+                description: Actual Items being created by this template
+                items:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                minItems: 1
+                type: array
             required:
-            - items
+            - templates
             type: object
           status:
             description: BreakRequestTemplateStatus defines the observed state of

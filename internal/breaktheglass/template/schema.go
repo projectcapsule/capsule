@@ -9,21 +9,20 @@ import (
 	"fmt"
 
 	"github.com/santhosh-tekuri/jsonschema/v5"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
 	"k8s.io/kube-openapi/pkg/validation/validate"
-
-	"github.com/projectcapsule/capsule/pkg/api/breaktheglass"
 )
 
-func ValidateItems(tis breaktheglass.TemplateItems) error {
-	for name, ti := range tis {
-		if _, err := ValidateSchema(ti.ParamSchema.Raw); err != nil {
-			return fmt.Errorf("paramSchema for item %q is invalid: %w", name, err)
-		}
+func ValidateItems(schema runtime.RawExtension, tis []runtime.RawExtension) error {
+	if _, err := ValidateSchema(schema.Raw); err != nil {
+		return fmt.Errorf("paramSchema is invalid: %w", err)
+	}
 
-		if _, err := ValidateTemplate(ti.ManifestTemplate.Raw); err != nil {
-			return fmt.Errorf("template for item %q is invalid: %w", name, err)
+	for i, tpl := range tis {
+		if _, err := ValidateTemplate(tpl.Raw); err != nil {
+			return fmt.Errorf("template %d is invalid: %w", i, err)
 		}
 	}
 

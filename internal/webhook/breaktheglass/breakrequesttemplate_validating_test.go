@@ -20,7 +20,6 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	mc "github.com/projectcapsule/capsule/internal/mocks/client"
 	"github.com/projectcapsule/capsule/internal/webhook/test"
-	"github.com/projectcapsule/capsule/pkg/api/breaktheglass"
 )
 
 func TestBreakRequestTemplateValidationHandler(t *testing.T) {
@@ -40,9 +39,7 @@ func TestBreakRequestTemplateValidationHandler(t *testing.T) {
 				Spec: capsulev1beta2.BreakRequestTemplateSpec{
 					AutoApprove:       false,
 					ApprovalCondition: "foo",
-					Items: breaktheglass.TemplateItems{
-						"cm": {ManifestTemplate: runtime.RawExtension{Object: &corev1.ConfigMap{}}},
-					},
+					Templates:         []runtime.RawExtension{{Object: &corev1.ConfigMap{}}},
 				},
 			},
 			expected: http.StatusForbidden,
@@ -53,9 +50,7 @@ func TestBreakRequestTemplateValidationHandler(t *testing.T) {
 			brt: &capsulev1beta2.BreakRequestTemplate{
 				Spec: capsulev1beta2.BreakRequestTemplateSpec{
 					AutoApprove: true,
-					Items: breaktheglass.TemplateItems{
-						"cm": {ManifestTemplate: runtime.RawExtension{Object: &corev1.ConfigMap{}}},
-					},
+					Templates:   []runtime.RawExtension{{Object: &corev1.ConfigMap{}}},
 				},
 			},
 			setup: func(cl *mc.MockClient) {
@@ -72,9 +67,7 @@ func TestBreakRequestTemplateValidationHandler(t *testing.T) {
 				Spec: capsulev1beta2.BreakRequestTemplateSpec{
 					AutoApprove:       true,
 					ApprovalCondition: "foo.spec.reason == 'test'",
-					Items: breaktheglass.TemplateItems{
-						"cm": {ManifestTemplate: runtime.RawExtension{Object: &corev1.ConfigMap{}}},
-					},
+					Templates:         []runtime.RawExtension{{Object: &corev1.ConfigMap{}}},
 				},
 			},
 			expected: http.StatusForbidden,
@@ -86,9 +79,7 @@ func TestBreakRequestTemplateValidationHandler(t *testing.T) {
 				Spec: capsulev1beta2.BreakRequestTemplateSpec{
 					AutoApprove:       true,
 					ApprovalCondition: "request.spec.reason == 'test'",
-					Items: breaktheglass.TemplateItems{
-						"cm": {ManifestTemplate: runtime.RawExtension{Object: &corev1.ConfigMap{}}},
-					},
+					Templates:         []runtime.RawExtension{{Object: &corev1.ConfigMap{}}},
 				},
 			},
 			setup: func(cl *mc.MockClient) {
@@ -103,12 +94,8 @@ func TestBreakRequestTemplateValidationHandler(t *testing.T) {
 			name: "allow if item schema is valid",
 			brt: &capsulev1beta2.BreakRequestTemplate{
 				Spec: capsulev1beta2.BreakRequestTemplateSpec{
-					Items: breaktheglass.TemplateItems{
-						"test": {
-							ManifestTemplate: runtime.RawExtension{Object: &corev1.ConfigMap{}},
-							ParamSchema:      runtime.RawExtension{Raw: []byte(`{"type": "string"}`)},
-						},
-					},
+					Templates:   []runtime.RawExtension{{Object: &corev1.ConfigMap{}}},
+					ParamSchema: runtime.RawExtension{Raw: []byte(`{"type": "string"}`)},
 				},
 			},
 			setup: func(cl *mc.MockClient) {
@@ -123,16 +110,12 @@ func TestBreakRequestTemplateValidationHandler(t *testing.T) {
 			name: "deny if item schema is invalid",
 			brt: &capsulev1beta2.BreakRequestTemplate{
 				Spec: capsulev1beta2.BreakRequestTemplateSpec{
-					Items: breaktheglass.TemplateItems{
-						"test": {
-							ManifestTemplate: runtime.RawExtension{Object: &corev1.ConfigMap{}},
-							ParamSchema:      runtime.RawExtension{Raw: []byte(`"type": `)},
-						},
-					},
+					Templates:   []runtime.RawExtension{{Object: &corev1.ConfigMap{}}},
+					ParamSchema: runtime.RawExtension{Raw: []byte(`"type": `)},
 				},
 			},
 			expected: http.StatusForbidden,
-			errMsg:   `invalid template items: paramSchema for item "test" is invalid: failed to validate OpenAPI schemaData: schema invalid`,
+			errMsg:   `invalid templates: paramSchema is invalid: failed to validate OpenAPI schemaData: schema invalid`,
 		},
 	}
 

@@ -69,7 +69,7 @@ func printBreakRequestsApprovalTable(
 	})
 
 	// Example: printing .status.items nicely as YAML
-	for name, item := range app.Items {
+	for i, item := range app.Templates {
 		content := prettyRawExtension(item)
 		if color {
 			content = colorizeYAML(content)
@@ -78,7 +78,7 @@ func printBreakRequestsApprovalTable(
 		t.AppendSeparator()
 		// Multi-line cells are supported; keep them as one cell.
 		t.AppendRow(table.Row{
-			fmt.Sprintf("Status Item %q", name),
+			fmt.Sprintf("Status Item %d", i),
 			content,
 		})
 	}
@@ -89,10 +89,7 @@ func printBreakRequestsApprovalTable(
 // PrettyRawExtension returns human-readable YAML for a RawExtension.
 // - If Object is non-nil, it marshals that.
 // - Else converts JSON -> YAML.
-func prettyRawExtension(re *runtime.RawExtension) string {
-	if re == nil {
-		return "-"
-	}
+func prettyRawExtension(re runtime.RawExtension) string {
 	// Prefer the decoded object when present.
 	if re.Object != nil {
 		j, err := json.Marshal(re.Object)

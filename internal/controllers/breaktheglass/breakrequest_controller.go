@@ -373,16 +373,16 @@ func (r *BreakRequestReconciler) reconcileItems(
 	}
 
 	// reset the approved items; only the effective items should be kept
-	br.Status.Approved.Items = make(breaktheglass.Items)
+	br.Status.Approved.Templates = nil
 
-	rendered, err := br.RenderItems(tpl.Items)
+	rendered, err := br.RenderItems(tpl.ParamSchema, tpl.Templates)
 	if err != nil {
 		return err
 	}
 
 	codecFactory := serializer.NewCodecFactory(r.Scheme())
 
-	for name, raw := range rendered {
+	for _, raw := range rendered {
 		obj := &unstructured.Unstructured{}
 		if _, _, decodeErr := codecFactory.UniversalDeserializer().
 			Decode(raw.Raw, nil, obj); decodeErr != nil {
@@ -410,7 +410,7 @@ func (r *BreakRequestReconciler) reconcileItems(
 		}
 
 		// append the item to the approved items (use deep copy to avoid using the cluster object)
-		br.Status.Approved.Items[name] = &runtime.RawExtension{Object: obj.DeepCopy()}
+		br.Status.Approved.Templates = append(br.Status.Approved.Templates, runtime.RawExtension{Object: obj.DeepCopy()})
 
 		// Apply the object to the cluster
 		_, err = controllerutil.CreateOrUpdate(ctx, r.Client, obj, func() error {
@@ -459,7 +459,7 @@ func (r *BreakRequestReconciler) deleteItems(
 		return errors.New("approved status is nil")
 	}
 
-	for _, item := range br.Status.Approved.Items {
+	for _, item := range br.Status.Approved.Templates {
 		obj, err := object(item)
 		if err != nil {
 			syncErr = errors.Join(syncErr, err)
@@ -479,11 +479,7 @@ func (r *BreakRequestReconciler) deleteItems(
 	return syncErr
 }
 
-func object(re *runtime.RawExtension) (client.Object, error) {
-	if re == nil {
-		return nil, errors.New("object is nil")
-	}
-
+func object(re runtime.RawExtension) (client.Object, error) {
 	// Prefer decoded object when present.
 	if re.Object != nil {
 		if co, ok := re.Object.(client.Object); ok {

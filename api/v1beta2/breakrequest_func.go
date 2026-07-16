@@ -20,7 +20,7 @@ import (
 // InitializeFromTemplate Copies all relevant values from the Template.
 func (br *BreakRequest) InitializeFromTemplate(brt *BreakRequestTemplate) {
 	br.Status.Template = &TemplateProperties{
-		Items:           brt.Spec.Items,
+		Templates:       brt.Spec.Templates,
 		DefaultDuration: brt.Spec.DefaultDuration,
 		MaxDuration:     brt.Spec.MaxDuration,
 		KeepFor:         brt.Spec.KeepFor,
@@ -82,7 +82,7 @@ func (br *BreakRequest) ApproveRequest(
 	}
 
 	// items are set by the controller, remove them from the status
-	properties.Items = nil
+	properties.Templates = nil
 
 	br.Status.Approved = properties
 
@@ -231,7 +231,7 @@ func (br *BreakRequest) GenerateApprovedProperties() (*ApprovedProperties, error
 		return nil, errors.New("template not set")
 	}
 
-	it, err := br.RenderItems(tpl.Items)
+	it, err := br.RenderItems(tpl.ParamSchema, tpl.Templates)
 	if err != nil {
 		return nil, err
 	}
@@ -244,40 +244,36 @@ func (br *BreakRequest) GenerateApprovedProperties() (*ApprovedProperties, error
 	return &ApprovedProperties{
 		Duration:  br.Spec.Duration,
 		StartTime: startTime,
-		Items:     it,
+		Templates: it,
 		KeepFor:   tpl.KeepFor,
 	}, nil
 }
 
-func (br *BreakRequest) RenderItems(ti breaktheglass.TemplateItems) (breaktheglass.Items, error) {
-	params := br.Spec.Params
-	if params == nil {
-		params = breaktheglass.TemplateParams{}
+func (br *BreakRequest) RenderItems(schema runtime.RawExtension, templates []runtime.RawExtension) ([]runtime.RawExtension, error) {
+	var params []byte
+	if br.Spec.Params != nil {
+		params = br.Spec.Params.Raw
 	}
 
-	rendered := make(breaktheglass.Items, len(ti))
+	rendered := make([]runtime.RawExtension, 0, len(templates))
 
 	var rerr error
 
-	for name, i := range ti {
-		var p []byte
-		if ip, ok := params[name]; ok {
-			p = ip.Raw
-		}
-
-		if err := template.Validate(i.ParamSchema.Raw, p); err != nil {
-			rerr = errors.Join(rerr, fmt.Errorf("invalid params for template item %s: %w", name, err))
-			rendered[name] = &runtime.RawExtension{}
+	for i, tpl := range templates {
+		if err := template.Validate(schema.Raw, params); err != nil {
+			rerr = errors.Join(rerr, fmt.Errorf("invalid params for template item %d: %w", i, err))
 
 			continue
 		}
 
-		r, err := template.RenderTemplate(i.ManifestTemplate.Raw, p)
+		r, err := template.RenderTemplate(tpl.Raw, params)
 		if err != nil {
-			rerr = errors.Join(rerr, fmt.Errorf("error rendering template item %s: %w", name, err))
+			rerr = errors.Join(rerr, fmt.Errorf("error rendering template item %d: %w", i, err))
+
+			continue
 		}
 
-		rendered[name] = &runtime.RawExtension{Raw: r}
+		rendered = append(rendered, runtime.RawExtension{Raw: r})
 	}
 
 	return rendered, rerr

@@ -5,6 +5,7 @@ package v1beta2
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/projectcapsule/capsule/pkg/api/breaktheglass"
 )
@@ -15,7 +16,7 @@ type BreakRequestSpec struct {
 	// +kubebuilder:validation:Required
 	TemplateName string `json:"templateName"`
 	// Params the parameters to use for the template.
-	Params breaktheglass.TemplateParams `json:"params,omitempty"`
+	Params *runtime.RawExtension `json:"params,omitempty"`
 	// Requesting actor for the access request.
 	Requestor breaktheglass.AccessEntity `json:"requestor,omitempty"`
 	// A reason on why the request is needed
@@ -62,8 +63,10 @@ type ActivePeriod struct {
 
 // TemplateProperties contains properties copied from the assigned template.
 type TemplateProperties struct {
-	// The items that are created by this request, provided by the template.
-	Items breaktheglass.TemplateItems `json:"templateItems,omitempty"`
+	// The templates that are created by this request, provided by the template.
+	Templates []runtime.RawExtension `json:"templates,omitempty"`
+	// ParamSchema template parameter schema
+	ParamSchema runtime.RawExtension `json:"paramSchema,omitempty"`
 	// The default duration of the BreakRequest referencing this template should be valid for.
 	DefaultDuration *metav1.Duration `json:"defaultDuration,omitempty"`
 	// The max allowed duration of the BreakRequest referencing this template should be valid for.
@@ -78,7 +81,7 @@ type ApprovedProperties struct {
 	KeepFor   breaktheglass.ExtendedDuration `json:"keepFor,omitempty"`
 	Duration  *metav1.Duration               `json:"duration,omitempty"`
 	StartTime metav1.Time                    `json:"startTime,omitempty"`
-	Items     breaktheglass.Items            `json:"items,omitempty"`
+	Templates []runtime.RawExtension         `json:"templates,omitempty"`
 }
 
 // ReviewInfo contains information about the review of a request.

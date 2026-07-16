@@ -5,6 +5,7 @@ package v1beta2
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/projectcapsule/capsule/pkg/api/breaktheglass"
 )
@@ -13,7 +14,11 @@ import (
 type BreakRequestTemplateSpec struct {
 	// Actual Items being created by this template
 	// +kubebuilder:validation:Required
-	Items breaktheglass.TemplateItems `json:"items"`
+	// +kubebuilder:validation:MinItems=1
+	Templates []runtime.RawExtension `json:"templates"`
+
+	// ParamSchema template parameter schema
+	ParamSchema runtime.RawExtension `json:"paramSchema,omitempty"`
 
 	// The default duration of the BreakRequest referencing this template should be valid for. If not set,
 	// the resource will be kept until the request is deleted.
