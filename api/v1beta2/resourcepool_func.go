@@ -162,6 +162,7 @@ func (r *ResourcePool) CalculateAvailableResources() {
 		// Deep-copy qt before subtracting: resource.Quantity contains internal pointers,
 		// so a shallow copy can alias the map entry and Sub() could mutate Hard.
 		// Using DeepCopy() ensures Hard remains unchanged.
+		remaining := qt.DeepCopy()
 
 		amount, exists := r.Status.Allocation.Claimed[res]
 		if exists {
