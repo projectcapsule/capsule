@@ -69,11 +69,9 @@ spec:
                   The Request can also be Terminated by another automation via calling the ExpireRequest() API-Function.
                 type: string
               params:
-                additionalProperties:
-                  type: object
-                  x-kubernetes-preserve-unknown-fields: true
                 description: Params the parameters to use for the template.
                 type: object
+                x-kubernetes-preserve-unknown-fields: true
               reason:
                 description: A reason on why the request is needed
                 type: string
@@ -123,18 +121,17 @@ spec:
                 properties:
                   duration:
                     type: string
-                  items:
-                    additionalProperties:
-                      type: object
-                      x-kubernetes-preserve-unknown-fields: true
-                    description: Items maps rendered items by name.
-                    type: object
                   keepFor:
                     pattern: ^([0-9]+(\.[0-9]+)?(s|m|h|d|w))+$
                     type: string
                   startTime:
                     format: date-time
                     type: string
+                  templates:
+                    items:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                    type: array
                 type: object
               conditions:
                 description: |-
@@ -257,23 +254,17 @@ spec:
                     description: The max allowed duration of the BreakRequest referencing
                       this template should be valid for.
                     type: string
-                  templateItems:
-                    additionalProperties:
-                      description: TemplateItem defines an item to be applied by a
-                        break request.
-                      properties:
-                        manifestTemplate:
-                          type: object
-                          x-kubernetes-preserve-unknown-fields: true
-                        paramSchema:
-                          type: object
-                          x-kubernetes-preserve-unknown-fields: true
-                      required:
-                      - manifestTemplate
-                      type: object
-                    description: The items that are created by this request, provided
-                      by the template.
+                  paramSchema:
+                    description: ParamSchema template parameter schema
                     type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                  templates:
+                    description: The templates that are created by this request, provided
+                      by the template.
+                    items:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                    type: array
                 type: object
             type: object
         type: object

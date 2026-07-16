@@ -58,7 +58,7 @@ func (b *breakRequestValidationHandler) OnCreate(_ client.Client, reader client.
 			return ad.Denyf("start time %s must be in the future", br.Spec.StartTime.String())
 		}
 
-		if _, err := br.RenderItems(brt.Spec.Items); err != nil {
+		if _, err := br.RenderItems(brt.Spec.ParamSchema, brt.Spec.Templates); err != nil {
 			return ad.Denyf("invalid template rendering for %s: %v", br.Spec.TemplateName, err)
 		}
 

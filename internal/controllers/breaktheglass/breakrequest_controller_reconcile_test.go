@@ -21,7 +21,6 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	mc "github.com/projectcapsule/capsule/internal/mocks/client"
-	"github.com/projectcapsule/capsule/pkg/api/breaktheglass"
 )
 
 const (
@@ -133,7 +132,7 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 				},
 				Spec: capsulev1beta2.BreakRequestSpec{
 					TemplateName: templateName,
-					Params:       map[string]runtime.RawExtension{templateName: {Raw: []byte(`{"testValue": "test-value"}`)}},
+					Params:       &runtime.RawExtension{Raw: []byte(`{"testValue": "test-value"}`)},
 				},
 				Status: capsulev1beta2.BreakRequestStatus{
 					Phase: capsulev1beta2.RequestPhaseApproved,
@@ -150,12 +149,8 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 						StartTime: v1.Now(),
 					},
 					Template: &capsulev1beta2.TemplateProperties{
-						Items: breaktheglass.TemplateItems{
-							templateName: {
-								ManifestTemplate: mtConfigMapParameterized,
-								ParamSchema:      psString,
-							},
-						},
+						Templates:   []runtime.RawExtension{mtConfigMapParameterized},
+						ParamSchema: psString,
 					},
 				},
 			},
@@ -167,8 +162,7 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 			},
 			verify: func(t *testing.T, br *capsulev1beta2.BreakRequest) {
 				assert.Equal(t, capsulev1beta2.RequestPhaseActive, br.Status.Phase)
-				assert.Len(t, br.Status.Approved.Items, 1)
-				assert.Contains(t, br.Status.Approved.Items, templateName)
+				assert.Len(t, br.Status.Approved.Templates, 1)
 
 				foundApproved := false
 				foundActive := false
@@ -183,7 +177,7 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 				assert.True(t, foundApproved)
 				assert.True(t, foundActive)
 
-				obj := br.Status.Approved.Items[templateName].Object
+				obj := br.Status.Approved.Templates[0].Object
 				co, ok := obj.(client.Object)
 				assert.True(t, ok)
 				assert.Len(t, co.GetOwnerReferences(), 1)
