@@ -89,10 +89,7 @@ func metaValidateJSONSchema(schemaBytes []byte) error {
 	meta := "https://json-schema.org/draft/2020-12/schema"
 
 	c := jsonschema.NewCompiler()
-	if err := c.AddResource(
-		"meta.json",
-		bytes.NewReader([]byte(`{"$ref":"`+meta+`"}`)),
-	); err != nil {
+	if err := c.AddResource("meta.json", bytes.NewReader([]byte(`{"$ref":"`+meta+`"}`))); err != nil {
 		return err
 	}
 	// Compile the candidate schema using the chosen meta-schema

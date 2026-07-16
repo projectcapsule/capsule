@@ -36,7 +36,7 @@ var reviewCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Example: `
   # interactive review
-  capsule review grant-admin --namespace default
+  capsule break-the-glass review grant-admin --namespace default
 
   # non-interactive approve/deny
   capsule review grant-admin --namespace default --approve
