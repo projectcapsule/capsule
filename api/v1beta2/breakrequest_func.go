@@ -4,6 +4,7 @@
 package v1beta2
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -12,9 +13,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/projectcapsule/capsule/internal/breaktheglass/template"
 	"github.com/projectcapsule/capsule/pkg/api/breaktheglass"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/template"
 )
 
 // InitializeFromTemplate Copies all relevant values from the Template.
@@ -250,23 +251,28 @@ func (br *BreakRequest) GenerateApprovedProperties() (*ApprovedProperties, error
 }
 
 func (br *BreakRequest) RenderItems(schema runtime.RawExtension, templates []runtime.RawExtension) ([]runtime.RawExtension, error) {
-	var params []byte
+	var paramBytes []byte
 	if br.Spec.Params != nil {
-		params = br.Spec.Params.Raw
+		paramBytes = br.Spec.Params.Raw
 	}
 
 	rendered := make([]runtime.RawExtension, 0, len(templates))
 
+	if err := template.Validate(schema.Raw, paramBytes); err != nil {
+		return nil, fmt.Errorf("invalid params: %w", err)
+	}
+
+	params := make(map[string]any)
+	if len(paramBytes) > 0 {
+		if err := json.Unmarshal(paramBytes, &params); err != nil {
+			return nil, fmt.Errorf("error unmarshalling params: %w", err)
+		}
+	}
+
 	var rerr error
 
 	for i, tpl := range templates {
-		if err := template.Validate(schema.Raw, params); err != nil {
-			rerr = errors.Join(rerr, fmt.Errorf("invalid params for template item %d: %w", i, err))
-
-			continue
-		}
-
-		r, err := template.RenderTemplate(tpl.Raw, params)
+		r, err := template.RenderTemplateBytes(params, "error", tpl.Raw)
 		if err != nil {
 			rerr = errors.Join(rerr, fmt.Errorf("error rendering template item %d: %w", i, err))
 

@@ -13,10 +13,10 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/breaktheglass/conditions"
-	"github.com/projectcapsule/capsule/internal/breaktheglass/template"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	"github.com/projectcapsule/capsule/pkg/template"
 )
 
 func BreakRequestTemplateValidationHandler(log logr.Logger) handlers.Handler {
