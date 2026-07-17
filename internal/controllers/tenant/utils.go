@@ -10,6 +10,8 @@ import (
 
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -49,6 +51,7 @@ func runForTenantNamespaces(
 ) error {
 	errs := make(chan error, len(tnt.Status.Spaces))
 	group := new(errgroup.Group)
+	group.SetLimit(8)
 
 	for _, namespace := range readyTenantNamespaces(tnt) {
 		group.Go(func() error {
@@ -103,6 +106,23 @@ func (r *Manager) pruningResources(ctx context.Context, ns string, keys []string
 
 	r.Log.V(4).Info("pruning objects with label selector " + selector.String())
 
+	list, err := managedObjectList(obj)
+	if err != nil {
+		return err
+	}
+
+	if err := r.List(ctx, list, &client.ListOptions{LabelSelector: selector, Namespace: ns}); err != nil {
+		if apierrors.IsNotFound(err) || apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
+			return nil
+		}
+
+		return err
+	}
+
+	if managedObjectListLength(list) == 0 {
+		return nil
+	}
+
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		err := r.DeleteAllOf(ctx, obj, &client.DeleteAllOfOptions{
 			ListOptions: client.ListOptions{
@@ -127,4 +147,34 @@ func (r *Manager) pruningResources(ctx context.Context, ns string, keys []string
 
 		return nil
 	})
+}
+
+func managedObjectList(obj client.Object) (client.ObjectList, error) {
+	switch obj.(type) {
+	case *networkingv1.NetworkPolicy:
+		return &networkingv1.NetworkPolicyList{}, nil
+	case *corev1.LimitRange:
+		return &corev1.LimitRangeList{}, nil
+	case *corev1.ResourceQuota:
+		return &corev1.ResourceQuotaList{}, nil
+	case *rbacv1.RoleBinding:
+		return &rbacv1.RoleBindingList{}, nil
+	default:
+		return nil, fmt.Errorf("unsupported managed resource type %T", obj)
+	}
+}
+
+func managedObjectListLength(list client.ObjectList) int {
+	switch typed := list.(type) {
+	case *networkingv1.NetworkPolicyList:
+		return len(typed.Items)
+	case *corev1.LimitRangeList:
+		return len(typed.Items)
+	case *corev1.ResourceQuotaList:
+		return len(typed.Items)
+	case *rbacv1.RoleBindingList:
+		return len(typed.Items)
+	default:
+		return 0
+	}
 }

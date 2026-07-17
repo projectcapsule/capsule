@@ -6,6 +6,7 @@ package rbac
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -14,11 +15,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -32,6 +32,11 @@ import (
 )
 
 const controllerManager = "rbac-controller"
+
+const (
+	rbacConfigurationEventMarker = "capsule-rbac-configuration"
+	serviceAccountEventMarker    = "capsule-rbac-serviceaccount"
+)
 
 type Manager struct {
 	Log           logr.Logger
@@ -57,28 +62,19 @@ func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlCo
 	crbErr := ctrl.NewControllerManagedBy(mgr).
 		Named("capsule/rbac/bindings").
 		For(&rbacv1.ClusterRoleBinding{}, namesPredicate).
-		Watches(&capsulev1beta2.CapsuleConfiguration{}, handler.Funcs{
-			UpdateFunc: func(ctx context.Context, updateEvent event.TypedUpdateEvent[client.Object], limitingInterface workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-				if updateEvent.ObjectNew.GetName() == ctrlConfig.ConfigurationName {
-					if crbErr := r.EnsureClusterRoleBindingsProvisioner(ctx); crbErr != nil {
-						r.Log.Error(err, "cannot update ClusterRoleBinding upon CapsuleConfiguration update")
-					}
-				}
-			},
-		}).
-		WatchesMetadata(&corev1.ServiceAccount{}, handler.Funcs{
-			CreateFunc: func(ctx context.Context, e event.TypedCreateEvent[client.Object], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-				r.handleSAChange(ctx, e.Object)
-			},
-			UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[client.Object], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-				if meta.LabelsChanged([]string{meta.OwnerPromotionLabel}, e.ObjectOld.GetLabels(), e.ObjectNew.GetLabels()) {
-					r.handleSAChange(ctx, e.ObjectNew)
-				}
-			},
-			DeleteFunc: func(ctx context.Context, e event.TypedDeleteEvent[client.Object], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-				r.handleSAChange(ctx, e.Object)
-			},
-		}).
+		Watches(
+			&capsulev1beta2.CapsuleConfiguration{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueRBACConfiguration),
+			builder.WithPredicates(
+				predicates.ProvisionerSubjectsChangedPredicate{},
+				predicates.NamesMatchingPredicate{Names: []string{ctrlConfig.ConfigurationName}},
+			),
+		).
+		WatchesMetadata(
+			&corev1.ServiceAccount{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueServiceAccountChange),
+			builder.WithPredicates(predicates.PromotedServiceaccountPredicate{}),
+		).
 		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
 		Complete(r)
 	if crbErr != nil {
@@ -92,6 +88,13 @@ func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlCo
 // Resource kinds and we're just interested to the ones with the said name since they're bounded together.
 func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
 	rbac := r.Configuration.RBAC()
+
+	switch request.Namespace {
+	case rbacConfigurationEventMarker:
+		return res, r.reconcileConfiguration(ctx)
+	case serviceAccountEventMarker:
+		return res, r.EnsureClusterRoleBindingsProvisioner(ctx)
+	}
 
 	switch request.Name {
 	case rbac.ProvisionerClusterRole:
@@ -117,6 +120,9 @@ func (r *Manager) EnsureClusterRoleBindingsProvisioner(ctx context.Context) erro
 	crb := &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{Name: cfg.ProvisionerClusterRole},
 	}
+
+	started := time.Now()
+	defer logOperationDuration(log, "ensure provisioner ClusterRoleBinding", started)
 
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, crb, func() error {
@@ -177,11 +183,15 @@ func (r *Manager) EnsureClusterRoleBindingsProvisioner(ctx context.Context) erro
 
 			if r.Configuration.AllowServiceAccountPromotion() {
 				saList := &corev1.ServiceAccountList{}
+				listStarted := time.Now()
 				if err := r.Client.List(ctx, saList, client.MatchingLabels{
 					meta.OwnerPromotionLabel: meta.ValueTrue,
 				}); err != nil {
+					logOperationDuration(log, "list promoted ServiceAccounts", listStarted)
+
 					return err
 				}
+				logOperationDuration(log, "list promoted ServiceAccounts", listStarted)
 
 				for _, sa := range saList.Items {
 					crb.Subjects = append(crb.Subjects, rbacv1.Subject{
@@ -235,7 +245,7 @@ func (r *Manager) EnsureClusterRoleProvisioner(ctx context.Context) (err error) 
 		return nil
 	}
 
-	return r.garbageCollectRBAC(ctx)
+	return nil
 }
 
 func (r *Manager) EnsureClusterRoleDeleter(ctx context.Context) (err error) {
@@ -269,13 +279,35 @@ func (r *Manager) EnsureClusterRoleDeleter(ctx context.Context) (err error) {
 		return err
 	}
 
-	return r.garbageCollectRBAC(ctx)
+	return nil
 }
 
 // Start is the Runnable function triggered upon Manager start-up to perform the first RBAC reconciliation
 // since we're not creating empty CR and CRB upon Capsule installation: it's a run-once task, since the reconciliation
 // is handled by the Reconciler implemented interface.
 func (r *Manager) Start(ctx context.Context) error {
+	return r.reconcileConfiguration(ctx)
+}
+
+func (r *Manager) enqueueServiceAccountChange(context.Context, client.Object) []reconcile.Request {
+	if !r.Configuration.AllowServiceAccountPromotion() {
+		return nil
+	}
+
+	return []reconcile.Request{{NamespacedName: client.ObjectKey{
+		Name:      r.Configuration.RBAC().ProvisionerClusterRole,
+		Namespace: serviceAccountEventMarker,
+	}}}
+}
+
+func (r *Manager) enqueueRBACConfiguration(context.Context, client.Object) []reconcile.Request {
+	return []reconcile.Request{{NamespacedName: client.ObjectKey{
+		Name:      r.Configuration.RBAC().ProvisionerClusterRole,
+		Namespace: rbacConfigurationEventMarker,
+	}}}
+}
+
+func (r *Manager) reconcileConfiguration(ctx context.Context) error {
 	if err := r.EnsureClusterRoleProvisioner(ctx); err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
@@ -287,17 +319,10 @@ func (r *Manager) Start(ctx context.Context) error {
 	return r.garbageCollectRBAC(ctx)
 }
 
-func (r *Manager) handleSAChange(ctx context.Context, obj client.Object) {
-	if !r.Configuration.AllowServiceAccountPromotion() {
-		return
-	}
-
-	if err := r.EnsureClusterRoleBindingsProvisioner(ctx); err != nil {
-		r.Log.Error(err, "cannot update ClusterRoleBinding upon ServiceAccount event")
-	}
-}
-
 func (r *Manager) garbageCollectRBAC(ctx context.Context) error {
+	started := time.Now()
+	defer logOperationDuration(log.FromContext(ctx), "garbage collect managed RBAC", started)
+
 	rbac := r.Configuration.RBAC()
 
 	desiredCR := map[string]struct{}{
@@ -318,6 +343,10 @@ func (r *Manager) garbageCollectRBAC(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func logOperationDuration(logger logr.Logger, operation string, started time.Time) {
+	logger.V(4).Info("RBAC operation completed", "operation", operation, "duration", time.Since(started))
 }
 
 //nolint:dupl

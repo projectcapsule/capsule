@@ -6,6 +6,7 @@ package tenantowners
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sort"
 
 	"github.com/go-logr/logr"
@@ -54,7 +55,7 @@ func (r *TenantOwnerManager) SetupWithManager(
 	r.reader = mgr.GetAPIReader()
 
 	return ctrl.NewControllerManagedBy(mgr).
-		Named("capsule/tenant-owner-status").
+		Named("capsule/tenantowner").
 		For(
 			&capsulev1beta2.TenantOwner{},
 			builder.WithPredicates(
@@ -214,6 +215,7 @@ func (r *TenantOwnerManager) updateTenantOwnerStatus(
 
 			return err
 		}
+		originalStatus := latest.Status.DeepCopy()
 
 		latest.Status.ObservedGeneration = latest.GetGeneration()
 
@@ -227,6 +229,9 @@ func (r *TenantOwnerManager) updateTenantOwnerStatus(
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(readyCondition)
+		if reflect.DeepEqual(*originalStatus, latest.Status) {
+			return nil
+		}
 
 		if err := r.Client.Status().Update(ctx, latest); err != nil {
 			if apierrors.IsNotFound(err) {

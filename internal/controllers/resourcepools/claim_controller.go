@@ -6,6 +6,7 @@ package resourcepools
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"github.com/go-logr/logr"
 	gherrors "github.com/pkg/errors"
@@ -27,6 +28,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/metrics"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 )
 
 type resourceClaimController struct {
@@ -53,7 +55,7 @@ func (r *resourceClaimController) SetupWithManager(mgr ctrl.Manager, ctrlConfig 
 		Watches(
 			&capsulev1beta2.ResourcePool{},
 			handler.EnqueueRequestsFromMapFunc(r.claimsWithoutPoolFromNamespaces),
-			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+			builder.WithPredicates(predicates.ResourcePoolNamespacesChangedPredicate{}),
 		).
 		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
 		Complete(r)
@@ -278,6 +280,7 @@ func (r *resourceClaimController) updateStatus(
 
 			return err
 		}
+		originalStatus := latest.Status.DeepCopy()
 
 		latest.Status = instance.Status
 		latest.Status.ObservedGeneration = instance.GetGeneration()
@@ -294,6 +297,9 @@ func (r *resourceClaimController) updateStatus(
 		// Unset legacy Status
 		//nolint:staticcheck
 		latest.Status.Condition = metav1.Condition{}
+		if reflect.DeepEqual(*originalStatus, latest.Status) {
+			return nil
+		}
 
 		if err := r.Client.Status().Update(ctx, latest); err != nil {
 			return err

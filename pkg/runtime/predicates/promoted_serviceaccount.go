@@ -7,7 +7,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
 type PromotedServiceaccountPredicate struct{}
@@ -51,9 +50,9 @@ func (PromotedServiceaccountPredicate) Update(e event.UpdateEvent) bool {
 		return false
 	}
 
-	if !utils.MapEqual(e.ObjectOld.GetLabels(), e.ObjectNew.GetLabels()) {
-		return true
-	}
+	oldLabels := e.ObjectOld.GetLabels()
+	newLabels := e.ObjectNew.GetLabels()
 
-	return false
+	return oldLabels[meta.OwnerPromotionLabel] != newLabels[meta.OwnerPromotionLabel] ||
+		oldLabels[meta.ServiceAccountPromotionLabel] != newLabels[meta.ServiceAccountPromotionLabel]
 }

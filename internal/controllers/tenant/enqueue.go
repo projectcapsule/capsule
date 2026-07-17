@@ -14,6 +14,8 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
+const classEventMarker = "class-event"
+
 func (r *Manager) enqueueForTenantsWithCondition(
 	ctx context.Context,
 	obj client.Object,
@@ -43,6 +45,14 @@ func (r *Manager) enqueueForTenantsWithCondition(
 }
 
 func (r *Manager) enqueueAllTenants(ctx context.Context, _ client.Object) []reconcile.Request {
+	return r.enqueueAllTenantsWithMarker(ctx, "")
+}
+
+func (r *Manager) enqueueAllTenantsForClass(ctx context.Context, _ client.Object) []reconcile.Request {
+	return r.enqueueAllTenantsWithMarker(ctx, classEventMarker)
+}
+
+func (r *Manager) enqueueAllTenantsWithMarker(ctx context.Context, marker string) []reconcile.Request {
 	var tenants capsulev1beta2.TenantList
 	if err := r.List(ctx, &tenants); err != nil {
 		r.Log.Error(err, "failed to list Tenants for class event")
@@ -54,7 +64,8 @@ func (r *Manager) enqueueAllTenants(ctx context.Context, _ client.Object) []reco
 	for i := range tenants.Items {
 		reqs = append(reqs, reconcile.Request{
 			NamespacedName: types.NamespacedName{
-				Name: tenants.Items[i].Name,
+				Name:      tenants.Items[i].Name,
+				Namespace: marker,
 			},
 		})
 	}

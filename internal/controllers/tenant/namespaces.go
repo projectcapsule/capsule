@@ -55,7 +55,10 @@ func (r *Manager) reconcileDeletingTenantNamespaces(
 		group.Go(func() error {
 			namespace := &corev1.Namespace{}
 
-			err := r.Get(ctx, client.ObjectKey{Name: statusNamespace.Name}, namespace)
+			// Deletion decisions must not depend on informer-cache freshness. A
+			// direct read observes NotFound and deletionTimestamp promptly, which
+			// lets the Tenant finalizer advance without waiting for cache delivery.
+			err := r.reader.Get(ctx, client.ObjectKey{Name: statusNamespace.Name}, namespace)
 			if apierrors.IsNotFound(err) {
 				removed <- statusNamespace.Name
 
@@ -84,7 +87,7 @@ func (r *Manager) reconcileDeletingTenantNamespaces(
 
 				latest := &corev1.Namespace{}
 
-				err := r.Get(ctx, client.ObjectKey{Name: namespace.Name}, latest)
+				err := r.reader.Get(ctx, client.ObjectKey{Name: namespace.Name}, latest)
 				if apierrors.IsNotFound(err) {
 					removed <- statusNamespace.Name
 

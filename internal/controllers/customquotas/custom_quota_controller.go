@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -69,6 +70,7 @@ func (r *customQuotaClaimController) SetupWithManager(mgr ctrl.Manager, ctrlConf
 				mgr.GetRESTMapper(),
 				&capsulev1beta2.CustomQuota{},
 			),
+			builder.WithPredicates(predicates.QuantityLedgerWorkChangedPredicate{}),
 		).
 		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
 		Complete(r)
@@ -296,6 +298,7 @@ func (r *customQuotaClaimController) updateStatus(
 
 			return err
 		}
+		originalStatus := latest.Status.DeepCopy()
 
 		latest.Status = instance.Status
 		latest.Status.ObservedGeneration = instance.GetGeneration()
@@ -309,6 +312,9 @@ func (r *customQuotaClaimController) updateStatus(
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(readyCondition)
+		if reflect.DeepEqual(*originalStatus, latest.Status) {
+			return nil
+		}
 
 		if err := r.Client.Status().Update(ctx, latest); err != nil {
 			return err

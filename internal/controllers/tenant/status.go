@@ -5,6 +5,7 @@ package tenant
 
 import (
 	"context"
+	"reflect"
 	"regexp"
 	"sort"
 
@@ -54,6 +55,7 @@ func (r *Manager) updateTenantStatus(ctx context.Context, instance *capsulev1bet
 
 			return err
 		}
+		originalStatus := latest.Status.DeepCopy()
 
 		latest.Status = instance.Status
 		latest.Status.ObservedGeneration = instance.GetGeneration()
@@ -67,6 +69,9 @@ func (r *Manager) updateTenantStatus(ctx context.Context, instance *capsulev1bet
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(readyCondition)
+		if reflect.DeepEqual(*originalStatus, latest.Status) {
+			return nil
+		}
 
 		if err := r.Client.Status().Update(ctx, latest); err != nil {
 			if apierrors.IsNotFound(err) {
@@ -87,6 +92,17 @@ func (r *Manager) updateReconcilingStatus(ctx context.Context, instance *capsule
 		latest := &capsulev1beta2.Tenant{}
 		if err = r.reader.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
 			return err
+		}
+
+		if latest.Status.ObservedGeneration == instance.GetGeneration() {
+			// The reconciled object may have come from a cache that has not yet
+			// observed the latest status write. Keep the instance (and therefore
+			// the patch helper baseline created by the caller) synchronized with
+			// the authoritative API-reader result even when no status update is
+			// required.
+			instance.Status = latest.Status
+
+			return nil
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(capmeta.NewReadyConditionReconcilingReason(instance))

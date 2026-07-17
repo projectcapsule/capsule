@@ -96,6 +96,13 @@ func (h *handler) OnDelete(
 			return ad.ErroredResponse(err)
 		}
 
+		// A namespace which is already terminating must be allowed to complete
+		// deletion even if its Tenant metadata became inconsistent meanwhile.
+		// Kubernetes authorization has already guarded the original delete.
+		if oldNs.DeletionTimestamp != nil || oldNs.Status.Phase == corev1.NamespaceTerminating {
+			return nil
+		}
+
 		tnt, err := tenant.ResolveNamespaceTenant(ctx, reader, oldNs)
 		if err != nil {
 			return ad.ErroredResponse(err)

@@ -24,7 +24,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -71,37 +70,12 @@ func (r *clusterCustomQuotaClaimController) SetupWithManager(mgr ctrl.Manager, c
 		Watches(
 			&capsulev1beta2.QuantityLedger{},
 			handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &capsulev1beta2.GlobalCustomQuota{}),
+			builder.WithPredicates(predicates.QuantityLedgerWorkChangedPredicate{}),
 		).
 		Watches(
 			&corev1.Namespace{},
 			handler.EnqueueRequestsFromMapFunc(r.mapNamespaceToGlobalCustomQuotas),
-			builder.WithPredicates(predicate.Funcs{
-				CreateFunc: func(e event.CreateEvent) bool {
-					return true
-				},
-				DeleteFunc: func(e event.DeleteEvent) bool {
-					return true
-				},
-				UpdateFunc: func(e event.UpdateEvent) bool {
-					if e.ObjectOld == nil || e.ObjectNew == nil {
-						return false
-					}
-
-					oldNs, okOld := e.ObjectOld.(*corev1.Namespace)
-
-					newNs, okNew := e.ObjectNew.(*corev1.Namespace)
-
-					if !okOld || !okNew {
-						return false
-					}
-
-					return !reflect.DeepEqual(oldNs.Labels, newNs.Labels) ||
-						!reflect.DeepEqual(oldNs.Annotations, newNs.Annotations)
-				},
-				GenericFunc: func(e event.GenericEvent) bool {
-					return false
-				},
-			}),
+			builder.WithPredicates(predicates.NamespaceMetadataChangedPredicate{}),
 		).
 		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
 		Complete(r)
@@ -388,6 +362,7 @@ func (r *clusterCustomQuotaClaimController) updateStatus(
 
 			return err
 		}
+		originalStatus := latest.Status.DeepCopy()
 
 		latest.Status = instance.Status
 		latest.Status.ObservedGeneration = instance.GetGeneration()
@@ -401,6 +376,9 @@ func (r *clusterCustomQuotaClaimController) updateStatus(
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(readyCondition)
+		if reflect.DeepEqual(*originalStatus, latest.Status) {
+			return nil
+		}
 
 		if err := r.Client.Status().Update(ctx, latest); err != nil {
 			return err
