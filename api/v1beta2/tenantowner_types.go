@@ -20,7 +20,11 @@ type TenantOwnerSpec struct {
 	// must be Capsule Users.
 	// +kubebuilder:default=true
 	// +optional
-	Aggregate bool `json:"aggregate,omitempty"`
+	Aggregate *bool `json:"aggregate,omitempty"`
+}
+
+func (s TenantOwnerSpec) AggregateEnabled() bool {
+	return s.Aggregate == nil || *s.Aggregate
 }
 
 // TenantOwnerStatus defines the observed state of TenantOwner.

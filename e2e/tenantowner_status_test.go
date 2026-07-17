@@ -11,6 +11,7 @@ import (
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capmeta "github.com/projectcapsule/capsule/pkg/api/meta"
@@ -65,7 +66,7 @@ var _ = Describe("TenantOwner status tracks matched Tenants", Ordered, Label("te
 			},
 		},
 		Spec: capsulev1beta2.TenantOwnerSpec{
-			Aggregate: true,
+			Aggregate: ptr.To(true),
 			CoreOwnerSpec: rbac.CoreOwnerSpec{
 				UserSpec: rbac.UserSpec{
 					Kind: rbac.UserOwner,
@@ -216,7 +217,7 @@ var _ = Describe("TenantOwner status with 10 matched Tenants", Ordered, Label("t
 			},
 		},
 		Spec: capsulev1beta2.TenantOwnerSpec{
-			Aggregate: true,
+			Aggregate: ptr.To(true),
 			CoreOwnerSpec: rbac.CoreOwnerSpec{
 				UserSpec: rbac.UserSpec{
 					Kind: rbac.UserOwner,
@@ -301,7 +302,7 @@ var _ = Describe("TenantOwner status fan-out: 10 TenantOwners matched by 1 Tenan
 					},
 				},
 				Spec: capsulev1beta2.TenantOwnerSpec{
-					Aggregate: true,
+					Aggregate: ptr.To(true),
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
 							Kind: rbac.UserOwner,
