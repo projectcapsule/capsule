@@ -399,7 +399,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("con
 		_, err = cs.CoreV1().Namespaces().UpdateStatus(
 			context.TODO(),
 			hijacked,
-			metav1.UpdateOptions{},
+			metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}},
 		)
 
 		if err != nil {
@@ -484,7 +484,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("con
 		_, err = cs.CoreV1().Namespaces().Finalize(
 			context.TODO(),
 			hijacked,
-			metav1.UpdateOptions{},
+			metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}},
 		)
 
 		if err != nil {
@@ -525,7 +525,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("con
 			_, err = cs.CoreV1().Namespaces().Update(
 				context.TODO(),
 				current,
-				metav1.UpdateOptions{},
+				metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}},
 			)
 
 			Expect(err).To(HaveOccurred())
@@ -950,7 +950,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("con
 				UID:        tenant.GetUID(),
 			}}
 
-			_, _ = cs.CoreV1().Namespaces().UpdateStatus(context.TODO(), statusNs, metav1.UpdateOptions{})
+			_, _ = cs.CoreV1().Namespaces().UpdateStatus(context.TODO(), statusNs, metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
 
 			patch := []byte(fmt.Sprintf(
 				`{"metadata":{"labels":{"%s":"%s"}}}`,
@@ -1219,7 +1219,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("con
 				},
 			}
 
-			_, err = cs.CoreV1().Namespaces().UpdateStatus(context.TODO(), statusNs, metav1.UpdateOptions{})
+			_, err = cs.CoreV1().Namespaces().UpdateStatus(context.TODO(), statusNs, metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
 			if err != nil {
 				expectOriginalTenantOwnership(ns.Name, tenant)
 
@@ -1261,7 +1261,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("con
 
 			statusNs.Labels[meta.TenantLabel] = randomName
 
-			_, err = cs.CoreV1().Namespaces().UpdateStatus(context.TODO(), statusNs, metav1.UpdateOptions{})
+			_, err = cs.CoreV1().Namespaces().UpdateStatus(context.TODO(), statusNs, metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
 			if err != nil {
 				expectOriginalTenantOwnership(ns.Name, tenant)
 
@@ -1312,7 +1312,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("con
 				},
 			}
 
-			_, err = cs.CoreV1().Namespaces().UpdateStatus(context.TODO(), statusNs, metav1.UpdateOptions{})
+			_, err = cs.CoreV1().Namespaces().UpdateStatus(context.TODO(), statusNs, metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
 			if err != nil {
 				retrievedNs := getNamespace(ns.Name)
 
@@ -1361,7 +1361,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("con
 				},
 			}
 
-			_, err = cs.CoreV1().Namespaces().UpdateStatus(context.TODO(), statusNs, metav1.UpdateOptions{})
+			_, err = cs.CoreV1().Namespaces().UpdateStatus(context.TODO(), statusNs, metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
 			if err != nil {
 				expectNoTenantOwnership(unmanaged.Name, tenant)
 
