@@ -97,7 +97,7 @@ func (h *handler) OnDelete(
 		}
 
 		tnt, err := tenant.ResolveNamespaceTenant(ctx, reader, oldNs)
-		if err != nil && user.IsAdmin() {
+		if err != nil && !user.IsAdmin() {
 			return ad.ErroredResponse(err)
 		}
 
