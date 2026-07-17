@@ -97,12 +97,8 @@ func (h *handler) OnDelete(
 		}
 
 		tnt, err := tenant.ResolveNamespaceTenant(ctx, reader, oldNs)
-		if err != nil && !user.IsAdmin() {
-			// An inconsistent namespace cannot be associated safely with a Tenant,
-			// but rejecting its deletion only makes the invalid state permanent.
-			// Authorization has already been enforced by the API server, and a
-			// delete cannot introduce or transfer tenant ownership.
-			return nil
+		if err != nil && user.IsAdmin() {
+			return ad.ErroredResponse(err)
 		}
 
 		if tnt == nil {
