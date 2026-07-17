@@ -26,7 +26,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
-var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("namespace", "hijack"), func() {
+var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("config", "namespace", "hijack"), func() {
 	t1 := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "e2e-ns-attack-1",
@@ -257,7 +257,42 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 		return fmt.Sprintf("random-tenant-%d", rand.Int()), types.UID(fmt.Sprintf("%d", rand.Int()))
 	}
 
+	createUnmanagedNamespace := func() *corev1.Namespace {
+		ns := NewNamespace("")
+		Expect(k8sClient.Create(context.TODO(), ns)).To(Succeed())
+		DeferCleanup(func() { EventuallyDeletion(ns) })
+
+		return ns
+	}
+
+	waitForTenantNamespacesDeletion := func(tenantNames ...string) {
+		names := make(map[string]struct{}, len(tenantNames))
+		for _, name := range tenantNames {
+			names[name] = struct{}{}
+		}
+
+		Eventually(func(g Gomega) {
+			list := &corev1.NamespaceList{}
+			g.Expect(k8sClient.List(context.TODO(), list)).To(Succeed())
+
+			for i := range list.Items {
+				for _, ref := range tenant.TenantOwnerReferences(&list.Items[i]) {
+					_, belongsToTestTenant := names[ref.Name]
+					g.Expect(belongsToTestTenant).To(
+						BeFalse(),
+						"namespace %q still references a previous incarnation of Tenant %q (UID %q)",
+						list.Items[i].Name,
+						ref.Name,
+						ref.UID,
+					)
+				}
+			}
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	}
+
 	JustBeforeEach(func() {
+		waitForTenantNamespacesDeletion(t1.Name, t2.Name, t3.Name)
+
 		EventuallyCreation(func() error {
 			t1.ResourceVersion = ""
 
@@ -285,6 +320,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 		EventuallyDeletion(t1)
 		EventuallyDeletion(t2)
 		EventuallyDeletion(t3)
+		waitForTenantNamespacesDeletion(t1.Name, t2.Name, t3.Name)
 	})
 
 	It("Owners can not hijack Tenant ownership through namespaces/status", func() {
@@ -363,7 +399,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 		_, err = cs.CoreV1().Namespaces().UpdateStatus(
 			context.TODO(),
 			hijacked,
-			metav1.UpdateOptions{},
+			metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}},
 		)
 
 		if err != nil {
@@ -448,7 +484,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 		_, err = cs.CoreV1().Namespaces().Finalize(
 			context.TODO(),
 			hijacked,
-			metav1.UpdateOptions{},
+			metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}},
 		)
 
 		if err != nil {
@@ -489,7 +525,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 			_, err = cs.CoreV1().Namespaces().Update(
 				context.TODO(),
 				current,
-				metav1.UpdateOptions{},
+				metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}},
 			)
 
 			Expect(err).To(HaveOccurred())
@@ -514,8 +550,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 		tenantA := getTenant(t1.Name)
 		tenantB := getTenant(t2.Name)
 
-		unmanaged := NewNamespace("")
-		Expect(k8sClient.Create(context.TODO(), unmanaged)).Should(Succeed())
+		unmanaged := createUnmanagedNamespace()
 
 		for _, owner := range t1.Spec.Owners {
 			cs := ownerClient(owner.UserSpec)
@@ -575,8 +610,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 	It("Tenant A owners can not adopt unmanaged namespaces into Tenant B", func() {
 		tenantB := getTenant(t3.Name)
 
-		unmanaged := NewNamespace("")
-		Expect(k8sClient.Create(context.TODO(), unmanaged)).Should(Succeed())
+		unmanaged := createUnmanagedNamespace()
 
 		for _, owner := range t1.Spec.Owners {
 			cs := ownerClient(owner.UserSpec)
@@ -606,8 +640,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 	It("Owners can not hijack unmanaged namespaces with controller ownerReference flags", func() {
 		tenant := getTenant(t1.Name)
 
-		unmanaged := NewNamespace("")
-		Expect(k8sClient.Create(context.TODO(), unmanaged)).Should(Succeed())
+		unmanaged := createUnmanagedNamespace()
 
 		for _, owner := range t1.Spec.Owners {
 			cs := ownerClient(owner.UserSpec)
@@ -641,8 +674,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 	It("Owners can not smuggle Tenant ownerReference beside unrelated ownerReferences", func() {
 		tenant := getTenant(t1.Name)
 
-		unmanaged := NewNamespace("")
-		Expect(k8sClient.Create(context.TODO(), unmanaged)).Should(Succeed())
+		unmanaged := createUnmanagedNamespace()
 
 		for _, owner := range t1.Spec.Owners {
 			cs := ownerClient(owner.UserSpec)
@@ -764,8 +796,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 	It("Owners can not hijack unmanaged namespaces using JSONPatch add label", func() {
 		tenant := getTenant(t1.Name)
 
-		unmanaged := NewNamespace("")
-		Expect(k8sClient.Create(context.TODO(), unmanaged)).Should(Succeed())
+		unmanaged := createUnmanagedNamespace()
 
 		for _, owner := range t1.Spec.Owners {
 			cs := ownerClient(owner.UserSpec)
@@ -791,8 +822,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 	It("Owners can not hijack unmanaged namespaces using JSONPatch add ownerReference", func() {
 		tenant := getTenant(t1.Name)
 
-		unmanaged := NewNamespace("")
-		Expect(k8sClient.Create(context.TODO(), unmanaged)).Should(Succeed())
+		unmanaged := createUnmanagedNamespace()
 
 		for _, owner := range t1.Spec.Owners {
 			cs := ownerClient(owner.UserSpec)
@@ -819,8 +849,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 	It("Owners can not hijack unmanaged namespaces with matching label and forged ownerReference UID", func() {
 		tenant := getTenant(t1.Name)
 
-		unmanaged := NewNamespace("")
-		Expect(k8sClient.Create(context.TODO(), unmanaged)).Should(Succeed())
+		unmanaged := createUnmanagedNamespace()
 
 		for _, owner := range t1.Spec.Owners {
 			cs := ownerClient(owner.UserSpec)
@@ -851,8 +880,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 	It("Owners can not hijack unmanaged namespaces using server-side apply", func() {
 		tenant := getTenant(t1.Name)
 
-		unmanaged := NewNamespace("")
-		Expect(k8sClient.Create(context.TODO(), unmanaged)).Should(Succeed())
+		unmanaged := createUnmanagedNamespace()
 
 		for _, owner := range t1.Spec.Owners {
 			cs := ownerClient(owner.UserSpec)
@@ -902,8 +930,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 			deleteNamespaceStatusRBACForOwner(tnt)
 		}, tenant)
 
-		unmanaged := NewNamespace("")
-		Expect(k8sClient.Create(context.TODO(), unmanaged)).Should(Succeed())
+		unmanaged := createUnmanagedNamespace()
 
 		for _, owner := range t1.Spec.Owners {
 			cs := ownerClient(owner.UserSpec)
@@ -923,7 +950,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 				UID:        tenant.GetUID(),
 			}}
 
-			_, _ = cs.CoreV1().Namespaces().UpdateStatus(context.TODO(), statusNs, metav1.UpdateOptions{})
+			_, _ = cs.CoreV1().Namespaces().UpdateStatus(context.TODO(), statusNs, metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
 
 			patch := []byte(fmt.Sprintf(
 				`{"metadata":{"labels":{"%s":"%s"}}}`,
@@ -947,8 +974,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 	It("Owners can not hijack unmanaged namespaces with valid ownerReference and mismatching label", func() {
 		tenant := getTenant(t1.Name)
 
-		unmanaged := NewNamespace("")
-		Expect(k8sClient.Create(context.TODO(), unmanaged)).Should(Succeed())
+		unmanaged := createUnmanagedNamespace()
 
 		for _, owner := range t1.Spec.Owners {
 			cs := ownerClient(owner.UserSpec)
@@ -1134,8 +1160,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 	It("Owners can not patch unmanaged namespaces into a Tenant", func() {
 		tenant := getTenant(t1.Name)
 
-		unmanaged := NewNamespace("")
-		Expect(k8sClient.Create(context.TODO(), unmanaged)).Should(Succeed())
+		unmanaged := createUnmanagedNamespace()
 
 		for _, owner := range t1.Spec.Owners {
 			cs := ownerClient(owner.UserSpec)
@@ -1194,7 +1219,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 				},
 			}
 
-			_, err = cs.CoreV1().Namespaces().UpdateStatus(context.TODO(), statusNs, metav1.UpdateOptions{})
+			_, err = cs.CoreV1().Namespaces().UpdateStatus(context.TODO(), statusNs, metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
 			if err != nil {
 				expectOriginalTenantOwnership(ns.Name, tenant)
 
@@ -1236,7 +1261,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 
 			statusNs.Labels[meta.TenantLabel] = randomName
 
-			_, err = cs.CoreV1().Namespaces().UpdateStatus(context.TODO(), statusNs, metav1.UpdateOptions{})
+			_, err = cs.CoreV1().Namespaces().UpdateStatus(context.TODO(), statusNs, metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
 			if err != nil {
 				expectOriginalTenantOwnership(ns.Name, tenant)
 
@@ -1287,7 +1312,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 				},
 			}
 
-			_, err = cs.CoreV1().Namespaces().UpdateStatus(context.TODO(), statusNs, metav1.UpdateOptions{})
+			_, err = cs.CoreV1().Namespaces().UpdateStatus(context.TODO(), statusNs, metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
 			if err != nil {
 				retrievedNs := getNamespace(ns.Name)
 
@@ -1314,8 +1339,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 			deleteNamespaceStatusRBACForOwner(tnt)
 		}, tenant)
 
-		unmanaged := NewNamespace("")
-		Expect(k8sClient.Create(context.TODO(), unmanaged)).Should(Succeed())
+		unmanaged := createUnmanagedNamespace()
 
 		for _, owner := range t1.Spec.Owners {
 			cs := ownerClient(owner.UserSpec)
@@ -1337,7 +1361,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 				},
 			}
 
-			_, err = cs.CoreV1().Namespaces().UpdateStatus(context.TODO(), statusNs, metav1.UpdateOptions{})
+			_, err = cs.CoreV1().Namespaces().UpdateStatus(context.TODO(), statusNs, metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
 			if err != nil {
 				expectNoTenantOwnership(unmanaged.Name, tenant)
 
@@ -1346,6 +1370,13 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 
 			expectNoTenantOwnership(unmanaged.Name, tenant)
 		}
+
+		Expect(k8sClient.Delete(context.TODO(), unmanaged)).To(Succeed())
+		Eventually(func() bool {
+			err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: unmanaged.Name}, &corev1.Namespace{})
+
+			return apierrors.IsNotFound(err)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
 	})
 })
 
