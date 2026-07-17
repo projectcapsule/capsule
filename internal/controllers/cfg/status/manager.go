@@ -117,7 +117,7 @@ func (r *Manager) SetupWithManager(
 				CreateFunc: func(e event.CreateEvent) bool {
 					to, ok := e.Object.(*capsulev1beta2.TenantOwner)
 
-					return ok && to.Spec.Aggregate
+					return ok && to.Spec.AggregateEnabled()
 				},
 				UpdateFunc: func(e event.UpdateEvent) bool {
 					oldTo, ok1 := e.ObjectOld.(*capsulev1beta2.TenantOwner)
@@ -127,7 +127,7 @@ func (r *Manager) SetupWithManager(
 						return false
 					}
 
-					if oldTo.Spec.Aggregate != newTo.Spec.Aggregate {
+					if oldTo.Spec.AggregateEnabled() != newTo.Spec.AggregateEnabled() {
 						return true
 					}
 
@@ -144,7 +144,7 @@ func (r *Manager) SetupWithManager(
 				DeleteFunc: func(e event.DeleteEvent) bool {
 					to, ok := e.Object.(*capsulev1beta2.TenantOwner)
 
-					return ok && to.Spec.Aggregate
+					return ok && to.Spec.AggregateEnabled()
 				},
 			}),
 		).
@@ -232,7 +232,7 @@ func (r *Manager) gatherCapsuleUsers(
 	for i := range toList.Items {
 		to := &toList.Items[i]
 
-		if !to.Spec.Aggregate {
+		if !to.Spec.AggregateEnabled() {
 			continue
 		}
 
