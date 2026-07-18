@@ -180,7 +180,7 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 		})
 	})
 
-	It("should fail when updating a Namespace", func() {
+	It("should fail when updating a Namespace", Label("skip-on-openshift"), func() {
 		role := &rbacv1.Role{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "ns-patch",

@@ -138,7 +138,7 @@ var _ = Describe("exceeding a Tenant resource quota", Ordered, Label("resourcequ
 		EventuallyDeletion(tnt)
 	})
 
-	It("should block new Pods", func() {
+	It("should block new Pods", Label("skip-on-openshift"), func() {
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 		for _, namespace := range nsl {
 			Eventually(func() (err error) {

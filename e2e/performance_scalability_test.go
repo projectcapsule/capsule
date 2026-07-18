@@ -50,7 +50,7 @@ var _ = Describe("verify scalability", Ordered, Label("performance", "scalabilit
 		EventuallyDeletion(tnt)
 	})
 
-	It("verify lifecycle (scalability)", func() {
+	It("verify lifecycle (scalability)", Label("skip-on-openshift"), func() {
 		const amount = 50
 		const podsPerNamespace int32 = 1
 

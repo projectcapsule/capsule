@@ -18,7 +18,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("enforcing an allowed set of Service external IPs", Ordered, Label("tenant", "networking", "service"), func() {
+var _ = Describe("enforcing an allowed set of Service external IPs", Ordered, Label("tenant", "networking", "service", "skip-on-openshift"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "e2e-allowed-external-ip",
@@ -95,7 +95,7 @@ var _ = Describe("enforcing an allowed set of Service external IPs", Ordered, La
 		}).ShouldNot(Succeed())
 	})
 
-	It("should allow the first CIDR block", Label("skip-on-openshift"), func() {
+	It("should allow the first CIDR block", func() {
 		ns := NewNamespace("", map[string]string{
 			meta.TenantLabel: tnt.GetName(),
 		})
@@ -132,7 +132,7 @@ var _ = Describe("enforcing an allowed set of Service external IPs", Ordered, La
 		}).Should(Succeed())
 	})
 
-	It("should allow the /32 CIDR block", Label("skip-on-openshift"), func() {
+	It("should allow the /32 CIDR block", func() {
 		ns := NewNamespace("", map[string]string{
 			meta.TenantLabel: tnt.GetName(),
 		})

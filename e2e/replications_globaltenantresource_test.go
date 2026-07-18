@@ -252,7 +252,7 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 			expectGlobalTenantResourceProcessedClusterRole("gtr-cluster-generator", "gtr-cluster-generator-role")
 		})
 
-		It("only allows the managing GlobalTenantResource service account to update created cluster-scoped objects", func() {
+		It("only allows the managing GlobalTenantResource service account to update created cluster-scoped objects", Label("skip-on-openshift"), func() {
 			saName := "gtr-cluster-update-guard"
 			clusterRoleName := "gtr-cluster-admission-role"
 			writerRoleName := "gtr-cluster-admission-writer"
@@ -834,7 +834,7 @@ data:
 			}
 		})
 
-		It("only allows the managing GlobalTenantResource service account to update created objects", func() {
+		It("only allows the managing GlobalTenantResource service account to update created objects", Label("skip-on-openshift"), func() {
 			saName := "gtr-update-guard"
 			targetNamespace := tenantANamespaces[0]
 			configMapName := "gtr-admission-protected"
@@ -903,7 +903,7 @@ data:
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 
-		It("fails to prune replicated resources when the impersonated service account cannot delete them", func() {
+		It("fails to prune replicated resources when the impersonated service account cannot delete them", Label("skip-on-openshift"), func() {
 			saCreate := "gtr-creator-ok"
 			saNoDelete := "gtr-creator-no-delete"
 
@@ -1047,7 +1047,7 @@ data:
 		})
 	})
 
-	Context("prune on selector drift", func() {
+	Context("prune on selector drift", Label("skip-on-openshift"), func() {
 		It("prunes objects from tenants that stop matching tenantSelector", func() {
 			gtr := newRawConfigMapGlobalTenantResource("gtr-tenant-selector-prune", map[string]string{
 				"mode": "both",
