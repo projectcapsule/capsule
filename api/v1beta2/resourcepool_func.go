@@ -206,6 +206,13 @@ func (r *ResourcePool) GetAvailableClaimableResources() corev1.ResourceList {
 
 		qt.Sub(claimed)
 
+		// A pool can never offer a negative amount of resources, so clamp at
+		// zero here too, otherwise callers that build PoolExhausted messages
+		// from this value can surface negative available quantities.
+		if qt.Sign() < 0 {
+			qt = resource.MustParse("0")
+		}
+
 		hard[resourceName] = qt
 	}
 

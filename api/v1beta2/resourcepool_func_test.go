@@ -355,3 +355,26 @@ func TestIsBoundToResourcePool_2(t *testing.T) {
 	})
 
 }
+
+func TestGetAvailableClaimableResources_OverSubscriptionDoesNotGoNegative(t *testing.T) {
+	pool := &capsulev1beta2.ResourcePool{
+		Status: capsulev1beta2.ResourcePoolStatus{
+			Allocation: capsulev1beta2.ResourcePoolQuotaStatus{
+				Hard: corev1.ResourceList{
+					corev1.ResourceLimitsCPU: resource.MustParse("10"),
+				},
+				Claimed: corev1.ResourceList{
+					corev1.ResourceLimitsCPU: resource.MustParse("55"),
+				},
+			},
+		},
+	}
+
+	// Claimed exceeds Hard, so Hard-Claimed is negative. The helper must clamp
+	// at zero so negative available values never leak into PoolExhausted
+	// condition messages.
+	claimable := pool.GetAvailableClaimableResources()
+	got := claimable[corev1.ResourceLimitsCPU]
+	assert.Equal(t, 0, (&got).Cmp(resource.MustParse("0")))
+	assert.False(t, (&got).Sign() < 0)
+}
