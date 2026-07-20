@@ -951,7 +951,9 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("con
 			}}
 
 			_, err = cs.CoreV1().Namespaces().UpdateStatus(context.TODO(), statusNs, metav1.UpdateOptions{})
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsForbidden(err)).To(BeTrue())
+			Expect(err).To(MatchError(ContainSubstring("namespace can not be patched into a tenant")))
 
 			patch := []byte(fmt.Sprintf(
 				`{"metadata":{"labels":{"%s":"%s"}}}`,
