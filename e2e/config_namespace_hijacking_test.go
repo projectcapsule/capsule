@@ -950,7 +950,8 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("con
 				UID:        tenant.GetUID(),
 			}}
 
-			_, _ = cs.CoreV1().Namespaces().UpdateStatus(context.TODO(), statusNs, metav1.UpdateOptions{})
+			_, err = cs.CoreV1().Namespaces().UpdateStatus(context.TODO(), statusNs, metav1.UpdateOptions{})
+			Expect(err).ToNot(HaveOccurred())
 
 			patch := []byte(fmt.Sprintf(
 				`{"metadata":{"labels":{"%s":"%s"}}}`,
