@@ -16,6 +16,8 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
+	"github.com/projectcapsule/capsule/pkg/ruleengine"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
@@ -54,8 +56,9 @@ type TypedHandlerWithTenantWithRuleset[T client.Object] interface {
 }
 
 type TypedTenantWithRulesetHandler[T client.Object] struct {
-	Factory  NewObjectFunc[T]
-	Handlers []TypedHandlerWithTenantWithRuleset[T]
+	Factory       NewObjectFunc[T]
+	Handlers      []TypedHandlerWithTenantWithRuleset[T]
+	Configuration configuration.Configuration
 }
 
 func (h *TypedTenantWithRulesetHandler[T]) OnCreate(
@@ -80,6 +83,10 @@ func (h *TypedTenantWithRulesetHandler[T]) OnCreate(
 		}
 
 		ruleBlocks, err := h.resolveRuleset(ctx, c, req, req.Namespace, tnt)
+		if err != nil {
+			return ErroredResponse(err)
+		}
+		ruleBlocks, err = ruleengine.FilterNamespaceRulesByAudience(h.Configuration, tnt, req, ruleBlocks)
 		if err != nil {
 			return ErroredResponse(err)
 		}
@@ -124,6 +131,10 @@ func (h *TypedTenantWithRulesetHandler[T]) OnUpdate(
 		if err != nil {
 			return ErroredResponse(err)
 		}
+		ruleBlocks, err = ruleengine.FilterNamespaceRulesByAudience(h.Configuration, tnt, req, ruleBlocks)
+		if err != nil {
+			return ErroredResponse(err)
+		}
 
 		for _, hndl := range h.Handlers {
 			if response := hndl.OnUpdate(c, reader, oldObj, newObj, decoder, recorder, tnt, ruleBlocks)(ctx, req); response != nil {
@@ -157,6 +168,10 @@ func (h *TypedTenantWithRulesetHandler[T]) OnDelete(
 		}
 
 		ruleBlocks, err := h.resolveRuleset(ctx, c, req, req.Namespace, tnt)
+		if err != nil {
+			return ErroredResponse(err)
+		}
+		ruleBlocks, err = ruleengine.FilterNamespaceRulesByAudience(h.Configuration, tnt, req, ruleBlocks)
 		if err != nil {
 			return ErroredResponse(err)
 		}

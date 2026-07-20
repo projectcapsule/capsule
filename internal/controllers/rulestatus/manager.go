@@ -6,6 +6,7 @@ package rulestatus
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -140,10 +141,15 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 
 	log.V(4).Info("reconciling completed")
 
+	if hasManagedMetadata(instance.Status.Rules) {
+		return ctrl.Result{RequeueAfter: time.Minute}, reconcileError
+	}
+
 	return ctrl.Result{}, reconcileError
 }
 
 func (r Manager) reconcile(ctx context.Context, instance *capsulev1beta2.RuleStatus) error {
+	hadManagedMetadata := hasManagedMetadata(instance.Status.Rules)
 	ruleStatus := make([]*rules.NamespaceRuleBodyNamespace, 0, len(instance.Spec))
 
 	for _, rule := range instance.Spec {
@@ -163,6 +169,11 @@ func (r Manager) reconcile(ctx context.Context, instance *capsulev1beta2.RuleSta
 	}
 
 	instance.Status.Rules = ruleStatus
+	if hadManagedMetadata || hasManagedMetadata(ruleStatus) {
+		if err := r.reconcileManagedMetadata(ctx, instance, ruleStatus); err != nil {
+			return fmt.Errorf("reconcile managed metadata: %w", err)
+		}
+	}
 
 	//nolint:staticcheck
 	instance.Status.Rule = rules.NamespaceRuleBodyNamespace{}

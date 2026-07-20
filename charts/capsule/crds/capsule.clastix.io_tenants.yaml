@@ -2515,6 +2515,26 @@ spec:
                           - deny
                           - audit
                           type: string
+                        audience:
+                          description: |-
+                            Audience limits this enforcement block to matching request subjects.
+                            An empty audience matches every request.
+                          items:
+                            properties:
+                              kind:
+                                enum:
+                                - User
+                                - Group
+                                - ServiceAccount
+                                - Custom
+                                type: string
+                              name:
+                                type: string
+                            required:
+                            - kind
+                            - name
+                            type: object
+                          type: array
                         metadata:
                           description: Enforcement for object metadata on namespaced
                             resources.
@@ -2525,6 +2545,16 @@ spec:
                               annotations:
                                 additionalProperties:
                                   properties:
+                                    default:
+                                      description: |-
+                                        Default is applied by admission mutation when the concrete metadata key is absent.
+                                        It is not reconciled after admission.
+                                      type: string
+                                    managed:
+                                      description: |-
+                                        Managed is enforced by admission mutation and continuously reconciled by
+                                        the RuleStatus controller using server-side apply.
+                                      type: string
                                     required:
                                       default: false
                                       description: |-
@@ -2598,6 +2628,16 @@ spec:
                               labels:
                                 additionalProperties:
                                   properties:
+                                    default:
+                                      description: |-
+                                        Default is applied by admission mutation when the concrete metadata key is absent.
+                                        It is not reconciled after admission.
+                                      type: string
+                                    managed:
+                                      description: |-
+                                        Managed is enforced by admission mutation and continuously reconciled by
+                                        the RuleStatus controller using server-side apply.
+                                      type: string
                                     required:
                                       default: false
                                       description: |-

@@ -3,6 +3,31 @@
 
 package rules
 
+type AudienceKind string
+
+const (
+	AudienceKindUser           AudienceKind = "User"
+	AudienceKindGroup          AudienceKind = "Group"
+	AudienceKindServiceAccount AudienceKind = "ServiceAccount"
+	AudienceKindCustom         AudienceKind = "Custom"
+)
+
+type CustomAudience string
+
+const (
+	CustomAudienceCapsuleUser   CustomAudience = "CapsuleUser"
+	CustomAudienceAdministrator CustomAudience = "Administrator"
+	CustomAudienceTenantOwner   CustomAudience = "TenantOwner"
+	CustomAudienceController    CustomAudience = "Controller"
+)
+
+// +kubebuilder:object:generate=true
+type Audience struct {
+	// +kubebuilder:validation:Enum=User;Group;ServiceAccount;Custom
+	Kind AudienceKind `json:"kind"`
+	Name string       `json:"name"`
+}
+
 // +kubebuilder:object:generate=true
 type NamespaceRuleEnforceBody struct {
 	// Declare the action being performed on the enforcement rule:
@@ -11,6 +36,11 @@ type NamespaceRuleEnforceBody struct {
 	// audit: On match, audit (post event) of admission request
 	//+kubebuilder:default:=deny
 	Action ActionType `json:"action,omitempty"`
+
+	// Audience limits this enforcement block to matching request subjects.
+	// An empty audience matches every request.
+	// +optional
+	Audience []Audience `json:"audience,omitempty"`
 
 	// Enforcement for Workloads (Pods)
 	Workloads NamespaceRuleEnforceWorkloadsBody `json:"workloads,omitempty"`

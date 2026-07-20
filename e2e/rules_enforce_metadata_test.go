@@ -378,6 +378,34 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 		return ns
 	}
 
+	createNamespaceAndExpectDenied := func(labels map[string]string, substrings ...string) {
+		if labels == nil {
+			labels = map[string]string{}
+		}
+		labels[meta.TenantLabel] = tnt.GetName()
+		base := NewNamespace("", labels)
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+
+		Eventually(func() error {
+			candidate := base.DeepCopy()
+			candidate.Name = fmt.Sprintf("%s-%d", base.Name, time.Now().UnixNano()%1e6)
+			_, err := cs.CoreV1().Namespaces().Create(context.Background(), candidate, metav1.CreateOptions{})
+			if err == nil {
+				_ = cs.CoreV1().Namespaces().Delete(context.Background(), candidate.Name, metav1.DeleteOptions{})
+				return fmt.Errorf("expected namespace create to be denied, but it succeeded")
+			}
+
+			msg := err.Error()
+			for _, substring := range substrings {
+				if !strings.Contains(msg, substring) {
+					return fmt.Errorf("expected error to contain %q, got: %s", substring, msg)
+				}
+			}
+
+			return nil
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	}
+
 	configMap := func(name string, labels map[string]string, annotations map[string]string) *corev1.ConfigMap {
 		return &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
@@ -821,6 +849,65 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 				},
 			),
 		)
+	})
+
+	It("matches label and annotation key expressions through the regex cache", func() {
+		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
+			metadataRule(
+				rules.ActionTypeAllow,
+				"v1",
+				[]string{"ConfigMap"},
+				map[string]rules.MetadataValueRule{
+					`example\.corp/label-.*`: metadataValueRule(false, metadataByExact("allowed")),
+				},
+				map[string]rules.MetadataValueRule{
+					"example.corp/*": metadataValueRule(false, metadataByExpression("^INV-[0-9]{4}$")),
+				},
+			),
+		})
+
+		ns := createNamespace(nil)
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+
+		createConfigMapAndExpectAllowed(cs, ns.Name, configMap(
+			"key-regex-allowed",
+			map[string]string{"example.corp/label-team": "allowed"},
+			map[string]string{"example.corp/cost-center": "INV-1234"},
+		))
+
+		createConfigMapAndExpectDenied(cs, ns.Name, configMap(
+			"key-regex-label-denied",
+			map[string]string{"example.corp/label-team": "blocked"},
+			nil,
+		), "metadata", "example.corp/label-team", "blocked", "not allowed")
+
+		createConfigMapAndExpectDenied(cs, ns.Name, configMap(
+			"key-regex-annotation-denied",
+			nil,
+			map[string]string{"example.corp/cost-center": "BAD-1234"},
+		), "metadata", "example.corp/cost-center", "BAD-1234", "not allowed")
+	})
+
+	It("requires Namespace to be explicitly included in kinds", func() {
+		policy := map[string]rules.MetadataValueRule{
+			"example.corp/namespace-policy": metadataValueRule(true, metadataByExact("allowed")),
+		}
+
+		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
+			metadataRule(rules.ActionTypeAllow, "*", []string{"*"}, policy, nil),
+		})
+		createNamespace(nil)
+
+		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
+			metadataRule(rules.ActionTypeAllow, "*", []string{"*", "Namespace"}, policy, nil),
+		})
+		createNamespaceAndExpectDenied(
+			nil,
+			"metadata",
+			"example.corp/namespace-policy",
+			"required",
+		)
+		createNamespace(map[string]string{"example.corp/namespace-policy": "allowed"})
 	})
 
 	It("applies one metadata rule to multiple core kinds", func() {

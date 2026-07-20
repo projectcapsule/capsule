@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 
 	"github.com/projectcapsule/capsule/pkg/api/rules"
@@ -25,6 +26,10 @@ func ValidateRuleStatusBody(
 			continue
 		}
 
+		if err := validateAudience(i, rule.Enforce.Audience); err != nil {
+			return err
+		}
+
 		if err := validateWorkloadRules(i, rule.Enforce.Workloads); err != nil {
 			return err
 		}
@@ -38,6 +43,27 @@ func ValidateRuleStatusBody(
 		}
 	}
 
+	return nil
+}
+
+func validateAudience(ruleIndex int, audience []rules.Audience) error {
+	for i, subject := range audience {
+		path := fmt.Sprintf("rules[%d].enforce.audience[%d]", ruleIndex, i)
+		if strings.TrimSpace(subject.Name) == "" {
+			return fmt.Errorf("%s.name is invalid: name is empty", path)
+		}
+		switch subject.Kind {
+		case rules.AudienceKindUser, rules.AudienceKindGroup, rules.AudienceKindServiceAccount:
+		case rules.AudienceKindCustom:
+			switch rules.CustomAudience(subject.Name) {
+			case rules.CustomAudienceCapsuleUser, rules.CustomAudienceAdministrator, rules.CustomAudienceTenantOwner, rules.CustomAudienceController:
+			default:
+				return fmt.Errorf("%s.name %q is invalid: unsupported custom audience", path, subject.Name)
+			}
+		default:
+			return fmt.Errorf("%s.kind %q is invalid: unsupported audience kind", path, subject.Kind)
+		}
+	}
 	return nil
 }
 
@@ -144,6 +170,9 @@ func validateMetadataRules(
 					err,
 				)
 			}
+			if err := validateMutableMetadataKey(key, policy); err != nil {
+				return fmt.Errorf("%s.labels[%q] is invalid: %w", fieldPath, key, err)
+			}
 
 			for k, matcher := range policy.Values {
 				if err := validateExpressionMatch(
@@ -164,6 +193,9 @@ func validateMetadataRules(
 					err,
 				)
 			}
+			if err := validateMutableMetadataKey(key, policy); err != nil {
+				return fmt.Errorf("%s.annotations[%q] is invalid: %w", fieldPath, key, err)
+			}
 
 			for k, matcher := range policy.Values {
 				if err := validateExpressionMatch(
@@ -179,14 +211,31 @@ func validateMetadataRules(
 	return nil
 }
 
+func validateMutableMetadataKey(key string, policy rules.MetadataValueRule) error {
+	if policy.Default == nil && policy.Managed == nil {
+		return nil
+	}
+	if errs := k8svalidation.IsQualifiedName(strings.TrimSpace(key)); len(errs) > 0 {
+		return errors.New("default and managed require a concrete metadata key")
+	}
+	return nil
+}
+
 func validateMetadataKey(key string) error {
 	key = strings.TrimSpace(key)
 	if key == "" {
 		return errors.New("key is empty")
 	}
 
-	if errs := k8svalidation.IsQualifiedName(key); len(errs) > 0 {
-		return errors.New(strings.Join(errs, ", "))
+	if !strings.ContainsAny(key, "*[](){}+?|^$\\") {
+		if errs := k8svalidation.IsQualifiedName(key); len(errs) > 0 {
+			return errors.New(strings.Join(errs, ", "))
+		}
+	}
+
+	expression := rules.MetadataKeyExpression(key)
+	if _, err := regexp.Compile(expression.Expression); err != nil {
+		return fmt.Errorf("invalid key expression %q: %w", key, err)
 	}
 
 	return nil
@@ -282,7 +331,13 @@ func validateMetadataTargets(
 		return nil
 	}
 
-	if err := rule.ValidateKnownKinds(mapper, fieldPath); err != nil {
+	if err := rule.ValidateKnownKindsWithScope(mapper, fieldPath, func(
+		gvk schema.GroupVersionKind,
+		scope k8smeta.RESTScope,
+	) bool {
+		return scope.Name() == k8smeta.RESTScopeNameNamespace ||
+			(gvk.Group == "" && gvk.Version == "v1" && gvk.Kind == "Namespace")
+	}); err != nil {
 		return err
 	}
 

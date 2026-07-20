@@ -419,6 +419,41 @@ func TestValidateMetadata(t *testing.T) {
 	}
 }
 
+func TestControlledMetadataEntriesMatchesKeyPatternsWithRegexCache(t *testing.T) {
+	t.Parallel()
+
+	h := newMetadataTestRules(nil, nil)
+	obj := &metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{
+		Annotations: map[string]string{
+			"example.corp/cost-center": "INV-1234",
+			"unrelated":                "ignored",
+		},
+	}}
+	enforce := []*apirules.NamespaceRuleEnforceBody{{
+		Metadata: []apirules.MetadataRule{{
+			VersionKinds: runtime.VersionKinds{APIGroups: []string{"v1"}, Kinds: []string{"Namespace"}},
+			Annotations: map[string]apirules.MetadataValueRule{
+				"example.corp/*": {},
+			},
+		}},
+	}}
+
+	entries, err := h.controlledMetadataEntries(
+		obj,
+		schema.GroupVersionKind{Version: "v1", Kind: "Namespace"},
+		enforce,
+	)
+	if err != nil {
+		t.Fatalf("controlledMetadataEntries() error = %v", err)
+	}
+	if len(entries) != 1 || entries[0].Key != "example.corp/cost-center" {
+		t.Fatalf("unexpected pattern-matched entries: %#v", entries)
+	}
+	if h.regexCache.Stats() != 1 {
+		t.Fatalf("expected key expression to use regex cache, got %d entries", h.regexCache.Stats())
+	}
+}
+
 func TestControlledMetadataEntries(t *testing.T) {
 	t.Parallel()
 
@@ -892,7 +927,10 @@ func TestControlledMetadataEntries(t *testing.T) {
 
 			h := newMetadataTestRules(tt.managedLabels, tt.managedAnnotations)
 
-			got := h.controlledMetadataEntries(tt.obj, tt.gvk, tt.enforceBodies)
+			got, err := h.controlledMetadataEntries(tt.obj, tt.gvk, tt.enforceBodies)
+			if err != nil {
+				t.Fatalf("controlledMetadataEntries() error = %v", err)
+			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Fatalf("unexpected entries\nwant: %#v\n got: %#v", tt.want, got)
 			}
