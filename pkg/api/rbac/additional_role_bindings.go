@@ -13,7 +13,7 @@ import (
 
 type AdditionalRoleBindingsSpec struct {
 	ClusterRoleName string `json:"clusterRoleName"`
-	// kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:MinItems=1
 	Subjects []rbacv1.Subject `json:"subjects"`
 	// Additional Labels for the synchronized rolebindings
 	Labels map[string]string `json:"labels,omitempty"`

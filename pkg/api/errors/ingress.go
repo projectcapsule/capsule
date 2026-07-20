@@ -45,9 +45,8 @@ func (i IngressClassForbiddenError) Error() string {
 }
 
 type IngressHostnameNotValidError struct {
-	invalidHostnames     []string
-	notMatchingHostnames []string
-	spec                 api.AllowedListSpec
+	invalidHostnames []string
+	spec             api.AllowedListSpec
 }
 
 type IngressHostnameCollisionError struct {
@@ -76,13 +75,13 @@ func (e EmptyIngressHostnameError) Error() string {
 	return fmt.Sprintf("empty hostname is not allowed for the current Tenant%s", appendHostnameError(e.spec))
 }
 
-func NewIngressHostnamesNotValid(invalidHostnames []string, notMatchingHostnames []string, spec api.AllowedListSpec) error {
-	return &IngressHostnameNotValidError{invalidHostnames: invalidHostnames, notMatchingHostnames: notMatchingHostnames, spec: spec}
+func NewIngressHostnamesNotValid(hostnames []string, spec api.AllowedListSpec) error {
+	return &IngressHostnameNotValidError{invalidHostnames: hostnames, spec: spec}
 }
 
 func (i IngressHostnameNotValidError) Error() string {
-	return fmt.Sprintf("Hostnames %s are not valid for the current Tenant. Hostnames %s not matching for the current Tenant%s",
-		i.invalidHostnames, i.notMatchingHostnames, appendHostnameError(i.spec))
+	return fmt.Sprintf("Hostnames %v are not valid for the current Tenant%s",
+		i.invalidHostnames, appendHostnameError(i.spec))
 }
 
 type IngressClassUndefinedError struct {

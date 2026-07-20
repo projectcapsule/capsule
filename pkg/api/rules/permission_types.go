@@ -5,10 +5,15 @@ package rules
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
 // +kubebuilder:object:generate=true
 type NamespaceRulePermissionBody struct {
+	// Bindings defines additional RoleBindings for namespaces selected by this rule.
+	Bindings []rbac.AdditionalRoleBindingsSpec `json:"bindings,omitempty"`
+
 	// Define Promotion Rules which distributed additional ClusterRoles across the Tenant
 	// for promoted ServiceAccounts.
 	Promotions []*NamespaceRulePromotionRule `json:"promotions,omitempty"`

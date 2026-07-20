@@ -81,7 +81,6 @@ spec:
                       description: Additional Labels for the synchronized rolebindings
                       type: object
                     subjects:
-                      description: kubebuilder:validation:Minimum=1
                       items:
                         description: |-
                           Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference,
@@ -111,6 +110,7 @@ spec:
                         - name
                         type: object
                         x-kubernetes-map-type: atomic
+                      minItems: 1
                       type: array
                   required:
                   - clusterRoleName
@@ -1154,7 +1154,6 @@ spec:
                       description: Additional Labels for the synchronized rolebindings
                       type: object
                     subjects:
-                      description: kubebuilder:validation:Minimum=1
                       items:
                         description: |-
                           Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference,
@@ -1184,6 +1183,7 @@ spec:
                         - name
                         type: object
                         x-kubernetes-map-type: atomic
+                      minItems: 1
                       type: array
                   required:
                   - clusterRoleName
@@ -2924,6 +2924,62 @@ spec:
                     permissions:
                       description: Permissions for given rule
                       properties:
+                        bindings:
+                          description: Bindings defines additional RoleBindings for
+                            namespaces selected by this rule.
+                          items:
+                            properties:
+                              annotations:
+                                additionalProperties:
+                                  type: string
+                                description: Additional Annotations for the synchronized
+                                  rolebindings
+                                type: object
+                              clusterRoleName:
+                                type: string
+                              labels:
+                                additionalProperties:
+                                  type: string
+                                description: Additional Labels for the synchronized
+                                  rolebindings
+                                type: object
+                              subjects:
+                                items:
+                                  description: |-
+                                    Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference,
+                                    or a value for non-objects such as user and group names.
+                                  properties:
+                                    apiGroup:
+                                      description: |-
+                                        APIGroup holds the API group of the referenced subject.
+                                        Defaults to "" for ServiceAccount subjects.
+                                        Defaults to "rbac.authorization.k8s.io" for User and Group subjects.
+                                      type: string
+                                    kind:
+                                      description: |-
+                                        Kind of object being referenced. Values defined by this API group are "User", "Group", and "ServiceAccount".
+                                        If the Authorizer does not recognized the kind value, the Authorizer should report an error.
+                                      type: string
+                                    name:
+                                      description: Name of the object being referenced.
+                                      type: string
+                                    namespace:
+                                      description: |-
+                                        Namespace of the referenced object.  If the object kind is non-namespace, such as "User" or "Group", and this value is not empty
+                                        the Authorizer should report an error.
+                                      type: string
+                                  required:
+                                  - kind
+                                  - name
+                                  type: object
+                                  x-kubernetes-map-type: atomic
+                                minItems: 1
+                                type: array
+                            required:
+                            - clusterRoleName
+                            - subjects
+                            type: object
+                          type: array
                         promotions:
                           description: |-
                             Define Promotion Rules which distributed additional ClusterRoles across the Tenant

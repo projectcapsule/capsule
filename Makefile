@@ -242,7 +242,7 @@ dev-setup-argocd: dev-setup-fluxcd
 	@printf "  \033[1mkubectl get secret -n argocd argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d\033[0m\n\n"
 	@printf "  \033[1mkubectl port-forward svc/argocd-server 9091:80 -n argocd\033[0m\n\n"
 
-dev-setup-cert-manager:
+dev-setup-cert-manager: dev-setup-fluxcd
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/cert-manager | envsubst | kubectl apply -f -
 
 dev-setup-fluxcd:
@@ -261,7 +261,7 @@ dev-setup-capsule: dev-setup-fluxcd
 	@$(MAKE) wait-for-helmreleases
 	@$(MAKE) dev-setup-capsule-example
 
-dev-setup-capsule-example: dev-setup-fluxcd
+dev-setup-capsule-example:
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/capsule/example-setup | envsubst | kubectl apply -f -
 	@$(KUBECTL) create ns wind-uat --as joe --as-group projectcapsule.dev || true
 	@$(KUBECTL) label ns wind-uat env=test
@@ -486,6 +486,8 @@ e2e-install: helm-controller-version ko-build-all dev-install-gw-api-crds
 		--set 'manager.options.workers=4' \
 		--set 'manager.options.clientConnectionQPS=2000' \
 		--set 'manager.options.clientConnectionBurst=1000' \
+		--set 'manager.options.leaderElection.leaseDuration=60s' \
+		--set 'manager.options.leaderElection.renewDeadline=40s' \
 		--set 'manager.rbac.minimal=true' \
 		--set 'webhooks.hooks.nodes.enabled=true' \
 		--set "webhooks.exclusive=true"\
@@ -516,6 +518,8 @@ e2e-install-openshift: helm-controller-version ko-build-all
 		--set 'manager.resources=null'\
 		--set "manager.image.tag=$(VERSION)" \
 		--set 'manager.livenessProbe.failureThreshold=10' \
+		--set 'manager.options.leaderElection.leaseDuration=60s' \
+		--set 'manager.options.leaderElection.renewDeadline=40s' \
 		--set 'webhooks.hooks.nodes.enabled=true' \
 		--set "webhooks.exclusive=true"\
 		--set "manager.options.logLevel=debug"\
@@ -644,7 +648,7 @@ kind:
 	$(call go-install-tool,$(KIND),sigs.k8s.io/kind/cmd/kind@$(KIND_VERSION))
 
 KO           := $(LOCALBIN)/ko
-KO_VERSION   := v0.18.1
+KO_VERSION   := v0.19.1
 KO_LOOKUP    := google/ko
 ko:
 	@test -s $(KO) && $(KO) -h | grep -q $(KO_VERSION) || \
@@ -679,7 +683,7 @@ goreleaser: ## Download goreleaser locally if necessary.
 	$(call go-install-tool,$(GORELEASER),github.com/$(GORELEASER_LOOKUP)/v2@v$(GORELEASER_VERSION))
 
 SYFT          := $(LOCALBIN)/syft
-SYFT_VERSION  := 1.45.1
+SYFT_VERSION  := 1.46.0
 SYFT_LOOKUP   := anchore/syft
 syft: ## Download syft locally if necessary.
 		test -s $(SYFT) && $(SYFT) --version | grep -q $(SYFT_VERSION) ||  \

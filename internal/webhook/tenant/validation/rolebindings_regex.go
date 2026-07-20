@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -62,8 +63,16 @@ func (h *rbRegexHandler) OnUpdate(
 }
 
 func (h *rbRegexHandler) validate(tnt *capsulev1beta2.Tenant, decoder admission.Decoder) *admission.Response {
-	if len(tnt.Spec.AdditionalRoleBindings) > 0 {
-		for _, binding := range tnt.Spec.AdditionalRoleBindings {
+	bindings := append([]rbac.AdditionalRoleBindingsSpec(nil), tnt.Spec.AdditionalRoleBindings...)
+
+	for _, rule := range tnt.Spec.Rules {
+		if rule != nil {
+			bindings = append(bindings, rule.Permissions.Bindings...)
+		}
+	}
+
+	if len(bindings) > 0 {
+		for _, binding := range bindings {
 			for _, subject := range binding.Subjects {
 				if subject.Kind == rbacv1.ServiceAccountKind {
 					err := validation.IsDNS1123Subdomain(subject.Name)

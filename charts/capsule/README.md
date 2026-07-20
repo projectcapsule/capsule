@@ -112,7 +112,7 @@ The following Values have changed key or Value:
 | manager.daemonsetStrategy | object | `{"type":"RollingUpdate"}` | [Daemonset Strategy](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/#creating-a-daemonset-with-rollingupdate-update-strategy) |
 | manager.deploymentStrategy | object | `{"type":"RollingUpdate"}` | [Deployment Strategy](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy) |
 | manager.env | list | `[]` | Additional Environment Variables |
-| manager.extraArgs | list | `["--enable-leader-election=true"]` | A list of extra arguments for the capsule controller |
+| manager.extraArgs | list | `[]` | A list of extra arguments for the capsule controller |
 | manager.hostNetwork | bool | `false` | Specifies if the container should be started in hostNetwork mode.  Required for use in some managed kubernetes clusters (such as AWS EKS) with custom CNI (such as calico), because control-plane managed by AWS cannot communicate with pods' IP CIDR and admission webhooks are not working |
 | manager.hostPID | bool | `false` | Specifies if the container should be started in hostPID mode. |
 | manager.hostUsers | bool | `true` | Don't use Host Users (User Namespaces) |
@@ -137,6 +137,10 @@ The following Values have changed key or Value:
 | manager.options.ignoreUserWithGroups | list | `[]` | Define groups which when found in the request of a user will be ignored by the Capsule this might be useful if you have one group where all the users are in, but you want to separate administrators from normal users with additional groups. |
 | manager.options.impersonation | object | `{}` | Impersonation |
 | manager.options.labels | object | `{}` | Additional labels to add to the CapsuleConfiguration resource |
+| manager.options.leaderElection.enabled | bool | `true` | Enable Leader Election for capsule controller |
+| manager.options.leaderElection.leaseDuration | string | `""` | Leader election lease duration. Empty uses controller-runtime's default. |
+| manager.options.leaderElection.renewDeadline | string | `""` | Leader election renew deadline. Empty uses controller-runtime's default. |
+| manager.options.leaderElection.retryPeriod | string | `""` | Leader election retry period. Empty uses controller-runtime's default. |
 | manager.options.logLevel | string | `"info"` | Set the log verbosity of the capsule with a value from 1 to 5 |
 | manager.options.nodeMetadata | object | `{"forbiddenAnnotations":{"denied":[],"deniedRegex":""},"forbiddenLabels":{"denied":[],"deniedRegex":""}}` | Allows to set the forbidden metadata for the worker nodes that could be patched by a Tenant |
 | manager.options.protectedNamespaceRegex | string | `""` | If specified, disallows creation of namespaces matching the passed regexp |
@@ -145,6 +149,20 @@ The following Values have changed key or Value:
 | manager.options.rbac.deleter | string | `"capsule-namespace-deleter"` | Name for the ClusterRole required to grant Namespace Deletion permissions. |
 | manager.options.rbac.promotionClusterRoles | list | `["capsule-namespace-provisioner","capsule-namespace-deleter"]` | The ClusterRoles applied for ServiceAccounts which had owner Promotion |
 | manager.options.rbac.provisioner | string | `"capsule-namespace-provisioner"` | Name for the ClusterRole required to grant Namespace Provision permissions. |
+| manager.options.tracing.basicAuth.existingSecret.name | string | `""` | Existing Secret containing OTLP basic auth credentials. |
+| manager.options.tracing.basicAuth.existingSecret.passwordKey | string | `"password"` | Secret key containing the basic auth password. |
+| manager.options.tracing.basicAuth.existingSecret.usernameKey | string | `"username"` | Secret key containing the basic auth username. |
+| manager.options.tracing.basicAuth.password | string | `""` | Basic auth password for the OTLP gRPC trace exporter. Prefer existingSecret for production. |
+| manager.options.tracing.basicAuth.username | string | `""` | Basic auth username for the OTLP gRPC trace exporter. Prefer existingSecret for production. |
+| manager.options.tracing.compression | string | `""` | Compression for OTLP gRPC trace exports. Supported value: gzip. Empty disables compression. |
+| manager.options.tracing.enabled | bool | `false` | Enable OpenTelemetry tracing for admission webhook requests. |
+| manager.options.tracing.endpoint | string | `""` | OTLP gRPC endpoint for exporting traces. If empty, OpenTelemetry environment variables are used. |
+| manager.options.tracing.headers | object | `{}` | OTLP gRPC metadata headers to send with each trace export request. |
+| manager.options.tracing.insecure | bool | `true` | Disable transport security for the OTLP gRPC trace exporter. |
+| manager.options.tracing.sampleRatio | float | `1` | Trace sampling ratio for admission webhook requests. Must be between 0 and 1. |
+| manager.options.tracing.timeout | string | `""` | Timeout for exporting a batch of spans. Empty uses OpenTelemetry's default. |
+| manager.options.tracing.tls.insecureSkipVerify | bool | `false` | Skip OTLP gRPC trace exporter TLS certificate verification. Not recommended for production. |
+| manager.options.tracing.tls.serverName | string | `""` | TLS server name override for the OTLP gRPC trace exporter. |
 | manager.options.userNames | list | `[]` | DEPRECATED: use users properties. Names of the users considered as Capsule users. |
 | manager.options.users | list | `[{"kind":"Group","name":"projectcapsule.dev"}]` | Define entities which are considered part of the Capsule construct. Users not mentioned here will be ignored by Capsule |
 | manager.options.workers | int | `1` | Workers (MaxConcurrentReconciles) is the maximum number of concurrent Reconciles which can be run (ALPHA). |
