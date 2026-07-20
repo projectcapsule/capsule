@@ -81,7 +81,7 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Ordered, Labe
 		}
 	})
 
-	It("should add labels to PersistentVolume and prevent cross-Tenant mount", func() {
+	It("should add labels to PersistentVolume and prevent cross-Tenant mount", Label("skip-on-openshift"), func() {
 		ns := NewNamespace("", map[string]string{
 			meta.TenantLabel: tnt1.GetName(),
 		})
