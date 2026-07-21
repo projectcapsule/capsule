@@ -231,7 +231,7 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 							Containers: []corev1.Container{
 								{
 									Name:            "container",
-									Image:           "gcr.io/google_containers/pause-amd64:3.0",
+									Image:           "registry.k8s.io/pause:3.10",
 									ImagePullPolicy: corev1.PullIfNotPresent,
 									SecurityContext: restrictedContainerSecurityContext(),
 								},
@@ -299,7 +299,7 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 					Containers: []corev1.Container{
 						{
 							Name:            "container",
-							Image:           "gcr.io/google_containers/pause-amd64:3.0",
+							Image:           "registry.k8s.io/pause:3.10",
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							SecurityContext: restrictedContainerSecurityContext(),
 						},
@@ -348,7 +348,7 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 				Containers: []corev1.Container{
 					{
 						Name:            "container",
-						Image:           "gcr.io/google_containers/pause-amd64:3.0",
+						Image:           "registry.k8s.io/pause:3.10",
 						ImagePullPolicy: corev1.PullIfNotPresent,
 						SecurityContext: restrictedContainerSecurityContext(),
 					},
@@ -426,7 +426,7 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 					Containers: []corev1.Container{
 						{
 							Name:            "container",
-							Image:           "gcr.io/google_containers/pause-amd64:3.0",
+							Image:           "registry.k8s.io/pause:3.10",
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							SecurityContext: restrictedContainerSecurityContext(),
 						},
@@ -494,7 +494,7 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 					Containers: []corev1.Container{
 						{
 							Name:            "container",
-							Image:           "gcr.io/google_containers/pause-amd64:3.0",
+							Image:           "registry.k8s.io/pause:3.10",
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							SecurityContext: restrictedContainerSecurityContext(),
 						},
@@ -562,7 +562,7 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 				Containers: []corev1.Container{
 					{
 						Name:            "container",
-						Image:           "gcr.io/google_containers/pause-amd64:3.0",
+						Image:           "registry.k8s.io/pause:3.10",
 						ImagePullPolicy: corev1.PullIfNotPresent,
 						SecurityContext: restrictedContainerSecurityContext(),
 					},

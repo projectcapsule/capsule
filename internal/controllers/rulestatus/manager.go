@@ -181,6 +181,7 @@ func (r *Manager) updateStatus(ctx context.Context, instance *capsulev1beta2.Rul
 
 			return err
 		}
+
 		originalStatus := latest.Status.DeepCopy()
 
 		latest.Status = instance.Status
@@ -195,6 +196,7 @@ func (r *Manager) updateStatus(ctx context.Context, instance *capsulev1beta2.Rul
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(readyCondition)
+
 		if reflect.DeepEqual(*originalStatus, latest.Status) {
 			return nil
 		}

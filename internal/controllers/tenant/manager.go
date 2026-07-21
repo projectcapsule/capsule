@@ -19,6 +19,7 @@ import (
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/discovery"
@@ -78,17 +79,29 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 		Named("capsule/tenants").
 		For(
 			&capsulev1beta2.Tenant{},
-			builder.WithPredicates(
-				predicate.Or(
-					predicate.GenerationChangedPredicate{},
-					predicates.UpdatedMetadataPredicate{},
-				),
-			),
+			builder.WithPredicates(predicates.ClassChanged()),
 		).
-		Owns(&networkingv1.NetworkPolicy{}, builder.WithPredicates(predicates.ClassChanged())).
-		Owns(&corev1.LimitRange{}, builder.WithPredicates(predicates.ClassChanged())).
-		Owns(&corev1.ResourceQuota{}, builder.WithPredicates(predicates.ClassChanged())).
-		Owns(&rbacv1.RoleBinding{}, builder.WithPredicates(predicates.ClassChanged())).
+		Owns(&networkingv1.NetworkPolicy{}, builder.WithPredicates(predicates.TenantManagedResourceChangedPredicate{})).
+		Owns(&corev1.LimitRange{}, builder.WithPredicates(predicates.TenantManagedResourceChangedPredicate{})).
+		Watches(
+			&corev1.ResourceQuota{},
+			handler.Funcs{
+				CreateFunc: func(ctx context.Context, e event.TypedCreateEvent[client.Object], _ workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+					r.syncResourceQuotasForResourceQuota(ctx, e.Object)
+				},
+				UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[client.Object], _ workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+					r.syncResourceQuotasForResourceQuota(ctx, e.ObjectNew)
+				},
+				DeleteFunc: func(ctx context.Context, e event.TypedDeleteEvent[client.Object], _ workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+					r.syncResourceQuotasForResourceQuota(ctx, e.Object)
+				},
+			},
+			builder.WithPredicates(predicate.Or(
+				predicates.TenantManagedResourceChangedPredicate{},
+				predicates.ResourceQuotaUsageChangedPredicate{},
+			)),
+		).
+		Owns(&rbacv1.RoleBinding{}, builder.WithPredicates(predicates.TenantManagedResourceChangedPredicate{})).
 		Watches(
 			&capsulev1beta2.CapsuleConfiguration{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
@@ -241,6 +254,33 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 	return ctrlBuilder.Complete(r)
 }
 
+func (r *Manager) syncResourceQuotasForResourceQuota(ctx context.Context, quota client.Object) {
+	owner := metav1.GetControllerOf(quota)
+	if owner == nil || owner.APIVersion != capsulev1beta2.GroupVersion.String() || owner.Kind != "Tenant" {
+		return
+	}
+
+	tenant := &capsulev1beta2.Tenant{}
+	if err := r.Get(ctx, client.ObjectKey{Name: owner.Name}, tenant); err != nil {
+		if !apierrors.IsNotFound(err) {
+			r.Log.Error(err, "cannot retrieve Tenant for ResourceQuota sync", "tenant", owner.Name)
+		}
+
+		return
+	}
+	if tenant.DeletionTimestamp != nil {
+		return
+	}
+
+	if err := r.syncCustomResourceQuotaUsages(ctx, tenant); err != nil {
+		r.Log.Error(err, "cannot update custom ResourceQuota usages", "tenant", tenant.Name)
+	}
+
+	if err := r.syncResourceQuotas(ctx, r.Log, tenant); err != nil {
+		r.Log.Error(err, "cannot sync ResourceQuotas", "tenant", tenant.Name)
+	}
+}
+
 func (r *Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ctrl.Result, err error) {
 	log := r.Log.WithValues("Request.Name", request.Name)
 
@@ -261,7 +301,8 @@ func (r *Manager) Reconcile(ctx context.Context, request ctrl.Request) (result c
 
 	if request.Namespace == classEventMarker {
 		reconcileError := r.collectAvailableResources(ctx, log, instance)
-		if statusErr := r.updateTenantStatus(ctx, instance, reconcileError); statusErr != nil {
+
+		if statusErr := r.updateTenantClassStatus(ctx, instance); statusErr != nil {
 			return reconcile.Result{}, fmt.Errorf("cannot update tenant class status: %w", statusErr)
 		}
 
@@ -285,6 +326,7 @@ func (r *Manager) Reconcile(ctx context.Context, request ctrl.Request) (result c
 	if err != nil {
 		return reconcile.Result{}, err
 	}
+
 	patchBaselineStatus := *instance.Status.DeepCopy()
 
 	reconcileError := r.reconcile(ctx, log, instance)
@@ -363,9 +405,6 @@ func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *caps
 		errs = append(errs, fmt.Errorf("cannot collect available rbac: %w", err))
 	}
 
-	// Reconcile Namespaces
-	log.V(4).Info("starting processing of Namespaces", "items", len(instance.Status.Namespaces))
-
 	if err = r.reconcileNamespaces(ctx, log, instance); err != nil {
 		errs = append(errs, fmt.Errorf("namespace(s) had reconciliation errors: %w", err))
 	}
@@ -376,37 +415,21 @@ func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *caps
 		errs = append(errs, fmt.Errorf("cannot ensure metadata: %w", err))
 	}
 
-	// Ensuring ResourceQuota
-	log.V(4).Info("ensuring limit resources count is updated")
-
 	if err = r.syncCustomResourceQuotaUsages(ctx, instance); err != nil {
 		errs = append(errs, fmt.Errorf("cannot count limited resources: %w", err))
 	}
-
-	// Ensuring NetworkPolicy resources
-	log.V(4).Info("starting processing of Network Policies")
 
 	if err = r.syncNetworkPolicies(ctx, log, instance); err != nil {
 		errs = append(errs, fmt.Errorf("cannot sync networkPolicy items: %w", err))
 	}
 
-	// Ensuring LimitRange resources
-	//nolint:staticcheck
-	log.V(4).Info("Starting processing of Limit Ranges", "items", len(instance.Spec.LimitRanges.Items))
-
 	if err = r.syncLimitRanges(ctx, log, instance); err != nil {
 		errs = append(errs, fmt.Errorf("cannot sync limitrange items: %w", err))
 	}
 
-	// Ensuring ResourceQuota resources
-	log.V(4).Info("Starting processing of Resource Quotas", "items", len(instance.Spec.ResourceQuota.Items))
-
 	if err = r.syncResourceQuotas(ctx, log, instance); err != nil {
 		errs = append(errs, fmt.Errorf("cannot sync resourcequota items: %w", err))
 	}
-
-	// Ensuring RoleBinding resources
-	log.V(4).Info("Ensuring RoleBindings for Owners and Tenant")
 
 	if err = r.syncRoleBindings(ctx, log, instance); err != nil {
 		errs = append(errs, fmt.Errorf("cannot sync rolebindings items: %w", err))
@@ -415,8 +438,6 @@ func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *caps
 	if err = errors.Join(errs...); err != nil {
 		return err
 	}
-
-	log.V(4).Info("Tenant reconciling completed")
 
 	return err
 }

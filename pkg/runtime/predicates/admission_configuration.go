@@ -30,12 +30,16 @@ func (ValidatingAdmissionConfigurationChangedPredicate) Delete(event.DeleteEvent
 func (ValidatingAdmissionConfigurationChangedPredicate) Generic(event.GenericEvent) bool {
 	return false
 }
+
 func (ValidatingAdmissionConfigurationChangedPredicate) Update(e event.UpdateEvent) bool {
 	oldObj, oldOK := e.ObjectOld.(*admissionv1.ValidatingWebhookConfiguration)
+
 	newObj, newOK := e.ObjectNew.(*admissionv1.ValidatingWebhookConfiguration)
+
 	if !oldOK || !newOK {
 		return true
 	}
+
 	if admissionStateHashChanged(oldObj.Annotations, newObj.Annotations) {
 		return false
 	}
@@ -50,10 +54,13 @@ func (MutatingAdmissionConfigurationChangedPredicate) Delete(event.DeleteEvent) 
 func (MutatingAdmissionConfigurationChangedPredicate) Generic(event.GenericEvent) bool { return false }
 func (MutatingAdmissionConfigurationChangedPredicate) Update(e event.UpdateEvent) bool {
 	oldObj, oldOK := e.ObjectOld.(*admissionv1.MutatingWebhookConfiguration)
+
 	newObj, newOK := e.ObjectNew.(*admissionv1.MutatingWebhookConfiguration)
+
 	if !oldOK || !newOK {
 		return true
 	}
+
 	if admissionStateHashChanged(oldObj.Annotations, newObj.Annotations) {
 		return false
 	}
@@ -88,6 +95,7 @@ func MutatingAdmissionStateHash(obj *admissionv1.MutatingWebhookConfiguration) s
 
 func admissionHash(metadata metav1.ObjectMeta, hooks any) string {
 	annotations := make(map[string]string, len(metadata.Annotations))
+
 	for key, value := range metadata.Annotations {
 		if key != AdmissionStateHashAnnotation {
 			annotations[key] = value

@@ -120,7 +120,7 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Ordered, Labe
 				Containers: []corev1.Container{
 					{
 						Name:            "container",
-						Image:           "gcr.io/google_containers/pause-amd64:3.0",
+						Image:           "registry.k8s.io/pause:3.10",
 						ImagePullPolicy: corev1.PullAlways,
 						SecurityContext: restrictedContainerSecurityContext(),
 						VolumeMounts: []corev1.VolumeMount{

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"time"
 
 	"github.com/go-logr/logr"
 	"golang.org/x/sync/errgroup"
@@ -23,6 +24,8 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
+
+const namespaceCascadingCleanupGracePeriod = 10 * time.Second
 
 // Ensuring all annotations are applied to each Namespace handled by the Tenant.
 func (r *Manager) reconcileNamespaces(
@@ -42,6 +45,8 @@ func (r *Manager) reconcileDeletingTenantNamespaces(
 	log logr.Logger,
 	tnt *capsulev1beta2.Tenant,
 ) error {
+	templateTenant := tnt.DeepCopy()
+
 	group, ctx := errgroup.WithContext(ctx)
 	group.SetLimit(8)
 
@@ -103,7 +108,7 @@ func (r *Manager) reconcileDeletingTenantNamespaces(
 				namespace = latest
 			}
 
-			stat, err := r.reconcileNamespace(ctx, log, namespace, tnt)
+			stat, err := r.reconcileNamespace(ctx, log, namespace, tnt, templateTenant)
 			if stat != nil {
 				results <- stat
 			}
@@ -163,6 +168,11 @@ func (r *Manager) reconcileActiveTenantNamespaces(
 		return err
 	}
 
+	// Rule rendering reads the complete Tenant, including status. Keep one
+	// immutable snapshot for all namespace workers so their status updates do
+	// not race with template conversion.
+	templateTenant := tnt.DeepCopy()
+
 	oldStatus := make(map[string]struct{}, len(tnt.Status.Spaces))
 	for i := range tnt.Status.Spaces {
 		oldStatus[tnt.Status.Spaces[i].Name] = struct{}{}
@@ -178,7 +188,7 @@ func (r *Manager) reconcileActiveTenantNamespaces(
 		ns := list.Items[i].DeepCopy()
 
 		group.Go(func() error {
-			stat, err := r.reconcileNamespace(ctx, log, ns, tnt)
+			stat, err := r.reconcileNamespace(ctx, log, ns, tnt, templateTenant)
 			if stat != nil {
 				results <- stat
 			}
@@ -242,6 +252,7 @@ func (r *Manager) reconcileNamespace(
 	log logr.Logger,
 	namespace *corev1.Namespace,
 	tnt *capsulev1beta2.Tenant,
+	templateTenant *capsulev1beta2.Tenant,
 ) (
 	stat *capsulev1beta2.TenantStatusNamespaceItem,
 	err error,
@@ -297,6 +308,7 @@ func (r *Manager) reconcileNamespace(
 	}()
 
 	// Verify if namespace is still active or terminating.
+	//nolint:nestif
 	if namespace.DeletionTimestamp != nil {
 		terminating = true
 
@@ -316,6 +328,20 @@ func (r *Manager) reconcileNamespace(
 			terminatingState.Reason = meta.PendingUnmanagedContentReason
 			terminatingState.Status = metav1.ConditionFalse
 			terminatingState.Message = "waiting for pods to finalize"
+			stat.Conditions.UpdateConditionByType(terminatingState)
+
+			return stat, nil
+		}
+
+		// Give Kubernetes' namespace controller time to perform its normal
+		// deletion before issuing a discovery-wide forced cleanup. Most namespaces
+		// disappear during this window, avoiding hundreds of list requests and
+		// substantial API pressure during Tenant teardown. Stuck namespaces still
+		// receive the existing finalizer cleanup after the grace period.
+		if time.Since(namespace.DeletionTimestamp.Time) < namespaceCascadingCleanupGracePeriod {
+			terminatingState.Reason = meta.TerminatingReason
+			terminatingState.Status = metav1.ConditionFalse
+			terminatingState.Message = "waiting for namespace finalization"
 			stat.Conditions.UpdateConditionByType(terminatingState)
 
 			return stat, nil
@@ -349,7 +375,7 @@ func (r *Manager) reconcileNamespace(
 	}
 
 	// Collect Rules for namespace.
-	err = r.reconcileRuleStatus(ctx, log, tnt, namespace)
+	err = r.reconcileRuleStatus(ctx, log, tnt, templateTenant, namespace)
 	if err != nil {
 		return stat, err
 	}

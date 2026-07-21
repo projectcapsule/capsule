@@ -280,6 +280,7 @@ func (r *resourceClaimController) updateStatus(
 
 			return err
 		}
+
 		originalStatus := latest.Status.DeepCopy()
 
 		latest.Status = instance.Status

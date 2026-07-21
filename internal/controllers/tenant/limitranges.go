@@ -56,9 +56,7 @@ func (r *Manager) syncLimitRange(
 			},
 		}
 
-		var res controllerutil.OperationResult
-
-		res, err = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() (err error) {
+		_, err = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() (err error) {
 			labels := target.GetLabels()
 			if labels == nil {
 				labels = map[string]string{}
@@ -90,8 +88,6 @@ func (r *Manager) syncLimitRange(
 
 			return err
 		}
-
-		log.Info("LimitRange sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
 	}
 
 	return nil

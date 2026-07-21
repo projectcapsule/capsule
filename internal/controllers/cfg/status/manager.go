@@ -292,6 +292,7 @@ func (r *Manager) updateConfigStatus(
 		if err = r.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
 			return err
 		}
+
 		originalStatus := latest.Status.DeepCopy()
 
 		// Update only the fields this reconcile is authoritative for.
@@ -326,6 +327,7 @@ func (r *Manager) updateConfigStatus(
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(readyCondition)
+
 		if reflect.DeepEqual(*originalStatus, latest.Status) {
 			return nil
 		}

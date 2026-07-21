@@ -54,7 +54,10 @@ func BuildNamespaceRuleBodyStatus(
 		nsLabels = labels.Set(ns.Labels)
 	}
 
-	templateContext, err := NewTenantNamespaceContext(tnt, ns, scheme, sanitize.DefaultSanitizeOptions())
+	templateOptions := sanitize.DefaultSanitizeOptions()
+	templateOptions.StripStatus = false
+
+	templateContext, err := NewTenantNamespaceContext(tnt, ns, scheme, templateOptions)
 	if err != nil {
 		return nil, fmt.Errorf("build namespace rule template context: %w", err)
 	}

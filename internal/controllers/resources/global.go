@@ -239,7 +239,6 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 	return requeue, nil
 }
 
-//nolint:dupl
 func (r *globalResourceController) enqueueDependentGlobalTenantResources(
 	ctx context.Context,
 	obj client.Object,
@@ -650,6 +649,7 @@ func (r *globalResourceController) updateStatus(ctx context.Context, instance *c
 
 			return err
 		}
+
 		originalStatus := latest.Status.DeepCopy()
 
 		latest.Status = instance.Status
@@ -675,6 +675,7 @@ func (r *globalResourceController) updateStatus(ctx context.Context, instance *c
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(cordonedCondition)
+
 		if reflect.DeepEqual(*originalStatus, latest.Status) {
 			return nil
 		}

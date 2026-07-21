@@ -362,6 +362,7 @@ func (r *clusterCustomQuotaClaimController) updateStatus(
 
 			return err
 		}
+
 		originalStatus := latest.Status.DeepCopy()
 
 		latest.Status = instance.Status
@@ -376,6 +377,7 @@ func (r *clusterCustomQuotaClaimController) updateStatus(
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(readyCondition)
+
 		if reflect.DeepEqual(*originalStatus, latest.Status) {
 			return nil
 		}

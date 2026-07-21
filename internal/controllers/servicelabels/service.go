@@ -25,6 +25,7 @@ type ServicesLabelsReconciler struct {
 	Log logr.Logger
 }
 
+//nolint:dupl
 func (r *ServicesLabelsReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
 	r.abstractServiceLabelsReconciler = abstractServiceLabelsReconciler{
 		obj:    &corev1.Service{},
@@ -52,6 +53,7 @@ func (r *ServicesLabelsReconciler) servicesForTenant(ctx context.Context, obj cl
 	}
 
 	requests := make([]reconcile.Request, 0)
+
 	for _, namespace := range tnt.Status.Namespaces {
 		items := &corev1.ServiceList{}
 		if err := r.client.List(ctx, items, client.InNamespace(namespace)); err != nil {

@@ -71,6 +71,7 @@ func (r *resourcePoolController) SetupWithManager(mgr ctrl.Manager, ctrlConfig c
 				predicate.GenerationChangedPredicate{},
 				predicates.UpdatedMetadataPredicate{},
 				predicates.DeletionChangedPredicate{},
+				predicates.ResourceQuotaUsageChangedPredicate{},
 			)),
 		).
 		Watches(&capsulev1beta2.ResourcePoolClaim{},
@@ -82,45 +83,6 @@ func (r *resourcePoolController) SetupWithManager(mgr ctrl.Manager, ctrlConfig c
 		).
 		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
 		Complete(r)
-}
-
-func (r *resourcePoolController) resourcePoolsForNamespace(ctx context.Context, obj client.Object) []reconcile.Request {
-	ns, ok := obj.(*corev1.Namespace)
-	if !ok {
-		return nil
-	}
-
-	poolList := &capsulev1beta2.ResourcePoolList{}
-	if err := r.Client.List(ctx, poolList); err != nil {
-		r.log.Error(err, "failed to list ResourcePools for namespace event", "namespace", ns.Name)
-
-		return nil
-	}
-
-	requests := make([]reconcile.Request, 0)
-	for i := range poolList.Items {
-		pool := &poolList.Items[i]
-		matched := slices.Contains(pool.Status.Namespaces, ns.Name)
-
-		for _, spec := range pool.Spec.Selectors {
-			if spec.LabelSelector == nil {
-				continue
-			}
-
-			selector, err := metav1.LabelSelectorAsSelector(spec.LabelSelector)
-			if err == nil && selector.Matches(labels.Set(ns.Labels)) {
-				matched = true
-
-				break
-			}
-		}
-
-		if matched {
-			requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(pool)})
-		}
-	}
-
-	return requests
 }
 
 func (r resourcePoolController) Reconcile(ctx context.Context, request ctrl.Request) (result ctrl.Result, err error) {
@@ -181,6 +143,46 @@ func (r resourcePoolController) Reconcile(ctx context.Context, request ctrl.Requ
 	err = r.reconcile(ctx, log, instance)
 
 	return ctrl.Result{}, err
+}
+
+func (r *resourcePoolController) resourcePoolsForNamespace(ctx context.Context, obj client.Object) []reconcile.Request {
+	ns, ok := obj.(*corev1.Namespace)
+	if !ok {
+		return nil
+	}
+
+	poolList := &capsulev1beta2.ResourcePoolList{}
+	if err := r.List(ctx, poolList); err != nil {
+		r.log.Error(err, "failed to list ResourcePools for namespace event", "namespace", ns.Name)
+
+		return nil
+	}
+
+	requests := make([]reconcile.Request, 0)
+
+	for i := range poolList.Items {
+		pool := &poolList.Items[i]
+		matched := slices.Contains(pool.Status.Namespaces, ns.Name)
+
+		for _, spec := range pool.Spec.Selectors {
+			if spec.LabelSelector == nil {
+				continue
+			}
+
+			selector, err := metav1.LabelSelectorAsSelector(spec.LabelSelector)
+			if err == nil && selector.Matches(labels.Set(ns.Labels)) {
+				matched = true
+
+				break
+			}
+		}
+
+		if matched {
+			requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(pool)})
+		}
+	}
+
+	return requests
 }
 
 func (r *resourcePoolController) finalize(
@@ -990,6 +992,7 @@ func (r *resourcePoolController) updateStatus(ctx context.Context, instance *cap
 
 			return err
 		}
+
 		originalStatus := latest.Status.DeepCopy()
 
 		latest.Status = instance.Status
@@ -1014,6 +1017,7 @@ func (r *resourcePoolController) updateStatus(ctx context.Context, instance *cap
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(exCondition)
+
 		if reflect.DeepEqual(*originalStatus, latest.Status) {
 			return nil
 		}

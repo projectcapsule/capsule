@@ -47,29 +47,6 @@ func (m *MetadataReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Mana
 		Complete(m)
 }
 
-func (m *MetadataReconciler) podsForTenant(ctx context.Context, obj client.Object) []reconcile.Request {
-	tnt, ok := obj.(*capsulev1beta2.Tenant)
-	if !ok {
-		return nil
-	}
-
-	requests := make([]reconcile.Request, 0)
-	for _, namespace := range tnt.Status.Namespaces {
-		pods := &corev1.PodList{}
-		if err := m.Client.List(ctx, pods, client.InNamespace(namespace)); err != nil {
-			m.Log.Error(err, "failed listing Pods for Tenant metadata update", "tenant", tnt.Name, "namespace", namespace)
-
-			continue
-		}
-
-		for i := range pods.Items {
-			requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&pods.Items[i])})
-		}
-	}
-
-	return requests
-}
-
 func (m *MetadataReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
 	var pod corev1.Pod
 
@@ -106,6 +83,30 @@ func (m *MetadataReconciler) Reconcile(ctx context.Context, request ctrl.Request
 	})
 
 	return reconcile.Result{}, err
+}
+
+func (m *MetadataReconciler) podsForTenant(ctx context.Context, obj client.Object) []reconcile.Request {
+	tnt, ok := obj.(*capsulev1beta2.Tenant)
+	if !ok {
+		return nil
+	}
+
+	requests := make([]reconcile.Request, 0)
+
+	for _, namespace := range tnt.Status.Namespaces {
+		pods := &corev1.PodList{}
+		if err := m.Client.List(ctx, pods, client.InNamespace(namespace)); err != nil {
+			m.Log.Error(err, "failed listing Pods for Tenant metadata update", "tenant", tnt.Name, "namespace", namespace)
+
+			continue
+		}
+
+		for i := range pods.Items {
+			requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&pods.Items[i])})
+		}
+	}
+
+	return requests
 }
 
 func (m *MetadataReconciler) getTenant(ctx context.Context, namespacedName types.NamespacedName, client client.Client) (*capsulev1beta2.Tenant, error) {

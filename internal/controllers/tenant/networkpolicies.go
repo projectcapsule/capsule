@@ -50,9 +50,7 @@ func (r *Manager) syncNetworkPolicy(ctx context.Context, log logr.Logger, tenant
 			},
 		}
 
-		var res controllerutil.OperationResult
-
-		res, err = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() (err error) {
+		_, err = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() (err error) {
 			labels := target.GetLabels()
 			if labels == nil {
 				labels = map[string]string{}
@@ -84,8 +82,6 @@ func (r *Manager) syncNetworkPolicy(ctx context.Context, log logr.Logger, tenant
 
 			return err
 		}
-
-		log.V(4).Info("network Policy sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
 	}
 
 	return nil

@@ -183,7 +183,9 @@ func (r *Manager) EnsureClusterRoleBindingsProvisioner(ctx context.Context) erro
 
 			if r.Configuration.AllowServiceAccountPromotion() {
 				saList := &corev1.ServiceAccountList{}
+
 				listStarted := time.Now()
+
 				if err := r.Client.List(ctx, saList, client.MatchingLabels{
 					meta.OwnerPromotionLabel: meta.ValueTrue,
 				}); err != nil {
@@ -191,6 +193,7 @@ func (r *Manager) EnsureClusterRoleBindingsProvisioner(ctx context.Context) erro
 
 					return err
 				}
+
 				logOperationDuration(log, "list promoted ServiceAccounts", listStarted)
 
 				for _, sa := range saList.Items {

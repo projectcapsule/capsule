@@ -159,6 +159,7 @@ func (r *mutatingReconciler) reconcileConfiguration(
 			caStarted := time.Now()
 			caCert, err = tls.FetchCurrentCaBundleForAdmission(ctx, r.client, r.configuration)
 			logOperationDuration(ctrllog.FromContext(ctx), "fetch mutating admission CA bundle", caStarted)
+
 			if err != nil {
 				return err
 			}
@@ -177,10 +178,13 @@ func (r *mutatingReconciler) reconcileConfiguration(
 
 		return err
 	})
+
 	logOperationDuration(ctrllog.FromContext(ctx), "create or update mutating webhook configuration", updateStarted)
+
 	if err != nil {
 		return err
 	}
+
 	if !cleanup {
 		return nil
 	}

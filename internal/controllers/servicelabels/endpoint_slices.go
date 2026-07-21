@@ -27,6 +27,7 @@ type EndpointSlicesLabelsReconciler struct {
 	VersionMajor uint
 }
 
+//nolint:dupl
 func (r *EndpointSlicesLabelsReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
 	r.abstractServiceLabelsReconciler = abstractServiceLabelsReconciler{
 		obj:    &discoveryv1.EndpointSlice{},
@@ -54,6 +55,7 @@ func (r *EndpointSlicesLabelsReconciler) endpointSlicesForTenant(ctx context.Con
 	}
 
 	requests := make([]reconcile.Request, 0)
+
 	for _, namespace := range tnt.Status.Namespaces {
 		items := &discoveryv1.EndpointSliceList{}
 		if err := r.client.List(ctx, items, client.InNamespace(namespace)); err != nil {

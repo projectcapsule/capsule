@@ -215,6 +215,7 @@ func (r *TenantOwnerManager) updateTenantOwnerStatus(
 
 			return err
 		}
+
 		originalStatus := latest.Status.DeepCopy()
 
 		latest.Status.ObservedGeneration = latest.GetGeneration()
@@ -229,6 +230,7 @@ func (r *TenantOwnerManager) updateTenantOwnerStatus(
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(readyCondition)
+
 		if reflect.DeepEqual(*originalStatus, latest.Status) {
 			return nil
 		}

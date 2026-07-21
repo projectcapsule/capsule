@@ -282,7 +282,6 @@ func (r *namespacedResourceController) enqueueTenantResourcesForTenant(ctx conte
 	return out
 }
 
-//nolint:dupl
 func (r *namespacedResourceController) enqueueDependentTenantResources(
 	ctx context.Context,
 	obj client.Object,
@@ -629,6 +628,7 @@ func (r *namespacedResourceController) updateStatus(ctx context.Context, instanc
 		if err = r.reader.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
 			return err
 		}
+
 		originalStatus := latest.Status.DeepCopy()
 
 		latest.Status = instance.Status
@@ -654,6 +654,7 @@ func (r *namespacedResourceController) updateStatus(ctx context.Context, instanc
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(cordonedCondition)
+
 		if reflect.DeepEqual(*originalStatus, latest.Status) {
 			return nil
 		}

@@ -15,6 +15,18 @@ func SanitizeUnstructured(obj *unstructured.Unstructured, opts SanitizeOptions) 
 		unstructured.RemoveNestedField(obj.Object, "metadata", "uid")
 	}
 
+	if opts.StripResourceVersion {
+		unstructured.RemoveNestedField(obj.Object, "metadata", "resourceVersion")
+	}
+
+	if opts.StripOwnerreferences {
+		unstructured.RemoveNestedField(obj.Object, "metadata", "ownerReferences")
+	}
+
+	if opts.StripGeneration {
+		unstructured.RemoveNestedField(obj.Object, "metadata", "generation")
+	}
+
 	if opts.StripManagedFields {
 		unstructured.RemoveNestedField(obj.Object, "metadata", "managedFields")
 	}

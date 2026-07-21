@@ -1385,7 +1385,7 @@ webhooks:
       # -- Capsule Hook Options
       opts: {}
       # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
-      failurePolicy: Ignore
+      failurePolicy: Fail
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Equivalent
       # @schema type: object
