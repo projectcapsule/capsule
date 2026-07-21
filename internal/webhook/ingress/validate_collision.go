@@ -134,6 +134,7 @@ func (r *collision) validateCollision(
 
 			namespaces := sets.NewString()
 
+			//nolint:exhaustive
 			switch scope {
 			case api.HostnameCollisionScopeCluster:
 				tenantList := &capsulev1beta2.TenantList{}

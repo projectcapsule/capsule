@@ -306,6 +306,7 @@ func (r *Manager) resourceQuotasUpdate(
 	list ...corev1.ResourceQuota,
 ) (err error) {
 	group := new(errgroup.Group)
+
 	reader := r.reader
 	if reader == nil {
 		reader = r.Client
@@ -329,7 +330,9 @@ func (r *Manager) resourceQuotasUpdate(
 		group.Go(func() (err error) {
 			return retry.RetryOnConflict(retry.DefaultBackoff, func() (retryErr error) {
 				found := &corev1.ResourceQuota{}
+
 				key := types.NamespacedName{Namespace: rq.Namespace, Name: rq.Name}
+
 				if retryErr = reader.Get(ctx, key, found); retryErr != nil {
 					return retryErr
 				}

@@ -145,14 +145,17 @@ func (r *Manager) updateTenantOwnersStatus(ctx context.Context, instance *capsul
 	})
 }
 
-// updateTenantClassStatus updates only the independently collected class
-// status. Class events use a distinct workqueue key and may run concurrently
-// with the main Tenant reconciliation, so copying the entire cached status here
-// could erase freshly evaluated owners, promotions, namespaces, or conditions.
-func (r *Manager) updateTenantClassStatus(ctx context.Context, instance *capsulev1beta2.Tenant) error {
+// updateTenantClassStatus collects and updates one class category against the
+// latest Tenant. Re-running the collector after a conflict prevents concurrent
+// class events from overwriting one another with stale status.
+func (r *Manager) updateTenantClassStatus(
+	ctx context.Context,
+	name string,
+	collector tenantClassCollector,
+) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		latest := &capsulev1beta2.Tenant{}
-		if err := r.reader.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
+		if err := r.reader.Get(ctx, types.NamespacedName{Name: name}, latest); err != nil {
 			if apierrors.IsNotFound(err) {
 				return nil
 			}
@@ -161,12 +164,14 @@ func (r *Manager) updateTenantClassStatus(ctx context.Context, instance *capsule
 		}
 
 		originalStatus := latest.Status.DeepCopy()
-		latest.Status.Classes = *instance.Status.Classes.DeepCopy()
+
+		if err := collector(ctx, latest); err != nil {
+			return err
+		}
+
 		ensureTenantStatusInitialized(latest)
 
 		if reflect.DeepEqual(*originalStatus, latest.Status) {
-			instance.Status = latest.Status
-
 			return nil
 		}
 
@@ -177,8 +182,6 @@ func (r *Manager) updateTenantClassStatus(ctx context.Context, instance *capsule
 
 			return err
 		}
-
-		instance.Status = latest.Status
 
 		return nil
 	})

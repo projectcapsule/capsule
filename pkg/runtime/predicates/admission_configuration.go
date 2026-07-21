@@ -40,10 +40,6 @@ func (ValidatingAdmissionConfigurationChangedPredicate) Update(e event.UpdateEve
 		return true
 	}
 
-	if admissionStateHashChanged(oldObj.Annotations, newObj.Annotations) {
-		return false
-	}
-
 	return ValidatingAdmissionStateHash(oldObj) != ValidatingAdmissionStateHash(newObj)
 }
 
@@ -61,18 +57,7 @@ func (MutatingAdmissionConfigurationChangedPredicate) Update(e event.UpdateEvent
 		return true
 	}
 
-	if admissionStateHashChanged(oldObj.Annotations, newObj.Annotations) {
-		return false
-	}
-
 	return MutatingAdmissionStateHash(oldObj) != MutatingAdmissionStateHash(newObj)
-}
-
-func admissionStateHashChanged(oldAnnotations, newAnnotations map[string]string) bool {
-	oldHash := oldAnnotations[AdmissionStateHashAnnotation]
-	newHash := newAnnotations[AdmissionStateHashAnnotation]
-
-	return newHash != "" && oldHash != newHash
 }
 
 func ValidatingAdmissionStateHash(obj *admissionv1.ValidatingWebhookConfiguration) string {

@@ -250,12 +250,15 @@ func TestUpdateTenantClassStatusPreservesOwnersAndConditions(t *testing.T) {
 	if err := cl.Get(context.Background(), client.ObjectKey{Name: stored.Name}, persistedBefore); err != nil {
 		t.Fatalf("get tenant before class update: %v", err)
 	}
-	staleClassEvent := stored.DeepCopy()
-	staleClassEvent.Status.Owners = nil
-	staleClassEvent.Status.Conditions = nil
-	staleClassEvent.Status.Classes.StorageClasses = []string{"fast"}
+	if err := manager.updateTenantClassStatus(
+		context.Background(),
+		stored.Name,
+		func(_ context.Context, tenant *capsulev1beta2.Tenant) error {
+			tenant.Status.Classes.StorageClasses = []string{"fast"}
 
-	if err := manager.updateTenantClassStatus(context.Background(), staleClassEvent); err != nil {
+			return nil
+		},
+	); err != nil {
 		t.Fatalf("update tenant class status: %v", err)
 	}
 

@@ -145,10 +145,58 @@ func TestValidatingAdmissionConfigurationChangedPredicate(t *testing.T) {
 		t.Fatal("webhook drift must be admitted")
 	}
 
+	driftedWithHash := unchanged.DeepCopy()
+	driftedWithHash.Webhooks[0].Name = "changed-with-hash.projectcapsule.dev"
+	driftedWithHash.Annotations[predicates.AdmissionStateHashAnnotation] = "changed"
+	if !p.Update(event.UpdateEvent{ObjectOld: unchanged, ObjectNew: driftedWithHash}) {
+		t.Fatal("webhook drift combined with a hash annotation update must be admitted")
+	}
+
 	caOnly := unchanged.DeepCopy()
 	caOnly.Webhooks[0].ClientConfig.CABundle = []byte("rotated")
 	if p.Update(event.UpdateEvent{ObjectOld: unchanged, ObjectNew: caOnly}) {
 		t.Fatal("CA rotation is owned by the TLS controller and must be filtered")
+	}
+}
+
+func TestMutatingAdmissionConfigurationChangedPredicate(t *testing.T) {
+	t.Parallel()
+
+	p := predicates.MutatingAdmissionConfigurationChangedPredicate{}
+	withoutHash := &admissionv1.MutatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{Name: "capsule"},
+		Webhooks:   []admissionv1.MutatingWebhook{{Name: "pods.projectcapsule.dev"}},
+	}
+	obj := withoutHash.DeepCopy()
+	obj.Annotations = map[string]string{
+		predicates.AdmissionStateHashAnnotation: predicates.MutatingAdmissionStateHash(obj),
+	}
+	if p.Update(event.UpdateEvent{ObjectOld: withoutHash, ObjectNew: obj}) {
+		t.Fatal("controller hash update must not enqueue itself")
+	}
+
+	driftedWithHash := obj.DeepCopy()
+	driftedWithHash.Webhooks[0].Name = "changed.projectcapsule.dev"
+	driftedWithHash.Annotations[predicates.AdmissionStateHashAnnotation] = "changed"
+	if !p.Update(event.UpdateEvent{ObjectOld: obj, ObjectNew: driftedWithHash}) {
+		t.Fatal("webhook drift combined with a hash annotation update must be admitted")
+	}
+}
+
+func TestDependencyStateChangedPredicateNilObjects(t *testing.T) {
+	t.Parallel()
+
+	p := predicates.DependencyStateChangedPredicate{}
+	obj := &capsulev1beta2.TenantResource{}
+
+	for _, e := range []event.UpdateEvent{
+		{ObjectNew: obj},
+		{ObjectOld: obj},
+		{},
+	} {
+		if p.Update(e) {
+			t.Fatal("update with a nil object must be filtered")
+		}
 	}
 }
 

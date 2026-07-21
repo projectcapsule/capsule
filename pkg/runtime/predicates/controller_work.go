@@ -173,6 +173,10 @@ func (DependencyStateChangedPredicate) Create(event.CreateEvent) bool   { return
 func (DependencyStateChangedPredicate) Delete(event.DeleteEvent) bool   { return true }
 func (DependencyStateChangedPredicate) Generic(event.GenericEvent) bool { return false }
 func (DependencyStateChangedPredicate) Update(e event.UpdateEvent) bool {
+	if e.ObjectOld == nil || e.ObjectNew == nil {
+		return false
+	}
+
 	return e.ObjectOld.GetGeneration() != e.ObjectNew.GetGeneration() ||
 		(e.ObjectOld.GetDeletionTimestamp() == nil) != (e.ObjectNew.GetDeletionTimestamp() == nil) ||
 		!reflect.DeepEqual(resourceReadyCondition(e.ObjectOld), resourceReadyCondition(e.ObjectNew))

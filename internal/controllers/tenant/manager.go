@@ -122,17 +122,17 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 		).
 		Watches(
 			&storagev1.StorageClass{},
-			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenantsForClass),
+			r.tenantClassEventHandler(r.collectAvailableStorageClasses),
 			builder.WithPredicates(predicates.ClassChanged()),
 		).
 		Watches(
 			&schedulingv1.PriorityClass{},
-			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenantsForClass),
+			r.tenantClassEventHandler(r.collectAvailablePriorityClasses),
 			builder.WithPredicates(predicates.ClassChanged()),
 		).
 		Watches(
 			&nodev1.RuntimeClass{},
-			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenantsForClass),
+			r.tenantClassEventHandler(r.collectAvailableRuntimeClasses),
 			builder.WithPredicates(predicates.ClassChanged()),
 		).
 		Watches(
@@ -231,7 +231,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 	if r.classes.gateway {
 		ctrlBuilder = ctrlBuilder.Watches(
 			&gatewayv1.GatewayClass{},
-			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenantsForClass),
+			r.tenantClassEventHandler(r.collectAvailableGatewayClasses),
 			builder.WithPredicates(predicates.ClassChanged()),
 		)
 	}
@@ -246,39 +246,12 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 	if r.classes.device {
 		ctrlBuilder = ctrlBuilder.Watches(
 			&resourcesv1.DeviceClass{},
-			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenantsForClass),
+			r.tenantClassEventHandler(r.collectAvailableDeviceClasses),
 			builder.WithPredicates(predicates.ClassChanged()),
 		)
 	}
 
 	return ctrlBuilder.Complete(r)
-}
-
-func (r *Manager) syncResourceQuotasForResourceQuota(ctx context.Context, quota client.Object) {
-	owner := metav1.GetControllerOf(quota)
-	if owner == nil || owner.APIVersion != capsulev1beta2.GroupVersion.String() || owner.Kind != "Tenant" {
-		return
-	}
-
-	tenant := &capsulev1beta2.Tenant{}
-	if err := r.Get(ctx, client.ObjectKey{Name: owner.Name}, tenant); err != nil {
-		if !apierrors.IsNotFound(err) {
-			r.Log.Error(err, "cannot retrieve Tenant for ResourceQuota sync", "tenant", owner.Name)
-		}
-
-		return
-	}
-	if tenant.DeletionTimestamp != nil {
-		return
-	}
-
-	if err := r.syncCustomResourceQuotaUsages(ctx, tenant); err != nil {
-		r.Log.Error(err, "cannot update custom ResourceQuota usages", "tenant", tenant.Name)
-	}
-
-	if err := r.syncResourceQuotas(ctx, r.Log, tenant); err != nil {
-		r.Log.Error(err, "cannot sync ResourceQuotas", "tenant", tenant.Name)
-	}
 }
 
 func (r *Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ctrl.Result, err error) {
@@ -297,18 +270,6 @@ func (r *Manager) Reconcile(ctx context.Context, request ctrl.Request) (result c
 		}
 
 		return result, err
-	}
-
-	if request.Namespace == classEventMarker {
-		reconcileError := r.collectAvailableResources(ctx, log, instance)
-
-		if statusErr := r.updateTenantClassStatus(ctx, instance); statusErr != nil {
-			return reconcile.Result{}, fmt.Errorf("cannot update tenant class status: %w", statusErr)
-		}
-
-		r.syncTenantStatusMetrics(instance)
-
-		return reconcile.Result{}, reconcileError
 	}
 
 	if updateErr := r.updateReconcilingStatus(ctx, instance); updateErr != nil {
@@ -455,4 +416,32 @@ func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *caps
 	log.V(4).Info("Tenant reconciling completed")
 
 	return err
+}
+
+func (r *Manager) syncResourceQuotasForResourceQuota(ctx context.Context, quota client.Object) {
+	owner := metav1.GetControllerOf(quota)
+	if owner == nil || owner.APIVersion != capsulev1beta2.GroupVersion.String() || owner.Kind != "Tenant" {
+		return
+	}
+
+	tenant := &capsulev1beta2.Tenant{}
+	if err := r.Get(ctx, client.ObjectKey{Name: owner.Name}, tenant); err != nil {
+		if !apierrors.IsNotFound(err) {
+			r.Log.Error(err, "cannot retrieve Tenant for ResourceQuota sync", "tenant", owner.Name)
+		}
+
+		return
+	}
+
+	if tenant.DeletionTimestamp != nil {
+		return
+	}
+
+	if err := r.syncCustomResourceQuotaUsages(ctx, tenant); err != nil {
+		r.Log.Error(err, "cannot update custom ResourceQuota usages", "tenant", tenant.Name)
+	}
+
+	if err := r.syncResourceQuotas(ctx, r.Log, tenant); err != nil {
+		r.Log.Error(err, "cannot sync ResourceQuotas", "tenant", tenant.Name)
+	}
 }
