@@ -25,6 +25,7 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
@@ -37,6 +38,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 	"github.com/projectcapsule/capsule/pkg/runtime/sanitize"
+	"github.com/projectcapsule/capsule/pkg/runtime/watch"
 )
 
 type globalResourceController struct {
@@ -50,6 +52,9 @@ type globalResourceController struct {
 	metrics       *metrics.GlobalTenantResourceRecorder
 
 	impersonation *cache.ImpersonationCache
+
+	triggers   *watch.Manager
+	triggerSrc source.Source
 }
 
 func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
@@ -94,6 +99,7 @@ func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, ctrlConfig
 			&capsulev1beta2.Tenant{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueRequestFromTenant),
 		).
+		WatchesRawSource(r.triggerSrc).
 		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
 		Complete(r)
 }
@@ -109,6 +115,11 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 			log.V(5).Info("Request object not found, could have been deleted after reconcile request")
 
 			r.metrics.DeleteMetrics(request.Name)
+
+			// Release any trigger watches this resource was keeping alive.
+			if serr := r.triggers.Sync(ctx, globalTriggerOwnerKey(request.Name), nil); serr != nil {
+				log.V(2).Error(serr, "failed to release trigger watches")
+			}
 
 			return reconcile.Result{}, nil
 		}
@@ -128,9 +139,13 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 
 	var statusErr error
 
+	var triggerCond meta.Condition
+
 	//nolint:dupl
 	defer func() {
 		meta.RemoveReconcileTriggerAnnotation(tntResource)
+
+		tntResource.Status.Conditions.UpdateConditionByType(triggerCond)
 
 		reconcileErr := err
 		if statusErr != nil {
@@ -167,6 +182,17 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 		// Controller-runtime should not receive handled reconciliation errors.
 		err = nil
 	}()
+
+	// Arm (or, while terminating, release) the dynamic trigger watches for the
+	// kinds this resource depends on, independent of cordon/dependency state.
+	// No tenant scoping: a GlobalTenantResource may watch objects in non-tenant
+	// namespaces (e.g. a replication source), which never carry the tenant
+	// label, and cluster-scoped kinds are never stamped at all. Narrowing to
+	// label-carrying objects would silently blind those triggers.
+	triggerCond = syncTriggers(
+		ctx, r.triggers, globalTriggerOwnerKey(tntResource.Name),
+		tntResource, tntResource.Spec.TenantResourceCommonSpec, false, log,
+	)
 
 	// On Deletion these checks are skipped.
 	//nolint:nestif

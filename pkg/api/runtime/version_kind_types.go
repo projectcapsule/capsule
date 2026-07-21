@@ -117,6 +117,8 @@ type VersionKinds struct {
 	// - ["*"] means all API groups and versions.
 	//
 	// +optional
+	// +kubebuilder:validation:MaxItems=100
+	// +kubebuilder:validation:items:MaxLength=317
 	APIGroups []string `json:"apiGroups,omitempty"`
 
 	// Kinds of the referents.
@@ -124,7 +126,9 @@ type VersionKinds struct {
 	// Use "*" to match all kinds.
 	//
 	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=100
 	// +kubebuilder:validation:items:MinLength=1
+	// +kubebuilder:validation:items:MaxLength=63
 	Kinds []string `json:"kinds"`
 }
 
