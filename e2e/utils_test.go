@@ -603,6 +603,26 @@ func deleteTenantPodsBeforeDeletion(tnt *capsulev1beta2.Tenant) {
 		remaining := 0
 		zero := int64(0)
 		for namespace := range namespaceNames {
+			// Stop workload controllers before deleting Pods. Otherwise controllers
+			// such as Deployments immediately replace the Pods and cleanup can never
+			// observe an empty namespace.
+			for _, workload := range []client.Object{
+				&appsv1.Deployment{},
+				&appsv1.ReplicaSet{},
+				&appsv1.StatefulSet{},
+				&appsv1.DaemonSet{},
+			} {
+				if err := k8sClient.DeleteAllOf(
+					context.TODO(),
+					workload,
+					client.InNamespace(namespace),
+					client.GracePeriodSeconds(0),
+					client.PropagationPolicy(metav1.DeletePropagationBackground),
+				); err != nil && !apierrors.IsNotFound(err) {
+					return fmt.Errorf("delete %T objects in namespace %q: %w", workload, namespace, err)
+				}
+			}
+
 			pods := &corev1.PodList{}
 			if err := k8sClient.List(context.TODO(), pods, client.InNamespace(namespace)); err != nil {
 				if apierrors.IsNotFound(err) {
