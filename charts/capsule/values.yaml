@@ -1002,7 +1002,6 @@ webhooks:
         resources:
           - '*'
         scope: Namespaced
-
     # -- Generic Rules API
     generic:
       # -- Enable the Hook
@@ -1045,6 +1044,16 @@ webhooks:
         resources:
           - '*'
         scope: Namespaced
+      - apiGroups:
+          - ''
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - namespaces
+        scope: Cluster
 
 
     resourcepools:

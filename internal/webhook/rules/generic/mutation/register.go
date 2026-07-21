@@ -4,7 +4,7 @@
 package mutation
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -24,9 +24,9 @@ func (g genericMutating) GetHandlers() []handlers.Handler {
 
 func (genericMutating) GetPath() string { return Path }
 
-func genericHandler(cfg configuration.Configuration, handler ...handlers.TypedHandlerWithTenantWithRuleset[*metav1.PartialObjectMetadata]) handlers.Handler {
-	return &handlers.TypedTenantWithRulesetHandler[*metav1.PartialObjectMetadata]{
-		Factory:       func() *metav1.PartialObjectMetadata { return &metav1.PartialObjectMetadata{} },
+func genericHandler(cfg configuration.Configuration, handler ...handlers.TypedHandlerWithTenantWithRuleset[*unstructured.Unstructured]) handlers.Handler {
+	return &handlers.TypedTenantWithRulesetHandler[*unstructured.Unstructured]{
+		Factory:       func() *unstructured.Unstructured { return &unstructured.Unstructured{} },
 		Handlers:      handler,
 		Configuration: cfg,
 	}

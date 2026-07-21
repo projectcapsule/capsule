@@ -891,9 +891,10 @@ func main() {
 	}
 
 	if err = (&rulestatuscontroller.Manager{
-		Client:  manager.GetClient(),
-		Log:     ctrl.Log.WithName("capsule.ctrl").WithName("ruleset"),
-		Metrics: metrics.MustMakeRuleStatusRecorder(),
+		Client:     manager.GetClient(),
+		RESTConfig: manager.GetConfig(),
+		Log:        ctrl.Log.WithName("capsule.ctrl").WithName("ruleset"),
+		Metrics:    metrics.MustMakeRuleStatusRecorder(),
 	}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RuleSet")
 		os.Exit(1)

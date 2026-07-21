@@ -22,12 +22,16 @@ func ValidateRuleStatusBody(
 	bodies []*rules.NamespaceRuleBodyNamespace,
 ) error {
 	for i, rule := range bodies {
-		if rule == nil || rule.Enforce == nil {
+		if rule == nil {
 			continue
 		}
 
-		if err := validateAudience(i, rule.Enforce.Audience); err != nil {
+		if err := validateAudience(i, rule.Audience); err != nil {
 			return err
+		}
+
+		if rule.Enforce == nil {
+			continue
 		}
 
 		if err := validateWorkloadRules(i, rule.Enforce.Workloads); err != nil {
@@ -35,6 +39,10 @@ func ValidateRuleStatusBody(
 		}
 
 		if err := validateServiceRules(i, rule.Enforce.Services); err != nil {
+			return err
+		}
+
+		if err := validateIngressRules(i, rule.Enforce.Ingress); err != nil {
 			return err
 		}
 
@@ -46,9 +54,43 @@ func ValidateRuleStatusBody(
 	return nil
 }
 
+func validateIngressRules(
+	ruleIndex int,
+	ingress rules.NamespaceRuleEnforceIngressBody,
+) error {
+	for i, resourceType := range ingress.Types {
+		switch resourceType {
+		case rules.IngressTypeIngress, rules.IngressTypeRoute,
+			rules.IngressTypeListenerSet,
+			rules.IngressTypeHTTPRoute,
+			rules.IngressTypeGateway,
+			rules.IngressTypeTLSRoute,
+			rules.IngressTypeGRPCRoute:
+		default:
+			return fmt.Errorf(
+				"rules[%d].enforce.ingress.types[%d] %q is invalid: unsupported ingress resource type",
+				ruleIndex,
+				i,
+				resourceType,
+			)
+		}
+	}
+
+	for i, hostname := range ingress.Hostnames {
+		if err := validateExpressionMatch(
+			hostname,
+			fmt.Sprintf("rules[%d].enforce.ingress.hostnames[%d]", ruleIndex, i),
+		); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func validateAudience(ruleIndex int, audience []rules.Audience) error {
 	for i, subject := range audience {
-		path := fmt.Sprintf("rules[%d].enforce.audience[%d]", ruleIndex, i)
+		path := fmt.Sprintf("rules[%d].audience[%d]", ruleIndex, i)
 		if strings.TrimSpace(subject.Name) == "" {
 			return fmt.Errorf("%s.name is invalid: name is empty", path)
 		}

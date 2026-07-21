@@ -10,6 +10,7 @@ import (
 	"net/http"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -22,23 +23,23 @@ import (
 
 type metadataRules struct{}
 
-func MetadataRules() handlers.TypedHandlerWithTenantWithRuleset[*metav1.PartialObjectMetadata] {
+func MetadataRules() handlers.TypedHandlerWithTenantWithRuleset[*unstructured.Unstructured] {
 	return &metadataRules{}
 }
 
-func (h *metadataRules) OnCreate(_ client.Client, _ client.Reader, obj *metav1.PartialObjectMetadata, _ admission.Decoder, _ events.EventRecorder, _ *capsulev1beta2.Tenant, bodies []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
+func (h *metadataRules) OnCreate(_ client.Client, _ client.Reader, obj *unstructured.Unstructured, _ admission.Decoder, _ events.EventRecorder, _ *capsulev1beta2.Tenant, bodies []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
 	return h.mutate(obj, bodies)
 }
 
-func (h *metadataRules) OnUpdate(_ client.Client, _ client.Reader, _ *metav1.PartialObjectMetadata, obj *metav1.PartialObjectMetadata, _ admission.Decoder, _ events.EventRecorder, _ *capsulev1beta2.Tenant, bodies []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
+func (h *metadataRules) OnUpdate(_ client.Client, _ client.Reader, _ *unstructured.Unstructured, obj *unstructured.Unstructured, _ admission.Decoder, _ events.EventRecorder, _ *capsulev1beta2.Tenant, bodies []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
 	return h.mutate(obj, bodies)
 }
 
-func (*metadataRules) OnDelete(client.Client, client.Reader, *metav1.PartialObjectMetadata, admission.Decoder, events.EventRecorder, *capsulev1beta2.Tenant, []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
+func (*metadataRules) OnDelete(client.Client, client.Reader, *unstructured.Unstructured, admission.Decoder, events.EventRecorder, *capsulev1beta2.Tenant, []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response { return nil }
 }
 
-func (*metadataRules) mutate(obj *metav1.PartialObjectMetadata, bodies []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
+func (*metadataRules) mutate(obj *unstructured.Unstructured, bodies []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		gvk := schema.GroupVersionKind{Group: req.Kind.Group, Version: req.Kind.Version, Kind: req.Kind.Kind}
 		if gvk.Version == "" || gvk.Kind == "" {

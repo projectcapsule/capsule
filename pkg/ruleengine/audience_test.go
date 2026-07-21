@@ -43,3 +43,27 @@ func TestMatchesAudience(t *testing.T) {
 		})
 	}
 }
+
+func TestFilterNamespaceRulesUsesRootAudience(t *testing.T) {
+	t.Parallel()
+	req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+		UserInfo: authenticationv1.UserInfo{Username: "alice", Groups: []string{"developers"}},
+	}}
+	matching := &rules.NamespaceRuleBodyNamespace{
+		Audience: []rules.Audience{{Kind: rules.AudienceKindGroup, Name: "developers"}},
+		Enforce:  &rules.NamespaceRuleEnforceBody{},
+	}
+	nonMatching := &rules.NamespaceRuleBodyNamespace{
+		Audience: []rules.Audience{{Kind: rules.AudienceKindUser, Name: "bob"}},
+		Enforce:  &rules.NamespaceRuleEnforceBody{},
+	}
+	unscoped := &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{}}
+
+	got, err := FilterNamespaceRulesByAudience(nil, nil, req, []*rules.NamespaceRuleBodyNamespace{matching, nonMatching, unscoped})
+	if err != nil {
+		t.Fatalf("FilterNamespaceRulesByAudience() error = %v", err)
+	}
+	if len(got) != 2 || got[0] != matching || got[1] != unscoped {
+		t.Fatalf("unexpected filtered rules: %#v", got)
+	}
+}

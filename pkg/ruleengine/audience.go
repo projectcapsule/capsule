@@ -23,11 +23,11 @@ func FilterNamespaceRulesByAudience(
 ) ([]*rules.NamespaceRuleBodyNamespace, error) {
 	out := make([]*rules.NamespaceRuleBodyNamespace, 0, len(bodies))
 	for _, body := range bodies {
-		if body == nil || body.Enforce == nil || len(body.Enforce.Audience) == 0 {
+		if body == nil || len(body.Audience) == 0 {
 			out = append(out, body)
 			continue
 		}
-		matched, err := matchesAudience(cfg, tnt, req, body.Enforce.Audience)
+		matched, err := matchesAudience(cfg, tnt, req, body.Audience)
 		if err != nil {
 			return nil, err
 		}

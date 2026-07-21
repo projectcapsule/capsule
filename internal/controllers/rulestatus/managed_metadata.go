@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"slices"
 	"strings"
 
@@ -21,12 +22,31 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 )
 
-func (r Manager) reconcileManagedMetadata(ctx context.Context, instance *capsulev1beta2.RuleStatus, bodies []*rules.NamespaceRuleBodyNamespace) error {
-	discoveryClient, err := discovery.NewDiscoveryClientForConfig(r.RESTConfig)
+func (r Manager) reconcileManagedMetadata(ctx context.Context, instance *capsulev1beta2.RuleStatus, previous, current []*rules.NamespaceRuleBodyNamespace) error {
+	if r.RESTConfig == nil {
+		return fmt.Errorf("REST config is required for managed metadata reconciliation")
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(r.RESTConfig)
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := dynamic.NewForConfig(r.RESTConfig)
+	manager := ruleStatusFieldManager(instance)
+
+	namespaceGVK := schema.GroupVersionKind{Version: "v1", Kind: "Namespace"}
+	previousLabels, previousAnnotations := managedMetadataForGVK(namespaceGVK, previous)
+	labels, annotations := managedMetadataForGVK(namespaceGVK, current)
+	if hasMetadata(previousLabels, previousAnnotations) || hasMetadata(labels, annotations) {
+		if err := reconcileObjectManagedMetadata(ctx, dynamicClient, schema.GroupVersionResource{Version: "v1", Resource: "namespaces"}, namespaceGVK, "", instance.GetNamespace(), previousLabels, previousAnnotations, labels, annotations, manager); err != nil {
+			return err
+		}
+	}
+
+	if !hasManagedNamespacedMetadata(previous) && !hasManagedNamespacedMetadata(current) {
+		return nil
+	}
+
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(r.RESTConfig)
 	if err != nil {
 		return err
 	}
@@ -34,8 +54,6 @@ func (r Manager) reconcileManagedMetadata(ctx context.Context, instance *capsule
 	if discoveryErr != nil && len(resourceLists) == 0 {
 		return discoveryErr
 	}
-	manager := ruleStatusFieldManager(instance)
-
 	for _, resourceList := range resourceLists {
 		gv, err := schema.ParseGroupVersion(resourceList.GroupVersion)
 		if err != nil {
@@ -46,22 +64,106 @@ func (r Manager) reconcileManagedMetadata(ctx context.Context, instance *capsule
 				continue
 			}
 			gvr, gvk := gv.WithResource(resource.Name), gv.WithKind(resource.Kind)
+			previousLabels, previousAnnotations := managedMetadataForGVK(gvk, previous)
+			labels, annotations := managedMetadataForGVK(gvk, current)
+			if !hasMetadata(previousLabels, previousAnnotations) && !hasMetadata(labels, annotations) {
+				continue
+			}
 			items, err := dynamicClient.Resource(gvr).Namespace(instance.GetNamespace()).List(ctx, metav1.ListOptions{})
 			if err != nil {
 				continue
 			}
-			labels, annotations := managedMetadataForGVK(gvk, bodies)
 			for i := range items.Items {
-				if err := applyManagedMetadata(ctx, dynamicClient, gvr, gvk, instance.GetNamespace(), items.Items[i].GetName(), labels, annotations, manager); err != nil {
+				if err := reconcileObjectManagedMetadata(ctx, dynamicClient, gvr, gvk, instance.GetNamespace(), items.Items[i].GetName(), previousLabels, previousAnnotations, labels, annotations, manager); err != nil {
 					return err
 				}
 			}
 		}
 	}
 
-	namespaceGVK := schema.GroupVersionKind{Version: "v1", Kind: "Namespace"}
-	labels, annotations := managedMetadataForGVK(namespaceGVK, bodies)
-	return applyManagedMetadata(ctx, dynamicClient, schema.GroupVersionResource{Version: "v1", Resource: "namespaces"}, namespaceGVK, "", instance.GetNamespace(), labels, annotations, manager)
+	return nil
+}
+
+func reconcileObjectManagedMetadata(ctx context.Context, dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, gvk schema.GroupVersionKind, namespace, name string, previousLabels, previousAnnotations, labels, annotations map[string]string, manager string) error {
+	removedLabels := removedMetadataKeys(previousLabels, labels)
+	removedAnnotations := removedMetadataKeys(previousAnnotations, annotations)
+	if hasRemovedMetadata(removedLabels, removedAnnotations) {
+		if err := removeManagedMetadata(ctx, dynamicClient, gvr, namespace, name, removedLabels, removedAnnotations); err != nil {
+			return err
+		}
+	}
+	return applyManagedMetadata(ctx, dynamicClient, gvr, gvk, namespace, name, labels, annotations, manager)
+}
+
+func removedMetadataKeys(previous, current map[string]string) map[string]any {
+	removed := map[string]any{}
+	for key := range previous {
+		if _, ok := current[key]; !ok {
+			removed[key] = nil
+		}
+	}
+	return removed
+}
+
+func hasRemovedMetadata(labels, annotations map[string]any) bool {
+	return len(labels) > 0 || len(annotations) > 0
+}
+
+func removeManagedMetadata(ctx context.Context, dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, namespace, name string, labels, annotations map[string]any) error {
+	metadata := map[string]any{}
+	if len(labels) > 0 {
+		metadata["labels"] = labels
+	}
+	if len(annotations) > 0 {
+		metadata["annotations"] = annotations
+	}
+	raw, err := json.Marshal(map[string]any{"metadata": metadata})
+	if err != nil {
+		return err
+	}
+	var resource dynamic.ResourceInterface = dynamicClient.Resource(gvr)
+	if namespace != "" {
+		resource = dynamicClient.Resource(gvr).Namespace(namespace)
+	}
+	_, err = resource.Patch(ctx, name, types.MergePatchType, raw, metav1.PatchOptions{})
+	return err
+}
+
+func hasMetadata(labels, annotations map[string]string) bool {
+	return len(labels) > 0 || len(annotations) > 0
+}
+
+func hasManagedNamespacedMetadata(bodies []*rules.NamespaceRuleBodyNamespace) bool {
+	for _, body := range bodies {
+		if body == nil || body.Enforce == nil {
+			continue
+		}
+		for _, rule := range body.Enforce.Metadata {
+			if !metadataRuleHasManagedValues(rule) {
+				continue
+			}
+			for _, kind := range rule.Kinds {
+				if strings.TrimSpace(kind) != "Namespace" {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func metadataRuleHasManagedValues(rule rules.MetadataRule) bool {
+	for _, policy := range rule.Labels {
+		if policy.Managed != nil {
+			return true
+		}
+	}
+	for _, policy := range rule.Annotations {
+		if policy.Managed != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func managedMetadataForGVK(gvk schema.GroupVersionKind, bodies []*rules.NamespaceRuleBodyNamespace) (map[string]string, map[string]string) {

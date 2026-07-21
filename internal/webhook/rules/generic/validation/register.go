@@ -5,6 +5,7 @@ package validation
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
@@ -30,11 +31,24 @@ func (w *genericValidating) GetHandlers() []handlers.Handler {
 		genericHandler(w.configuration,
 			GenericRules(w.regexCache),
 		),
+		ingressHandler(w.configuration,
+			IngressRules(w.regexCache),
+		),
 	}
 }
 
 func (genericValidating) GetPath() string {
 	return Path
+}
+
+func ingressHandler(cfg configuration.Configuration,
+	handler ...handlers.TypedHandlerWithTenantWithRuleset[*unstructured.Unstructured],
+) handlers.Handler {
+	return &handlers.TypedTenantWithRulesetHandler[*unstructured.Unstructured]{
+		Factory:       func() *unstructured.Unstructured { return &unstructured.Unstructured{} },
+		Handlers:      handler,
+		Configuration: cfg,
+	}
 }
 
 func genericHandler(cfg configuration.Configuration,

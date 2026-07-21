@@ -149,7 +149,8 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 }
 
 func (r Manager) reconcile(ctx context.Context, instance *capsulev1beta2.RuleStatus) error {
-	hadManagedMetadata := hasManagedMetadata(instance.Status.Rules)
+	previousRules := instance.Status.Rules
+	hadManagedMetadata := hasManagedMetadata(previousRules)
 	ruleStatus := make([]*rules.NamespaceRuleBodyNamespace, 0, len(instance.Spec))
 
 	for _, rule := range instance.Spec {
@@ -163,22 +164,38 @@ func (r Manager) reconcile(ctx context.Context, instance *capsulev1beta2.RuleSta
 			enforce.Metadata[i].APIGroups = enforce.Metadata[i].StatusAPIGroups()
 		}
 
-		ruleStatus = append(ruleStatus, &rules.NamespaceRuleBodyNamespace{
-			Enforce: enforce,
-		})
+		statusRule := rule.DeepCopy()
+		statusRule.Enforce = enforce
+		ruleStatus = append(ruleStatus, statusRule)
 	}
 
 	instance.Status.Rules = ruleStatus
+	//nolint:staticcheck
+	instance.Status.Rule = rules.NamespaceRuleBodyNamespace{}
+
 	if hadManagedMetadata || hasManagedMetadata(ruleStatus) {
-		if err := r.reconcileManagedMetadata(ctx, instance, ruleStatus); err != nil {
+		if err := r.publishRulesStatus(ctx, instance); err != nil {
+			return fmt.Errorf("publish rules before managed metadata reconciliation: %w", err)
+		}
+		if err := r.reconcileManagedMetadata(ctx, instance, previousRules, ruleStatus); err != nil {
 			return fmt.Errorf("reconcile managed metadata: %w", err)
 		}
 	}
 
-	//nolint:staticcheck
-	instance.Status.Rule = rules.NamespaceRuleBodyNamespace{}
-
 	return nil
+}
+
+func (r *Manager) publishRulesStatus(ctx context.Context, instance *capsulev1beta2.RuleStatus) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		latest := &capsulev1beta2.RuleStatus{}
+		if err := r.reader.Get(ctx, client.ObjectKeyFromObject(instance), latest); err != nil {
+			return err
+		}
+		latest.Status.Rules = instance.Status.Rules
+		//nolint:staticcheck
+		latest.Status.Rule = instance.Status.Rule
+		return r.Client.Status().Update(ctx, latest)
+	})
 }
 
 func (r *Manager) updateStatus(ctx context.Context, instance *capsulev1beta2.RuleStatus, reconcileError error) error {

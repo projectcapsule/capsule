@@ -6,7 +6,7 @@ package mutation
 import (
 	"testing"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/ptr"
 
@@ -16,9 +16,14 @@ import (
 
 func TestMutateMetadataDefaultsAndManaged(t *testing.T) {
 	t.Parallel()
-	obj := &metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{
-		Labels: map[string]string{"default-present": "user", "managed": "user"},
-	}}
+	obj := &unstructured.Unstructured{}
+	obj.SetLabels(map[string]string{"default-present": "user", "managed": "user"})
+	obj.Object["roleRef"] = map[string]any{
+		"apiGroup": "rbac.authorization.k8s.io",
+		"kind":     "ClusterRole",
+		"name":     "admin",
+	}
+	obj.Object["subjects"] = []any{map[string]any{"kind": "User", "name": "alice"}}
 	bodies := []*rules.NamespaceRuleBodyNamespace{{Enforce: &rules.NamespaceRuleEnforceBody{
 		Metadata: []rules.MetadataRule{{
 			VersionKinds: runtime.VersionKinds{APIGroups: []string{"v1"}, Kinds: []string{"ConfigMap"}},
@@ -39,5 +44,12 @@ func TestMutateMetadataDefaultsAndManaged(t *testing.T) {
 	}
 	if got := obj.GetLabels()["managed"]; got != "controlled" {
 		t.Fatalf("managed = %q", got)
+	}
+	roleRef, ok := obj.Object["roleRef"].(map[string]any)
+	if !ok || roleRef["kind"] != "ClusterRole" || roleRef["name"] != "admin" {
+		t.Fatalf("roleRef was changed: %#v", obj.Object["roleRef"])
+	}
+	if _, ok := obj.Object["subjects"]; !ok {
+		t.Fatal("subjects were removed")
 	}
 }

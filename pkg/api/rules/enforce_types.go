@@ -37,11 +37,6 @@ type NamespaceRuleEnforceBody struct {
 	//+kubebuilder:default:=deny
 	Action ActionType `json:"action,omitempty"`
 
-	// Audience limits this enforcement block to matching request subjects.
-	// An empty audience matches every request.
-	// +optional
-	Audience []Audience `json:"audience,omitempty"`
-
 	// Enforcement for Workloads (Pods)
 	Workloads NamespaceRuleEnforceWorkloadsBody `json:"workloads,omitempty"`
 
@@ -53,4 +48,8 @@ type NamespaceRuleEnforceBody struct {
 	//
 	// +optional
 	Metadata []MetadataRule `json:"metadata,omitempty"`
+
+	// Enforcement for Ingress and Gateway API resource hostnames.
+	// +optional
+	Ingress NamespaceRuleEnforceIngressBody `json:"ingress,omitempty"`
 }

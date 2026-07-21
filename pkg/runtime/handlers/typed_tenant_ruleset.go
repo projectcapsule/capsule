@@ -82,7 +82,7 @@ func (h *TypedTenantWithRulesetHandler[T]) OnCreate(
 			return ErroredResponse(err)
 		}
 
-		ruleBlocks, err := h.resolveRuleset(ctx, c, req, req.Namespace, tnt)
+		ruleBlocks, err := h.resolveRuleset(ctx, c, reader, req, req.Namespace, tnt)
 		if err != nil {
 			return ErroredResponse(err)
 		}
@@ -127,7 +127,7 @@ func (h *TypedTenantWithRulesetHandler[T]) OnUpdate(
 			return ErroredResponse(err)
 		}
 
-		ruleBlocks, err := h.resolveRuleset(ctx, c, req, req.Namespace, tnt)
+		ruleBlocks, err := h.resolveRuleset(ctx, c, reader, req, req.Namespace, tnt)
 		if err != nil {
 			return ErroredResponse(err)
 		}
@@ -167,7 +167,7 @@ func (h *TypedTenantWithRulesetHandler[T]) OnDelete(
 			return ErroredResponse(err)
 		}
 
-		ruleBlocks, err := h.resolveRuleset(ctx, c, req, req.Namespace, tnt)
+		ruleBlocks, err := h.resolveRuleset(ctx, c, reader, req, req.Namespace, tnt)
 		if err != nil {
 			return ErroredResponse(err)
 		}
@@ -203,6 +203,7 @@ func (h *TypedTenantWithRulesetHandler[T]) resolveTenant(
 func (h *TypedTenantWithRulesetHandler[T]) resolveRuleset(
 	ctx context.Context,
 	c client.Client,
+	reader client.Reader,
 	req admission.Request,
 	namespace string,
 	tnt *capsulev1beta2.Tenant,
@@ -213,7 +214,7 @@ func (h *TypedTenantWithRulesetHandler[T]) resolveRuleset(
 		Name:      meta.NameForManagedRuleStatus(),
 	}
 
-	if err := c.Get(ctx, key, rs); err == nil {
+	if err := reader.Get(ctx, key, rs); err == nil {
 		return rs.Status.Rules, nil
 	} else if !apierrors.IsNotFound(err) {
 		return nil, err

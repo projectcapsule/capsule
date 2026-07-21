@@ -23,13 +23,36 @@ spec:
         action: deny
         metadata:
           - apiGroups:
-              - "rbac.authorization.k8s.io/v1"
+              - "v1"
             kinds:
-              - "RoleBinding"
+              - "Namespace"
             labels:
-              reflection.proxy.projectcapsule.dev/enabled:
+              pod-security.kubernetes.io/enforce:
+                managed: "restricted"
+          #- apiGroups:
+          #    - "v1"
+          #  kinds:
+          #    - "*"
+          #  labels:
+          #    custom.corp/tenant:
+          #      managed: "{{ $.tenant.metadata.name }}"
+          #    test: 
+          #      managed: "true"
+    - audience:
+        - kind: "Custom"
+          name: "CapsuleUser"
+      enforce:
+        action: deny
+        metadata:
+          - apiGroups:
+              - "v1"
+            kinds:
+              - "Namespace"
+            labels:
+              "openshift.io/*":
+                required: false
                 values:
-                  - exp: ".*"
+                  - exp:  "^.*$"
     - namespaceSelector:
         matchExpressions:
           - key: env
