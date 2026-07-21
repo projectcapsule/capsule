@@ -21,7 +21,7 @@ type CapsuleConfigurationStatus struct {
 	// The total count is available via len(Tenants).
 	// +listType=atomic
 	// +optional
-	Tenants []string `json:"tenants,omitempty"`
+	Tenants []string `json:"tenants"`
 	// ObservedGeneration is the most recent generation the controller has observed.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`

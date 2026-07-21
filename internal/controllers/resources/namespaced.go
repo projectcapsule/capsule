@@ -22,7 +22,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -36,6 +35,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/processor"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	tenantresourceindexer "github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 	"github.com/projectcapsule/capsule/pkg/runtime/sanitize"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
@@ -83,6 +83,7 @@ func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager, ctrlCo
 		Watches(
 			&capsulev1beta2.TenantResource{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueDependentTenantResources),
+			builder.WithPredicates(predicates.DependencyStateChangedPredicate{}),
 		).
 		Watches(
 			&capsulev1beta2.CapsuleConfiguration{},
@@ -102,33 +103,7 @@ func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager, ctrlCo
 		Watches(
 			&capsulev1beta2.Tenant{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueTenantResourcesForTenant),
-			builder.WithPredicates(
-				predicate.Funcs{
-					CreateFunc: func(e event.CreateEvent) bool {
-						return true
-					},
-					DeleteFunc: func(e event.DeleteEvent) bool {
-						return true
-					},
-					UpdateFunc: func(e event.UpdateEvent) bool {
-						oldObj, okOld := e.ObjectOld.(*capsulev1beta2.Tenant)
-
-						newObj, okNew := e.ObjectNew.(*capsulev1beta2.Tenant)
-						if !okOld || !okNew {
-							return false
-						}
-
-						if !reflect.DeepEqual(oldObj.Status.Namespaces, newObj.Status.Namespaces) {
-							return true
-						}
-
-						return false
-					},
-					GenericFunc: func(e event.GenericEvent) bool {
-						return false
-					},
-				},
-			),
+			builder.WithPredicates(predicates.TenantNamespacesChangedPredicate{}),
 		).
 		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
 		Complete(r)
@@ -153,8 +128,7 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 	}
 
 	requeue := reconcile.Result{
-		Requeue:      true,
-		RequeueAfter: tntResource.Spec.ResyncPeriod.Duration,
+		RequeueAfter: jitteredResync(tntResource.Spec.ResyncPeriod.Duration),
 	}
 
 	patchHelper, err := patch.NewHelper(tntResource, r.client)
@@ -308,7 +282,6 @@ func (r *namespacedResourceController) enqueueTenantResourcesForTenant(ctx conte
 	return out
 }
 
-//nolint:dupl
 func (r *namespacedResourceController) enqueueDependentTenantResources(
 	ctx context.Context,
 	obj client.Object,
@@ -319,25 +292,18 @@ func (r *namespacedResourceController) enqueueDependentTenantResources(
 	}
 
 	var list capsulev1beta2.TenantResourceList
-	if err := r.client.List(ctx, &list); err != nil {
+	if err := r.client.List(
+		ctx,
+		&list,
+		client.InNamespace(changed.Namespace),
+		client.MatchingFields{tenantresourceindexer.NamespacedDependenciesFieldName: changed.Name},
+	); err != nil {
 		return nil
 	}
 
-	reqs := make([]ctrl.Request, 0)
-
-	for _, gtr := range list.Items {
-		for _, dep := range gtr.Spec.DependsOn {
-			if dep.Name.String() == changed.Name {
-				reqs = append(reqs, ctrl.Request{
-					NamespacedName: types.NamespacedName{
-						Name:      gtr.Name,
-						Namespace: gtr.Namespace,
-					},
-				})
-
-				break
-			}
-		}
+	reqs := make([]ctrl.Request, 0, len(list.Items))
+	for i := range list.Items {
+		reqs = append(reqs, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(&list.Items[i])})
 	}
 
 	return reqs
@@ -631,6 +597,10 @@ func (r *namespacedResourceController) updateReconcilingStatus(ctx context.Conte
 			return err
 		}
 
+		if latest.Status.ObservedGeneration == instance.GetGeneration() {
+			return nil
+		}
+
 		latest.Status.ServiceAccount = instance.Status.ServiceAccount
 
 		latest.Status.Conditions.UpdateConditionByType(meta.NewReadyConditionReconcilingReason(instance))
@@ -659,6 +629,8 @@ func (r *namespacedResourceController) updateStatus(ctx context.Context, instanc
 			return err
 		}
 
+		originalStatus := latest.Status.DeepCopy()
+
 		latest.Status = instance.Status
 		latest.Status.ObservedGeneration = instance.GetGeneration()
 
@@ -682,6 +654,10 @@ func (r *namespacedResourceController) updateStatus(ctx context.Context, instanc
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(cordonedCondition)
+
+		if reflect.DeepEqual(*originalStatus, latest.Status) {
+			return nil
+		}
 
 		if err := r.client.Status().Update(ctx, latest); err != nil {
 			return err

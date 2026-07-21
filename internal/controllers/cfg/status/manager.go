@@ -6,6 +6,7 @@ package config
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"slices"
 	"sort"
 
@@ -292,6 +293,8 @@ func (r *Manager) updateConfigStatus(
 			return err
 		}
 
+		originalStatus := latest.Status.DeepCopy()
+
 		// Update only the fields this reconcile is authoritative for.
 		// Avoid wholesale status replacement: a non-tenant reconcile must not
 		// clobber a newer status.tenants written by a concurrent tenant-event
@@ -324,6 +327,10 @@ func (r *Manager) updateConfigStatus(
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(readyCondition)
+
+		if reflect.DeepEqual(*originalStatus, latest.Status) {
+			return nil
+		}
 
 		return r.Client.Status().Update(ctx, latest)
 	})

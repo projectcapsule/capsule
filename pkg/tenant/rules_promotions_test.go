@@ -53,10 +53,14 @@ func TestBuildNamespaceRuleBodyStatus(t *testing.T) {
 	}
 
 	tnt := tenantObject("tenant-a")
+	tnt.Status.State = capsulev1beta2.TenantStateActive
 	matching := &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{
 		Action: rules.ActionTypeAudit,
 		Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
-			Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"prod-scheduler"}}},
+			Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{
+				"{{ .tenant.status.state }}",
+				"{{ .namespace.status.phase }}",
+			}}},
 		},
 	}}
 	unmatched := &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeDeny}}
@@ -72,7 +76,10 @@ func TestBuildNamespaceRuleBodyStatus(t *testing.T) {
 		nil,
 		{},
 	}
-	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "tenant-a-prod", Labels: map[string]string{"env": "prod"}}}
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: "tenant-a-prod", Labels: map[string]string{"env": "prod"}},
+		Status:     corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
+	}
 
 	got, err := tenant.BuildNamespaceRuleBodyStatus(scheme, ns, tnt)
 	if err != nil {
@@ -81,7 +88,7 @@ func TestBuildNamespaceRuleBodyStatus(t *testing.T) {
 	if len(got) != 1 || got[0].Enforce.Action != rules.ActionTypeAudit {
 		t.Fatalf("BuildNamespaceRuleBodyStatus() = %#v, want one audit rule", got)
 	}
-	if got[0].Enforce.Workloads.Schedulers[0].Exact[0] != "prod-scheduler" {
+	if !reflect.DeepEqual(got[0].Enforce.Workloads.Schedulers[0].Exact, []string{"Active", "Active"}) {
 		t.Fatalf("BuildNamespaceRuleBodyStatus() scheduler = %#v", got[0].Enforce.Workloads.Schedulers)
 	}
 

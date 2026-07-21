@@ -7,12 +7,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
 
 	"github.com/go-logr/logr"
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -103,7 +105,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, log logr.Logger, tenan
 				// For this case, we're going to block the Quota setting the Hard as the
 				// used one.
 				for name, hardQuota := range resourceQuota.Hard {
-					log.V(4).Info("desired hard " + name.String() + " quota is " + hardQuota.String())
+					log.V(4).Info("desired hard quota", "resource", name.String(), "quantity", hardQuota.String())
 
 					// Getting the whole usage across all the Tenant Namespaces
 					var quantity resource.Quantity
@@ -111,7 +113,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, log logr.Logger, tenan
 						quantity.Add(item.Status.Used[name])
 					}
 
-					log.V(4).Info("computed " + name.String() + " quota for the whole Tenant is " + quantity.String())
+					log.V(4).Info("computed quota for the whole Tenant", "resource", name.String(), "quantity", quantity.String())
 
 					// Expose usage and limit metrics for the resource (name) of the ResourceQuota (index)
 					r.Metrics.TenantResourceUsageGauge.WithLabelValues(
@@ -172,9 +174,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, log logr.Logger, tenan
 						}
 					}
 
-					if scopeErr = r.resourceQuotasUpdate(ctx, log, name, quantity, toKeep, resourceQuota.Hard[name], list.Items...); scopeErr != nil {
-						log.Error(scopeErr, "cannot proceed with outer ResourceQuota")
-
+					if scopeErr = r.resourceQuotasUpdate(ctx, name, quantity, toKeep, resourceQuota.Hard[name], list.Items...); scopeErr != nil {
 						return scopeErr
 					}
 				}
@@ -242,10 +242,10 @@ func (r *Manager) syncResourceQuota(ctx context.Context, log logr.Logger, tenant
 			},
 		}
 
-		var res controllerutil.OperationResult
+		var result controllerutil.OperationResult
 
 		err = retry.RetryOnConflict(retry.DefaultBackoff, func() (retryErr error) {
-			res, retryErr = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() (err error) {
+			result, retryErr = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() (err error) {
 				targetLabels := target.GetLabels()
 				if targetLabels == nil {
 					targetLabels = map[string]string{}
@@ -288,7 +288,7 @@ func (r *Manager) syncResourceQuota(ctx context.Context, log logr.Logger, tenant
 			return err
 		}
 
-		log.V(4).Info("resource Quota sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
+		log.V(4).Info("ResourceQuota sync result", "result", result, "name", target.Name, "namespace", target.Namespace)
 	}
 
 	return nil
@@ -299,7 +299,6 @@ func (r *Manager) syncResourceQuota(ctx context.Context, log logr.Logger, tenant
 // reconciliation loop.
 func (r *Manager) resourceQuotasUpdate(
 	ctx context.Context,
-	log logr.Logger,
 	resourceName corev1.ResourceName,
 	actual resource.Quantity,
 	toKeep sets.Set[corev1.ResourceName],
@@ -307,6 +306,11 @@ func (r *Manager) resourceQuotasUpdate(
 	list ...corev1.ResourceQuota,
 ) (err error) {
 	group := new(errgroup.Group)
+
+	reader := r.reader
+	if reader == nil {
+		reader = r.Client
+	}
 
 	annotationsToKeep := sets.New[string]()
 
@@ -324,64 +328,59 @@ func (r *Manager) resourceQuotasUpdate(
 		rq := item
 
 		group.Go(func() (err error) {
-			found := &corev1.ResourceQuota{}
-			if err = r.Get(ctx, types.NamespacedName{Namespace: rq.Namespace, Name: rq.Name}, found); err != nil {
-				return err
-			}
-
 			return retry.RetryOnConflict(retry.DefaultBackoff, func() (retryErr error) {
-				_, retryErr = controllerutil.CreateOrUpdate(ctx, r.Client, found, func() error {
-					// Ensuring annotation map is there to avoid uninitialized map error and
-					// assigning the overall usage
-					if found.Annotations == nil {
-						found.Annotations = make(map[string]string)
-					}
+				found := &corev1.ResourceQuota{}
 
-					if found.Labels == nil {
-						found.Labels = make(map[string]string, len(rq.Labels))
-					}
+				key := types.NamespacedName{Namespace: rq.Namespace, Name: rq.Name}
 
-					// Pruning the Capsule quota annotations:
-					// if the ResourceQuota is updated by removing some objects,
-					// we could still have left-overs which could be misleading.
-					// This will not lead to a reconciliation loop since the whole code is idempotent.
-					for k := range found.Annotations {
-						if (strings.HasPrefix(k, capsulev1beta2.HardCapsuleQuotaAnnotation) ||
-							strings.HasPrefix(k, capsulev1beta2.UsedCapsuleQuotaAnnotation)) &&
-							(annotationsToKeep == nil || !annotationsToKeep.Has(k)) {
-							delete(found.Annotations, k)
-						}
-					}
+				if retryErr = reader.Get(ctx, key, found); retryErr != nil {
+					return retryErr
+				}
 
-					found.Labels = rq.Labels
-					if actualKey, keyErr := capsulev1beta2.UsedQuotaFor(resourceName); keyErr == nil {
-						found.Annotations[actualKey] = actual.String()
-					}
+				before := found.DeepCopy()
 
-					if limitKey, keyErr := capsulev1beta2.HardQuotaFor(resourceName); keyErr == nil {
-						found.Annotations[limitKey] = limit.String()
-					}
+				// Ensuring annotation map is there to avoid uninitialized map error and
+				// assigning the overall usage
+				if found.Annotations == nil {
+					found.Annotations = make(map[string]string)
+				}
 
-					// Updating the Resource according to the actual.Cmp result
-					if rq.Spec.Hard != nil {
-						found.Spec.Hard = rq.Spec.Hard.DeepCopy()
-					} else {
-						// Ensure it’s nil (or empty) consistently
-						found.Spec.Hard = nil
+				// Pruning the Capsule quota annotations:
+				// if the ResourceQuota is updated by removing some objects,
+				// we could still have left-overs which could be misleading.
+				for k := range found.Annotations {
+					if (strings.HasPrefix(k, capsulev1beta2.HardCapsuleQuotaAnnotation) ||
+						strings.HasPrefix(k, capsulev1beta2.UsedCapsuleQuotaAnnotation)) &&
+						(annotationsToKeep == nil || !annotationsToKeep.Has(k)) {
+						delete(found.Annotations, k)
 					}
+				}
 
+				found.Labels = maps.Clone(rq.Labels)
+				if actualKey, keyErr := capsulev1beta2.UsedQuotaFor(resourceName); keyErr == nil {
+					found.Annotations[actualKey] = actual.String()
+				}
+
+				if limitKey, keyErr := capsulev1beta2.HardQuotaFor(resourceName); keyErr == nil {
+					found.Annotations[limitKey] = limit.String()
+				}
+
+				if rq.Spec.Hard != nil {
+					found.Spec.Hard = rq.Spec.Hard.DeepCopy()
+				} else {
+					found.Spec.Hard = nil
+				}
+
+				if apiequality.Semantic.DeepEqual(before, found) {
 					return nil
-				})
+				}
 
-				return retryErr
+				return r.Update(ctx, found)
 			})
 		})
 	}
 
 	if err = group.Wait(); err != nil {
-		// We had an error and we mark the whole transaction as failed
-		// to process it another time according to the Tenant controller back-off factor.
-		log.Error(err, "cannot update outer ResourceQuotas", "resourceName", resourceName.String())
 		err = fmt.Errorf("update of outer ResourceQuota items has failed: %w", err)
 	}
 

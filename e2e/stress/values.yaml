@@ -1,0 +1,36 @@
+replicaCount: 1
+
+certManager:
+  generateCertificates: false
+
+tls:
+  enableController: true
+  create: true
+
+manager:
+  image:
+    registry: capsule.local
+    repository: projectcapsule/capsule
+    tag: stress
+    pullPolicy: Never
+  resources: null
+  options:
+    workers: 4
+    clientConnectionQPS: 500
+    clientConnectionBurst: 1000
+    logLevel: "2"
+    leaderElection:
+      enabled: false
+
+# KWOK's simulated nodes cannot execute Capsule. Pin the controller to the
+# real kind control-plane node used by the kwokctl kind runtime.
+nodeSelector:
+  node-role.kubernetes.io/control-plane: ""
+
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+  - key: node-role.kubernetes.io/master
+    operator: Exists
+    effect: NoSchedule
