@@ -98,9 +98,28 @@ func (h *ownerReferenceHandler) OnUpdate(
 	recorder events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		tnt, err := resolveTenantForNamespaceUpdate(ctx, reader, user, h.cfg, oldNs, newNs)
-		if err != nil {
-			return ad.ErroredResponse(err)
+		var tnt *capsulev1beta2.Tenant
+
+		if user.IsAdmin() {
+			if !tenant.HasConsistentTenantReference(newNs) {
+				return ad.Deny("tenant label and ownerReference must both be set consistently or both be absent")
+			}
+
+			if !tenant.HasTenantReference(newNs) {
+				return nil
+			}
+
+			var err error
+			tnt, err = tenant.ResolveNamespaceTenant(ctx, reader, newNs)
+			if err != nil {
+				return ad.ErroredResponse(err)
+			}
+		} else {
+			var err error
+			tnt, err = resolveTenantForNamespaceUpdate(ctx, reader, user, h.cfg, oldNs, newNs)
+			if err != nil {
+				return ad.ErroredResponse(err)
+			}
 		}
 
 		if tnt == nil {
@@ -153,12 +172,7 @@ func resolveTenantForNamespaceUpdate(
 		return tnt, nil
 	}
 
-	// 3) Controller/admin is allowed to resolve by label only.
-	if user.IsAdmin() {
-		return tenant.GetTenantByLabels(ctx, c, newNs)
-	}
-
-	// 4) fall back to labels + user
+	// 3) fall back to labels + user
 	return tenant.GetTenantByLabelsAndUser(ctx, c, cfg, newNs, user)
 }
 

@@ -63,6 +63,16 @@ func (h *namespacePatchGuardHandler) OnUpdate(
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if user.IsAdmin() {
+			if !tenant.HasConsistentTenantReference(newNs) {
+				return denyNamespacePatch(
+					ctx,
+					req,
+					oldNs,
+					recorder,
+					"tenant label and ownerReference must both be set consistently or both be absent",
+				)
+			}
+
 			return nil
 		}
 

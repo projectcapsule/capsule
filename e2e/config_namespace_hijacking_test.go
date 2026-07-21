@@ -27,6 +27,13 @@ import (
 )
 
 var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("config", "namespace", "hijack"), func() {
+	administrator := rbac.UserSpec{
+		Name: "e2e-namespace-hijacking-admin",
+		Kind: rbac.UserOwner,
+	}
+
+	var originalConfigurationSpec *capsulev1beta2.CapsuleConfigurationSpec
+
 	t1 := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "e2e-ns-attack-1",
@@ -289,6 +296,27 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("con
 			}
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	}
+
+	BeforeAll(func() {
+		configuration := &capsulev1beta2.CapsuleConfiguration{}
+		Expect(k8sClient.Get(
+			context.Background(),
+			types.NamespacedName{Name: defaultConfigurationName},
+			configuration,
+		)).To(Succeed())
+
+		originalConfigurationSpec = configuration.Spec.DeepCopy()
+
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec.Administrators = append(configuration.Spec.Administrators, administrator)
+		})
+	})
+
+	AfterAll(func() {
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec = *originalConfigurationSpec
+		})
+	})
 
 	JustBeforeEach(func() {
 		waitForTenantNamespacesDeletion(t1.Name, t2.Name, t3.Name)
@@ -1096,6 +1124,95 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("con
 		}
 	})
 
+	It("Administrators can migrate managed namespaces to another Tenant", func() {
+		tenantA := getTenant(t1.Name)
+		tenantB := getTenant(t2.Name)
+
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tenantA.GetName(),
+		})
+		NamespaceCreation(ns, t1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(t1, ns).Should(Succeed())
+		DeferCleanup(func() { EventuallyDeletion(ns) })
+
+		ref, err := GetTenantOwnerReferenceAsPatch(tenantB)
+		Expect(err).NotTo(HaveOccurred())
+
+		patch := map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"labels": map[string]interface{}{
+					meta.TenantLabel: tenantB.GetName(),
+				},
+				"ownerReferences": []map[string]interface{}{ref},
+			},
+		}
+
+		Eventually(func() error {
+			return PatchNamespace(ns, ownerClient(administrator), patch)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		Eventually(func(g Gomega) {
+			current := getNamespace(ns.Name)
+
+			g.Expect(current.Labels).To(HaveKeyWithValue(meta.TenantLabel, tenantB.GetName()))
+			g.Expect(tenantOwnerReferences(current)).To(Equal([]string{tenantB.GetName()}))
+			g.Expect(hasTenantOwnerReference(current, tenantB)).To(BeTrue())
+			g.Expect(hasTenantOwnerReference(current, tenantA)).To(BeFalse())
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		NamespaceIsNotPartOfTenant(t1, ns).Should(Succeed())
+		NamespaceIsPartOfTenant(t2, ns).Should(Succeed())
+	})
+
+	It("Administrators can remove complete Tenant ownership but not only one reference", func() {
+		tenant := getTenant(t1.Name)
+
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tenant.GetName(),
+		})
+		NamespaceCreation(ns, t1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(t1, ns).Should(Succeed())
+		DeferCleanup(func() { EventuallyDeletion(ns) })
+
+		adminClient := ownerClient(administrator)
+		Eventually(func() error {
+			_, err := adminClient.CoreV1().Namespaces().Patch(
+				context.TODO(),
+				ns.Name,
+				types.MergePatchType,
+				[]byte(`{"metadata":{"annotations":{"e2e.capsule.clastix.io/admin":"true"}}}`),
+				metav1.PatchOptions{},
+			)
+
+			return err
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		_, err := adminClient.CoreV1().Namespaces().Patch(
+			context.TODO(),
+			ns.Name,
+			types.MergePatchType,
+			[]byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":null}}}`, meta.TenantLabel)),
+			metav1.PatchOptions{},
+		)
+		Expect(err).To(MatchError(ContainSubstring(
+			"tenant label and ownerReference must both be set consistently or both be absent",
+		)))
+		expectOriginalTenantOwnership(ns.Name, tenant)
+
+		patch := map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"labels": map[string]interface{}{
+					meta.TenantLabel: nil,
+				},
+				"ownerReferences": []interface{}{},
+			},
+		}
+		Expect(PatchNamespace(ns, adminClient, patch)).To(Succeed())
+
+		ExpectNamespaceNotAssignedToTenant(context.TODO(), ns.Name)
+		NamespaceIsNotPartOfTenant(t1, ns).Should(Succeed())
+	})
+
 	It("Owners can not migrate managed namespaces to another Tenant", func() {
 		tenantA := getTenant(t1.Name)
 		tenantB := getTenant(t2.Name)
@@ -1156,6 +1273,18 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("con
 			_, err = cs.CoreV1().Namespaces().Patch(context.TODO(), ns.Name, types.StrategicMergePatchType, patchRemoveTenantLabel, metav1.PatchOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
+			expectOriginalTenantOwnership(ns.Name, tenant)
+
+			patchRemoveOwnership := map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"labels": map[string]interface{}{
+						meta.TenantLabel: nil,
+					},
+					"ownerReferences": []interface{}{},
+				},
+			}
+
+			Expect(PatchNamespace(ns, cs, patchRemoveOwnership)).To(Succeed())
 			expectOriginalTenantOwnership(ns.Name, tenant)
 		}
 	})

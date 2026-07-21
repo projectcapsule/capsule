@@ -242,7 +242,7 @@ dev-setup-argocd: dev-setup-fluxcd
 	@printf "  \033[1mkubectl get secret -n argocd argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d\033[0m\n\n"
 	@printf "  \033[1mkubectl port-forward svc/argocd-server 9091:80 -n argocd\033[0m\n\n"
 
-dev-setup-cert-manager:
+dev-setup-cert-manager: dev-setup-fluxcd
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/cert-manager | envsubst | kubectl apply -f -
 
 dev-setup-fluxcd:

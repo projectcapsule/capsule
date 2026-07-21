@@ -136,6 +136,9 @@ func (h *handler) OnUpdate(
 
 		oldHasTenantReference := tenant.HasTenantReference(oldNs)
 		newHasTenantReference := tenant.HasTenantReference(ns)
+		if user.IsAdmin() && !tenant.HasConsistentTenantReference(ns) {
+			return ad.Deny("tenant label and ownerReference must both be set consistently or both be absent")
+		}
 
 		if !user.IsAdmin() {
 			switch {
@@ -182,6 +185,8 @@ func (h *handler) OnUpdate(
 			}
 		}
 
+		adminTenantTransition := user.IsAdmin() && namespaceTenantChanged(oldTenant, newTenant)
+
 		tnt := newTenant
 		if !user.IsAdmin() {
 			tnt = oldTenant
@@ -195,6 +200,10 @@ func (h *handler) OnUpdate(
 			return terminating
 		}
 
+		if adminTenantTransition {
+			return nil
+		}
+
 		for _, hndl := range h.handlers {
 			if response := hndl.OnUpdate(c, reader, user, ns, oldNs, decoder, recorder, tnt)(ctx, req); response != nil {
 				return response
@@ -203,6 +212,14 @@ func (h *handler) OnUpdate(
 
 		return nil
 	}
+}
+
+func namespaceTenantChanged(oldTenant, newTenant *capsulev1beta2.Tenant) bool {
+	if oldTenant == nil || newTenant == nil {
+		return oldTenant != newTenant
+	}
+
+	return oldTenant.GetName() != newTenant.GetName() || oldTenant.GetUID() != newTenant.GetUID()
 }
 
 func (h *handler) rejectOnTermination(
