@@ -104,6 +104,8 @@ func (r *Manager) pruningResources(ctx context.Context, ns string, keys []string
 		selector = selector.Add(*notIn)
 	}
 
+	r.Log.V(4).Info("pruning objects", "labelSelector", selector.String(), "namespace", ns)
+
 	list, err := managedObjectList(obj)
 	if err != nil {
 		return err

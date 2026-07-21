@@ -405,6 +405,8 @@ func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *caps
 		errs = append(errs, fmt.Errorf("cannot collect available rbac: %w", err))
 	}
 
+	log.V(4).Info("starting processing of Namespaces", "items", len(instance.Status.Namespaces))
+
 	if err = r.reconcileNamespaces(ctx, log, instance); err != nil {
 		errs = append(errs, fmt.Errorf("namespace(s) had reconciliation errors: %w", err))
 	}
@@ -415,21 +417,32 @@ func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *caps
 		errs = append(errs, fmt.Errorf("cannot ensure metadata: %w", err))
 	}
 
+	log.V(4).Info("ensuring limit resources count is updated")
+
 	if err = r.syncCustomResourceQuotaUsages(ctx, instance); err != nil {
 		errs = append(errs, fmt.Errorf("cannot count limited resources: %w", err))
 	}
+
+	log.V(4).Info("starting processing of Network Policies")
 
 	if err = r.syncNetworkPolicies(ctx, log, instance); err != nil {
 		errs = append(errs, fmt.Errorf("cannot sync networkPolicy items: %w", err))
 	}
 
+	//nolint:staticcheck
+	log.V(4).Info("starting processing of Limit Ranges", "items", len(instance.Spec.LimitRanges.Items))
+
 	if err = r.syncLimitRanges(ctx, log, instance); err != nil {
 		errs = append(errs, fmt.Errorf("cannot sync limitrange items: %w", err))
 	}
 
+	log.V(4).Info("starting processing of Resource Quotas", "items", len(instance.Spec.ResourceQuota.Items))
+
 	if err = r.syncResourceQuotas(ctx, log, instance); err != nil {
 		errs = append(errs, fmt.Errorf("cannot sync resourcequota items: %w", err))
 	}
+
+	log.V(4).Info("ensuring RoleBindings for Owners and Tenant")
 
 	if err = r.syncRoleBindings(ctx, log, instance); err != nil {
 		errs = append(errs, fmt.Errorf("cannot sync rolebindings items: %w", err))
@@ -438,6 +451,8 @@ func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *caps
 	if err = errors.Join(errs...); err != nil {
 		return err
 	}
+
+	log.V(4).Info("Tenant reconciling completed")
 
 	return err
 }

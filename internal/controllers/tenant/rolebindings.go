@@ -144,7 +144,9 @@ func (r *Manager) syncAdditionalRoleBinding(
 			},
 		}
 
-		_, err = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() error {
+		var result controllerutil.OperationResult
+
+		result, err = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() error {
 			target.Labels = map[string]string{}
 			target.Annotations = map[string]string{}
 
@@ -183,6 +185,8 @@ func (r *Manager) syncAdditionalRoleBinding(
 
 			return fmt.Errorf("%w (role: %s)", err, roleBinding.ClusterRoleName)
 		}
+
+		log.V(4).Info("RoleBinding sync result", "result", result, "name", target.Name, "namespace", target.Namespace)
 	}
 
 	// Prune at finish to prevent gaps

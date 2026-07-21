@@ -56,7 +56,9 @@ func (r *Manager) syncLimitRange(
 			},
 		}
 
-		_, err = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() (err error) {
+		var result controllerutil.OperationResult
+
+		result, err = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() (err error) {
 			labels := target.GetLabels()
 			if labels == nil {
 				labels = map[string]string{}
@@ -76,7 +78,7 @@ func (r *Manager) syncLimitRange(
 		})
 		if err != nil {
 			if apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
-				log.Info(
+				log.V(4).Info(
 					"skipping LimitRange sync because namespace is terminating",
 					"name", target.Name,
 					"namespace", target.Namespace,
@@ -88,6 +90,8 @@ func (r *Manager) syncLimitRange(
 
 			return err
 		}
+
+		log.V(4).Info("LimitRange sync result", "result", result, "name", target.Name, "namespace", target.Namespace)
 	}
 
 	return nil

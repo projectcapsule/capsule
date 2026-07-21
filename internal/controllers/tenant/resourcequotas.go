@@ -105,11 +105,15 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, log logr.Logger, tenan
 				// For this case, we're going to block the Quota setting the Hard as the
 				// used one.
 				for name, hardQuota := range resourceQuota.Hard {
+					log.V(4).Info("desired hard quota", "resource", name.String(), "quantity", hardQuota.String())
+
 					// Getting the whole usage across all the Tenant Namespaces
 					var quantity resource.Quantity
 					for _, item := range list.Items {
 						quantity.Add(item.Status.Used[name])
 					}
+
+					log.V(4).Info("computed quota for the whole Tenant", "resource", name.String(), "quantity", quantity.String())
 
 					// Expose usage and limit metrics for the resource (name) of the ResourceQuota (index)
 					r.Metrics.TenantResourceUsageGauge.WithLabelValues(
@@ -238,8 +242,10 @@ func (r *Manager) syncResourceQuota(ctx context.Context, log logr.Logger, tenant
 			},
 		}
 
+		var result controllerutil.OperationResult
+
 		err = retry.RetryOnConflict(retry.DefaultBackoff, func() (retryErr error) {
-			_, retryErr = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() (err error) {
+			result, retryErr = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() (err error) {
 				targetLabels := target.GetLabels()
 				if targetLabels == nil {
 					targetLabels = map[string]string{}
@@ -281,6 +287,8 @@ func (r *Manager) syncResourceQuota(ctx context.Context, log logr.Logger, tenant
 
 			return err
 		}
+
+		log.V(4).Info("ResourceQuota sync result", "result", result, "name", target.Name, "namespace", target.Namespace)
 	}
 
 	return nil
