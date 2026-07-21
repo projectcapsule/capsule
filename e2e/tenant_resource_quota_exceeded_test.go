@@ -164,7 +164,7 @@ var _ = Describe("exceeding a Tenant resource quota", Ordered, Label("resourcequ
 								Containers: []corev1.Container{
 									{
 										Name:            "my-pause",
-										Image:           "gcr.io/google_containers/pause-amd64:3.0",
+										Image:           "registry.k8s.io/pause:3.10",
 										SecurityContext: restrictedContainerSecurityContext(),
 									},
 								},
@@ -184,12 +184,14 @@ var _ = Describe("exceeding a Tenant resource quota", Ordered, Label("resourcequ
 					return k8sClient.Get(context.TODO(), types.NamespacedName{Name: n, Namespace: ns}, rq)
 				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			})
+
 			By("ensuring the status has been blocked with actual usage", func() {
 				Eventually(func() bool {
 					_ = k8sClient.Get(context.TODO(), types.NamespacedName{Name: n, Namespace: ns}, rq)
 					return rq.Status.Hard.Pods().String() == rq.Status.Used.Pods().String()
 				}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
 			})
+
 			By("creating an exceeded Pod", func() {
 				pod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
@@ -200,7 +202,7 @@ var _ = Describe("exceeding a Tenant resource quota", Ordered, Label("resourcequ
 						Containers: []corev1.Container{
 							{
 								Name:            "container",
-								Image:           "gcr.io/google_containers/pause-amd64:3.0",
+								Image:           "registry.k8s.io/pause:3.10",
 								SecurityContext: restrictedContainerSecurityContext(),
 							},
 						},

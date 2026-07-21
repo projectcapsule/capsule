@@ -5,6 +5,8 @@ package tenant
 
 import (
 	"context"
+	"errors"
+	"reflect"
 	"regexp"
 	"sort"
 
@@ -44,6 +46,27 @@ func setTenantStatusState(tnt *capsulev1beta2.Tenant) {
 	tnt.Status.State = capsulev1beta2.TenantStateActive
 }
 
+// ensureTenantStatusInitialized establishes fields required by the Tenant CRD.
+// Partial status writers (owners and available classes) can be the first writer
+// for a newly created Tenant, so they cannot assume the main reconciliation has
+// already initialized state and conditions.
+func ensureTenantStatusInitialized(tnt *capsulev1beta2.Tenant) {
+	setTenantStatusState(tnt)
+
+	if tnt.Status.Conditions.GetConditionByType(capmeta.ReadyCondition) == nil {
+		tnt.Status.Conditions.UpdateConditionByType(capmeta.NewReadyConditionReconcilingReason(tnt))
+	}
+
+	cordonedCondition := capmeta.NewCordonedCondition(tnt)
+	if tnt.Spec.Cordoned {
+		cordonedCondition.Reason = capmeta.CordonedReason
+		cordonedCondition.Message = "Tenant is cordoned"
+		cordonedCondition.Status = metav1.ConditionTrue
+	}
+
+	tnt.Status.Conditions.UpdateConditionByType(cordonedCondition)
+}
+
 func (r *Manager) updateTenantStatus(ctx context.Context, instance *capsulev1beta2.Tenant, reconcileError error) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		latest := &capsulev1beta2.Tenant{}
@@ -55,9 +78,11 @@ func (r *Manager) updateTenantStatus(ctx context.Context, instance *capsulev1bet
 			return err
 		}
 
+		originalStatus := latest.Status.DeepCopy()
+
 		latest.Status = instance.Status
 		latest.Status.ObservedGeneration = instance.GetGeneration()
-		setTenantStatusState(latest)
+		ensureTenantStatusInitialized(latest)
 
 		readyCondition := capmeta.NewReadyCondition(instance)
 		if reconcileError != nil {
@@ -67,6 +92,10 @@ func (r *Manager) updateTenantStatus(ctx context.Context, instance *capsulev1bet
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(readyCondition)
+
+		if reflect.DeepEqual(*originalStatus, latest.Status) {
+			return nil
+		}
 
 		if err := r.Client.Status().Update(ctx, latest); err != nil {
 			if apierrors.IsNotFound(err) {
@@ -82,6 +111,82 @@ func (r *Manager) updateTenantStatus(ctx context.Context, instance *capsulev1bet
 	})
 }
 
+// updateTenantOwnersStatus persists owners as soon as their evaluation finishes.
+// Owner authorization must not depend on the remaining tenant reconciliation
+// succeeding, which can involve unrelated resources and take considerably longer.
+func (r *Manager) updateTenantOwnersStatus(ctx context.Context, instance *capsulev1beta2.Tenant) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		latest := &capsulev1beta2.Tenant{}
+		if err := r.reader.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+
+			return err
+		}
+
+		originalStatus := latest.Status.DeepCopy()
+		latest.Status.Owners = instance.Status.Owners.DeepCopy()
+		ensureTenantStatusInitialized(latest)
+
+		if reflect.DeepEqual(*originalStatus, latest.Status) {
+			return nil
+		}
+
+		if err := r.Client.Status().Update(ctx, latest); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+
+			return err
+		}
+
+		return nil
+	})
+}
+
+// updateTenantClassStatus collects and updates one class category against the
+// latest Tenant. Re-running the collector after a conflict prevents concurrent
+// class events from overwriting one another with stale status.
+func (r *Manager) updateTenantClassStatus(
+	ctx context.Context,
+	name string,
+	collector tenantClassCollector,
+) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		latest := &capsulev1beta2.Tenant{}
+		if err := r.reader.Get(ctx, types.NamespacedName{Name: name}, latest); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+
+			return err
+		}
+
+		originalStatus := latest.Status.DeepCopy()
+
+		if err := collector(ctx, latest); err != nil {
+			return err
+		}
+
+		ensureTenantStatusInitialized(latest)
+
+		if reflect.DeepEqual(*originalStatus, latest.Status) {
+			return nil
+		}
+
+		if err := r.Client.Status().Update(ctx, latest); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+
+			return err
+		}
+
+		return nil
+	})
+}
+
 func (r *Manager) updateReconcilingStatus(ctx context.Context, instance *capsulev1beta2.Tenant) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.Tenant{}
@@ -89,21 +194,33 @@ func (r *Manager) updateReconcilingStatus(ctx context.Context, instance *capsule
 			return err
 		}
 
-		latest.Status.Conditions.UpdateConditionByType(capmeta.NewReadyConditionReconcilingReason(instance))
+		originalStatus := latest.Status.DeepCopy()
 
-		setTenantStatusState(latest)
-
-		cordonedCondition := capmeta.NewCordonedCondition(instance)
-
-		if instance.Spec.Cordoned {
-			latest.Status.State = capsulev1beta2.TenantStateCordoned
-
-			cordonedCondition.Reason = capmeta.CordonedReason
-			cordonedCondition.Message = "Tenant is cordoned"
-			cordonedCondition.Status = metav1.ConditionTrue
+		// Spec owners are already known and do not depend on ServiceAccount or
+		// TenantOwner discovery. Include them in the initial reconciling status
+		// write so authorization is not delayed by those potentially expensive
+		// list operations. Upsert preserves previously discovered promotions until
+		// collectRBAC replaces the owner list with its authoritative evaluation.
+		for _, owner := range instance.Spec.Owners.ToStatusOwners() {
+			latest.Status.Owners.Upsert(owner)
 		}
 
-		latest.Status.Conditions.UpdateConditionByType(cordonedCondition)
+		ensureTenantStatusInitialized(latest)
+
+		if latest.Status.ObservedGeneration == instance.GetGeneration() {
+			// The reconciled object may have come from a cache that has not yet
+			// observed the latest status write. Keep the instance (and therefore
+			// the patch helper baseline created by the caller) synchronized with
+			// the authoritative API-reader result. Missing spec owners still require
+			// a repair write even when observedGeneration is already current.
+			if reflect.DeepEqual(*originalStatus, latest.Status) {
+				instance.Status = latest.Status
+
+				return nil
+			}
+		} else {
+			latest.Status.Conditions.UpdateConditionByType(capmeta.NewReadyConditionReconcilingReason(instance))
+		}
 
 		if err := r.Client.Status().Update(ctx, latest); err != nil {
 			if apierrors.IsNotFound(err) {
@@ -121,7 +238,7 @@ func (r *Manager) updateReconcilingStatus(ctx context.Context, instance *capsule
 
 // Sets a label on the Tenant object with it's name.
 func (r *Manager) collectRBAC(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
-	owners, err := tenant.CollectOwners(
+	owners, evaluationErr := tenant.CollectOwners(
 		ctx,
 		r.Client,
 		tnt,
@@ -129,7 +246,11 @@ func (r *Manager) collectRBAC(ctx context.Context, tnt *capsulev1beta2.Tenant) (
 	)
 	tnt.Status.Owners = owners
 
-	if err != nil {
+	// CollectOwners returns every owner it could evaluate before an error. Persist
+	// that result immediately so later reconciliation failures cannot leave owner
+	// authorization stale or empty.
+	statusErr := r.updateTenantOwnersStatus(ctx, tnt)
+	if err = errors.Join(evaluationErr, statusErr); err != nil {
 		return err
 	}
 

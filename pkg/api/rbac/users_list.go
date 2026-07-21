@@ -65,7 +65,6 @@ func (u UserListSpec) IsPresent(name string, groups []string) bool {
 	return false
 }
 
-//nolint:dupl
 func (o UserListSpec) FindUser(name string, kind OwnerKind) (UserSpec, bool) {
 	sort.Sort(ByKindName(o))
 

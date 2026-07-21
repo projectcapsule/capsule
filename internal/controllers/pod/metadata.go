@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -23,6 +24,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	controllerutils "github.com/projectcapsule/capsule/internal/controllers/utils"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
@@ -36,6 +38,11 @@ func (m *MetadataReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Mana
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("capsule/pod").
 		For(&corev1.Pod{}, m.forOptionPerInstanceName(ctx)).
+		Watches(
+			&capsulev1beta2.Tenant{},
+			handler.EnqueueRequestsFromMapFunc(m.podsForTenant),
+			builder.WithPredicates(predicates.TenantPodOptionsChangedPredicate{}),
+		).
 		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
 		Complete(m)
 }
@@ -76,6 +83,30 @@ func (m *MetadataReconciler) Reconcile(ctx context.Context, request ctrl.Request
 	})
 
 	return reconcile.Result{}, err
+}
+
+func (m *MetadataReconciler) podsForTenant(ctx context.Context, obj client.Object) []reconcile.Request {
+	tnt, ok := obj.(*capsulev1beta2.Tenant)
+	if !ok {
+		return nil
+	}
+
+	requests := make([]reconcile.Request, 0)
+
+	for _, namespace := range tnt.Status.Namespaces {
+		pods := &corev1.PodList{}
+		if err := m.Client.List(ctx, pods, client.InNamespace(namespace)); err != nil {
+			m.Log.Error(err, "failed listing Pods for Tenant metadata update", "tenant", tnt.Name, "namespace", namespace)
+
+			continue
+		}
+
+		for i := range pods.Items {
+			requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&pods.Items[i])})
+		}
+	}
+
+	return requests
 }
 
 func (m *MetadataReconciler) getTenant(ctx context.Context, namespacedName types.NamespacedName, client client.Client) (*capsulev1beta2.Tenant, error) {
@@ -119,12 +150,15 @@ func (m *MetadataReconciler) sync(available map[string]string, tenantSpec map[st
 }
 
 func (m *MetadataReconciler) forOptionPerInstanceName(ctx context.Context) builder.ForOption {
-	return builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
-		status, err := tenant.IsNamespaceInTenant(ctx, m.Client, object.GetNamespace())
-		if err != nil {
-			m.Log.Error(err, "failed resolving instances")
-		}
+	return builder.WithPredicates(predicate.And(
+		predicates.ObjectMetadataChangedPredicate{},
+		predicate.NewPredicateFuncs(func(object client.Object) bool {
+			status, err := tenant.IsNamespaceInTenant(ctx, m.Client, object.GetNamespace())
+			if err != nil {
+				m.Log.Error(err, "failed resolving instances")
+			}
 
-		return status
-	}))
+			return status
+		}),
+	))
 }

@@ -6,6 +6,7 @@ package resources
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strconv"
 
 	"github.com/go-logr/logr"
@@ -35,6 +36,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/processor"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	tenantresourceindexer "github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 	"github.com/projectcapsule/capsule/pkg/runtime/sanitize"
 )
@@ -89,10 +91,12 @@ func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, ctrlConfig
 		Watches(
 			&capsulev1beta2.GlobalTenantResource{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueDependentGlobalTenantResources),
+			builder.WithPredicates(predicates.DependencyStateChangedPredicate{}),
 		).
 		Watches(
 			&capsulev1beta2.Tenant{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueRequestFromTenant),
+			builder.WithPredicates(predicates.TenantSelectionChangedPredicate{}),
 		).
 		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
 		Complete(r)
@@ -117,8 +121,7 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 	}
 
 	requeue := reconcile.Result{
-		Requeue:      true,
-		RequeueAfter: tntResource.Spec.ResyncPeriod.Duration,
+		RequeueAfter: jitteredResync(tntResource.Spec.ResyncPeriod.Duration),
 	}
 
 	patchHelper, err := patch.NewHelper(tntResource, r.client)
@@ -236,7 +239,6 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 	return requeue, nil
 }
 
-//nolint:dupl
 func (r *globalResourceController) enqueueDependentGlobalTenantResources(
 	ctx context.Context,
 	obj client.Object,
@@ -247,25 +249,13 @@ func (r *globalResourceController) enqueueDependentGlobalTenantResources(
 	}
 
 	var list capsulev1beta2.GlobalTenantResourceList
-	if err := r.client.List(ctx, &list); err != nil {
+	if err := r.client.List(ctx, &list, client.MatchingFields{tenantresourceindexer.GlobalDependenciesFieldName: changed.Name}); err != nil {
 		return nil
 	}
 
-	reqs := make([]ctrl.Request, 0)
-
-	for _, gtr := range list.Items {
-		for _, dep := range gtr.Spec.DependsOn {
-			if dep.Name.String() == changed.Name {
-				reqs = append(reqs, ctrl.Request{
-					NamespacedName: types.NamespacedName{
-						Name:      gtr.Name,
-						Namespace: gtr.Namespace,
-					},
-				})
-
-				break
-			}
-		}
+	reqs := make([]ctrl.Request, 0, len(list.Items))
+	for i := range list.Items {
+		reqs = append(reqs, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(&list.Items[i])})
 	}
 
 	return reqs
@@ -624,6 +614,10 @@ func (r *globalResourceController) updateReconcilingStatus(ctx context.Context, 
 			return err
 		}
 
+		if latest.Status.ObservedGeneration == instance.GetGeneration() {
+			return nil
+		}
+
 		latest.Status.ServiceAccount = instance.Status.ServiceAccount
 
 		latest.Status.Conditions.UpdateConditionByType(meta.NewReadyConditionReconcilingReason(instance))
@@ -656,6 +650,8 @@ func (r *globalResourceController) updateStatus(ctx context.Context, instance *c
 			return err
 		}
 
+		originalStatus := latest.Status.DeepCopy()
+
 		latest.Status = instance.Status
 		latest.Status.ObservedGeneration = instance.GetGeneration()
 
@@ -679,6 +675,10 @@ func (r *globalResourceController) updateStatus(ctx context.Context, instance *c
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(cordonedCondition)
+
+		if reflect.DeepEqual(*originalStatus, latest.Status) {
+			return nil
+		}
 
 		if err := r.client.Status().Update(ctx, latest); err != nil {
 			return err

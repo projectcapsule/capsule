@@ -19,6 +19,7 @@ import (
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/discovery"
@@ -78,17 +79,29 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 		Named("capsule/tenants").
 		For(
 			&capsulev1beta2.Tenant{},
-			builder.WithPredicates(
-				predicate.Or(
-					predicate.GenerationChangedPredicate{},
-					predicates.UpdatedMetadataPredicate{},
-				),
-			),
+			builder.WithPredicates(predicates.ClassChanged()),
 		).
-		Owns(&networkingv1.NetworkPolicy{}).
-		Owns(&corev1.LimitRange{}).
-		Owns(&corev1.ResourceQuota{}).
-		Owns(&rbacv1.RoleBinding{}).
+		Owns(&networkingv1.NetworkPolicy{}, builder.WithPredicates(predicates.TenantManagedResourceChangedPredicate{})).
+		Owns(&corev1.LimitRange{}, builder.WithPredicates(predicates.TenantManagedResourceChangedPredicate{})).
+		Watches(
+			&corev1.ResourceQuota{},
+			handler.Funcs{
+				CreateFunc: func(ctx context.Context, e event.TypedCreateEvent[client.Object], _ workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+					r.syncResourceQuotasForResourceQuota(ctx, e.Object)
+				},
+				UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[client.Object], _ workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+					r.syncResourceQuotasForResourceQuota(ctx, e.ObjectNew)
+				},
+				DeleteFunc: func(ctx context.Context, e event.TypedDeleteEvent[client.Object], _ workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+					r.syncResourceQuotasForResourceQuota(ctx, e.Object)
+				},
+			},
+			builder.WithPredicates(predicate.Or(
+				predicates.TenantManagedResourceChangedPredicate{},
+				predicates.ResourceQuotaUsageChangedPredicate{},
+			)),
+		).
+		Owns(&rbacv1.RoleBinding{}, builder.WithPredicates(predicates.TenantManagedResourceChangedPredicate{})).
 		Watches(
 			&capsulev1beta2.CapsuleConfiguration{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
@@ -100,22 +113,27 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 		Watches(
 			&corev1.Namespace{},
 			handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &capsulev1beta2.Tenant{}),
+			builder.WithPredicates(predicates.NamespaceTenantStateChangedPredicate{}),
 		).
 		Watches(
 			&capsulev1beta2.RuleStatus{},
 			handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &capsulev1beta2.Tenant{}),
+			builder.WithPredicates(predicates.ClassChanged()),
 		).
 		Watches(
 			&storagev1.StorageClass{},
-			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
+			r.tenantClassEventHandler(r.collectAvailableStorageClasses),
+			builder.WithPredicates(predicates.ClassChanged()),
 		).
 		Watches(
 			&schedulingv1.PriorityClass{},
-			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
+			r.tenantClassEventHandler(r.collectAvailablePriorityClasses),
+			builder.WithPredicates(predicates.ClassChanged()),
 		).
 		Watches(
 			&nodev1.RuntimeClass{},
-			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
+			r.tenantClassEventHandler(r.collectAvailableRuntimeClasses),
+			builder.WithPredicates(predicates.ClassChanged()),
 		).
 		Watches(
 			&capsulev1beta2.TenantOwner{},
@@ -213,7 +231,8 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 	if r.classes.gateway {
 		ctrlBuilder = ctrlBuilder.Watches(
 			&gatewayv1.GatewayClass{},
-			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
+			r.tenantClassEventHandler(r.collectAvailableGatewayClasses),
+			builder.WithPredicates(predicates.ClassChanged()),
 		)
 	}
 
@@ -227,7 +246,8 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 	if r.classes.device {
 		ctrlBuilder = ctrlBuilder.Watches(
 			&resourcesv1.DeviceClass{},
-			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
+			r.tenantClassEventHandler(r.collectAvailableDeviceClasses),
+			builder.WithPredicates(predicates.ClassChanged()),
 		)
 	}
 
@@ -239,7 +259,7 @@ func (r *Manager) Reconcile(ctx context.Context, request ctrl.Request) (result c
 
 	// Fetch the Tenant instance
 	instance := &capsulev1beta2.Tenant{}
-	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
+	if err = r.Get(ctx, client.ObjectKey{Name: request.Name}, instance); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.V(5).Info("request object not found, could have been deleted after reconcile request")
 
@@ -252,11 +272,6 @@ func (r *Manager) Reconcile(ctx context.Context, request ctrl.Request) (result c
 		return result, err
 	}
 
-	patchHelper, err := patch.NewHelper(instance, r.Client)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
-
 	if updateErr := r.updateReconcilingStatus(ctx, instance); updateErr != nil {
 		if apierrors.IsNotFound(updateErr) {
 			return reconcile.Result{}, nil
@@ -264,6 +279,16 @@ func (r *Manager) Reconcile(ctx context.Context, request ctrl.Request) (result c
 
 		return reconcile.Result{}, updateErr
 	}
+
+	// Create the patch helper after the initial status has been established and
+	// copied back into instance. Otherwise its baseline may contain a nil status
+	// condition list and the subsequent patch can fail CRD validation.
+	patchHelper, err := patch.NewHelper(instance, r.Client)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	patchBaselineStatus := *instance.Status.DeepCopy()
 
 	reconcileError := r.reconcile(ctx, log, instance)
 
@@ -283,7 +308,17 @@ func (r *Manager) Reconcile(ctx context.Context, request ctrl.Request) (result c
 		r.syncTenantStatusMetrics(instance)
 	}()
 
-	if e := patchHelper.Patch(ctx, instance); e != nil {
+	// Status has a dedicated retrying writer in the deferred update above.
+	// Cluster API's patch helper patches status automatically, so temporarily
+	// restore its baseline to ensure this call can only persist metadata/spec.
+	// This prevents a stale cached status (including nil conditions) from racing
+	// the authoritative status update.
+	desiredStatus := *instance.Status.DeepCopy()
+	instance.Status = patchBaselineStatus
+	e := patchHelper.Patch(ctx, instance)
+	instance.Status = desiredStatus
+
+	if e != nil {
 		if caperrors.IgnoreGone(e) {
 			err = nil
 
@@ -293,11 +328,15 @@ func (r *Manager) Reconcile(ctx context.Context, request ctrl.Request) (result c
 		return reconcile.Result{}, e
 	}
 
-	// Collect available resources
-	if err = r.collectAvailableResources(ctx, log, instance); err != nil {
-		err = fmt.Errorf("cannot collect available resources: %w", err)
+	// Available class collection is irrelevant while deleting and can involve
+	// several cluster-wide lists. Keep the termination path focused on namespace
+	// cleanup and finalizer removal.
+	if instance.DeletionTimestamp == nil {
+		if err = r.collectAvailableResources(ctx, log, instance); err != nil {
+			err = fmt.Errorf("cannot collect available resources: %w", err)
 
-		return reconcile.Result{}, err
+			return reconcile.Result{}, err
+		}
 	}
 
 	if instance.DeletionTimestamp != nil && len(instance.Status.Spaces) > 0 {
@@ -310,12 +349,23 @@ func (r *Manager) Reconcile(ctx context.Context, request ctrl.Request) (result c
 func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *capsulev1beta2.Tenant) (err error) {
 	var errs []error
 
+	if instance.DeletionTimestamp != nil {
+		if err = r.reconcileNamespaces(ctx, log, instance); err != nil {
+			errs = append(errs, fmt.Errorf("namespace(s) had reconciliation errors: %w", err))
+		}
+
+		if err = r.ensureMetadata(ctx, instance); err != nil {
+			errs = append(errs, fmt.Errorf("cannot ensure metadata: %w", err))
+		}
+
+		return errors.Join(errs...)
+	}
+
 	// Collect Ownership/Promotions for Status
 	if err = r.collectRBAC(ctx, instance); err != nil {
 		errs = append(errs, fmt.Errorf("cannot collect available rbac: %w", err))
 	}
 
-	// Reconcile Namespaces
 	log.V(4).Info("starting processing of Namespaces", "items", len(instance.Status.Namespaces))
 
 	if err = r.reconcileNamespaces(ctx, log, instance); err != nil {
@@ -328,37 +378,32 @@ func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *caps
 		errs = append(errs, fmt.Errorf("cannot ensure metadata: %w", err))
 	}
 
-	// Ensuring ResourceQuota
 	log.V(4).Info("ensuring limit resources count is updated")
 
 	if err = r.syncCustomResourceQuotaUsages(ctx, instance); err != nil {
 		errs = append(errs, fmt.Errorf("cannot count limited resources: %w", err))
 	}
 
-	// Ensuring NetworkPolicy resources
 	log.V(4).Info("starting processing of Network Policies")
 
 	if err = r.syncNetworkPolicies(ctx, log, instance); err != nil {
 		errs = append(errs, fmt.Errorf("cannot sync networkPolicy items: %w", err))
 	}
 
-	// Ensuring LimitRange resources
 	//nolint:staticcheck
-	log.V(4).Info("Starting processing of Limit Ranges", "items", len(instance.Spec.LimitRanges.Items))
+	log.V(4).Info("starting processing of Limit Ranges", "items", len(instance.Spec.LimitRanges.Items))
 
 	if err = r.syncLimitRanges(ctx, log, instance); err != nil {
 		errs = append(errs, fmt.Errorf("cannot sync limitrange items: %w", err))
 	}
 
-	// Ensuring ResourceQuota resources
-	log.V(4).Info("Starting processing of Resource Quotas", "items", len(instance.Spec.ResourceQuota.Items))
+	log.V(4).Info("starting processing of Resource Quotas", "items", len(instance.Spec.ResourceQuota.Items))
 
 	if err = r.syncResourceQuotas(ctx, log, instance); err != nil {
 		errs = append(errs, fmt.Errorf("cannot sync resourcequota items: %w", err))
 	}
 
-	// Ensuring RoleBinding resources
-	log.V(4).Info("Ensuring RoleBindings for Owners and Tenant")
+	log.V(4).Info("ensuring RoleBindings for Owners and Tenant")
 
 	if err = r.syncRoleBindings(ctx, log, instance); err != nil {
 		errs = append(errs, fmt.Errorf("cannot sync rolebindings items: %w", err))
@@ -371,4 +416,32 @@ func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *caps
 	log.V(4).Info("Tenant reconciling completed")
 
 	return err
+}
+
+func (r *Manager) syncResourceQuotasForResourceQuota(ctx context.Context, quota client.Object) {
+	owner := metav1.GetControllerOf(quota)
+	if owner == nil || owner.APIVersion != capsulev1beta2.GroupVersion.String() || owner.Kind != "Tenant" {
+		return
+	}
+
+	tenant := &capsulev1beta2.Tenant{}
+	if err := r.Get(ctx, client.ObjectKey{Name: owner.Name}, tenant); err != nil {
+		if !apierrors.IsNotFound(err) {
+			r.Log.Error(err, "cannot retrieve Tenant for ResourceQuota sync", "tenant", owner.Name)
+		}
+
+		return
+	}
+
+	if tenant.DeletionTimestamp != nil {
+		return
+	}
+
+	if err := r.syncCustomResourceQuotaUsages(ctx, tenant); err != nil {
+		r.Log.Error(err, "cannot update custom ResourceQuota usages", "tenant", tenant.Name)
+	}
+
+	if err := r.syncResourceQuotas(ctx, r.Log, tenant); err != nil {
+		r.Log.Error(err, "cannot sync ResourceQuotas", "tenant", tenant.Name)
+	}
 }

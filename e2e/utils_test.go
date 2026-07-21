@@ -40,8 +40,8 @@ import (
 )
 
 const (
-	defaultTimeoutInterval                    = 60 * time.Second
-	defaultTerminationTimeoutInterval         = 60 * time.Second
+	defaultTimeoutInterval                    = 80 * time.Second
+	defaultTerminationTimeoutInterval         = 120 * time.Second
 	defaultPollInterval                       = 2 * time.Second
 	defaultConfigurationName                  = "default"
 	e2eClientQPS                      float32 = 1000
@@ -532,6 +532,18 @@ func EventuallyCreation(f interface{}) AsyncAssertion {
 }
 
 func EventuallyDeletion(obj client.Object) {
+	if tnt, ok := obj.(*capsulev1beta2.Tenant); ok {
+		deleteTenantPodsBeforeDeletion(tnt)
+	}
+
+	eventuallyDeletionWithoutPodCleanup(obj)
+}
+
+func EventuallyDeletionWithoutPodCleanup(obj client.Object) {
+	eventuallyDeletionWithoutPodCleanup(obj)
+}
+
+func eventuallyDeletionWithoutPodCleanup(obj client.Object) {
 	key := client.ObjectKeyFromObject(obj)
 
 	Eventually(func() error {
@@ -553,6 +565,91 @@ func EventuallyDeletion(obj client.Object) {
 
 		return fmt.Errorf("%T %q still exists", obj, obj.GetName())
 	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func deleteTenantPodsBeforeDeletion(tnt *capsulev1beta2.Tenant) {
+	Eventually(func() error {
+		namespaces := &corev1.NamespaceList{}
+		if err := k8sClient.List(
+			context.TODO(),
+			namespaces,
+			client.MatchingLabels{meta.TenantLabel: tnt.GetName()},
+		); err != nil {
+			return fmt.Errorf("list namespaces for Tenant %q: %w", tnt.GetName(), err)
+		}
+		namespaceNames := make(map[string]struct{}, len(namespaces.Items))
+		for i := range namespaces.Items {
+			namespaceNames[namespaces.Items[i].GetName()] = struct{}{}
+		}
+
+		currentTenant := &capsulev1beta2.Tenant{}
+		if err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: tnt.GetName()}, currentTenant); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return fmt.Errorf("get Tenant %q before Pod cleanup: %w", tnt.GetName(), err)
+			}
+		} else {
+			for _, namespace := range currentTenant.Status.Spaces {
+				if namespace != nil && namespace.Name != "" {
+					namespaceNames[namespace.Name] = struct{}{}
+				}
+			}
+			for _, namespace := range currentTenant.Status.Namespaces {
+				if namespace != "" {
+					namespaceNames[namespace] = struct{}{}
+				}
+			}
+		}
+
+		remaining := 0
+		zero := int64(0)
+		for namespace := range namespaceNames {
+			// Stop workload controllers before deleting Pods. Otherwise controllers
+			// such as Deployments immediately replace the Pods and cleanup can never
+			// observe an empty namespace.
+			for _, workload := range []client.Object{
+				&appsv1.Deployment{},
+				&appsv1.ReplicaSet{},
+				&appsv1.StatefulSet{},
+				&appsv1.DaemonSet{},
+			} {
+				if err := k8sClient.DeleteAllOf(
+					context.TODO(),
+					workload,
+					client.InNamespace(namespace),
+					client.GracePeriodSeconds(0),
+					client.PropagationPolicy(metav1.DeletePropagationBackground),
+				); err != nil && !apierrors.IsNotFound(err) {
+					return fmt.Errorf("delete %T objects in namespace %q: %w", workload, namespace, err)
+				}
+			}
+
+			pods := &corev1.PodList{}
+			if err := k8sClient.List(context.TODO(), pods, client.InNamespace(namespace)); err != nil {
+				if apierrors.IsNotFound(err) {
+					continue
+				}
+
+				return fmt.Errorf("list Pods in namespace %q: %w", namespace, err)
+			}
+
+			remaining += len(pods.Items)
+			for j := range pods.Items {
+				pod := &pods.Items[j]
+				if err := k8sClient.Delete(context.TODO(), pod, &client.DeleteOptions{
+					GracePeriodSeconds: &zero,
+				}); err != nil && !apierrors.IsNotFound(err) {
+					return fmt.Errorf("delete Pod %q/%q: %w", namespace, pod.GetName(), err)
+				}
+			}
+		}
+
+		if remaining > 0 {
+			return fmt.Errorf("Tenant %q still has %d Pod(s)", tnt.GetName(), remaining)
+		}
+
+		return nil
+	}, defaultTerminationTimeoutInterval, defaultPollInterval).Should(Succeed(),
+		"failed to delete Pods before deleting Tenant %q", tnt.GetName())
 }
 
 func ModifyCapsuleConfigurationOpts(fn func(configuration *capsulev1beta2.CapsuleConfiguration)) {

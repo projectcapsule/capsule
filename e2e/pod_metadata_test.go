@@ -83,7 +83,7 @@ var _ = Describe("adding metadata to Pod objects", Ordered, Label("pod"), func()
 				Containers: []corev1.Container{
 					{
 						Name:            "container",
-						Image:           "quay.io/google-containers/pause-amd64:3.0",
+						Image:           "registry.k8s.io/pause:3.10",
 						ImagePullPolicy: "IfNotPresent",
 						SecurityContext: restrictedContainerSecurityContext(),
 					},
