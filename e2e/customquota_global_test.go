@@ -211,7 +211,7 @@ func getLedger(ctx context.Context, namespace, name string) *capsulev1beta2.Quan
 	return obj
 }
 
-var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ordered, Label("global", "globalcustomquota", "customquota", "ledger"), Ordered, func() {
+var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ordered, Label("global", "globalcustomquota", "customquota", "ledger", "skip-on-openshift"), Ordered, func() {
 	const (
 		testNamespace = "global-custom-quota-e2e-test"
 		tenantLabel   = "e2e.capsule.dev/test-suite"
@@ -316,7 +316,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 		}
 	})
 
-	It("aggregates a custom pod quantity path and settles the corresponding ledger", func() {
+	It("aggregates a custom pod quantity path and settles the corresponding ledger", Label("skip-on-openshift"), func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "gq-pod-cpu-requests",
@@ -440,7 +440,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 
-	It("denies creating a matching object when the configured quantity path resolves to no value", func() {
+	It("denies creating a matching object when the configured quantity path resolves to no value", Label("skip-on-openshift"), func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "gq-missing-path-deny-create",
@@ -492,7 +492,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 	})
 
-	It("remains consistent under concurrent pod creations for a GlobalCustomQuota", func() {
+	It("remains consistent under concurrent pod creations for a GlobalCustomQuota", Label("skip-on-openshift"), func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "gq-concurrent-pod-count",

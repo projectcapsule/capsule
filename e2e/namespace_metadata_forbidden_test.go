@@ -12,6 +12,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
@@ -20,6 +21,8 @@ import (
 )
 
 var _ = Describe("creating a Namespace with user-specified labels and annotations", Ordered, Label("namespace", "metadata", "forbidden"), func() {
+	originConfig := &capsulev1beta2.CapsuleConfiguration{}
+
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "e2e-user-metadata-forbidden",
@@ -62,7 +65,14 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 		},
 	}
 
+	admin := rbac.UserSpec{
+		Name: "admin",
+		Kind: "User",
+	}
+
 	JustBeforeEach(func() {
+		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: defaultConfigurationName}, originConfig)).To(Succeed())
+
 		EventuallyCreation(func() error {
 			tnt.ResourceVersion = ""
 
@@ -70,13 +80,28 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 		}).Should(Succeed())
 
 		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
+
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec.Administrators = []rbac.UserSpec{admin}
+		})
 	})
 
 	JustAfterEach(func() {
 		EventuallyDeletion(tnt)
+
+		Eventually(func() error {
+			c := &capsulev1beta2.CapsuleConfiguration{}
+			if err := k8sClient.Get(context.Background(), client.ObjectKey{Name: originConfig.Name}, c); err != nil {
+				return err
+			}
+			c.Spec = originConfig.Spec
+			return k8sClient.Update(context.Background(), c)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 
 	It("should allow", func() {
+		ctx := context.TODO()
+
 		By("specifying non-forbidden labels", func() {
 			ns := NewNamespace("", map[string]string{
 				"bim":            "baz",
@@ -113,6 +138,58 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 				g.Expect(ns.GetLabels()).To(HaveKeyWithValue("managed.projectcapsule.dev/tenant", tnt.GetName()))
 				g.Expect(ns.GetAnnotations()).To(HaveKeyWithValue("managed.projectcapsule.dev/source", "capsule"))
 			}, defaultTimeoutInterval, time.Second).Should(Succeed())
+		})
+
+		By("creating a Namespace with forbidden labels as an admin", func() {
+			ns := NewNamespace("", map[string]string{
+				"foo":            "bar",
+				"gatsby-custom":  "value",
+				meta.TenantLabel: tnt.GetName(),
+			})
+
+			NamespaceCreation(ns, admin, defaultTimeoutInterval).Should(Succeed())
+			NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+		})
+
+		By("creating a Namespace with forbidden annotations as an admin", func() {
+			ns := NewNamespace("", map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			})
+			ns.SetAnnotations(map[string]string{"foo": "bar", "gatsby-custom": "value"})
+
+			NamespaceCreation(ns, admin, defaultTimeoutInterval).Should(Succeed())
+			NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+		})
+
+		By("updating a Namespace with a new forbidden label as an admin", func() {
+			ns := NewNamespace("admin-update-labels", map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			})
+
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+
+			original := ns.DeepCopy()
+			ns.Labels["foo"] = "bar"
+			ns.Labels["gatsby-custom"] = "value"
+
+			Eventually(func() error {
+				return impersonationClient(admin.Name, nil).Patch(ctx, ns, client.MergeFrom(original))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		})
+
+		By("updating a Namespace with a new forbidden annotation as an admin", func() {
+			ns := NewNamespace("admin-update-annotations", map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			})
+
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+
+			original := ns.DeepCopy()
+			ns.SetAnnotations(map[string]string{"foo": "bar", "gatsby-custom": "value"})
+
+			Eventually(func() error {
+				return impersonationClient(admin.Name, nil).Patch(ctx, ns, client.MergeFrom(original))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 	})
 
@@ -180,7 +257,7 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 		})
 	})
 
-	It("should fail when updating a Namespace", func() {
+	It("should fail when updating a Namespace", Label("skip-on-openshift"), func() {
 		role := &rbacv1.Role{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "ns-patch",

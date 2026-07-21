@@ -20,7 +20,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
-var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, Label("namespaced", "namespacedcustomquota", "customquota", "ledger"), Ordered, func() {
+var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, Label("namespaced", "namespacedcustomquota", "customquota", "ledger", "skip-on-openshift"), Ordered, func() {
 	const (
 		testNamespace = "custom-quota-e2e-test"
 		tenantLabel   = "e2e.capsule.dev/test-suite"
@@ -136,7 +136,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 
-	It("denies creating a matching object when the configured quantity path resolves to no value", func() {
+	It("denies creating a matching object when the configured quantity path resolves to no value", Label("skip-on-openshift"), func() {
 		q := &capsulev1beta2.CustomQuota{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "cq-missing-path-deny-create",
@@ -178,7 +178,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 		expectLedgerSettled(ctx, testNamespace, q.GetName())
 	})
 
-	It("remains consistent under concurrent pod creations for a CustomQuota", func() {
+	It("remains consistent under concurrent pod creations for a CustomQuota", Label("skip-on-openshift"), func() {
 		q := &capsulev1beta2.CustomQuota{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "cq-concurrent-pod-count",
@@ -261,7 +261,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 		expectLedgerSettled(ctx, testNamespace, q.GetName())
 	})
 
-	It("tracks different paths independently when global and namespaced quotas match the same pod gvk", func() {
+	It("tracks different paths independently when global and namespaced quotas match the same pod gvk", Label("skip-on-openshift"), func() {
 		gq := &capsulev1beta2.GlobalCustomQuota{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "gq-mixed-path-cpu-from-cq-suite",

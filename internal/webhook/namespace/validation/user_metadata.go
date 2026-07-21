@@ -30,14 +30,14 @@ func UserMetadataHandler() handlers.TypedHandlerWithTenantUser[*corev1.Namespace
 func (h *userMetadataHandler) OnCreate(
 	_ client.Client,
 	_ client.Reader,
-	_ users.AdmissionUser,
+	user users.AdmissionUser,
 	ns *corev1.Namespace,
 	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if tnt.Spec.NamespaceOptions != nil {
+		if tnt.Spec.NamespaceOptions != nil && user.IsCapsule() {
 			labels, annotations, err := userMetadataForValidation(ns, nil, tnt)
 			if err != nil {
 				return ad.ErroredResponse(err)
@@ -64,7 +64,7 @@ func (h *userMetadataHandler) OnCreate(
 func (h *userMetadataHandler) OnUpdate(
 	_ client.Client,
 	_ client.Reader,
-	_ users.AdmissionUser,
+	user users.AdmissionUser,
 	newNs *corev1.Namespace,
 	oldNs *corev1.Namespace,
 	_ admission.Decoder,
@@ -111,7 +111,7 @@ func (h *userMetadataHandler) OnUpdate(
 			}
 		}
 
-		if tnt.Spec.NamespaceOptions != nil {
+		if tnt.Spec.NamespaceOptions != nil && user.IsCapsule() {
 			labels, annotations, err := userMetadataForValidation(newNs, oldNs, tnt)
 			if err != nil {
 				return ad.ErroredResponse(err)

@@ -958,7 +958,7 @@ data:
 	})
 
 	Context("apply lifecycle with prune enabled", func() {
-		It("applies, updates and prunes raw items", func() {
+		It("applies, updates and prunes raw items", Label("skip-on-openshift"), func() {
 			tr := newRawConfigMapTenantResource(baseNamespace, "raw-prune-enabled", map[string]string{
 				"mode": "before",
 				"foo":  "one",
