@@ -512,7 +512,7 @@ var _ = Describe("enforcing pod QoS namespace rules", Ordered, Label("tenant", "
 		)
 	})
 
-	It("computes QoS across init containers and regular containers", func() {
+	It("computes QoS across init containers and regular containers", Label("skip-on-openshift"), func() {
 		ns := NewNamespace("", map[string]string{
 			meta.TenantLabel: tnt.GetName(),
 		})

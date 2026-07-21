@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -495,10 +496,16 @@ func reconcileQuantityLedgerAllocation(
 		allocated.Add(reserved)
 		quota.ClampQuantityToZero(&allocated)
 
+		originalStatus := ledger.Status.DeepCopy()
+
 		ledger.Status.Reservations = activeReservations
 		ledger.Status.PendingDeletes = activeDeletes
 		ledger.Status.Reserved = reserved
 		ledger.Status.Allocated = allocated
+
+		if reflect.DeepEqual(*originalStatus, ledger.Status) {
+			return nil
+		}
 
 		return c.Status().Update(ctx, ledger)
 	})

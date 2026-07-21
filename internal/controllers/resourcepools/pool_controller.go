@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 
@@ -17,14 +18,17 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -34,6 +38,7 @@ import (
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
@@ -52,31 +57,29 @@ func (r *resourcePoolController) SetupWithManager(mgr ctrl.Manager, ctrlConfig c
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("capsule/resourcepools/pools").
-		For(&capsulev1beta2.ResourcePool{}).
-		Owns(&corev1.ResourceQuota{}).
+		For(
+			&capsulev1beta2.ResourcePool{},
+			builder.WithPredicates(predicate.Or(
+				predicate.GenerationChangedPredicate{},
+				predicates.UpdatedMetadataPredicate{},
+				predicates.DeletionChangedPredicate{},
+			)),
+		).
+		Owns(
+			&corev1.ResourceQuota{},
+			builder.WithPredicates(predicate.Or(
+				predicate.GenerationChangedPredicate{},
+				predicates.UpdatedMetadataPredicate{},
+				predicates.DeletionChangedPredicate{},
+				predicates.ResourceQuotaUsageChangedPredicate{},
+			)),
+		).
 		Watches(&capsulev1beta2.ResourcePoolClaim{},
 			handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &capsulev1beta2.ResourcePool{}),
 		).
 		Watches(&corev1.Namespace{},
-			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, _ client.Object) []reconcile.Request {
-				// Fetch all GlobalResourceQuota objects
-				grqList := &capsulev1beta2.ResourcePoolList{}
-				if err := r.Client.List(ctx, grqList); err != nil {
-					r.log.Error(err, "Failed to list ResourcePools objects")
-
-					return nil
-				}
-
-				// Enqueue a reconcile request for each GlobalResourceQuota
-				var requests []reconcile.Request
-				for _, grq := range grqList.Items {
-					requests = append(requests, reconcile.Request{
-						NamespacedName: client.ObjectKeyFromObject(&grq),
-					})
-				}
-
-				return requests
-			}),
+			handler.EnqueueRequestsFromMapFunc(r.resourcePoolsForNamespace),
+			builder.WithPredicates(predicates.UpdatedMetadataPredicate{}),
 		).
 		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
 		Complete(r)
@@ -140,6 +143,46 @@ func (r resourcePoolController) Reconcile(ctx context.Context, request ctrl.Requ
 	err = r.reconcile(ctx, log, instance)
 
 	return ctrl.Result{}, err
+}
+
+func (r *resourcePoolController) resourcePoolsForNamespace(ctx context.Context, obj client.Object) []reconcile.Request {
+	ns, ok := obj.(*corev1.Namespace)
+	if !ok {
+		return nil
+	}
+
+	poolList := &capsulev1beta2.ResourcePoolList{}
+	if err := r.List(ctx, poolList); err != nil {
+		r.log.Error(err, "failed to list ResourcePools for namespace event", "namespace", ns.Name)
+
+		return nil
+	}
+
+	requests := make([]reconcile.Request, 0)
+
+	for i := range poolList.Items {
+		pool := &poolList.Items[i]
+		matched := slices.Contains(pool.Status.Namespaces, ns.Name)
+
+		for _, spec := range pool.Spec.Selectors {
+			if spec.LabelSelector == nil {
+				continue
+			}
+
+			selector, err := metav1.LabelSelectorAsSelector(spec.LabelSelector)
+			if err == nil && selector.Matches(labels.Set(ns.Labels)) {
+				matched = true
+
+				break
+			}
+		}
+
+		if matched {
+			requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(pool)})
+		}
+	}
+
+	return requests
 }
 
 func (r *resourcePoolController) finalize(
@@ -950,6 +993,8 @@ func (r *resourcePoolController) updateStatus(ctx context.Context, instance *cap
 			return err
 		}
 
+		originalStatus := latest.Status.DeepCopy()
+
 		latest.Status = instance.Status
 		latest.Status.ObservedGeneration = instance.GetGeneration()
 
@@ -972,6 +1017,10 @@ func (r *resourcePoolController) updateStatus(ctx context.Context, instance *cap
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(exCondition)
+
+		if reflect.DeepEqual(*originalStatus, latest.Status) {
+			return nil
+		}
 
 		if err := r.Client.Status().Update(ctx, latest); err != nil {
 			return err

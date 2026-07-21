@@ -6,6 +6,7 @@ package rulestatus
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -209,6 +210,8 @@ func (r *Manager) updateStatus(ctx context.Context, instance *capsulev1beta2.Rul
 			return err
 		}
 
+		originalStatus := latest.Status.DeepCopy()
+
 		latest.Status = instance.Status
 		latest.Status.ObservedGeneration = instance.GetGeneration()
 
@@ -221,6 +224,10 @@ func (r *Manager) updateStatus(ctx context.Context, instance *capsulev1beta2.Rul
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(readyCondition)
+
+		if reflect.DeepEqual(*originalStatus, latest.Status) {
+			return nil
+		}
 
 		if err := r.Client.Status().Update(ctx, latest); err != nil {
 			return err
@@ -238,6 +245,10 @@ func (r *Manager) updateReconcilingStatus(ctx context.Context, instance *capsule
 		latest := &capsulev1beta2.RuleStatus{}
 		if err = r.reader.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
 			return err
+		}
+
+		if latest.Status.ObservedGeneration == instance.GetGeneration() {
+			return nil
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(meta.NewReadyConditionReconcilingReason(instance))

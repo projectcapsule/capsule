@@ -288,6 +288,22 @@ func TestFindOwner_Randomized(t *testing.T) {
 	}
 }
 
+func TestFindOwnerDoesNotMutateList(t *testing.T) {
+	list := rbac.OwnerStatusListSpec{
+		{UserSpec: rbac.UserSpec{Kind: rbac.UserOwner, Name: "zoe"}},
+		{UserSpec: rbac.UserSpec{Kind: rbac.GroupOwner, Name: "developers"}},
+		{UserSpec: rbac.UserSpec{Kind: rbac.UserOwner, Name: "alice"}},
+	}
+	want := list.DeepCopy()
+
+	if _, found := list.FindOwner("alice", rbac.UserOwner); !found {
+		t.Fatal("expected owner to be found")
+	}
+	if !reflect.DeepEqual(list, want) {
+		t.Fatalf("FindOwner mutated list: got %#v, want %#v", list, want)
+	}
+}
+
 func TestIsOwner_RandomizedMatchesSlowImplementation(t *testing.T) {
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
 

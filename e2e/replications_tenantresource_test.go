@@ -120,6 +120,15 @@ var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace
 	})
 
 	AfterEach(func() {
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec = originalConfig.Spec
+		})
+
+		cleanupTenantResourcesWithDefaultServiceAccount(
+			ctx,
+			append([]string{baseNamespace}, targetNamespaces...)...,
+		)
+
 		ignoreNotFound(k8sClient.Delete(ctx, sharedSourceSecret))
 		ignoreNotFound(k8sClient.Delete(ctx, contextSecretOne))
 		ignoreNotFound(k8sClient.Delete(ctx, contextSecretTwo))
@@ -129,10 +138,6 @@ var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace
 		}
 
 		EventuallyDeletion(tnt)
-
-		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
-			configuration.Spec = originalConfig.Spec
-		})
 	})
 
 	Context("cluster-scoped object protection", func() {
@@ -958,7 +963,7 @@ data:
 	})
 
 	Context("apply lifecycle with prune enabled", func() {
-		It("applies, updates and prunes raw items", func() {
+		It("applies, updates and prunes raw items", Label("skip-on-openshift"), func() {
 			tr := newRawConfigMapTenantResource(baseNamespace, "raw-prune-enabled", map[string]string{
 				"mode": "before",
 				"foo":  "one",
@@ -1551,6 +1556,19 @@ data:
 					g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "prune-protected", Namespace: ns}, cm)).To(Succeed())
 				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			}
+
+			// Switch to the SA that can for cleanup delete.
+			Eventually(func() error {
+				current := &capsulev1beta2.TenantResource{}
+				if err := k8sClient.Get(ctx, types.NamespacedName{Name: tr.Name, Namespace: baseNamespace}, current); err != nil {
+					return err
+				}
+				current.Spec.ServiceAccount = &apimeta.LocalRFC1123ObjectReference{
+					Name: apimeta.RFC1123Name(saNoDelete),
+				}
+				return k8sClient.Update(ctx, current)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
 		})
 		It("fails to replicate namespacedItems when the impersonated service account cannot read source resources", func() {
 			saName := "restricted-source-reader"
@@ -1940,6 +1958,49 @@ func expectResolvedServiceAccount(namespace, name, saName, saNamespace string) {
 		g.Expect(tr.Status.ServiceAccount.Name).To(Equal(apimeta.RFC1123Name(saName)))
 		g.Expect(tr.Status.ServiceAccount.Namespace).To(Equal(apimeta.RFC1123SubdomainName(saNamespace)))
 	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func cleanupTenantResourcesWithDefaultServiceAccount(ctx context.Context, namespaces ...string) {
+	for _, namespace := range namespaces {
+		Eventually(func() error {
+			resources := &capsulev1beta2.TenantResourceList{}
+			if err := k8sClient.List(ctx, resources, client.InNamespace(namespace)); err != nil {
+				return err
+			}
+
+			if len(resources.Items) == 0 {
+				return nil
+			}
+
+			for i := range resources.Items {
+				resource := &resources.Items[i]
+
+				if resource.Spec.ServiceAccount != nil {
+					resource.Spec.ServiceAccount = nil
+
+					if err := k8sClient.Update(ctx, resource); err != nil && !apierrors.IsNotFound(err) {
+						return err
+					}
+
+					continue
+				}
+
+				if !resource.DeletionTimestamp.IsZero() {
+					continue
+				}
+
+				if err := k8sClient.Delete(ctx, resource); err != nil && !apierrors.IsNotFound(err) {
+					return err
+				}
+			}
+
+			return fmt.Errorf(
+				"namespace %q still has %d TenantResource(s)",
+				namespace,
+				len(resources.Items),
+			)
+		}, defaultTerminationTimeoutInterval, defaultPollInterval).Should(Succeed())
+	}
 }
 
 func expectConfigMapData(namespace, name string, expected map[string]string) {

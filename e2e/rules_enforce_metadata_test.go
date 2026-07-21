@@ -975,7 +975,7 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 		)
 	})
 
-	It("treats empty apiVersion as core v1 and does not match grouped resources", func() {
+	It("treats empty apiVersion as core v1 and does not match grouped resources", Label("skip-on-openshift"), func() {
 		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
 			metadataRule(
 				rules.ActionTypeAllow,

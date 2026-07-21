@@ -133,28 +133,23 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 	})
 
 	AfterEach(func() {
+		Eventually(func() error {
+			cfg := &capsulev1beta2.CapsuleConfiguration{}
+			if err := k8sClient.Get(ctx, client.ObjectKey{Name: originConfig.Name}, cfg); err != nil {
+				return err
+			}
+			cfg.Spec = originConfig.Spec
+			return k8sClient.Update(ctx, cfg)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		cleanupGlobalTenantResourcesWithDefaultServiceAccount(ctx)
+
 		for _, ns := range allNamespaces {
 			ForceDeleteNamespace(ctx, ns)
 		}
 
 		EventuallyDeletion(tenantA)
 		EventuallyDeletion(tenantB)
-
-		Eventually(func() error {
-			poolList := &capsulev1beta2.GlobalTenantResourceList{}
-			labelSelector := client.MatchingLabels{"e2e.capsule.dev/test-suite": "true"}
-			if err := k8sClient.List(context.TODO(), poolList, labelSelector); err != nil {
-				return err
-			}
-
-			for _, pool := range poolList.Items {
-				if err := k8sClient.Delete(context.TODO(), &pool); err != nil {
-					return err
-				}
-			}
-
-			return nil
-		}, "30s", "5s").Should(Succeed())
 
 		Eventually(func() error {
 			clusterRoleList := &rbacv1.ClusterRoleList{}
@@ -171,15 +166,6 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 
 			return nil
 		}, "30s", "5s").Should(Succeed())
-
-		Eventually(func() error {
-			cfg := &capsulev1beta2.CapsuleConfiguration{}
-			if err := k8sClient.Get(ctx, client.ObjectKey{Name: originConfig.Name}, cfg); err != nil {
-				return err
-			}
-			cfg.Spec = originConfig.Spec
-			return k8sClient.Update(ctx, cfg)
-		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 	})
 
@@ -252,7 +238,7 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 			expectGlobalTenantResourceProcessedClusterRole("gtr-cluster-generator", "gtr-cluster-generator-role")
 		})
 
-		It("only allows the managing GlobalTenantResource service account to update created cluster-scoped objects", func() {
+		It("only allows the managing GlobalTenantResource service account to update created cluster-scoped objects", Label("skip-on-openshift"), func() {
 			saName := "gtr-cluster-update-guard"
 			clusterRoleName := "gtr-cluster-admission-role"
 			writerRoleName := "gtr-cluster-admission-writer"
@@ -834,7 +820,7 @@ data:
 			}
 		})
 
-		It("only allows the managing GlobalTenantResource service account to update created objects", func() {
+		It("only allows the managing GlobalTenantResource service account to update created objects", Label("skip-on-openshift"), func() {
 			saName := "gtr-update-guard"
 			targetNamespace := tenantANamespaces[0]
 			configMapName := "gtr-admission-protected"
@@ -903,7 +889,7 @@ data:
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 
-		It("fails to prune replicated resources when the impersonated service account cannot delete them", func() {
+		It("fails to prune replicated resources when the impersonated service account cannot delete them", Label("skip-on-openshift"), func() {
 			saCreate := "gtr-creator-ok"
 			saNoDelete := "gtr-creator-no-delete"
 
@@ -1047,7 +1033,7 @@ data:
 		})
 	})
 
-	Context("prune on selector drift", func() {
+	Context("prune on selector drift", Label("skip-on-openshift"), func() {
 		It("prunes objects from tenants that stop matching tenantSelector", func() {
 			gtr := newRawConfigMapGlobalTenantResource("gtr-tenant-selector-prune", map[string]string{
 				"mode": "both",
@@ -1718,6 +1704,44 @@ func bindServiceAccountToClusterResource(
 			Verbs:     verbs,
 		}},
 	)
+}
+
+func cleanupGlobalTenantResourcesWithDefaultServiceAccount(ctx context.Context) {
+	Eventually(func() error {
+		resources := &capsulev1beta2.GlobalTenantResourceList{}
+		labelSelector := client.MatchingLabels{"e2e.capsule.dev/test-suite": "true"}
+		if err := k8sClient.List(ctx, resources, labelSelector); err != nil {
+			return err
+		}
+
+		if len(resources.Items) == 0 {
+			return nil
+		}
+
+		for i := range resources.Items {
+			resource := &resources.Items[i]
+
+			if resource.Spec.ServiceAccount != nil {
+				resource.Spec.ServiceAccount = nil
+
+				if err := k8sClient.Update(ctx, resource); err != nil && !apierrors.IsNotFound(err) {
+					return err
+				}
+
+				continue
+			}
+
+			if !resource.DeletionTimestamp.IsZero() {
+				continue
+			}
+
+			if err := k8sClient.Delete(ctx, resource); err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
+		}
+
+		return fmt.Errorf("still have %d GlobalTenantResource(s)", len(resources.Items))
+	}, defaultTerminationTimeoutInterval, defaultPollInterval).Should(Succeed())
 }
 
 func bindServiceAccountToClusterResources(

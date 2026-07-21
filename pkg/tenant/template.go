@@ -5,6 +5,7 @@ package tenant
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -13,15 +14,13 @@ import (
 )
 
 // NewTenantContext returns the context for the tenant.
-func NewTenantContext(tnt *capsulev1beta2.Tenant, scheme *runtime.Scheme, opts sanitize.SanitizeOptions) (map[string]any, error) {
-	if err := sanitize.SanitizeObject(tnt, scheme, opts); err != nil {
-		return nil, err
-	}
-
+func NewTenantContext(tnt *capsulev1beta2.Tenant, _ *runtime.Scheme, opts sanitize.SanitizeOptions) (map[string]any, error) {
 	context, err := utils.ToUnstructuredMap(tnt)
 	if err != nil {
 		return nil, err
 	}
+
+	sanitize.SanitizeUnstructured(&unstructured.Unstructured{Object: context}, opts)
 
 	context["rbac"] = tnt.GetClusterRolesBySubject(nil)
 
@@ -38,9 +37,7 @@ func NewTenantNamespaceContext(
 	context := make(map[string]any)
 
 	if tnt != nil {
-		tntCopy := tnt.DeepCopy()
-
-		tCtx, err := NewTenantContext(tntCopy, scheme, opts)
+		tCtx, err := NewTenantContext(tnt, scheme, opts)
 		if err != nil {
 			return context, err
 		}
@@ -49,16 +46,12 @@ func NewTenantNamespaceContext(
 	}
 
 	if ns != nil {
-		nsCopy := ns.DeepCopy()
-
-		if err := sanitize.SanitizeObject(nsCopy, scheme, opts); err != nil {
-			return context, err
-		}
-
-		nsMap, err := utils.ToUnstructuredMap(nsCopy)
+		nsMap, err := utils.ToUnstructuredMap(ns)
 		if err != nil {
 			return context, err
 		}
+
+		sanitize.SanitizeUnstructured(&unstructured.Unstructured{Object: nsMap}, opts)
 
 		context["namespace"] = nsMap
 	}
