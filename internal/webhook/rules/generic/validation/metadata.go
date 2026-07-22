@@ -1,6 +1,7 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
+//nolint:dupl
 package validation
 
 import (
@@ -210,7 +211,7 @@ func (h *genericRules) controlledMetadataEntries(
 				for key, value := range labels {
 					matched, err := h.matchesMetadataKey(selector, key)
 					if err != nil {
-						return nil, err
+						return nil, fmt.Errorf("invalid label selector %q: %w", selector, err)
 					}
 
 					if !matched {
@@ -242,7 +243,7 @@ func (h *genericRules) controlledMetadataEntries(
 				for key, value := range annotations {
 					matched, err := h.matchesMetadataKey(selector, key)
 					if err != nil {
-						return nil, err
+						return nil, fmt.Errorf("invalid label selector %q: %w", selector, err)
 					}
 
 					if !matched {
