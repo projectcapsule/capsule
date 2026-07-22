@@ -53,6 +53,26 @@ spec:
               description: For future implementation where users might manage RuleStatus
                 CRs themselves
               properties:
+                audience:
+                  description: |-
+                    Audience limits this rule to matching request subjects.
+                    An empty audience matches every request.
+                  items:
+                    properties:
+                      kind:
+                        enum:
+                        - User
+                        - Group
+                        - ServiceAccount
+                        - Custom
+                        type: string
+                      name:
+                        type: string
+                    required:
+                    - kind
+                    - name
+                    type: object
+                  type: array
                 enforce:
                   description: Enforcement for given rule
                   properties:
@@ -68,6 +88,58 @@ spec:
                       - deny
                       - audit
                       type: string
+                    ingress:
+                      description: Enforcement for Ingress and Gateway API resource
+                        hostnames.
+                      properties:
+                        hostnames:
+                          description: |-
+                            Hostnames defines allowed, denied, or audited hostname expressions.
+                            A resource targeted by an allow or deny rule must declare non-empty values
+                            in all hostname fields. Audit-only rules record missing hostnames without
+                            denying them.
+                          items:
+                            description: |-
+                              At least one of Exact or Exp must be set.
+                              Both may be set together.
+                            properties:
+                              exact:
+                                description: Exact matches one of the provided values
+                                  exactly.
+                                items:
+                                  type: string
+                                minItems: 1
+                                type: array
+                              exp:
+                                description: Exp matches regular expression.
+                                minLength: 1
+                                type: string
+                              negate:
+                                default: false
+                                description: Negate regular Expression
+                                type: boolean
+                            type: object
+                            x-kubernetes-validations:
+                            - message: at least one of exact or exp must be set
+                              rule: has(self.exact) || has(self.exp)
+                          minItems: 1
+                          type: array
+                        types:
+                          description: Types defines the resource kinds to which hostname
+                            enforcement applies.
+                          items:
+                            enum:
+                            - Ingress
+                            - Route
+                            - ListenerSet
+                            - HTTPRoute
+                            - Gateway
+                            - TLSRoute
+                            - GRPCRoute
+                            type: string
+                          minItems: 1
+                          type: array
+                      type: object
                     metadata:
                       description: Enforcement for object metadata on namespaced resources.
                       items:
@@ -77,6 +149,16 @@ spec:
                           annotations:
                             additionalProperties:
                               properties:
+                                default:
+                                  description: |-
+                                    Default is applied by admission mutation when the concrete metadata key is absent.
+                                    It is not reconciled after admission.
+                                  type: string
+                                managed:
+                                  description: |-
+                                    Managed is enforced by admission mutation and reconciled by the RuleStatus
+                                    controller using server-side apply when the rule configuration changes.
+                                  type: string
                                 required:
                                   default: false
                                   description: |-
@@ -150,6 +232,16 @@ spec:
                           labels:
                             additionalProperties:
                               properties:
+                                default:
+                                  description: |-
+                                    Default is applied by admission mutation when the concrete metadata key is absent.
+                                    It is not reconciled after admission.
+                                  type: string
+                                managed:
+                                  description: |-
+                                    Managed is enforced by admission mutation and reconciled by the RuleStatus
+                                    controller using server-side apply when the rule configuration changes.
+                                  type: string
                                 required:
                                   default: false
                                   description: |-
@@ -457,6 +549,26 @@ spec:
                   Deprecated: use Rules.
                   Rule contains a legacy flattened view and cannot fully represent action-aware rules.
                 properties:
+                  audience:
+                    description: |-
+                      Audience limits this rule to matching request subjects.
+                      An empty audience matches every request.
+                    items:
+                      properties:
+                        kind:
+                          enum:
+                          - User
+                          - Group
+                          - ServiceAccount
+                          - Custom
+                          type: string
+                        name:
+                          type: string
+                      required:
+                      - kind
+                      - name
+                      type: object
+                    type: array
                   enforce:
                     description: Enforcement for given rule
                     properties:
@@ -472,6 +584,58 @@ spec:
                         - deny
                         - audit
                         type: string
+                      ingress:
+                        description: Enforcement for Ingress and Gateway API resource
+                          hostnames.
+                        properties:
+                          hostnames:
+                            description: |-
+                              Hostnames defines allowed, denied, or audited hostname expressions.
+                              A resource targeted by an allow or deny rule must declare non-empty values
+                              in all hostname fields. Audit-only rules record missing hostnames without
+                              denying them.
+                            items:
+                              description: |-
+                                At least one of Exact or Exp must be set.
+                                Both may be set together.
+                              properties:
+                                exact:
+                                  description: Exact matches one of the provided values
+                                    exactly.
+                                  items:
+                                    type: string
+                                  minItems: 1
+                                  type: array
+                                exp:
+                                  description: Exp matches regular expression.
+                                  minLength: 1
+                                  type: string
+                                negate:
+                                  default: false
+                                  description: Negate regular Expression
+                                  type: boolean
+                              type: object
+                              x-kubernetes-validations:
+                              - message: at least one of exact or exp must be set
+                                rule: has(self.exact) || has(self.exp)
+                            minItems: 1
+                            type: array
+                          types:
+                            description: Types defines the resource kinds to which
+                              hostname enforcement applies.
+                            items:
+                              enum:
+                              - Ingress
+                              - Route
+                              - ListenerSet
+                              - HTTPRoute
+                              - Gateway
+                              - TLSRoute
+                              - GRPCRoute
+                              type: string
+                            minItems: 1
+                            type: array
+                        type: object
                       metadata:
                         description: Enforcement for object metadata on namespaced
                           resources.
@@ -482,6 +646,16 @@ spec:
                             annotations:
                               additionalProperties:
                                 properties:
+                                  default:
+                                    description: |-
+                                      Default is applied by admission mutation when the concrete metadata key is absent.
+                                      It is not reconciled after admission.
+                                    type: string
+                                  managed:
+                                    description: |-
+                                      Managed is enforced by admission mutation and reconciled by the RuleStatus
+                                      controller using server-side apply when the rule configuration changes.
+                                    type: string
                                   required:
                                     default: false
                                     description: |-
@@ -555,6 +729,16 @@ spec:
                             labels:
                               additionalProperties:
                                 properties:
+                                  default:
+                                    description: |-
+                                      Default is applied by admission mutation when the concrete metadata key is absent.
+                                      It is not reconciled after admission.
+                                    type: string
+                                  managed:
+                                    description: |-
+                                      Managed is enforced by admission mutation and reconciled by the RuleStatus
+                                      controller using server-side apply when the rule configuration changes.
+                                    type: string
                                   required:
                                     default: false
                                     description: |-
@@ -800,6 +984,26 @@ spec:
                   description: For future implementation where users might manage
                     RuleStatus CRs themselves
                   properties:
+                    audience:
+                      description: |-
+                        Audience limits this rule to matching request subjects.
+                        An empty audience matches every request.
+                      items:
+                        properties:
+                          kind:
+                            enum:
+                            - User
+                            - Group
+                            - ServiceAccount
+                            - Custom
+                            type: string
+                          name:
+                            type: string
+                        required:
+                        - kind
+                        - name
+                        type: object
+                      type: array
                     enforce:
                       description: Enforcement for given rule
                       properties:
@@ -815,6 +1019,58 @@ spec:
                           - deny
                           - audit
                           type: string
+                        ingress:
+                          description: Enforcement for Ingress and Gateway API resource
+                            hostnames.
+                          properties:
+                            hostnames:
+                              description: |-
+                                Hostnames defines allowed, denied, or audited hostname expressions.
+                                A resource targeted by an allow or deny rule must declare non-empty values
+                                in all hostname fields. Audit-only rules record missing hostnames without
+                                denying them.
+                              items:
+                                description: |-
+                                  At least one of Exact or Exp must be set.
+                                  Both may be set together.
+                                properties:
+                                  exact:
+                                    description: Exact matches one of the provided
+                                      values exactly.
+                                    items:
+                                      type: string
+                                    minItems: 1
+                                    type: array
+                                  exp:
+                                    description: Exp matches regular expression.
+                                    minLength: 1
+                                    type: string
+                                  negate:
+                                    default: false
+                                    description: Negate regular Expression
+                                    type: boolean
+                                type: object
+                                x-kubernetes-validations:
+                                - message: at least one of exact or exp must be set
+                                  rule: has(self.exact) || has(self.exp)
+                              minItems: 1
+                              type: array
+                            types:
+                              description: Types defines the resource kinds to which
+                                hostname enforcement applies.
+                              items:
+                                enum:
+                                - Ingress
+                                - Route
+                                - ListenerSet
+                                - HTTPRoute
+                                - Gateway
+                                - TLSRoute
+                                - GRPCRoute
+                                type: string
+                              minItems: 1
+                              type: array
+                          type: object
                         metadata:
                           description: Enforcement for object metadata on namespaced
                             resources.
@@ -825,6 +1081,16 @@ spec:
                               annotations:
                                 additionalProperties:
                                   properties:
+                                    default:
+                                      description: |-
+                                        Default is applied by admission mutation when the concrete metadata key is absent.
+                                        It is not reconciled after admission.
+                                      type: string
+                                    managed:
+                                      description: |-
+                                        Managed is enforced by admission mutation and reconciled by the RuleStatus
+                                        controller using server-side apply when the rule configuration changes.
+                                      type: string
                                     required:
                                       default: false
                                       description: |-
@@ -898,6 +1164,16 @@ spec:
                               labels:
                                 additionalProperties:
                                   properties:
+                                    default:
+                                      description: |-
+                                        Default is applied by admission mutation when the concrete metadata key is absent.
+                                        It is not reconciled after admission.
+                                      type: string
+                                    managed:
+                                      description: |-
+                                        Managed is enforced by admission mutation and reconciled by the RuleStatus
+                                        controller using server-side apply when the rule configuration changes.
+                                      type: string
                                     required:
                                       default: false
                                       description: |-

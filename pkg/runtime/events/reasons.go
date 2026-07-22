@@ -55,6 +55,7 @@ const (
 	ReasonIngressHostnameNotValid  string = "IngressHostnameNotValid"
 	ReasonIngressHostnameEmpty     string = "IngressHostnameEmpty"
 	ReasonIngressHostnameCollision string = "IngressHostnameCollision"
+	ReasonForbiddenIngressHostname string = "ForbiddenIngressHostname"
 
 	// Services.
 	ReasonForbiddenExternalServiceIP string = "ForbiddenExternalServiceIP"

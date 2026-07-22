@@ -114,6 +114,7 @@ helm-test-exec: ct helm-controller-version ko-build-all
 # Setup development env
 dev-build: kind
 	$(KIND) create cluster --wait=60s --name $(CLUSTER_NAME) --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION) --config ./hack/kind-cluster.yaml
+	$(KUBECTL) apply --force-conflicts --server-side=true -f ./e2e/rbac.yaml
 	$(MAKE) dev-install-gw-api-crds
 
 .PHONY: dev-destroy
