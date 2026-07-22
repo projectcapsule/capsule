@@ -20,7 +20,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("creating a Namespace with user-specified labels and annotations", Ordered, Label("namespace", "metadata", "forbidden"), func() {
+var _ = Describe("creating a Namespace with user-specified labels and annotations", Ordered, Label("config", "namespace", "metadata", "forbidden"), func() {
 	originConfig := &capsulev1beta2.CapsuleConfiguration{}
 
 	tnt := &capsulev1beta2.Tenant{
