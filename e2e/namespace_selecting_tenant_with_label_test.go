@@ -144,7 +144,9 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 
 			patch := map[string]interface{}{
 				"metadata": map[string]interface{}{
-					"labels":          map[string]string{},
+					"labels": map[string]interface{}{
+						meta.TenantLabel: nil,
+					},
 					"ownerReferences": []map[string]interface{}{ref},
 				},
 			}
@@ -155,7 +157,7 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 			new := &corev1.Namespace{}
 			k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, new)
 
-			NamespaceIsPartOfTenant(t1, ns).Should(Succeed())
+			NamespaceIsPartOfTenant(t1, new).Should(Succeed())
 		})
 
 		By("assigning to the Namespace the Capsule Tenant label (Empty Ownerreferences)", func() {
@@ -178,11 +180,11 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 		})
 
 		By("assigning to the Namespace the Capsule Tenant label (Empty Ownerreferences) - Without Label", func() {
-			ns.Labels = map[string]string{}
-
 			patch := map[string]interface{}{
 				"metadata": map[string]interface{}{
-					"labels":          map[string]string{},
+					"labels": map[string]interface{}{
+						meta.TenantLabel: nil,
+					},
 					"ownerReferences": []string{},
 				},
 			}
@@ -193,7 +195,7 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 			new := &corev1.Namespace{}
 			k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, new)
 
-			NamespaceIsPartOfTenant(t1, ns).Should(Succeed())
+			NamespaceIsPartOfTenant(t1, new).Should(Succeed())
 		})
 
 		By("assigning to the Namespace the Capsule Tenant label (2nd Tenant Label + Ownerreference)", func() {

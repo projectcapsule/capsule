@@ -972,6 +972,39 @@ spec:
       {{- end }}
       webhooks:
       {{- $any := false -}}
+      {{- with .Values.webhooks.hooks.generic }}
+        {{- if .enabled }}
+          {{- $any = true }}
+      - name: generic.rules.mutating.projectcapsule.dev
+        {{- with .opts }}
+        opts:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        admissionReviewVersions:
+          - v1
+          - v1beta1
+        path: "/rules/generic/mutating"
+        failurePolicy: {{ .failurePolicy }}
+        matchPolicy: {{ .matchPolicy }}
+        reinvocationPolicy: {{ .reinvocationPolicy }}
+        {{- with .namespaceSelector }}
+        namespaceSelector:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .objectSelector }}
+        objectSelector:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .matchConditions }}
+        matchConditions:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        rules:
+          {{- toYaml .rules | nindent 10 }}
+        sideEffects: None
+        timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
+        {{- end }}
+      {{- end }}
       {{- with (mergeOverwrite .Values.webhooks.hooks.namespaces .Values.webhooks.hooks.namespaceOwnerReference) }}
         {{- if .enabled }}
           {{- $any = true }}

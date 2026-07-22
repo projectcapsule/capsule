@@ -7,29 +7,43 @@ metadata:
     customer: a
 spec:
   owners:
-  - name: alice
-    kind: User
+    - name: alice
+      kind: User
   rules:
     - permissions:
         bindings:
           - clusterRoleName: 'custom:proxy-viewer'
             subjects:
-            - apiGroup: rbac.authorization.k8s.io
-              kind: User
-              name: joe
+              - apiGroup: rbac.authorization.k8s.io
+                kind: User
+                name: joe
             labels:
               reflection.proxy.projectcapsule.dev/enabled: "true"
       enforce:
         action: deny
         metadata:
           - apiGroups:
-              - "rbac.authorization.k8s.io/v1"
+              - "v1"
             kinds:
-              - "RoleBinding"
+              - "Namespace"
             labels:
-              reflection.proxy.projectcapsule.dev/enabled:
+              pod-security.kubernetes.io/enforce:
+                managed: "restricted"
+    - audience:
+        - kind: "Custom"
+          name: "CapsuleUser"
+      enforce:
+        action: deny
+        metadata:
+          - apiGroups:
+              - "v1"
+            kinds:
+              - "Namespace"
+            labels:
+              "openshift.io/*":
+                required: false
                 values:
-                  - exp: ".*"
+                  - exp: "^.*$"
     - namespaceSelector:
         matchExpressions:
           - key: env
@@ -39,17 +53,7 @@ spec:
       permissions:
         promotions:
           - clusterRoles:
-            - "secret-replicator"
-    - namespaceSelector:
-        matchExpressions:
-          - key: env
-            operator: In
-            values:
-              - "prod"
-      permissions:
-        promotions:
-          - clusterRoles:
-            - "sade-boi"
+              - "secret-replicator"
   permissions:
     matchOwners:
     - matchLabels:
@@ -121,16 +125,6 @@ spec:
               to: 32767
   - enforce:
       action: "allow"
-      # generic:
-      #   - kinds:
-      #       - "ConfigMap"
-      #     path: ".data.key"
-      #     entity: "Any/TenantOwner/CapsuleUser"
-      #     operator: "Equals/Truthy"
-      #     values:
-      #       - exact:
-      #         - "sad"
-      #         from: ".status.classes.ingress"
       metadata:
         - kinds:
             - "ConfigMap"

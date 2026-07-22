@@ -89,4 +89,16 @@ func collectRegexExpressionsFromNamespaceRule(
 
 		set[cache.HashRegex(expr)] = expr
 	}
+
+	for _, metadataRule := range rule.Enforce.Metadata {
+		for selector := range metadataRule.Labels {
+			expr := rules.MetadataKeyExpression(selector)
+			set[cache.HashRegex(expr)] = expr
+		}
+
+		for selector := range metadataRule.Annotations {
+			expr := rules.MetadataKeyExpression(selector)
+			set[cache.HashRegex(expr)] = expr
+		}
+	}
 }

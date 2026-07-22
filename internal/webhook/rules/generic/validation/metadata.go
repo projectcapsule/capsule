@@ -1,6 +1,7 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
+//nolint:dupl
 package validation
 
 import (
@@ -40,7 +41,11 @@ func (h *genericRules) validateMetadata(
 		return nil, nil
 	}
 
-	entries := h.controlledMetadataEntries(obj, gvk, enforceBodies)
+	entries, err := h.controlledMetadataEntries(obj, gvk, enforceBodies)
+	if err != nil {
+		return nil, err
+	}
+
 	if len(entries) == 0 {
 		return nil, nil
 	}
@@ -115,9 +120,9 @@ func (h *genericRules) metadataSet(
 			}
 		},
 
-		Rules: func(enforce *apirules.NamespaceRuleEnforceBody) []runtime.ExpressionMatch {
+		RulesWithError: func(enforce *apirules.NamespaceRuleEnforceBody) ([]runtime.ExpressionMatch, error) {
 			if enforce == nil || len(enforce.Metadata) == 0 {
-				return nil
+				return nil, nil
 			}
 
 			var out []runtime.ExpressionMatch
@@ -130,19 +135,31 @@ func (h *genericRules) metadataSet(
 
 				switch entry.Field {
 				case metadataFieldLabel:
-					policy, ok := rule.Labels[entry.Key]
-					if ok {
-						out = append(out, policy.Values...)
+					for selector, policy := range rule.Labels {
+						matched, err := h.matchesMetadataKey(selector, entry.Key)
+						if err != nil {
+							return nil, fmt.Errorf("invalid label selector %q: %w", selector, err)
+						}
+
+						if matched {
+							out = append(out, policy.Values...)
+						}
 					}
 				case metadataFieldAnnotation:
-					policy, ok := rule.Annotations[entry.Key]
-					if ok {
-						out = append(out, policy.Values...)
+					for selector, policy := range rule.Annotations {
+						matched, err := h.matchesMetadataKey(selector, entry.Key)
+						if err != nil {
+							return nil, fmt.Errorf("invalid annotation selector %q: %w", selector, err)
+						}
+
+						if matched {
+							out = append(out, policy.Values...)
+						}
 					}
 				}
 			}
 
-			return out
+			return out, nil
 		},
 		Matches: func(match runtime.ExpressionMatch, value ruleengine.Value) (ruleengine.Match, error) {
 			matched, err := match.MatchesWithExpressionMatcher(h.regexCache, value.Value)
@@ -159,11 +176,12 @@ func (h *genericRules) metadataSet(
 	}
 }
 
+//nolint:gocognit
 func (h *genericRules) controlledMetadataEntries(
 	obj genericObject,
 	gvk schema.GroupVersionKind,
 	enforceBodies []*apirules.NamespaceRuleEnforceBody,
-) []metadataEntry {
+) ([]metadataEntry, error) {
 	labels := obj.GetLabels()
 	annotations := obj.GetAnnotations()
 
@@ -182,60 +200,74 @@ func (h *genericRules) controlledMetadataEntries(
 				continue
 			}
 
-			for key, policy := range rule.Labels {
-				if h.managedMetadata.HasLabel(key) {
+			for selector, policy := range rule.Labels {
+				if h.managedMetadata.HasLabel(selector) {
 					continue
 				}
 
-				value, exists := labels[key]
 				required := action == apirules.ActionTypeAllow && policy.Required
+				matchedAny := false
 
-				if !exists && !required {
-					continue
+				for key, value := range labels {
+					matched, err := h.matchesMetadataKey(selector, key)
+					if err != nil {
+						return nil, fmt.Errorf("invalid label selector %q: %w", selector, err)
+					}
+
+					if !matched {
+						continue
+					}
+
+					if h.managedMetadata.HasLabel(key) {
+						continue
+					}
+
+					matchedAny = true
+
+					h.addMetadataEntry(seen, metadataFieldLabel, key, value, true, required)
 				}
 
-				path := metadataLabelPath(key)
-
-				entry := seen[path]
-				entry.Field = metadataFieldLabel
-				entry.Key = key
-				entry.Path = path
-				entry.Present = exists
-				entry.Value = value
-				entry.Required = entry.Required || required
-
-				seen[path] = entry
+				if !matchedAny && required {
+					h.addMetadataEntry(seen, metadataFieldLabel, selector, "", false, true)
+				}
 			}
 
-			for key, policy := range rule.Annotations {
-				if h.managedMetadata.HasAnnotation(key) {
+			for selector, policy := range rule.Annotations {
+				if h.managedMetadata.HasAnnotation(selector) {
 					continue
 				}
 
-				value, exists := annotations[key]
 				required := action == apirules.ActionTypeAllow && policy.Required
+				matchedAny := false
 
-				if !exists && !required {
-					continue
+				for key, value := range annotations {
+					matched, err := h.matchesMetadataKey(selector, key)
+					if err != nil {
+						return nil, fmt.Errorf("invalid annotation selector %q: %w", selector, err)
+					}
+
+					if !matched {
+						continue
+					}
+
+					if h.managedMetadata.HasAnnotation(key) {
+						continue
+					}
+
+					matchedAny = true
+
+					h.addMetadataEntry(seen, metadataFieldAnnotation, key, value, true, required)
 				}
 
-				path := metadataAnnotationPath(key)
-
-				entry := seen[path]
-				entry.Field = metadataFieldAnnotation
-				entry.Key = key
-				entry.Path = path
-				entry.Present = exists
-				entry.Value = value
-				entry.Required = entry.Required || required
-
-				seen[path] = entry
+				if !matchedAny && required {
+					h.addMetadataEntry(seen, metadataFieldAnnotation, selector, "", false, true)
+				}
 			}
 		}
 	}
 
 	if len(seen) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	out := make([]metadataEntry, 0, len(seen))
@@ -247,7 +279,39 @@ func (h *genericRules) controlledMetadataEntries(
 		return out[i].Path < out[j].Path
 	})
 
-	return out
+	return out, nil
+}
+
+func (h *genericRules) matchesMetadataKey(selector, key string) (bool, error) {
+	return h.regexCache.MatchRegex(apirules.MetadataKeyExpression(selector), key)
+}
+
+func (h *genericRules) addMetadataEntry(
+	seen map[string]metadataEntry,
+	field metadataField,
+	key string,
+	value string,
+	present bool,
+	required bool,
+) {
+	path := metadataLabelPath(key)
+	if field == metadataFieldAnnotation {
+		path = metadataAnnotationPath(key)
+	}
+
+	entry := seen[path]
+	entry.Field = field
+	entry.Key = key
+	entry.Path = path
+
+	entry.Present = entry.Present || present
+
+	if present {
+		entry.Value = value
+	}
+
+	entry.Required = entry.Required || required
+	seen[path] = entry
 }
 
 func metadataSetName(field metadataField) string {

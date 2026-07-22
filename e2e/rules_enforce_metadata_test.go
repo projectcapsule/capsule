@@ -15,6 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -363,6 +364,36 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 		tnt.Spec.Rules = next
 	}
 
+	waitForProjectedMetadata := func(nsName, key string, wantDefault, wantManaged *string) {
+		Eventually(func(g Gomega) {
+			status := &capsulev1beta2.RuleStatus{}
+			g.Expect(k8sClient.Get(context.Background(), client.ObjectKey{
+				Name:      meta.NameForManagedRuleStatus(),
+				Namespace: nsName,
+			}, status)).To(Succeed())
+
+			for _, body := range status.Status.Rules {
+				if body == nil || body.Enforce == nil {
+					continue
+				}
+				for _, metadata := range body.Enforce.Metadata {
+					if policy, ok := metadata.Labels[key]; ok {
+						g.Expect(policy.Default).To(Equal(wantDefault))
+						g.Expect(policy.Managed).To(Equal(wantManaged))
+						return
+					}
+					if policy, ok := metadata.Annotations[key]; ok {
+						g.Expect(policy.Default).To(Equal(wantDefault))
+						g.Expect(policy.Managed).To(Equal(wantManaged))
+						return
+					}
+				}
+			}
+
+			g.Expect(false).To(BeTrue(), "metadata policy %q was not projected", key)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	}
+
 	createNamespace := func(labels map[string]string) *corev1.Namespace {
 		if labels == nil {
 			labels = map[string]string{}
@@ -376,6 +407,34 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		return ns
+	}
+
+	createNamespaceAndExpectDenied := func(labels map[string]string, substrings ...string) {
+		if labels == nil {
+			labels = map[string]string{}
+		}
+		labels[meta.TenantLabel] = tnt.GetName()
+		base := NewNamespace("", labels)
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+
+		Eventually(func() error {
+			candidate := base.DeepCopy()
+			candidate.Name = fmt.Sprintf("%s-%d", base.Name, time.Now().UnixNano()%1e6)
+			_, err := cs.CoreV1().Namespaces().Create(context.Background(), candidate, metav1.CreateOptions{})
+			if err == nil {
+				_ = cs.CoreV1().Namespaces().Delete(context.Background(), candidate.Name, metav1.DeleteOptions{})
+				return fmt.Errorf("expected namespace create to be denied, but it succeeded")
+			}
+
+			msg := err.Error()
+			for _, substring := range substrings {
+				if !strings.Contains(msg, substring) {
+					return fmt.Errorf("expected error to contain %q, got: %s", substring, msg)
+				}
+			}
+
+			return nil
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	}
 
 	configMap := func(name string, labels map[string]string, annotations map[string]string) *corev1.ConfigMap {
@@ -821,6 +880,65 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 				},
 			),
 		)
+	})
+
+	It("matches label and annotation key expressions through the regex cache", func() {
+		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
+			metadataRule(
+				rules.ActionTypeAllow,
+				"v1",
+				[]string{"ConfigMap"},
+				map[string]rules.MetadataValueRule{
+					`example\.corp/label-.*`: metadataValueRule(false, metadataByExact("allowed")),
+				},
+				map[string]rules.MetadataValueRule{
+					"example.corp/*": metadataValueRule(false, metadataByExpression("^INV-[0-9]{4}$")),
+				},
+			),
+		})
+
+		ns := createNamespace(nil)
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+
+		createConfigMapAndExpectAllowed(cs, ns.Name, configMap(
+			"key-regex-allowed",
+			map[string]string{"example.corp/label-team": "allowed"},
+			map[string]string{"example.corp/cost-center": "INV-1234"},
+		))
+
+		createConfigMapAndExpectDenied(cs, ns.Name, configMap(
+			"key-regex-label-denied",
+			map[string]string{"example.corp/label-team": "blocked"},
+			nil,
+		), "metadata", "example.corp/label-team", "blocked", "not allowed")
+
+		createConfigMapAndExpectDenied(cs, ns.Name, configMap(
+			"key-regex-annotation-denied",
+			nil,
+			map[string]string{"example.corp/cost-center": "BAD-1234"},
+		), "metadata", "example.corp/cost-center", "BAD-1234", "not allowed")
+	})
+
+	It("requires Namespace to be explicitly included in kinds", func() {
+		policy := map[string]rules.MetadataValueRule{
+			"example.corp/namespace-policy": metadataValueRule(true, metadataByExact("allowed")),
+		}
+
+		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
+			metadataRule(rules.ActionTypeAllow, "*", []string{"*"}, policy, nil),
+		})
+		createNamespace(nil)
+
+		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
+			metadataRule(rules.ActionTypeAllow, "*", []string{"*", "Namespace"}, policy, nil),
+		})
+		createNamespaceAndExpectDenied(
+			nil,
+			"metadata",
+			"example.corp/namespace-policy",
+			"required",
+		)
+		createNamespace(map[string]string{"example.corp/namespace-policy": "allowed"})
 	})
 
 	It("applies one metadata rule to multiple core kinds", func() {
@@ -2178,5 +2296,360 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 			"test",
 			"denied",
 		)
+	})
+
+	It("applies Namespace defaults only when Namespace is explicitly targeted", func() {
+		defaultValue := "baseline"
+		policy := map[string]rules.MetadataValueRule{
+			"example.corp/namespace-default": {
+				Default: &defaultValue,
+			},
+		}
+
+		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
+			metadataRule(rules.ActionTypeAllow, "*", []string{"*"}, policy, nil),
+		})
+		withoutExplicitKind := createNamespace(nil)
+
+		Eventually(func(g Gomega) {
+			current := &corev1.Namespace{}
+			g.Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: withoutExplicitKind.Name}, current)).To(Succeed())
+			g.Expect(current.Labels).NotTo(HaveKey("example.corp/namespace-default"))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
+			metadataRule(rules.ActionTypeAllow, "*", []string{"*", "Namespace"}, policy, nil),
+		})
+		waitForProjectedMetadata(withoutExplicitKind.Name, "example.corp/namespace-default", &defaultValue, nil)
+
+		withExplicitKind := createNamespace(nil)
+		Eventually(func(g Gomega) {
+			current := &corev1.Namespace{}
+			g.Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: withExplicitKind.Name}, current)).To(Succeed())
+			g.Expect(current.Labels).To(HaveKeyWithValue("example.corp/namespace-default", defaultValue))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	})
+
+	It("applies defaults, preserves supplied values, and lets managed values win in combination", func() {
+		defaultOnly := "defaulted"
+		combinedDefault := "fallback"
+		combinedManaged := "controlled"
+		standaloneManaged := "managed-annotation"
+
+		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
+			metadataRule(
+				rules.ActionTypeAllow,
+				"v1",
+				[]string{"ConfigMap"},
+				map[string]rules.MetadataValueRule{
+					"example.corp/default": {
+						Default: &defaultOnly,
+					},
+					"example.corp/combined": {
+						Default: &combinedDefault,
+						Managed: &combinedManaged,
+					},
+				},
+				map[string]rules.MetadataValueRule{
+					"example.corp/managed": {
+						Managed: &standaloneManaged,
+					},
+				},
+			),
+		})
+
+		ns := createNamespace(nil)
+		waitForProjectedMetadata(ns.Name, "example.corp/combined", &combinedDefault, &combinedManaged)
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+
+		created, err := cs.CoreV1().ConfigMaps(ns.Name).Create(context.Background(), configMap(
+			"metadata-default-managed-combination",
+			map[string]string{
+				"example.corp/combined": "user-value",
+			},
+			map[string]string{
+				"example.corp/managed": "user-value",
+			},
+		), metav1.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(created.Labels).To(HaveKeyWithValue("example.corp/default", defaultOnly))
+		Expect(created.Labels).To(HaveKeyWithValue("example.corp/combined", combinedManaged))
+		Expect(created.Annotations).To(HaveKeyWithValue("example.corp/managed", standaloneManaged))
+
+		preserved, err := cs.CoreV1().ConfigMaps(ns.Name).Create(context.Background(), configMap(
+			"metadata-default-preserves-user-value",
+			map[string]string{
+				"example.corp/default": "supplied",
+			},
+			nil,
+		), metav1.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(preserved.Labels).To(HaveKeyWithValue("example.corp/default", "supplied"))
+		Expect(preserved.Labels).To(HaveKeyWithValue("example.corp/combined", combinedManaged))
+		Expect(preserved.Annotations).To(HaveKeyWithValue("example.corp/managed", standaloneManaged))
+	})
+
+	It("reconciles standalone managed metadata and removes it when the rule is removed", func() {
+		managedLabel := "managed-label"
+		managedAnnotation := "managed-annotation"
+		managedNamespace := "managed-namespace"
+
+		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
+			metadataRule(
+				rules.ActionTypeAllow,
+				"v1",
+				[]string{"ConfigMap"},
+				map[string]rules.MetadataValueRule{
+					"example.corp/lifecycle": {Managed: &managedLabel},
+				},
+				map[string]rules.MetadataValueRule{
+					"example.corp/lifecycle": {Managed: &managedAnnotation},
+				},
+			),
+			metadataRule(
+				rules.ActionTypeAllow,
+				"v1",
+				[]string{"Namespace"},
+				map[string]rules.MetadataValueRule{
+					"example.corp/namespace-lifecycle": {Managed: &managedNamespace},
+				},
+				nil,
+			),
+		})
+
+		ns := createNamespace(map[string]string{"example.corp/user-owned": "keep"})
+		waitForProjectedMetadata(ns.Name, "example.corp/lifecycle", nil, &managedLabel)
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+
+		cm, err := cs.CoreV1().ConfigMaps(ns.Name).Create(context.Background(), configMap(
+			"managed-metadata-lifecycle",
+			map[string]string{"example.corp/user-owned": "keep"},
+			map[string]string{"example.corp/user-annotation": "keep"},
+		), metav1.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		Eventually(func(g Gomega) {
+			current, getErr := cs.CoreV1().ConfigMaps(ns.Name).Get(context.Background(), cm.Name, metav1.GetOptions{})
+			g.Expect(getErr).NotTo(HaveOccurred())
+			g.Expect(current.Labels).To(HaveKeyWithValue("example.corp/lifecycle", managedLabel))
+			g.Expect(current.Annotations).To(HaveKeyWithValue("example.corp/lifecycle", managedAnnotation))
+
+			currentNamespace := &corev1.Namespace{}
+			g.Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: ns.Name}, currentNamespace)).To(Succeed())
+			g.Expect(currentNamespace.Labels).To(HaveKeyWithValue("example.corp/namespace-lifecycle", managedNamespace))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		updateTenantRules(nil)
+
+		Eventually(func(g Gomega) {
+			current, getErr := cs.CoreV1().ConfigMaps(ns.Name).Get(context.Background(), cm.Name, metav1.GetOptions{})
+			g.Expect(getErr).NotTo(HaveOccurred())
+			g.Expect(current.Labels).NotTo(HaveKey("example.corp/lifecycle"))
+			g.Expect(current.Annotations).NotTo(HaveKey("example.corp/lifecycle"))
+			g.Expect(current.Labels).To(HaveKeyWithValue("example.corp/user-owned", "keep"))
+			g.Expect(current.Annotations).To(HaveKeyWithValue("example.corp/user-annotation", "keep"))
+
+			currentNamespace := &corev1.Namespace{}
+			g.Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: ns.Name}, currentNamespace)).To(Succeed())
+			g.Expect(currentNamespace.Labels).NotTo(HaveKey("example.corp/namespace-lifecycle"))
+			g.Expect(currentNamespace.Labels).To(HaveKeyWithValue("example.corp/user-owned", "keep"))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	})
+
+	It("filters mutation and validation by audience across metadata, Service, and workload rules", func() {
+		defaultValue := "owner-default"
+		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
+			{
+				NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
+					Audience: []rules.Audience{{Kind: rules.AudienceKindUser, Name: ownerName}},
+					Enforce: &rules.NamespaceRuleEnforceBody{
+						Action: rules.ActionTypeDeny,
+						Metadata: []rules.MetadataRule{{
+							VersionKinds: runtime.VersionKinds{APIGroups: []string{"v1"}, Kinds: []string{"ConfigMap"}},
+							Labels: map[string]rules.MetadataValueRule{
+								"example.corp/audience-default": {Default: &defaultValue},
+								"example.corp/audience-blocked": metadataValueRule(false, metadataByExact("true")),
+							},
+						}},
+					},
+				},
+			},
+			{
+				NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
+					Audience: []rules.Audience{{Kind: rules.AudienceKindGroup, Name: ownerName}},
+					Enforce: &rules.NamespaceRuleEnforceBody{
+						Action: rules.ActionTypeDeny,
+						Services: rules.NamespaceRuleEnforceServicesBody{
+							Types: []rules.ServiceType{rules.ServiceTypeClusterIP},
+						},
+					},
+				},
+			},
+			{
+				NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
+					Audience: []rules.Audience{{Kind: rules.AudienceKindCustom, Name: string(rules.CustomAudienceTenantOwner)}},
+					Enforce: &rules.NamespaceRuleEnforceBody{
+						Action: rules.ActionTypeDeny,
+						Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
+							QoSClasses: []corev1.PodQOSClass{corev1.PodQOSBestEffort},
+						},
+					},
+				},
+			},
+		})
+
+		ns := createNamespace(nil)
+		waitForProjectedMetadata(ns.Name, "example.corp/audience-default", &defaultValue, nil)
+		owner := ownerClient(tnt.Spec.Owners[0].UserSpec)
+		admin := clusterAdminClient()
+
+		ownerCM, err := owner.CoreV1().ConfigMaps(ns.Name).Create(context.Background(), configMap(
+			"audience-owner-mutated",
+			nil,
+			nil,
+		), metav1.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ownerCM.Labels).To(HaveKeyWithValue("example.corp/audience-default", defaultValue))
+
+		createConfigMapAndExpectDenied(owner, ns.Name, configMap(
+			"audience-owner-denied",
+			map[string]string{"example.corp/audience-blocked": "true"},
+			nil,
+		), "example.corp/audience-blocked", "denied")
+
+		adminCM, err := admin.CoreV1().ConfigMaps(ns.Name).Create(context.Background(), configMap(
+			"audience-admin-bypasses-metadata",
+			map[string]string{"example.corp/audience-blocked": "true"},
+			nil,
+		), metav1.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(adminCM.Labels).NotTo(HaveKey("example.corp/audience-default"))
+
+		createServiceAndExpectDenied(owner, ns.Name, service("audience-owner-service-denied", nil, nil), "ClusterIP", "denied")
+		createServiceAndExpectAllowed(admin, ns.Name, service("audience-admin-service-allowed", nil, nil))
+
+		ownerPod := MakePod(ns.Name, "audience-owner-pod-denied", nil, nil, "nginx:1.25", "", "")
+		Eventually(func() error {
+			_, createErr := owner.CoreV1().Pods(ns.Name).Create(context.Background(), ownerPod, metav1.CreateOptions{})
+			if createErr == nil {
+				_ = owner.CoreV1().Pods(ns.Name).Delete(context.Background(), ownerPod.Name, metav1.DeleteOptions{})
+				return fmt.Errorf("expected TenantOwner audience to deny the BestEffort Pod")
+			}
+			if !strings.Contains(createErr.Error(), "BestEffort") || !strings.Contains(createErr.Error(), "denied") {
+				return createErr
+			}
+			return nil
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		adminPod := MakePod(ns.Name, "audience-admin-pod-allowed", nil, nil, "nginx:1.25", "", "")
+		EventuallyCreation(func() error {
+			_, createErr := admin.CoreV1().Pods(ns.Name).Create(context.Background(), adminPod, metav1.CreateOptions{})
+			return createErr
+		}).Should(Succeed())
+	})
+
+	It("rejects forbidden namespace metadata injected through the status subresource", func() {
+		const policyKey = "pod-security.kubernetes.io/enforce"
+
+		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
+			metadataRule(
+				rules.ActionTypeAllow,
+				"v1",
+				[]string{"Namespace"},
+				map[string]rules.MetadataValueRule{
+					policyKey: metadataValueRule(true, metadataByExact("baseline", "restricted")),
+				},
+				nil,
+			),
+		})
+
+		ns := createNamespace(map[string]string{policyKey: "baseline"})
+		waitForProjectedMetadata(ns.Name, policyKey, nil, nil)
+
+		createNamespaceStatusRBACForOwner(tnt)
+		DeferCleanup(deleteNamespaceStatusRBACForOwner, tnt)
+
+		owner := ownerClient(tnt.Spec.Owners[0].UserSpec)
+		patchStatus := func(value string) error {
+			patch := []byte(fmt.Sprintf(
+				`[{"op":"add","path":"/metadata/labels/pod-security.kubernetes.io~1enforce","value":%q}]`,
+				value,
+			))
+			_, err := owner.CoreV1().Namespaces().Patch(
+				context.Background(),
+				ns.Name,
+				k8stypes.JSONPatchType,
+				patch,
+				metav1.PatchOptions{},
+				"status",
+			)
+
+			return err
+		}
+
+		By("allowing a compliant metadata update through namespaces/status")
+		Eventually(func() error {
+			return patchStatus("restricted")
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		By("rejecting a forbidden metadata update through namespaces/status")
+		Eventually(func() error {
+			err := patchStatus("privileged")
+			if err == nil {
+				return fmt.Errorf("expected namespace status patch to be denied")
+			}
+			if !strings.Contains(err.Error(), policyKey) ||
+				!strings.Contains(err.Error(), "privileged") ||
+				!strings.Contains(err.Error(), "not allowed") {
+				return err
+			}
+
+			return nil
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		By("preserving the last allowed metadata value")
+		Eventually(func(g Gomega) {
+			current := &corev1.Namespace{}
+			g.Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: ns.Name}, current)).To(Succeed())
+			g.Expect(current.Labels).To(HaveKeyWithValue(policyKey, "restricted"))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	})
+
+	It("ignores metadata enforcement for non-Namespace subresource updates", func() {
+		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
+			metadataRule(
+				rules.ActionTypeAllow,
+				"*",
+				[]string{"*"},
+				map[string]rules.MetadataValueRule{
+					"example.corp/subresource-required": metadataValueRule(true, metadataByExact("true")),
+				},
+				nil,
+			),
+		})
+
+		ns := createNamespace(nil)
+		owner := ownerClient(tnt.Spec.Owners[0].UserSpec)
+		deploy := deployment(
+			"metadata-scale-subresource",
+			map[string]string{"example.corp/subresource-required": "true"},
+			nil,
+		)
+		deploy.Namespace = ns.Name
+
+		EventuallyCreation(func() error {
+			_, err := owner.AppsV1().Deployments(ns.Name).Create(context.Background(), deploy, metav1.CreateOptions{})
+			return err
+		}).Should(Succeed())
+
+		Eventually(func() error {
+			scale, err := owner.AppsV1().Deployments(ns.Name).GetScale(context.Background(), deploy.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			scale.Spec.Replicas = 2
+			_, err = owner.AppsV1().Deployments(ns.Name).UpdateScale(context.Background(), deploy.Name, scale, metav1.UpdateOptions{})
+			return err
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 })

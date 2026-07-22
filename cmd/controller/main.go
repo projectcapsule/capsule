@@ -76,6 +76,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/pvc"
 	"github.com/projectcapsule/capsule/internal/webhook/resourcepool"
 	"github.com/projectcapsule/capsule/internal/webhook/route"
+	rulesgenericmutation "github.com/projectcapsule/capsule/internal/webhook/rules/generic/mutation"
 	rulesgenericvalidation "github.com/projectcapsule/capsule/internal/webhook/rules/generic/validation"
 	podrules "github.com/projectcapsule/capsule/internal/webhook/rules/pods/validation"
 	servicerules "github.com/projectcapsule/capsule/internal/webhook/rules/services/validation"
@@ -685,11 +686,12 @@ func main() {
 	// webhooks: the order matters, don't change it and just append
 	webhooksList := append(
 		make([]handlers.Webhook, 0),
-		rulesgenericvalidation.Register(regexCache),
+		rulesgenericmutation.Register(cfg),
+		rulesgenericvalidation.Register(regexCache, cfg),
 		route.GenericReplicasHandler(),
 		route.GenericManagedHandler(cfg),
 		route.Pod(
-			pod.Handler(
+			pod.Handler(cfg,
 				podrules.PodRules(regexCache, registryCache),
 				pod.ImagePullPolicy(),
 				pod.ContainerRegistryLegacy(cfg),
@@ -710,7 +712,7 @@ func main() {
 			),
 		),
 		route.Service(
-			service.Handler(
+			service.Handler(cfg,
 				servicerules.ServiceRules(regexCache),
 				service.Validating(),
 			),
@@ -759,6 +761,7 @@ func main() {
 				namespacevalidation.CordoningHandler(cfg),
 				namespacevalidation.QuotaHandler(),
 				namespacevalidation.PrefixHandler(cfg),
+				namespacevalidation.RulesMetadataHandler(regexCache, cfg),
 				namespacevalidation.UserMetadataHandler(),
 				namespacevalidation.RequiredMetadataHandler(),
 			),
@@ -768,6 +771,8 @@ func main() {
 				cfg,
 				namespacemutation.OwnerReferenceHandler(cfg),
 				namespacemutation.MetadataHandler(cfg),
+				// Tenant metadata must be resolved before applying namespace rules.
+				namespacemutation.RulesMetadataHandler(cfg),
 			),
 		),
 		route.ResourcePoolMutation(resourcepool.PoolMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool"))),
@@ -886,9 +891,10 @@ func main() {
 	}
 
 	if err = (&rulestatuscontroller.Manager{
-		Client:  manager.GetClient(),
-		Log:     ctrl.Log.WithName("capsule.ctrl").WithName("ruleset"),
-		Metrics: metrics.MustMakeRuleStatusRecorder(),
+		Client:     manager.GetClient(),
+		RESTConfig: manager.GetConfig(),
+		Log:        ctrl.Log.WithName("capsule.ctrl").WithName("ruleset"),
+		Metrics:    metrics.MustMakeRuleStatusRecorder(),
 	}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RuleSet")
 		os.Exit(1)

@@ -419,6 +419,41 @@ func TestValidateMetadata(t *testing.T) {
 	}
 }
 
+func TestControlledMetadataEntriesMatchesKeyPatternsWithRegexCache(t *testing.T) {
+	t.Parallel()
+
+	h := newMetadataTestRules(nil, nil)
+	obj := &metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{
+		Annotations: map[string]string{
+			"example.corp/cost-center": "INV-1234",
+			"unrelated":                "ignored",
+		},
+	}}
+	enforce := []*apirules.NamespaceRuleEnforceBody{{
+		Metadata: []apirules.MetadataRule{{
+			VersionKinds: runtime.VersionKinds{APIGroups: []string{"v1"}, Kinds: []string{"Namespace"}},
+			Annotations: map[string]apirules.MetadataValueRule{
+				"example.corp/*": {},
+			},
+		}},
+	}}
+
+	entries, err := h.controlledMetadataEntries(
+		obj,
+		schema.GroupVersionKind{Version: "v1", Kind: "Namespace"},
+		enforce,
+	)
+	if err != nil {
+		t.Fatalf("controlledMetadataEntries() error = %v", err)
+	}
+	if len(entries) != 1 || entries[0].Key != "example.corp/cost-center" {
+		t.Fatalf("unexpected pattern-matched entries: %#v", entries)
+	}
+	if h.regexCache.Stats() != 1 {
+		t.Fatalf("expected key expression to use regex cache, got %d entries", h.regexCache.Stats())
+	}
+}
+
 func TestControlledMetadataEntries(t *testing.T) {
 	t.Parallel()
 
@@ -742,6 +777,45 @@ func TestControlledMetadataEntries(t *testing.T) {
 			want: nil,
 		},
 		{
+			name: "managed metadata does not satisfy required selectors",
+			obj: metadataObject(
+				map[string]string{
+					meta.TenantLabel: "tenant-a",
+				},
+				map[string]string{
+					meta.ReconcileAnnotation: "true",
+				},
+			),
+			gvk: coreGVK("ConfigMap"),
+			enforceBodies: []*apirules.NamespaceRuleEnforceBody{
+				enforceMetadata(
+					apirules.ActionTypeAllow,
+					[]string{"*"},
+					[]string{"ConfigMap"},
+					map[string]apirules.MetadataValueRule{
+						"capsule.clastix.io/*": metadataPolicy(true, exact("tenant-a")),
+					},
+					map[string]apirules.MetadataValueRule{
+						"reconcile.projectcapsule.dev/*": metadataPolicy(true, exact("true")),
+					},
+				),
+			},
+			want: []metadataEntry{
+				{
+					Field:    metadataFieldAnnotation,
+					Key:      "reconcile.projectcapsule.dev/*",
+					Path:     `metadata.annotations["reconcile.projectcapsule.dev/*"]`,
+					Required: true,
+				},
+				{
+					Field:    metadataFieldLabel,
+					Key:      "capsule.clastix.io/*",
+					Path:     `metadata.labels["capsule.clastix.io/*"]`,
+					Required: true,
+				},
+			},
+		},
+		{
 			name: "custom parameters add label and annotation to managed metadata",
 			managedLabels: []string{
 				meta.TenantLabel,
@@ -892,7 +966,10 @@ func TestControlledMetadataEntries(t *testing.T) {
 
 			h := newMetadataTestRules(tt.managedLabels, tt.managedAnnotations)
 
-			got := h.controlledMetadataEntries(tt.obj, tt.gvk, tt.enforceBodies)
+			got, err := h.controlledMetadataEntries(tt.obj, tt.gvk, tt.enforceBodies)
+			if err != nil {
+				t.Fatalf("controlledMetadataEntries() error = %v", err)
+			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Fatalf("unexpected entries\nwant: %#v\n got: %#v", tt.want, got)
 			}
@@ -942,7 +1019,7 @@ func TestMetadataSet(t *testing.T) {
 
 		set := h.metadataSet(coreGVK("ConfigMap"), entry)
 
-		got := set.Rules(enforceMetadata(
+		got, err := set.RulesWithError(enforceMetadata(
 			apirules.ActionTypeAllow,
 			[]string{"*"},
 			[]string{"ConfigMap"},
@@ -951,6 +1028,9 @@ func TestMetadataSet(t *testing.T) {
 			},
 			nil,
 		))
+		if err != nil {
+			t.Fatalf("RulesWithError() error = %v", err)
+		}
 
 		if len(got) != 2 {
 			t.Fatalf("expected two matchers, got %d", len(got))
@@ -976,7 +1056,7 @@ func TestMetadataSet(t *testing.T) {
 
 		set := h.metadataSet(coreGVK("ConfigMap"), entry)
 
-		got := set.Rules(enforceMetadata(
+		got, err := set.RulesWithError(enforceMetadata(
 			apirules.ActionTypeAllow,
 			[]string{"*"},
 			[]string{"ConfigMap"},
@@ -985,6 +1065,9 @@ func TestMetadataSet(t *testing.T) {
 				"cost-center": metadataPolicy(true, expression("^INV-[0-9]{4}$")),
 			},
 		))
+		if err != nil {
+			t.Fatalf("RulesWithError() error = %v", err)
+		}
 
 		if len(got) != 1 {
 			t.Fatalf("expected one matcher, got %d", len(got))
@@ -1003,7 +1086,11 @@ func TestMetadataSet(t *testing.T) {
 			Key:   "env",
 		})
 
-		if got := set.Rules(nil); got != nil {
+		got, err := set.RulesWithError(nil)
+		if err != nil {
+			t.Fatalf("RulesWithError() error = %v", err)
+		}
+		if got != nil {
 			t.Fatalf("expected nil, got %#v", got)
 		}
 	})
@@ -1017,7 +1104,7 @@ func TestMetadataSet(t *testing.T) {
 			Key:   "env",
 		})
 
-		got := set.Rules(enforceMetadata(
+		got, err := set.RulesWithError(enforceMetadata(
 			apirules.ActionTypeAllow,
 			[]string{"*"},
 			[]string{"ConfigMap"},
@@ -1026,9 +1113,56 @@ func TestMetadataSet(t *testing.T) {
 			},
 			nil,
 		))
+		if err != nil {
+			t.Fatalf("RulesWithError() error = %v", err)
+		}
 
 		if got != nil {
 			t.Fatalf("expected nil, got %#v", got)
+		}
+	})
+
+	t.Run("rules returns invalid key selector errors", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []struct {
+			name  string
+			entry metadataEntry
+			body  *apirules.NamespaceRuleEnforceBody
+		}{
+			{
+				name:  "label",
+				entry: metadataEntry{Field: metadataFieldLabel, Key: "env"},
+				body: enforceMetadata(
+					apirules.ActionTypeAllow,
+					[]string{"*"},
+					[]string{"ConfigMap"},
+					map[string]apirules.MetadataValueRule{"[": metadataPolicy(false, exact("prod"))},
+					nil,
+				),
+			},
+			{
+				name:  "annotation",
+				entry: metadataEntry{Field: metadataFieldAnnotation, Key: "env"},
+				body: enforceMetadata(
+					apirules.ActionTypeAllow,
+					[]string{"*"},
+					[]string{"ConfigMap"},
+					nil,
+					map[string]apirules.MetadataValueRule{"[": metadataPolicy(false, exact("prod"))},
+				),
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				set := newMetadataTestRules(nil, nil).metadataSet(coreGVK("ConfigMap"), tt.entry)
+				if _, err := set.RulesWithError(tt.body); err == nil {
+					t.Fatal("RulesWithError() error = nil, want invalid selector error")
+				}
+			})
 		}
 	})
 
