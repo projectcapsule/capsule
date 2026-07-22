@@ -14,6 +14,7 @@ import (
 
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 	"github.com/projectcapsule/capsule/pkg/api/runtime"
+	"github.com/projectcapsule/capsule/pkg/runtime/jsonpath"
 )
 
 func ValidateRuleStatusBody(
@@ -35,6 +36,43 @@ func ValidateRuleStatusBody(
 
 		if err := validateMetadataRules(i, rule.Enforce.Metadata, mapper); err != nil {
 			return err
+		}
+
+		if err := validateFieldRules(i, rule.Enforce.Fields, mapper); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func validateFieldRules(
+	ruleIndex int,
+	fields []rules.FieldRule,
+	mapper k8smeta.RESTMapper,
+) error {
+	for j, rule := range fields {
+		fieldPath := fmt.Sprintf("rules[%d].enforce.fields[%d]", ruleIndex, j)
+
+		if err := validateVersionKindTargets(fieldPath, rule.VersionKinds, mapper); err != nil {
+			return err
+		}
+
+		if _, err := jsonpath.CompileJSONPath(rule.Path); err != nil {
+			return fmt.Errorf("%s.path %q is invalid: %w", fieldPath, rule.Path, err)
+		}
+
+		if len(rule.Match) == 0 {
+			return fmt.Errorf("%s.match is invalid: at least one match must be configured", fieldPath)
+		}
+
+		for k, matcher := range rule.Match {
+			if err := validateExpressionMatch(
+				matcher,
+				fmt.Sprintf("%s.match[%d]", fieldPath, k),
+			); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -131,7 +169,7 @@ func validateMetadataRules(
 	for j, rule := range metadata {
 		fieldPath := fmt.Sprintf("rules[%d].enforce.metadata[%d]", ruleIndex, j)
 
-		if err := validateMetadataTargets(fieldPath, rule, mapper); err != nil {
+		if err := validateVersionKindTargets(fieldPath, rule.VersionKinds, mapper); err != nil {
 			return err
 		}
 
@@ -262,16 +300,16 @@ func validateNodePortRange(portRange rules.ServiceNodePortRange) error {
 	return nil
 }
 
-func validateMetadataTargets(
+func validateVersionKindTargets(
 	fieldPath string,
-	rule rules.MetadataRule,
+	targets runtime.VersionKinds,
 	mapper k8smeta.RESTMapper,
 ) error {
-	if len(rule.Kinds) == 0 {
+	if len(targets.Kinds) == 0 {
 		return fmt.Errorf("%s.kinds is invalid: at least one kind must be configured", fieldPath)
 	}
 
-	for i, kind := range rule.Kinds {
+	for i, kind := range targets.Kinds {
 		kind = strings.TrimSpace(kind)
 		if kind == "" {
 			return fmt.Errorf("%s.kinds[%d] is invalid: kind is empty", fieldPath, i)
@@ -282,7 +320,7 @@ func validateMetadataTargets(
 		return nil
 	}
 
-	if err := rule.ValidateKnownKinds(mapper, fieldPath); err != nil {
+	if err := targets.ValidateKnownKinds(mapper, fieldPath); err != nil {
 		return err
 	}
 

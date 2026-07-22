@@ -68,6 +68,96 @@ spec:
                       - deny
                       - audit
                       type: string
+                    fields:
+                      description: Enforcement for values at declared field paths
+                        on namespaced resources.
+                      items:
+                        description: |-
+                          FieldRule defines value constraints for a declared field path on
+                          namespaced resources.
+
+                          Rules constrain values that exist: a path resolving to no value (or only
+                          empty values) is not evaluated, so field rules never make a field
+                          required. Note that server-side defaulting (DefaultStorageClass,
+                          LimitRanger, ...) runs before validating webhooks, so defaulted fields
+                          are already populated when rules are evaluated.
+                        properties:
+                          apiGroups:
+                            description: |-
+                              API groups or API group/version selectors of the referents.
+
+                              Empty or omitted APIGroups means the core Kubernetes API version "v1".
+                              Use "*" to match all API groups and versions.
+
+                              Examples:
+                              - [] or [""] means core "v1".
+                              - ["v1"] means core "v1".
+                              - ["apps"] means any version in the "apps" API group.
+                              - ["apps/v1"] means only "apps/v1".
+                              - ["apps", "batch/v1"] means any "apps" version and "batch/v1".
+                              - ["*"] means all API groups and versions.
+                            items:
+                              type: string
+                            type: array
+                          kinds:
+                            description: |-
+                              Kinds of the referents.
+
+                              Use "*" to match all kinds.
+                            items:
+                              minLength: 1
+                              type: string
+                            minItems: 1
+                            type: array
+                          match:
+                            description: |-
+                              Match defines allowed, denied, or audited values for the field,
+                              depending on the enforcement action.
+                            items:
+                              description: |-
+                                At least one of Exact or Exp must be set.
+                                Both may be set together.
+                              properties:
+                                exact:
+                                  description: Exact matches one of the provided values
+                                    exactly.
+                                  items:
+                                    type: string
+                                  minItems: 1
+                                  type: array
+                                exp:
+                                  description: Exp matches regular expression.
+                                  minLength: 1
+                                  type: string
+                                negate:
+                                  default: false
+                                  description: Negate regular Expression
+                                  type: boolean
+                              type: object
+                              x-kubernetes-validations:
+                              - message: at least one of exact or exp must be set
+                                rule: has(self.exact) || has(self.exp)
+                            minItems: 1
+                            type: array
+                          path:
+                            description: |-
+                              Path is a JSONPath expression into the object, written with a leading
+                              dot and without surrounding curly braces (the same form used by
+                              CustomQuota source paths), e.g.
+                              ".spec.template.spec.containers[*].image", where "[*]" expands every
+                              element of an array field into one checked value.
+
+                              Values resolved by the path must be scalars, and violations are
+                              reported against the configured path, not concrete array indexes.
+                            maxLength: 512
+                            minLength: 1
+                            type: string
+                        required:
+                        - kinds
+                        - match
+                        - path
+                        type: object
+                      type: array
                     metadata:
                       description: Enforcement for object metadata on namespaced resources.
                       items:
@@ -472,6 +562,96 @@ spec:
                         - deny
                         - audit
                         type: string
+                      fields:
+                        description: Enforcement for values at declared field paths
+                          on namespaced resources.
+                        items:
+                          description: |-
+                            FieldRule defines value constraints for a declared field path on
+                            namespaced resources.
+
+                            Rules constrain values that exist: a path resolving to no value (or only
+                            empty values) is not evaluated, so field rules never make a field
+                            required. Note that server-side defaulting (DefaultStorageClass,
+                            LimitRanger, ...) runs before validating webhooks, so defaulted fields
+                            are already populated when rules are evaluated.
+                          properties:
+                            apiGroups:
+                              description: |-
+                                API groups or API group/version selectors of the referents.
+
+                                Empty or omitted APIGroups means the core Kubernetes API version "v1".
+                                Use "*" to match all API groups and versions.
+
+                                Examples:
+                                - [] or [""] means core "v1".
+                                - ["v1"] means core "v1".
+                                - ["apps"] means any version in the "apps" API group.
+                                - ["apps/v1"] means only "apps/v1".
+                                - ["apps", "batch/v1"] means any "apps" version and "batch/v1".
+                                - ["*"] means all API groups and versions.
+                              items:
+                                type: string
+                              type: array
+                            kinds:
+                              description: |-
+                                Kinds of the referents.
+
+                                Use "*" to match all kinds.
+                              items:
+                                minLength: 1
+                                type: string
+                              minItems: 1
+                              type: array
+                            match:
+                              description: |-
+                                Match defines allowed, denied, or audited values for the field,
+                                depending on the enforcement action.
+                              items:
+                                description: |-
+                                  At least one of Exact or Exp must be set.
+                                  Both may be set together.
+                                properties:
+                                  exact:
+                                    description: Exact matches one of the provided
+                                      values exactly.
+                                    items:
+                                      type: string
+                                    minItems: 1
+                                    type: array
+                                  exp:
+                                    description: Exp matches regular expression.
+                                    minLength: 1
+                                    type: string
+                                  negate:
+                                    default: false
+                                    description: Negate regular Expression
+                                    type: boolean
+                                type: object
+                                x-kubernetes-validations:
+                                - message: at least one of exact or exp must be set
+                                  rule: has(self.exact) || has(self.exp)
+                              minItems: 1
+                              type: array
+                            path:
+                              description: |-
+                                Path is a JSONPath expression into the object, written with a leading
+                                dot and without surrounding curly braces (the same form used by
+                                CustomQuota source paths), e.g.
+                                ".spec.template.spec.containers[*].image", where "[*]" expands every
+                                element of an array field into one checked value.
+
+                                Values resolved by the path must be scalars, and violations are
+                                reported against the configured path, not concrete array indexes.
+                              maxLength: 512
+                              minLength: 1
+                              type: string
+                          required:
+                          - kinds
+                          - match
+                          - path
+                          type: object
+                        type: array
                       metadata:
                         description: Enforcement for object metadata on namespaced
                           resources.
@@ -815,6 +995,97 @@ spec:
                           - deny
                           - audit
                           type: string
+                        fields:
+                          description: Enforcement for values at declared field paths
+                            on namespaced resources.
+                          items:
+                            description: |-
+                              FieldRule defines value constraints for a declared field path on
+                              namespaced resources.
+
+                              Rules constrain values that exist: a path resolving to no value (or only
+                              empty values) is not evaluated, so field rules never make a field
+                              required. Note that server-side defaulting (DefaultStorageClass,
+                              LimitRanger, ...) runs before validating webhooks, so defaulted fields
+                              are already populated when rules are evaluated.
+                            properties:
+                              apiGroups:
+                                description: |-
+                                  API groups or API group/version selectors of the referents.
+
+                                  Empty or omitted APIGroups means the core Kubernetes API version "v1".
+                                  Use "*" to match all API groups and versions.
+
+                                  Examples:
+                                  - [] or [""] means core "v1".
+                                  - ["v1"] means core "v1".
+                                  - ["apps"] means any version in the "apps" API group.
+                                  - ["apps/v1"] means only "apps/v1".
+                                  - ["apps", "batch/v1"] means any "apps" version and "batch/v1".
+                                  - ["*"] means all API groups and versions.
+                                items:
+                                  type: string
+                                type: array
+                              kinds:
+                                description: |-
+                                  Kinds of the referents.
+
+                                  Use "*" to match all kinds.
+                                items:
+                                  minLength: 1
+                                  type: string
+                                minItems: 1
+                                type: array
+                              match:
+                                description: |-
+                                  Match defines allowed, denied, or audited values for the field,
+                                  depending on the enforcement action.
+                                items:
+                                  description: |-
+                                    At least one of Exact or Exp must be set.
+                                    Both may be set together.
+                                  properties:
+                                    exact:
+                                      description: Exact matches one of the provided
+                                        values exactly.
+                                      items:
+                                        type: string
+                                      minItems: 1
+                                      type: array
+                                    exp:
+                                      description: Exp matches regular expression.
+                                      minLength: 1
+                                      type: string
+                                    negate:
+                                      default: false
+                                      description: Negate regular Expression
+                                      type: boolean
+                                  type: object
+                                  x-kubernetes-validations:
+                                  - message: at least one of exact or exp must be
+                                      set
+                                    rule: has(self.exact) || has(self.exp)
+                                minItems: 1
+                                type: array
+                              path:
+                                description: |-
+                                  Path is a JSONPath expression into the object, written with a leading
+                                  dot and without surrounding curly braces (the same form used by
+                                  CustomQuota source paths), e.g.
+                                  ".spec.template.spec.containers[*].image", where "[*]" expands every
+                                  element of an array field into one checked value.
+
+                                  Values resolved by the path must be scalars, and violations are
+                                  reported against the configured path, not concrete array indexes.
+                                maxLength: 512
+                                minLength: 1
+                                type: string
+                            required:
+                            - kinds
+                            - match
+                            - path
+                            type: object
+                          type: array
                         metadata:
                           description: Enforcement for object metadata on namespaced
                             resources.

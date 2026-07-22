@@ -4,7 +4,7 @@
 package validation
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -13,19 +13,21 @@ import (
 const Path = "/rules/generic/validating"
 
 type genericValidating struct {
-	regexCache *cache.RegexCache
+	regexCache    *cache.RegexCache
+	jsonPathCache *cache.JSONPathCache
 }
 
-func Register(regexCache *cache.RegexCache) handlers.Webhook {
+func Register(regexCache *cache.RegexCache, jsonPathCache *cache.JSONPathCache) handlers.Webhook {
 	return &genericValidating{
-		regexCache: regexCache,
+		regexCache:    regexCache,
+		jsonPathCache: jsonPathCache,
 	}
 }
 
 func (w *genericValidating) GetHandlers() []handlers.Handler {
 	return []handlers.Handler{
 		genericHandler(
-			GenericRules(w.regexCache),
+			GenericRules(w.regexCache, w.jsonPathCache),
 		),
 	}
 }
@@ -35,11 +37,11 @@ func (genericValidating) GetPath() string {
 }
 
 func genericHandler(
-	handler ...handlers.TypedHandlerWithTenantWithRuleset[*metav1.PartialObjectMetadata],
+	handler ...handlers.TypedHandlerWithTenantWithRuleset[*unstructured.Unstructured],
 ) handlers.Handler {
-	return &handlers.TypedTenantWithRulesetHandler[*metav1.PartialObjectMetadata]{
-		Factory: func() *metav1.PartialObjectMetadata {
-			return &metav1.PartialObjectMetadata{}
+	return &handlers.TypedTenantWithRulesetHandler[*unstructured.Unstructured]{
+		Factory: func() *unstructured.Unstructured {
+			return &unstructured.Unstructured{}
 		},
 		Handlers: handler,
 	}

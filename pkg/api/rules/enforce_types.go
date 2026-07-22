@@ -23,4 +23,9 @@ type NamespaceRuleEnforceBody struct {
 	//
 	// +optional
 	Metadata []MetadataRule `json:"metadata,omitempty"`
+
+	// Enforcement for values at declared field paths on namespaced resources.
+	//
+	// +optional
+	Fields []FieldRule `json:"fields,omitempty"`
 }

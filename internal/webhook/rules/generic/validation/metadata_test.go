@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/projectcapsule/capsule/internal/cache"
@@ -1237,12 +1237,11 @@ func metadataObject(
 	labels map[string]string,
 	annotations map[string]string,
 ) genericObject {
-	return &metav1.PartialObjectMetadata{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels:      labels,
-			Annotations: annotations,
-		},
-	}
+	obj := &unstructured.Unstructured{Object: map[string]any{}}
+	obj.SetLabels(labels)
+	obj.SetAnnotations(annotations)
+
+	return obj
 }
 
 func coreGVK(kind string) schema.GroupVersionKind {

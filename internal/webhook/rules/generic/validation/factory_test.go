@@ -11,6 +11,7 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -27,7 +28,7 @@ import (
 func TestGenericRules(t *testing.T) {
 	t.Parallel()
 
-	got := GenericRules(nil)
+	got := GenericRules(nil, nil)
 
 	h, ok := got.(*genericRules)
 	if !ok {
@@ -38,8 +39,12 @@ func TestGenericRules(t *testing.T) {
 		t.Fatalf("expected regex cache")
 	}
 
-	if len(h.rules) != 1 {
-		t.Fatalf("expected one generic validator, got %d", len(h.rules))
+	if h.jsonPathCache == nil {
+		t.Fatalf("expected jsonpath cache")
+	}
+
+	if len(h.rules) != 2 {
+		t.Fatalf("expected two generic validators, got %d", len(h.rules))
 	}
 
 	if !h.managedMetadata.HasLabel(meta.TenantLabel) {
@@ -872,14 +877,13 @@ func genericMetadataObject(
 	labels map[string]string,
 	annotations map[string]string,
 ) genericObject {
-	return &metav1.PartialObjectMetadata{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        "object",
-			Namespace:   "tenant-a",
-			Labels:      labels,
-			Annotations: annotations,
-		},
-	}
+	obj := &unstructured.Unstructured{Object: map[string]any{}}
+	obj.SetName("object")
+	obj.SetNamespace("tenant-a")
+	obj.SetLabels(labels)
+	obj.SetAnnotations(annotations)
+
+	return obj
 }
 
 var (
@@ -1038,7 +1042,7 @@ func testTenant() *capsulev1beta2.Tenant {
 func TestGenericRulesWithRealMetadataValidatorSmoke(t *testing.T) {
 	t.Parallel()
 
-	h := GenericRules(cache.NewRegexCache()).(*genericRules)
+	h := GenericRules(cache.NewRegexCache(), cache.NewJSONPathCache()).(*genericRules)
 
 	evaluation, err := h.validateMetadata(
 		genericMetadataObject(map[string]string{"env": "prod"}, nil),

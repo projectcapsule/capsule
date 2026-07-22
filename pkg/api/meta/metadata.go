@@ -193,7 +193,7 @@ func DefaultObjectSkipRules() []ObjectSkipRule {
 }
 
 func ShouldSkipObjectByRules(
-	obj *metav1.PartialObjectMetadata,
+	obj metav1.Object,
 	rules []ObjectSkipRule,
 ) bool {
 	if obj == nil || len(rules) == 0 {

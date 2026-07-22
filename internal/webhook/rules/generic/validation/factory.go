@@ -9,7 +9,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -24,7 +24,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
-type genericObject = *metav1.PartialObjectMetadata
+type genericObject = *unstructured.Unstructured
 
 type genericRuleSet[R any] = ruleengine.Set[R, genericObject]
 
@@ -53,25 +53,33 @@ type genericRuleValidator func(
 type genericRules struct {
 	rules           []genericRuleValidator
 	regexCache      *cache.RegexCache
+	jsonPathCache   *cache.JSONPathCache
 	managedMetadata meta.ManagedMetadata
 	objectSkipRules []meta.ObjectSkipRule
 }
 
 func GenericRules(
 	regexCache *cache.RegexCache,
+	jsonPathCache *cache.JSONPathCache,
 ) handlers.TypedHandlerWithTenantWithRuleset[genericObject] {
 	if regexCache == nil {
 		regexCache = cache.NewRegexCache()
 	}
 
+	if jsonPathCache == nil {
+		jsonPathCache = cache.NewJSONPathCache()
+	}
+
 	h := &genericRules{
 		regexCache:      regexCache,
+		jsonPathCache:   jsonPathCache,
 		managedMetadata: meta.NewManagedMetadata(nil, nil),
 		objectSkipRules: meta.DefaultObjectSkipRules(),
 	}
 
 	h.rules = []genericRuleValidator{
 		h.validateMetadata,
+		h.validateFields,
 	}
 
 	return h

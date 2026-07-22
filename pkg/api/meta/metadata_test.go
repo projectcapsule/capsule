@@ -670,7 +670,7 @@ func TestShouldSkipObjectByRules(t *testing.T) {
 
 	tests := []struct {
 		name  string
-		obj   *metav1.PartialObjectMetadata
+		obj   metav1.Object
 		rules []ObjectSkipRule
 		want  bool
 	}{
