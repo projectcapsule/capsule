@@ -124,6 +124,10 @@ func (h *ownerReferenceHandler) OnUpdate(
 		}
 
 		labels := newNs.GetLabels()
+		if labels == nil {
+			labels = make(map[string]string)
+		}
+
 		tenant.AddNamespaceNameLabels(labels, newNs)
 		tenant.AddTenantNameLabel(labels, tnt)
 		newNs.SetLabels(labels)
@@ -154,52 +158,27 @@ func (h *ownerReferenceHandler) tenantForUpdate(
 		return nil, ad.ErroredResponse(err)
 	}
 
-	if oldTenant != nil && namespaceReferencesTenant(newNs, oldTenant) {
-		if !tenant.NamespaceIsOwned(ctx, reader, h.cfg, oldNs, oldTenant, user) {
-			return nil, denyNamespacePatch(ctx, req, oldNs, recorder, "denied patch request for this namespace")
+	if oldTenant == nil {
+		requestedTenant, requestedErr := requestedNamespaceTenant(ctx, reader, newNs)
+		if requestedErr != nil {
+			return nil, denyNamespacePatch(ctx, req, oldNs, recorder, requestedErr.Error())
 		}
 
-		return oldTenant, nil
-	}
+		if requestedTenant != nil {
+			return nil, denyNamespacePatch(ctx, req, oldNs, recorder, "namespace can not be patched into a tenant")
+		}
 
-	requestedTenant, err := requestedNamespaceTenant(ctx, reader, newNs)
-	if err != nil {
-		return nil, denyNamespacePatch(ctx, req, oldNs, recorder, err.Error())
-	}
-
-	switch {
-	case oldTenant == nil && requestedTenant == nil:
 		return nil, denyNamespacePatch(ctx, req, oldNs, recorder, "namespace is not owned by any tenant")
-
-	case oldTenant == nil:
-		return nil, denyNamespacePatch(ctx, req, oldNs, recorder, "namespace can not be patched into a tenant")
-
-	case requestedTenant == nil:
-		return nil, denyNamespacePatch(ctx, req, oldNs, recorder, "namespace can not remove tenant ownership")
-
-	case oldTenant.GetName() != requestedTenant.GetName() || oldTenant.GetUID() != requestedTenant.GetUID():
-		return nil, denyNamespacePatch(ctx, req, oldNs, recorder, "namespace can not be migrated between tenants")
 	}
 
 	if !tenant.NamespaceIsOwned(ctx, reader, h.cfg, oldNs, oldTenant, user) {
 		return nil, denyNamespacePatch(ctx, req, oldNs, recorder, "denied patch request for this namespace")
 	}
 
+	// Tenant owners may patch managed namespaces, but only administrators can
+	// change their Tenant assignment. Returning the old Tenant lets this handler
+	// normalize partial or attempted assignment changes back to the current one.
 	return oldTenant, nil
-}
-
-func namespaceReferencesTenant(ns *corev1.Namespace, tnt *capsulev1beta2.Tenant) bool {
-	if tenant.TenanLabelValue(ns) == tnt.GetName() {
-		return true
-	}
-
-	for _, ref := range tenant.TenantOwnerReferences(ns) {
-		if tenant.IsTenantOwnerReferenceForTenant(ref, tnt) {
-			return true
-		}
-	}
-
-	return false
 }
 
 func requestedNamespaceTenant(
