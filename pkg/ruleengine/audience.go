@@ -60,6 +60,10 @@ func matchesAudience(cfg configuration.Configuration, tnt *capsulev1beta2.Tenant
 				return true, nil
 			}
 		case rules.AudienceKindCustom:
+			if cfg == nil {
+				return false, fmt.Errorf("configuration is required for custom audience %q", subject.Name)
+			}
+
 			matched, err := matchesCustomAudience(cfg, tnt, req, rules.CustomAudience(subject.Name))
 			if err != nil {
 				return false, err
