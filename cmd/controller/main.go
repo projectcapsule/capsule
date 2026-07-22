@@ -773,7 +773,6 @@ func main() {
 				namespacemutation.MetadataHandler(cfg),
 				// Tenant metadata must be resolved before applying namespace rules.
 				namespacemutation.RulesMetadataHandler(cfg),
-				namespacemutation.NamespacePatchGuardHandler(cfg),
 			),
 		),
 		route.ResourcePoolMutation(resourcepool.PoolMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool"))),

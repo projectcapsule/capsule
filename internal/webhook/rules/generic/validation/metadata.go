@@ -243,7 +243,7 @@ func (h *genericRules) controlledMetadataEntries(
 				for key, value := range annotations {
 					matched, err := h.matchesMetadataKey(selector, key)
 					if err != nil {
-						return nil, fmt.Errorf("invalid label selector %q: %w", selector, err)
+						return nil, fmt.Errorf("invalid annotation selector %q: %w", selector, err)
 					}
 
 					if !matched {
