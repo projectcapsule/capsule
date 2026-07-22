@@ -98,28 +98,9 @@ func (h *ownerReferenceHandler) OnUpdate(
 	recorder events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		var tnt *capsulev1beta2.Tenant
-
-		if user.IsAdmin() {
-			if !tenant.HasConsistentTenantReference(newNs) {
-				return ad.Deny("tenant label and ownerReference must both be set consistently or both be absent")
-			}
-
-			if !tenant.HasTenantReference(newNs) {
-				return nil
-			}
-
-			var err error
-			tnt, err = tenant.ResolveNamespaceTenant(ctx, reader, newNs)
-			if err != nil {
-				return ad.ErroredResponse(err)
-			}
-		} else {
-			var err error
-			tnt, err = resolveTenantForNamespaceUpdate(ctx, reader, user, h.cfg, oldNs, newNs)
-			if err != nil {
-				return ad.ErroredResponse(err)
-			}
+		tnt, errResponse := h.tenantForUpdate(ctx, reader, user, oldNs, newNs, req, recorder)
+		if errResponse != nil {
+			return errResponse
 		}
 
 		if tnt == nil {
@@ -151,29 +132,138 @@ func (h *ownerReferenceHandler) OnUpdate(
 	}
 }
 
-func resolveTenantForNamespaceUpdate(
+func (h *ownerReferenceHandler) tenantForUpdate(
 	ctx context.Context,
-	c client.Reader,
+	reader client.Reader,
 	user users.AdmissionUser,
-	cfg configuration.Configuration,
 	oldNs, newNs *corev1.Namespace,
+	req admission.Request,
+	recorder events.EventRecorder,
+) (*capsulev1beta2.Tenant, *admission.Response) {
+	if user.IsAdmin() {
+		requestedTenant, err := requestedNamespaceTenant(ctx, reader, newNs)
+		if err != nil {
+			return nil, denyNamespacePatch(ctx, req, oldNs, recorder, err.Error())
+		}
+
+		return requestedTenant, nil
+	}
+
+	oldTenant, err := tenant.ResolveNamespaceTenant(ctx, reader, oldNs)
+	if err != nil {
+		return nil, ad.ErroredResponse(err)
+	}
+
+	if oldTenant != nil && namespaceReferencesTenant(newNs, oldTenant) {
+		if !tenant.NamespaceIsOwned(ctx, reader, h.cfg, oldNs, oldTenant, user) {
+			return nil, denyNamespacePatch(ctx, req, oldNs, recorder, "denied patch request for this namespace")
+		}
+
+		return oldTenant, nil
+	}
+
+	requestedTenant, err := requestedNamespaceTenant(ctx, reader, newNs)
+	if err != nil {
+		return nil, denyNamespacePatch(ctx, req, oldNs, recorder, err.Error())
+	}
+
+	switch {
+	case oldTenant == nil && requestedTenant == nil:
+		return nil, denyNamespacePatch(ctx, req, oldNs, recorder, "namespace is not owned by any tenant")
+
+	case oldTenant == nil:
+		return nil, denyNamespacePatch(ctx, req, oldNs, recorder, "namespace can not be patched into a tenant")
+
+	case requestedTenant == nil:
+		return nil, denyNamespacePatch(ctx, req, oldNs, recorder, "namespace can not remove tenant ownership")
+
+	case oldTenant.GetName() != requestedTenant.GetName() || oldTenant.GetUID() != requestedTenant.GetUID():
+		return nil, denyNamespacePatch(ctx, req, oldNs, recorder, "namespace can not be migrated between tenants")
+	}
+
+	if !tenant.NamespaceIsOwned(ctx, reader, h.cfg, oldNs, oldTenant, user) {
+		return nil, denyNamespacePatch(ctx, req, oldNs, recorder, "denied patch request for this namespace")
+	}
+
+	return oldTenant, nil
+}
+
+func namespaceReferencesTenant(ns *corev1.Namespace, tnt *capsulev1beta2.Tenant) bool {
+	if tenant.TenanLabelValue(ns) == tnt.GetName() {
+		return true
+	}
+
+	for _, ref := range tenant.TenantOwnerReferences(ns) {
+		if tenant.IsTenantOwnerReferenceForTenant(ref, tnt) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func requestedNamespaceTenant(
+	ctx context.Context,
+	reader client.Reader,
+	ns *corev1.Namespace,
 ) (*capsulev1beta2.Tenant, error) {
-	// 1) try old ownerRefs
-	if tnt, err := tenant.GetTenantByOwnerreferences(ctx, c, oldNs.OwnerReferences); err != nil {
-		return nil, err
-	} else if tnt != nil {
-		return tnt, nil
+	label := tenant.TenanLabelValue(ns)
+	refs := tenant.TenantOwnerReferences(ns)
+
+	if len(refs) > 1 {
+		return nil, fmt.Errorf("namespace can not have multiple Tenant ownerReferences")
 	}
 
-	// 2) try new ownerRefs
-	if tnt, err := tenant.GetTenantByOwnerreferences(ctx, c, newNs.OwnerReferences); err != nil {
-		return nil, err
-	} else if tnt != nil {
-		return tnt, nil
+	name := label
+	if len(refs) == 1 {
+		if name != "" && name != refs[0].Name {
+			return nil, fmt.Errorf("namespace label %q does not match owner reference %q", name, refs[0].Name)
+		}
+
+		name = refs[0].Name
 	}
 
-	// 3) fall back to labels + user
-	return tenant.GetTenantByLabelsAndUser(ctx, c, cfg, newNs, user)
+	if name == "" {
+		return nil, nil
+	}
+
+	tnt := &capsulev1beta2.Tenant{}
+	if err := reader.Get(ctx, client.ObjectKey{Name: name}, tnt); err != nil {
+		return nil, err
+	}
+
+	if len(refs) == 1 && refs[0].UID != "" && refs[0].UID != tnt.GetUID() {
+		return nil, fmt.Errorf(
+			"tenant ownerReference UID mismatch for %q: namespace references UID %q but tenant has UID %q",
+			name,
+			refs[0].UID,
+			tnt.GetUID(),
+		)
+	}
+
+	return tnt, nil
+}
+
+func denyNamespacePatch(
+	ctx context.Context,
+	req admission.Request,
+	ns *corev1.Namespace,
+	recorder events.EventRecorder,
+	message string,
+) *admission.Response {
+	if ns != nil {
+		recorder.LabeledEvent(
+			ns,
+			corev1.EventTypeWarning,
+			events.ReasonNamespaceHijack,
+			events.ActionValidationDenied,
+			"namespace disallows patching relevant metadata",
+		).
+			WithRequestAnnotations(req).
+			Emit(ctx)
+	}
+
+	return ad.Deny(message)
 }
 
 func assignToTenant(

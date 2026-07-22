@@ -7,6 +7,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -17,6 +18,8 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
+	capevents "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 	"github.com/projectcapsule/capsule/pkg/users"
 )
@@ -78,27 +81,123 @@ func TestOwnerReferenceHandlerAllowsAdminTenantDetachment(t *testing.T) {
 	}
 }
 
-func TestOwnerReferenceHandlerDeniesIncompleteAdminTenantReference(t *testing.T) {
+func TestOwnerReferenceHandlerRepairsMissingOwnerReferenceForTenantOwner(t *testing.T) {
 	t.Parallel()
 
+	owner := rbac.CoreOwnerSpec{UserSpec: rbac.UserSpec{Name: "alice", Kind: rbac.UserOwner}}
 	oldTenant := testTenant("green", "green-uid")
+	oldTenant.Status.Owners = rbac.OwnerStatusListSpec{owner}
 	oldNs := testTenantNamespace("workloads", oldTenant)
 	newNs := oldNs.DeepCopy()
 	newNs.OwnerReferences = nil
 	client := testClient(t, oldTenant)
+	recorder := capevents.NewEventRecorder(nil, logr.Discard(), nil, nil)
 
 	response := (&ownerReferenceHandler{}).OnUpdate(
 		client,
 		client,
-		users.AdmissionUser{Type: users.AdmissionUserAdmin},
+		users.AdmissionUser{Type: users.AdmissionUserCapsule, Username: owner.Name},
 		newNs,
 		oldNs,
 		nil,
-		nil,
+		recorder,
 	)(context.Background(), admission.Request{})
 
-	if response == nil || response.Allowed {
-		t.Fatalf("expected incomplete tenant ownership to be denied, got %#v", response)
+	if response != nil {
+		t.Fatalf("expected same-tenant GitOps update to proceed, got %#v", response)
+	}
+
+	refs := tenant.TenantOwnerReferences(newNs)
+	if len(refs) != 1 || !tenant.IsTenantOwnerReferenceForTenant(refs[0], oldTenant) {
+		t.Fatalf("tenant ownerReferences = %#v, want repaired tenant %q reference", refs, oldTenant.Name)
+	}
+}
+
+func TestOwnerReferenceHandlerRemovesAdditionalTenantReferenceForTenantOwner(t *testing.T) {
+	t.Parallel()
+
+	owner := rbac.CoreOwnerSpec{UserSpec: rbac.UserSpec{Name: "alice", Kind: rbac.UserOwner}}
+	oldTenant := testTenant("green", "green-uid")
+	oldTenant.Status.Owners = rbac.OwnerStatusListSpec{owner}
+	oldNs := testTenantNamespace("workloads", oldTenant)
+	newNs := oldNs.DeepCopy()
+	newNs.OwnerReferences = append(newNs.OwnerReferences, metav1.OwnerReference{
+		APIVersion: capsulev1beta2.GroupVersion.String(),
+		Kind:       tenant.ObjectReferenceTenantKind,
+		Name:       "blue",
+		UID:        "blue-uid",
+	})
+	client := testClient(t, oldTenant)
+	recorder := capevents.NewEventRecorder(nil, logr.Discard(), nil, nil)
+
+	response := (&ownerReferenceHandler{}).OnUpdate(
+		client,
+		client,
+		users.AdmissionUser{Type: users.AdmissionUserCapsule, Username: owner.Name},
+		newNs,
+		oldNs,
+		nil,
+		recorder,
+	)(context.Background(), admission.Request{})
+
+	if response != nil {
+		t.Fatalf("expected additional ownerReference to be sanitized, got %#v", response)
+	}
+
+	refs := tenant.TenantOwnerReferences(newNs)
+	if len(refs) != 1 || !tenant.IsTenantOwnerReferenceForTenant(refs[0], oldTenant) {
+		t.Fatalf("tenant ownerReferences = %#v, want only tenant %q", refs, oldTenant.Name)
+	}
+}
+
+func TestOwnerReferenceHandlerRejectsNonAdminTenantTransitions(t *testing.T) {
+	t.Parallel()
+
+	green := testTenant("green", "green-uid")
+	blue := testTenant("blue", "blue-uid")
+	recorder := capevents.NewEventRecorder(nil, logr.Discard(), nil, nil)
+
+	tests := []struct {
+		name string
+		old  *corev1.Namespace
+		new  *corev1.Namespace
+	}{
+		{
+			name: "join",
+			old:  &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "workloads"}},
+			new:  testTenantNamespace("workloads", green),
+		},
+		{
+			name: "migration",
+			old:  testTenantNamespace("workloads", green),
+			new:  testTenantNamespace("workloads", blue),
+		},
+		{
+			name: "detachment",
+			old:  testTenantNamespace("workloads", green),
+			new:  &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "workloads"}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			client := testClient(t, green, blue)
+			response := (&ownerReferenceHandler{}).OnUpdate(
+				client,
+				client,
+				users.AdmissionUser{Type: users.AdmissionUserCapsule, Username: "alice"},
+				tt.new.DeepCopy(),
+				tt.old.DeepCopy(),
+				nil,
+				recorder,
+			)(context.Background(), admission.Request{})
+
+			if response == nil || response.Allowed {
+				t.Fatalf("expected non-admin %s to be denied, got %#v", tt.name, response)
+			}
+		})
 	}
 }
 

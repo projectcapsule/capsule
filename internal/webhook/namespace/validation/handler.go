@@ -122,6 +122,7 @@ func (h *handler) OnDelete(
 	}
 }
 
+//nolint:cyclop
 func (h *handler) OnUpdate(
 	c client.Client,
 	reader client.Reader,
@@ -142,7 +143,9 @@ func (h *handler) OnUpdate(
 		}
 
 		oldHasTenantReference := tenant.HasTenantReference(oldNs)
+
 		newHasTenantReference := tenant.HasTenantReference(ns)
+
 		if user.IsAdmin() && !tenant.HasConsistentTenantReference(ns) {
 			return ad.Deny("tenant label and ownerReference must both be set consistently or both be absent")
 		}

@@ -45,8 +45,11 @@ import (
 //
 // In case of Namespace-scoped Resource Budget, we're just replicating the resources across all registered Namespaces.
 
-//nolint:cyclop
 func (r *Manager) syncResourceQuotas(ctx context.Context, log logr.Logger, tenant *capsulev1beta2.Tenant) (err error) { //nolint:gocognit
+	if err := r.runGarbageCollection(ctx, tenant, &corev1.ResourceQuota{}); err != nil {
+		return err
+	}
+
 	// Remove prior metrics, to avoid cleaning up for metrics of deleted ResourceQuotas
 	r.Metrics.DeleteTenantResourceMetrics(tenant.Name)
 	// Expose the namespace quota and usage as metrics for the tenant
@@ -204,22 +207,9 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, log logr.Logger, tenan
 		keys = append(keys, strconv.Itoa(i))
 	}
 
-	group := new(errgroup.Group)
-
-	for _, ns := range tenant.Status.Spaces {
-		namespace := ns.Name
-
-		cond := ns.Conditions.GetConditionByType(meta.ReadyCondition)
-		if cond != nil && cond.Reason == meta.TerminatingReason {
-			continue
-		}
-
-		group.Go(func() error {
-			return r.syncResourceQuota(ctx, log, tenant, namespace, keys)
-		})
-	}
-
-	return group.Wait()
+	return runForTenantNamespaces(ctx, tenant, func(ctx context.Context, namespace string) error {
+		return r.syncResourceQuota(ctx, log, tenant, namespace, keys)
+	})
 }
 
 func (r *Manager) syncResourceQuota(ctx context.Context, log logr.Logger, tenant *capsulev1beta2.Tenant, namespace string, keys []string) (err error) {

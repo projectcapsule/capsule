@@ -195,19 +195,21 @@ var _ = Describe("Administrators", Ordered, Label("namespace", "permissions", "a
 		By("creating namespace with no label", func() {
 			ns := NewNamespace("")
 			NamespaceCreation(ns, admin, defaultTimeoutInterval).Should(Succeed())
+			DeferCleanup(func() { EventuallyDeletion(ns) })
 
-			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
-			Expect(len(ns.OwnerReferences)).To(Equal(0))
+			ExpectNamespaceNotAssignedToTenant(context.Background(), ns.Name)
 		})
 
-		By("creating namespace with no label", func() {
+		By("joining an existing unassigned namespace", func() {
 			ns := NewNamespace("")
 			NamespaceCreation(ns, admin, defaultTimeoutInterval).Should(Succeed())
+			DeferCleanup(func() { EventuallyDeletion(ns) })
 
-			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
-			Expect(len(ns.OwnerReferences)).To(Equal(0))
+			ExpectNamespaceNotAssignedToTenant(context.Background(), ns.Name)
 
-			PatchTenantLabelForNamespace(tnt1, ns, ownerClient(admin), defaultTimeoutInterval).Should(Succeed())
+			Eventually(func() error {
+				return PatchTenantAssignmentForNamespace(tnt1, ns, ownerClient(admin))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			NamespaceIsPartOfTenant(tnt1, ns).Should(Succeed())
 		})
 	})

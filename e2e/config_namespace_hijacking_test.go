@@ -1164,7 +1164,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("con
 		NamespaceIsPartOfTenant(t2, ns).Should(Succeed())
 	})
 
-	It("Administrators can remove complete Tenant ownership but not only one reference", func() {
+	It("Administrators can remove complete Tenant ownership while partial removal is reverted", func() {
 		tenant := getTenant(t1.Name)
 
 		ns := NewNamespace("", map[string]string{
@@ -1187,16 +1187,17 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("con
 			return err
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
-		_, err := adminClient.CoreV1().Namespaces().Patch(
-			context.TODO(),
-			ns.Name,
-			types.MergePatchType,
-			[]byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":null}}}`, meta.TenantLabel)),
-			metav1.PatchOptions{},
-		)
-		Expect(err).To(MatchError(ContainSubstring(
-			"tenant label and ownerReference must both be set consistently or both be absent",
-		)))
+		Eventually(func() error {
+			_, err := adminClient.CoreV1().Namespaces().Patch(
+				context.TODO(),
+				ns.Name,
+				types.MergePatchType,
+				[]byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":null}}}`, meta.TenantLabel)),
+				metav1.PatchOptions{},
+			)
+
+			return err
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		expectOriginalTenantOwnership(ns.Name, tenant)
 
 		patch := map[string]interface{}{
@@ -1284,7 +1285,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("con
 				},
 			}
 
-			Expect(PatchNamespace(ns, cs, patchRemoveOwnership)).To(Succeed())
+			Expect(PatchNamespace(ns, cs, patchRemoveOwnership)).ToNot(Succeed())
 			expectOriginalTenantOwnership(ns.Name, tenant)
 		}
 	})

@@ -768,7 +768,6 @@ func main() {
 				cfg,
 				namespacemutation.OwnerReferenceHandler(cfg),
 				namespacemutation.MetadataHandler(cfg),
-				namespacemutation.NamespacePatchGuardHandler(cfg),
 			),
 		),
 		route.ResourcePoolMutation(resourcepool.PoolMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool"))),
