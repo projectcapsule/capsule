@@ -75,8 +75,8 @@ type MetadataValueRule struct {
 	// +optional
 	Default *string `json:"default,omitempty"`
 
-	// Managed is enforced by admission mutation and continuously reconciled by
-	// the RuleStatus controller using server-side apply.
+	// Managed is enforced by admission mutation and reconciled by the RuleStatus
+	// controller using server-side apply when the rule configuration changes.
 	// +optional
 	Managed *string `json:"managed,omitempty"`
 }

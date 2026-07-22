@@ -58,6 +58,20 @@ func validateIngressRules(
 	ruleIndex int,
 	ingress rules.NamespaceRuleEnforceIngressBody,
 ) error {
+	if len(ingress.Types) == 0 && len(ingress.Hostnames) > 0 {
+		return fmt.Errorf(
+			"rules[%d].enforce.ingress.types is invalid: types must be configured when hostnames are configured",
+			ruleIndex,
+		)
+	}
+
+	if len(ingress.Types) > 0 && len(ingress.Hostnames) == 0 {
+		return fmt.Errorf(
+			"rules[%d].enforce.ingress.hostnames is invalid: hostnames must be configured when types are configured",
+			ruleIndex,
+		)
+	}
+
 	for i, resourceType := range ingress.Types {
 		switch resourceType {
 		case rules.IngressTypeIngress, rules.IngressTypeRoute,

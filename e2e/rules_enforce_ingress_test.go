@@ -13,6 +13,7 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -32,7 +33,10 @@ import (
 )
 
 var _ = Describe("enforcing ingress hostname namespace rules", Ordered, Label("tenant", "rules", "enforce", "ingress"), func() {
-	const ownerName = "e2e-rules-ingress"
+	const (
+		ownerName             = "e2e-rules-ingress"
+		gatewayAPIClusterRole = "e2e-rules-ingress-gateway-api"
+	)
 
 	var tnt *capsulev1beta2.Tenant
 
@@ -166,6 +170,18 @@ var _ = Describe("enforcing ingress hostname namespace rules", Ordered, Label("t
 							UserSpec: rbac.UserSpec{
 								Name: ownerName,
 								Kind: "User",
+							},
+						},
+					},
+				},
+				AdditionalRoleBindings: []rbac.AdditionalRoleBindingsSpec{
+					{
+						ClusterRoleName: gatewayAPIClusterRole,
+						Subjects: []rbacv1.Subject{
+							{
+								APIGroup: rbacv1.GroupName,
+								Kind:     rbacv1.UserKind,
+								Name:     ownerName,
 							},
 						},
 					},
@@ -388,6 +404,40 @@ var _ = Describe("enforcing ingress hostname namespace rules", Ordered, Label("t
 
 	BeforeAll(func() {
 		utilruntime.Must(gatewayv1.Install(scheme.Scheme))
+
+		role := &rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: gatewayAPIClusterRole},
+			Rules: []rbacv1.PolicyRule{
+				{
+					APIGroups: []string{"gateway.networking.k8s.io"},
+					Resources: []string{"gateways", "httproutes"},
+					Verbs:     []string{"create", "delete"},
+				},
+			},
+		}
+		Eventually(func() error {
+			current := &rbacv1.ClusterRole{}
+			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: gatewayAPIClusterRole}, current)
+			if apierrors.IsNotFound(err) {
+				return k8sClient.Create(context.Background(), role)
+			}
+			if err != nil {
+				return err
+			}
+
+			current.Rules = role.Rules
+
+			return k8sClient.Update(context.Background(), current)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	})
+
+	AfterAll(func() {
+		err := k8sClient.Delete(context.Background(), &rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: gatewayAPIClusterRole},
+		})
+		if !apierrors.IsNotFound(err) {
+			Expect(err).NotTo(HaveOccurred())
+		}
 	})
 
 	JustBeforeEach(func() {

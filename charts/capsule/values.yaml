@@ -1044,17 +1044,6 @@ webhooks:
         resources:
           - '*'
         scope: Namespaced
-      - apiGroups:
-          - ''
-        apiVersions:
-          - v1
-        operations:
-          - CREATE
-          - UPDATE
-        resources:
-          - namespaces
-        scope: Cluster
-
 
     resourcepools:
       pools:

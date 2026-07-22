@@ -149,42 +149,12 @@ func (h *TypedTenantWithRulesetHandler[T]) OnUpdate(
 }
 
 func (h *TypedTenantWithRulesetHandler[T]) OnDelete(
-	c client.Client,
-	reader client.Reader,
-	decoder admission.Decoder,
-	recorder events.EventRecorder,
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
 ) Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
-		tnt, err := h.resolveTenant(ctx, reader, req)
-		if err != nil {
-			return ErroredResponse(err)
-		}
-
-		if tnt == nil {
-			return nil
-		}
-
-		obj := h.Factory()
-		if err := decoder.Decode(req, obj); err != nil {
-			return ErroredResponse(err)
-		}
-
-		ruleBlocks, err := h.resolveRuleset(ctx, c, reader, req, req.Namespace, tnt)
-		if err != nil {
-			return ErroredResponse(err)
-		}
-
-		ruleBlocks, err = ruleengine.FilterNamespaceRulesByAudience(h.Configuration, tnt, req, ruleBlocks)
-		if err != nil {
-			return ErroredResponse(err)
-		}
-
-		for _, hndl := range h.Handlers {
-			if response := hndl.OnDelete(c, reader, obj, decoder, recorder, tnt, ruleBlocks)(ctx, req); response != nil {
-				return response
-			}
-		}
-
+	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }

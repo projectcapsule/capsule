@@ -156,8 +156,8 @@ spec:
                                   type: string
                                 managed:
                                   description: |-
-                                    Managed is enforced by admission mutation and continuously reconciled by
-                                    the RuleStatus controller using server-side apply.
+                                    Managed is enforced by admission mutation and reconciled by the RuleStatus
+                                    controller using server-side apply when the rule configuration changes.
                                   type: string
                                 required:
                                   default: false
@@ -239,8 +239,8 @@ spec:
                                   type: string
                                 managed:
                                   description: |-
-                                    Managed is enforced by admission mutation and continuously reconciled by
-                                    the RuleStatus controller using server-side apply.
+                                    Managed is enforced by admission mutation and reconciled by the RuleStatus
+                                    controller using server-side apply when the rule configuration changes.
                                   type: string
                                 required:
                                   default: false
@@ -653,8 +653,8 @@ spec:
                                     type: string
                                   managed:
                                     description: |-
-                                      Managed is enforced by admission mutation and continuously reconciled by
-                                      the RuleStatus controller using server-side apply.
+                                      Managed is enforced by admission mutation and reconciled by the RuleStatus
+                                      controller using server-side apply when the rule configuration changes.
                                     type: string
                                   required:
                                     default: false
@@ -736,8 +736,8 @@ spec:
                                     type: string
                                   managed:
                                     description: |-
-                                      Managed is enforced by admission mutation and continuously reconciled by
-                                      the RuleStatus controller using server-side apply.
+                                      Managed is enforced by admission mutation and reconciled by the RuleStatus
+                                      controller using server-side apply when the rule configuration changes.
                                     type: string
                                   required:
                                     default: false
@@ -1088,8 +1088,8 @@ spec:
                                       type: string
                                     managed:
                                       description: |-
-                                        Managed is enforced by admission mutation and continuously reconciled by
-                                        the RuleStatus controller using server-side apply.
+                                        Managed is enforced by admission mutation and reconciled by the RuleStatus
+                                        controller using server-side apply when the rule configuration changes.
                                       type: string
                                     required:
                                       default: false
@@ -1171,8 +1171,8 @@ spec:
                                       type: string
                                     managed:
                                       description: |-
-                                        Managed is enforced by admission mutation and continuously reconciled by
-                                        the RuleStatus controller using server-side apply.
+                                        Managed is enforced by admission mutation and reconciled by the RuleStatus
+                                        controller using server-side apply when the rule configuration changes.
                                       type: string
                                     required:
                                       default: false

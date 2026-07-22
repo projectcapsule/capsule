@@ -769,9 +769,10 @@ func main() {
 		route.NamespaceMutation(
 			namespacemutation.NamespaceHandler(
 				cfg,
-				namespacemutation.RulesMetadataHandler(cfg),
 				namespacemutation.OwnerReferenceHandler(cfg),
 				namespacemutation.MetadataHandler(cfg),
+				// Tenant metadata must be resolved before applying namespace rules.
+				namespacemutation.RulesMetadataHandler(cfg),
 				namespacemutation.NamespacePatchGuardHandler(cfg),
 			),
 		),

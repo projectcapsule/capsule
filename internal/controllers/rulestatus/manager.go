@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -141,10 +140,6 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	}
 
 	log.V(4).Info("reconciling completed")
-
-	if hasManagedMetadata(instance.Status.Rules) {
-		return ctrl.Result{RequeueAfter: time.Minute}, reconcileError
-	}
 
 	return ctrl.Result{}, reconcileError
 }

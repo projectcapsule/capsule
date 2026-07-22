@@ -15,6 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -2547,7 +2548,74 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 		}).Should(Succeed())
 	})
 
-	It("ignores metadata enforcement for subresource updates", func() {
+	It("rejects forbidden namespace metadata injected through the status subresource", func() {
+		const policyKey = "pod-security.kubernetes.io/enforce"
+
+		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
+			metadataRule(
+				rules.ActionTypeAllow,
+				"v1",
+				[]string{"Namespace"},
+				map[string]rules.MetadataValueRule{
+					policyKey: metadataValueRule(true, metadataByExact("baseline", "restricted")),
+				},
+				nil,
+			),
+		})
+
+		ns := createNamespace(map[string]string{policyKey: "baseline"})
+		waitForProjectedMetadata(ns.Name, policyKey, nil, nil)
+
+		createNamespaceStatusRBACForOwner(tnt)
+		DeferCleanup(deleteNamespaceStatusRBACForOwner, tnt)
+
+		owner := ownerClient(tnt.Spec.Owners[0].UserSpec)
+		patchStatus := func(value string) error {
+			patch := []byte(fmt.Sprintf(
+				`[{"op":"add","path":"/metadata/labels/pod-security.kubernetes.io~1enforce","value":%q}]`,
+				value,
+			))
+			_, err := owner.CoreV1().Namespaces().Patch(
+				context.Background(),
+				ns.Name,
+				k8stypes.JSONPatchType,
+				patch,
+				metav1.PatchOptions{},
+				"status",
+			)
+
+			return err
+		}
+
+		By("allowing a compliant metadata update through namespaces/status")
+		Eventually(func() error {
+			return patchStatus("restricted")
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		By("rejecting a forbidden metadata update through namespaces/status")
+		Eventually(func() error {
+			err := patchStatus("privileged")
+			if err == nil {
+				return fmt.Errorf("expected namespace status patch to be denied")
+			}
+			if !strings.Contains(err.Error(), policyKey) ||
+				!strings.Contains(err.Error(), "privileged") ||
+				!strings.Contains(err.Error(), "not allowed") {
+				return err
+			}
+
+			return nil
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		By("preserving the last allowed metadata value")
+		Eventually(func(g Gomega) {
+			current := &corev1.Namespace{}
+			g.Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: ns.Name}, current)).To(Succeed())
+			g.Expect(current.Labels).To(HaveKeyWithValue(policyKey, "restricted"))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	})
+
+	It("ignores metadata enforcement for non-Namespace subresource updates", func() {
 		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
 			metadataRule(
 				rules.ActionTypeAllow,

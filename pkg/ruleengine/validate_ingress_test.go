@@ -51,4 +51,16 @@ func TestValidateIngressRules(t *testing.T) {
 	if err := ValidateRuleStatusBody(nil, []*rules.NamespaceRuleBodyNamespace{invalidRegex}); err == nil || !strings.Contains(err.Error(), "ingress.hostnames[0].exp") {
 		t.Fatalf("ValidateRuleStatusBody(invalid regex) error = %v", err)
 	}
+
+	missingTypes := valid[0].DeepCopy()
+	missingTypes.Enforce.Ingress.Types = nil
+	if err := ValidateRuleStatusBody(nil, []*rules.NamespaceRuleBodyNamespace{missingTypes}); err == nil || !strings.Contains(err.Error(), "ingress.types") {
+		t.Fatalf("ValidateRuleStatusBody(missing types) error = %v", err)
+	}
+
+	missingHostnames := valid[0].DeepCopy()
+	missingHostnames.Enforce.Ingress.Hostnames = nil
+	if err := ValidateRuleStatusBody(nil, []*rules.NamespaceRuleBodyNamespace{missingHostnames}); err == nil || !strings.Contains(err.Error(), "ingress.hostnames") {
+		t.Fatalf("ValidateRuleStatusBody(missing hostnames) error = %v", err)
+	}
 }

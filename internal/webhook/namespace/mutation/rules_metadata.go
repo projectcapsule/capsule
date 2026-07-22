@@ -40,6 +40,10 @@ func (*rulesMetadataMutation) OnDelete(client.Client, client.Reader, users.Admis
 
 func mutateNamespaceRules(c client.Client, reader client.Reader, cfg configuration.Configuration, ns *corev1.Namespace) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
+		if req.SubResource == "finalize" {
+			return nil
+		}
+
 		tnt, err := tenant.GetTenantByLabels(ctx, reader, ns)
 		if err != nil {
 			return handlers.ErroredResponse(err)

@@ -66,6 +66,10 @@ func (h *rulesMetadataHandler) OnUpdate(
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
+		if req.SubResource == "finalize" {
+			return nil
+		}
+
 		bodies, err := tenant.BuildNamespaceRuleBodyStatus(c.Scheme(), ns, tnt)
 		if err != nil {
 			return handlers.ErroredResponse(err)
