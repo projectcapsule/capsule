@@ -119,9 +119,9 @@ func (h *genericRules) metadataSet(
 			}
 		},
 
-		Rules: func(enforce *apirules.NamespaceRuleEnforceBody) []runtime.ExpressionMatch {
+		RulesWithError: func(enforce *apirules.NamespaceRuleEnforceBody) ([]runtime.ExpressionMatch, error) {
 			if enforce == nil || len(enforce.Metadata) == 0 {
-				return nil
+				return nil, nil
 			}
 
 			var out []runtime.ExpressionMatch
@@ -137,7 +137,7 @@ func (h *genericRules) metadataSet(
 					for selector, policy := range rule.Labels {
 						matched, err := h.matchesMetadataKey(selector, entry.Key)
 						if err != nil {
-							continue
+							return nil, fmt.Errorf("invalid label selector %q: %w", selector, err)
 						}
 
 						if matched {
@@ -148,7 +148,7 @@ func (h *genericRules) metadataSet(
 					for selector, policy := range rule.Annotations {
 						matched, err := h.matchesMetadataKey(selector, entry.Key)
 						if err != nil {
-							continue
+							return nil, fmt.Errorf("invalid annotation selector %q: %w", selector, err)
 						}
 
 						if matched {
@@ -158,7 +158,7 @@ func (h *genericRules) metadataSet(
 				}
 			}
 
-			return out
+			return out, nil
 		},
 		Matches: func(match runtime.ExpressionMatch, value ruleengine.Value) (ruleengine.Match, error) {
 			matched, err := match.MatchesWithExpressionMatcher(h.regexCache, value.Value)

@@ -215,6 +215,10 @@ func validateMetadataRules(
 	for j, rule := range metadata {
 		fieldPath := fmt.Sprintf("rules[%d].enforce.metadata[%d]", ruleIndex, j)
 
+		if rule.HasWildcard() && metadataRuleHasManagedValues(rule) {
+			return fmt.Errorf("%s is invalid: managed metadata requires concrete apiGroups and kinds", fieldPath)
+		}
+
 		if err := validateMetadataTargets(fieldPath, rule, mapper); err != nil {
 			return err
 		}
@@ -269,6 +273,22 @@ func validateMetadataRules(
 	}
 
 	return nil
+}
+
+func metadataRuleHasManagedValues(rule rules.MetadataRule) bool {
+	for _, policy := range rule.Labels {
+		if policy.Managed != nil {
+			return true
+		}
+	}
+
+	for _, policy := range rule.Annotations {
+		if policy.Managed != nil {
+			return true
+		}
+	}
+
+	return false
 }
 
 func validateMutableMetadataKey(key string, policy rules.MetadataValueRule) error {

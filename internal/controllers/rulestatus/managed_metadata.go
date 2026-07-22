@@ -9,19 +9,27 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"slices"
+	"sort"
 	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 )
+
+const managedMetadataListPageSize int64 = 500
+
+type managedMetadataTarget struct {
+	gvr schema.GroupVersionResource
+	gvk schema.GroupVersionKind
+}
 
 func (r Manager) reconcileManagedMetadata(ctx context.Context, instance *capsulev1beta2.RuleStatus, previous, current []*rules.NamespaceRuleBodyNamespace) error {
 	if r.RESTConfig == nil {
@@ -46,62 +54,161 @@ func (r Manager) reconcileManagedMetadata(ctx context.Context, instance *capsule
 		}
 	}
 
-	if !hasManagedNamespacedMetadata(previous) && !hasManagedNamespacedMetadata(current) {
-		return nil
-	}
-
-	discoveryClient, err := discovery.NewDiscoveryClientForConfig(r.RESTConfig)
+	targets, err := managedMetadataTargets(r.RESTMapper, previous, current)
 	if err != nil {
 		return err
 	}
 
-	resourceLists, discoveryErr := discoveryClient.ServerPreferredResources()
-	if discoveryErr != nil && len(resourceLists) == 0 {
-		if isManagedMetadataObjectGone(discoveryErr) {
-			return nil
-		}
+	for _, target := range targets {
+		previousLabels, previousAnnotations := managedMetadataForGVK(target.gvk, previous)
+		labels, annotations := managedMetadataForGVK(target.gvk, current)
 
-		return discoveryErr
-	}
-
-	for _, resourceList := range resourceLists {
-		gv, err := schema.ParseGroupVersion(resourceList.GroupVersion)
-		if err != nil {
-			continue
-		}
-
-		for _, resource := range resourceList.APIResources {
-			if !resource.Namespaced || strings.Contains(resource.Name, "/") || !slices.Contains(resource.Verbs, "list") || !slices.Contains(resource.Verbs, "patch") {
-				continue
-			}
-
-			gvr, gvk := gv.WithResource(resource.Name), gv.WithKind(resource.Kind)
-			previousLabels, previousAnnotations := managedMetadataForGVK(gvk, previous)
-
-			labels, annotations := managedMetadataForGVK(gvk, current)
-
-			if !hasMetadata(previousLabels, previousAnnotations) && !hasMetadata(labels, annotations) {
-				continue
-			}
-
-			items, err := dynamicClient.Resource(gvr).Namespace(instance.GetNamespace()).List(ctx, metav1.ListOptions{})
-			if err != nil {
-				if isManagedMetadataObjectGone(err) {
-					continue
-				}
-
-				return fmt.Errorf("list %s in namespace %q: %w", gvr.String(), instance.GetNamespace(), err)
-			}
-
-			for i := range items.Items {
-				if err := reconcileObjectManagedMetadata(ctx, dynamicClient, gvr, gvk, instance.GetNamespace(), items.Items[i].GetName(), previousLabels, previousAnnotations, labels, annotations, manager); err != nil {
-					return err
-				}
-			}
+		if err := reconcileManagedMetadataTarget(
+			ctx,
+			dynamicClient,
+			target,
+			instance.GetNamespace(),
+			previousLabels,
+			previousAnnotations,
+			labels,
+			annotations,
+			manager,
+		); err != nil {
+			return err
 		}
 	}
 
 	return nil
+}
+
+func reconcileManagedMetadataTarget(
+	ctx context.Context,
+	dynamicClient dynamic.Interface,
+	target managedMetadataTarget,
+	namespace string,
+	previousLabels, previousAnnotations, labels, annotations map[string]string,
+	manager string,
+) error {
+	continueToken := ""
+
+	for {
+		items, err := dynamicClient.Resource(target.gvr).Namespace(namespace).List(ctx, metav1.ListOptions{
+			Limit:    managedMetadataListPageSize,
+			Continue: continueToken,
+		})
+		if err != nil {
+			if isManagedMetadataObjectGone(err) {
+				return nil
+			}
+
+			return fmt.Errorf("list %s in namespace %q: %w", target.gvr.String(), namespace, err)
+		}
+
+		for i := range items.Items {
+			if err := reconcileObjectManagedMetadata(
+				ctx,
+				dynamicClient,
+				target.gvr,
+				target.gvk,
+				namespace,
+				items.Items[i].GetName(),
+				previousLabels,
+				previousAnnotations,
+				labels,
+				annotations,
+				manager,
+			); err != nil {
+				return err
+			}
+		}
+
+		continueToken = items.GetContinue()
+		if continueToken == "" {
+			return nil
+		}
+	}
+}
+
+func managedMetadataTargets(
+	mapper k8smeta.RESTMapper,
+	ruleSets ...[]*rules.NamespaceRuleBodyNamespace,
+) ([]managedMetadataTarget, error) {
+	targets := make(map[schema.GroupVersionResource]managedMetadataTarget)
+
+	for _, bodies := range ruleSets {
+		for _, body := range bodies {
+			if body == nil || body.Enforce == nil {
+				continue
+			}
+
+			for _, rule := range body.Enforce.Metadata {
+				if !metadataRuleHasManagedValues(rule) {
+					continue
+				}
+
+				if rule.HasWildcard() {
+					return nil, fmt.Errorf("managed metadata requires concrete apiGroups and kinds")
+				}
+
+				for _, kind := range rule.Kinds {
+					kind = strings.TrimSpace(kind)
+					for _, apiGroup := range rule.StatusAPIGroups() {
+						mapping, err := managedMetadataRESTMapping(mapper, apiGroup, kind)
+						if err != nil {
+							return nil, fmt.Errorf("resolve managed metadata target %q/%q: %w", apiGroup, kind, err)
+						}
+
+						if mapping.GroupVersionKind.Group == "" &&
+							mapping.GroupVersionKind.Version == apiruntime.CoreAPIVersion &&
+							mapping.GroupVersionKind.Kind == "Namespace" {
+							continue
+						}
+
+						if mapping.Scope.Name() != k8smeta.RESTScopeNameNamespace {
+							return nil, fmt.Errorf("managed metadata target %s is not namespaced", mapping.GroupVersionKind.String())
+						}
+
+						targets[mapping.Resource] = managedMetadataTarget{
+							gvr: mapping.Resource,
+							gvk: mapping.GroupVersionKind,
+						}
+					}
+				}
+			}
+		}
+	}
+
+	out := make([]managedMetadataTarget, 0, len(targets))
+	for _, target := range targets {
+		out = append(out, target)
+	}
+
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].gvr.String() < out[j].gvr.String()
+	})
+
+	return out, nil
+}
+
+func managedMetadataRESTMapping(
+	mapper k8smeta.RESTMapper,
+	apiGroup string,
+	kind string,
+) (*k8smeta.RESTMapping, error) {
+	if mapper == nil {
+		return nil, fmt.Errorf("REST mapper is required for managed metadata reconciliation")
+	}
+
+	apiGroup = strings.TrimSpace(apiGroup)
+	if apiGroup == "" || apiGroup == apiruntime.CoreAPIVersion {
+		return mapper.RESTMapping(schema.GroupKind{Kind: kind}, apiruntime.CoreAPIVersion)
+	}
+
+	if gv, err := schema.ParseGroupVersion(apiGroup); err == nil && strings.Contains(apiGroup, "/") {
+		return mapper.RESTMapping(schema.GroupKind{Group: gv.Group, Kind: kind}, gv.Version)
+	}
+
+	return mapper.RESTMapping(schema.GroupKind{Group: apiGroup, Kind: kind})
 }
 
 func reconcileObjectManagedMetadata(ctx context.Context, dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, gvk schema.GroupVersionKind, namespace, name string, previousLabels, previousAnnotations, labels, annotations map[string]string, manager string) error {
@@ -165,28 +272,6 @@ func removeManagedMetadata(ctx context.Context, dynamicClient dynamic.Interface,
 
 func hasMetadata(labels, annotations map[string]string) bool {
 	return len(labels) > 0 || len(annotations) > 0
-}
-
-func hasManagedNamespacedMetadata(bodies []*rules.NamespaceRuleBodyNamespace) bool {
-	for _, body := range bodies {
-		if body == nil || body.Enforce == nil {
-			continue
-		}
-
-		for _, rule := range body.Enforce.Metadata {
-			if !metadataRuleHasManagedValues(rule) {
-				continue
-			}
-
-			for _, kind := range rule.Kinds {
-				if strings.TrimSpace(kind) != "Namespace" {
-					return true
-				}
-			}
-		}
-	}
-
-	return false
 }
 
 func metadataRuleHasManagedValues(rule rules.MetadataRule) bool {

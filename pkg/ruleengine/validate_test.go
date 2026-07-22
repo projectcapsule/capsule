@@ -772,6 +772,14 @@ func TestMutableMetadataRequiresConcreteKey(t *testing.T) {
 	if err := validateMutableMetadataKey(`example\.corp/.*`, policy); err == nil {
 		t.Fatal("regexp managed key was accepted")
 	}
+
+	rule := rules.MetadataRule{
+		VersionKinds: runtime.VersionKinds{APIGroups: []string{"*"}, Kinds: []string{"ConfigMap"}},
+		Labels:       map[string]rules.MetadataValueRule{"example.corp/key": policy},
+	}
+	if err := validateMetadataRules(0, []rules.MetadataRule{rule}, nil); err == nil || !strings.Contains(err.Error(), "managed metadata requires concrete apiGroups and kinds") {
+		t.Fatalf("wildcard managed target error = %v", err)
+	}
 }
 
 func TestValidateRuleStatusBodyWithRESTMapper(t *testing.T) {

@@ -11,6 +11,7 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
@@ -43,10 +44,12 @@ type Manager struct {
 	Recorder      events.EventRecorder
 	Configuration configuration.Configuration
 	RESTConfig    *rest.Config
+	RESTMapper    k8smeta.RESTMapper
 }
 
 func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
 	r.reader = mgr.GetAPIReader()
+	r.RESTMapper = mgr.GetRESTMapper()
 
 	ctrlBuilder := ctrl.NewControllerManagedBy(mgr).
 		Named("capsule/rule-status").

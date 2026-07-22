@@ -1019,7 +1019,7 @@ func TestMetadataSet(t *testing.T) {
 
 		set := h.metadataSet(coreGVK("ConfigMap"), entry)
 
-		got := set.Rules(enforceMetadata(
+		got, err := set.RulesWithError(enforceMetadata(
 			apirules.ActionTypeAllow,
 			[]string{"*"},
 			[]string{"ConfigMap"},
@@ -1028,6 +1028,9 @@ func TestMetadataSet(t *testing.T) {
 			},
 			nil,
 		))
+		if err != nil {
+			t.Fatalf("RulesWithError() error = %v", err)
+		}
 
 		if len(got) != 2 {
 			t.Fatalf("expected two matchers, got %d", len(got))
@@ -1053,7 +1056,7 @@ func TestMetadataSet(t *testing.T) {
 
 		set := h.metadataSet(coreGVK("ConfigMap"), entry)
 
-		got := set.Rules(enforceMetadata(
+		got, err := set.RulesWithError(enforceMetadata(
 			apirules.ActionTypeAllow,
 			[]string{"*"},
 			[]string{"ConfigMap"},
@@ -1062,6 +1065,9 @@ func TestMetadataSet(t *testing.T) {
 				"cost-center": metadataPolicy(true, expression("^INV-[0-9]{4}$")),
 			},
 		))
+		if err != nil {
+			t.Fatalf("RulesWithError() error = %v", err)
+		}
 
 		if len(got) != 1 {
 			t.Fatalf("expected one matcher, got %d", len(got))
@@ -1080,7 +1086,11 @@ func TestMetadataSet(t *testing.T) {
 			Key:   "env",
 		})
 
-		if got := set.Rules(nil); got != nil {
+		got, err := set.RulesWithError(nil)
+		if err != nil {
+			t.Fatalf("RulesWithError() error = %v", err)
+		}
+		if got != nil {
 			t.Fatalf("expected nil, got %#v", got)
 		}
 	})
@@ -1094,7 +1104,7 @@ func TestMetadataSet(t *testing.T) {
 			Key:   "env",
 		})
 
-		got := set.Rules(enforceMetadata(
+		got, err := set.RulesWithError(enforceMetadata(
 			apirules.ActionTypeAllow,
 			[]string{"*"},
 			[]string{"ConfigMap"},
@@ -1103,9 +1113,56 @@ func TestMetadataSet(t *testing.T) {
 			},
 			nil,
 		))
+		if err != nil {
+			t.Fatalf("RulesWithError() error = %v", err)
+		}
 
 		if got != nil {
 			t.Fatalf("expected nil, got %#v", got)
+		}
+	})
+
+	t.Run("rules returns invalid key selector errors", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []struct {
+			name  string
+			entry metadataEntry
+			body  *apirules.NamespaceRuleEnforceBody
+		}{
+			{
+				name:  "label",
+				entry: metadataEntry{Field: metadataFieldLabel, Key: "env"},
+				body: enforceMetadata(
+					apirules.ActionTypeAllow,
+					[]string{"*"},
+					[]string{"ConfigMap"},
+					map[string]apirules.MetadataValueRule{"[": metadataPolicy(false, exact("prod"))},
+					nil,
+				),
+			},
+			{
+				name:  "annotation",
+				entry: metadataEntry{Field: metadataFieldAnnotation, Key: "env"},
+				body: enforceMetadata(
+					apirules.ActionTypeAllow,
+					[]string{"*"},
+					[]string{"ConfigMap"},
+					nil,
+					map[string]apirules.MetadataValueRule{"[": metadataPolicy(false, exact("prod"))},
+				),
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				set := newMetadataTestRules(nil, nil).metadataSet(coreGVK("ConfigMap"), tt.entry)
+				if _, err := set.RulesWithError(tt.body); err == nil {
+					t.Fatal("RulesWithError() error = nil, want invalid selector error")
+				}
+			})
 		}
 	})
 

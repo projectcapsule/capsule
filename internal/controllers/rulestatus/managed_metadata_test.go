@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -18,6 +19,8 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/rules"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 )
 
 func TestReconcileManagedMetadataRequiresRESTConfig(t *testing.T) {
@@ -176,5 +179,145 @@ func TestReconcileObjectManagedMetadataStopsAfterGoneRemoval(t *testing.T) {
 	}
 	if patches != 1 {
 		t.Fatalf("reconcileObjectManagedMetadata() made %d patches, want 1", patches)
+	}
+}
+
+func TestManagedMetadataTargetsOnlyReferencedGVKs(t *testing.T) {
+	t.Parallel()
+
+	mapper := k8smeta.NewDefaultRESTMapper([]schema.GroupVersion{
+		{Version: "v1"},
+		{Group: "apps", Version: "v1"},
+	})
+	mapper.Add(schema.GroupVersionKind{Version: "v1", Kind: "Namespace"}, k8smeta.RESTScopeRoot)
+	mapper.Add(schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"}, k8smeta.RESTScopeNamespace)
+	mapper.Add(schema.GroupVersionKind{Version: "v1", Kind: "Secret"}, k8smeta.RESTScopeNamespace)
+	mapper.Add(schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}, k8smeta.RESTScopeNamespace)
+
+	managed := "controlled"
+	bodies := []*rules.NamespaceRuleBodyNamespace{{
+		Enforce: &rules.NamespaceRuleEnforceBody{
+			Metadata: []rules.MetadataRule{
+				{
+					VersionKinds: apiruntime.VersionKinds{APIGroups: []string{"v1"}, Kinds: []string{"Namespace", "ConfigMap"}},
+					Labels:       map[string]rules.MetadataValueRule{"example.com/managed": {Managed: &managed}},
+				},
+				{
+					VersionKinds: apiruntime.VersionKinds{APIGroups: []string{"apps/v1"}, Kinds: []string{"Deployment"}},
+					Annotations:  map[string]rules.MetadataValueRule{"example.com/managed": {Managed: &managed}},
+				},
+			},
+		},
+	}}
+
+	targets, err := managedMetadataTargets(mapper, bodies, bodies)
+	if err != nil {
+		t.Fatalf("managedMetadataTargets() error = %v", err)
+	}
+
+	want := []managedMetadataTarget{
+		{
+			gvr: schema.GroupVersionResource{Version: "v1", Resource: "configmaps"},
+			gvk: schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"},
+		},
+		{
+			gvr: schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
+			gvk: schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
+		},
+	}
+
+	if len(targets) != len(want) {
+		t.Fatalf("managedMetadataTargets() = %#v, want %#v", targets, want)
+	}
+	for i := range want {
+		if targets[i] != want[i] {
+			t.Fatalf("managedMetadataTargets()[%d] = %#v, want %#v", i, targets[i], want[i])
+		}
+	}
+}
+
+func TestManagedMetadataTargetsRejectWildcards(t *testing.T) {
+	t.Parallel()
+
+	managed := "controlled"
+	bodies := []*rules.NamespaceRuleBodyNamespace{{
+		Enforce: &rules.NamespaceRuleEnforceBody{
+			Metadata: []rules.MetadataRule{{
+				VersionKinds: apiruntime.VersionKinds{APIGroups: []string{"*"}, Kinds: []string{"ConfigMap"}},
+				Labels:       map[string]rules.MetadataValueRule{"example.com/managed": {Managed: &managed}},
+			}},
+		},
+	}}
+
+	_, err := managedMetadataTargets(nil, bodies)
+	if err == nil || !strings.Contains(err.Error(), "requires concrete apiGroups and kinds") {
+		t.Fatalf("managedMetadataTargets() error = %v", err)
+	}
+}
+
+func TestReconcileManagedMetadataTargetUsesPagination(t *testing.T) {
+	t.Parallel()
+
+	gvr := schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}
+	dynamicClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(
+		runtime.NewScheme(),
+		map[schema.GroupVersionResource]string{gvr: "ConfigMapList"},
+	)
+	listCalls := 0
+	patchCalls := 0
+	dynamicClient.PrependReactor("list", "configmaps", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		listCalls++
+
+		listAction, ok := action.(interface{ GetListOptions() metav1.ListOptions })
+		if !ok {
+			t.Fatalf("list action does not expose list options: %T", action)
+		}
+		opts := listAction.GetListOptions()
+		if opts.Limit != managedMetadataListPageSize {
+			t.Fatalf("list limit = %d, want %d", opts.Limit, managedMetadataListPageSize)
+		}
+
+		item := unstructured.Unstructured{}
+		item.SetName("settings")
+		items := &unstructured.UnstructuredList{Items: []unstructured.Unstructured{item}}
+		if listCalls == 1 {
+			if opts.Continue != "" {
+				t.Fatalf("first list continue token = %q, want empty", opts.Continue)
+			}
+			items.SetContinue("next-page")
+		} else if opts.Continue != "next-page" {
+			t.Fatalf("second list continue token = %q, want next-page", opts.Continue)
+		}
+
+		return true, items, nil
+	})
+	dynamicClient.PrependReactor("patch", "configmaps", func(k8stesting.Action) (bool, runtime.Object, error) {
+		patchCalls++
+
+		return true, &unstructured.Unstructured{}, nil
+	})
+
+	err := reconcileManagedMetadataTarget(
+		context.Background(),
+		dynamicClient,
+		managedMetadataTarget{
+			gvr: gvr,
+			gvk: schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"},
+		},
+		"solar-test",
+		nil,
+		nil,
+		map[string]string{"managed": "true"},
+		nil,
+		"test-manager",
+	)
+	if err != nil {
+		t.Fatalf("reconcileManagedMetadataTarget() error = %v", err)
+	}
+	if listCalls != 2 {
+		t.Fatalf("list calls = %d, want 2", listCalls)
+	}
+	if patchCalls != 2 {
+		t.Fatalf("patch calls = %d, want 2", patchCalls)
 	}
 }
