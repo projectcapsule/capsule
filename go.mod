@@ -24,7 +24,7 @@ require (
 	go.uber.org/automaxprocs v1.6.0
 	go.uber.org/zap v1.28.0
 	go.yaml.in/yaml/v2 v2.4.3
-	golang.org/x/sync v0.20.0
+	golang.org/x/sync v0.22.0
 	gomodules.xyz/jsonpatch/v2 v2.5.0
 	gomodules.xyz/jsonpatch/v3 v3.0.1
 	google.golang.org/grpc v1.82.0
