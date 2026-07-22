@@ -5,14 +5,17 @@ package rulestatus
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
+	k8stesting "k8s.io/client-go/testing"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
@@ -79,5 +82,99 @@ func TestRemoveManagedMetadata(t *testing.T) {
 	}
 	if got.GetLabels()["kept"] != "value" {
 		t.Fatalf("unmanaged label changed: %#v", got.GetLabels())
+	}
+}
+
+func TestApplyManagedMetadataSkipsGoneObjects(t *testing.T) {
+	t.Parallel()
+
+	dynamicClient := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
+	dynamicClient.PrependReactor("patch", "configmaps", func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, "settings")
+	})
+
+	err := applyManagedMetadata(
+		context.Background(),
+		dynamicClient,
+		schema.GroupVersionResource{Version: "v1", Resource: "configmaps"},
+		schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"},
+		"solar-test",
+		"settings",
+		map[string]string{"managed": "true"},
+		nil,
+		"test-manager",
+	)
+	if err != nil {
+		t.Fatalf("applyManagedMetadata() error = %v", err)
+	}
+}
+
+func TestApplyManagedMetadataReturnsNonNotFoundPatchErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		patchErr error
+	}{
+		{name: "forbidden", patchErr: apierrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, "settings", errors.New("denied"))},
+		{name: "other error", patchErr: errors.New("patch failed")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			dynamicClient := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
+			dynamicClient.PrependReactor("patch", "configmaps", func(k8stesting.Action) (bool, runtime.Object, error) {
+				return true, nil, tt.patchErr
+			})
+
+			err := applyManagedMetadata(
+				context.Background(),
+				dynamicClient,
+				schema.GroupVersionResource{Version: "v1", Resource: "configmaps"},
+				schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"},
+				"solar-test",
+				"settings",
+				map[string]string{"managed": "true"},
+				nil,
+				"test-manager",
+			)
+			if !errors.Is(err, tt.patchErr) {
+				t.Fatalf("applyManagedMetadata() error = %v, want %v", err, tt.patchErr)
+			}
+		})
+	}
+}
+
+func TestReconcileObjectManagedMetadataStopsAfterGoneRemoval(t *testing.T) {
+	t.Parallel()
+
+	patches := 0
+	dynamicClient := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
+	dynamicClient.PrependReactor("patch", "configmaps", func(k8stesting.Action) (bool, runtime.Object, error) {
+		patches++
+
+		return true, nil, apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, "settings")
+	})
+
+	err := reconcileObjectManagedMetadata(
+		context.Background(),
+		dynamicClient,
+		schema.GroupVersionResource{Version: "v1", Resource: "configmaps"},
+		schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"},
+		"solar-test",
+		"settings",
+		map[string]string{"removed": "value"},
+		nil,
+		nil,
+		nil,
+		"test-manager",
+	)
+	if err != nil {
+		t.Fatalf("reconcileObjectManagedMetadata() error = %v", err)
+	}
+	if patches != 1 {
+		t.Fatalf("reconcileObjectManagedMetadata() made %d patches, want 1", patches)
 	}
 }

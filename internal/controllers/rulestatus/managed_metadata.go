@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -56,6 +57,10 @@ func (r Manager) reconcileManagedMetadata(ctx context.Context, instance *capsule
 
 	resourceLists, discoveryErr := discoveryClient.ServerPreferredResources()
 	if discoveryErr != nil && len(resourceLists) == 0 {
+		if isManagedMetadataObjectGone(discoveryErr) {
+			return nil
+		}
+
 		return discoveryErr
 	}
 
@@ -81,7 +86,11 @@ func (r Manager) reconcileManagedMetadata(ctx context.Context, instance *capsule
 
 			items, err := dynamicClient.Resource(gvr).Namespace(instance.GetNamespace()).List(ctx, metav1.ListOptions{})
 			if err != nil {
-				continue
+				if isManagedMetadataObjectGone(err) {
+					continue
+				}
+
+				return fmt.Errorf("list %s in namespace %q: %w", gvr.String(), instance.GetNamespace(), err)
 			}
 
 			for i := range items.Items {
@@ -102,6 +111,10 @@ func reconcileObjectManagedMetadata(ctx context.Context, dynamicClient dynamic.I
 
 	if hasRemovedMetadata(removedLabels, removedAnnotations) {
 		if err := removeManagedMetadata(ctx, dynamicClient, gvr, namespace, name, removedLabels, removedAnnotations); err != nil {
+			if isManagedMetadataObjectGone(err) {
+				return nil
+			}
+
 			return err
 		}
 	}
@@ -264,9 +277,17 @@ func applyManagedMetadata(ctx context.Context, dynamicClient dynamic.Interface, 
 	}
 
 	force := true
+
 	_, err = resource.Patch(ctx, name, types.ApplyPatchType, raw, metav1.PatchOptions{FieldManager: manager, Force: &force})
+	if isManagedMetadataObjectGone(err) {
+		return nil
+	}
 
 	return err
+}
+
+func isManagedMetadataObjectGone(err error) bool {
+	return apierrors.IsNotFound(err)
 }
 
 func ruleStatusFieldManager(instance *capsulev1beta2.RuleStatus) string {

@@ -777,6 +777,45 @@ func TestControlledMetadataEntries(t *testing.T) {
 			want: nil,
 		},
 		{
+			name: "managed metadata does not satisfy required selectors",
+			obj: metadataObject(
+				map[string]string{
+					meta.TenantLabel: "tenant-a",
+				},
+				map[string]string{
+					meta.ReconcileAnnotation: "true",
+				},
+			),
+			gvk: coreGVK("ConfigMap"),
+			enforceBodies: []*apirules.NamespaceRuleEnforceBody{
+				enforceMetadata(
+					apirules.ActionTypeAllow,
+					[]string{"*"},
+					[]string{"ConfigMap"},
+					map[string]apirules.MetadataValueRule{
+						"capsule.clastix.io/*": metadataPolicy(true, exact("tenant-a")),
+					},
+					map[string]apirules.MetadataValueRule{
+						"reconcile.projectcapsule.dev/*": metadataPolicy(true, exact("true")),
+					},
+				),
+			},
+			want: []metadataEntry{
+				{
+					Field:    metadataFieldAnnotation,
+					Key:      "reconcile.projectcapsule.dev/*",
+					Path:     `metadata.annotations["reconcile.projectcapsule.dev/*"]`,
+					Required: true,
+				},
+				{
+					Field:    metadataFieldLabel,
+					Key:      "capsule.clastix.io/*",
+					Path:     `metadata.labels["capsule.clastix.io/*"]`,
+					Required: true,
+				},
+			},
+		},
+		{
 			name: "custom parameters add label and annotation to managed metadata",
 			managedLabels: []string{
 				meta.TenantLabel,

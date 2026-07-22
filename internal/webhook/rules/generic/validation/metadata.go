@@ -217,11 +217,11 @@ func (h *genericRules) controlledMetadataEntries(
 						continue
 					}
 
-					matchedAny = true
-
 					if h.managedMetadata.HasLabel(key) {
 						continue
 					}
+
+					matchedAny = true
 
 					h.addMetadataEntry(seen, metadataFieldLabel, key, value, true, required)
 				}
@@ -249,11 +249,11 @@ func (h *genericRules) controlledMetadataEntries(
 						continue
 					}
 
-					matchedAny = true
-
 					if h.managedMetadata.HasAnnotation(key) {
 						continue
 					}
+
+					matchedAny = true
 
 					h.addMetadataEntry(seen, metadataFieldAnnotation, key, value, true, required)
 				}
