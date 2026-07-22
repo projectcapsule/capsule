@@ -94,6 +94,7 @@ func validateAudience(ruleIndex int, audience []rules.Audience) error {
 		if strings.TrimSpace(subject.Name) == "" {
 			return fmt.Errorf("%s.name is invalid: name is empty", path)
 		}
+
 		switch subject.Kind {
 		case rules.AudienceKindUser, rules.AudienceKindGroup, rules.AudienceKindServiceAccount:
 		case rules.AudienceKindCustom:
@@ -106,6 +107,7 @@ func validateAudience(ruleIndex int, audience []rules.Audience) error {
 			return fmt.Errorf("%s.kind %q is invalid: unsupported audience kind", path, subject.Kind)
 		}
 	}
+
 	return nil
 }
 
@@ -212,6 +214,7 @@ func validateMetadataRules(
 					err,
 				)
 			}
+
 			if err := validateMutableMetadataKey(key, policy); err != nil {
 				return fmt.Errorf("%s.labels[%q] is invalid: %w", fieldPath, key, err)
 			}
@@ -235,6 +238,7 @@ func validateMetadataRules(
 					err,
 				)
 			}
+
 			if err := validateMutableMetadataKey(key, policy); err != nil {
 				return fmt.Errorf("%s.annotations[%q] is invalid: %w", fieldPath, key, err)
 			}
@@ -257,9 +261,11 @@ func validateMutableMetadataKey(key string, policy rules.MetadataValueRule) erro
 	if policy.Default == nil && policy.Managed == nil {
 		return nil
 	}
+
 	if errs := k8svalidation.IsQualifiedName(strings.TrimSpace(key)); len(errs) > 0 {
 		return errors.New("default and managed require a concrete metadata key")
 	}
+
 	return nil
 }
 

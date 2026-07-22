@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,15 +45,21 @@ func (*metadataRules) mutate(obj *unstructured.Unstructured, bodies []*apirules.
 		gvk := schema.GroupVersionKind{Group: req.Kind.Group, Version: req.Kind.Version, Kind: req.Kind.Kind}
 		if gvk.Version == "" || gvk.Kind == "" {
 			response := admission.Errored(http.StatusBadRequest, fmt.Errorf("admission request kind is incomplete: %s", gvk.String()))
+
 			return &response
 		}
+
 		MutateMetadata(obj, gvk, bodies)
+
 		marshaled, err := json.Marshal(obj)
 		if err != nil {
 			response := admission.Errored(http.StatusInternalServerError, err)
+
 			return &response
 		}
+
 		response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
+
 		return &response
 	}
 }
@@ -61,23 +68,29 @@ func MutateMetadata(obj metav1.Object, gvk schema.GroupVersionKind, bodies []*ap
 	if obj == nil {
 		return
 	}
+
 	labels, annotations := obj.GetLabels(), obj.GetAnnotations()
 	defaultLabels, managedLabels := map[string]string{}, map[string]string{}
 	defaultAnnotations, managedAnnotations := map[string]string{}, map[string]string{}
+
 	for _, body := range bodies {
 		if body == nil || body.Enforce == nil {
 			continue
 		}
+
 		for _, rule := range body.Enforce.Metadata {
 			if !rule.MatchesGroupVersionKind(gvk) {
 				continue
 			}
+
 			collectMutation(rule.Labels, defaultLabels, managedLabels)
 			collectMutation(rule.Annotations, defaultAnnotations, managedAnnotations)
 		}
 	}
+
 	labels = applyMutation(labels, defaultLabels, managedLabels)
 	annotations = applyMutation(annotations, defaultAnnotations, managedAnnotations)
+
 	obj.SetLabels(labels)
 	obj.SetAnnotations(annotations)
 }
@@ -87,6 +100,7 @@ func collectMutation(policies map[string]apirules.MetadataValueRule, defaults, m
 		if policy.Default != nil {
 			defaults[key] = *policy.Default
 		}
+
 		if policy.Managed != nil {
 			managed[key] = *policy.Managed
 		}
@@ -97,16 +111,18 @@ func applyMutation(current, defaults, managed map[string]string) map[string]stri
 	if len(defaults) == 0 && len(managed) == 0 {
 		return current
 	}
+
 	if current == nil {
 		current = map[string]string{}
 	}
+
 	for key, value := range defaults {
 		if _, ok := current[key]; !ok {
 			current[key] = value
 		}
 	}
-	for key, value := range managed {
-		current[key] = value
-	}
+
+	maps.Copy(current, managed)
+
 	return current
 }

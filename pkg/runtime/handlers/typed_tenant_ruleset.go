@@ -86,6 +86,7 @@ func (h *TypedTenantWithRulesetHandler[T]) OnCreate(
 		if err != nil {
 			return ErroredResponse(err)
 		}
+
 		ruleBlocks, err = ruleengine.FilterNamespaceRulesByAudience(h.Configuration, tnt, req, ruleBlocks)
 		if err != nil {
 			return ErroredResponse(err)
@@ -131,6 +132,7 @@ func (h *TypedTenantWithRulesetHandler[T]) OnUpdate(
 		if err != nil {
 			return ErroredResponse(err)
 		}
+
 		ruleBlocks, err = ruleengine.FilterNamespaceRulesByAudience(h.Configuration, tnt, req, ruleBlocks)
 		if err != nil {
 			return ErroredResponse(err)
@@ -171,6 +173,7 @@ func (h *TypedTenantWithRulesetHandler[T]) OnDelete(
 		if err != nil {
 			return ErroredResponse(err)
 		}
+
 		ruleBlocks, err = ruleengine.FilterNamespaceRulesByAudience(h.Configuration, tnt, req, ruleBlocks)
 		if err != nil {
 			return ErroredResponse(err)

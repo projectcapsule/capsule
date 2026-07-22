@@ -44,18 +44,23 @@ func mutateNamespaceRules(c client.Client, reader client.Reader, cfg configurati
 		if err != nil {
 			return handlers.ErroredResponse(err)
 		}
+
 		if tnt == nil {
 			return nil
 		}
+
 		bodies, err := tenant.BuildNamespaceRuleBodyStatus(c.Scheme(), ns, tnt)
 		if err != nil {
 			return handlers.ErroredResponse(err)
 		}
+
 		bodies, err = ruleengine.FilterNamespaceRulesByAudience(cfg, tnt, req, bodies)
 		if err != nil {
 			return handlers.ErroredResponse(err)
 		}
+
 		rulesmutation.MutateMetadata(ns, schema.GroupVersionKind{Version: "v1", Kind: "Namespace"}, bodies)
+
 		return nil
 	}
 }

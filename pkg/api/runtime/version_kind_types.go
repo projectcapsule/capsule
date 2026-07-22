@@ -242,10 +242,13 @@ func restMappingForAPIGroup(
 	kind string,
 ) (*apimeta.RESTMapping, error) {
 	apiGroup = strings.TrimSpace(apiGroup)
+
 	apiGroup = normalizeAPIVersion(apiGroup)
+
 	if apiGroup == CoreAPIVersion {
 		return mapper.RESTMapping(schema.GroupKind{Kind: kind}, CoreAPIVersion)
 	}
+
 	if gv, err := schema.ParseGroupVersion(apiGroup); err == nil && strings.Contains(apiGroup, "/") {
 		return mapper.RESTMapping(schema.GroupKind{Group: gv.Group, Kind: kind}, gv.Version)
 	}

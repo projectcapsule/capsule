@@ -35,12 +35,15 @@ type MetadataRule struct {
 func (r MetadataRule) MatchesGroupVersionKind(gvk schema.GroupVersionKind) bool {
 	if gvk.Group == "" && gvk.Version == "v1" && gvk.Kind == "Namespace" {
 		explicit := false
+
 		for _, kind := range r.Kinds {
 			if strings.TrimSpace(kind) == "Namespace" {
 				explicit = true
+
 				break
 			}
 		}
+
 		if !explicit {
 			return false
 		}
@@ -83,12 +86,16 @@ type MetadataValueRule struct {
 // convenient wildcards, while the rest of the selector retains regexp syntax.
 func MetadataKeyExpression(selector string) runtime.ExpressionRegex {
 	selector = strings.TrimSpace(selector)
+
 	var expression strings.Builder
+
 	for i, char := range selector {
 		if char == '*' && (i == 0 || selector[i-1] != '.') {
 			expression.WriteString(".*")
+
 			continue
 		}
+
 		expression.WriteRune(char)
 	}
 

@@ -5,6 +5,7 @@ package ruleengine
 
 import (
 	"fmt"
+	"slices"
 
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -22,19 +23,24 @@ func FilterNamespaceRulesByAudience(
 	bodies []*rules.NamespaceRuleBodyNamespace,
 ) ([]*rules.NamespaceRuleBodyNamespace, error) {
 	out := make([]*rules.NamespaceRuleBodyNamespace, 0, len(bodies))
+
 	for _, body := range bodies {
 		if body == nil || len(body.Audience) == 0 {
 			out = append(out, body)
+
 			continue
 		}
+
 		matched, err := matchesAudience(cfg, tnt, req, body.Audience)
 		if err != nil {
 			return nil, err
 		}
+
 		if matched {
 			out = append(out, body)
 		}
 	}
+
 	return out, nil
 }
 
@@ -46,10 +52,8 @@ func matchesAudience(cfg configuration.Configuration, tnt *capsulev1beta2.Tenant
 				return true, nil
 			}
 		case rules.AudienceKindGroup:
-			for _, group := range req.UserInfo.Groups {
-				if group == subject.Name {
-					return true, nil
-				}
+			if slices.Contains(req.UserInfo.Groups, subject.Name) {
+				return true, nil
 			}
 		case rules.AudienceKindServiceAccount:
 			if (rbac.UserListSpec{{Kind: rbac.ServiceAccountOwner, Name: subject.Name}}).IsPresent(req.UserInfo.Username, req.UserInfo.Groups) {
@@ -60,6 +64,7 @@ func matchesAudience(cfg configuration.Configuration, tnt *capsulev1beta2.Tenant
 			if err != nil {
 				return false, err
 			}
+
 			if matched {
 				return true, nil
 			}
@@ -67,6 +72,7 @@ func matchesAudience(cfg configuration.Configuration, tnt *capsulev1beta2.Tenant
 			return false, fmt.Errorf("unsupported audience kind %q", subject.Kind)
 		}
 	}
+
 	return false, nil
 }
 
@@ -80,6 +86,7 @@ func matchesCustomAudience(cfg configuration.Configuration, tnt *capsulev1beta2.
 		if tnt == nil {
 			return false, nil
 		}
+
 		return tnt.Spec.Owners.IsOwner(req.UserInfo.Username, req.UserInfo.Groups) ||
 			tnt.Status.Owners.IsOwner(req.UserInfo.Username, req.UserInfo.Groups), nil
 	case rules.CustomAudienceController:

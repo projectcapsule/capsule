@@ -178,6 +178,7 @@ func (r Manager) reconcile(ctx context.Context, instance *capsulev1beta2.RuleSta
 		if err := r.publishRulesStatus(ctx, instance); err != nil {
 			return fmt.Errorf("publish rules before managed metadata reconciliation: %w", err)
 		}
+
 		if err := r.reconcileManagedMetadata(ctx, instance, previousRules, ruleStatus); err != nil {
 			return fmt.Errorf("reconcile managed metadata: %w", err)
 		}
@@ -192,9 +193,11 @@ func (r *Manager) publishRulesStatus(ctx context.Context, instance *capsulev1bet
 		if err := r.reader.Get(ctx, client.ObjectKeyFromObject(instance), latest); err != nil {
 			return err
 		}
+
 		latest.Status.Rules = instance.Status.Rules
 		//nolint:staticcheck
 		latest.Status.Rule = instance.Status.Rule
+
 		return r.Client.Status().Update(ctx, latest)
 	})
 }

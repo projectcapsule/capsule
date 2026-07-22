@@ -6,6 +6,7 @@ package validation
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -81,16 +82,19 @@ func (h *ingressRules) validate(
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		gvk := schema.GroupVersionKind{Group: req.Kind.Group, Version: req.Kind.Version, Kind: req.Kind.Kind}
+
 		resourceType, supported := ingressTypeForGVK(gvk)
 		if !supported {
 			return nil
 		}
 
 		enforceBodies := ruleengine.EnforceBodiesFromNamespaceRules(bodies)
+
 		evaluation, err := h.evaluate(obj, resourceType, enforceBodies)
 		if err != nil {
 			return ad.Deny(err.Error())
 		}
+
 		if evaluation == nil {
 			return nil
 		}
@@ -142,6 +146,7 @@ func (h *ingressRules) evaluate(
 	if err != nil {
 		return nil, err
 	}
+
 	if len(values) == 0 {
 		values = []ruleengine.Value{{Path: hostnameRootPath(resourceType)}}
 	}
@@ -158,6 +163,7 @@ func (h *ingressRules) evaluate(
 		if hasAuditRules {
 			evaluation.Audits = append(evaluation.Audits, missingHostnameAuditDecision(value, resourceType))
 		}
+
 		if hasEnforcingRules {
 			evaluation.Blocking = missingHostnameDecision(value, resourceType)
 
@@ -267,13 +273,7 @@ func hasEnforcingIngressHostnameRules(
 }
 
 func containsIngressType(types []apirules.IngressType, expected apirules.IngressType) bool {
-	for _, resourceType := range types {
-		if resourceType == expected {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(types, expected)
 }
 
 func missingHostnameDecision(value ruleengine.Value, resourceType apirules.IngressType) *ruleengine.Decision {
@@ -343,20 +343,24 @@ func routeObjectValues(obj *unstructured.Unstructured) ([]ruleengine.Value, erro
 
 func ingressValues(obj *unstructured.Unstructured) ([]ruleengine.Value, error) {
 	values := make([]ruleengine.Value, 0)
+
 	rules, found, err := unstructured.NestedSlice(obj.Object, "spec", "rules")
 	if err != nil {
 		return nil, fmt.Errorf("read spec.rules: %w", err)
 	}
+
 	if found {
 		for i, item := range rules {
 			rule, ok := item.(map[string]any)
 			if !ok {
 				return nil, fmt.Errorf("spec.rules[%d] is not an object", i)
 			}
+
 			host, _, err := unstructured.NestedString(rule, "host")
 			if err != nil {
 				return nil, fmt.Errorf("read spec.rules[%d].host: %w", i, err)
 			}
+
 			values = append(values, ruleengine.Value{Value: strings.TrimSpace(host), Path: fmt.Sprintf("spec.rules[%d].host", i)})
 		}
 	}
@@ -365,20 +369,25 @@ func ingressValues(obj *unstructured.Unstructured) ([]ruleengine.Value, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read spec.tls: %w", err)
 	}
+
 	if found {
 		for i, item := range tls {
 			entry, ok := item.(map[string]any)
 			if !ok {
 				return nil, fmt.Errorf("spec.tls[%d] is not an object", i)
 			}
+
 			hosts, hostsFound, err := unstructured.NestedStringSlice(entry, "hosts")
 			if err != nil {
 				return nil, fmt.Errorf("read spec.tls[%d].hosts: %w", i, err)
 			}
+
 			if !hostsFound || len(hosts) == 0 {
 				values = append(values, ruleengine.Value{Path: fmt.Sprintf("spec.tls[%d].hosts", i)})
+
 				continue
 			}
+
 			for j, host := range hosts {
 				values = append(values, ruleengine.Value{Value: strings.TrimSpace(host), Path: fmt.Sprintf("spec.tls[%d].hosts[%d]", i, j)})
 			}
@@ -393,20 +402,24 @@ func listenerValues(obj *unstructured.Unstructured) ([]ruleengine.Value, error) 
 	if err != nil {
 		return nil, fmt.Errorf("read spec.listeners: %w", err)
 	}
+
 	if !found {
 		return nil, nil
 	}
 
 	values := make([]ruleengine.Value, 0, len(listeners))
+
 	for i, item := range listeners {
 		listener, ok := item.(map[string]any)
 		if !ok {
 			return nil, fmt.Errorf("spec.listeners[%d] is not an object", i)
 		}
+
 		hostname, _, err := unstructured.NestedString(listener, "hostname")
 		if err != nil {
 			return nil, fmt.Errorf("read spec.listeners[%d].hostname: %w", i, err)
 		}
+
 		values = append(values, ruleengine.Value{Value: strings.TrimSpace(hostname), Path: fmt.Sprintf("spec.listeners[%d].hostname", i)})
 	}
 
@@ -418,6 +431,7 @@ func routeValues(obj *unstructured.Unstructured) ([]ruleengine.Value, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read spec.hostnames: %w", err)
 	}
+
 	if !found {
 		return nil, nil
 	}

@@ -44,6 +44,7 @@ func (h *genericRules) validateMetadata(
 	if err != nil {
 		return nil, err
 	}
+
 	if len(entries) == 0 {
 		return nil, nil
 	}
@@ -138,6 +139,7 @@ func (h *genericRules) metadataSet(
 						if err != nil {
 							continue
 						}
+
 						if matched {
 							out = append(out, policy.Values...)
 						}
@@ -148,6 +150,7 @@ func (h *genericRules) metadataSet(
 						if err != nil {
 							continue
 						}
+
 						if matched {
 							out = append(out, policy.Values...)
 						}
@@ -199,22 +202,29 @@ func (h *genericRules) controlledMetadataEntries(
 				if h.managedMetadata.HasLabel(selector) {
 					continue
 				}
+
 				required := action == apirules.ActionTypeAllow && policy.Required
 				matchedAny := false
+
 				for key, value := range labels {
 					matched, err := h.matchesMetadataKey(selector, key)
 					if err != nil {
 						return nil, err
 					}
+
 					if !matched {
 						continue
 					}
+
 					matchedAny = true
+
 					if h.managedMetadata.HasLabel(key) {
 						continue
 					}
+
 					h.addMetadataEntry(seen, metadataFieldLabel, key, value, true, required)
 				}
+
 				if !matchedAny && required {
 					h.addMetadataEntry(seen, metadataFieldLabel, selector, "", false, true)
 				}
@@ -224,22 +234,29 @@ func (h *genericRules) controlledMetadataEntries(
 				if h.managedMetadata.HasAnnotation(selector) {
 					continue
 				}
+
 				required := action == apirules.ActionTypeAllow && policy.Required
 				matchedAny := false
+
 				for key, value := range annotations {
 					matched, err := h.matchesMetadataKey(selector, key)
 					if err != nil {
 						return nil, err
 					}
+
 					if !matched {
 						continue
 					}
+
 					matchedAny = true
+
 					if h.managedMetadata.HasAnnotation(key) {
 						continue
 					}
+
 					h.addMetadataEntry(seen, metadataFieldAnnotation, key, value, true, required)
 				}
+
 				if !matchedAny && required {
 					h.addMetadataEntry(seen, metadataFieldAnnotation, selector, "", false, true)
 				}
@@ -279,14 +296,18 @@ func (h *genericRules) addMetadataEntry(
 	if field == metadataFieldAnnotation {
 		path = metadataAnnotationPath(key)
 	}
+
 	entry := seen[path]
 	entry.Field = field
 	entry.Key = key
 	entry.Path = path
+
 	entry.Present = entry.Present || present
+
 	if present {
 		entry.Value = value
 	}
+
 	entry.Required = entry.Required || required
 	seen[path] = entry
 }
