@@ -175,6 +175,7 @@ func (h *genericRules) metadataSet(
 	}
 }
 
+//nolint:gocognit
 func (h *genericRules) controlledMetadataEntries(
 	obj genericObject,
 	gvk schema.GroupVersionKind,

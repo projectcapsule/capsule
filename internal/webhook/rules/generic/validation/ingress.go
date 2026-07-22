@@ -208,6 +208,7 @@ func (h *ingressRules) evaluate(
 	return evaluation, nil
 }
 
+//nolint:exhaustive
 func ingressTypeForGVK(gvk schema.GroupVersionKind) (apirules.IngressType, bool) {
 	switch {
 	case gvk.Group == "networking.k8s.io" && gvk.Version == "v1" && gvk.Kind == string(apirules.IngressTypeIngress):
@@ -304,6 +305,7 @@ func missingHostnameAuditDecision(value ruleengine.Value, resourceType apirules.
 	}
 }
 
+//nolint:exhaustive
 func hostnameRootPath(resourceType apirules.IngressType) string {
 	switch resourceType {
 	case apirules.IngressTypeIngress:

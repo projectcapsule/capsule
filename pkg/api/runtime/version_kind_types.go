@@ -287,52 +287,6 @@ func (s VersionKinds) StatusAPIGroups() []string {
 	return out
 }
 
-func validateKnownKindForAPIGroup(
-	mapper apimeta.RESTMapper,
-	apiGroup string,
-	kind string,
-) error {
-	apiGroup = normalizeAPIVersion(apiGroup)
-
-	if apiGroup == CoreAPIVersion {
-		_, err := mapper.RESTMapping(
-			schema.GroupKind{
-				Group: "",
-				Kind:  kind,
-			},
-			CoreAPIVersion,
-		)
-
-		return err
-	}
-
-	if strings.Contains(apiGroup, "/") {
-		gv, err := schema.ParseGroupVersion(apiGroup)
-		if err != nil {
-			return err
-		}
-
-		_, err = mapper.RESTMapping(
-			schema.GroupKind{
-				Group: gv.Group,
-				Kind:  kind,
-			},
-			gv.Version,
-		)
-
-		return err
-	}
-
-	_, err := mapper.RESTMapping(
-		schema.GroupKind{
-			Group: apiGroup,
-			Kind:  kind,
-		},
-	)
-
-	return err
-}
-
 func (s VersionKinds) NormalizedAPIGroups() []string {
 	if len(s.APIGroups) == 0 {
 		return []string{CoreAPIVersion}

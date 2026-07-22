@@ -8,15 +8,22 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 )
 
 func TestMatchesAudience(t *testing.T) {
 	t.Parallel()
+
+	cfg := audienceConfiguration(t)
 	req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{UserInfo: authenticationv1.UserInfo{Username: "alice", Groups: []string{"developers"}}}}
 
 	tests := []struct {
@@ -33,7 +40,7 @@ func TestMatchesAudience(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			matched, err := matchesAudience(nil, tt.tnt, req, tt.audience)
+			matched, err := matchesAudience(cfg, tt.tnt, req, tt.audience)
 			if err != nil {
 				t.Fatalf("matchesAudience() error = %v", err)
 			}
@@ -46,6 +53,8 @@ func TestMatchesAudience(t *testing.T) {
 
 func TestFilterNamespaceRulesUsesRootAudience(t *testing.T) {
 	t.Parallel()
+
+	cfg := audienceConfiguration(t)
 	req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
 		UserInfo: authenticationv1.UserInfo{Username: "alice", Groups: []string{"developers"}},
 	}}
@@ -59,11 +68,28 @@ func TestFilterNamespaceRulesUsesRootAudience(t *testing.T) {
 	}
 	unscoped := &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{}}
 
-	got, err := FilterNamespaceRulesByAudience(nil, nil, req, []*rules.NamespaceRuleBodyNamespace{matching, nonMatching, unscoped})
+	got, err := FilterNamespaceRulesByAudience(cfg, nil, req, []*rules.NamespaceRuleBodyNamespace{matching, nonMatching, unscoped})
 	if err != nil {
 		t.Fatalf("FilterNamespaceRulesByAudience() error = %v", err)
 	}
 	if len(got) != 2 || got[0] != matching || got[1] != unscoped {
 		t.Fatalf("unexpected filtered rules: %#v", got)
 	}
+}
+
+func audienceConfiguration(t *testing.T) configuration.Configuration {
+	t.Helper()
+
+	scheme := runtime.NewScheme()
+	if err := capsulev1beta2.AddToScheme(scheme); err != nil {
+		t.Fatalf("adding capsule scheme: %v", err)
+	}
+
+	config := &capsulev1beta2.CapsuleConfiguration{
+		ObjectMeta: metav1.ObjectMeta{Name: "capsule"},
+		Spec:       configuration.DefaultCapsuleConfiguration(),
+	}
+	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(config).Build()
+
+	return configuration.NewCapsuleConfiguration(t.Context(), cl, cl, &rest.Config{}, config.Name)
 }
