@@ -150,7 +150,7 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 			}
 
 			err = PatchNamespace(ns, ownerClient(t2.Spec.Owners[0].UserSpec), patch)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).To(HaveOccurred())
 
 			new := &corev1.Namespace{}
 			k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, new)
@@ -169,7 +169,7 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 			}
 
 			err := PatchNamespace(ns, ownerClient(t2.Spec.Owners[0].UserSpec), patch)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).To(HaveOccurred())
 
 			new := &corev1.Namespace{}
 			k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, new)
@@ -188,7 +188,7 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 			}
 
 			err := PatchNamespace(ns, ownerClient(t2.Spec.Owners[0].UserSpec), patch)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).To(HaveOccurred())
 
 			new := &corev1.Namespace{}
 			k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, new)
@@ -210,7 +210,7 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 			}
 
 			err = PatchNamespace(ns, ownerClient(t2.Spec.Owners[0].UserSpec), patch)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).To(HaveOccurred())
 
 			new := &corev1.Namespace{}
 			k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, new)

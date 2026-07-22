@@ -171,6 +171,27 @@ func (h *ownerReferenceHandler) tenantForUpdate(
 		return nil, denyNamespacePatch(ctx, req, oldNs, recorder, "namespace is not owned by any tenant")
 	}
 
+	if namespaceReferencesTenant(newNs, oldTenant) {
+		if !tenant.NamespaceIsOwned(ctx, reader, h.cfg, oldNs, oldTenant, user) {
+			return nil, denyNamespacePatch(ctx, req, oldNs, recorder, "denied patch request for this namespace")
+		}
+
+		return oldTenant, nil
+	}
+
+	requestedTenant, requestedErr := requestedNamespaceTenant(ctx, reader, newNs)
+	if requestedErr != nil {
+		return nil, denyNamespacePatch(ctx, req, oldNs, recorder, requestedErr.Error())
+	}
+
+	if requestedTenant == nil {
+		return nil, denyNamespacePatch(ctx, req, oldNs, recorder, "namespace can not remove tenant ownership")
+	}
+
+	if oldTenant.GetName() != requestedTenant.GetName() || oldTenant.GetUID() != requestedTenant.GetUID() {
+		return nil, denyNamespacePatch(ctx, req, oldNs, recorder, "namespace can not be migrated between tenants")
+	}
+
 	if !tenant.NamespaceIsOwned(ctx, reader, h.cfg, oldNs, oldTenant, user) {
 		return nil, denyNamespacePatch(ctx, req, oldNs, recorder, "denied patch request for this namespace")
 	}
@@ -179,6 +200,20 @@ func (h *ownerReferenceHandler) tenantForUpdate(
 	// change their Tenant assignment. Returning the old Tenant lets this handler
 	// normalize partial or attempted assignment changes back to the current one.
 	return oldTenant, nil
+}
+
+func namespaceReferencesTenant(ns *corev1.Namespace, tnt *capsulev1beta2.Tenant) bool {
+	if tenant.TenanLabelValue(ns) == tnt.GetName() {
+		return true
+	}
+
+	for _, ref := range tenant.TenantOwnerReferences(ns) {
+		if tenant.IsTenantOwnerReferenceForTenant(ref, tnt) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func requestedNamespaceTenant(

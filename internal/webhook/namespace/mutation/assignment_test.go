@@ -75,7 +75,7 @@ func TestOwnerReferenceHandlerAllowsAdminTenantDetachment(t *testing.T) {
 	}
 }
 
-func TestOwnerReferenceHandlerRevertsTenantOwnerAssignmentChanges(t *testing.T) {
+func TestOwnerReferenceHandlerRejectsTenantOwnerAssignmentChanges(t *testing.T) {
 	t.Parallel()
 
 	owner := rbac.CoreOwnerSpec{UserSpec: rbac.UserSpec{Name: "alice", Kind: rbac.UserOwner}}
@@ -115,10 +115,9 @@ func TestOwnerReferenceHandlerRevertsTenantOwnerAssignmentChanges(t *testing.T) 
 				recorder,
 			)(context.Background(), admission.Request{})
 
-			if response != nil {
-				t.Fatalf("expected patch to be accepted and reverted, got %#v", response)
+			if response == nil || response.Allowed {
+				t.Fatalf("expected assignment change to be denied, got %#v", response)
 			}
-			assertTenantAssignment(t, newNs, green)
 		})
 	}
 }

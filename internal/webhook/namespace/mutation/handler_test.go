@@ -83,7 +83,7 @@ func TestNamespaceHandlerDoesNotInterceptUnlabelledAdministratorCreate(t *testin
 	}
 }
 
-func TestNamespaceHandlerRevertsTenantOwnerLabelMigrationWithEmptyOwnerReferences(t *testing.T) {
+func TestNamespaceHandlerRejectsTenantOwnerLabelMigrationWithEmptyOwnerReferences(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -132,10 +132,7 @@ func TestNamespaceHandlerRevertsTenantOwnerLabelMigrationWithEmptyOwnerReference
 		},
 	}})
 
-	if response == nil || !response.Allowed {
-		t.Fatalf("expected label migration patch to be accepted and reverted, got %#v", response)
-	}
-	if len(response.Patches) == 0 {
-		t.Fatal("expected response to restore the original Tenant assignment")
+	if response == nil || response.Allowed {
+		t.Fatalf("expected label migration patch to be denied, got %#v", response)
 	}
 }
