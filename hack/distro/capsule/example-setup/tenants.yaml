@@ -7,16 +7,16 @@ metadata:
     customer: a
 spec:
   owners:
-  - name: alice
-    kind: User
+    - name: alice
+      kind: User
   rules:
     - permissions:
         bindings:
           - clusterRoleName: 'custom:proxy-viewer'
             subjects:
-            - apiGroup: rbac.authorization.k8s.io
-              kind: User
-              name: joe
+              - apiGroup: rbac.authorization.k8s.io
+                kind: User
+                name: joe
             labels:
               reflection.proxy.projectcapsule.dev/enabled: "true"
       enforce:
@@ -29,15 +29,6 @@ spec:
             labels:
               pod-security.kubernetes.io/enforce:
                 managed: "restricted"
-          #- apiGroups:
-          #    - "v1"
-          #  kinds:
-          #    - "*"
-          #  labels:
-          #    custom.corp/tenant:
-          #      managed: "{{ $.tenant.metadata.name }}"
-          #    test: 
-          #      managed: "true"
     - audience:
         - kind: "Custom"
           name: "CapsuleUser"
@@ -52,7 +43,7 @@ spec:
               "openshift.io/*":
                 required: false
                 values:
-                  - exp:  "^.*$"
+                  - exp: "^.*$"
     - namespaceSelector:
         matchExpressions:
           - key: env
@@ -62,17 +53,7 @@ spec:
       permissions:
         promotions:
           - clusterRoles:
-            - "secret-replicator"
-    - namespaceSelector:
-        matchExpressions:
-          - key: env
-            operator: In
-            values:
-              - "prod"
-      permissions:
-        promotions:
-          - clusterRoles:
-            - "sade-boi"
+              - "secret-replicator"
   permissions:
     matchOwners:
     - matchLabels:
