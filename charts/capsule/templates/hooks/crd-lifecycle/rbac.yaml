@@ -38,6 +38,8 @@ rules:
   - customquotas.capsule.clastix.io
   - globalcustomquotas.capsule.clastix.io
   - quantityledgers.capsule.clastix.io
+  - breakrequests.capsule.clastix.io
+  - breakrequesttemplates.capsule.clastix.io
   verbs:
   - create
   - delete
