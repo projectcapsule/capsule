@@ -61,6 +61,7 @@ func (r *Manager) ensureRuleStatus(
 		}
 
 		labels[meta.NewManagedByCapsuleLabel] = meta.ValueController
+		labels[meta.NewTenantLabel] = tnt.Name
 		labels[meta.CapsuleNameLabel] = rule.GetName()
 
 		rule.SetLabels(labels)

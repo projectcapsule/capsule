@@ -23,6 +23,10 @@ import (
 //
 
 func (r *Manager) syncLimitRanges(ctx context.Context, log logr.Logger, tenant *capsulev1beta2.Tenant) error {
+	if err := r.runGarbageCollection(ctx, tenant, &corev1.LimitRange{}); err != nil {
+		return err
+	}
+
 	// getting requested LimitRange keys
 	//nolint:staticcheck
 	keys := make([]string, 0, len(tenant.Spec.LimitRanges.Items))

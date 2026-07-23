@@ -9,6 +9,7 @@ import (
 
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/utils/ptr"
 
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 	"github.com/projectcapsule/capsule/pkg/api/runtime"
@@ -745,6 +746,42 @@ func TestValidateRuleStatusBody(t *testing.T) {
 	}
 }
 
+func TestValidateMetadataKeyPatterns(t *testing.T) {
+	t.Parallel()
+
+	if err := validateMetadataKey("example.corp/*"); err != nil {
+		t.Fatalf("expected wildcard key selector to be valid: %v", err)
+	}
+	if err := validateMetadataKey(`example\.corp/.*`); err != nil {
+		t.Fatalf("expected regexp key selector to be valid: %v", err)
+	}
+	if err := validateMetadataKey("example.corp/["); err == nil {
+		t.Fatal("expected invalid regexp key selector to be rejected")
+	}
+}
+
+func TestMutableMetadataRequiresConcreteKey(t *testing.T) {
+	t.Parallel()
+	policy := rules.MetadataValueRule{Managed: ptr.To("controlled")}
+	if err := validateMutableMetadataKey("example.corp/key", policy); err != nil {
+		t.Fatalf("concrete key rejected: %v", err)
+	}
+	if err := validateMutableMetadataKey("example.corp/*", policy); err == nil {
+		t.Fatal("wildcard managed key was accepted")
+	}
+	if err := validateMutableMetadataKey(`example\.corp/.*`, policy); err == nil {
+		t.Fatal("regexp managed key was accepted")
+	}
+
+	rule := rules.MetadataRule{
+		VersionKinds: runtime.VersionKinds{APIGroups: []string{"*"}, Kinds: []string{"ConfigMap"}},
+		Labels:       map[string]rules.MetadataValueRule{"example.corp/key": policy},
+	}
+	if err := validateMetadataRules(0, []rules.MetadataRule{rule}, nil); err == nil || !strings.Contains(err.Error(), "managed metadata requires concrete apiGroups and kinds") {
+		t.Fatalf("wildcard managed target error = %v", err)
+	}
+}
+
 func TestValidateRuleStatusBodyWithRESTMapper(t *testing.T) {
 	t.Parallel()
 
@@ -818,6 +855,18 @@ func TestValidateRuleStatusBodyWithRESTMapper(t *testing.T) {
 					},
 				},
 			},
+		},
+		{
+			name:   "core namespace is a valid metadata target",
+			mapper: mapper,
+			bodies: []*rules.NamespaceRuleBodyNamespace{{
+				Enforce: &rules.NamespaceRuleEnforceBody{Metadata: []rules.MetadataRule{{
+					VersionKinds: runtime.VersionKinds{APIGroups: []string{""}, Kinds: []string{"Namespace"}},
+					Annotations: map[string]rules.MetadataValueRule{
+						"example.corp/*": {Values: []runtime.ExpressionMatch{{Exact: []string{"allowed"}}}},
+					},
+				}}},
+			}},
 		},
 		{
 			name:   "known grouped apiVersion kind is valid",
@@ -1145,6 +1194,15 @@ func newRuleValidationRESTMapper() apimeta.RESTMapper {
 			Version: "v1",
 		},
 	})
+
+	mapper.Add(
+		schema.GroupVersionKind{
+			Group:   "",
+			Version: "v1",
+			Kind:    "Namespace",
+		},
+		apimeta.RESTScopeRoot,
+	)
 
 	mapper.Add(
 		schema.GroupVersionKind{

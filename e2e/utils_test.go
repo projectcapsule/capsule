@@ -366,18 +366,24 @@ func GetTenantOwnerReferenceAsPatch(
 
 }
 
-func PatchTenantLabelForNamespace(tnt *capsulev1beta2.Tenant, ns *corev1.Namespace, cs kubernetes.Interface, timeout time.Duration) AsyncAssertion {
-	return Eventually(func() (err error) {
-		patch := map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"labels": map[string]interface{}{
-					meta.TenantLabel: tnt.GetName(),
-				},
-			},
-		}
+func PatchTenantAssignmentForNamespace(
+	tnt *capsulev1beta2.Tenant,
+	ns *corev1.Namespace,
+	cs kubernetes.Interface,
+) error {
+	ref, err := GetTenantOwnerReferenceAsPatch(tnt)
+	if err != nil {
+		return err
+	}
 
-		return PatchNamespace(ns, cs, patch)
-	}, timeout, defaultPollInterval)
+	return PatchNamespace(ns, cs, map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"labels": map[string]interface{}{
+				meta.TenantLabel: tnt.GetName(),
+			},
+			"ownerReferences": []map[string]interface{}{ref},
+		},
+	})
 }
 
 func PatchNamespace(ns *corev1.Namespace, cs kubernetes.Interface, patch map[string]interface{}) error {

@@ -37,7 +37,10 @@ func (r *Manager) reconcileNamespaces(
 		return r.reconcileDeletingTenantNamespaces(ctx, log, tnt)
 	}
 
-	return r.reconcileActiveTenantNamespaces(ctx, log, tnt)
+	reconcileErr := r.reconcileActiveTenantNamespaces(ctx, log, tnt)
+	garbageCollectionErr := r.runGarbageCollection(ctx, tnt, &capsulev1beta2.RuleStatus{})
+
+	return errors.Join(reconcileErr, garbageCollectionErr)
 }
 
 func (r *Manager) reconcileDeletingTenantNamespaces(

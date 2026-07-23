@@ -3,6 +3,31 @@
 
 package rules
 
+type AudienceKind string
+
+const (
+	AudienceKindUser           AudienceKind = "User"
+	AudienceKindGroup          AudienceKind = "Group"
+	AudienceKindServiceAccount AudienceKind = "ServiceAccount"
+	AudienceKindCustom         AudienceKind = "Custom"
+)
+
+type CustomAudience string
+
+const (
+	CustomAudienceCapsuleUser   CustomAudience = "CapsuleUser"
+	CustomAudienceAdministrator CustomAudience = "Administrator"
+	CustomAudienceTenantOwner   CustomAudience = "TenantOwner"
+	CustomAudienceController    CustomAudience = "Controller"
+)
+
+// +kubebuilder:object:generate=true
+type Audience struct {
+	// +kubebuilder:validation:Enum=User;Group;ServiceAccount;Custom
+	Kind AudienceKind `json:"kind"`
+	Name string       `json:"name"`
+}
+
 // +kubebuilder:object:generate=true
 type NamespaceRuleEnforceBody struct {
 	// Declare the action being performed on the enforcement rule:
@@ -23,4 +48,8 @@ type NamespaceRuleEnforceBody struct {
 	//
 	// +optional
 	Metadata []MetadataRule `json:"metadata,omitempty"`
+
+	// Enforcement for Ingress and Gateway API resource hostnames.
+	// +optional
+	Ingress NamespaceRuleEnforceIngressBody `json:"ingress,omitempty"`
 }

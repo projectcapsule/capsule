@@ -1002,7 +1002,6 @@ webhooks:
         resources:
           - '*'
         scope: Namespaced
-
     # -- Generic Rules API
     generic:
       # -- Enable the Hook
@@ -1045,7 +1044,6 @@ webhooks:
         resources:
           - '*'
         scope: Namespaced
-
 
     resourcepools:
       pools:

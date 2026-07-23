@@ -10,6 +10,11 @@ import (
 // For future implementation where users might manage RuleStatus CRs themselves
 // +kubebuilder:object:generate=true
 type NamespaceRuleBodyNamespace struct {
+	// Audience limits this rule to matching request subjects.
+	// An empty audience matches every request.
+	// +optional
+	Audience []Audience `json:"audience,omitempty"`
+
 	// Enforcement for given rule
 	//+optional
 	Enforce *NamespaceRuleEnforceBody `json:"enforce,omitzero"`

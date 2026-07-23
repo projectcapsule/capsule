@@ -1,7 +1,6 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-//nolint:dupl
 package handlers
 
 import (
@@ -16,6 +15,8 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
+	"github.com/projectcapsule/capsule/pkg/ruleengine"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
@@ -54,8 +55,9 @@ type TypedHandlerWithTenantWithRuleset[T client.Object] interface {
 }
 
 type TypedTenantWithRulesetHandler[T client.Object] struct {
-	Factory  NewObjectFunc[T]
-	Handlers []TypedHandlerWithTenantWithRuleset[T]
+	Factory       NewObjectFunc[T]
+	Handlers      []TypedHandlerWithTenantWithRuleset[T]
+	Configuration configuration.Configuration
 }
 
 func (h *TypedTenantWithRulesetHandler[T]) OnCreate(
@@ -79,7 +81,12 @@ func (h *TypedTenantWithRulesetHandler[T]) OnCreate(
 			return ErroredResponse(err)
 		}
 
-		ruleBlocks, err := h.resolveRuleset(ctx, c, req, req.Namespace, tnt)
+		ruleBlocks, err := h.resolveRuleset(ctx, c, reader, req, req.Namespace, tnt)
+		if err != nil {
+			return ErroredResponse(err)
+		}
+
+		ruleBlocks, err = ruleengine.FilterNamespaceRulesByAudience(h.Configuration, tnt, req, ruleBlocks)
 		if err != nil {
 			return ErroredResponse(err)
 		}
@@ -120,7 +127,12 @@ func (h *TypedTenantWithRulesetHandler[T]) OnUpdate(
 			return ErroredResponse(err)
 		}
 
-		ruleBlocks, err := h.resolveRuleset(ctx, c, req, req.Namespace, tnt)
+		ruleBlocks, err := h.resolveRuleset(ctx, c, reader, req, req.Namespace, tnt)
+		if err != nil {
+			return ErroredResponse(err)
+		}
+
+		ruleBlocks, err = ruleengine.FilterNamespaceRulesByAudience(h.Configuration, tnt, req, ruleBlocks)
 		if err != nil {
 			return ErroredResponse(err)
 		}
@@ -136,37 +148,12 @@ func (h *TypedTenantWithRulesetHandler[T]) OnUpdate(
 }
 
 func (h *TypedTenantWithRulesetHandler[T]) OnDelete(
-	c client.Client,
-	reader client.Reader,
-	decoder admission.Decoder,
-	recorder events.EventRecorder,
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
 ) Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
-		tnt, err := h.resolveTenant(ctx, reader, req)
-		if err != nil {
-			return ErroredResponse(err)
-		}
-
-		if tnt == nil {
-			return nil
-		}
-
-		obj := h.Factory()
-		if err := decoder.Decode(req, obj); err != nil {
-			return ErroredResponse(err)
-		}
-
-		ruleBlocks, err := h.resolveRuleset(ctx, c, req, req.Namespace, tnt)
-		if err != nil {
-			return ErroredResponse(err)
-		}
-
-		for _, hndl := range h.Handlers {
-			if response := hndl.OnDelete(c, reader, obj, decoder, recorder, tnt, ruleBlocks)(ctx, req); response != nil {
-				return response
-			}
-		}
-
+	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
@@ -188,6 +175,7 @@ func (h *TypedTenantWithRulesetHandler[T]) resolveTenant(
 func (h *TypedTenantWithRulesetHandler[T]) resolveRuleset(
 	ctx context.Context,
 	c client.Client,
+	reader client.Reader,
 	req admission.Request,
 	namespace string,
 	tnt *capsulev1beta2.Tenant,
@@ -198,7 +186,7 @@ func (h *TypedTenantWithRulesetHandler[T]) resolveRuleset(
 		Name:      meta.NameForManagedRuleStatus(),
 	}
 
-	if err := c.Get(ctx, key, rs); err == nil {
+	if err := reader.Get(ctx, key, rs); err == nil {
 		return rs.Status.Rules, nil
 	} else if !apierrors.IsNotFound(err) {
 		return nil, err

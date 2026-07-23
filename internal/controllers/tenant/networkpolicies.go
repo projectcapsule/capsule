@@ -24,6 +24,10 @@ import (
 //
 
 func (r *Manager) syncNetworkPolicies(ctx context.Context, log logr.Logger, tenant *capsulev1beta2.Tenant) error {
+	if err := r.runGarbageCollection(ctx, tenant, &networkingv1.NetworkPolicy{}); err != nil {
+		return err
+	}
+
 	//nolint:staticcheck
 	keys := make([]string, 0, len(tenant.Spec.NetworkPolicies.Items))
 

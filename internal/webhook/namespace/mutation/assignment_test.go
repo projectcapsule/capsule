@@ -24,7 +24,58 @@ import (
 	"github.com/projectcapsule/capsule/pkg/users"
 )
 
-func TestOwnerReferenceHandlerRevertsTenantOwnerAssignmentChanges(t *testing.T) {
+func TestOwnerReferenceHandlerAllowsAdminTenantMigration(t *testing.T) {
+	t.Parallel()
+
+	green := testTenant("green", "green-uid")
+	blue := testTenant("blue", "blue-uid")
+	oldNs := testTenantNamespace("workloads", green)
+	newNs := testTenantNamespace("workloads", blue)
+	c := testClient(t, green, blue)
+
+	response := (&ownerReferenceHandler{}).OnUpdate(
+		c,
+		c,
+		users.AdmissionUser{Type: users.AdmissionUserAdmin},
+		newNs,
+		oldNs,
+		nil,
+		nil,
+	)(context.Background(), admission.Request{})
+
+	if response != nil {
+		t.Fatalf("expected migration to proceed, got response %#v", response)
+	}
+	assertTenantAssignment(t, newNs, blue)
+}
+
+func TestOwnerReferenceHandlerAllowsAdminTenantDetachment(t *testing.T) {
+	t.Parallel()
+
+	green := testTenant("green", "green-uid")
+	oldNs := testTenantNamespace("workloads", green)
+	newNs := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: oldNs.GetName()}}
+	c := testClient(t, green)
+
+	response := (&ownerReferenceHandler{}).OnUpdate(
+		c,
+		c,
+		users.AdmissionUser{Type: users.AdmissionUserAdmin},
+		newNs,
+		oldNs,
+		nil,
+		nil,
+	)(context.Background(), admission.Request{})
+
+	if response != nil {
+		t.Fatalf("expected detachment to proceed, got response %#v", response)
+	}
+	if tenant.HasTenantReference(newNs) {
+		t.Fatalf("detached namespace still has tenant ownership: %#v", newNs.ObjectMeta)
+	}
+}
+
+func TestOwnerReferenceHandlerRejectsTenantOwnerAssignmentChanges(t *testing.T) {
 	t.Parallel()
 
 	owner := rbac.CoreOwnerSpec{UserSpec: rbac.UserSpec{Name: "alice", Kind: rbac.UserOwner}}
@@ -64,37 +115,72 @@ func TestOwnerReferenceHandlerRevertsTenantOwnerAssignmentChanges(t *testing.T) 
 				recorder,
 			)(context.Background(), admission.Request{})
 
-			if response != nil {
-				t.Fatalf("expected patch to be accepted and reverted, got %#v", response)
+			if response == nil || response.Allowed {
+				t.Fatalf("expected assignment change to be denied, got %#v", response)
 			}
-			assertTenantAssignment(t, newNs, green)
 		})
 	}
 }
 
-func TestOwnerReferenceHandlerAllowsAdministratorAssignmentChanges(t *testing.T) {
+func TestOwnerReferenceHandlerRepairsTenantOwnerReferences(t *testing.T) {
 	t.Parallel()
 
+	owner := rbac.CoreOwnerSpec{UserSpec: rbac.UserSpec{Name: "alice", Kind: rbac.UserOwner}}
 	green := testTenant("green", "green-uid")
-	blue := testTenant("blue", "blue-uid")
+	green.Status.Owners = rbac.OwnerStatusListSpec{owner}
 	oldNs := testTenantNamespace("workloads", green)
-	c := testClient(t, green, blue)
+	recorder := capevents.NewEventRecorder(nil, logr.Discard(), nil, nil)
 
-	newNs := testTenantNamespace("workloads", blue)
-	response := (&ownerReferenceHandler{}).OnUpdate(
-		c,
-		c,
-		users.AdmissionUser{Type: users.AdmissionUserAdmin},
-		newNs,
-		oldNs,
-		nil,
-		nil,
-	)(context.Background(), admission.Request{})
+	tests := []struct {
+		name string
+		new  *corev1.Namespace
+	}{
+		{
+			name: "missing reference",
+			new: func() *corev1.Namespace {
+				ns := oldNs.DeepCopy()
+				ns.OwnerReferences = nil
 
-	if response != nil {
-		t.Fatalf("expected administrator migration to proceed, got %#v", response)
+				return ns
+			}(),
+		},
+		{
+			name: "additional reference",
+			new: func() *corev1.Namespace {
+				ns := oldNs.DeepCopy()
+				ns.OwnerReferences = append(ns.OwnerReferences, metav1.OwnerReference{
+					APIVersion: capsulev1beta2.GroupVersion.String(),
+					Kind:       tenant.ObjectReferenceTenantKind,
+					Name:       "blue",
+					UID:        "blue-uid",
+				})
+
+				return ns
+			}(),
+		},
 	}
-	assertTenantAssignment(t, newNs, blue)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := testClient(t, green)
+			newNs := tt.new.DeepCopy()
+
+			response := (&ownerReferenceHandler{}).OnUpdate(
+				c,
+				c,
+				users.AdmissionUser{Type: users.AdmissionUserCapsule, Username: owner.Name},
+				newNs,
+				oldNs.DeepCopy(),
+				nil,
+				recorder,
+			)(context.Background(), admission.Request{})
+
+			if response != nil {
+				t.Fatalf("expected ownerReferences to be normalized, got %#v", response)
+			}
+			assertTenantAssignment(t, newNs, green)
+		})
+	}
 }
 
 func TestOwnerReferenceHandlerRejectsNonOwnerJoin(t *testing.T) {

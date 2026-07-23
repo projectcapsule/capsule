@@ -4,6 +4,10 @@
 package rules
 
 import (
+	"strings"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	"github.com/projectcapsule/capsule/pkg/api/runtime"
 )
 
@@ -25,6 +29,29 @@ type MetadataRule struct {
 	Annotations map[string]MetadataValueRule `json:"annotations,omitempty"`
 }
 
+// MatchesGroupVersionKind matches metadata targets. Namespace is deliberately
+// opt-in: wildcard kind selectors never include it, so cluster-scoped
+// namespace admission cannot be enabled accidentally.
+func (r MetadataRule) MatchesGroupVersionKind(gvk schema.GroupVersionKind) bool {
+	if gvk.Group == "" && gvk.Version == "v1" && gvk.Kind == "Namespace" {
+		explicit := false
+
+		for _, kind := range r.Kinds {
+			if strings.TrimSpace(kind) == "Namespace" {
+				explicit = true
+
+				break
+			}
+		}
+
+		if !explicit {
+			return false
+		}
+	}
+
+	return r.VersionKinds.MatchesGroupVersionKind(gvk)
+}
+
 // +kubebuilder:object:generate=true
 type MetadataValueRule struct {
 	// Required enforces that the metadata key must be present.
@@ -42,4 +69,37 @@ type MetadataValueRule struct {
 	//
 	// +optional
 	Values []runtime.ExpressionMatch `json:"values,omitempty"`
+
+	// Default is applied by admission mutation when the concrete metadata key is absent.
+	// It is not reconciled after admission.
+	// +optional
+	Default *string `json:"default,omitempty"`
+
+	// Managed is enforced by admission mutation and reconciled by the RuleStatus
+	// controller using server-side apply when the rule configuration changes.
+	// +optional
+	Managed *string `json:"managed,omitempty"`
+}
+
+// MetadataKeyExpression converts a metadata key selector into the regular
+// expression used by admission validation and runtime matching. Asterisks are
+// convenient wildcards, while the rest of the selector retains regexp syntax.
+func MetadataKeyExpression(selector string) runtime.ExpressionRegex {
+	selector = strings.TrimSpace(selector)
+
+	var expression strings.Builder
+
+	for i, char := range selector {
+		if char == '*' && (i == 0 || selector[i-1] != '.') {
+			expression.WriteString(".*")
+
+			continue
+		}
+
+		expression.WriteRune(char)
+	}
+
+	return runtime.ExpressionRegex{
+		Expression: "^(?:" + expression.String() + ")$",
+	}
 }
