@@ -164,6 +164,44 @@ func TestCalculateResources(t *testing.T) {
 	assert.Equal(t, 0, (&actualAvailable).Cmp(resource.MustParse("1")))
 }
 
+func TestCalculateResources_OverSubscriptionDoesNotGoNegative(t *testing.T) {
+	pool := &capsulev1beta2.ResourcePool{
+		Status: capsulev1beta2.ResourcePoolStatus{
+			Allocation: capsulev1beta2.ResourcePoolQuotaStatus{
+				Hard: corev1.ResourceList{
+					corev1.ResourceLimitsCPU: resource.MustParse("10"),
+				},
+			},
+			Claims: capsulev1beta2.ResourcePoolNamespaceClaimsStatus{
+				"ns": {
+					&capsulev1beta2.ResourcePoolClaimsItem{
+						Claims: corev1.ResourceList{
+							corev1.ResourceLimitsCPU: resource.MustParse("55"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	pool.CalculateClaimedResources()
+
+	// Even when claims exceed the hard limit, available must clamp at zero
+	// and Hard must stay intact (regression: subtracting in place corrupted
+	// both Hard and Available, producing negative values — see issue #1977).
+	actualAvailable := pool.Status.Allocation.Available[corev1.ResourceLimitsCPU]
+	assert.Equal(t, 0, (&actualAvailable).Cmp(resource.MustParse("0")))
+
+	actualHard := pool.Status.Allocation.Hard[corev1.ResourceLimitsCPU]
+	assert.Equal(t, 0, (&actualHard).Cmp(resource.MustParse("10")))
+
+	// With zero available, a new oversized claim must be rejected.
+	errs := pool.CanClaimFromPool(corev1.ResourceList{
+		corev1.ResourceLimitsCPU: resource.MustParse("55"),
+	})
+	assert.Len(t, errs, 1)
+}
+
 func TestCanClaimFromPool(t *testing.T) {
 	pool := &capsulev1beta2.ResourcePool{
 		Status: capsulev1beta2.ResourcePoolStatus{
@@ -316,4 +354,27 @@ func TestIsBoundToResourcePool_2(t *testing.T) {
 		assert.Equal(t, true, claim.IsBoundInResourcePool())
 	})
 
+}
+
+func TestGetAvailableClaimableResources_OverSubscriptionDoesNotGoNegative(t *testing.T) {
+	pool := &capsulev1beta2.ResourcePool{
+		Status: capsulev1beta2.ResourcePoolStatus{
+			Allocation: capsulev1beta2.ResourcePoolQuotaStatus{
+				Hard: corev1.ResourceList{
+					corev1.ResourceLimitsCPU: resource.MustParse("10"),
+				},
+				Claimed: corev1.ResourceList{
+					corev1.ResourceLimitsCPU: resource.MustParse("55"),
+				},
+			},
+		},
+	}
+
+	// Claimed exceeds Hard, so Hard-Claimed is negative. The helper must clamp
+	// at zero so negative available values never leak into PoolExhausted
+	// condition messages.
+	claimable := pool.GetAvailableClaimableResources()
+	got := claimable[corev1.ResourceLimitsCPU]
+	assert.Equal(t, 0, (&got).Cmp(resource.MustParse("0")))
+	assert.False(t, (&got).Sign() < 0)
 }
