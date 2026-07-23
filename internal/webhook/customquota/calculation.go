@@ -10,6 +10,7 @@ import (
 	"sort"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -697,11 +698,44 @@ func (h *objectCalculationHandler) matchGlobalCustomQuotas(
 
 	objLabels := labels.Set(u.GetLabels())
 
+	// Fetch the namespace once so that per-GCQ namespace-selector
+	// checks below are a pure in-memory label
+	// evaluation rather than a repeated cache lookup.
+	var nsLabels labels.Set
+
+	if req.Namespace != "" {
+		ns := &corev1.Namespace{}
+		if err := c.Get(ctx, types.NamespacedName{Name: req.Namespace}, ns); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil, nil
+			}
+
+			return nil, fmt.Errorf("get namespace %s: %w", req.Namespace, err)
+		}
+
+		nsLabels = labels.Set(ns.GetLabels())
+	}
+
 	out := make([]quota.MatchedQuota, 0)
 
 	for _, gcq := range list.Items {
-		if !gcq.Status.NamespacePresent("*") && !gcq.Status.NamespacePresent(req.Namespace) {
-			continue
+		// Evaluate namespace selectors directly from Spec against the live
+		// namespace labels (informer-cached) rather than checking
+		// Status.Namespaces, which is only updated after a controller reconcile.
+		// This closes the window where newly-labelled namespaces bypass the quota
+		// before the controller has had a chance to reconcile.
+		if len(gcq.Spec.NamespaceSelectors) > 0 {
+			nsLabelSelectors := make([]metav1.LabelSelector, 0, len(gcq.Spec.NamespaceSelectors))
+
+			for _, nsSel := range gcq.Spec.NamespaceSelectors {
+				if nsSel.LabelSelector != nil {
+					nsLabelSelectors = append(nsLabelSelectors, *nsSel.LabelSelector)
+				}
+			}
+
+			if !selectors.MatchesSelectors(nsLabels, nsLabelSelectors) {
+				continue
+			}
 		}
 
 		if !selectors.MatchesSelectors(objLabels, gcq.Spec.ScopeSelectors) {
