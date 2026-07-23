@@ -471,7 +471,13 @@
                         },
                         "impersonation": {
                             "description": "Impersonation",
-                            "type": "object"
+                            "type": "object",
+                            "properties": {
+                                "tenantDefaultServiceAccount": {
+                                    "type": "string"
+                                }
+                            },
+                            "additionalProperties": true
                         },
                         "labels": {
                             "description": "Additional labels to add to the CapsuleConfiguration resource",
