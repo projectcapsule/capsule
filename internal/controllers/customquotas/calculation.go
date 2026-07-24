@@ -31,6 +31,7 @@ type quotaUsageReconcileInput struct {
 	Mapper k8smeta.RESTMapper
 
 	JSONPathCache *cache.JSONPathCache
+	CELCache      *cache.CELCache
 
 	Sources        []capsulev1beta2.CustomQuotaSpecSource
 	ScopeSelectors []metav1.LabelSelector
@@ -95,7 +96,7 @@ func reconcileQuotaUsage(
 		})
 	}
 
-	targets, err := CompileTargets(in.JSONPathCache, out.Targets)
+	targets, err := CompileTargets(in.JSONPathCache, in.CELCache, out.Targets)
 	if err != nil {
 		return out, err
 	}
@@ -143,7 +144,7 @@ func reconcileQuotaUsage(
 		)
 
 		for _, item := range items {
-			matches, err := MatchesCompiledSelectorsWithFields(item, target.CompiledSelectors)
+			matches, err := MatchesCompiledSelectorsWithFields(ctx, item, target.CompiledSelectors)
 			if err != nil {
 				errs = append(errs, fmt.Errorf(
 					"evaluate selectors for %s/%s (%s): %w",
@@ -160,7 +161,7 @@ func reconcileQuotaUsage(
 				continue
 			}
 
-			rawUsage, err := usageForTarget(item, target)
+			rawUsage, err := usageForTarget(ctx, item, target)
 			if err != nil {
 				errs = append(errs, err)
 
@@ -263,6 +264,7 @@ func reconcileQuotaUsage(
 }
 
 func usageForTarget(
+	ctx context.Context,
 	item unstructured.Unstructured,
 	target cache.CompiledTarget,
 ) (resource.Quantity, error) {
@@ -271,14 +273,28 @@ func usageForTarget(
 		return *resource.NewQuantity(1, resource.DecimalSI), nil
 
 	case quota.OpAdd, quota.OpSub:
-		usage, err := quota.ParseQuantityFromUnstructured(item, target.CompiledPath)
+		var (
+			usage resource.Quantity
+			err   error
+		)
+
+		switch {
+		case target.CompiledCEL != nil:
+			usage, err = target.CompiledCEL.EvaluateQuantity(ctx, item)
+		case target.CompiledPath != nil:
+			usage, err = quota.ParseQuantityFromUnstructured(item, target.CompiledPath)
+		default:
+			err = fmt.Errorf("compiled usage expression is missing")
+		}
+
 		if err != nil {
 			return resource.Quantity{}, fmt.Errorf(
-				"get usage from %s/%s (%s) path %q op %q: %w",
+				"get usage from %s/%s (%s) path %q cel %q op %q: %w",
 				item.GetNamespace(),
 				item.GetName(),
 				item.GetObjectKind().GroupVersionKind().String(),
 				target.Path,
+				target.CEL,
 				target.Operation,
 				err,
 			)

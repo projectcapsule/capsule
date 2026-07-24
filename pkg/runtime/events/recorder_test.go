@@ -6,6 +6,7 @@ package events_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
@@ -97,11 +98,24 @@ func TestLabeledEventEmitCreatesEvent(t *testing.T) {
 	).WithLabels(map[string]string{"capsule.clastix.io/test": "true"}).Emit(ctx)
 
 	var eventList eventsv1.EventList
-	if err := cl.List(ctx, &eventList, client.InNamespace("audit")); err != nil {
-		t.Fatalf("listing emitted events: %v", err)
-	}
-	if len(eventList.Items) != 1 {
-		t.Fatalf("emitted events = %d, want 1", len(eventList.Items))
+	deadline := time.Now().Add(time.Second)
+
+	for {
+		eventList.Items = nil
+
+		if err := cl.List(ctx, &eventList, client.InNamespace("audit")); err != nil {
+			t.Fatalf("listing emitted events: %v", err)
+		}
+
+		if len(eventList.Items) == 1 {
+			break
+		}
+
+		if time.Now().After(deadline) {
+			t.Fatalf("emitted events = %d, want 1", len(eventList.Items))
+		}
+
+		time.Sleep(time.Millisecond)
 	}
 
 	got := eventList.Items[0]

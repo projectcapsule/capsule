@@ -12,14 +12,151 @@ import (
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/internal/cache"
 	capsulemeta "github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/runtime/quota"
+	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
+
+func TestCompiledTargetsSupportMixedJSONPathAndCELSelectors(t *testing.T) {
+	t.Parallel()
+
+	celCache, err := cache.NewCELCache()
+	if err != nil {
+		t.Fatalf("NewCELCache() error = %v", err)
+	}
+
+	targets, err := CompileTargets(
+		cache.NewJSONPathCache(),
+		celCache,
+		[]capsulev1beta2.CustomQuotaStatusTarget{
+			{
+				CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+					Operation: quota.OpCount,
+					Selectors: []selectors.SelectorWithFields{
+						{
+							FieldSelectors: []string{".spec.restartPolicy=Always"},
+							CELExpressions: []string{
+								`object.spec.containers.exists(c, c.image == "nginx:1.27.0")`,
+							},
+						},
+					},
+				},
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("CompileTargets() error = %v", err)
+	}
+
+	object := unstructured.Unstructured{Object: map[string]any{
+		"spec": map[string]any{
+			"restartPolicy": "Always",
+			"containers": []any{
+				map[string]any{"image": "nginx:1.27.0"},
+			},
+		},
+	}}
+
+	matched, err := MatchesCompiledSelectorsWithFields(
+		context.Background(),
+		object,
+		targets[0].CompiledSelectors,
+	)
+	if err != nil {
+		t.Fatalf("MatchesCompiledSelectorsWithFields() error = %v", err)
+	}
+	if !matched {
+		t.Fatal("mixed JSONPath and CEL selectors did not match")
+	}
+
+	object.Object["spec"].(map[string]any)["restartPolicy"] = "Never"
+	matched, err = MatchesCompiledSelectorsWithFields(
+		context.Background(),
+		object,
+		targets[0].CompiledSelectors,
+	)
+	if err != nil {
+		t.Fatalf("MatchesCompiledSelectorsWithFields() JSONPath mismatch error = %v", err)
+	}
+	if matched {
+		t.Fatal("selector matched when its JSONPath condition was false")
+	}
+
+	object.Object["spec"].(map[string]any)["restartPolicy"] = "Always"
+	object.Object["spec"].(map[string]any)["containers"] = []any{
+		map[string]any{"image": "nginx:1.26.0"},
+	}
+	matched, err = MatchesCompiledSelectorsWithFields(
+		context.Background(),
+		object,
+		targets[0].CompiledSelectors,
+	)
+	if err != nil {
+		t.Fatalf("MatchesCompiledSelectorsWithFields() CEL mismatch error = %v", err)
+	}
+	if matched {
+		t.Fatal("selector matched when its CEL condition was false")
+	}
+}
+
+func TestUsageForTargetSupportsCELQuantityLists(t *testing.T) {
+	t.Parallel()
+
+	celCache, err := cache.NewCELCache()
+	if err != nil {
+		t.Fatalf("NewCELCache() error = %v", err)
+	}
+
+	targets, err := CompileTargets(
+		cache.NewJSONPathCache(),
+		celCache,
+		[]capsulev1beta2.CustomQuotaStatusTarget{
+			{
+				CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+					Operation: quota.OpAdd,
+					CEL: `object.spec.containers` +
+						`.map(c, quantity(c.resources.requests["cpu"]))`,
+				},
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("CompileTargets() error = %v", err)
+	}
+
+	object := unstructured.Unstructured{Object: map[string]any{
+		"spec": map[string]any{
+			"containers": []any{
+				map[string]any{
+					"resources": map[string]any{
+						"requests": map[string]any{"cpu": "250m"},
+					},
+				},
+				map[string]any{
+					"resources": map[string]any{
+						"requests": map[string]any{"cpu": "500m"},
+					},
+				},
+			},
+		},
+	}}
+
+	usage, err := usageForTarget(context.Background(), object, targets[0])
+	if err != nil {
+		t.Fatalf("usageForTarget() error = %v", err)
+	}
+	if usage.Cmp(resource.MustParse("750m")) != 0 {
+		t.Fatalf("usageForTarget() = %s, want 750m", usage.String())
+	}
+}
 
 func TestUsagePercentage(t *testing.T) {
 	t.Parallel()

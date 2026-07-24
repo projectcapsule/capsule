@@ -22,6 +22,9 @@ import (
 const (
 	ReportingController = "controller.projectcapsule.dev"
 	ReportingInstance   = "capsule-admission"
+
+	eventQueueSize     = 1024
+	eventCreateTimeout = 10 * time.Second
 )
 
 type EventRecorder interface {
@@ -39,6 +42,7 @@ type eventRecorder struct {
 	client        client.Client
 	configuration configuration.Configuration
 	log           logr.Logger
+	queue         chan *eventsv1.Event
 }
 
 func NewEventRecorder(
@@ -47,12 +51,20 @@ func NewEventRecorder(
 	recorder k8sevents.EventRecorder,
 	configuration configuration.Configuration,
 ) EventRecorder {
-	return &eventRecorder{
+	r := &eventRecorder{
 		EventRecorder: recorder,
 		client:        c,
 		log:           log.WithName("event-recorder"),
 		configuration: configuration,
 	}
+
+	if c != nil {
+		r.queue = make(chan *eventsv1.Event, eventQueueSize)
+
+		go r.run()
+	}
+
+	return r
 }
 
 func (r *eventRecorder) Emit(ctx context.Context, e LabeledEvent) {
@@ -130,18 +142,41 @@ func (r *eventRecorder) Emit(ctx context.Context, e LabeledEvent) {
 		event.Related = &relatedRef
 	}
 
-	if err := r.client.Create(ctx, event); err != nil {
+	select {
+	case r.queue <- event:
+	default:
 		r.log.Error(
-			err,
-			"cannot emit labeled event",
+			nil,
+			"cannot enqueue labeled event: queue is full",
 			"reason", e.Reason(),
 			"action", e.Action(),
 			"type", e.EventType(),
 			"regarding", regardingRef.Name,
 			"namespace", namespace,
 		)
+	}
+}
 
-		return
+func (r *eventRecorder) run() {
+	for event := range r.queue {
+		ctx, cancel := context.WithTimeout(context.Background(), eventCreateTimeout)
+		err := r.client.Create(ctx, event)
+
+		cancel()
+
+		if err == nil {
+			continue
+		}
+
+		r.log.Error(
+			err,
+			"cannot emit labeled event",
+			"reason", event.Reason,
+			"action", event.Action,
+			"type", event.Type,
+			"regarding", event.Regarding.Name,
+			"namespace", event.Namespace,
+		)
 	}
 }
 

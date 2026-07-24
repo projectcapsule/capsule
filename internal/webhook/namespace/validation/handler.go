@@ -6,18 +6,21 @@ package validation
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	webhookutils "github.com/projectcapsule/capsule/internal/webhook/utils"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/tenant"
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 func NamespaceHandler(configuration configuration.Configuration, hndlers ...handlers.TypedHandlerWithTenantUser[*corev1.Namespace]) handlers.Handler {
@@ -39,6 +42,8 @@ func (h *handler) OnCreate(
 	recorder events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
+		reader = webhookutils.NewTenantCachingReader(reader)
+
 		user := handlers.ResolveAdmissionUser(ctx, c, req, h.cfg)
 
 		ns := &corev1.Namespace{}
@@ -63,12 +68,7 @@ func (h *handler) OnCreate(
 			return nil
 		}
 
-		if terminating := h.rejectOnTermination(
-			ctx,
-			c,
-			ns,
-			tnt,
-		); terminating != nil {
+		if terminating := h.rejectOnTermination(ns, tnt); terminating != nil {
 			return terminating
 		}
 
@@ -89,8 +89,6 @@ func (h *handler) OnDelete(
 	recorder events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		user := handlers.ResolveAdmissionUser(ctx, c, req, h.cfg)
-
 		oldNs := &corev1.Namespace{}
 		if err := decoder.DecodeRaw(req.OldObject, oldNs); err != nil {
 			return ad.ErroredResponse(err)
@@ -103,7 +101,17 @@ func (h *handler) OnDelete(
 			return nil
 		}
 
+		reader = webhookutils.NewTenantCachingReader(reader)
+
 		tnt, err := tenant.ResolveNamespaceTenant(ctx, reader, oldNs)
+		if apierrors.IsNotFound(err) {
+			// Kubernetes authorization already controls namespace deletion.
+			// A stale Tenant reference must not make a namespace undeletable.
+			return nil
+		}
+
+		user := handlers.ResolveAdmissionUser(ctx, c, req, h.cfg)
+
 		if err != nil && !user.IsAdmin() {
 			return ad.ErroredResponse(err)
 		}
@@ -122,7 +130,6 @@ func (h *handler) OnDelete(
 	}
 }
 
-//nolint:cyclop
 func (h *handler) OnUpdate(
 	c client.Client,
 	reader client.Reader,
@@ -130,8 +137,6 @@ func (h *handler) OnUpdate(
 	recorder events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		user := handlers.ResolveAdmissionUser(ctx, c, req, h.cfg)
-
 		ns := &corev1.Namespace{}
 		if err := decoder.Decode(req, ns); err != nil {
 			return ad.ErroredResponse(err)
@@ -142,23 +147,16 @@ func (h *handler) OnUpdate(
 			return ad.ErroredResponse(err)
 		}
 
-		oldHasTenantReference := tenant.HasTenantReference(oldNs)
-
-		newHasTenantReference := tenant.HasTenantReference(ns)
-
-		if user.IsAdmin() && !tenant.HasConsistentTenantReference(ns) {
-			return ad.Deny("tenant label and ownerReference must both be set consistently or both be absent")
+		if response, stop := validateTerminatingNamespaceUpdate(req, oldNs, ns); stop {
+			return response
 		}
 
-		if !user.IsAdmin() {
-			switch {
-			case !oldHasTenantReference && newHasTenantReference:
-				return ad.Deny("namespace can not be patched into a tenant")
-			case oldHasTenantReference && !newHasTenantReference:
-				return ad.Deny("namespace can not remove tenant ownership")
-			case !oldHasTenantReference && !newHasTenantReference:
-				return nil
-			}
+		reader = webhookutils.NewTenantCachingReader(reader)
+
+		user := handlers.ResolveAdmissionUser(ctx, c, req, h.cfg)
+
+		if response, stop := validateNamespaceTenantReferenceTransition(user, oldNs, ns); stop {
+			return response
 		}
 
 		oldTenant, err := tenant.ResolveNamespaceTenant(ctx, reader, oldNs)
@@ -206,7 +204,7 @@ func (h *handler) OnUpdate(
 			return nil
 		}
 
-		if terminating := h.rejectOnTermination(ctx, c, ns, newTenant); terminating != nil {
+		if terminating := h.rejectOnTermination(ns, newTenant); terminating != nil {
 			return terminating
 		}
 
@@ -232,9 +230,71 @@ func namespaceTenantChanged(oldTenant, newTenant *capsulev1beta2.Tenant) bool {
 	return oldTenant.GetName() != newTenant.GetName() || oldTenant.GetUID() != newTenant.GetUID()
 }
 
+func isTerminatingNamespaceUpdate(
+	req admission.Request,
+	oldNs, newNs *corev1.Namespace,
+) bool {
+	return req.SubResource == "finalize" ||
+		newNs.DeletionTimestamp != nil ||
+		oldNs.DeletionTimestamp != nil ||
+		newNs.Status.Phase == corev1.NamespaceTerminating ||
+		oldNs.Status.Phase == corev1.NamespaceTerminating
+}
+
+func validateTerminatingNamespaceUpdate(
+	req admission.Request,
+	oldNs, newNs *corev1.Namespace,
+) (*admission.Response, bool) {
+	if !isTerminatingNamespaceUpdate(req, oldNs, newNs) {
+		return nil, false
+	}
+
+	if namespaceTenantAssignmentChanged(oldNs, newNs) {
+		return ad.Deny("namespace tenant ownership can not change during termination"), true
+	}
+
+	return nil, true
+}
+
+func validateNamespaceTenantReferenceTransition(
+	user users.AdmissionUser,
+	oldNs, newNs *corev1.Namespace,
+) (*admission.Response, bool) {
+	if user.IsAdmin() {
+		if !tenant.HasConsistentTenantReference(newNs) {
+			return ad.Deny("tenant label and ownerReference must both be set consistently or both be absent"), true
+		}
+
+		return nil, false
+	}
+
+	oldHasTenantReference := tenant.HasTenantReference(oldNs)
+	newHasTenantReference := tenant.HasTenantReference(newNs)
+
+	switch {
+	case !oldHasTenantReference && newHasTenantReference:
+		return ad.Deny("namespace can not be patched into a tenant"), true
+	case oldHasTenantReference && !newHasTenantReference:
+		return ad.Deny("namespace can not remove tenant ownership"), true
+	case !oldHasTenantReference && !newHasTenantReference:
+		return nil, true
+	default:
+		return nil, false
+	}
+}
+
+func namespaceTenantAssignmentChanged(oldNs, newNs *corev1.Namespace) bool {
+	if tenant.TenanLabelValue(oldNs) != tenant.TenanLabelValue(newNs) {
+		return true
+	}
+
+	return !reflect.DeepEqual(
+		tenant.TenantOwnerReferences(oldNs),
+		tenant.TenantOwnerReferences(newNs),
+	)
+}
+
 func (h *handler) rejectOnTermination(
-	ctx context.Context,
-	c client.Reader,
 	ns *corev1.Namespace,
 	t *capsulev1beta2.Tenant,
 ) *admission.Response {
@@ -242,15 +302,11 @@ func (h *handler) rejectOnTermination(
 		return nil
 	}
 
-	tnt := &capsulev1beta2.Tenant{}
-
-	_ = c.Get(ctx, types.NamespacedName{Name: t.GetName()}, tnt)
-
-	if tnt.DeletionTimestamp == nil {
+	if t.DeletionTimestamp == nil {
 		return nil
 	}
 
-	instance := tnt.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{
+	instance := t.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{
 		Name: ns.GetName(),
 		UID:  ns.GetUID(),
 	})

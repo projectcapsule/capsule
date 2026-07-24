@@ -46,6 +46,7 @@ type customQuotaClaimController struct {
 	mapper   k8smeta.RESTMapper
 
 	jsonPathCache *cache.JSONPathCache
+	celCache      *cache.CELCache
 	targetsCache  *cache.CompiledTargetsCache[string]
 }
 
@@ -177,6 +178,7 @@ func (r *customQuotaClaimController) reconcile(
 		Mapper: r.mapper,
 
 		JSONPathCache: r.jsonPathCache,
+		CELCache:      r.celCache,
 
 		Sources:        instance.Spec.Sources,
 		ScopeSelectors: instance.Spec.ScopeSelectors,

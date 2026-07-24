@@ -83,31 +83,6 @@ var _ = SynchronizedAfterSuite(
 	},
 	func() {
 		Eventually(func() error {
-			var tnts capsulev1beta2.TenantList
-
-			if err := k8sClient.List(
-				context.TODO(),
-				&tnts,
-				client.MatchingLabels{"env": "e2e"},
-			); err != nil {
-				return err
-			}
-
-			if len(tnts.Items) == 0 {
-				return nil
-			}
-
-			for i := range tnts.Items {
-				ns := &tnts.Items[i]
-				if err := k8sClient.Delete(context.TODO(), ns); err != nil && !apierrors.IsNotFound(err) {
-					return err
-				}
-			}
-
-			return fmt.Errorf("still have %d tenants with env=e2e", len(tnts.Items))
-		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-
-		Eventually(func() error {
 			var nsList corev1.NamespaceList
 
 			if err := k8sClient.List(
@@ -130,6 +105,31 @@ var _ = SynchronizedAfterSuite(
 			}
 
 			return fmt.Errorf("still have %d namespaces with env=e2e", len(nsList.Items))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		Eventually(func() error {
+			var tnts capsulev1beta2.TenantList
+
+			if err := k8sClient.List(
+				context.TODO(),
+				&tnts,
+				client.MatchingLabels{"env": "e2e"},
+			); err != nil {
+				return err
+			}
+
+			if len(tnts.Items) == 0 {
+				return nil
+			}
+
+			for i := range tnts.Items {
+				ns := &tnts.Items[i]
+				if err := k8sClient.Delete(context.TODO(), ns); err != nil && !apierrors.IsNotFound(err) {
+					return err
+				}
+			}
+
+			return fmt.Errorf("still have %d tenants with env=e2e", len(tnts.Items))
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 		By("tearing down the test environment")

@@ -21,11 +21,13 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
+	celruntime "github.com/projectcapsule/capsule/pkg/runtime/cel"
 	"github.com/projectcapsule/capsule/pkg/runtime/jsonpath"
 	"github.com/projectcapsule/capsule/pkg/runtime/quota"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
@@ -51,11 +53,13 @@ type CompiledTarget struct {
 	capsulev1beta2.CustomQuotaStatusTarget
 
 	CompiledPath      *jsonpath.CompiledJSONPath
+	CompiledCEL       *celruntime.CompiledExpression
 	CompiledSelectors []selectors.CompiledSelectorWithFields
 }
 
 func CompileTargets(
 	jcache *cache.JSONPathCache,
+	ccache *cache.CELCache,
 	targets []capsulev1beta2.CustomQuotaStatusTarget,
 ) ([]cache.CompiledTarget, error) {
 	out := make([]cache.CompiledTarget, 0, len(targets))
@@ -67,27 +71,51 @@ func CompileTargets(
 
 		switch target.Operation {
 		case quota.OpCount:
-			// no usage path needed
+			// no usage expression needed
 
 		case quota.OpAdd, quota.OpSub:
-			compiledPath, err := jcache.GetOrCompile(target.Path)
-			if err != nil {
+			switch {
+			case target.Path != "" && target.CEL == "":
+				compiledPath, err := jcache.GetOrCompile(target.Path)
+				if err != nil {
+					return nil, fmt.Errorf(
+						"compile usage path %q for %s %q: %w",
+						target.Path,
+						target.String(),
+						target.Operation,
+						err,
+					)
+				}
+
+				pt.CompiledPath = compiledPath
+
+			case target.CEL != "" && target.Path == "":
+				compiledCEL, err := ccache.GetOrCompileQuantity(target.CEL, environment.StoredExpressions)
+				if err != nil {
+					return nil, fmt.Errorf(
+						"compile usage CEL expression %q for %s %q: %w",
+						target.CEL,
+						target.String(),
+						target.Operation,
+						err,
+					)
+				}
+
+				pt.CompiledCEL = compiledCEL
+
+			default:
 				return nil, fmt.Errorf(
-					"compile usage path %q for %s %q: %w",
-					target.Path,
+					"exactly one of path or cel must be set for %s %q",
 					target.String(),
 					target.Operation,
-					err,
 				)
 			}
-
-			pt.CompiledPath = compiledPath
 
 		default:
 			return nil, fmt.Errorf("unsupported operation %q for %s", target.Operation, target.String())
 		}
 
-		compiledSelectors, err := CompileSelectorsWithFields(jcache, target.Selectors)
+		compiledSelectors, err := CompileSelectorsWithFields(jcache, ccache, target.Selectors)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"compile selectors for %s: %w",
@@ -105,6 +133,7 @@ func CompileTargets(
 }
 
 func MatchesCompiledSelectorsWithFields(
+	ctx context.Context,
 	u unstructured.Unstructured,
 	selectors []selectors.CompiledSelectorWithFields,
 ) (bool, error) {
@@ -123,6 +152,23 @@ func MatchesCompiledSelectorsWithFields(
 
 		for _, matcher := range sel.FieldMatchers {
 			ok, err := evaluateCompiledFieldSelector(u, matcher)
+			if err != nil {
+				return false, err
+			}
+
+			if !ok {
+				allFieldsMatch = false
+
+				break
+			}
+		}
+
+		if !allFieldsMatch {
+			continue
+		}
+
+		for _, matcher := range sel.CELMatchers {
+			ok, err := matcher.EvaluateBoolean(ctx, u)
 			if err != nil {
 				return false, err
 			}
@@ -180,7 +226,8 @@ func MakeGlobalCustomQuotaCacheKey(name string) string {
 }
 
 func CompileSelectorsWithFields(
-	cache *cache.JSONPathCache,
+	jcache *cache.JSONPathCache,
+	ccache *cache.CELCache,
 	in []selectors.SelectorWithFields,
 ) ([]selectors.CompiledSelectorWithFields, error) {
 	if len(in) == 0 {
@@ -204,7 +251,7 @@ func CompileSelectorsWithFields(
 		fieldMatchers := make([]selectors.CompiledFieldSelector, 0, len(selector.FieldSelectors))
 
 		for _, raw := range selector.FieldSelectors {
-			compiledSelector, err := utils.CompileFieldSelector(cache, raw)
+			compiledSelector, err := utils.CompileFieldSelector(jcache, raw)
 			if err != nil {
 				return nil, fmt.Errorf("compile field selector %q: %w", raw, err)
 			}
@@ -212,9 +259,21 @@ func CompileSelectorsWithFields(
 			fieldMatchers = append(fieldMatchers, compiledSelector)
 		}
 
+		celMatchers := make([]*celruntime.CompiledExpression, 0, len(selector.CELExpressions))
+
+		for _, expression := range selector.CELExpressions {
+			compiledExpression, err := ccache.GetOrCompileBoolean(expression, environment.StoredExpressions)
+			if err != nil {
+				return nil, fmt.Errorf("compile CEL selector %q: %w", expression, err)
+			}
+
+			celMatchers = append(celMatchers, compiledExpression)
+		}
+
 		out = append(out, selectors.CompiledSelectorWithFields{
 			LabelSelector: lblSel,
 			FieldMatchers: fieldMatchers,
+			CELMatchers:   celMatchers,
 		})
 	}
 

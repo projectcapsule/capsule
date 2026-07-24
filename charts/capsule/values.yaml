@@ -851,6 +851,16 @@ webhooks:
     # -- (integer, null) Custom service port for the webhook service
     port: # @schema type:[integer, null]
 
+  # -- MatchConditions for all webhooks
+  matchConditions:
+    - name: "exclude-privileged-users"
+      expression: >
+        !(
+          request.userInfo.username in [
+            "kubernetes-admin"
+          ]
+        )
+
   # Admission Webhook Configuration
   hooks:
     customquotas:

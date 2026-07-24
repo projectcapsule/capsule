@@ -633,6 +633,13 @@ func main() {
 	regexCache := cache.NewRegexCache()
 	registryCache := cache.NewRegistryRuleSetCache(regexCache)
 	jsonPathCache := cache.NewJSONPathCache()
+
+	celCache, err := cache.NewCELCache()
+	if err != nil {
+		setupLog.Error(err, "unable to initialize Kubernetes CEL cache")
+		os.Exit(1)
+	}
+
 	targetsCache := cache.NewCompiledTargetsCache[string]()
 
 	if directCfg.EnableTLSConfiguration() {
@@ -776,15 +783,18 @@ func main() {
 		route.CustomQuotaValidation(customquotavalidation.CustomQuotaValidationHandler(
 			targetsCache,
 			jsonPathCache,
+			celCache,
 		)),
 		route.GlobalCustomQuotaValidation(customquotavalidation.GlobalCustomQuotaValidationHandler(
 			targetsCache,
 			jsonPathCache,
+			celCache,
 		)),
 		route.CalculationCustomQuotas(
 			customquotavalidation.ObjectCalculationHandler(
 				targetsCache,
 				jsonPathCache,
+				celCache,
 			),
 		),
 		route.GenericTenantAssignment(
@@ -903,6 +913,7 @@ func main() {
 		ImpersonationCache: impersonationCache,
 		RegistryCache:      registryCache,
 		JSONPathCache:      jsonPathCache,
+		CELCache:           celCache,
 		TargetsCache:       targetsCache,
 		RegexCache:         regexCache,
 	}
@@ -949,6 +960,7 @@ func main() {
 		manager.GetEventRecorder("customquotas-ctrl"),
 		controllerConfig,
 		jsonPathCache,
+		celCache,
 		targetsCache,
 	); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "customquotas")

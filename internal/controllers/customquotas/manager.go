@@ -21,6 +21,7 @@ func Add(
 	recorder events.EventRecorder,
 	cfg utils.ControllerOptions,
 	jsonPathCache *cache.JSONPathCache,
+	celCache *cache.CELCache,
 	targetsCache *cache.CompiledTargetsCache[string],
 ) (err error) {
 	if err = (&customQuotaClaimController{
@@ -29,6 +30,7 @@ func Add(
 		recorder:      recorder,
 		metrics:       metrics.MustMakeCustomQuotaRecorder(),
 		jsonPathCache: jsonPathCache,
+		celCache:      celCache,
 		targetsCache:  targetsCache,
 	}).SetupWithManager(mgr, cfg); err != nil {
 		return fmt.Errorf("unable to create custom quota controller: %w", err)
@@ -40,6 +42,7 @@ func Add(
 		recorder:      recorder,
 		metrics:       metrics.MustMakeGlobalCustomQuotaRecorder(),
 		jsonPathCache: jsonPathCache,
+		celCache:      celCache,
 		targetsCache:  targetsCache,
 	}).SetupWithManager(mgr, cfg); err != nil {
 		return fmt.Errorf("unable to create cluster custom quota controller: %w", err)

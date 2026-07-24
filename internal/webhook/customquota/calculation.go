@@ -57,15 +57,18 @@ var ledgerMutationBackoff = wait.Backoff{
 type objectCalculationHandler struct {
 	targetsCache  *cache.CompiledTargetsCache[string]
 	jsonPathCache *cache.JSONPathCache
+	celCache      *cache.CELCache
 }
 
 func ObjectCalculationHandler(
 	targetsCache *cache.CompiledTargetsCache[string],
 	jsonPathCache *cache.JSONPathCache,
+	celCache *cache.CELCache,
 ) handlers.Handler {
 	return &objectCalculationHandler{
 		targetsCache:  targetsCache,
 		jsonPathCache: jsonPathCache,
+		celCache:      celCache,
 	}
 }
 
@@ -573,9 +576,12 @@ func (h *objectCalculationHandler) OnDelete(
 			"name", req.Name,
 		)
 
-		// Deletes are relatively infrequent and must not be blocked by a stale
-		// namespace informer while namespace finalization is in progress.
-		terminating, err := namespaceTerminating(ctx, reader, req.Namespace)
+		// Namespace termination can fan out into many object deletions at once.
+		// Use the local informer for this best-effort fast path so those deletes
+		// do not each add an API read before quota processing can be skipped.
+		// A stale non-terminating result only falls back to the normal,
+		// conservative ledger path.
+		terminating, err := namespaceTerminating(ctx, c, req.Namespace)
 		if err != nil {
 			logger.Error(err, "cannot determine whether namespace is terminating")
 		} else if terminating {
@@ -753,7 +759,7 @@ func (h *objectCalculationHandler) matchAllQuotasFromSnapshot(
 	u unstructured.Unstructured,
 	snapshot quotaPolicySnapshot,
 ) ([]quota.MatchedQuota, error) {
-	namespaced, err := h.matchCustomQuotasFromItems(req, u, snapshot.namespaced)
+	namespaced, err := h.matchCustomQuotasFromItems(ctx, req, u, snapshot.namespaced)
 	if err != nil {
 		return nil, err
 	}
@@ -793,6 +799,7 @@ func (h *objectCalculationHandler) matchAllQuotasFromSnapshot(
 }
 
 func (h *objectCalculationHandler) matchCustomQuotasFromItems(
+	ctx context.Context,
 	req admission.Request,
 	u unstructured.Unstructured,
 	items []capsulev1beta2.CustomQuota,
@@ -841,7 +848,7 @@ func (h *objectCalculationHandler) matchCustomQuotasFromItems(
 				continue
 			}
 
-			matches, err := controller.MatchesCompiledSelectorsWithFields(u, target.CompiledSelectors)
+			matches, err := controller.MatchesCompiledSelectorsWithFields(ctx, u, target.CompiledSelectors)
 			if err != nil {
 				return nil, fmt.Errorf(
 					"evaluate selectors for %s/%s on CustomQuota %s/%s: %w",
@@ -863,6 +870,8 @@ func (h *objectCalculationHandler) matchCustomQuotasFromItems(
 				Namespace:    cq.Namespace,
 				Path:         target.Path,
 				CompiledPath: target.CompiledPath,
+				CEL:          target.CEL,
+				CompiledCEL:  target.CompiledCEL,
 				Operation:    target.Operation,
 				Limit:        cq.Spec.Limit.DeepCopy(),
 				Used:         cq.Status.Usage.Used.DeepCopy(),
@@ -941,7 +950,7 @@ func (h *objectCalculationHandler) matchGlobalCustomQuotasFromItems(
 				continue
 			}
 
-			matches, err := controller.MatchesCompiledSelectorsWithFields(u, target.CompiledSelectors)
+			matches, err := controller.MatchesCompiledSelectorsWithFields(ctx, u, target.CompiledSelectors)
 			if err != nil {
 				return nil, fmt.Errorf(
 					"evaluate selectors for %s/%s on GlobalCustomQuota %s: %w",
@@ -962,6 +971,8 @@ func (h *objectCalculationHandler) matchGlobalCustomQuotasFromItems(
 				Namespace:    "",
 				Path:         target.Path,
 				CompiledPath: target.CompiledPath,
+				CEL:          target.CEL,
+				CompiledCEL:  target.CompiledCEL,
 				Operation:    target.Operation,
 				Limit:        gcq.Spec.Limit.DeepCopy(),
 				Used:         gcq.Status.Usage.Used.DeepCopy(),
@@ -1037,33 +1048,53 @@ func (h *objectCalculationHandler) evaluateMatchedQuotas(
 ) ([]evaluatedQuota, error) {
 	log := log.FromContext(ctx)
 
-	usageByPath := make(map[string]resource.Quantity, len(matched))
+	usageByExpression := make(map[string]resource.Quantity, len(matched))
 
 	for _, mq := range matched {
-		// count does not use a path
+		// count does not use a calculation expression
 		if mq.Operation == quota.OpCount {
 			continue
 		}
 
-		if _, ok := usageByPath[mq.Path]; ok {
+		expressionKey := matchedQuotaExpressionKey(mq)
+		if _, ok := usageByExpression[expressionKey]; ok {
 			continue
 		}
 
-		usage, err := quota.ParseQuantityFromUnstructured(u, mq.CompiledPath)
+		var (
+			usage resource.Quantity
+			err   error
+		)
+
+		switch {
+		case mq.CompiledCEL != nil:
+			usage, err = mq.CompiledCEL.EvaluateQuantity(ctx, u)
+		case mq.CompiledPath != nil:
+			usage, err = quota.ParseQuantityFromUnstructured(u, mq.CompiledPath)
+		default:
+			err = fmt.Errorf("compiled usage expression is missing")
+		}
+
 		if err != nil {
 			return nil, fmt.Errorf(
-				"%s %q source path %q op %q did not resolve to a valid quantity: %w",
+				"%s %q source path %q cel %q op %q did not resolve to a valid quantity: %w",
 				quotaTypeName(mq.IsGlobal),
 				mq.Name,
 				mq.Path,
+				mq.CEL,
 				mq.Operation,
 				err,
 			)
 		}
 
-		log.V(5).Info("parsed usage", "path", mq.Path, "parsed", usage.String())
+		log.V(5).Info(
+			"evaluated usage",
+			"path", mq.Path,
+			"cel", mq.CEL,
+			"quantity", usage.String(),
+		)
 
-		usageByPath[mq.Path] = usage
+		usageByExpression[expressionKey] = usage
 	}
 
 	byKey := make(map[string]evaluatedQuota, len(matched))
@@ -1088,7 +1119,7 @@ func (h *objectCalculationHandler) evaluateMatchedQuotas(
 			usage = *resource.NewQuantity(1, resource.DecimalSI)
 
 		case quota.OpSub:
-			usage = usageByPath[mq.Path].DeepCopy()
+			usage = usageByExpression[matchedQuotaExpressionKey(mq)].DeepCopy()
 			usage.Neg()
 			ev.Usage.Add(usage)
 			quota.ClampQuantityToZero(&ev.Usage)
@@ -1097,7 +1128,7 @@ func (h *objectCalculationHandler) evaluateMatchedQuotas(
 			continue
 
 		case quota.OpAdd:
-			usage = usageByPath[mq.Path].DeepCopy()
+			usage = usageByExpression[matchedQuotaExpressionKey(mq)].DeepCopy()
 
 		default:
 			return nil, fmt.Errorf("unsupported quota operation %q for key %q", mq.Operation, mq.Key)
@@ -1113,6 +1144,14 @@ func (h *objectCalculationHandler) evaluateMatchedQuotas(
 	}
 
 	return out, nil
+}
+
+func matchedQuotaExpressionKey(matched quota.MatchedQuota) string {
+	if matched.CEL != "" {
+		return "cel:" + matched.CEL
+	}
+
+	return "path:" + matched.Path
 }
 
 func addLedgerPendingDelete(
@@ -1201,7 +1240,7 @@ func (h *objectCalculationHandler) getOrCompileCurrentTargets(
 		return compiled, nil
 	}
 
-	compiled, err := controller.CompileTargets(h.jsonPathCache, targets)
+	compiled, err := controller.CompileTargets(h.jsonPathCache, h.celCache, targets)
 	if err != nil {
 		return nil, err
 	}

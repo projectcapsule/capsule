@@ -44,6 +44,7 @@ type CacheInvalidator struct {
 	RegistryCache      *cache.RegistryRuleSetCache
 	TargetsCache       *cache.CompiledTargetsCache[string]
 	JSONPathCache      *cache.JSONPathCache
+	CELCache           *cache.CELCache
 	ImpersonationCache *cache.ImpersonationCache
 	RegexCache         *cache.RegexCache
 }
