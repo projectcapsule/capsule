@@ -92,7 +92,18 @@ func (NamespaceTenantStateChangedPredicate) Update(e event.UpdateEvent) bool {
 
 type QuantityLedgerWorkChangedPredicate struct{ predicate.Funcs }
 
-func (QuantityLedgerWorkChangedPredicate) Create(event.CreateEvent) bool   { return true }
+func (QuantityLedgerWorkChangedPredicate) Create(e event.CreateEvent) bool {
+	ledger, ok := e.Object.(*capsulev1beta2.QuantityLedger)
+	if !ok {
+		return false
+	}
+
+	// A ledger can be created and receive admission reservations before the
+	// informer observes its first Add event. In that case the Add is the only
+	// work notification; filtering it would strand the reservations forever.
+	return quantityLedgerHasWork(ledger)
+}
+
 func (QuantityLedgerWorkChangedPredicate) Delete(event.DeleteEvent) bool   { return true }
 func (QuantityLedgerWorkChangedPredicate) Generic(event.GenericEvent) bool { return false }
 func (QuantityLedgerWorkChangedPredicate) Update(e event.UpdateEvent) bool {
@@ -104,9 +115,67 @@ func (QuantityLedgerWorkChangedPredicate) Update(e event.UpdateEvent) bool {
 		return false
 	}
 
-	return oldLedger.Generation != newLedger.Generation ||
-		!reflect.DeepEqual(oldLedger.Status.Reservations, newLedger.Status.Reservations) ||
-		!reflect.DeepEqual(oldLedger.Status.PendingDeletes, newLedger.Status.PendingDeletes)
+	if oldLedger.Generation != newLedger.Generation {
+		return true
+	}
+
+	// Informers may coalesce an intermediate settled state. An update can
+	// therefore replace reservations with pending deletes (or append more
+	// reservations) while both observed snapshots contain work. Admit every
+	// newly introduced or changed work item so it cannot be stranded. Pure
+	// settlement/removal updates remain filtered.
+	return quantityLedgerIntroducesWork(oldLedger, newLedger)
+}
+
+func quantityLedgerHasWork(ledger *capsulev1beta2.QuantityLedger) bool {
+	return len(ledger.Status.Reservations) > 0 ||
+		len(ledger.Status.PendingDeletes) > 0
+}
+
+func quantityLedgerIntroducesWork(oldLedger, newLedger *capsulev1beta2.QuantityLedger) bool {
+	matchedReservations := make([]bool, len(oldLedger.Status.Reservations))
+
+	for _, newReservation := range newLedger.Status.Reservations {
+		matched := false
+
+		for i, oldReservation := range oldLedger.Status.Reservations {
+			if matchedReservations[i] || !reflect.DeepEqual(oldReservation, newReservation) {
+				continue
+			}
+
+			matchedReservations[i] = true
+			matched = true
+
+			break
+		}
+
+		if !matched {
+			return true
+		}
+	}
+
+	matchedPendingDeletes := make([]bool, len(oldLedger.Status.PendingDeletes))
+
+	for _, newPendingDelete := range newLedger.Status.PendingDeletes {
+		matched := false
+
+		for i, oldPendingDelete := range oldLedger.Status.PendingDeletes {
+			if matchedPendingDeletes[i] || !reflect.DeepEqual(oldPendingDelete, newPendingDelete) {
+				continue
+			}
+
+			matchedPendingDeletes[i] = true
+			matched = true
+
+			break
+		}
+
+		if !matched {
+			return true
+		}
+	}
+
+	return false
 }
 
 type ProvisionerSubjectsChangedPredicate struct{ predicate.Funcs }

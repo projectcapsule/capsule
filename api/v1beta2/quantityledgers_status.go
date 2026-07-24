@@ -21,6 +21,16 @@ type QuantityLedgerReservation struct {
 	// Amount reserved for this request.
 	Usage resource.Quantity `json:"usage"`
 
+	// Delta is the additional amount held against the quota while the admitted
+	// object is materializing. For creates this is normally equal to Usage. For
+	// updates it is max(newUsage-oldUsage, 0), so admission never releases
+	// capacity before the API server has persisted the update.
+	//
+	// A nil value is interpreted as Usage for backwards compatibility with
+	// ledgers written before this field was introduced.
+	// +optional
+	Delta *resource.Quantity `json:"delta,omitempty"`
+
 	// Object that this reservation is intended to create/update.
 	ObjectRef QuantityLedgerObjectRef `json:"objectRef"`
 
@@ -38,6 +48,11 @@ type QuantityLedgerReservation struct {
 // QuantityLedgerPendingDelete tracks objects that are expected to disappear from claims
 // soon, but may still temporarily appear during rebuild due to propagation delay.
 type QuantityLedgerPendingDelete struct {
+	// ID identifies the admission request that added this hint. It allows a
+	// failed multi-quota admission to roll back only its own hint.
+	// +optional
+	ID string `json:"id,omitempty"`
+
 	ObjectRef QuantityLedgerObjectRef `json:"objectRef"`
 	CreatedAt metav1.Time             `json:"createdAt"`
 }

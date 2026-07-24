@@ -936,6 +936,8 @@ webhooks:
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchConditions: []
       # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
+      # Include an explicit status subresource (for example, pods/status) when
+      # CustomQuota field selectors depend on status fields.
       rules: []
 
     # -- Webhook for Rule Status ([Read More](https://projectcapsule.dev/docs/resource-management/customquotas/#admission))

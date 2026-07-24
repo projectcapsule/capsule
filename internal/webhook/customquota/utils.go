@@ -22,6 +22,11 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/quota"
 )
 
+const (
+	maxQuantityLedgerReservations   = 1024
+	maxQuantityLedgerPendingDeletes = 1024
+)
+
 func quantityLedgerKeyForMatchedQuota(item evaluatedQuota) types.NamespacedName {
 	if item.IsGlobal {
 		return types.NamespacedName{
@@ -42,6 +47,7 @@ func reserveCreateOnLedger(
 	reader client.Reader,
 	item evaluatedQuota,
 	reservation *capsulev1beta2.QuantityLedgerReservation,
+	dryRun bool,
 ) (bool, resource.Quantity, resource.Quantity, error) {
 	var (
 		allowed       bool
@@ -59,13 +65,6 @@ func reserveCreateOnLedger(
 
 		now := metav1.Now()
 
-		allocated := ledger.Status.Allocated.DeepCopy()
-		if allocated.IsZero() {
-			allocated = resource.MustParse("0")
-		}
-
-		requested := reservation.Usage.DeepCopy()
-
 		// Idempotency: if this admission request already has a reservation,
 		// do not increment Allocated a second time.
 		activeReservations := make([]capsulev1beta2.QuantityLedgerReservation, 0, len(ledger.Status.Reservations)+1)
@@ -81,6 +80,7 @@ func reserveCreateOnLedger(
 
 				// Keep Allocated unchanged for retry/idempotent update.
 				existing.Usage = reservation.Usage.DeepCopy()
+				existing.Delta = copyQuantityPtr(reservation.Delta)
 				existing.ObjectRef = reservation.ObjectRef
 				existing.UpdatedAt = now
 				existing.ExpiresAt = reservation.ExpiresAt
@@ -89,26 +89,36 @@ func reserveCreateOnLedger(
 			activeReservations = append(activeReservations, existing)
 		}
 
-		nextAllocated := allocated.DeepCopy()
 		if !foundReservation {
-			nextAllocated.Add(requested)
+			if len(activeReservations) >= maxQuantityLedgerReservations {
+				return fmt.Errorf(
+					"quantity ledger %s has reached the maximum of %d inflight reservations",
+					ledgerKey.String(),
+					maxQuantityLedgerReservations,
+				)
+			}
+
+			activeReservations = append(activeReservations, *reservation)
 		}
+
+		newReserved := sumReservationDeltas(activeReservations)
+		nextAllocated := observedLedgerAllocation(ledger)
+		nextAllocated.Add(newReserved)
 
 		if nextAllocated.Cmp(item.Limit) > 0 {
 			allowed = false
 			effectiveUsed = nextAllocated
-			reserved = allocated
+			reserved = ledger.Status.Reserved.DeepCopy()
 
 			return nil
 		}
 
-		if !foundReservation {
-			activeReservations = append(activeReservations, *reservation)
-		}
+		if dryRun {
+			allowed = true
+			effectiveUsed = nextAllocated
+			reserved = ledger.Status.Reserved.DeepCopy()
 
-		newReserved := resource.MustParse("0")
-		for _, r := range activeReservations {
-			newReserved.Add(r.Usage)
+			return nil
 		}
 
 		ledger.Status.Reservations = activeReservations
@@ -134,10 +144,12 @@ func replaceUsageOnLedger(
 	c client.Client,
 	reader client.Reader,
 	item evaluatedQuota,
-	oldUsage resource.Quantity,
-	newUsage resource.Quantity,
+	_ resource.Quantity,
+	_ resource.Quantity,
 	reservation *capsulev1beta2.QuantityLedgerReservation,
-	pendingDelete *capsulev1beta2.QuantityLedgerObjectRef,
+	pendingDelete *capsulev1beta2.QuantityLedgerPendingDelete,
+	enforceLimit bool,
+	dryRun bool,
 ) (bool, resource.Quantity, resource.Quantity, error) {
 	var (
 		allowed       bool
@@ -166,6 +178,7 @@ func replaceUsageOnLedger(
 			if reservation != nil && existing.ID == reservation.ID {
 				foundReservation = true
 				existing.Usage = reservation.Usage.DeepCopy()
+				existing.Delta = copyQuantityPtr(reservation.Delta)
 				existing.ObjectRef = reservation.ObjectRef
 				existing.UpdatedAt = now
 				existing.ExpiresAt = reservation.ExpiresAt
@@ -175,6 +188,14 @@ func replaceUsageOnLedger(
 		}
 
 		if reservation != nil && !foundReservation {
+			if len(activeReservations) >= maxQuantityLedgerReservations {
+				return fmt.Errorf(
+					"quantity ledger %s has reached the maximum of %d inflight reservations",
+					ledgerKey.String(),
+					maxQuantityLedgerReservations,
+				)
+			}
+
 			activeReservations = append(activeReservations, *reservation)
 		}
 
@@ -185,7 +206,7 @@ func replaceUsageOnLedger(
 			exists := false
 
 			for _, pd := range activeDeletes {
-				if pd.ObjectRef.UID != "" && pd.ObjectRef.UID == pendingDelete.UID {
+				if sameQuantityLedgerPendingDelete(pd, *pendingDelete) {
 					exists = true
 
 					break
@@ -193,24 +214,29 @@ func replaceUsageOnLedger(
 			}
 
 			if !exists {
-				activeDeletes = append(activeDeletes, capsulev1beta2.QuantityLedgerPendingDelete{
-					ObjectRef: *pendingDelete,
-					CreatedAt: now,
-				})
+				if len(activeDeletes) >= maxQuantityLedgerPendingDeletes {
+					return fmt.Errorf(
+						"quantity ledger %s has reached the maximum of %d pending deletes",
+						ledgerKey.String(),
+						maxQuantityLedgerPendingDeletes,
+					)
+				}
+
+				newPendingDelete := *pendingDelete
+				newPendingDelete.CreatedAt = now
+				activeDeletes = append(activeDeletes, newPendingDelete)
 			}
 		}
 
-		nextAllocated := ledger.Status.Allocated.DeepCopy()
-		if nextAllocated.IsZero() {
-			nextAllocated = resource.MustParse("0")
-		}
+		// Never release capacity from admission. The API operation can still
+		// fail after this webhook returns, so only the positive usage delta is
+		// reserved here. Reconciliation releases decreases after observing the
+		// persisted object.
+		newReserved := sumReservationDeltas(activeReservations)
+		nextAllocated := observedLedgerAllocation(ledger)
+		nextAllocated.Add(newReserved)
 
-		nextAllocated.Sub(oldUsage)
-		quota.ClampQuantityToZero(&nextAllocated)
-
-		nextAllocated.Add(newUsage)
-
-		if nextAllocated.Cmp(item.Limit) > 0 {
+		if enforceLimit && nextAllocated.Cmp(item.Limit) > 0 {
 			allowed = false
 			effectiveUsed = nextAllocated
 			reserved = ledger.Status.Reserved.DeepCopy()
@@ -218,9 +244,12 @@ func replaceUsageOnLedger(
 			return nil
 		}
 
-		newReserved := resource.MustParse("0")
-		for _, res := range activeReservations {
-			newReserved.Add(res.Usage)
+		if dryRun {
+			allowed = true
+			effectiveUsed = nextAllocated
+			reserved = ledger.Status.Reserved.DeepCopy()
+
+			return nil
 		}
 
 		ledger.Status.Reservations = activeReservations
@@ -248,8 +277,9 @@ func rollbackUsageReplacementOnLedger(
 	reader client.Reader,
 	ledgerKey types.NamespacedName,
 	reservationID string,
-	oldUsage resource.Quantity,
-	newUsage resource.Quantity,
+	_ resource.Quantity,
+	_ resource.Quantity,
+	pendingDelete *capsulev1beta2.QuantityLedgerPendingDelete,
 ) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		ledger := &capsulev1beta2.QuantityLedger{}
@@ -262,13 +292,33 @@ func rollbackUsageReplacementOnLedger(
 		}
 
 		activeReservations := make([]capsulev1beta2.QuantityLedgerReservation, 0, len(ledger.Status.Reservations))
+		released := resource.MustParse("0")
 
 		for _, res := range ledger.Status.Reservations {
 			if reservationID != "" && res.ID == reservationID {
+				released.Add(reservationDelta(res))
+
 				continue
 			}
 
 			activeReservations = append(activeReservations, res)
+		}
+
+		activeDeletes := make([]capsulev1beta2.QuantityLedgerPendingDelete, 0, len(ledger.Status.PendingDeletes))
+		removedPendingDelete := false
+
+		for _, pd := range ledger.Status.PendingDeletes {
+			if pendingDelete != nil && sameQuantityLedgerPendingDelete(pd, *pendingDelete) {
+				removedPendingDelete = true
+
+				continue
+			}
+
+			activeDeletes = append(activeDeletes, pd)
+		}
+
+		if released.Sign() == 0 && !removedPendingDelete {
+			return nil
 		}
 
 		allocated := ledger.Status.Allocated.DeepCopy()
@@ -276,27 +326,47 @@ func rollbackUsageReplacementOnLedger(
 			allocated = resource.MustParse("0")
 		}
 
-		allocated.Sub(newUsage)
+		allocated.Sub(released)
 		quota.ClampQuantityToZero(&allocated)
-		allocated.Add(oldUsage)
 
 		newReserved := resource.MustParse("0")
 		for _, res := range activeReservations {
-			newReserved.Add(res.Usage)
+			newReserved.Add(reservationDelta(res))
 		}
 
 		ledger.Status.Allocated = allocated
 		ledger.Status.Reservations = activeReservations
+		ledger.Status.PendingDeletes = activeDeletes
 		ledger.Status.Reserved = newReserved
 
 		return c.Status().Update(ctx, ledger)
 	})
 }
 
+func sameQuantityLedgerPendingDelete(
+	a capsulev1beta2.QuantityLedgerPendingDelete,
+	b capsulev1beta2.QuantityLedgerPendingDelete,
+) bool {
+	if a.ID != "" || b.ID != "" {
+		return a.ID != "" && a.ID == b.ID
+	}
+
+	if a.ObjectRef.UID != "" && b.ObjectRef.UID != "" {
+		return a.ObjectRef.UID == b.ObjectRef.UID
+	}
+
+	return a.ObjectRef.APIGroup == b.ObjectRef.APIGroup &&
+		a.ObjectRef.APIVersion == b.ObjectRef.APIVersion &&
+		a.ObjectRef.Kind == b.ObjectRef.Kind &&
+		a.ObjectRef.Namespace == b.ObjectRef.Namespace &&
+		a.ObjectRef.Name == b.ObjectRef.Name
+}
+
 func buildReservation(
 	req admission.Request,
 	u unstructured.Unstructured,
 	usage resource.Quantity,
+	delta resource.Quantity,
 	quotaKey string,
 ) capsulev1beta2.QuantityLedgerReservation {
 	now := metav1.Now()
@@ -313,10 +383,53 @@ func buildReservation(
 			UID:        u.GetUID(),
 		},
 		Usage:     usage.DeepCopy(),
+		Delta:     quantityPtr(delta),
 		CreatedAt: now,
 		UpdatedAt: now,
 		ExpiresAt: &expiresAt,
 	}
+}
+
+func quantityPtr(in resource.Quantity) *resource.Quantity {
+	out := in.DeepCopy()
+
+	return &out
+}
+
+func copyQuantityPtr(in *resource.Quantity) *resource.Quantity {
+	if in == nil {
+		return nil
+	}
+
+	return quantityPtr(*in)
+}
+
+func reservationDelta(res capsulev1beta2.QuantityLedgerReservation) resource.Quantity {
+	if res.Delta == nil {
+		return res.Usage.DeepCopy()
+	}
+
+	return res.Delta.DeepCopy()
+}
+
+func observedLedgerAllocation(ledger *capsulev1beta2.QuantityLedger) resource.Quantity {
+	observed := ledger.Status.Allocated.DeepCopy()
+	observed.Sub(ledger.Status.Reserved)
+	quota.ClampQuantityToZero(&observed)
+
+	return observed
+}
+
+func sumReservationDeltas(
+	reservations []capsulev1beta2.QuantityLedgerReservation,
+) resource.Quantity {
+	total := resource.MustParse("0")
+
+	for _, reservation := range reservations {
+		total.Add(reservationDelta(reservation))
+	}
+
+	return total
 }
 
 func allKeys[K comparable, V any](a map[K]V, b map[K]V) []K {

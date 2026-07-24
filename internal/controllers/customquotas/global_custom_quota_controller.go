@@ -16,6 +16,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/retry"
@@ -101,7 +102,8 @@ func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, reque
 		return reconcile.Result{}, err
 	}
 
-	if err := r.ensureQuotaLedger(ctx, instance); err != nil {
+	ledger, err := r.ensureQuotaLedger(ctx, instance)
+	if err != nil {
 		if instance.DeletionTimestamp != nil || shouldIgnoreLedgerEnsureError(err) {
 			log.V(4).Info("skipping QuantityLedger ensure because CustomQuota or namespace is terminating",
 				"customQuota", request.String(),
@@ -114,7 +116,19 @@ func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, reque
 		return reconcile.Result{}, err
 	}
 
+	if hasWork, delay := quantityLedgerWorkDelay(time.Now(), ledger); hasWork && delay > 0 {
+		log.V(5).Info("debouncing QuantityLedger work",
+			"customQuota", request.String(),
+			"after", delay.String(),
+		)
+
+		return ctrl.Result{RequeueAfter: delay}, nil
+	}
+
 	reconcileErr := r.reconcile(ctx, log, instance)
+	if reconcileErr == nil {
+		meta.RemoveReconcileTriggerAnnotation(instance)
+	}
 
 	requeueAfter, ledgerErr := r.reconcileLedger(ctx, log, instance)
 
@@ -136,6 +150,10 @@ func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, reque
 		}
 
 		return reconcile.Result{}, fmt.Errorf("failed to patch: %w", err)
+	}
+
+	if ledgerErr != nil {
+		return ctrl.Result{}, fmt.Errorf("reconcile QuantityLedger: %w", ledgerErr)
 	}
 
 	if requeueAfter != nil {
@@ -172,7 +190,17 @@ func (r *clusterCustomQuotaClaimController) mapNamespaceToGlobalCustomQuotas(
 	for i := range quotaList.Items {
 		gcq := &quotaList.Items[i]
 
-		if shouldReconcileForNamespaceEvent(gcq, ns.Name) {
+		shouldReconcile, err := shouldReconcileForNamespaceEvent(gcq, ns)
+		if err != nil {
+			r.log.Error(err, "cannot evaluate GlobalCustomQuota namespace selector",
+				"globalCustomQuota", gcq.Name,
+				"namespace", ns.Name,
+			)
+
+			shouldReconcile = true
+		}
+
+		if shouldReconcile {
 			requests = append(requests, reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name: gcq.Name,
@@ -186,13 +214,38 @@ func (r *clusterCustomQuotaClaimController) mapNamespaceToGlobalCustomQuotas(
 
 func shouldReconcileForNamespaceEvent(
 	instance *capsulev1beta2.GlobalCustomQuota,
-	namespace string,
-) bool {
-	if len(instance.Spec.NamespaceSelectors) > 0 {
-		return true
+	namespace *corev1.Namespace,
+) (bool, error) {
+	if len(instance.Spec.NamespaceSelectors) == 0 {
+		return false, nil
 	}
 
-	return slices.Contains(instance.Status.Namespaces, namespace)
+	selected := false
+
+	if namespace.DeletionTimestamp == nil {
+		namespaceLabels := labels.Set(namespace.Labels)
+
+		for _, rawSelector := range instance.Spec.NamespaceSelectors {
+			if rawSelector.LabelSelector == nil {
+				continue
+			}
+
+			selector, err := metav1.LabelSelectorAsSelector(rawSelector.LabelSelector)
+			if err != nil {
+				return false, err
+			}
+
+			if selector.Matches(namespaceLabels) {
+				selected = true
+
+				break
+			}
+		}
+	}
+
+	wasSelected := slices.Contains(instance.Status.Namespaces, namespace.Name)
+
+	return selected != wasSelected, nil
 }
 
 func (r *clusterCustomQuotaClaimController) reconcile(
@@ -258,6 +311,7 @@ func (r *clusterCustomQuotaClaimController) reconcileLedger(
 	return reconcileQuantityLedgerAllocation(
 		ctx,
 		r.Client,
+		r.reader,
 		log,
 		key,
 		instance.Status.Usage.Used.DeepCopy(),
@@ -268,7 +322,7 @@ func (r *clusterCustomQuotaClaimController) reconcileLedger(
 func (r *clusterCustomQuotaClaimController) ensureQuotaLedger(
 	ctx context.Context,
 	instance *capsulev1beta2.GlobalCustomQuota,
-) error {
+) (*capsulev1beta2.QuantityLedger, error) {
 	ledger := &capsulev1beta2.QuantityLedger{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      instance.GetName(),
@@ -293,11 +347,11 @@ func (r *clusterCustomQuotaClaimController) ensureQuotaLedger(
 		return controllerutil.SetControllerReference(instance, ledger, r.Scheme())
 	})
 	if err != nil {
-		return fmt.Errorf("create or update QuantityLedger %s/%s for GlobalCustomQuota %s: %w",
+		return nil, fmt.Errorf("create or update QuantityLedger %s/%s for GlobalCustomQuota %s: %w",
 			ledger.Namespace, ledger.Name, instance.GetName(), err)
 	}
 
-	return nil
+	return ledger, nil
 }
 
 func (r *clusterCustomQuotaClaimController) emitMetrics(

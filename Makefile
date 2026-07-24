@@ -215,7 +215,8 @@ dev-setup: dev-setup-cert-manager
 		--set 'webhooks.hooks.calculations.rules[0].operations[1]=UPDATE' \
 		--set 'webhooks.hooks.calculations.rules[0].operations[2]=DELETE' \
 		--set 'webhooks.hooks.calculations.rules[0].resources[0]=pods' \
-		--set 'webhooks.hooks.calculations.rules[0].resources[1]=persistentvolumeclaims' \
+		--set 'webhooks.hooks.calculations.rules[0].resources[1]=pods/status' \
+		--set 'webhooks.hooks.calculations.rules[0].resources[2]=persistentvolumeclaims' \
 		--set 'webhooks.hooks.calculations.rules[0].scope=Namespaced' \
 		--set 'webhooks.hooks.calculations.namespaceSelector.matchLabels.env=e2e' \
 		capsule \
@@ -499,7 +500,8 @@ e2e-install: helm-controller-version ko-build-all dev-install-gw-api-crds
 		--set 'webhooks.hooks.calculations.rules[0].operations[1]=UPDATE' \
 		--set 'webhooks.hooks.calculations.rules[0].operations[2]=DELETE' \
 		--set 'webhooks.hooks.calculations.rules[0].resources[0]=pods' \
-		--set 'webhooks.hooks.calculations.rules[0].resources[1]=persistentvolumeclaims' \
+		--set 'webhooks.hooks.calculations.rules[0].resources[1]=pods/status' \
+		--set 'webhooks.hooks.calculations.rules[0].resources[2]=persistentvolumeclaims' \
 		--set 'webhooks.hooks.calculations.rules[0].scope=Namespaced' \
 		--set 'webhooks.hooks.calculations.namespaceSelector.matchLabels.env=e2e' \
 		capsule \

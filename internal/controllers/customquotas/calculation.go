@@ -118,7 +118,14 @@ func reconcileQuotaUsage(
 
 		items, ok := itemsByGVK[gvk]
 		if !ok {
-			items, err = getResourcesByGVK(ctx, gvk, in.Client, in.ScopeSelectors, in.Namespaces...)
+			items, err = getResourcesByGVK(
+				ctx,
+				gvk,
+				in.Client,
+				target.Scope == k8smeta.RESTScopeNameNamespace,
+				in.ScopeSelectors,
+				in.Namespaces...,
+			)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("list resources for %s: %w", gvk.String(), err))
 

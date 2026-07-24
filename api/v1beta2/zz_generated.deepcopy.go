@@ -975,6 +975,11 @@ func (in *QuantityLedgerPendingDelete) DeepCopy() *QuantityLedgerPendingDelete {
 func (in *QuantityLedgerReservation) DeepCopyInto(out *QuantityLedgerReservation) {
 	*out = *in
 	out.Usage = in.Usage.DeepCopy()
+	if in.Delta != nil {
+		in, out := &in.Delta, &out.Delta
+		x := (*in).DeepCopy()
+		*out = &x
+	}
 	out.ObjectRef = in.ObjectRef
 	in.CreatedAt.DeepCopyInto(&out.CreatedAt)
 	in.UpdatedAt.DeepCopyInto(&out.UpdatedAt)

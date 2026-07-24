@@ -172,6 +172,11 @@ spec:
                     createdAt:
                       format: date-time
                       type: string
+                    id:
+                      description: |-
+                        ID identifies the admission request that added this hint. It allows a
+                        failed multi-quota admission to roll back only its own hint.
+                      type: string
                     objectRef:
                       description: |-
                         QuotaLedgerObjectRef identifies the object for which a reservation exists.
@@ -219,6 +224,20 @@ spec:
                       description: Time the reservation was first created.
                       format: date-time
                       type: string
+                    delta:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      description: |-
+                        Delta is the additional amount held against the quota while the admitted
+                        object is materializing. For creates this is normally equal to Usage. For
+                        updates it is max(newUsage-oldUsage, 0), so admission never releases
+                        capacity before the API server has persisted the update.
+
+                        A nil value is interpreted as Usage for backwards compatibility with
+                        ledgers written before this field was introduced.
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
                     expiresAt:
                       description: Time after which the reservation may be considered
                         stale.

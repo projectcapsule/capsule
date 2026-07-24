@@ -32,7 +32,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
@@ -629,15 +628,10 @@ func main() {
 
 	setupLog.Info("initializing caches")
 
-	// Initialize Notifiers (Channels)
-	customQuotaCh := make(chan event.TypedGenericEvent[*capsulev1beta2.CustomQuota], 1024)
-	globalCustomQuotaCh := make(chan event.TypedGenericEvent[*capsulev1beta2.GlobalCustomQuota], 1024)
-
 	// Initialize Caches
 	impersonationCache := cache.NewImpersonationCache()
 	regexCache := cache.NewRegexCache()
 	registryCache := cache.NewRegistryRuleSetCache(regexCache)
-	customQuotaQuantityCache := cache.NewQuantityCache[string]()
 	jsonPathCache := cache.NewJSONPathCache()
 	targetsCache := cache.NewCompiledTargetsCache[string]()
 
@@ -954,11 +948,8 @@ func main() {
 		manager,
 		manager.GetEventRecorder("customquotas-ctrl"),
 		controllerConfig,
-		customQuotaQuantityCache,
 		jsonPathCache,
 		targetsCache,
-		customQuotaCh,
-		globalCustomQuotaCh,
 	); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "customquotas")
 		os.Exit(1)

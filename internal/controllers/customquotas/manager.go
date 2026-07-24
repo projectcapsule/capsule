@@ -8,10 +8,8 @@ import (
 
 	"github.com/go-logr/logr"
 	"k8s.io/client-go/tools/events"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
@@ -22,11 +20,8 @@ func Add(
 	mgr manager.Manager,
 	recorder events.EventRecorder,
 	cfg utils.ControllerOptions,
-	quantityCache *cache.QuantityCache[string],
 	jsonPathCache *cache.JSONPathCache,
 	targetsCache *cache.CompiledTargetsCache[string],
-	namespaceNotifier chan event.TypedGenericEvent[*capsulev1beta2.CustomQuota],
-	globalNotifier chan event.TypedGenericEvent[*capsulev1beta2.GlobalCustomQuota],
 ) (err error) {
 	if err = (&customQuotaClaimController{
 		Client:        mgr.GetClient(),

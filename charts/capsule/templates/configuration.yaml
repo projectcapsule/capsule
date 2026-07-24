@@ -950,7 +950,7 @@ spec:
         {{- end }}
         rules:
           {{- toYaml .rules | nindent 10 }}
-        sideEffects: None
+        sideEffects: NoneOnDryRun
         timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
         {{- end }}
       {{- end }}

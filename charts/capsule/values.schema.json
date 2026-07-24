@@ -1147,7 +1147,7 @@
                                     "additionalProperties": true
                                 },
                                 "rules": {
-                                    "description": "[Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)",
+                                    "description": "[Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules) Include an explicit status subresource (for example, pods/status) when CustomQuota field selectors depend on status fields.",
                                     "type": "array"
                                 }
                             }
