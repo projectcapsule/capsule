@@ -1053,7 +1053,6 @@ webhooks:
           - CREATE
           - UPDATE
         resources:
-          - '*'
           - '*/*'
         scope: Namespaced
 
