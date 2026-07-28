@@ -139,9 +139,10 @@ func NamespaceDeletionAdmin(ns *corev1.Namespace, timeout time.Duration) AsyncAs
 }
 
 func ForceDeleteNamespace(ctx context.Context, name string) {
+	cs := clusterAdminClient()
+
 	Eventually(func() error {
-		ns := &corev1.Namespace{}
-		err := k8sClient.Get(ctx, types.NamespacedName{Name: name}, ns)
+		ns, err := cs.CoreV1().Namespaces().Get(ctx, name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return nil
 		}
@@ -149,27 +150,30 @@ func ForceDeleteNamespace(ctx context.Context, name string) {
 			return err
 		}
 
-		// Trigger deletion if not already happening
-		if ns.DeletionTimestamp.IsZero() {
-			if err := k8sClient.Delete(ctx, ns); err != nil && !apierrors.IsNotFound(err) {
+		if controllerutil.RemoveFinalizer(ns, namespaceTerminationHoldFinalizer) {
+			if _, err = cs.CoreV1().Namespaces().Update(ctx, ns, metav1.UpdateOptions{}); err != nil {
 				return err
 			}
+
+			return fmt.Errorf("removed E2E termination hold finalizer from namespace %s", name)
+		}
+
+		// Trigger deletion if not already happening
+		if ns.DeletionTimestamp.IsZero() {
+			if err := cs.CoreV1().Namespaces().Delete(ctx, name, metav1.DeleteOptions{}); err != nil &&
+				!apierrors.IsNotFound(err) {
+				return err
+			}
+
 			return fmt.Errorf("namespace %s deletion triggered", name)
 		}
 
-		// Force-remove finalizers (THIS is the key part)
-		if len(ns.Finalizers) > 0 {
-			ns.Finalizers = nil
-			if err := k8sClient.Update(ctx, ns); err != nil {
-				return err
-			}
-			return fmt.Errorf("namespace %s finalizers removed", name)
-		}
-
-		// wait until fully gone
+		// Let the namespace controller remove the kubernetes finalizer. Forcing
+		// finalization can orphan content that becomes visible if a namespace
+		// with the same name is recreated.
 		return fmt.Errorf("namespace %s still terminating", name)
 	}, defaultTerminationTimeoutInterval, defaultPollInterval).Should(Succeed(),
-		"failed to force delete namespace %s", name)
+		"failed to delete namespace %s", name)
 }
 
 func NamespaceCreation(ns *corev1.Namespace, owner rbac.UserSpec, timeout time.Duration) AsyncAssertion {

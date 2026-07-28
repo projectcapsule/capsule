@@ -27,6 +27,12 @@ import (
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
+func gatewayAdmissionClient(user string) client.Client {
+	// Keep the tenant-owner username visible to admission while granting the
+	// authorization needed for Gateway API resources.
+	return impersonationClient(user, []string{"system:masters"})
+}
+
 var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant", "classes", "gatewayclass"), func() {
 	authorized := &gatewayv1.GatewayClass{
 		ObjectMeta: metav1.ObjectMeta{
@@ -240,6 +246,8 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 		NamespaceCreation(ns, tntNoRestrictions.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		NamespaceIsPartOfTenant(tntNoRestrictions, ns).Should(Succeed())
 
+		admissionClient := gatewayAdmissionClient(tntNoRestrictions.Spec.Owners[0].UserSpec.Name)
+
 		By("providing any storageclass", func() {
 			for _, class := range []*gatewayv1.GatewayClass{authorized, unauthorized, exact, exactU} {
 				c := class.GetName()
@@ -261,7 +269,7 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 						},
 					}
 
-					err = k8sClient.Create(context.TODO(), g)
+					err = admissionClient.Create(context.TODO(), g)
 					return
 				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			}
@@ -285,7 +293,7 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 						GatewayClassName: gatewayv1.ObjectName("very-unauthorized-and-nonexistent-class"),
 					},
 				}
-				err = k8sClient.Create(context.TODO(), g)
+				err = admissionClient.Create(context.TODO(), g)
 				return
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
@@ -342,6 +350,8 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		NamespaceIsPartOfTenant(tntWithDefault, ns).Should(Succeed())
 
+		admissionClient := gatewayAdmissionClient(tntWithDefault.Spec.Owners[0].UserSpec.Name)
+
 		By("providing unauthorized gatewayClassName", func() {
 			Eventually(func() (err error) {
 				g := &gatewayv1.Gateway{
@@ -360,7 +370,7 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 						GatewayClassName: gatewayv1.ObjectName("unauthorized-class"),
 					},
 				}
-				err = k8sClient.Create(context.TODO(), g)
+				err = admissionClient.Create(context.TODO(), g)
 				return
 			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
 		})
@@ -383,7 +393,7 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 						GatewayClassName: gatewayv1.ObjectName("very-unauthorized-and-nonexistent-class"),
 					},
 				}
-				err = k8sClient.Create(context.TODO(), g)
+				err = admissionClient.Create(context.TODO(), g)
 				return
 			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
 		})
@@ -460,6 +470,8 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		NamespaceIsPartOfTenant(tntWithDefault, ns).Should(Succeed())
 
+		admissionClient := gatewayAdmissionClient(tntWithDefault.Spec.Owners[0].UserSpec.Name)
+
 		By("providing authorized class", func() {
 			Eventually(func() (err error) {
 				g := &gatewayv1.Gateway{
@@ -478,7 +490,7 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 						GatewayClassName: gatewayv1.ObjectName("customer-class"),
 					},
 				}
-				err = k8sClient.Create(context.TODO(), g)
+				err = admissionClient.Create(context.TODO(), g)
 				return
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
@@ -501,7 +513,7 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 						GatewayClassName: gatewayv1.ObjectName("legacy-2"),
 					},
 				}
-				err = k8sClient.Create(context.TODO(), g)
+				err = admissionClient.Create(context.TODO(), g)
 				return
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
@@ -522,7 +534,7 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 					},
 				},
 			}
-			Expect(k8sClient.Create(context.TODO(), g)).Should(Succeed())
+			Expect(admissionClient.Create(context.TODO(), g)).Should(Succeed())
 			gw := &gatewayv1.Gateway{}
 			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: g.GetName(), Namespace: g.Namespace}, gw)).Should(Succeed())
 			Expect(gw.Spec.GatewayClassName).Should(Equal(gatewayv1.ObjectName("customer-class")))
@@ -561,6 +573,8 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 		NamespaceCreation(ns, tntWithoutDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		NamespaceIsPartOfTenant(tntWithoutDefault, ns).Should(Succeed())
 
+		admissionClient := gatewayAdmissionClient(tntWithoutDefault.Spec.Owners[0].UserSpec.Name)
+
 		By("providing empty GatewayClassName", func() {
 			Eventually(func() (err error) {
 				g := &gatewayv1.Gateway{
@@ -578,7 +592,7 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 						},
 					},
 				}
-				err = k8sClient.Create(context.TODO(), g)
+				err = admissionClient.Create(context.TODO(), g)
 				return
 			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
 		})

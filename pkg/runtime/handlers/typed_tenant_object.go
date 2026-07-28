@@ -1,7 +1,6 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-//nolint:dupl
 package handlers
 
 import (
@@ -22,12 +21,32 @@ type TypedHandlerWithTenant[T client.Object] interface {
 }
 
 type TypedTenantHandler[T client.Object] struct {
-	Factory  NewObjectFunc[T]
-	Handlers []TypedHandlerWithTenant[T]
+	Factory   NewObjectFunc[T]
+	Handlers  []TypedHandlerWithTenant[T]
+	Predicate func(req admission.Request, obj T, oldObj T) bool
 }
 
 func (h *TypedTenantHandler[T]) OnCreate(c client.Client, reader client.Reader, decoder admission.Decoder, recorder events.EventRecorder) Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
+		var (
+			obj     T
+			decoded bool
+		)
+
+		if h.Predicate != nil {
+			obj = h.Factory()
+			if err := decoder.Decode(req, obj); err != nil {
+				return ErroredResponse(err)
+			}
+
+			decoded = true
+
+			var oldObj T
+			if !h.Predicate(req, obj, oldObj) {
+				return nil
+			}
+		}
+
 		tnt, err := h.resolveTenant(ctx, reader, req)
 		if err != nil {
 			return ErroredResponse(err)
@@ -37,9 +56,11 @@ func (h *TypedTenantHandler[T]) OnCreate(c client.Client, reader client.Reader, 
 			return nil
 		}
 
-		obj := h.Factory()
-		if err := decoder.Decode(req, obj); err != nil {
-			return ErroredResponse(err)
+		if !decoded {
+			obj = h.Factory()
+			if err := decoder.Decode(req, obj); err != nil {
+				return ErroredResponse(err)
+			}
 		}
 
 		for _, hndl := range h.Handlers {
@@ -54,6 +75,30 @@ func (h *TypedTenantHandler[T]) OnCreate(c client.Client, reader client.Reader, 
 
 func (h *TypedTenantHandler[T]) OnUpdate(c client.Client, reader client.Reader, decoder admission.Decoder, recorder events.EventRecorder) Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
+		var (
+			newObj  T
+			oldObj  T
+			decoded bool
+		)
+
+		if h.Predicate != nil {
+			newObj = h.Factory()
+			if err := decoder.Decode(req, newObj); err != nil {
+				return ErroredResponse(err)
+			}
+
+			oldObj = h.Factory()
+			if err := decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
+				return ErroredResponse(err)
+			}
+
+			decoded = true
+
+			if !h.Predicate(req, newObj, oldObj) {
+				return nil
+			}
+		}
+
 		tnt, err := h.resolveTenant(ctx, reader, req)
 		if err != nil {
 			return ErroredResponse(err)
@@ -63,14 +108,16 @@ func (h *TypedTenantHandler[T]) OnUpdate(c client.Client, reader client.Reader, 
 			return nil
 		}
 
-		newObj := h.Factory()
-		if err := decoder.Decode(req, newObj); err != nil {
-			return ErroredResponse(err)
-		}
+		if !decoded {
+			newObj = h.Factory()
+			if err := decoder.Decode(req, newObj); err != nil {
+				return ErroredResponse(err)
+			}
 
-		oldObj := h.Factory()
-		if err := decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
-			return ErroredResponse(err)
+			oldObj = h.Factory()
+			if err := decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
+				return ErroredResponse(err)
+			}
 		}
 
 		for _, hndl := range h.Handlers {

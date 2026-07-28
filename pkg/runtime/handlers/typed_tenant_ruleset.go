@@ -60,6 +60,12 @@ type TypedTenantWithRulesetHandler[T client.Object] struct {
 	Configuration configuration.Configuration
 }
 
+type rulesetReadResult struct {
+	rules []*rules.NamespaceRuleBodyNamespace
+	found bool
+	err   error
+}
+
 func (h *TypedTenantWithRulesetHandler[T]) OnCreate(
 	c client.Client,
 	reader client.Reader,
@@ -67,6 +73,12 @@ func (h *TypedTenantWithRulesetHandler[T]) OnCreate(
 	recorder events.EventRecorder,
 ) Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
+		if req.Namespace == "" {
+			return nil
+		}
+
+		rulesetResult := h.readRulesetAsync(ctx, reader, req.Namespace)
+
 		tnt, err := h.resolveTenant(ctx, reader, req)
 		if err != nil {
 			return ErroredResponse(err)
@@ -81,7 +93,7 @@ func (h *TypedTenantWithRulesetHandler[T]) OnCreate(
 			return ErroredResponse(err)
 		}
 
-		ruleBlocks, err := h.resolveRuleset(ctx, c, reader, req, req.Namespace, tnt)
+		ruleBlocks, err := h.resolveRuleset(ctx, c, req.Namespace, tnt, <-rulesetResult)
 		if err != nil {
 			return ErroredResponse(err)
 		}
@@ -108,7 +120,13 @@ func (h *TypedTenantWithRulesetHandler[T]) OnUpdate(
 	recorder events.EventRecorder,
 ) Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		tnt, err := h.resolveTenant(ctx, c, req)
+		if req.Namespace == "" {
+			return nil
+		}
+
+		rulesetResult := h.readRulesetAsync(ctx, reader, req.Namespace)
+
+		tnt, err := h.resolveTenant(ctx, reader, req)
 		if err != nil {
 			return ErroredResponse(err)
 		}
@@ -127,7 +145,7 @@ func (h *TypedTenantWithRulesetHandler[T]) OnUpdate(
 			return ErroredResponse(err)
 		}
 
-		ruleBlocks, err := h.resolveRuleset(ctx, c, reader, req, req.Namespace, tnt)
+		ruleBlocks, err := h.resolveRuleset(ctx, c, req.Namespace, tnt, <-rulesetResult)
 		if err != nil {
 			return ErroredResponse(err)
 		}
@@ -170,26 +188,53 @@ func (h *TypedTenantWithRulesetHandler[T]) resolveTenant(
 	return tenant.GetTenantByNamespace(ctx, c, req.Namespace)
 }
 
+func (h *TypedTenantWithRulesetHandler[T]) readRulesetAsync(
+	ctx context.Context,
+	reader client.Reader,
+	namespace string,
+) <-chan rulesetReadResult {
+	result := make(chan rulesetReadResult, 1)
+
+	go func() {
+		rs := &capsulev1beta2.RuleStatus{}
+		key := types.NamespacedName{
+			Namespace: namespace,
+			Name:      meta.NameForManagedRuleStatus(),
+		}
+
+		err := reader.Get(ctx, key, rs)
+
+		switch {
+		case err == nil:
+			result <- rulesetReadResult{
+				rules: rs.Status.Rules,
+				found: true,
+			}
+		case apierrors.IsNotFound(err):
+			result <- rulesetReadResult{}
+		default:
+			result <- rulesetReadResult{err: err}
+		}
+	}()
+
+	return result
+}
+
 // Resolve the corresponding managed ruleset for this namespace.
 // If not yet present, try to calculate it.
 func (h *TypedTenantWithRulesetHandler[T]) resolveRuleset(
 	ctx context.Context,
 	c client.Client,
-	reader client.Reader,
-	req admission.Request,
 	namespace string,
 	tnt *capsulev1beta2.Tenant,
+	result rulesetReadResult,
 ) ([]*rules.NamespaceRuleBodyNamespace, error) {
-	rs := &capsulev1beta2.RuleStatus{}
-	key := types.NamespacedName{
-		Namespace: namespace,
-		Name:      meta.NameForManagedRuleStatus(),
+	if result.err != nil {
+		return nil, result.err
 	}
 
-	if err := reader.Get(ctx, key, rs); err == nil {
-		return rs.Status.Rules, nil
-	} else if !apierrors.IsNotFound(err) {
-		return nil, err
+	if result.found {
+		return result.rules, nil
 	}
 
 	ns := &corev1.Namespace{}

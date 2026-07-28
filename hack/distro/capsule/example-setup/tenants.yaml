@@ -10,7 +10,39 @@ spec:
     - name: alice
       kind: User
   rules:
-    - permissions:
+    - quota:
+        - hard:
+            limits.cpu: "8"
+            limits.memory: 16Gi
+            requests.cpu: "8"
+            requests.memory: 16Gi
+      classes:
+        gateway:
+          - matchLabels:
+              team: platform
+        ingress:
+          - matchLabels:
+              team: platform
+        storage:
+          - matchLabels:
+              team: platform
+        priority:
+          - matchLabels:
+              team: platform
+        runtime:
+          - matchLabels:
+              team: platform
+        cluster:
+          - matchLabels:
+              team: platform
+            namespaceSelector:
+              matchExpressions:
+                - key: env
+                  operator: In
+                  values:
+                    - "test"
+
+      permissions:
         bindings:
           - clusterRoleName: 'custom:proxy-viewer'
             subjects:

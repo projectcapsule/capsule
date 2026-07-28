@@ -32,7 +32,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
@@ -629,16 +628,18 @@ func main() {
 
 	setupLog.Info("initializing caches")
 
-	// Initialize Notifiers (Channels)
-	customQuotaCh := make(chan event.TypedGenericEvent[*capsulev1beta2.CustomQuota], 1024)
-	globalCustomQuotaCh := make(chan event.TypedGenericEvent[*capsulev1beta2.GlobalCustomQuota], 1024)
-
 	// Initialize Caches
 	impersonationCache := cache.NewImpersonationCache()
 	regexCache := cache.NewRegexCache()
 	registryCache := cache.NewRegistryRuleSetCache(regexCache)
-	customQuotaQuantityCache := cache.NewQuantityCache[string]()
 	jsonPathCache := cache.NewJSONPathCache()
+
+	celCache, err := cache.NewCELCache()
+	if err != nil {
+		setupLog.Error(err, "unable to initialize Kubernetes CEL cache")
+		os.Exit(1)
+	}
+
 	targetsCache := cache.NewCompiledTargetsCache[string]()
 
 	if directCfg.EnableTLSConfiguration() {
@@ -687,12 +688,27 @@ func main() {
 	webhooksList := append(
 		make([]handlers.Webhook, 0),
 		rulesgenericmutation.Register(cfg),
-		rulesgenericvalidation.Register(regexCache, cfg),
+		rulesgenericvalidation.Register(
+			regexCache,
+			cfg,
+			rulesgenericvalidation.ForKind(
+				corev1.SchemeGroupVersion.WithKind("Pod").GroupKind(),
+				pod.Handler(cfg,
+					podrules.PodRules(regexCache, registryCache),
+				),
+				"ephemeralcontainers",
+			),
+			rulesgenericvalidation.ForKind(
+				corev1.SchemeGroupVersion.WithKind("Service").GroupKind(),
+				service.Handler(cfg,
+					servicerules.ServiceRules(regexCache),
+				),
+			),
+		),
 		route.GenericReplicasHandler(),
 		route.GenericManagedHandler(cfg),
 		route.Pod(
 			pod.Handler(cfg,
-				podrules.PodRules(regexCache, registryCache),
 				pod.ImagePullPolicy(),
 				pod.ContainerRegistryLegacy(cfg),
 				pod.PriorityClass(),
@@ -707,13 +723,12 @@ func main() {
 			),
 		),
 		route.PVCMutating(
-			pvc.Handler(
+			pvc.MutatingHandler(
 				pvc.PersistentVolumeMutatingVolume(),
 			),
 		),
 		route.Service(
 			service.Handler(cfg,
-				servicerules.ServiceRules(regexCache),
 				service.Validating(),
 			),
 		),
@@ -782,15 +797,18 @@ func main() {
 		route.CustomQuotaValidation(customquotavalidation.CustomQuotaValidationHandler(
 			targetsCache,
 			jsonPathCache,
+			celCache,
 		)),
 		route.GlobalCustomQuotaValidation(customquotavalidation.GlobalCustomQuotaValidationHandler(
 			targetsCache,
 			jsonPathCache,
+			celCache,
 		)),
 		route.CalculationCustomQuotas(
 			customquotavalidation.ObjectCalculationHandler(
 				targetsCache,
 				jsonPathCache,
+				celCache,
 			),
 		),
 		route.GenericTenantAssignment(
@@ -909,6 +927,7 @@ func main() {
 		ImpersonationCache: impersonationCache,
 		RegistryCache:      registryCache,
 		JSONPathCache:      jsonPathCache,
+		CELCache:           celCache,
 		TargetsCache:       targetsCache,
 		RegexCache:         regexCache,
 	}
@@ -954,11 +973,9 @@ func main() {
 		manager,
 		manager.GetEventRecorder("customquotas-ctrl"),
 		controllerConfig,
-		customQuotaQuantityCache,
 		jsonPathCache,
+		celCache,
 		targetsCache,
-		customQuotaCh,
-		globalCustomQuotaCh,
 	); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "customquotas")
 		os.Exit(1)

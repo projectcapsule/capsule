@@ -22,13 +22,20 @@ func FilterNamespaceRulesByAudience(
 	req admission.Request,
 	bodies []*rules.NamespaceRuleBodyNamespace,
 ) ([]*rules.NamespaceRuleBodyNamespace, error) {
-	out := make([]*rules.NamespaceRuleBodyNamespace, 0, len(bodies))
+	var out []*rules.NamespaceRuleBodyNamespace
 
-	for _, body := range bodies {
+	for i, body := range bodies {
 		if body == nil || len(body.Audience) == 0 {
-			out = append(out, body)
+			if out != nil {
+				out = append(out, body)
+			}
 
 			continue
+		}
+
+		if out == nil {
+			out = make([]*rules.NamespaceRuleBodyNamespace, 0, len(bodies))
+			out = append(out, bodies[:i]...)
 		}
 
 		matched, err := matchesAudience(cfg, tnt, req, body.Audience)
@@ -39,6 +46,10 @@ func FilterNamespaceRulesByAudience(
 		if matched {
 			out = append(out, body)
 		}
+	}
+
+	if out == nil {
+		return bodies, nil
 	}
 
 	return out, nil

@@ -616,8 +616,15 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 	}
 
 	createDeploymentAndExpectAllowed := func(nsName string, deploy *appsv1.Deployment) {
+		owner := impersonationClient(
+			tnt.Spec.Owners[0].UserSpec.Name,
+			withDefaultGroups(nil),
+		)
+
+		deploy.Namespace = nsName
+
 		EventuallyCreation(func() error {
-			return k8sClient.Create(context.Background(), deploy, &client.CreateOptions{})
+			return owner.Create(context.Background(), deploy, &client.CreateOptions{})
 		}).Should(Succeed())
 
 		EventuallyDeletion(deploy)
@@ -630,6 +637,11 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 			baseName = "deployment"
 		}
 
+		owner := impersonationClient(
+			tnt.Spec.Owners[0].UserSpec.Name,
+			withDefaultGroups(nil),
+		)
+
 		Eventually(func() error {
 			candidate := base.DeepCopy()
 			candidate.Name = fmt.Sprintf("%s-%d", baseName, time.Now().UnixNano()%1e6)
@@ -637,9 +649,9 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 			candidate.Spec.Selector.MatchLabels["app"] = candidate.Name
 			candidate.Spec.Template.Labels["app"] = candidate.Name
 
-			err := k8sClient.Create(context.Background(), candidate, &client.CreateOptions{})
+			err := owner.Create(context.Background(), candidate, &client.CreateOptions{})
 			if err == nil {
-				_ = k8sClient.Delete(context.Background(), candidate)
+				_ = owner.Delete(context.Background(), candidate)
 
 				return fmt.Errorf("expected deployment create to be denied, but it succeeded")
 			}

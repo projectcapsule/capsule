@@ -46,7 +46,7 @@ func (r *CacheInvalidator) rebuildTargetsCache(ctx context.Context, log logr.Log
 	}
 
 	for key, targets := range targetsByKey {
-		compiled, err := customquotas.CompileTargets(r.JSONPathCache, targets)
+		compiled, err := customquotas.CompileTargets(r.JSONPathCache, r.CELCache, targets)
 		if err != nil {
 			return fmt.Errorf("compile targets for cache key %q: %w", key, err)
 		}

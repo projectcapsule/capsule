@@ -35,7 +35,9 @@ func TestMutateMetadataDefaultsAndManaged(t *testing.T) {
 		}},
 	}}}
 
-	MutateMetadata(obj, schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"}, bodies)
+	if changed := MutateMetadata(obj, schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"}, bodies); !changed {
+		t.Fatal("MutateMetadata() changed = false, want true")
+	}
 	if got := obj.GetLabels()["default-missing"]; got != "fallback" {
 		t.Fatalf("default = %q", got)
 	}
@@ -51,5 +53,20 @@ func TestMutateMetadataDefaultsAndManaged(t *testing.T) {
 	}
 	if _, ok := obj.Object["subjects"]; !ok {
 		t.Fatal("subjects were removed")
+	}
+}
+
+func TestMutateMetadataReportsNoop(t *testing.T) {
+	t.Parallel()
+
+	obj := &unstructured.Unstructured{}
+	obj.SetLabels(map[string]string{"existing": "value"})
+
+	if changed := MutateMetadata(
+		obj,
+		schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"},
+		nil,
+	); changed {
+		t.Fatal("MutateMetadata() changed = true without matching rules")
 	}
 }

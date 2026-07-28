@@ -297,10 +297,21 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 	})
 
 	AfterEach(func() {
-		ForceDeleteNamespace(ctx, testNamespace)
-
 		req, err := labels.NewRequirement("e2e.capsule.dev/test-suite", selection.Equals, []string{"globalcustomquota-ledger"})
 		Expect(err).NotTo(HaveOccurred())
+
+		var customQuotaList capsulev1beta2.CustomQuotaList
+		Expect(k8sClient.List(
+			context.TODO(),
+			&customQuotaList,
+			client.MatchingLabelsSelector{
+				Selector: labels.NewSelector().Add(*req),
+			},
+		)).Should(Succeed())
+
+		for i := range customQuotaList.Items {
+			EventuallyDeletion(&customQuotaList.Items[i])
+		}
 
 		var list capsulev1beta2.GlobalCustomQuotaList
 		Expect(k8sClient.List(
@@ -314,6 +325,8 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 		for i := range list.Items {
 			EventuallyDeletion(&list.Items[i])
 		}
+
+		ForceDeleteNamespace(ctx, testNamespace)
 	})
 
 	It("aggregates a custom pod quantity path and settles the corresponding ledger", Label("skip-on-openshift"), func() {

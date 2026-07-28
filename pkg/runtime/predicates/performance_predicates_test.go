@@ -204,6 +204,19 @@ func TestQuantityLedgerWorkChangedPredicate(t *testing.T) {
 	t.Parallel()
 
 	p := predicates.QuantityLedgerWorkChangedPredicate{}
+	if p.Create(event.CreateEvent{Object: &capsulev1beta2.QuantityLedger{}}) {
+		t.Fatal("settled ledger creation must be filtered; the owning quota create already reconciles it")
+	}
+
+	createdWithWork := &capsulev1beta2.QuantityLedger{
+		Status: capsulev1beta2.QuantityLedgerStatus{
+			Reservations: []capsulev1beta2.QuantityLedgerReservation{{ID: "request"}},
+		},
+	}
+	if !p.Create(event.CreateEvent{Object: createdWithWork}) {
+		t.Fatal("ledger first observed with work must trigger reconciliation")
+	}
+
 	oldLedger := &capsulev1beta2.QuantityLedger{}
 	derived := oldLedger.DeepCopy()
 	derived.Status.Allocated = resource.MustParse("1")
@@ -215,6 +228,41 @@ func TestQuantityLedgerWorkChangedPredicate(t *testing.T) {
 	work.Status.Reservations = append(work.Status.Reservations, capsulev1beta2.QuantityLedgerReservation{ID: "request"})
 	if !p.Update(event.UpdateEvent{ObjectOld: oldLedger, ObjectNew: work}) {
 		t.Fatal("reservation update must be admitted")
+	}
+
+	moreWork := work.DeepCopy()
+	moreWork.Status.Reservations = append(
+		moreWork.Status.Reservations,
+		capsulev1beta2.QuantityLedgerReservation{ID: "request-2"},
+	)
+	if !p.Update(event.UpdateEvent{ObjectOld: work, ObjectNew: moreWork}) {
+		t.Fatal("additional work must be admitted in case the informer coalesced an intermediate settled state")
+	}
+
+	replacedWork := oldLedger.DeepCopy()
+	replacedWork.Status.PendingDeletes = []capsulev1beta2.QuantityLedgerPendingDelete{{
+		ID: "delete-request",
+	}}
+	if !p.Update(event.UpdateEvent{ObjectOld: work, ObjectNew: replacedWork}) {
+		t.Fatal("replacement work must be admitted when an intermediate settled state is not observed")
+	}
+
+	settled := moreWork.DeepCopy()
+	settled.Status.Reservations = nil
+	if p.Update(event.UpdateEvent{ObjectOld: moreWork, ObjectNew: settled}) {
+		t.Fatal("controller settlement updates must be filtered")
+	}
+
+	partiallySettled := moreWork.DeepCopy()
+	partiallySettled.Status.Reservations = partiallySettled.Status.Reservations[:1]
+	if p.Update(event.UpdateEvent{ObjectOld: moreWork, ObjectNew: partiallySettled}) {
+		t.Fatal("partial controller settlement updates must be filtered")
+	}
+
+	unchangedWork := work.DeepCopy()
+	unchangedWork.Status.Allocated = resource.MustParse("1")
+	if p.Update(event.UpdateEvent{ObjectOld: work, ObjectNew: unchangedWork}) {
+		t.Fatal("derived updates with unchanged work must be filtered")
 	}
 }
 

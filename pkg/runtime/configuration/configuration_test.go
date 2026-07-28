@@ -5,6 +5,7 @@ package configuration_test
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"testing"
 	"time"
@@ -21,6 +22,36 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
+
+type failingConfigurationReader struct {
+	client.Reader
+
+	gets int
+}
+
+type timeoutConfigurationClient struct {
+	client.Client
+}
+
+func (c *timeoutConfigurationClient) Get(
+	context.Context,
+	client.ObjectKey,
+	client.Object,
+	...client.GetOption,
+) error {
+	return context.DeadlineExceeded
+}
+
+func (r *failingConfigurationReader) Get(
+	context.Context,
+	client.ObjectKey,
+	client.Object,
+	...client.GetOption,
+) error {
+	r.gets++
+
+	return errors.New("direct reader should not be used")
+}
 
 func TestDefaultCapsuleConfiguration(t *testing.T) {
 	t.Parallel()
@@ -77,6 +108,58 @@ func TestNewCapsuleConfigurationCreatesDefaultWhenMissing(t *testing.T) {
 	var stored capsulev1beta2.CapsuleConfiguration
 	if err := cl.Get(ctx, client.ObjectKey{Name: "capsule"}, &stored); err != nil {
 		t.Fatalf("created configuration was not stored: %v", err)
+	}
+}
+
+func TestNewCapsuleConfigurationCreatesDefaultAfterInformerTimeout(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	storage := configurationFakeClient(t)
+	cachedClient := &timeoutConfigurationClient{Client: storage}
+	directReader := configurationFakeClient(t)
+
+	cfg := configuration.NewCapsuleConfiguration(
+		ctx,
+		cachedClient,
+		directReader,
+		&rest.Config{Host: "https://kubernetes.default"},
+		"capsule",
+	)
+
+	got := cfg.GetConfigObject()
+	if got.Name != "capsule" {
+		t.Fatalf("GetConfigObject().Name = %q, want capsule", got.Name)
+	}
+	if !reflect.DeepEqual(got.Spec, configuration.DefaultCapsuleConfiguration()) {
+		t.Fatalf("default configuration = %#v, want %#v", got.Spec, configuration.DefaultCapsuleConfiguration())
+	}
+
+	stored := &capsulev1beta2.CapsuleConfiguration{}
+	if err := storage.Get(ctx, client.ObjectKey{Name: "capsule"}, stored); err != nil {
+		t.Fatalf("created configuration was not stored: %v", err)
+	}
+}
+
+func TestCapsuleConfigurationUsesInformerClientBeforeDirectReader(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	stored := &capsulev1beta2.CapsuleConfiguration{
+		ObjectMeta: metav1.ObjectMeta{Name: "capsule"},
+		Spec: capsulev1beta2.CapsuleConfigurationSpec{
+			ForceTenantPrefix: true,
+		},
+	}
+	cl := configurationFakeClient(t, stored)
+	reader := &failingConfigurationReader{Reader: cl}
+	cfg := configuration.NewCapsuleConfiguration(ctx, cl, reader, &rest.Config{}, "capsule")
+
+	if !cfg.ForceTenantPrefix() {
+		t.Fatal("ForceTenantPrefix() = false, want cached configuration value")
+	}
+	if reader.gets != 0 {
+		t.Fatalf("direct reader Get calls = %d, want 0", reader.gets)
 	}
 }
 

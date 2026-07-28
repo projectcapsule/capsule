@@ -83,6 +83,51 @@ func TestNamespaceHandlerDoesNotInterceptUnlabelledAdministratorCreate(t *testin
 	}
 }
 
+func TestNamespaceHandlerDoesNotInterceptFinalize(t *testing.T) {
+	t.Parallel()
+
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+
+	now := metav1.Now()
+	oldNs := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "terminating",
+			DeletionTimestamp: &now,
+		},
+		Status: corev1.NamespaceStatus{Phase: corev1.NamespaceTerminating},
+	}
+	newNs := oldNs.DeepCopy()
+	newNs.Spec.Finalizers = nil
+
+	oldRaw, err := json.Marshal(oldNs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newRaw, err := json.Marshal(newNs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	response := NamespaceHandler(nil).OnUpdate(
+		nil,
+		nil,
+		admission.NewDecoder(scheme),
+		nil,
+	)(context.Background(), admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+		Operation:   admissionv1.Update,
+		SubResource: "finalize",
+		Object:      runtime.RawExtension{Raw: newRaw},
+		OldObject:   runtime.RawExtension{Raw: oldRaw},
+	}})
+
+	if response != nil {
+		t.Fatalf("finalize response = %#v, want no interception", response)
+	}
+}
+
 func TestNamespaceHandlerRejectsTenantOwnerLabelMigrationWithEmptyOwnerReferences(t *testing.T) {
 	t.Parallel()
 

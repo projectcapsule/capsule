@@ -6,6 +6,7 @@ package quota
 import (
 	"k8s.io/apimachinery/pkg/api/resource"
 
+	celruntime "github.com/projectcapsule/capsule/pkg/runtime/cel"
 	"github.com/projectcapsule/capsule/pkg/runtime/jsonpath"
 )
 
@@ -16,6 +17,8 @@ type MatchedQuota struct {
 	Namespace    string
 	Path         string
 	CompiledPath *jsonpath.CompiledJSONPath
+	CEL          string
+	CompiledCEL  *celruntime.CompiledExpression
 	Operation    Operation
 	Limit        resource.Quantity
 	Used         resource.Quantity

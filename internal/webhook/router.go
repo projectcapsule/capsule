@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	webhookutils "github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
@@ -83,22 +84,27 @@ func (r *handlerRouter) Handle(ctx context.Context, req admission.Request) admis
 		attribute.String("admission.webhook.path", r.path),
 	)
 
+	reader := r.reader
+	if len(r.handlers) > 1 {
+		reader = webhookutils.NewRequestCachingReader(reader)
+	}
+
 	switch req.Operation {
 	case admissionv1.Create:
 		for _, h := range r.handlers {
-			if response := h.OnCreate(r.client, r.reader, r.decoder, r.recorder)(ctx, req); response != nil {
+			if response := h.OnCreate(r.client, reader, r.decoder, r.recorder)(ctx, req); response != nil {
 				return r.recordResponse(span, *response)
 			}
 		}
 	case admissionv1.Update:
 		for _, h := range r.handlers {
-			if response := h.OnUpdate(r.client, r.reader, r.decoder, r.recorder)(ctx, req); response != nil {
+			if response := h.OnUpdate(r.client, reader, r.decoder, r.recorder)(ctx, req); response != nil {
 				return r.recordResponse(span, *response)
 			}
 		}
 	case admissionv1.Delete:
 		for _, h := range r.handlers {
-			if response := h.OnDelete(r.client, r.reader, r.decoder, r.recorder)(ctx, req); response != nil {
+			if response := h.OnDelete(r.client, reader, r.decoder, r.recorder)(ctx, req); response != nil {
 				return r.recordResponse(span, *response)
 			}
 		}
