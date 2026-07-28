@@ -178,7 +178,23 @@ func GetTenantByUserInfo(
 	ns *corev1.Namespace,
 	user users.AdmissionUser,
 ) (sortedTenants, error) {
-	var tenants sortedTenants
+	tenants := make(sortedTenants, 0)
+	seen := make(map[string]struct{})
+
+	// A requester can match the same Tenant through multiple owner identities
+	// (for example, both directly and through one or more groups).
+	appendUnique := func(items []capsulev1beta2.Tenant) {
+		for i := range items {
+			name := items[i].GetName()
+			if _, ok := seen[name]; ok {
+				continue
+			}
+
+			seen[name] = struct{}{}
+
+			tenants = append(tenants, items[i])
+		}
+	}
 
 	// User tenants.
 	userTntList := &capsulev1beta2.TenantList{}
@@ -191,7 +207,7 @@ func GetTenantByUserInfo(
 		return nil, err
 	}
 
-	tenants = userTntList.Items
+	appendUnique(userTntList.Items)
 
 	// ServiceAccount tenants.
 	if strings.HasPrefix(user.Username, "system:serviceaccount:") {
@@ -205,7 +221,7 @@ func GetTenantByUserInfo(
 			return nil, err
 		}
 
-		tenants = append(tenants, saTntList.Items...)
+		appendUnique(saTntList.Items)
 	}
 
 	// Group tenants.
@@ -221,7 +237,7 @@ func GetTenantByUserInfo(
 			return nil, err
 		}
 
-		tenants = append(tenants, groupTntList.Items...)
+		appendUnique(groupTntList.Items)
 	}
 
 	sort.Sort(sort.Reverse(tenants))
