@@ -87,10 +87,8 @@ func NewCapsuleConfiguration(ctx context.Context, c client.Client, reader client
 				panic(errors.Wrap(directErr, "cannot retrieve Capsule configuration with name "+name))
 			}
 
-			if !apierrors.IsNotFound(cacheErr) {
-				panic(errors.Wrap(cacheErr, "cannot retrieve cached Capsule configuration with name "+name))
-			}
-
+			// The direct reader is authoritative and reported NotFound.
+			// Ignore the failed cached read and create the default configuration.
 			cfg = &capsulev1beta2.CapsuleConfiguration{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: name,
