@@ -1,7 +1,6 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-//nolint:dupl
 package handlers
 
 import (
@@ -27,11 +26,28 @@ type TypedTenantWithUserHandler[T client.Object] struct {
 	Factory       NewObjectFunc[T]
 	Handlers      []TypedHandlerWithTenantUser[T]
 	Configuration configuration.Configuration
+	Predicate     func(req admission.Request, obj T, oldObj T) bool
+	UserResolver  func(
+		ctx context.Context,
+		c client.Client,
+		req admission.Request,
+		cfg configuration.Configuration,
+	) users.AdmissionUser
 }
 
 func (h *TypedTenantWithUserHandler[T]) OnCreate(c client.Client, reader client.Reader, decoder admission.Decoder, recorder events.EventRecorder) Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		user := ResolveAdmissionUser(ctx, c, req, h.Configuration)
+		obj := h.Factory()
+		if err := decoder.Decode(req, obj); err != nil {
+			return ErroredResponse(err)
+		}
+
+		if h.Predicate != nil {
+			var oldObj T
+			if !h.Predicate(req, obj, oldObj) {
+				return nil
+			}
+		}
 
 		tnt, err := h.resolveTenant(ctx, reader, req)
 		if err != nil {
@@ -42,10 +58,7 @@ func (h *TypedTenantWithUserHandler[T]) OnCreate(c client.Client, reader client.
 			return nil
 		}
 
-		obj := h.Factory()
-		if err := decoder.Decode(req, obj); err != nil {
-			return ErroredResponse(err)
-		}
+		user := h.resolveUser(ctx, c, req)
 
 		for _, hndl := range h.Handlers {
 			if response := hndl.OnCreate(c, reader, user, obj, decoder, recorder, tnt)(ctx, req); response != nil {
@@ -59,7 +72,19 @@ func (h *TypedTenantWithUserHandler[T]) OnCreate(c client.Client, reader client.
 
 func (h *TypedTenantWithUserHandler[T]) OnUpdate(c client.Client, reader client.Reader, decoder admission.Decoder, recorder events.EventRecorder) Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		user := ResolveAdmissionUser(ctx, c, req, h.Configuration)
+		newObj := h.Factory()
+		if err := decoder.Decode(req, newObj); err != nil {
+			return ErroredResponse(err)
+		}
+
+		oldObj := h.Factory()
+		if err := decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
+			return ErroredResponse(err)
+		}
+
+		if h.Predicate != nil && !h.Predicate(req, newObj, oldObj) {
+			return nil
+		}
 
 		tnt, err := h.resolveTenant(ctx, reader, req)
 		if err != nil {
@@ -70,15 +95,7 @@ func (h *TypedTenantWithUserHandler[T]) OnUpdate(c client.Client, reader client.
 			return nil
 		}
 
-		newObj := h.Factory()
-		if err := decoder.Decode(req, newObj); err != nil {
-			return ErroredResponse(err)
-		}
-
-		oldObj := h.Factory()
-		if err := decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
-			return ErroredResponse(err)
-		}
+		user := h.resolveUser(ctx, c, req)
 
 		for _, hndl := range h.Handlers {
 			if response := hndl.OnUpdate(c, reader, user, oldObj, newObj, decoder, recorder, tnt)(ctx, req); response != nil {
@@ -92,8 +109,6 @@ func (h *TypedTenantWithUserHandler[T]) OnUpdate(c client.Client, reader client.
 
 func (h *TypedTenantWithUserHandler[T]) OnDelete(c client.Client, reader client.Reader, decoder admission.Decoder, recorder events.EventRecorder) Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		user := ResolveAdmissionUser(ctx, c, req, h.Configuration)
-
 		tnt, err := h.resolveTenant(ctx, reader, req)
 		if err != nil {
 			return ErroredResponse(err)
@@ -108,6 +123,8 @@ func (h *TypedTenantWithUserHandler[T]) OnDelete(c client.Client, reader client.
 			return ErroredResponse(err)
 		}
 
+		user := h.resolveUser(ctx, c, req)
+
 		for _, hndl := range h.Handlers {
 			if response := hndl.OnDelete(c, reader, user, obj, decoder, recorder, tnt)(ctx, req); response != nil {
 				return response
@@ -116,6 +133,18 @@ func (h *TypedTenantWithUserHandler[T]) OnDelete(c client.Client, reader client.
 
 		return nil
 	}
+}
+
+func (h *TypedTenantWithUserHandler[T]) resolveUser(
+	ctx context.Context,
+	c client.Client,
+	req admission.Request,
+) users.AdmissionUser {
+	if h.UserResolver != nil {
+		return h.UserResolver(ctx, c, req, h.Configuration)
+	}
+
+	return ResolveAdmissionUser(ctx, c, req, h.Configuration)
 }
 
 func (h *TypedTenantWithUserHandler[T]) resolveTenant(ctx context.Context, c client.Reader, req admission.Request) (*capsulev1beta2.Tenant, error) {

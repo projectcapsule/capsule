@@ -150,6 +150,14 @@ func ForceDeleteNamespace(ctx context.Context, name string) {
 			return err
 		}
 
+		if controllerutil.RemoveFinalizer(ns, namespaceTerminationHoldFinalizer) {
+			if _, err = cs.CoreV1().Namespaces().Update(ctx, ns, metav1.UpdateOptions{}); err != nil {
+				return err
+			}
+
+			return fmt.Errorf("removed E2E termination hold finalizer from namespace %s", name)
+		}
+
 		// Trigger deletion if not already happening
 		if ns.DeletionTimestamp.IsZero() {
 			if err := cs.CoreV1().Namespaces().Delete(ctx, name, metav1.DeleteOptions{}); err != nil &&

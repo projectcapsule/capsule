@@ -688,12 +688,27 @@ func main() {
 	webhooksList := append(
 		make([]handlers.Webhook, 0),
 		rulesgenericmutation.Register(cfg),
-		rulesgenericvalidation.Register(regexCache, cfg),
+		rulesgenericvalidation.Register(
+			regexCache,
+			cfg,
+			rulesgenericvalidation.ForKind(
+				corev1.SchemeGroupVersion.WithKind("Pod").GroupKind(),
+				pod.Handler(cfg,
+					podrules.PodRules(regexCache, registryCache),
+				),
+				"ephemeralcontainers",
+			),
+			rulesgenericvalidation.ForKind(
+				corev1.SchemeGroupVersion.WithKind("Service").GroupKind(),
+				service.Handler(cfg,
+					servicerules.ServiceRules(regexCache),
+				),
+			),
+		),
 		route.GenericReplicasHandler(),
 		route.GenericManagedHandler(cfg),
 		route.Pod(
 			pod.Handler(cfg,
-				podrules.PodRules(regexCache, registryCache),
 				pod.ImagePullPolicy(),
 				pod.ContainerRegistryLegacy(cfg),
 				pod.PriorityClass(),
@@ -708,13 +723,12 @@ func main() {
 			),
 		),
 		route.PVCMutating(
-			pvc.Handler(
+			pvc.MutatingHandler(
 				pvc.PersistentVolumeMutatingVolume(),
 			),
 		),
 		route.Service(
 			service.Handler(cfg,
-				servicerules.ServiceRules(regexCache),
 				service.Validating(),
 			),
 		),

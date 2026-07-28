@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"maps"
 	"net/http"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,7 +48,9 @@ func (*metadataRules) mutate(obj *unstructured.Unstructured, bodies []*apirules.
 			return &response
 		}
 
-		MutateMetadata(obj, gvk, bodies)
+		if !MutateMetadata(obj, gvk, bodies) {
+			return nil
+		}
 
 		marshaled, err := json.Marshal(obj)
 		if err != nil {
@@ -64,14 +65,23 @@ func (*metadataRules) mutate(obj *unstructured.Unstructured, bodies []*apirules.
 	}
 }
 
-func MutateMetadata(obj metav1.Object, gvk schema.GroupVersionKind, bodies []*apirules.NamespaceRuleBodyNamespace) {
+func MutateMetadata(
+	obj metav1.Object,
+	gvk schema.GroupVersionKind,
+	bodies []*apirules.NamespaceRuleBodyNamespace,
+) bool {
 	if obj == nil {
-		return
+		return false
 	}
 
 	labels, annotations := obj.GetLabels(), obj.GetAnnotations()
-	defaultLabels, managedLabels := map[string]string{}, map[string]string{}
-	defaultAnnotations, managedAnnotations := map[string]string{}, map[string]string{}
+
+	var (
+		defaultLabels      map[string]string
+		managedLabels      map[string]string
+		defaultAnnotations map[string]string
+		managedAnnotations map[string]string
+	)
 
 	for _, body := range bodies {
 		if body == nil || body.Enforce == nil {
@@ -83,16 +93,29 @@ func MutateMetadata(obj metav1.Object, gvk schema.GroupVersionKind, bodies []*ap
 				continue
 			}
 
+			if defaultLabels == nil {
+				defaultLabels = map[string]string{}
+				managedLabels = map[string]string{}
+				defaultAnnotations = map[string]string{}
+				managedAnnotations = map[string]string{}
+			}
+
 			collectMutation(rule.Labels, defaultLabels, managedLabels)
 			collectMutation(rule.Annotations, defaultAnnotations, managedAnnotations)
 		}
 	}
 
-	labels = applyMutation(labels, defaultLabels, managedLabels)
-	annotations = applyMutation(annotations, defaultAnnotations, managedAnnotations)
+	labels, labelsChanged := applyMutation(labels, defaultLabels, managedLabels)
+	annotations, annotationsChanged := applyMutation(annotations, defaultAnnotations, managedAnnotations)
+
+	if !labelsChanged && !annotationsChanged {
+		return false
+	}
 
 	obj.SetLabels(labels)
 	obj.SetAnnotations(annotations)
+
+	return true
 }
 
 func collectMutation(policies map[string]apirules.MetadataValueRule, defaults, managed map[string]string) {
@@ -107,22 +130,32 @@ func collectMutation(policies map[string]apirules.MetadataValueRule, defaults, m
 	}
 }
 
-func applyMutation(current, defaults, managed map[string]string) map[string]string {
+func applyMutation(current, defaults, managed map[string]string) (map[string]string, bool) {
 	if len(defaults) == 0 && len(managed) == 0 {
-		return current
+		return current, false
 	}
 
 	if current == nil {
 		current = map[string]string{}
 	}
 
+	changed := false
+
 	for key, value := range defaults {
 		if _, ok := current[key]; !ok {
 			current[key] = value
+			changed = true
 		}
 	}
 
-	maps.Copy(current, managed)
+	for key, value := range managed {
+		if current[key] == value {
+			continue
+		}
 
-	return current
+		current[key] = value
+		changed = true
+	}
+
+	return current, changed
 }

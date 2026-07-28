@@ -852,14 +852,15 @@ webhooks:
     port: # @schema type:[integer, null]
 
   # -- MatchConditions for all webhooks
-  matchConditions:
-    - name: "exclude-privileged-users"
-      expression: >
-        !(
-          request.userInfo.username in [
-            "kubernetes-admin"
-          ]
-        )
+  matchConditions: []
+  #  - name: "exclude-privileged-users"
+  #    expression: >
+  #      request.resource.group == "capsule.clastix.io" ||
+  #      !(
+  #        request.userInfo.username in [
+  #          "kubernetes-admin"
+  #        ]
+  #      )
 
   # Admission Webhook Configuration
   hooks:
@@ -1014,7 +1015,7 @@ webhooks:
         resources:
           - '*'
         scope: Namespaced
-    # -- Generic Rules API
+    # -- Generic Rules API, including the rule-engine validation for Pods and Services
     generic:
       # -- Enable the Hook
       enabled: true
@@ -1037,8 +1038,6 @@ webhooks:
             operator: Exists
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchConditions:
-        - name: ignore-subresources
-          expression: '!has(request.subResource) || request.subResource == ""'
         - name: ignore-events
           expression: 'request.resource.resource != "events"'
 
@@ -1054,7 +1053,7 @@ webhooks:
           - CREATE
           - UPDATE
         resources:
-          - '*'
+          - '*/*'
         scope: Namespaced
 
     resourcepools:

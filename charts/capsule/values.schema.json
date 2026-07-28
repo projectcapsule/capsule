@@ -1552,7 +1552,7 @@
                             }
                         },
                         "generic": {
-                            "description": "Generic Rules API",
+                            "description": "Generic Rules API, including the rule-engine validation for Pods and Services",
                             "type": "object",
                             "properties": {
                                 "enabled": {
@@ -2555,6 +2555,10 @@
                 "labels": {
                     "description": "Additional Labels for all webhooks",
                     "type": "object"
+                },
+                "matchConditions": {
+                    "description": "MatchConditions for all webhooks",
+                    "type": "array"
                 },
                 "mutatingWebhooksTimeoutSeconds": {
                     "description": "Timeout in seconds for mutating webhooks",
