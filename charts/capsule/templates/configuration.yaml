@@ -1524,11 +1524,11 @@ spec:
         reinvocationPolicy: {{ .reinvocationPolicy }}
         {{- with .namespaceSelector }}
         namespaceSelector:
-          {{- toYaml . |  nindent 4 }}
+          {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
-          {{- toYaml . |  nindent 4 }}
+          {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- if or .matchConditions $.Values.webhooks.matchConditions }}
         matchConditions:

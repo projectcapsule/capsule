@@ -101,10 +101,6 @@ spec:
     additionalMetadataList:
       - labels:
           customer: a
-
-
-
-
   resourceQuotas:
     scope: Tenant
     items:
