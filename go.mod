@@ -7,7 +7,7 @@ require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/fluxcd/pkg/apis/kustomize v1.15.0
 	github.com/fluxcd/pkg/ssa v0.64.0
-	github.com/go-logr/logr v1.4.3
+	github.com/go-logr/logr v1.4.4
 	github.com/go-sprout/sprout v1.0.3
 	github.com/google/cel-go v0.26.1
 	github.com/onsi/ginkgo/v2 v2.28.1
