@@ -21,12 +21,18 @@ func ValidateRuleStatusBody(
 	mapper k8smeta.RESTMapper,
 	bodies []*rules.NamespaceRuleBodyNamespace,
 ) error {
+	quotaNames := make(map[string]string)
+
 	for i, rule := range bodies {
 		if rule == nil {
 			continue
 		}
 
 		if err := validateAudience(i, rule.Audience); err != nil {
+			return err
+		}
+
+		if err := validateQuotaRules(i, rule.Quota, quotaNames); err != nil {
 			return err
 		}
 
@@ -48,6 +54,43 @@ func ValidateRuleStatusBody(
 
 		if err := validateMetadataRules(i, rule.Enforce.Metadata, mapper); err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+func validateQuotaRules(ruleIndex int, quotas []rules.ResourceQuotaRule, names map[string]string) error {
+	for quotaIndex, quota := range quotas {
+		path := fmt.Sprintf("rules[%d].quota[%d]", ruleIndex, quotaIndex)
+		if errs := k8svalidation.IsDNS1123Label(quota.Name); len(errs) > 0 {
+			return fmt.Errorf("%s.name %q is invalid: %s", path, quota.Name, strings.Join(errs, "; "))
+		}
+
+		if previous, found := names[quota.Name]; found {
+			return fmt.Errorf(
+				"%s.name %q is invalid: quota name is already used by %s",
+				path,
+				quota.Name,
+				previous,
+			)
+		}
+
+		names[quota.Name] = path
+
+		if len(quota.Hard) == 0 {
+			return fmt.Errorf("%s.hard is invalid: at least one resource is required", path)
+		}
+
+		for name, quantity := range quota.Hard {
+			if quantity.Sign() < 0 {
+				return fmt.Errorf(
+					"rules[%d].quota[%d].hard[%q] is invalid: quantity must not be negative",
+					ruleIndex,
+					quotaIndex,
+					name,
+				)
+			}
 		}
 	}
 

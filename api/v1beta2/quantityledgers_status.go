@@ -4,6 +4,7 @@
 package v1beta2
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -57,6 +58,55 @@ type QuantityLedgerPendingDelete struct {
 	CreatedAt metav1.Time             `json:"createdAt"`
 }
 
+// QuantityLedgerResourceQuotaReservation is an atomic reservation against all
+// resources tracked by a GlobalResourceQuota.
+type QuantityLedgerResourceQuotaReservation struct {
+	// Unique reservation identifier.
+	// +kubebuilder:validation:MinLength=1
+	ID string `json:"id"`
+
+	// Usage is the calculated usage of the admitted object.
+	Usage corev1.ResourceList `json:"usage,omitempty"`
+
+	// Delta is the positive amount held while ResourceQuota status catches up.
+	Delta corev1.ResourceList `json:"delta,omitempty"`
+
+	// Object that this reservation is intended to create/update.
+	ObjectRef QuantityLedgerObjectRef `json:"objectRef"`
+
+	CreatedAt metav1.Time  `json:"createdAt"`
+	UpdatedAt metav1.Time  `json:"updatedAt"`
+	ExpiresAt *metav1.Time `json:"expiresAt,omitempty"`
+}
+
+// QuantityLedgerResourceQuotaStatus is the coordination state for one
+// GlobalResourceQuota.
+type QuantityLedgerResourceQuotaStatus struct {
+	// ObservedGeneration is the GlobalResourceQuota generation represented by
+	// this ledger state.
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// Initialized is true after every selected namespace has reported
+	// ResourceQuota status for this quota.
+	Initialized bool `json:"initialized,omitempty"`
+
+	// Namespaces is the selected namespace set represented by Used.
+	Namespaces []string `json:"namespaces,omitempty"`
+
+	// Used is the usage observed from ResourceQuota status across all selected
+	// namespaces.
+	Used corev1.ResourceList `json:"used,omitempty"`
+
+	// Reserved is derived from Reservations.
+	Reserved corev1.ResourceList `json:"reserved,omitempty"`
+
+	// Allocated is Used plus all active reservations.
+	Allocated corev1.ResourceList `json:"allocated,omitempty"`
+
+	// Reservations contains inflight admission operations.
+	Reservations []QuantityLedgerResourceQuotaReservation `json:"reservations,omitempty"`
+}
+
 // QuantityLedgerStatus contains the mutable coordination state used by admission
 // and quota controllers.
 type QuantityLedgerStatus struct {
@@ -80,4 +130,9 @@ type QuantityLedgerStatus struct {
 	// Allocated is the admission-owned total that has been accepted by the webhook.
 	// It must be updated only through optimistic concurrency on QuantityLedger.
 	Allocated resource.Quantity `json:"allocated,omitempty"`
+
+	// ResourceQuota contains coordination state for GlobalResourceQuota.
+	// It is unset for CustomQuota and GlobalCustomQuota ledgers.
+	// +optional
+	ResourceQuota *QuantityLedgerResourceQuotaStatus `json:"resourceQuota,omitempty"`
 }
