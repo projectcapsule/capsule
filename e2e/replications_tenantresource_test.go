@@ -261,8 +261,6 @@ rules:
 
 	It("skips applying resources to terminating namespaces and removes them from processedItems", func() {
 		terminatingNamespace := targetNamespaces[2]
-		releaseNamespace := holdNamespaceTerminating(ctx, terminatingNamespace)
-		defer releaseNamespace()
 
 		tr := &capsulev1beta2.TenantResource{
 			ObjectMeta: metav1.ObjectMeta{
@@ -299,14 +297,73 @@ rules:
 			return k8sClient.Create(ctx, tr)
 		}).Should(Succeed())
 
-		By("verifying non-terminating namespaces still receive the resource")
-		for _, ns := range targetNamespaces[:2] {
+		By("establishing the resource in every active namespace")
+		for _, ns := range append([]string{baseNamespace}, targetNamespaces...) {
 			expectConfigMapData(ns, "tr-skip-terminating", map[string]string{
 				"mode": "active",
 			})
 		}
 
+		Eventually(func(g Gomega) {
+			current := &capsulev1beta2.TenantResource{}
+			g.Expect(k8sClient.Get(ctx, types.NamespacedName{
+				Name:      tr.Name,
+				Namespace: tr.Namespace,
+			}, current)).To(Succeed())
+
+			processedNamespaces := make([]string, 0, len(current.Status.ProcessedItems))
+			for _, item := range current.Status.ProcessedItems {
+				g.Expect(item.Name).To(Equal("tr-skip-terminating"))
+				g.Expect(item.Status).To(Equal(metav1.ConditionTrue))
+				processedNamespaces = append(processedNamespaces, item.Namespace)
+			}
+
+			g.Expect(processedNamespaces).To(ConsistOf(append([]string{baseNamespace}, targetNamespaces...)))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		releaseNamespace := holdNamespaceTerminating(ctx, terminatingNamespace)
+		defer releaseNamespace()
+
+		By("updating the resource after one target namespace starts terminating")
+		Eventually(func() error {
+			current := &capsulev1beta2.TenantResource{}
+			if err := k8sClient.Get(ctx, types.NamespacedName{
+				Name:      tr.Name,
+				Namespace: tr.Namespace,
+			}, current); err != nil {
+				return err
+			}
+
+			current.Spec.Resources[0].RawItems[0] = capsulev1beta2.RawExtension{
+				RawExtension: runtime.RawExtension{
+					Object: &corev1.ConfigMap{
+						TypeMeta: metav1.TypeMeta{
+							APIVersion: "v1",
+							Kind:       "ConfigMap",
+						},
+						ObjectMeta: metav1.ObjectMeta{Name: "tr-skip-terminating"},
+						Data:       map[string]string{"mode": "updated"},
+					},
+				},
+			}
+
+			return k8sClient.Update(ctx, current)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		By("verifying non-terminating namespaces still receive updates")
+		for _, ns := range append([]string{baseNamespace}, targetNamespaces[:2]...) {
+			expectConfigMapData(ns, "tr-skip-terminating", map[string]string{
+				"mode": "updated",
+			})
+		}
+
 		By("verifying the terminating namespace is skipped")
+		Eventually(func() error {
+			return k8sClient.Get(ctx, types.NamespacedName{
+				Name:      "tr-skip-terminating",
+				Namespace: terminatingNamespace,
+			}, &corev1.ConfigMap{})
+		}, defaultTimeoutInterval, defaultPollInterval).Should(HaveOccurred())
 		Consistently(func() error {
 			return k8sClient.Get(ctx, types.NamespacedName{
 				Name:      "tr-skip-terminating",
@@ -323,12 +380,14 @@ rules:
 				Namespace: tr.Namespace,
 			}, current)).To(Succeed())
 
+			processedNamespaces := make([]string, 0, len(current.Status.ProcessedItems))
 			for _, item := range current.Status.ProcessedItems {
 				g.Expect(item.Name).To(Equal("tr-skip-terminating"))
-
-				g.Expect(item.Namespace).ToNot(Equal(terminatingNamespace))
 				g.Expect(item.Status).To(Equal(metav1.ConditionTrue))
+				processedNamespaces = append(processedNamespaces, item.Namespace)
 			}
+
+			g.Expect(processedNamespaces).To(ConsistOf(baseNamespace, targetNamespaces[0], targetNamespaces[1]))
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 

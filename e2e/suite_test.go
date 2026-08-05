@@ -83,6 +83,31 @@ var _ = SynchronizedAfterSuite(
 	},
 	func() {
 		Eventually(func() error {
+			var quotas capsulev1beta2.GlobalResourceQuotaList
+
+			if err := k8sClient.List(
+				context.TODO(),
+				&quotas,
+				client.MatchingLabels{"env": "e2e"},
+			); err != nil {
+				return err
+			}
+
+			if len(quotas.Items) == 0 {
+				return nil
+			}
+
+			for i := range quotas.Items {
+				quota := &quotas.Items[i]
+				if err := k8sClient.Delete(context.TODO(), quota); err != nil && !apierrors.IsNotFound(err) {
+					return err
+				}
+			}
+
+			return fmt.Errorf("still have %d global resource quotas with env=e2e", len(quotas.Items))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		Eventually(func() error {
 			var nsList corev1.NamespaceList
 
 			if err := k8sClient.List(

@@ -46,6 +46,7 @@ import (
 	cacheinvalidator "github.com/projectcapsule/capsule/internal/controllers/cfg/invalidator"
 	configcontroller "github.com/projectcapsule/capsule/internal/controllers/cfg/status"
 	customquotacontroller "github.com/projectcapsule/capsule/internal/controllers/customquotas"
+	globalresourcequotacontroller "github.com/projectcapsule/capsule/internal/controllers/globalresourcequotas"
 	podlabelscontroller "github.com/projectcapsule/capsule/internal/controllers/pod"
 	"github.com/projectcapsule/capsule/internal/controllers/pv"
 	rbaccontroller "github.com/projectcapsule/capsule/internal/controllers/rbac"
@@ -66,6 +67,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/dra"
 	"github.com/projectcapsule/capsule/internal/webhook/gateway"
 	"github.com/projectcapsule/capsule/internal/webhook/generic"
+	globalresourcequotavalidation "github.com/projectcapsule/capsule/internal/webhook/globalresourcequota"
 	"github.com/projectcapsule/capsule/internal/webhook/ingress"
 	namespacemutation "github.com/projectcapsule/capsule/internal/webhook/namespace/mutation"
 	namespacevalidation "github.com/projectcapsule/capsule/internal/webhook/namespace/validation"
@@ -804,6 +806,7 @@ func main() {
 			jsonPathCache,
 			celCache,
 		)),
+		route.GlobalResourceQuotaCalculation(globalresourcequotavalidation.Handler()),
 		route.CalculationCustomQuotas(
 			customquotavalidation.ObjectCalculationHandler(
 				targetsCache,
@@ -966,6 +969,16 @@ func main() {
 		controllerConfig,
 	); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "resourcepools")
+		os.Exit(1)
+	}
+
+	if err := globalresourcequotacontroller.Add(
+		ctrl.Log.WithName("capsule.ctrl").WithName("globalresourcequotas"),
+		manager,
+		manager.GetEventRecorder("globalresourcequotas-ctrl"),
+		controllerConfig,
+	); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "globalresourcequotas")
 		os.Exit(1)
 	}
 

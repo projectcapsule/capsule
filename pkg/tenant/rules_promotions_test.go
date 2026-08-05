@@ -62,7 +62,8 @@ func TestBuildNamespaceRuleBodyStatus(t *testing.T) {
 				"{{ .namespace.status.phase }}",
 			}}},
 		},
-	}}
+	}, Quota: []rules.ResourceQuotaRule{{Name: "shared-compute"}}}
+	quotaOnly := &rules.NamespaceRuleBodyNamespace{Quota: []rules.ResourceQuotaRule{{Name: "object-counts"}}}
 	unmatched := &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeDeny}}
 	tnt.Spec.Rules = []*rules.NamespaceRuleBodyTenant{
 		{
@@ -72,6 +73,10 @@ func TestBuildNamespaceRuleBodyStatus(t *testing.T) {
 		{
 			NamespaceRuleBodyNamespace: unmatched,
 			NamespaceSelector:          &metav1.LabelSelector{MatchLabels: map[string]string{"env": "dev"}},
+		},
+		{
+			NamespaceRuleBodyNamespace: quotaOnly,
+			NamespaceSelector:          &metav1.LabelSelector{MatchLabels: map[string]string{"env": "prod"}},
 		},
 		nil,
 		{},
@@ -87,6 +92,9 @@ func TestBuildNamespaceRuleBodyStatus(t *testing.T) {
 	}
 	if len(got) != 1 || got[0].Enforce.Action != rules.ActionTypeAudit {
 		t.Fatalf("BuildNamespaceRuleBodyStatus() = %#v, want one audit rule", got)
+	}
+	if len(got[0].Quota) != 0 {
+		t.Fatalf("BuildNamespaceRuleBodyStatus() quota = %#v, want none", got[0].Quota)
 	}
 	if !reflect.DeepEqual(got[0].Enforce.Workloads.Schedulers[0].Exact, []string{"Active", "Active"}) {
 		t.Fatalf("BuildNamespaceRuleBodyStatus() scheduler = %#v", got[0].Enforce.Workloads.Schedulers)
