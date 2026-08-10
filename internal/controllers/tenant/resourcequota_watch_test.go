@@ -71,7 +71,7 @@ func TestResourceQuotaWatchSyncsOnlyTheOwnerTenantQuotas(t *testing.T) {
 			Object: map[string]any{"metadata": map[string]any{"name": "widget"}},
 		}}}, nil
 	})
-	manager := &Manager{Client: cl, DynamicClient: dynamicClient, Metrics: metrics.NewTenantRecorder()}
+	manager := &Manager{Client: cl, reader: cl, DynamicClient: dynamicClient, Metrics: metrics.NewTenantRecorder()}
 
 	manager.syncResourceQuotasForResourceQuota(context.Background(), trigger)
 

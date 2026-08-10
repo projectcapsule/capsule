@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -64,6 +65,9 @@ type Manager struct {
 	classes       supportedClasses
 
 	discoveryCache cache.DiscoveryNamespacedResourceCache
+
+	resourceQuotaSyncMu sync.Mutex
+	resourceQuotaSyncs  map[string]*tenantResourceQuotaSync
 }
 
 type supportedClasses struct {
@@ -424,8 +428,13 @@ func (r *Manager) syncResourceQuotasForResourceQuota(ctx context.Context, quota 
 		return
 	}
 
+	reader := r.reader
+	if reader == nil {
+		reader = r.Client
+	}
+
 	tenant := &capsulev1beta2.Tenant{}
-	if err := r.Get(ctx, client.ObjectKey{Name: owner.Name}, tenant); err != nil {
+	if err := reader.Get(ctx, client.ObjectKey{Name: owner.Name}, tenant); err != nil {
 		if !apierrors.IsNotFound(err) {
 			r.Log.Error(err, "cannot retrieve Tenant for ResourceQuota sync", "tenant", owner.Name)
 		}
