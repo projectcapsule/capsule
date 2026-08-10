@@ -177,7 +177,7 @@ func BuildNamespaceAnnotationsForTenant(tnt *capsulev1beta2.Tenant) map[string]s
 			annotations[meta.AvailableIngressClassesAnnotation] = strings.Join(ic.Exact, ",")
 		}
 
-		//nolint:staticcheck
+		//nolint:staticcheck,nolintlint // Preserve annotations for the deprecated v1beta2 field until it is removed.
 		if len(ic.Regex) > 0 {
 			annotations[meta.AvailableIngressClassesRegexpAnnotation] = ic.Regex
 		}
@@ -188,7 +188,7 @@ func BuildNamespaceAnnotationsForTenant(tnt *capsulev1beta2.Tenant) map[string]s
 			annotations[meta.AvailableStorageClassesAnnotation] = strings.Join(sc.Exact, ",")
 		}
 
-		//nolint:staticcheck
+		//nolint:staticcheck,nolintlint // Preserve annotations for the deprecated v1beta2 field until it is removed.
 		if len(sc.Regex) > 0 {
 			annotations[meta.AvailableStorageClassesRegexpAnnotation] = sc.Regex
 		}

@@ -30,6 +30,8 @@ var (
 	resyncPeriod = metav1.Duration{Duration: 10 * time.Second}
 )
 
+const tenantResourceTargetLabel = "e2e.projectcapsule.dev/tenantresource-target"
+
 var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace", "tenantresource"), Ordered, func() {
 	var (
 		ctx                   context.Context
@@ -113,9 +115,19 @@ var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace
 		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 
 		for _, ns := range append(append([]string{}, targetNamespaces...), baseNamespace) {
-			namespace := NewNamespace(ns, map[string]string{apimeta.TenantLabel: tnt.GetName()})
+			labels := map[string]string{apimeta.TenantLabel: tnt.GetName()}
+			if ns != baseNamespace {
+				labels[tenantResourceTargetLabel] = "true"
+			}
+
+			namespace := NewNamespace(ns, labels)
 			NamespaceCreation(namespace, tenantOwner, defaultTimeoutInterval).Should(Succeed())
 			NamespaceIsPartOfTenant(tnt, namespace).Should(Succeed())
+		}
+
+		ensureServiceAccount(baseNamespace, "default")
+		for _, ns := range append(append([]string{}, targetNamespaces...), baseNamespace) {
+			bindServiceAccountToTenantResourceManager(baseNamespace, "default", ns)
 		}
 	})
 
@@ -261,8 +273,6 @@ rules:
 
 	It("skips applying resources to terminating namespaces and removes them from processedItems", func() {
 		terminatingNamespace := targetNamespaces[2]
-		releaseNamespace := holdNamespaceTerminating(ctx, terminatingNamespace)
-		defer releaseNamespace()
 
 		tr := &capsulev1beta2.TenantResource{
 			ObjectMeta: metav1.ObjectMeta{
@@ -274,6 +284,9 @@ rules:
 					PruningOnDelete: ptr.To(true),
 					ResyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 					Resources: []capsulev1beta2.ResourceSpec{{
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{tenantResourceTargetLabel: "true"},
+						},
 						RawItems: []capsulev1beta2.RawExtension{{
 							RawExtension: runtime.RawExtension{
 								Object: &corev1.ConfigMap{
@@ -299,14 +312,64 @@ rules:
 			return k8sClient.Create(ctx, tr)
 		}).Should(Succeed())
 
-		By("verifying non-terminating namespaces still receive the resource")
-		for _, ns := range targetNamespaces[:2] {
+		By("waiting for the initial replication to complete")
+		expectTenantResourceProcessedNamespaces(
+			baseNamespace,
+			tr.Name,
+			"tr-skip-terminating",
+			targetNamespaces,
+		)
+
+		By("establishing the resource in every active namespace")
+		for _, ns := range targetNamespaces {
 			expectConfigMapData(ns, "tr-skip-terminating", map[string]string{
 				"mode": "active",
 			})
 		}
 
+		releaseNamespace := holdNamespaceTerminating(ctx, terminatingNamespace)
+		defer releaseNamespace()
+
+		By("updating the resource after one target namespace starts terminating")
+		Eventually(func() error {
+			current := &capsulev1beta2.TenantResource{}
+			if err := k8sClient.Get(ctx, types.NamespacedName{
+				Name:      tr.Name,
+				Namespace: tr.Namespace,
+			}, current); err != nil {
+				return err
+			}
+
+			current.Spec.Resources[0].RawItems[0] = capsulev1beta2.RawExtension{
+				RawExtension: runtime.RawExtension{
+					Object: &corev1.ConfigMap{
+						TypeMeta: metav1.TypeMeta{
+							APIVersion: "v1",
+							Kind:       "ConfigMap",
+						},
+						ObjectMeta: metav1.ObjectMeta{Name: "tr-skip-terminating"},
+						Data:       map[string]string{"mode": "updated"},
+					},
+				},
+			}
+
+			return k8sClient.Update(ctx, current)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		By("verifying non-terminating namespaces still receive updates")
+		for _, ns := range targetNamespaces[:2] {
+			expectConfigMapData(ns, "tr-skip-terminating", map[string]string{
+				"mode": "updated",
+			})
+		}
+
 		By("verifying the terminating namespace is skipped")
+		Eventually(func() error {
+			return k8sClient.Get(ctx, types.NamespacedName{
+				Name:      "tr-skip-terminating",
+				Namespace: terminatingNamespace,
+			}, &corev1.ConfigMap{})
+		}, defaultTimeoutInterval, defaultPollInterval).Should(HaveOccurred())
 		Consistently(func() error {
 			return k8sClient.Get(ctx, types.NamespacedName{
 				Name:      "tr-skip-terminating",
@@ -315,21 +378,12 @@ rules:
 		}, 2*resyncPeriod.Duration, defaultPollInterval).Should(HaveOccurred())
 
 		By("verifying the terminating namespace item is not kept in processedItems")
-		Eventually(func(g Gomega) {
-			current := &capsulev1beta2.TenantResource{}
-
-			g.Expect(k8sClient.Get(ctx, types.NamespacedName{
-				Name:      tr.Name,
-				Namespace: tr.Namespace,
-			}, current)).To(Succeed())
-
-			for _, item := range current.Status.ProcessedItems {
-				g.Expect(item.Name).To(Equal("tr-skip-terminating"))
-
-				g.Expect(item.Namespace).ToNot(Equal(terminatingNamespace))
-				g.Expect(item.Status).To(Equal(metav1.ConditionTrue))
-			}
-		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		expectTenantResourceProcessedNamespaces(
+			baseNamespace,
+			tr.Name,
+			"tr-skip-terminating",
+			targetNamespaces[:2],
+		)
 	})
 
 	Context("generators and template context", func() {
@@ -1283,19 +1337,13 @@ data:
 
 	Context("impersonation", func() {
 		It("reflects the resolved service account in status", func() {
-			tr := newRawConfigMapTenantResource(baseNamespace, "sa-resolution", map[string]string{"mode": "default-controller"})
+			tr := newRawConfigMapTenantResource(baseNamespace, "sa-resolution", map[string]string{"mode": "default-service-account"})
 			tr.Spec.ServiceAccount = nil
 
 			By("creating the TenantResource without an explicit ServiceAccount")
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
 
-			By("defaulting to the controller service account")
-			expectResolvedServiceAccount(baseNamespace, tr.Name, "capsule", ControllerNamespace)
-
-			By("configuring a tenant default service account")
-			ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
-				configuration.Spec.Impersonation.TenantDefaultServiceAccount = "default"
-			})
+			By("defaulting to the configured tenant service account")
 			expectResolvedServiceAccount(baseNamespace, tr.Name, "default", baseNamespace)
 
 			By("overriding with an explicit service account on the TenantResource")
@@ -1950,6 +1998,40 @@ func expectTenantResourceFailed(namespace, name, contains string) {
 	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 }
 
+func expectTenantResourceProcessedNamespaces(namespace, name, itemName string, expected []string) {
+	Eventually(func(g Gomega) {
+		tr := &capsulev1beta2.TenantResource{}
+		g.Expect(k8sClient.Get(
+			context.Background(),
+			types.NamespacedName{Name: name, Namespace: namespace},
+			tr,
+		)).To(Succeed())
+
+		ready := tr.Status.Conditions.GetConditionByType(apimeta.ReadyCondition)
+		g.Expect(ready).NotTo(BeNil(), "TenantResource %s/%s has no Ready condition", namespace, name)
+		if ready == nil {
+			return
+		}
+		g.Expect(ready.Status).To(
+			Equal(metav1.ConditionTrue),
+			"TenantResource %s/%s reconciliation failed: %s",
+			namespace,
+			name,
+			ready.Message,
+		)
+		g.Expect(tr.Status.ObservedGeneration).To(Equal(tr.Generation))
+
+		processedNamespaces := make([]string, 0, len(tr.Status.ProcessedItems))
+		for _, item := range tr.Status.ProcessedItems {
+			g.Expect(item.Name).To(Equal(itemName))
+			g.Expect(item.Status).To(Equal(metav1.ConditionTrue), item.Message)
+			processedNamespaces = append(processedNamespaces, item.Namespace)
+		}
+
+		g.Expect(processedNamespaces).To(ConsistOf(expected))
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
 func expectResolvedServiceAccount(namespace, name, saName, saNamespace string) {
 	Eventually(func(g Gomega) {
 		tr := &capsulev1beta2.TenantResource{}
@@ -2006,7 +2088,12 @@ func cleanupTenantResourcesWithDefaultServiceAccount(ctx context.Context, namesp
 func expectConfigMapData(namespace, name string, expected map[string]string) {
 	Eventually(func(g Gomega) {
 		cm := &corev1.ConfigMap{}
-		g.Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, cm)).To(Succeed())
+		g.Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, cm)).To(
+			Succeed(),
+			"expected ConfigMap %s/%s",
+			namespace,
+			name,
+		)
 		for k, v := range expected {
 			g.Expect(cm.Data).To(HaveKeyWithValue(k, v))
 		}
@@ -2221,6 +2308,16 @@ func bindServiceAccountToConfigMapDeleter(saNamespace, saName, targetNamespace s
 		targetNamespace,
 		[]string{"configmaps"},
 		[]string{"get", "list", "watch", "delete"},
+	)
+}
+
+func bindServiceAccountToTenantResourceManager(saNamespace, saName, targetNamespace string) {
+	bindServiceAccountToNamespacedResource(
+		saNamespace,
+		saName,
+		targetNamespace,
+		[]string{"configmaps", "secrets"},
+		[]string{"get", "list", "watch", "create", "update", "patch", "delete"},
 	)
 }
 

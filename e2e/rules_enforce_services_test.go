@@ -997,9 +997,9 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 		ns := createNamespace(nil)
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
-		createServiceAndExpectDenied(cs, ns.Name, loadBalancerService("lb-source-range-denied", "", []string{"10.0.1.0/23"}, ptr.To(false)),
+		createServiceAndExpectDenied(cs, ns.Name, loadBalancerService("lb-source-range-denied", "", []string{"10.0.0.0/23"}, ptr.To(false)),
 			"loadBalancer CIDR",
-			"10.0.1.0/23",
+			"10.0.0.0/23",
 			"spec.loadBalancerSourceRanges[0]",
 			"Allowed CIDRs",
 		)

@@ -31,6 +31,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&CustomQuotaList{},
 		&GlobalCustomQuota{},
 		&GlobalCustomQuotaList{},
+		&GlobalResourceQuota{},
+		&GlobalResourceQuotaList{},
 		&GlobalTenantResource{},
 		&GlobalTenantResourceList{},
 		&QuantityLedger{},
