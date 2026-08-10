@@ -9,7 +9,7 @@ require (
 	github.com/fluxcd/pkg/ssa v0.77.0
 	github.com/go-logr/logr v1.4.3
 	github.com/go-sprout/sprout v1.0.3
-	github.com/google/cel-go v0.26.1
+	github.com/google/cel-go v0.30.0
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.42.1
 	github.com/pkg/errors v0.9.1
@@ -46,7 +46,7 @@ require (
 	dario.cat/mergo v1.0.2 // indirect
 	filippo.io/hpke v0.4.0 // indirect
 	github.com/Masterminds/semver/v3 v3.5.0 // indirect
-	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
+	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
