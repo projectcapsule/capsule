@@ -67,6 +67,10 @@ func (h persistentVolumeMutatingVolume) OnUpdate(
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
+		if isBoundPVC(oldPVC) {
+			return nil
+		}
+
 		if newPVC == nil || tnt == nil {
 			return nil
 		}
