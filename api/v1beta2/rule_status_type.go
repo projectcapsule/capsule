@@ -54,7 +54,3 @@ type RuleStatusList struct {
 
 	Items []RuleStatus `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&RuleStatus{}, &RuleStatusList{})
-}

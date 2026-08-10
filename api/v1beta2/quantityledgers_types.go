@@ -91,7 +91,3 @@ type QuantityLedgerList struct {
 
 	Items []QuantityLedger `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&QuantityLedger{}, &QuantityLedgerList{})
-}
