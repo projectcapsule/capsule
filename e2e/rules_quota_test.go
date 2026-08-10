@@ -339,14 +339,8 @@ var _ = Describe("rule-generated GlobalResourceQuota", Ordered, Label("resourceq
 		Expect(err).NotTo(HaveOccurred())
 
 		Eventually(func(g Gomega) {
-			deployment, getErr := cs.AppsV1().Deployments(podLevelB).Get(
-				ctx,
-				secondName,
-				metav1.GetOptions{},
-			)
+			failure, getErr := replicaSetFailureForDeployment(ctx, podLevelB, secondName)
 			g.Expect(getErr).NotTo(HaveOccurred())
-
-			failure := deploymentReplicaFailure(deployment)
 			g.Expect(failure).NotTo(BeNil())
 			g.Expect(failure.Status).To(Equal(corev1.ConditionTrue))
 			g.Expect(failure.Message).To(ContainSubstring("exceeds GlobalResourceQuota"))

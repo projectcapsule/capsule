@@ -272,6 +272,13 @@ rules:
 					PruningOnDelete: ptr.To(true),
 					ResyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 					Resources: []capsulev1beta2.ResourceSpec{{
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{{
+								Key:      corev1.LabelMetadataName,
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   targetNamespaces,
+							}},
+						},
 						RawItems: []capsulev1beta2.RawExtension{{
 							RawExtension: runtime.RawExtension{
 								Object: &corev1.ConfigMap{
@@ -298,7 +305,7 @@ rules:
 		}).Should(Succeed())
 
 		By("establishing the resource in every active namespace")
-		for _, ns := range append([]string{baseNamespace}, targetNamespaces...) {
+		for _, ns := range targetNamespaces {
 			expectConfigMapData(ns, "tr-skip-terminating", map[string]string{
 				"mode": "active",
 			})
@@ -318,7 +325,7 @@ rules:
 				processedNamespaces = append(processedNamespaces, item.Namespace)
 			}
 
-			g.Expect(processedNamespaces).To(ConsistOf(append([]string{baseNamespace}, targetNamespaces...)))
+			g.Expect(processedNamespaces).To(ConsistOf(targetNamespaces))
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 		releaseNamespace := holdNamespaceTerminating(ctx, terminatingNamespace)
@@ -351,7 +358,7 @@ rules:
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 		By("verifying non-terminating namespaces still receive updates")
-		for _, ns := range append([]string{baseNamespace}, targetNamespaces[:2]...) {
+		for _, ns := range targetNamespaces[:2] {
 			expectConfigMapData(ns, "tr-skip-terminating", map[string]string{
 				"mode": "updated",
 			})
@@ -387,7 +394,7 @@ rules:
 				processedNamespaces = append(processedNamespaces, item.Namespace)
 			}
 
-			g.Expect(processedNamespaces).To(ConsistOf(baseNamespace, targetNamespaces[0], targetNamespaces[1]))
+			g.Expect(processedNamespaces).To(ConsistOf(targetNamespaces[0], targetNamespaces[1]))
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 
@@ -2065,7 +2072,12 @@ func cleanupTenantResourcesWithDefaultServiceAccount(ctx context.Context, namesp
 func expectConfigMapData(namespace, name string, expected map[string]string) {
 	Eventually(func(g Gomega) {
 		cm := &corev1.ConfigMap{}
-		g.Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, cm)).To(Succeed())
+		g.Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, cm)).To(
+			Succeed(),
+			"expected ConfigMap %s/%s",
+			namespace,
+			name,
+		)
 		for k, v := range expected {
 			g.Expect(cm.Data).To(HaveKeyWithValue(k, v))
 		}

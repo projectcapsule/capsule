@@ -15,14 +15,19 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
 
 var _ = Describe("GlobalResourceQuota", Ordered, Label("globalresourcequota", "resourcequota", "ledger", "skip-on-openshift"), func() {
 	const (
+		tenantAName = "e2e-global-resource-quota-a"
+		tenantBName = "e2e-global-resource-quota-b"
+
 		computeQuotaName   = "e2e-global-resource-quota-compute"
 		serviceQuotaName   = "e2e-global-resource-quota-services"
 		countQuotaName     = "e2e-global-resource-quota-counts"
@@ -44,6 +49,31 @@ var _ = Describe("GlobalResourceQuota", Ordered, Label("globalresourcequota", "r
 	)
 
 	ctx := context.Background()
+	tenantAOwner := rbac.UserSpec{Name: tenantAName, Kind: rbac.OwnerKind("User")}
+	tenantBOwner := rbac.UserSpec{Name: tenantBName, Kind: rbac.OwnerKind("User")}
+	tenantA := &capsulev1beta2.Tenant{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   tenantAName,
+			Labels: map[string]string{"env": "e2e"},
+		},
+		Spec: capsulev1beta2.TenantSpec{
+			Owners: rbac.OwnerListSpec{{
+				CoreOwnerSpec: rbac.CoreOwnerSpec{UserSpec: tenantAOwner},
+			}},
+		},
+	}
+	tenantB := &capsulev1beta2.Tenant{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   tenantBName,
+			Labels: map[string]string{"env": "e2e"},
+		},
+		Spec: capsulev1beta2.TenantSpec{
+			Owners: rbac.OwnerListSpec{{
+				CoreOwnerSpec: rbac.CoreOwnerSpec{UserSpec: tenantBOwner},
+			}},
+		},
+	}
+	tenants := []*capsulev1beta2.Tenant{tenantA, tenantB}
 	computeHard := corev1.ResourceList{
 		corev1.ResourceRequestsCPU:    resource.MustParse("1"),
 		corev1.ResourceRequestsMemory: resource.MustParse("1Gi"),
@@ -129,25 +159,39 @@ var _ = Describe("GlobalResourceQuota", Ordered, Label("globalresourcequota", "r
 		{quota: countQuota, namespaces: []string{countA, countB}, hard: countHard},
 		{quota: ephemeralQuota, namespaces: []string{ephemeralA, ephemeralB}, hard: ephemeralHard},
 	}
+	namespaceCases := []struct {
+		name     string
+		labelKey string
+		tenant   *capsulev1beta2.Tenant
+		owner    rbac.UserSpec
+	}{
+		{name: computeA, labelKey: computeSelector, tenant: tenantA, owner: tenantAOwner},
+		{name: computeB, labelKey: computeSelector, tenant: tenantB, owner: tenantBOwner},
+		{name: serviceA, labelKey: serviceSelector, tenant: tenantA, owner: tenantAOwner},
+		{name: serviceB, labelKey: serviceSelector, tenant: tenantB, owner: tenantBOwner},
+		{name: countA, labelKey: countSelector, tenant: tenantA, owner: tenantAOwner},
+		{name: countB, labelKey: countSelector, tenant: tenantB, owner: tenantBOwner},
+		{name: ephemeralA, labelKey: ephemeralSelector, tenant: tenantA, owner: tenantAOwner},
+		{name: ephemeralB, labelKey: ephemeralSelector, tenant: tenantB, owner: tenantBOwner},
+	}
 
 	BeforeAll(func() {
-		for _, namespace := range []struct {
-			name     string
-			labelKey string
-		}{
-			{name: computeA, labelKey: computeSelector},
-			{name: computeB, labelKey: computeSelector},
-			{name: serviceA, labelKey: serviceSelector},
-			{name: serviceB, labelKey: serviceSelector},
-			{name: countA, labelKey: countSelector},
-			{name: countB, labelKey: countSelector},
-			{name: ephemeralA, labelKey: ephemeralSelector},
-			{name: ephemeralB, labelKey: ephemeralSelector},
-		} {
-			NamespaceCreationAdmin(
-				NewNamespace(namespace.name, map[string]string{namespace.labelKey: "true"}),
-				defaultTimeoutInterval,
-			).Should(Succeed())
+		for _, tenant := range tenants {
+			EventuallyCreation(func() error {
+				tenant.ResourceVersion = ""
+
+				return k8sClient.Create(ctx, tenant)
+			}).Should(Succeed())
+			TenantReadyTrue(tenant)
+		}
+
+		for _, namespace := range namespaceCases {
+			ns := NewNamespace(namespace.name, map[string]string{
+				meta.TenantLabel:   namespace.tenant.Name,
+				namespace.labelKey: "true",
+			})
+			NamespaceCreation(ns, namespace.owner, defaultTimeoutInterval).Should(Succeed())
+			NamespaceIsPartOfTenant(namespace.tenant, ns).Should(Succeed())
 		}
 
 		for quotaIndex := range quotaCases {
@@ -211,17 +255,11 @@ var _ = Describe("GlobalResourceQuota", Ordered, Label("globalresourcequota", "r
 		for _, quotaCase := range quotaCases {
 			EventuallyDeletion(quotaCase.quota)
 		}
-		for _, namespace := range []string{
-			computeA,
-			computeB,
-			serviceA,
-			serviceB,
-			countA,
-			countB,
-			ephemeralA,
-			ephemeralB,
-		} {
-			ForceDeleteNamespace(ctx, namespace)
+		for _, namespace := range namespaceCases {
+			ForceDeleteNamespace(ctx, namespace.name)
+		}
+		for _, tenant := range tenants {
+			EventuallyDeletion(tenant)
 		}
 	})
 
@@ -278,14 +316,8 @@ var _ = Describe("GlobalResourceQuota", Ordered, Label("globalresourcequota", "r
 		Expect(err).NotTo(HaveOccurred())
 
 		Eventually(func(g Gomega) {
-			deployment, getErr := cs.AppsV1().Deployments(computeB).Get(
-				ctx,
-				secondName,
-				metav1.GetOptions{},
-			)
+			failure, getErr := replicaSetFailureForDeployment(ctx, computeB, secondName)
 			g.Expect(getErr).NotTo(HaveOccurred())
-
-			failure := deploymentReplicaFailure(deployment)
 			g.Expect(failure).NotTo(BeNil())
 			g.Expect(failure.Status).To(Equal(corev1.ConditionTrue))
 			g.Expect(failure.Message).To(ContainSubstring("exceeds GlobalResourceQuota"))
@@ -490,15 +522,39 @@ func expectResourceListEqual(g Gomega, actual, expected corev1.ResourceList) {
 	}
 }
 
-func deploymentReplicaFailure(deployment *appsv1.Deployment) *appsv1.DeploymentCondition {
-	for index := range deployment.Status.Conditions {
-		condition := &deployment.Status.Conditions[index]
-		if condition.Type == appsv1.DeploymentReplicaFailure {
-			return condition
+func replicaSetFailureForDeployment(
+	ctx context.Context,
+	namespace string,
+	deploymentName string,
+) (*appsv1.ReplicaSetCondition, error) {
+	deployment := &appsv1.Deployment{}
+	if err := k8sClient.Get(ctx, types.NamespacedName{
+		Namespace: namespace,
+		Name:      deploymentName,
+	}, deployment); err != nil {
+		return nil, err
+	}
+
+	replicaSets := &appsv1.ReplicaSetList{}
+	if err := k8sClient.List(ctx, replicaSets, client.InNamespace(namespace)); err != nil {
+		return nil, err
+	}
+
+	for replicaSetIndex := range replicaSets.Items {
+		replicaSet := &replicaSets.Items[replicaSetIndex]
+		if !metav1.IsControlledBy(replicaSet, deployment) {
+			continue
+		}
+
+		for conditionIndex := range replicaSet.Status.Conditions {
+			condition := &replicaSet.Status.Conditions[conditionIndex]
+			if condition.Type == appsv1.ReplicaSetReplicaFailure {
+				return condition, nil
+			}
 		}
 	}
 
-	return nil
+	return nil, nil
 }
 
 func expectConcurrentAdmissions(results <-chan error, total, expectedSuccess int) {

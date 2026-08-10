@@ -144,12 +144,6 @@ func positiveResource(resources corev1.ResourceList, name corev1.ResourceName) (
 	return quantity, true
 }
 
-//nolint:exhaustive
 func isSupportedQoSComputeResource(name corev1.ResourceName) bool {
-	switch name {
-	case corev1.ResourceCPU, corev1.ResourceMemory:
-		return true
-	default:
-		return false
-	}
+	return name == corev1.ResourceCPU || name == corev1.ResourceMemory
 }
