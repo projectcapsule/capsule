@@ -56,7 +56,3 @@ type TenantResourceList struct {
 
 	Items []TenantResource `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&TenantResource{}, &TenantResourceList{})
-}

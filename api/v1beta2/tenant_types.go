@@ -171,7 +171,3 @@ type TenantList struct {
 
 	Items []Tenant `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&Tenant{}, &TenantList{})
-}

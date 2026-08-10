@@ -97,7 +97,3 @@ type CustomQuotaList struct {
 
 	Items []CustomQuota `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&CustomQuota{}, &CustomQuotaList{})
-}
