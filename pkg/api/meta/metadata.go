@@ -26,6 +26,7 @@ func NewManagedMetadata(
 			TenantLabel,
 			NewTenantLabel,
 			ResourcePoolLabel,
+			GlobalResourceQuotaLabel,
 			FreezeLabel,
 			OwnerPromotionLabel,
 			ServiceAccountPromotionLabel,
@@ -38,6 +39,7 @@ func NewManagedMetadata(
 			LimitRangeLabel,
 			NetworkPolicyLabel,
 			ResourceQuotaLabel,
+			RuleQuotaLabel,
 			RolebindingLabel,
 		),
 		annotations: stringSet(

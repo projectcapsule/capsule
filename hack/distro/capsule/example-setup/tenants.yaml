@@ -10,37 +10,62 @@ spec:
     - name: alice
       kind: User
   rules:
+    - namespaceSelector:
+        matchExpressions:
+          - key: env
+            operator: In
+            values:
+              - "test"
+      quota:
+        - name: "max-pods"
+          hard:
+            pods: "10"
+      permissions:
+        promotions:
+          - clusterRoles:
+              - "secret-replicator"
     - quota:
-        - hard:
+        - name: shared-compute
+          hard:
             limits.cpu: "8"
             limits.memory: 16Gi
             requests.cpu: "8"
             requests.memory: 16Gi
-      classes:
-        gateway:
-          - matchLabels:
-              team: platform
-        ingress:
-          - matchLabels:
-              team: platform
-        storage:
-          - matchLabels:
-              team: platform
-        priority:
-          - matchLabels:
-              team: platform
-        runtime:
-          - matchLabels:
-              team: platform
-        cluster:
-          - matchLabels:
-              team: platform
-            namespaceSelector:
-              matchExpressions:
-                - key: env
-                  operator: In
-                  values:
-                    - "test"
+      # classes:
+      #   cluster:
+      #     - matchLabels:
+      #         team: platform
+      #       namespaceSelector:
+      #         matchExpressions:
+      #           - key: env
+      #             operator: In
+      #             values:
+      #               - "test"
+      # classes:
+      #  gateway:
+      #    - matchLabels:
+      #        team: platform
+      #  ingress:
+      #    - matchLabels:
+      #        team: platform
+      #  storage:
+      #    - matchLabels:
+      #        team: platform
+      #  priority:
+      #    - matchLabels:
+      #        team: platform
+      #  runtime:
+      #    - matchLabels:
+      #        team: platform
+      #  cluster:
+      #    - matchLabels:
+      #        team: platform
+      #      namespaceSelector:
+      #        matchExpressions:
+      #          - key: env
+      #            operator: In
+      #            values:
+      #              - "test"
 
       permissions:
         bindings:
@@ -60,7 +85,7 @@ spec:
               - "Namespace"
             labels:
               pod-security.kubernetes.io/enforce:
-                managed: "restricted"
+                managed: "baseline"
     - audience:
         - kind: "Custom"
           name: "CapsuleUser"
@@ -101,16 +126,6 @@ spec:
     additionalMetadataList:
       - labels:
           customer: a
-  resourceQuotas:
-    scope: Tenant
-    items:
-    - hard:
-        limits.cpu: "8"
-        limits.memory: 16Gi
-        requests.cpu: "8"
-        requests.memory: 16Gi
-    - hard:
-        pods: "10"
 ---
 apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
@@ -155,25 +170,6 @@ spec:
           ports:
             - from: 30000
               to: 32767
-  - enforce:
-      action: "allow"
-      metadata:
-        - kinds:
-            - "ConfigMap"
-          labels:
-            "corp.com/tenant":
-              required: true
-              values:
-                - exact:
-                    - test
-          annotations:
-            "example.corp/cost-center":
-              required: true
-              values:
-                - exp: "^INV-[0-9]{4}$"
-                  exact:
-                    - prod
-                    - test
 ---
 apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant

@@ -1,0 +1,15 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: GlobalResourceQuota
+metadata:
+  name: green-shared-compute
+spec:
+  namespaceSelectors:
+    - matchLabels:
+        capsule.clastix.io/tenant: green
+  quota:
+    hard:
+      limits.cpu: "8"
+      limits.memory: 16Gi
+      requests.cpu: "8"
+      requests.memory: 16Gi

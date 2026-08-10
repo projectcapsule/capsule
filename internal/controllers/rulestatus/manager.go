@@ -157,13 +157,17 @@ func (r Manager) reconcile(ctx context.Context, instance *capsulev1beta2.RuleSta
 			continue
 		}
 
-		enforce := rule.Enforce.DeepCopy()
+		statusRule := rule.DeepCopy()
+		// RuleStatus is an enforcement cache. Quota definitions are reconciled
+		// independently as GlobalResourceQuotas and may include legacy entries
+		// which predate stable quota names.
+		statusRule.Quota = nil
 
+		enforce := rule.Enforce.DeepCopy()
 		for i := range enforce.Metadata {
 			enforce.Metadata[i].APIGroups = enforce.Metadata[i].StatusAPIGroups()
 		}
 
-		statusRule := rule.DeepCopy()
 		statusRule.Enforce = enforce
 		ruleStatus = append(ruleStatus, statusRule)
 	}
@@ -248,12 +252,37 @@ func (r *Manager) updateReconcilingStatus(ctx context.Context, instance *capsule
 			return err
 		}
 
+		cleanedQuota := removeQuotaDefinitions(&latest.Status)
 		if latest.Status.ObservedGeneration == instance.GetGeneration() {
-			return nil
+			if !cleanedQuota {
+				return nil
+			}
+
+			return r.Status().Update(ctx, latest)
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(meta.NewReadyConditionReconcilingReason(instance))
 
 		return r.Status().Update(ctx, latest)
 	})
+}
+
+//nolint:staticcheck // The deprecated flattened Rule must be cleaned for objects written by older Capsule versions.
+func removeQuotaDefinitions(status *capsulev1beta2.RuleStatusStatus) bool {
+	if status == nil {
+		return false
+	}
+
+	changed := len(status.Rule.Quota) > 0
+
+	for _, rule := range status.Rules {
+		if rule != nil && len(rule.Quota) > 0 {
+			changed = true
+			rule.Quota = nil
+		}
+	}
+
+	status.Rule.Quota = nil
+
+	return changed
 }

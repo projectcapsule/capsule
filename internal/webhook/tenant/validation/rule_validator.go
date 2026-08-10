@@ -5,6 +5,7 @@ package validation
 
 import (
 	"context"
+	"fmt"
 
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -16,6 +17,7 @@ import (
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	tenantutils "github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 type RuleValidationHandler struct {
@@ -89,7 +91,7 @@ func (h *RuleValidationHandler) handle(
 		}
 
 		body := rule.NamespaceRuleBodyNamespace
-		if body.Enforce == nil {
+		if body.Enforce == nil && len(body.Quota) == 0 {
 			continue
 		}
 
@@ -102,6 +104,18 @@ func (h *RuleValidationHandler) handle(
 
 	if err := ruleengine.ValidateRuleStatusBody(h.mapper, bodies); err != nil {
 		return ad.Deny(err.Error())
+	}
+
+	for ruleIndex, rule := range tnt.Spec.Rules {
+		if rule == nil || rule.NamespaceRuleBodyNamespace == nil {
+			continue
+		}
+
+		for quotaIndex, quota := range rule.Quota {
+			if err := tenantutils.ValidateRuleGlobalResourceQuotaName(tnt, quota.Name); err != nil {
+				return ad.Deny(fmt.Sprintf("rules[%d].quota[%d]: %v", ruleIndex, quotaIndex, err))
+			}
+		}
 	}
 
 	return nil

@@ -7,7 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/ptr"
 
@@ -36,6 +38,73 @@ func TestValidateRuleStatusBody(t *testing.T) {
 					Enforce: nil,
 				},
 			},
+		},
+		{
+			name:   "valid quota-only rule",
+			mapper: mapper,
+			bodies: []*rules.NamespaceRuleBodyNamespace{{
+				Quota: []rules.ResourceQuotaRule{{
+					Name: "shared-compute",
+					ResourceQuotaSpec: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{
+						corev1.ResourceRequestsCPU: resource.MustParse("8"),
+					}},
+				}},
+			}},
+		},
+		{
+			name:   "quota name is required",
+			mapper: mapper,
+			bodies: []*rules.NamespaceRuleBodyNamespace{{
+				Quota: []rules.ResourceQuotaRule{{
+					ResourceQuotaSpec: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{
+						corev1.ResourceRequestsCPU: resource.MustParse("8"),
+					}},
+				}},
+			}},
+			wantErr: "rules[0].quota[0].name",
+		},
+		{
+			name:   "quota name must be a DNS label",
+			mapper: mapper,
+			bodies: []*rules.NamespaceRuleBodyNamespace{{
+				Quota: []rules.ResourceQuotaRule{{
+					Name: "Shared_Compute",
+					ResourceQuotaSpec: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{
+						corev1.ResourceRequestsCPU: resource.MustParse("8"),
+					}},
+				}},
+			}},
+			wantErr: `rules[0].quota[0].name "Shared_Compute" is invalid`,
+		},
+		{
+			name:   "quota hard must not be empty",
+			mapper: mapper,
+			bodies: []*rules.NamespaceRuleBodyNamespace{{
+				Quota: []rules.ResourceQuotaRule{{Name: "shared-compute"}},
+			}},
+			wantErr: "rules[0].quota[0].hard is invalid",
+		},
+		{
+			name:   "quota hard must not be negative",
+			mapper: mapper,
+			bodies: []*rules.NamespaceRuleBodyNamespace{{
+				Quota: []rules.ResourceQuotaRule{{
+					Name: "shared-compute",
+					ResourceQuotaSpec: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{
+						corev1.ResourceRequestsCPU: resource.MustParse("-1"),
+					}},
+				}},
+			}},
+			wantErr: `rules[0].quota[0].hard["requests.cpu"] is invalid`,
+		},
+		{
+			name:   "quota names must be unique across rules",
+			mapper: mapper,
+			bodies: []*rules.NamespaceRuleBodyNamespace{
+				{Quota: []rules.ResourceQuotaRule{{Name: "shared-compute", ResourceQuotaSpec: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}}}}},
+				{Quota: []rules.ResourceQuotaRule{{Name: "shared-compute", ResourceQuotaSpec: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("1Gi")}}}}},
+			},
+			wantErr: `rules[1].quota[0].name "shared-compute" is invalid: quota name is already used by rules[0].quota[0]`,
 		},
 		{
 			name:   "valid workload service and metadata rules",

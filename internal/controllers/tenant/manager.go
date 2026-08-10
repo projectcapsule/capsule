@@ -87,6 +87,14 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 		).
 		Owns(&networkingv1.NetworkPolicy{}, builder.WithPredicates(predicates.TenantManagedResourceChangedPredicate{})).
 		Owns(&corev1.LimitRange{}, builder.WithPredicates(predicates.TenantManagedResourceChangedPredicate{})).
+		Owns(
+			&capsulev1beta2.GlobalResourceQuota{},
+			builder.WithPredicates(predicate.Or(
+				predicate.GenerationChangedPredicate{},
+				predicates.UpdatedMetadataPredicate{},
+				predicates.DeletionChangedPredicate{},
+			)),
+		).
 		Watches(
 			&corev1.ResourceQuota{},
 			handler.Funcs{
@@ -405,6 +413,12 @@ func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *caps
 
 	if err = r.syncResourceQuotas(ctx, log, instance); err != nil {
 		errs = append(errs, fmt.Errorf("cannot sync resourcequota items: %w", err))
+	}
+
+	log.V(4).Info("starting processing of rule GlobalResourceQuotas")
+
+	if err = r.syncGlobalResourceQuotas(ctx, instance); err != nil {
+		errs = append(errs, fmt.Errorf("cannot sync rule global resource quotas: %w", err))
 	}
 
 	log.V(4).Info("ensuring RoleBindings for Owners and Tenant")

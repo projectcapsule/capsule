@@ -67,7 +67,3 @@ type GlobalTenantResourceList struct {
 
 	Items []GlobalTenantResource `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&GlobalTenantResource{}, &GlobalTenantResourceList{})
-}
