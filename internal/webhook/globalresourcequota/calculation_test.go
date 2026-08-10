@@ -44,12 +44,12 @@ func TestReserveIsAtomicAcrossResources(t *testing.T) {
 		corev1.ResourceRequestsCPU:    resource.MustParse("1"),
 		corev1.ResourceRequestsMemory: resource.MustParse("7Gi"),
 	})
-	allowed, _, created, err := reserve(context.Background(), cl, cl, key, quota, denied, false)
+	allowed, _, applied, err := reserve(context.Background(), cl, cl, key, quota, denied, false)
 	if err != nil {
 		t.Fatalf("reserve(denied) error = %v", err)
 	}
-	if allowed || created {
-		t.Fatalf("reserve(denied) = allowed %v, created %v; want false, false", allowed, created)
+	if allowed || applied {
+		t.Fatalf("reserve(denied) = allowed %v, applied %v; want false, false", allowed, applied)
 	}
 
 	current := &capsulev1beta2.QuantityLedger{}
@@ -64,13 +64,67 @@ func TestReserveIsAtomicAcrossResources(t *testing.T) {
 		corev1.ResourceRequestsCPU:    resource.MustParse("1"),
 		corev1.ResourceRequestsMemory: resource.MustParse("6Gi"),
 	})
-	allowed, _, created, err = reserve(context.Background(), cl, cl, key, quota, accepted, false)
+	allowed, _, applied, err = reserve(context.Background(), cl, cl, key, quota, accepted, false)
 	if err != nil {
 		t.Fatalf("reserve(accepted) error = %v", err)
 	}
-	if !allowed || !created {
-		t.Fatalf("reserve(accepted) = allowed %v, created %v; want true, true", allowed, created)
+	if !allowed || !applied {
+		t.Fatalf("reserve(accepted) = allowed %v, applied %v; want true, true", allowed, applied)
 	}
+}
+
+func TestReserveReportsUpdatedReservationForRollback(t *testing.T) {
+	t.Parallel()
+
+	key := types.NamespacedName{Namespace: "capsule-system", Name: "updated"}
+	hard := corev1.ResourceList{corev1.ResourceRequestsCPU: resource.MustParse("10")}
+	quota := globalQuotaForTest("updated", hard)
+	ledger := initializedLedger(key, quota, zeroResourceList(hard))
+	existing := reservationForTest("same-admission", corev1.ResourceList{
+		corev1.ResourceRequestsCPU: resource.MustParse("1"),
+	})
+	ledger.Status.ResourceQuota.Reservations = []capsulev1beta2.QuantityLedgerResourceQuotaReservation{existing}
+	ledger.Status.ResourceQuota.Reserved = existing.Delta.DeepCopy()
+	ledger.Status.ResourceQuota.Allocated = existing.Delta.DeepCopy()
+	cl := ledgerClient(t, ledger)
+
+	updated := reservationForTest("same-admission", corev1.ResourceList{
+		corev1.ResourceRequestsCPU: resource.MustParse("2"),
+	})
+	allowed, _, applied, err := reserve(context.Background(), cl, cl, key, quota, updated, false)
+	if err != nil {
+		t.Fatalf("reserve(updated) error = %v", err)
+	}
+	if !allowed || !applied {
+		t.Fatalf("reserve(updated) = allowed %v, applied %v; want true, true", allowed, applied)
+	}
+	persisted := &capsulev1beta2.QuantityLedger{}
+	if err := cl.Get(context.Background(), key, persisted); err != nil {
+		t.Fatal(err)
+	}
+	if len(persisted.Status.ResourceQuota.Reservations) != 1 {
+		t.Fatalf("stored reservations = %d, want 1", len(persisted.Status.ResourceQuota.Reservations))
+	}
+	assertLedgerQuantity(
+		t,
+		persisted.Status.ResourceQuota.Reservations[0].Delta,
+		corev1.ResourceRequestsCPU,
+		"2",
+	)
+
+	if err := rollbackReservation(context.Background(), cl, cl, key, updated.ID); err != nil {
+		t.Fatalf("rollbackReservation(updated) error = %v", err)
+	}
+
+	current := &capsulev1beta2.QuantityLedger{}
+	if err := cl.Get(context.Background(), key, current); err != nil {
+		t.Fatal(err)
+	}
+	if len(current.Status.ResourceQuota.Reservations) != 0 {
+		t.Fatalf("updated reservation was not rolled back: %#v", current.Status.ResourceQuota.Reservations)
+	}
+	assertLedgerQuantity(t, current.Status.ResourceQuota.Reserved, corev1.ResourceRequestsCPU, "0")
+	assertLedgerQuantity(t, current.Status.ResourceQuota.Allocated, corev1.ResourceRequestsCPU, "0")
 }
 
 func TestConcurrentReservationsCannotOversubscribe(t *testing.T) {

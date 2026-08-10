@@ -19,7 +19,7 @@ CAPSULE_IMG     ?= $(REGISTRY)/$(IMG_BASE)
 CLUSTER_NAME    ?= capsule
 FILTER		 	?= && !skip
 ## Kubernetes Version Support
-KUBERNETES_SUPPORTED_VERSION ?= "v1.35.0"
+KUBERNETES_SUPPORTED_VERSION ?= "v1.36.1"
 
 ## Openshift Version Support
 OS_SUPPORTED_VERSION ?= "4.22.0-okd-scos.ec.10"
@@ -679,14 +679,14 @@ apidocs-gen: ## Download crdoc locally if necessary.
 	$(call go-install-tool,$(APIDOCS_GEN),fybrik.io/crdoc@$(APIDOCS_GEN_VERSION))
 
 GORELEASER          := $(LOCALBIN)/goreleaser
-GORELEASER_VERSION  := 2.17.0
+GORELEASER_VERSION  := 2.17.1
 GORELEASER_LOOKUP   := goreleaser/goreleaser
 goreleaser: ## Download goreleaser locally if necessary.
 		test -s $(GORELEASER) && $(GORELEASER) --version | grep -q $(GORELEASER_VERSION) ||  \
 	$(call go-install-tool,$(GORELEASER),github.com/$(GORELEASER_LOOKUP)/v2@v$(GORELEASER_VERSION))
 
 SYFT          := $(LOCALBIN)/syft
-SYFT_VERSION  := 1.46.0
+SYFT_VERSION  := 1.49.0
 SYFT_LOOKUP   := anchore/syft
 syft: ## Download syft locally if necessary.
 		test -s $(SYFT) && $(SYFT) --version | grep -q $(SYFT_VERSION) ||  \

@@ -78,10 +78,6 @@ type TenantList struct {
 	Items []Tenant `json:"items"`
 }
 
-func init() {
-	SchemeBuilder.Register(&Tenant{}, &TenantList{})
-}
-
 func (in *Tenant) GetNamespaces() (res []string) {
 	res = make([]string, 0, len(in.Status.Namespaces))
 

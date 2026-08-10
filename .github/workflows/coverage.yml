@@ -27,12 +27,12 @@ jobs:
           value: ${{ secrets.FOSSA_API_KEY }}
       - name: "Run FOSSA Scan"
         if: steps.checksecret.outputs.result == 'true'
-        uses: fossas/fossa-action@ff70fe9fe17cbd2040648f1c45e8ec4e4884dcf3 # v1.9.0
+        uses: fossas/fossa-action@29693cc50323968e039056be419b32989fc5880c # v2.0.0
         with:
           api-key: ${{ secrets.FOSSA_API_KEY }}
       - name: "Run FOSSA Test"
         if: steps.checksecret.outputs.result == 'true'
-        uses: fossas/fossa-action@ff70fe9fe17cbd2040648f1c45e8ec4e4884dcf3 # v1.9.0
+        uses: fossas/fossa-action@29693cc50323968e039056be419b32989fc5880c # v2.0.0
         with:
           api-key: ${{ secrets.FOSSA_API_KEY }}
           run-tests: true
@@ -48,15 +48,15 @@ jobs:
     steps:
       - name: Checkout Source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: 'go.mod'
       - name: Run Gosec Security Scanner
-        uses: securego/gosec@9e6a9843d7a4a6e3e9a8539b02612c8a4aa3f889 # v2.27.1
+        uses: securego/gosec@9e75c0576c9878035d4221392108d458abe10fc3 # v2.28.0
         with:
           args: '-no-fail -fmt sarif -out gosec.sarif ./...'
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
+        uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
         with:
           sarif_file: gosec.sarif
   unit_tests:
@@ -65,7 +65,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: 'go.mod'
       - name: Unit Test

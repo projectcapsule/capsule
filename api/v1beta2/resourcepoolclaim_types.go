@@ -69,7 +69,3 @@ type ResourcePoolClaimList struct {
 
 	Items []ResourcePoolClaim `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&ResourcePoolClaim{}, &ResourcePoolClaimList{})
-}

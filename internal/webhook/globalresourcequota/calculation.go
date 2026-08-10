@@ -243,7 +243,7 @@ func reserveForGlobalResourceQuota(
 	}
 	reservation := newReservation(req, quota.Name, newUsage, delta)
 
-	allowed, projected, created, err := reserve(
+	allowed, projected, applied, err := reserve(
 		ctx,
 		c,
 		reader,
@@ -272,7 +272,7 @@ func reserveForGlobalResourceQuota(
 		)
 	}
 
-	if !created || (req.DryRun != nil && *req.DryRun) {
+	if !applied || (req.DryRun != nil && *req.DryRun) {
 		return nil, nil
 	}
 
@@ -428,10 +428,12 @@ func reserve(
 	quota *capsulev1beta2.GlobalResourceQuota,
 	reservation capsulev1beta2.QuantityLedgerResourceQuotaReservation,
 	dryRun bool,
-) (allowed bool, allocated corev1.ResourceList, created bool, err error) {
+) (allowed bool, allocated corev1.ResourceList, applied bool, err error) {
 	hard := quota.Spec.Quota.Hard
 
 	err = retry.RetryOnConflict(ledgerBackoff, func() error {
+		applied = false
+
 		ledger := &capsulev1beta2.QuantityLedger{}
 		if getErr := reader.Get(ctx, key, ledger); getErr != nil {
 			return getErr
@@ -475,6 +477,7 @@ func reserve(
 
 			if existing.ID == reservation.ID {
 				found = true
+				applied = true
 				existing.Usage = reservation.Usage.DeepCopy()
 				existing.Delta = reservation.Delta.DeepCopy()
 				existing.ObjectRef = reservation.ObjectRef
@@ -491,7 +494,7 @@ func reserve(
 			}
 
 			active = append(active, reservation)
-			created = true
+			applied = true
 		}
 
 		reserved := sumReservations(active, hard)
@@ -501,14 +504,14 @@ func reserve(
 
 		if exceeds(next, hard) {
 			allowed = false
-			created = false
+			applied = false
 
 			return nil
 		}
 
 		if dryRun {
 			allowed = true
-			created = false
+			applied = false
 
 			return nil
 		}
@@ -518,7 +521,7 @@ func reserve(
 		ledger.Status.ResourceQuota.Allocated = next
 
 		if updateErr := c.Status().Update(ctx, ledger); updateErr != nil {
-			created = false
+			applied = false
 
 			return updateErr
 		}
@@ -528,7 +531,7 @@ func reserve(
 		return nil
 	})
 
-	return allowed, allocated, created, err
+	return allowed, allocated, applied, err
 }
 
 func rollbackReservations(
