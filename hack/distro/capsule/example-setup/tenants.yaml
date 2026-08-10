@@ -32,6 +32,16 @@ spec:
             requests.cpu: "8"
             requests.memory: 16Gi
       # classes:
+      #   cluster:
+      #     - matchLabels:
+      #         team: platform
+      #       namespaceSelector:
+      #         matchExpressions:
+      #           - key: env
+      #             operator: In
+      #             values:
+      #               - "test"
+      # classes:
       #  gateway:
       #    - matchLabels:
       #        team: platform

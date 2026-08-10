@@ -124,6 +124,11 @@ var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace
 			NamespaceCreation(namespace, tenantOwner, defaultTimeoutInterval).Should(Succeed())
 			NamespaceIsPartOfTenant(tnt, namespace).Should(Succeed())
 		}
+
+		ensureServiceAccount(baseNamespace, "default")
+		for _, ns := range append(append([]string{}, targetNamespaces...), baseNamespace) {
+			bindServiceAccountToTenantResourceManager(baseNamespace, "default", ns)
+		}
 	})
 
 	AfterEach(func() {
@@ -1332,19 +1337,13 @@ data:
 
 	Context("impersonation", func() {
 		It("reflects the resolved service account in status", func() {
-			tr := newRawConfigMapTenantResource(baseNamespace, "sa-resolution", map[string]string{"mode": "default-controller"})
+			tr := newRawConfigMapTenantResource(baseNamespace, "sa-resolution", map[string]string{"mode": "default-service-account"})
 			tr.Spec.ServiceAccount = nil
 
 			By("creating the TenantResource without an explicit ServiceAccount")
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
 
-			By("defaulting to the controller service account")
-			expectResolvedServiceAccount(baseNamespace, tr.Name, "capsule", ControllerNamespace)
-
-			By("configuring a tenant default service account")
-			ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
-				configuration.Spec.Impersonation.TenantDefaultServiceAccount = "default"
-			})
+			By("defaulting to the configured tenant service account")
 			expectResolvedServiceAccount(baseNamespace, tr.Name, "default", baseNamespace)
 
 			By("overriding with an explicit service account on the TenantResource")
@@ -2309,6 +2308,16 @@ func bindServiceAccountToConfigMapDeleter(saNamespace, saName, targetNamespace s
 		targetNamespace,
 		[]string{"configmaps"},
 		[]string{"get", "list", "watch", "delete"},
+	)
+}
+
+func bindServiceAccountToTenantResourceManager(saNamespace, saName, targetNamespace string) {
+	bindServiceAccountToNamespacedResource(
+		saNamespace,
+		saName,
+		targetNamespace,
+		[]string{"configmaps", "secrets"},
+		[]string{"get", "list", "watch", "create", "update", "patch", "delete"},
 	)
 }
 

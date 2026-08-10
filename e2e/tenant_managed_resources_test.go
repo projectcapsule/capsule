@@ -105,7 +105,7 @@ var _ = Describe("creating namespaces within a Tenant with resources", Ordered, 
 								},
 								{
 									IPBlock: &networkingv1.IPBlock{
-										CIDR: "192.168.0.0/12",
+										CIDR: "192.168.0.0/16",
 									},
 								},
 							},
@@ -118,7 +118,7 @@ var _ = Describe("creating namespaces within a Tenant with resources", Ordered, 
 									IPBlock: &networkingv1.IPBlock{
 										CIDR: "0.0.0.0/0",
 										Except: []string{
-											"192.168.0.0/12",
+											"192.168.0.0/16",
 										},
 									},
 								},
