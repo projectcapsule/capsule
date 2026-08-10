@@ -51,7 +51,3 @@ type GlobalResourceQuotaList struct {
 
 	Items []GlobalResourceQuota `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&GlobalResourceQuota{}, &GlobalResourceQuotaList{})
-}
