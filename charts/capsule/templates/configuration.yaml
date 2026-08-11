@@ -539,6 +539,11 @@ spec:
         {{- with $.Values.webhooks.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
+          - name: skip-bound-pvc-updates
+            expression: >
+              request.operation != "UPDATE" ||
+              !has(oldObject.status.phase) ||
+              oldObject.status.phase != "Bound"
           - name: requires-pvc-spec-validation
             expression: >
               request.operation != "UPDATE" ||
@@ -1238,6 +1243,11 @@ spec:
         {{- with $.Values.webhooks.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
+          - name: skip-bound-pvc-updates
+            expression: >
+              request.operation != "UPDATE" ||
+              !has(oldObject.status.phase) ||
+              oldObject.status.phase != "Bound"
           - name: requires-pvc-spec-validation
             expression: >
               request.operation != "UPDATE" ||

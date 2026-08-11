@@ -51,6 +51,14 @@ func requiresPVCSpecValidation(
 	pvc *corev1.PersistentVolumeClaim,
 	oldPVC *corev1.PersistentVolumeClaim,
 ) bool {
+	// A bound PVC's volume binding fields, including its selector, are immutable.
+	// Reapplying the tenant selector during an update would make otherwise valid
+	// metadata or resize updates fail for claims created before Capsule enforced it.
+	if req.Operation == admissionv1.Update &&
+		isBoundPVC(oldPVC) {
+		return false
+	}
+
 	// Finalizer cleanup must remain possible after a bound PV has disappeared.
 	// Continue validating any update that changes the PVC spec.
 	if req.Operation != admissionv1.Update ||
@@ -61,4 +69,8 @@ func requiresPVCSpecValidation(
 	}
 
 	return !apiequality.Semantic.DeepEqual(pvc.Spec, oldPVC.Spec)
+}
+
+func isBoundPVC(pvc *corev1.PersistentVolumeClaim) bool {
+	return pvc != nil && pvc.Status.Phase == corev1.ClaimBound
 }
