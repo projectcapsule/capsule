@@ -217,7 +217,7 @@ func (co *Collector) AddToAccumulation(
 		return err
 	}
 
-	if err := co.validateClusterScopedObjectAllowed(opts, obj); err != nil {
+	if err := co.validateClusterScopedObjectAllowed(opts, obj, ns); err != nil {
 		return err
 	}
 
@@ -274,6 +274,58 @@ func (co *Collector) AddToAccumulation(
 	})
 
 	return nil
+}
+
+// CollectForNamespace collects the items of a single ResourceSpec targeting the given Namespace,
+// replicating into it the already loaded source objects.
+//
+// The given options are used as a template: the iterator is always derived from the target
+// Namespace, thus callers are not required to prepare it.
+func (co *Collector) CollectForNamespace(
+	ctx context.Context,
+	c client.Client,
+	opts CollectorOptions,
+	tnt capsulev1beta2.Tenant,
+	resourceIndex string,
+	spec capsulev1beta2.ResourceSpec,
+	sources map[gvk.ResourceKey]*unstructured.Unstructured,
+	target *corev1.Namespace,
+) error {
+	log := log.FromContext(ctx)
+
+	opts.Iterator = NewCollectorIteratorOptions(&tnt, target, spec)
+
+	for _, obj := range sources {
+		if obj.GetNamespace() == target.GetName() {
+			continue
+		}
+
+		// Rejected upfront, before imposing the target Namespace on a copy which could never
+		// be applied as such.
+		if err := co.validateClusterScopedObjectAllowed(opts, obj, target); err != nil {
+			return err
+		}
+
+		replica := obj.DeepCopy()
+		if err := sanitize.SanitizeObject(replica, c.Scheme(), co.objectSanitizeOptions); err != nil {
+			return err
+		}
+
+		replica.SetNamespace(target.GetName())
+
+		log.V(4).Info(
+			"adding replication for namespaced item",
+			"name", replica.GetName(),
+			"namespace", replica.GetNamespace(),
+			"kind", replica.GetKind(),
+		)
+
+		if err := co.AddToAccumulation(&tnt, target, opts, spec, replica, "replica", false); err != nil {
+			return err
+		}
+	}
+
+	return co.Collect(ctx, c, opts, &tnt, resourceIndex, spec, target)
 }
 
 func (co *Collector) CollectNamespacedItems(
@@ -383,11 +435,21 @@ func GatherAdditionalMetadata(
 	return labels, annotations
 }
 
+// Ensures the given object can take part to the accumulation:
+//   - a cluster-scoped object is accumulated only when the specification allows it;
+//   - a cluster-scoped object is never accumulated for a target Namespace, since stamping
+//     the target on it would track the very same object once per Namespace. Beside being
+//     applied over and over, pruning any of those entries would delete the object the
+//     remaining Namespaces are still referring to.
+//
+// Cluster-scoped objects remain replicable through the None and Tenant scopes, which impose
+// no target Namespace at all.
 func (co *Collector) validateClusterScopedObjectAllowed(
 	opts CollectorOptions,
 	obj *unstructured.Unstructured,
+	ns *corev1.Namespace,
 ) error {
-	if opts.AllowClusterScopedObjects {
+	if opts.AllowClusterScopedObjects && ns == nil {
 		return nil
 	}
 
@@ -396,11 +458,18 @@ func (co *Collector) validateClusterScopedObjectAllowed(
 		return err
 	}
 
-	if !isNamespaced {
+	if isNamespaced {
+		return nil
+	}
+
+	if !opts.AllowClusterScopedObjects {
 		return fmt.Errorf("cluster-scoped kind %s/%s is not allowed", obj.GetAPIVersion(), obj.GetKind())
 	}
 
-	return nil
+	return fmt.Errorf(
+		"cluster-scoped kind %s/%s cannot be replicated into the Namespace %s",
+		obj.GetAPIVersion(), obj.GetKind(), ns.GetName(),
+	)
 }
 
 // Handles a single generator item.
@@ -449,35 +518,47 @@ func (co *Collector) handleRawItem(
 	return obj, nil
 }
 
+// Builds the selector matching the Namespaces of the given Tenant which are targeted by
+// the resource specification, allowing to evaluate a single Namespace without listing
+// them all.
+func (co *Collector) namespaceSelector(
+	tnt capsulev1beta2.Tenant,
+	resource capsulev1beta2.ResourceSpec,
+) (labels.Selector, error) {
+	selector := labels.NewSelector()
+
+	if resource.NamespaceSelector != nil {
+		var err error
+
+		selector, err = metav1.LabelSelectorAsSelector(resource.NamespaceSelector)
+		if err != nil {
+			return nil, fmt.Errorf("cannot create Namespace selector for Namespace filtering and resource replication: %w", err)
+		}
+	}
+
+	// Resources can be replicated only on Namespaces belonging to the same Global:
+	// preventing a boundary cross by enforcing the selection.
+	tntRequirement, err := labels.NewRequirement(meta.TenantLabel, selection.Equals, []string{tnt.GetName()})
+	if err != nil {
+		return nil, fmt.Errorf("unable to create requirement for Namespace filtering and resource replication: %w", err)
+	}
+
+	return selector.Add(*tntRequirement), nil
+}
+
 func (co *Collector) selectedTenantNamespaces(
 	ctx context.Context,
 	log logr.Logger,
 	tnt capsulev1beta2.Tenant,
 	resource capsulev1beta2.ResourceSpec,
 ) (ns []*corev1.Namespace, err error) {
-	// Creating Namespace selector
-	var selector labels.Selector
-
-	if resource.NamespaceSelector != nil {
-		selector, err = metav1.LabelSelectorAsSelector(resource.NamespaceSelector)
-		if err != nil {
-			log.Error(err, "cannot create Namespace selector for Namespace filtering and resource replication")
-
-			return nil, err
-		}
-	} else {
-		selector = labels.NewSelector()
-	}
-	// Resources can be replicated only on Namespaces belonging to the same Global:
-	// preventing a boundary cross by enforcing the selection.
-	tntRequirement, err := labels.NewRequirement(meta.TenantLabel, selection.Equals, []string{tnt.GetName()})
+	selector, err := co.namespaceSelector(tnt, resource)
 	if err != nil {
-		log.Error(err, "unable to create requirement for Namespace filtering and resource replication")
+		log.Error(err, "cannot create selector for Namespace filtering and resource replication")
 
 		return nil, err
 	}
 
-	selector = selector.Add(*tntRequirement)
 	// Selecting the targeted Namespace according to the TenantResource specification.
 	namespaces := corev1.NamespaceList{}
 	if err = co.gatherClient.List(ctx, &namespaces, client.MatchingLabelsSelector{Selector: selector}); err != nil {

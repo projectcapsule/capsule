@@ -4,9 +4,11 @@
 package processor
 
 import (
+	"context"
 	"errors"
 	"testing"
 
+	"github.com/go-logr/logr"
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -131,5 +133,148 @@ func TestFailAndRecord(t *testing.T) {
 
 	if got.Message != "prefix: boom" {
 		t.Fatalf("expected message %q, got %q", "prefix: boom", got.Message)
+	}
+}
+
+func TestProcessorScopeMatches(t *testing.T) {
+	t.Parallel()
+
+	scope := Scope{Tenant: "tenant-a", Namespace: "ns-a"}
+
+	for _, tc := range []struct {
+		name string
+		id   gvk.ResourceID
+		want bool
+	}{
+		{
+			name: "same tenant and namespace",
+			id:   resourceID("tenant-a", "ns-a", "settings"),
+			want: true,
+		},
+		{
+			name: "other namespace",
+			id:   resourceID("tenant-a", "ns-b", "settings"),
+			want: false,
+		},
+		{
+			name: "other tenant",
+			id:   resourceID("tenant-b", "ns-a", "settings"),
+			want: false,
+		},
+		{
+			name: "no namespace",
+			id:   resourceID("tenant-a", "", "settings"),
+			want: false,
+		},
+	} {
+		if got := scope.Matches(tc.id); got != tc.want {
+			t.Fatalf("%s: expected %v, got %v", tc.name, tc.want, got)
+		}
+	}
+}
+
+func TestScopedAccumulator(t *testing.T) {
+	t.Parallel()
+
+	inScope := resourceID("tenant-a", "ns-a", "settings")
+	otherNs := resourceID("tenant-a", "ns-b", "settings")
+	otherTnt := resourceID("tenant-b", "ns-a", "settings")
+
+	acc := Accumulator{
+		inScope.GetKey(""):  {Resource: inScope},
+		otherNs.GetKey(""):  {Resource: otherNs},
+		otherTnt.GetKey(""): {Resource: otherTnt},
+		"empty":             nil,
+	}
+
+	scoped, ignored := scopedAccumulator(acc, Scope{Tenant: "tenant-a", Namespace: "ns-a"})
+
+	if len(scoped) != 1 {
+		t.Fatalf("expected a single scoped item, got %d", len(scoped))
+	}
+
+	if scoped[inScope.GetKey("")] == nil {
+		t.Fatal("expected the in scope item to be retained")
+	}
+
+	if ignored != 2 {
+		t.Fatalf("expected 2 ignored items, got %d", ignored)
+	}
+
+	// The nil entry is dropped without being accounted as ignored.
+	if _, ok := scoped["empty"]; ok {
+		t.Fatal("expected the empty entry to be dropped")
+	}
+}
+
+func TestReconcileNamespaceRequiresNamespace(t *testing.T) {
+	t.Parallel()
+
+	items, err := (&Processor{}).ReconcileNamespace(
+		context.Background(),
+		logr.Discard(),
+		nil,
+		nil,
+		Accumulator{},
+		ProcessorOptions{},
+		Scope{Tenant: "tenant-a"},
+	)
+	if err == nil {
+		t.Fatal("expected an error for a scope without a Namespace")
+	}
+
+	if items != nil {
+		t.Fatalf("expected no processed item, got %+v", items)
+	}
+}
+
+func TestReconcileNamespaceSeedsScopeOnly(t *testing.T) {
+	t.Parallel()
+
+	inScope := resourceID("tenant-a", "ns-a", "settings")
+	otherNs := resourceID("tenant-a", "ns-b", "settings")
+
+	current := meta.ProcessedItems{
+		{ResourceID: otherNs, ObjectReferenceStatusCondition: meta.ObjectReferenceStatusCondition{Created: true}},
+		{ResourceID: inScope, ObjectReferenceStatusCondition: meta.ObjectReferenceStatusCondition{Created: true}},
+	}
+
+	// An empty Accumulator reaches out to no client at all: the outcome is only made
+	// of what was already tracked for the reconciled scope.
+	items, err := (&Processor{}).ReconcileNamespace(
+		context.Background(),
+		logr.Discard(),
+		nil,
+		current,
+		Accumulator{},
+		ProcessorOptions{},
+		Scope{Tenant: "tenant-a", Namespace: "ns-a"},
+	)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(items) != 1 || items[0].ResourceID != inScope {
+		t.Fatalf("expected only the in scope item, got %+v", items)
+	}
+
+	if !items[0].Created {
+		t.Fatal("expected the tracked creation flag to be carried over")
+	}
+
+	if len(current) != 2 {
+		t.Fatalf("expected the given items to be left untouched, got %+v", current)
+	}
+}
+
+func resourceID(tenant, namespace, name string) gvk.ResourceID {
+	return gvk.ResourceID{
+		TenantResourceIDWithOrigin: gvk.TenantResourceIDWithOrigin{
+			TenantResourceID: gvk.TenantResourceID{Tenant: tenant},
+		},
+		Version:   "v1",
+		Kind:      "ConfigMap",
+		Name:      name,
+		Namespace: namespace,
 	}
 }
