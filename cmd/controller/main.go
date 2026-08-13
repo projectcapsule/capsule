@@ -556,9 +556,10 @@ func main() {
 			Port:    webhookPort,
 			TLSOpts: webhookTLSOpts,
 		}),
-		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "42c733ea.clastix.capsule.io",
-		HealthProbeBindAddress: ":10080",
+		LeaderElection:          enableLeaderElection,
+		LeaderElectionID:        "42c733ea.clastix.capsule.io",
+		LeaderElectionNamespace: ns,
+		HealthProbeBindAddress:  ":10080",
 		NewClient: func(config *rest.Config, options client.Options) (client.Client, error) {
 			options.Cache.Unstructured = true
 
