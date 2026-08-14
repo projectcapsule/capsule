@@ -156,10 +156,19 @@ func (r *NamespaceTrigger) replicateNamespacedResources(
 	namespace *corev1.Namespace,
 ) (syncErr error) {
 	var tr capsulev1beta2.TenantResourceList
-	if err := r.client.List(ctx, &tr, client.InNamespace(namespace.Name)); err != nil {
-		log.Error(err, "cannot retrieve TenantResourceList")
 
-		return err
+	nsSet := sets.New[string](tnt.Status.Namespaces...)
+	nsSet.Insert(namespace.GetName())
+
+	for ns := range nsSet {
+		var list capsulev1beta2.TenantResourceList
+		if err := r.client.List(ctx, &list, client.InNamespace(ns)); err != nil {
+			log.Error(err, "cannot retrieve TenantResourceList", "namespace", ns)
+
+			return err
+		}
+
+		tr.Items = append(tr.Items, list.Items...)
 	}
 
 	for _, tntResource := range tr.Items {
