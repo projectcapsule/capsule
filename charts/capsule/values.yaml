@@ -156,6 +156,10 @@ manager:
     # When set to true you must aggregate further permissions by yourself.
     strict: false
 
+    # -- DEPRECATED: use strict instead.
+    # Former name of the strict option; takes effect when either flag is true.
+    minimal: false
+
     # -- Specifies further cluster roles to be added to the Capsule manager service account.
     existingClusterRoles: []
     # - cluster-admin
