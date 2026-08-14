@@ -170,6 +170,7 @@ The following Values have changed key or Value:
 | manager.rbac.create | bool | `true` | Specifies whether RBAC resources should be created. |
 | manager.rbac.existingClusterRoles | list | `[]` | Specifies further cluster roles to be added to the Capsule manager service account. |
 | manager.rbac.existingRoles | list | `[]` | Specifies further cluster roles to be added to the Capsule manager service account. |
+| manager.rbac.minimal | bool | `false` | DEPRECATED: use strict instead. Former name of the strict option; takes effect when either flag is true. |
 | manager.rbac.role.extraResources | list | `[]` | Extra namespaced RBAC PolicyRules to add to a Role created by this chart and bound to the Capsule ServiceAccount. |
 | manager.rbac.strict | bool | `false` | Strongly restrict the RBAC assigned to Capsule Controller. When set to true you must aggregate further permissions by yourself. |
 | manager.readinessProbe | object | `{"httpGet":{"path":"/readyz","port":10080}}` | Configure the readiness probe using Deployment probe spec |
