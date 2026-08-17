@@ -7,7 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
@@ -71,6 +73,55 @@ func TestCollectorAddToAccumulationClusterScopedObjects(t *testing.T) {
 		}
 
 		if err := collector.AddToAccumulation(nil, nil, opts, capsuleResourceSpec(), obj, "test", true); err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		if len(acc) != 1 {
+			t.Fatalf("expected object to be accumulated, got %d items", len(acc))
+		}
+	})
+
+	t.Run("rejects cluster scoped object targeting a namespace", func(t *testing.T) {
+		t.Parallel()
+
+		acc := processor.Accumulator{}
+		obj := newUnstructured("v1", "Namespace", "", "example")
+
+		opts := CollectorOptions{
+			Accumulator:               acc,
+			AllowClusterScopedObjects: true,
+		}
+
+		target := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "tenant-a"}}
+
+		err := collector.AddToAccumulation(nil, target, opts, capsuleResourceSpec(), obj, "test", true)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+
+		if !strings.Contains(err.Error(), "cannot be replicated into the Namespace tenant-a") {
+			t.Fatalf("expected a namespaced replication error, got %v", err)
+		}
+
+		if len(acc) != 0 {
+			t.Fatalf("expected object not to be accumulated, got %d items", len(acc))
+		}
+	})
+
+	t.Run("keeps allowing namespaced object targeting a namespace", func(t *testing.T) {
+		t.Parallel()
+
+		acc := processor.Accumulator{}
+		obj := newUnstructured("v1", "ConfigMap", "source", "example")
+
+		opts := CollectorOptions{
+			Accumulator:               acc,
+			AllowClusterScopedObjects: true,
+		}
+
+		target := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "tenant-a"}}
+
+		if err := collector.AddToAccumulation(nil, target, opts, capsuleResourceSpec(), obj, "test", true); err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
 
