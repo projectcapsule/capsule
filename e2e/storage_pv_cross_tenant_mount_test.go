@@ -5,6 +5,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -217,6 +218,67 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Ordered, Labe
 
 			return k8sClient.Create(context.Background(), &pvc)
 		}, defaultTimeoutInterval, defaultPollInterval).Should(HaveOccurred())
+	})
+
+	It("should repair empty and stale Tenant labels on claimed PersistentVolumes", Label("skip-on-openshift"), func() {
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt1.GetName(),
+		})
+		NamespaceCreation(ns, tnt1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+
+		volumes := make([]*corev1.PersistentVolume, 0, 2)
+		defer func() {
+			for _, pv := range volumes {
+				_ = k8sClient.Delete(context.Background(), pv)
+			}
+		}()
+
+		for index, value := range []string{"", tnt2.Name} {
+			pv := &corev1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("repair-tenant-label-%d", index),
+					Labels: map[string]string{
+						meta.TenantLabel: value,
+					},
+				},
+				Spec: corev1.PersistentVolumeSpec{
+					Capacity: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse("1Gi"),
+					},
+					AccessModes: []corev1.PersistentVolumeAccessMode{
+						corev1.ReadWriteOnce,
+					},
+					PersistentVolumeReclaimPolicy: corev1.PersistentVolumeReclaimRetain,
+					StorageClassName:              "manual",
+					ClaimRef: &corev1.ObjectReference{
+						APIVersion: "v1",
+						Kind:       "PersistentVolumeClaim",
+						Namespace:  ns.Name,
+						Name:       fmt.Sprintf("repair-tenant-label-%d", index),
+					},
+					PersistentVolumeSource: corev1.PersistentVolumeSource{
+						HostPath: &corev1.HostPathVolumeSource{
+							Path: fmt.Sprintf("/tmp/capsule-e2e-repair-tenant-label-%d", index),
+						},
+					},
+				},
+			}
+			volumes = append(volumes, pv)
+
+			EventuallyCreation(func() error {
+				return k8sClient.Create(context.Background(), pv)
+			}).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				current := &corev1.PersistentVolume{}
+				g.Expect(k8sClient.Get(
+					context.Background(),
+					types.NamespacedName{Name: pv.Name},
+					current,
+				)).To(Succeed())
+				g.Expect(current.GetLabels()).To(HaveKeyWithValue(meta.TenantLabel, tnt1.Name))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		}
 	})
 
 	It("should not add a selector when updating an already-bound dynamic PVC without selector", func() {
