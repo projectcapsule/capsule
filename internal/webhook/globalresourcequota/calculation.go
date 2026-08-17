@@ -310,31 +310,7 @@ func validateGlobalResourceQuota(quota *capsulev1beta2.GlobalResourceQuota) erro
 }
 
 func validateHardLimit(hard, allocated corev1.ResourceList) error {
-	for name, usage := range allocated {
-		if usage.Sign() <= 0 {
-			continue
-		}
-
-		limit, exists := hard[name]
-		if !exists {
-			return fmt.Errorf(
-				"spec.quota.hard[%q] cannot be removed while %s is allocated",
-				name,
-				usage.String(),
-			)
-		}
-
-		if limit.Cmp(usage) < 0 {
-			return fmt.Errorf(
-				"spec.quota.hard[%q] cannot be reduced to %s while %s is allocated",
-				name,
-				limit.String(),
-				usage.String(),
-			)
-		}
-	}
-
-	return nil
+	return runtimequota.ValidateHardLimit("spec.quota.hard", hard, allocated)
 }
 
 func isManagedResourceQuota(req admission.Request, object any) bool {
