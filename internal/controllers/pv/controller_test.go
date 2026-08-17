@@ -214,6 +214,19 @@ func TestPersistentVolumePredicate(t *testing.T) {
 		t.Fatal("tenant label change should reconcile")
 	}
 
+	missingLabel := claimed.DeepCopy()
+	delete(missingLabel.Labels, meta.TenantLabel)
+	emptyLabel := missingLabel.DeepCopy()
+	emptyLabel.Labels[meta.TenantLabel] = ""
+
+	if !pred.Update(event.UpdateEvent{ObjectOld: missingLabel, ObjectNew: emptyLabel}) {
+		t.Fatal("adding an empty tenant label should reconcile")
+	}
+
+	if !pred.Update(event.UpdateEvent{ObjectOld: emptyLabel, ObjectNew: missingLabel}) {
+		t.Fatal("removing an empty tenant label should reconcile")
+	}
+
 	claimChanged := claimed.DeepCopy()
 	claimChanged.Spec.ClaimRef = claimChanged.Spec.ClaimRef.DeepCopy()
 	claimChanged.Spec.ClaimRef.Namespace = "tenant-b-ns"

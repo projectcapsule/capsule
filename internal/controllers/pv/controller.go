@@ -67,12 +67,19 @@ func persistentVolumePredicate(label string) predicate.Predicate {
 			}
 
 			return !apiequality.Semantic.DeepEqual(oldPV.Spec.ClaimRef, newPV.Spec.ClaimRef) ||
-				oldPV.GetLabels()[label] != newPV.GetLabels()[label]
+				persistentVolumeLabelChanged(oldPV, newPV, label)
 		},
 		GenericFunc: func(event.GenericEvent) bool {
 			return false
 		},
 	}
+}
+
+func persistentVolumeLabelChanged(oldPV, newPV *corev1.PersistentVolume, label string) bool {
+	oldValue, oldExists := oldPV.GetLabels()[label]
+	newValue, newExists := newPV.GetLabels()[label]
+
+	return oldExists != newExists || oldValue != newValue
 }
 
 func (c *Controller) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
