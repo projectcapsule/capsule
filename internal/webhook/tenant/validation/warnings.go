@@ -82,6 +82,8 @@ func (h *warningHandler) handle(tnt *capsulev1beta2.Tenant, req admission.Reques
 		}
 	}
 
+	response.Warnings = append(response.Warnings, deprecatedTenantFieldWarnings(tnt)...)
+
 	//nolint:staticcheck
 	if len(tnt.Spec.LimitRanges.Items) > 0 {
 		response.Warnings = append(response.Warnings,
@@ -96,12 +98,7 @@ func (h *warningHandler) handle(tnt *capsulev1beta2.Tenant, req admission.Reques
 		)
 	}
 
-	//nolint:staticcheck
-	if tnt.Spec.NamespaceOptions != nil && tnt.Spec.NamespaceOptions.AdditionalMetadata != nil {
-		response.Warnings = append(response.Warnings,
-			"The field `additionalMetadata` is deprecated and will be removed in a future release. Please migrate to `additionalMetadataList`. See: https://projectcapsule.dev/docs/tenants/metadata/#additionalmetadatalist.",
-		)
-	}
+	response.Warnings = append(response.Warnings, deprecatedNamespaceOptionWarnings(tnt)...)
 
 	//nolint:staticcheck
 	if tnt.Spec.StorageClasses != nil && tnt.Spec.StorageClasses.Regex != "" {
@@ -142,4 +139,74 @@ func (h *warningHandler) handle(tnt *capsulev1beta2.Tenant, req admission.Reques
 	}
 
 	return response
+}
+
+func deprecatedTenantFieldWarnings(tnt *capsulev1beta2.Tenant) (warnings []string) {
+	//nolint:staticcheck
+	if tnt.Spec.ResourceQuota.Scope != "" || len(tnt.Spec.ResourceQuota.Items) > 0 {
+		warnings = append(warnings,
+			"The field `resourceQuotas` is deprecated and will be removed in a future release. Please migrate to rules quotas. See: https://projectcapsule.dev/docs/tenants/rules/#quotas.",
+		)
+	}
+
+	//nolint:staticcheck
+	if tnt.Spec.ServiceOptions != nil {
+		warnings = append(warnings,
+			"The field `serviceOptions` is deprecated and will be removed in a future release. Please migrate to rules metadata. See: https://projectcapsule.dev/docs/rules/enforcement/metadata/.",
+		)
+	}
+
+	//nolint:staticcheck
+	if tnt.Spec.PodOptions != nil {
+		warnings = append(warnings,
+			"The field `podOptions` is deprecated and will be removed in a future release. Please migrate to rules metadata. See: https://projectcapsule.dev/docs/rules/enforcement/metadata/.",
+		)
+	}
+
+	return warnings
+}
+
+func deprecatedNamespaceOptionWarnings(tnt *capsulev1beta2.Tenant) (warnings []string) {
+	if tnt.Spec.NamespaceOptions == nil {
+		return warnings
+	}
+
+	//nolint:staticcheck
+	if tnt.Spec.NamespaceOptions.AdditionalMetadata != nil {
+		warnings = append(warnings,
+			"The field `additionalMetadata` is deprecated and will be removed in a future release. Please migrate to rules metadata. See: https://projectcapsule.dev/docs/rules/enforcement/metadata/#namespace.",
+		)
+	}
+
+	//nolint:staticcheck
+	if len(tnt.Spec.NamespaceOptions.AdditionalMetadataList) > 0 {
+		warnings = append(warnings,
+			"The field `additionalMetadataList` is deprecated and will be removed in a future release. Please migrate to rules metadata. See: https://projectcapsule.dev/docs/rules/enforcement/metadata/#namespace.",
+		)
+	}
+
+	//nolint:staticcheck
+	if tnt.Spec.NamespaceOptions.RequiredMetadata != nil {
+		warnings = append(warnings,
+			"The field `requiredMetadata` is deprecated and will be removed in a future release. Please migrate to rules metadata. See: https://projectcapsule.dev/docs/rules/enforcement/metadata/#namespace.",
+		)
+	}
+
+	//nolint:staticcheck
+	if len(tnt.Spec.NamespaceOptions.ForbiddenLabels.Exact) > 0 ||
+		tnt.Spec.NamespaceOptions.ForbiddenLabels.Regex != "" {
+		warnings = append(warnings,
+			"The field `forbiddenLabels` is deprecated and will be removed in a future release. Please migrate to rules metadata. See: https://projectcapsule.dev/docs/rules/enforcement/metadata/#namespace.",
+		)
+	}
+
+	//nolint:staticcheck
+	if len(tnt.Spec.NamespaceOptions.ForbiddenAnnotations.Exact) > 0 ||
+		tnt.Spec.NamespaceOptions.ForbiddenAnnotations.Regex != "" {
+		warnings = append(warnings,
+			"The field `forbiddenAnnotations` is deprecated and will be removed in a future release. Please migrate to rules metadata. See: https://projectcapsule.dev/docs/rules/enforcement/metadata/#namespace.",
+		)
+	}
+
+	return warnings
 }

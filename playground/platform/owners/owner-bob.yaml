@@ -1,0 +1,10 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: TenantOwner
+metadata:
+  labels:
+    projectcapsule.dev/tenant: green
+  name: bob
+spec:
+  kind: User
+  name: "bob"

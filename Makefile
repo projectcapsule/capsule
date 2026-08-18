@@ -256,34 +256,10 @@ dev-setup-fluxcd-openshift:
 dev-setup-openshift-specifics:
 	@$(KUBECTL) apply -f hack/distro/openshift/extend-admin-role.yaml
 	@$(KUBECTL) apply -f hack/distro/openshift/capsule-namespace-deleter.yaml
-# Here to setup the current capsule version
-# Intended to test updates to new version
-dev-setup-capsule: dev-setup-fluxcd
-	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/capsule | envsubst | kubectl apply -f -
-	@$(MAKE) wait-for-helmreleases
-	@$(MAKE) dev-setup-capsule-example
-
-dev-setup-capsule-example: dev-setup-fluxcd
-	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/capsule/example-setup | envsubst | kubectl apply -f -
-	@$(KUBECTL) create ns wind-uat --as joe --as-group projectcapsule.dev || true
-	@$(KUBECTL) label ns wind-uat env=test
-	@$(KUBECTL) create ns wind-test --as joe --as-group projectcapsule.dev || true
-	@$(KUBECTL) label ns wind-test env=test
-	@$(KUBECTL) create ns wind-prod --as joe --as-group projectcapsule.dev || true
-	@$(KUBECTL) label ns wind-prod env=prod
-	@$(KUBECTL) create ns green-uat --as bob --as-group projectcapsule.dev || true
-	@$(KUBECTL) label ns green-uat env=test
-	@$(KUBECTL) create ns green-test --as bob --as-group projectcapsule.dev || true
-	@$(KUBECTL) label ns green-test env=test
-	@$(KUBECTL) create ns green-prod --as bob --as-group projectcapsule.dev || true
-	@$(KUBECTL) label ns green-prod env=prod
-	@$(KUBECTL) create ns solar-uat --as alice --as-group projectcapsule.dev || true
-	@$(KUBECTL) label ns solar-uat env=test
-	@$(KUBECTL) create ns solar-test --as alice --as-group projectcapsule.dev || true
-	@$(KUBECTL) label ns solar-test env=test
-	@$(KUBECTL) create ns solar-prod --as alice --as-group projectcapsule.dev || true
-	@$(KUBECTL) label ns solar-prod env=prod
-	@$(KUBECTL) apply -f hack/distro/capsule/example-setup/claims.yaml
+# Build and deploy the current Capsule checkout in the local playground.
+.PHONY: dev-setup-capsule
+dev-setup-capsule:
+	@$(MAKE) -C playground dev-capsule
 
 
 wait-for-helmreleases:

@@ -1,0 +1,38 @@
+---
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: ${CLUSTER_NAME}
+featureGates:
+  ImageVolume: true
+  # Alpha and disabled by default on the Kubernetes 1.32 and 1.33 e2e jobs.
+  PodLevelResources: true
+kubeadmConfigPatches:
+  - |
+    kind: ClusterConfiguration
+    apiServer:
+      extraArgs:
+        authentication-config: /etc/kubernetes/pki/playground-authentication-config.yaml
+nodes:
+  - role: control-plane
+    extraMounts:
+      - hostPath: "${DEX_CA_FILE}"
+        containerPath: /etc/kubernetes/pki/playground-oidc-ca.crt
+        readOnly: true
+      - hostPath: "${AUTHENTICATION_CONFIG_FILE}"
+        containerPath: /etc/kubernetes/pki/playground-authentication-config.yaml
+        readOnly: true
+  - role: worker
+    labels:
+      ingress-ready: "true"
+    extraPortMappings:
+      # HTTP(S) traffic is routed by the ingress controller.
+      - hostPort: 80
+        containerPort: 80
+        protocol: TCP
+      - hostPort: 443
+        containerPort: 443
+        protocol: TCP
+      # The Kubernetes API proxy is intentionally exposed directly.
+      - hostPort: ${PROXY_PORT}
+        containerPort: 9001
+        protocol: TCP

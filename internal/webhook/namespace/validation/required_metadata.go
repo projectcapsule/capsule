@@ -24,6 +24,7 @@ func RequiredMetadataHandler() handlers.TypedHandlerWithTenantUser[*corev1.Names
 	return &requiredMetadataHandler{}
 }
 
+//nolint:staticcheck
 func (h *requiredMetadataHandler) OnCreate(
 	_ client.Client,
 	_ client.Reader,
@@ -61,6 +62,7 @@ func (h *requiredMetadataHandler) OnCreate(
 	}
 }
 
+//nolint:staticcheck
 func (h *requiredMetadataHandler) OnUpdate(
 	_ client.Client,
 	_ client.Reader,

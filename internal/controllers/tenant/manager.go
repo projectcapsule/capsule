@@ -358,6 +358,7 @@ func (r *Manager) Reconcile(ctx context.Context, request ctrl.Request) (result c
 	return reconcile.Result{}, reconcileError
 }
 
+//nolint:staticcheck
 func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *capsulev1beta2.Tenant) (err error) {
 	var errs []error
 

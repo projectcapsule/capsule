@@ -67,6 +67,7 @@ func (h *forbiddenAnnotationsRegexHandler) OnUpdate(
 	}
 }
 
+//nolint:staticcheck
 func (h *forbiddenAnnotationsRegexHandler) validate(tnt *capsulev1beta2.Tenant, req admission.Request) *admission.Response {
 	if tnt == nil || tnt.Spec.NamespaceOptions == nil {
 		return nil

@@ -1,0 +1,107 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: dex
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: https://charts.dexidp.io
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: dex
+  namespace: flux-system
+spec:
+  interval: 10m
+  serviceAccountName: kustomize-controller
+  targetNamespace: dex
+  dependsOn:
+    - name: ingress-nginx
+  chart:
+    spec:
+      chart: dex
+      version: "0.24.1"
+      sourceRef:
+        kind: HelmRepository
+        name: dex
+      interval: 1h
+  install:
+    createNamespace: true
+    remediation:
+      retries: -1
+  values:
+    replicaCount: 1
+    service:
+      type: ClusterIP
+      ports:
+        http:
+          port: 80
+          targetPort: 5556
+    config:
+      issuer: "${DEX_URL}"
+      storage:
+        type: kubernetes
+        config:
+          inCluster: true
+
+      web:
+        http: 0.0.0.0:5556
+
+      oauth2:
+        skipApprovalScreen: true
+        passwordConnector: local
+
+      enablePasswordDB: true
+      staticClients:
+        - id: "${OIDC_CLIENT_ID}"
+          name: Kubernetes
+          secret: "${OIDC_CLIENT_SECRET}"
+          redirectURIs:
+            - "${PROXY_URL}/*"
+            - "${HEADLAMP_URL}/oidc-callback"
+        - id: gangplank
+          name: Gangplank
+          secret: gangplank-secret
+          redirectURIs:
+            - "${GANGPLANK_URL}/callback"
+      staticPasswords:
+        - email: bob@projectcapsule.dev
+          username: bob
+          userID: 11111111-1111-1111-1111-111111111111
+          hash: '$2y$10$lgNluw1j3KhMp1r7epBCFuQiPcdKnybFqDEIFMnoXXsDBD.QLeR7.'
+          groups:
+            - capsule-users
+            - green-users
+
+        - email: alice@projectcapsule.dev
+          username: alice
+          userID: 22222222-2222-2222-2222-222222222222
+          hash: '$2y$10$7Q7yIi/QgY6t9n2bSqZVVewVmoxoNUfj3cxwhtXUhe/ArTeZ3dJM2'
+          groups:
+            - capsule-users
+            - solar-users
+
+        - email: gatsby@projectcapsule.dev
+          username: gatsby
+          userID: 33333333-3333-3333-3333-333333333333
+          hash: '$2y$10$njJhZ9HalGwwkF/uGKh3jOguYq2TRbmV2ECu6Mnfo32JagiESNh4O'
+          groups:
+            - capsule-users
+            - wind-users
+
+        - email: admin@projectcapsule.dev
+          username: admin
+          userID: 44444444-4444-4444-4444-444444444444
+          hash: '$2y$10$lGHaUNVKMRRPIaXGDk3.JOPBws6CzmX6080GLEDMetx.LzgPsq6DK'
+          groups:
+            - capsule-admins
+
+        - email: renewable@projectcapsule.dev
+          username: renewable
+          userID: 55555555-5555-5555-5555-555555555555
+          hash: '$2y$10$MDRVJ8JruEb4nuaRNomue.8OibUXzVpGqnc6cMS29vk6uQkvuCIP2'
+          groups:
+            - capsule-users
+            - renewable-users

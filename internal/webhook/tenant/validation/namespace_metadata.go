@@ -63,6 +63,7 @@ func (h *namespaceMetadataHandler) OnUpdate(
 	}
 }
 
+//nolint:staticcheck
 func validateTenantNamespaceMetadata(tnt *capsulev1beta2.Tenant) *admission.Response {
 	if tnt == nil {
 		return nil

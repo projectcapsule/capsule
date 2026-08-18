@@ -130,6 +130,7 @@ func BuildInstanceMetadataForNamespace(ns *corev1.Namespace, tnt *capsulev1beta2
 	return labels, annotations
 }
 
+//nolint:staticcheck
 func BuildNamespaceMetadataForTenant(ns *corev1.Namespace, tnt *capsulev1beta2.Tenant) (labels map[string]string, annotations map[string]string, err error) {
 	annotations = BuildNamespaceAnnotationsForTenant(tnt)
 	labels = BuildNamespaceLabelsForTenant(tnt)

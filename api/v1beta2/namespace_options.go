@@ -11,18 +11,26 @@ type NamespaceOptions struct {
 	// +kubebuilder:validation:Minimum=1
 	// Specifies the maximum number of namespaces allowed for that Tenant. Once the namespace quota assigned to the Tenant has been reached, the Tenant owner cannot create further namespaces. Optional.
 	Quota *int32 `json:"quota,omitempty"`
-	// Deprecated: Use additionalMetadataList instead (https://projectcapsule.dev/docs/tenants/metadata/#additionalmetadatalist)
+	// Deprecated: Use Rules Metadata instead (https://projectcapsule.dev/docs/rules/enforcement/metadata/#namespace)
 	//
 	// Specifies additional labels and annotations the Capsule operator places on any Namespace resource in the Tenant. Optional.
 	AdditionalMetadata *api.AdditionalMetadataSpec `json:"additionalMetadata,omitempty"`
+	// Deprecated: Use Rules Metadata instead (https://projectcapsule.dev/docs/rules/enforcement/metadata/#namespace)
+	//
 	// Specifies additional labels and annotations the Capsule operator places on any Namespace resource in the Tenant via a list. Optional.
 	AdditionalMetadataList []api.AdditionalMetadataSelectorSpec `json:"additionalMetadataList,omitempty"`
+	// Deprecated: Use Rules Metadata instead (https://projectcapsule.dev/docs/rules/enforcement/metadata/#namespace)
+	//
 	// Required Metadata for namespace within this tenant
 	// +optional
 	RequiredMetadata *RequiredMetadata `json:"requiredMetadata,omitzero"`
+	// Deprecated: Use Rules Metadata instead (https://projectcapsule.dev/docs/rules/enforcement/metadata/#namespace)
+	//
 	// Define the labels that a Tenant Owner cannot set for their Namespace resources.
 	// +optional
 	ForbiddenLabels api.ForbiddenListSpec `json:"forbiddenLabels,omitzero"`
+	// Deprecated: Use Rules Metadata instead (https://projectcapsule.dev/docs/rules/enforcement/metadata/#namespace)
+	//
 	// Define the annotations that a Tenant Owner cannot set for their Namespace resources.
 	// +optional
 	ForbiddenAnnotations api.ForbiddenListSpec `json:"forbiddenAnnotations,omitzero"`

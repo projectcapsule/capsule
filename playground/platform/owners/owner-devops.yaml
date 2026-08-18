@@ -18,13 +18,3 @@ metadata:
 spec:
   kind: Group
   name: "oidc:org:devops"
----
-apiVersion: capsule.clastix.io/v1beta2
-kind: TenantOwner
-metadata:
-  labels:
-    team: platform
-  name: platform
-spec:
-  kind: Group
-  name: "oidc:org:platform"
