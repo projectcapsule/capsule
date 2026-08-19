@@ -70,6 +70,10 @@ func (h *validationHandler) handle(
 	config *capsulev1beta2.CapsuleConfiguration,
 	req admission.Request,
 ) *admission.Response {
+	if err := validateAdmissionClients(config.Spec.Admission); err != nil {
+		return ad.Deny(err.Error())
+	}
+
 	if err := h.validateRegex(
 		"spec.protectedNamespaceRegex",
 		config.Spec.ProtectedNamespaceRegexpString,
@@ -89,6 +93,22 @@ func (h *validationHandler) handle(
 		config.Spec.NodeMetadata.ForbiddenLabels.Regex,
 	); err != nil {
 		return ad.Deny(err.Error())
+	}
+
+	return nil
+}
+
+func validateAdmissionClients(config capsulev1beta2.DynamicAdmission) error {
+	if config.Validating != nil {
+		if err := ad.ValidateWebhookClientConfig(config.Validating.Client); err != nil {
+			return fmt.Errorf("spec.admission.validating.client is invalid: %w", err)
+		}
+	}
+
+	if config.Mutating != nil {
+		if err := ad.ValidateWebhookClientConfig(config.Mutating.Client); err != nil {
+			return fmt.Errorf("spec.admission.mutating.client is invalid: %w", err)
+		}
 	}
 
 	return nil

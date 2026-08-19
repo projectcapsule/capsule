@@ -72,6 +72,7 @@ func (h *validating) OnDelete(
 	}
 }
 
+//nolint:staticcheck
 func (h *validating) handle(
 	ctx context.Context,
 	req admission.Request,

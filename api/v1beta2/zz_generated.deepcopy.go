@@ -2452,16 +2452,6 @@ func (in *TenantSpec) DeepCopyInto(out *TenantSpec) {
 		*out = new(NamespaceOptions)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.ServiceOptions != nil {
-		in, out := &in.ServiceOptions, &out.ServiceOptions
-		*out = new(api.ServiceOptions)
-		(*in).DeepCopyInto(*out)
-	}
-	if in.PodOptions != nil {
-		in, out := &in.PodOptions, &out.PodOptions
-		*out = new(api.PodOptions)
-		(*in).DeepCopyInto(*out)
-	}
 	if in.StorageClasses != nil {
 		in, out := &in.StorageClasses, &out.StorageClasses
 		*out = new(api.DefaultAllowedListSpec)
@@ -2475,7 +2465,6 @@ func (in *TenantSpec) DeepCopyInto(out *TenantSpec) {
 			(*out)[key] = val
 		}
 	}
-	in.ResourceQuota.DeepCopyInto(&out.ResourceQuota)
 	if in.AdditionalRoleBindings != nil {
 		in, out := &in.AdditionalRoleBindings, &out.AdditionalRoleBindings
 		*out = make([]rbac.AdditionalRoleBindingsSpec, len(*in))
@@ -2503,6 +2492,17 @@ func (in *TenantSpec) DeepCopyInto(out *TenantSpec) {
 		in, out := &in.ForceTenantPrefix, &out.ForceTenantPrefix
 		*out = new(bool)
 		**out = **in
+	}
+	in.ResourceQuota.DeepCopyInto(&out.ResourceQuota)
+	if in.ServiceOptions != nil {
+		in, out := &in.ServiceOptions, &out.ServiceOptions
+		*out = new(api.ServiceOptions)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.PodOptions != nil {
+		in, out := &in.PodOptions, &out.PodOptions
+		*out = new(api.PodOptions)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.ContainerRegistries != nil {
 		in, out := &in.ContainerRegistries, &out.ContainerRegistries

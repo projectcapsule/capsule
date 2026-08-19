@@ -1,0 +1,155 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: headlamp
+  namespace: flux-system
+spec:
+  interval: 10m
+  releaseName: "headlamp"
+  targetNamespace: capsule-system
+  serviceAccountName: kustomize-controller
+  dependsOn:
+    - name: capsule
+    - name: dex
+  chart:
+    spec:
+      chart: headlamp
+      version: "0.42.0"
+      sourceRef:
+        kind: HelmRepository
+        name: headlamp-charts
+      interval: 24h
+  install:
+    createNamespace: true
+    remediation:
+      retries: -1
+  upgrade:
+    remediation:
+      remediateLastFailure: true
+  driftDetection:
+    mode: enabled
+  values:
+    replicaCount: 1
+    automountServiceAccountToken: true
+    podAnnotations:
+      playground.capsule.clastix.io/ca-sha256: "${PLAYGROUND_CA_SHA256}"
+    pluginsManager:
+      enabled: true
+      configContent: |
+        plugins:
+          - name: capsule
+            source: https://artifacthub.io/packages/headlamp/headlamp-capsule/capsule
+            version: 0.2.0
+        installOptions:
+          parallel: true
+          maxConcurrent: 2
+    service:
+      type: ClusterIP
+      port: 80
+      targetPort: 4466
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    volumeMounts:
+      - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+        name: token-ca
+      - name: ca-store
+        mountPath: /etc/ssl/
+    env:
+      - name: KUBERNETES_SERVICE_HOST
+        value: capsule-proxy.capsule-system.svc
+      - name: KUBERNETES_SERVICE_PORT
+        value: "9001"
+    volumes:
+      - name: ca-store
+        emptyDir: {}
+      - name: capsule-proxy
+        secret:
+          secretName: capsule-proxy
+          items:
+            - key: ca
+              path: ca.crt
+      - name: dex-ca
+        secret:
+          secretName: dex-ca
+      - name: token-ca
+        projected:
+          sources:
+            - serviceAccountToken:
+                path: token
+            - secret:
+                name: capsule-proxy
+                items:
+                  - key: ca
+                    path: ca.crt
+            - downwardAPI: null
+              items:
+                - fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.namespace
+                  path: namespace
+    initContainers:
+      - name: add-ca
+        image: docker.io/alpine:3
+        command:
+          - /bin/sh
+          - -c
+        args:
+          - |
+            set -e
+            cp -R /etc/ssl/* /work/
+            cat /ca/ca.crt /dex-ca/ca.crt >> /work/certs/ca-certificates.crt
+        volumeMounts:
+          - name: ca-store
+            mountPath: /work
+          - name: capsule-proxy
+            mountPath: /ca
+          - name: dex-ca
+            mountPath: /dex-ca
+        securityContext:
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          privileged: false
+          runAsUser: 65534
+          runAsGroup: 65534
+    podSecurityContext:
+      runAsNonRoot: true
+      seccompProfile:
+        type: RuntimeDefault
+    securityContext:
+      capabilities:
+        drop:
+          - ALL
+      readOnlyRootFilesystem: false
+      allowPrivilegeEscalation: false
+      privileged: false
+      runAsUser: 100
+      runAsGroup: 101
+    config:
+      pluginsDir: /build/plugins
+      inCluster: true
+      extraArgs:
+        - -oidc-ca-file=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      oidc:
+        clientID: "${OIDC_CLIENT_ID}"
+        clientSecret: "${OIDC_CLIENT_SECRET}"
+        issuerURL: "${DEX_URL}"
+        callbackURL: "${HEADLAMP_URL}/oidc-callback"
+        scopes: "email,profile,groups"
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: headlamp-charts
+  namespace: flux-system
+spec:
+  interval: 24h0m0s
+  url: https://kubernetes-sigs.github.io/headlamp/

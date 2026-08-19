@@ -11,6 +11,52 @@ import (
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 )
 
+func TestValidateWebhookClientConfig(t *testing.T) {
+	t.Parallel()
+
+	webhookURL := "https://capsule.example.com"
+	service := &admissionregistrationv1.ServiceReference{
+		Name:      "capsule-webhook-service",
+		Namespace: "capsule-system",
+	}
+
+	tests := []struct {
+		name    string
+		client  *admissionregistrationv1.WebhookClientConfig
+		wantErr bool
+	}{
+		{name: "nil", wantErr: true},
+		{name: "neither", client: &admissionregistrationv1.WebhookClientConfig{}, wantErr: true},
+		{
+			name:   "url",
+			client: &admissionregistrationv1.WebhookClientConfig{URL: &webhookURL},
+		},
+		{
+			name:   "service",
+			client: &admissionregistrationv1.WebhookClientConfig{Service: service},
+		},
+		{
+			name: "both",
+			client: &admissionregistrationv1.WebhookClientConfig{
+				URL:     &webhookURL,
+				Service: service,
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := admission.ValidateWebhookClientConfig(test.client)
+			if (err != nil) != test.wantErr {
+				t.Fatalf("ValidateWebhookClientConfig() error = %v, wantErr %t", err, test.wantErr)
+			}
+		})
+	}
+}
+
 func TestDynamicClientWithPath_EmptyPath_NoChange(t *testing.T) {
 	t.Parallel()
 

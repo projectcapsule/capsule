@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: headlamp
+  namespace: capsule-system
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - "${HEADLAMP_HOST}"
+      secretName: headlamp-tls
+  rules:
+    - host: "${HEADLAMP_HOST}"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: headlamp
+                port:
+                  number: 80
