@@ -47,6 +47,7 @@ func (m *MetadataReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Mana
 		Complete(m)
 }
 
+//nolint:staticcheck
 func (m *MetadataReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
 	var pod corev1.Pod
 
@@ -109,6 +110,7 @@ func (m *MetadataReconciler) podsForTenant(ctx context.Context, obj client.Objec
 	return requests
 }
 
+//nolint:staticcheck
 func (m *MetadataReconciler) getTenant(ctx context.Context, namespacedName types.NamespacedName, client client.Client) (*capsulev1beta2.Tenant, error) {
 	ns := &corev1.Namespace{}
 	tenant := &capsulev1beta2.Tenant{}

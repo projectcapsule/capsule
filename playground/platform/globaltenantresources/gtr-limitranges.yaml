@@ -1,0 +1,28 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: GlobalTenantResource
+metadata:
+  name: tenant-limitranges
+spec:
+  resyncPeriod: 60s
+  serviceAccount:
+    name: gtr-reconciler
+    namespace: capsule-system
+  resources:
+    - namespaceSelector:
+        matchLabels:
+          company.com/environment: test
+      rawItems:
+        - apiVersion: v1
+          kind: LimitRange
+          metadata:
+            name: service-level-best-effort
+          spec:
+            limits:
+              - max:
+                  cpu: "0"
+                  memory: "0"
+                min:
+                  cpu: "0"
+                  memory: "0"
+                type: Container

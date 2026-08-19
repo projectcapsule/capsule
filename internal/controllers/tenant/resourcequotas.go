@@ -62,6 +62,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, log logr.Logger, tenan
 	})
 }
 
+//nolint:staticcheck
 func (r *Manager) latestResourceQuotaTenant(
 	ctx context.Context,
 	tenant *capsulev1beta2.Tenant,
@@ -129,7 +130,8 @@ func (r *Manager) withTenantResourceQuotaSync(tenant string, syncFn func() error
 	return syncFn()
 }
 
-func (r *Manager) syncResourceQuotasLocked(ctx context.Context, log logr.Logger, tenant *capsulev1beta2.Tenant) (err error) { //nolint:gocognit
+//nolint:gocognit,staticcheck
+func (r *Manager) syncResourceQuotasLocked(ctx context.Context, log logr.Logger, tenant *capsulev1beta2.Tenant) (err error) {
 	if err := r.prepareResourceQuotaSync(ctx, tenant); err != nil {
 		return err
 	}
@@ -294,6 +296,7 @@ func (r *Manager) syncResourceQuotasLocked(ctx context.Context, log logr.Logger,
 	})
 }
 
+//nolint:staticcheck
 func (r *Manager) prepareResourceQuotaSync(
 	ctx context.Context,
 	tenant *capsulev1beta2.Tenant,
@@ -336,6 +339,7 @@ func (r *Manager) prepareResourceQuotaSync(
 	return nil
 }
 
+//nolint:staticcheck
 func (r *Manager) syncResourceQuota(ctx context.Context, log logr.Logger, tenant *capsulev1beta2.Tenant, namespace string) (err error) {
 	// getting ResourceQuota labels for the mutateFn
 	var typeLabel string

@@ -149,6 +149,7 @@ func (h *userMetadataHandler) OnDelete(
 	}
 }
 
+//nolint:staticcheck
 func validateUserMetadata(
 	ctx context.Context,
 	req admission.Request,

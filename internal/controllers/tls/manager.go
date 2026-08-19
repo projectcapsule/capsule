@@ -284,22 +284,27 @@ func (r *Reconciler) ensureCertificateMaterial(
 		}
 
 	case hasCABundle && !hasCAKey:
-		// Legacy mode: we can validate and patch caBundle, but we cannot issue
-		// a new serving certificate without the CA private key.
-		log.V(10).Info(
-			"TLS Secret contains CA bundle but no CA private key; running in legacy CA mode",
+		// A CA bundle without its private key is typical of an externally
+		// managed Secret. Once the Capsule TLS controller is enabled, it must
+		// take ownership of the complete certificate lifecycle; otherwise a
+		// SAN change or certificate renewal cannot be recovered.
+		log.V(3).Info(
+			"TLS Secret contains CA bundle but no CA private key, rotating into controller-managed TLS material",
 			"secret", client.ObjectKeyFromObject(certSecret).String(),
 		)
 
-		if err := r.validateSecretCertificate(certSecret, sans); err != nil {
-			return nil, nil, false, fmt.Errorf(
-				"TLS Secret %s contains legacy CA material without ca.key and the serving certificate is invalid: %w",
-				client.ObjectKeyFromObject(certSecret).String(),
-				err,
-			)
+		generatedCA, generatedCABundle, generatedCAKey, err := generateCertificateAuthorityMaterial()
+		if err != nil {
+			return nil, nil, false, err
 		}
 
-		return nil, caBundle, false, nil
+		ca = generatedCA
+		caBundle = generatedCABundle
+
+		certSecret.Data[corev1.ServiceAccountRootCAKey] = generatedCABundle
+		certSecret.Data["ca.key"] = generatedCAKey
+
+		rotateServingCert = true
 
 	default:
 		log.V(10).Info(

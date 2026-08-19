@@ -72,6 +72,7 @@ func (h *requiredMetadataHandler) OnUpdate(
 	}
 }
 
+//nolint:staticcheck
 func (h *requiredMetadataHandler) validate(tnt *capsulev1beta2.Tenant, req admission.Request) *admission.Response {
 	no := tnt.Spec.NamespaceOptions
 	if no == nil || no.RequiredMetadata == nil {
@@ -118,6 +119,7 @@ func requiredMetadataChanged(oldT, newT *capsulev1beta2.Tenant) bool {
 	return false
 }
 
+//nolint:staticcheck
 func getRequiredMetadata(t *capsulev1beta2.Tenant) *capsulev1beta2.RequiredMetadata {
 	// Adjust the return type to your actual struct type:
 	// e.g. *capsulev1beta2.NamespaceRequiredMetadata or similar.

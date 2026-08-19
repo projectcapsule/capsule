@@ -1,0 +1,34 @@
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: best-effort
+  labels:
+    consumer: "customer"
+value: 1000000
+globalDefault: true
+description: "Best-Effort Priority"
+preemptionPolicy: PreemptLowerPriority
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: customer
+  labels:
+    consumer: "customer"
+value: 10000000
+globalDefault: false
+description: "Customer Workload Priority"
+preemptionPolicy: PreemptLowerPriority
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: operations-critical
+  labels:
+    name: operations-critical
+    consumer: "operations"
+value: 10000000
+preemptionPolicy: PreemptLowerPriority
+globalDefault: false
+description: "This priority class is used for cluster operations, which are not system critical"

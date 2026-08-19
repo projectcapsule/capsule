@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dex
+  namespace: dex
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - "${DEX_HOST}"
+      secretName: dex-tls
+  rules:
+    - host: "${DEX_HOST}"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: dex-dex
+                port:
+                  number: 80

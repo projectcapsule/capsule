@@ -1,0 +1,47 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespaces.yaml
+  - dns.yaml
+  - ingress-nginx/
+  - capsule/
+  - dex/
+  - headlamp/
+generatorOptions:
+  disableNameSuffixHash: true
+secretGenerator:
+  - name: dex-tls
+    namespace: dex
+    type: kubernetes.io/tls
+    files:
+      - tls.crt=.generated/dex.crt
+      - tls.key=.generated/dex.key
+  - name: headlamp-tls
+    namespace: capsule-system
+    type: kubernetes.io/tls
+    files:
+      - tls.crt=.generated/dex.crt
+      - tls.key=.generated/dex.key
+  - name: dex-ca
+    namespace: capsule-system
+    files:
+      - ca.crt=.generated/ca.crt
+  - name: capsule-proxy
+    namespace: capsule-system
+    files:
+      - ca=.generated/ca.crt
+      - tls.crt=.generated/proxy.crt
+      - tls.key=.generated/proxy.key
+  - name: capsule-tls
+    namespace: capsule-system
+    type: kubernetes.io/tls
+    files:
+      - ca.crt=.generated/ca.crt
+      - tls.crt=.generated/capsule.crt
+      - tls.key=.generated/capsule.key
+    options:
+      labels:
+        app.kubernetes.io/managed-by: Helm
+      annotations:
+        meta.helm.sh/release-name: capsule
+        meta.helm.sh/release-namespace: capsule-system

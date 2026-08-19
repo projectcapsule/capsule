@@ -1,0 +1,27 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: GlobalTenantResource
+metadata:
+  name: zero-trust-netpol
+spec:
+  resyncPeriod: 60s
+  serviceAccount:
+    name: gtr-reconciler
+    namespace: capsule-system
+  resources:
+    - rawItems:
+        - apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: zero-trust
+          spec:
+            podSelector: {}  # This applies to all pods in the namespace
+            policyTypes:
+            - Ingress
+            - Egress
+            ingress:
+            - from:
+              - podSelector: {}  # Only allow traffic from pods in the same namespace
+            egress:
+            - to:
+              - podSelector: {}  # Only allow traffic to pods in the same namespace

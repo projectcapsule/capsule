@@ -5,7 +5,7 @@ metadata:
   name: get-me-solar
   namespace: solar-test
 spec:
-  pool: "solar-pool"
+  pool: "solar"
   claim:
     requests.cpu: "2"
     requests.memory: 2Gi
@@ -16,7 +16,7 @@ metadata:
   name: get-me-solar-2
   namespace: solar-test
 spec:
-  pool: "solar-pool"
+  pool: "solar"
   claim:
     requests.cpu: "2"
     requests.memory: 2Gi
@@ -29,7 +29,7 @@ metadata:
     "projectcapsule.dev/release": "true"
   namespace: solar-test
 spec:
-  pool: "customer-pool"
+  pool: "renewable"
   claim:
     requests.cpu: "2"
     requests.memory: 2Gi
