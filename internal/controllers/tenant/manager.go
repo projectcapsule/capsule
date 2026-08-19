@@ -366,9 +366,7 @@ func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *caps
 			errs = append(errs, fmt.Errorf("namespace(s) had reconciliation errors: %w", err))
 		}
 
-		if err = r.ensureMetadata(ctx, instance); err != nil {
-			errs = append(errs, fmt.Errorf("cannot ensure metadata: %w", err))
-		}
+		r.ensureMetadata(instance)
 
 		return errors.Join(errs...)
 	}
@@ -385,10 +383,7 @@ func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *caps
 	}
 
 	// Ensuring Metadata.
-	err = r.ensureMetadata(ctx, instance)
-	if err != nil {
-		errs = append(errs, fmt.Errorf("cannot ensure metadata: %w", err))
-	}
+	r.ensureMetadata(instance)
 
 	log.V(4).Info("ensuring limit resources count is updated")
 

@@ -27,7 +27,7 @@ func CordoningHandler(configuration configuration.Configuration) handlers.TypedH
 }
 
 func (h *cordoningHandler) OnCreate(
-	c client.Client,
+	_ client.Client,
 	_ client.Reader,
 	user users.AdmissionUser,
 	ns *corev1.Namespace,
@@ -36,12 +36,12 @@ func (h *cordoningHandler) OnCreate(
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.validate(ctx, req, c, user, ns, recorder, tnt)
+		return h.validate(ctx, req, user, ns, recorder, tnt)
 	}
 }
 
 func (h *cordoningHandler) OnDelete(
-	c client.Client,
+	_ client.Client,
 	_ client.Reader,
 	user users.AdmissionUser,
 	ns *corev1.Namespace,
@@ -50,12 +50,12 @@ func (h *cordoningHandler) OnDelete(
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.validate(ctx, req, c, user, ns, recorder, tnt)
+		return h.validate(ctx, req, user, ns, recorder, tnt)
 	}
 }
 
 func (h *cordoningHandler) OnUpdate(
-	c client.Client,
+	_ client.Client,
 	_ client.Reader,
 	user users.AdmissionUser,
 	ns *corev1.Namespace,
@@ -65,14 +65,13 @@ func (h *cordoningHandler) OnUpdate(
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.validate(ctx, req, c, user, ns, recorder, tnt)
+		return h.validate(ctx, req, user, ns, recorder, tnt)
 	}
 }
 
 func (h *cordoningHandler) validate(
 	ctx context.Context,
 	req admission.Request,
-	c client.Client,
 	user users.AdmissionUser,
 	ns *corev1.Namespace,
 	recorder events.EventRecorder,

@@ -159,7 +159,7 @@ func (co *Collector) Collect(
 	for rawIndex, item := range spec.RawItems {
 		log.V(5).Info("processing raw item", "index", rawIndex)
 
-		p, rawError := co.handleRawItem(ctx, c, opts, item, ns)
+		p, rawError := co.handleRawItem(opts, item, ns)
 		if rawError != nil {
 			syncErr = errors.Join(syncErr, rawError)
 
@@ -180,7 +180,7 @@ func (co *Collector) Collect(
 	for generatorIndex, item := range spec.Generators {
 		log.V(5).Info("processing generator item", "index", generatorIndex)
 
-		p, genError := co.handleGeneratorItem(ctx, c, generatorIndex, item, ns, tplContext)
+		p, genError := co.handleGeneratorItem(item, ns, tplContext)
 		if genError != nil {
 			syncErr = errors.Join(syncErr, genError)
 
@@ -474,9 +474,6 @@ func (co *Collector) validateClusterScopedObjectAllowed(
 
 // Handles a single generator item.
 func (co *Collector) handleGeneratorItem(
-	ctx context.Context,
-	c client.Client,
-	index int,
 	item capsulev1beta2.TemplateItemSpec,
 	ns *corev1.Namespace,
 	tmplContext tpl.ReferenceContext,
@@ -498,8 +495,6 @@ func (co *Collector) handleGeneratorItem(
 }
 
 func (co *Collector) handleRawItem(
-	ctx context.Context,
-	c client.Client,
 	opts CollectorOptions,
 	item capsulev1beta2.RawExtension,
 	ns *corev1.Namespace,

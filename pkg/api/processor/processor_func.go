@@ -439,16 +439,7 @@ func (r *Processor) Prune(
 		return false, err
 	}
 
-	deletable, err := r.handlePruneDeletion(
-		ctx,
-		c,
-		actual,
-		fieldOwner,
-		current,
-	)
-	if err != nil {
-		return deletable, err
-	}
+	deletable := r.handlePruneDeletion(actual, fieldOwner, current)
 
 	if deletable {
 		err = c.Delete(ctx, actual)
@@ -478,25 +469,23 @@ func (r *Processor) isClusterScoped(gvk schema.GroupVersionKind) (bool, error) {
 
 // Completely prune the resource when there's no more managers and the resource was created by the controller.
 func (r *Processor) handlePruneDeletion(
-	ctx context.Context,
-	c client.Client,
 	actual *unstructured.Unstructured,
 	fieldOwner string,
 	current *meta.ObjectReferenceStatus,
-) (bool, error) {
+) bool {
 	if current != nil && current.Created {
-		return true, nil
+		return true
 	}
 
 	labels := actual.GetLabels()
 	if _, ok := labels[meta.CreatedByCapsuleLabel]; !ok {
-		return false, nil
+		return false
 	}
 
 	return meta.HasExactlyCapsuleOwners(actual, meta.FieldManagerCapsulePrefix+"/resource/", []string{
 		fieldOwner,
 		meta.ResourceControllerFieldOwnerPrefix(),
-	}), nil
+	})
 }
 
 // Remove metadata from the controller when an object

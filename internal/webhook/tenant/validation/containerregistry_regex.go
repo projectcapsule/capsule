@@ -30,8 +30,8 @@ func (h *containerRegistryRegexHandler) OnCreate(
 	decoder admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
-		if err := h.validate(tnt, req); err != nil {
+	return func(context.Context, admission.Request) *admission.Response {
+		if err := h.validate(tnt); err != nil {
 			return err
 		}
 
@@ -59,8 +59,8 @@ func (h *containerRegistryRegexHandler) OnUpdate(
 	decoder admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
-		if response := h.validate(tnt, req); response != nil {
+	return func(context.Context, admission.Request) *admission.Response {
+		if response := h.validate(tnt); response != nil {
 			return response
 		}
 
@@ -71,7 +71,6 @@ func (h *containerRegistryRegexHandler) OnUpdate(
 //nolint:staticcheck
 func (h *containerRegistryRegexHandler) validate(
 	tnt *capsulev1beta2.Tenant,
-	req admission.Request,
 ) *admission.Response {
 	if tnt.Spec.ContainerRegistries != nil && len(tnt.Spec.ContainerRegistries.Regex) > 0 {
 		if _, err := regexp.Compile(tnt.Spec.ContainerRegistries.Regex); err != nil {

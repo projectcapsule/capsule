@@ -22,7 +22,6 @@ linters:
     - perfsprint
     - recvcheck
     - testpackage
-    - unparam
     - varnamelen
     - wrapcheck
     - interfacebloat

@@ -29,11 +29,11 @@ func (h *rbRegexHandler) OnCreate(
 	_ client.Client,
 	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
-	decoder admission.Decoder,
+	_ admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
-		return h.validate(tnt, decoder)
+	return func(context.Context, admission.Request) *admission.Response {
+		return h.validate(tnt)
 	}
 }
 
@@ -54,15 +54,15 @@ func (h *rbRegexHandler) OnUpdate(
 	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	old *capsulev1beta2.Tenant,
-	decoder admission.Decoder,
+	_ admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
-		return h.validate(tnt, decoder)
+	return func(context.Context, admission.Request) *admission.Response {
+		return h.validate(tnt)
 	}
 }
 
-func (h *rbRegexHandler) validate(tnt *capsulev1beta2.Tenant, decoder admission.Decoder) *admission.Response {
+func (h *rbRegexHandler) validate(tnt *capsulev1beta2.Tenant) *admission.Response {
 	bindings := append([]rbac.AdditionalRoleBindingsSpec(nil), tnt.Spec.AdditionalRoleBindings...)
 
 	for _, rule := range tnt.Spec.Rules {

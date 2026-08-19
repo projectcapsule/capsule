@@ -154,7 +154,7 @@ func (r *Reconciler) ReconcileCertificates(
 	log logr.Logger,
 	certSecret *corev1.Secret,
 ) error {
-	sans, err := r.desiredWebhookSANs(ctx)
+	sans, err := r.desiredWebhookSANs()
 	if err != nil {
 		return err
 	}

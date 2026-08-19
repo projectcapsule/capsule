@@ -158,7 +158,7 @@ func (r resourceClaimController) reconcile(
 		return err
 	}
 
-	return r.allocateResourcePool(ctx, log, claim, pool)
+	return r.allocateResourcePool(log, claim, pool)
 }
 
 // Verify a Pool can be allocated.
@@ -219,7 +219,6 @@ func (r resourceClaimController) evaluateResourcePool(
 }
 
 func (r resourceClaimController) allocateResourcePool(
-	ctx context.Context,
 	log logr.Logger,
 	cl *capsulev1beta2.ResourcePoolClaim,
 	pool *capsulev1beta2.ResourcePool,

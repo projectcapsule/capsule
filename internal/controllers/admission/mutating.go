@@ -88,7 +88,7 @@ func (r *mutatingReconciler) reconcileConfiguration(
 ) error {
 	desiredName := string(cfg.Name)
 
-	desiredHooks, err := r.webhooks(ctx, cfg)
+	desiredHooks, err := r.webhooks(cfg)
 	if err != nil {
 		return err
 	}
@@ -240,7 +240,6 @@ func (r *mutatingReconciler) deleteWebhookConfig(ctx context.Context, name strin
 }
 
 func (r *mutatingReconciler) webhooks(
-	ctx context.Context,
 	cfg *capsulev1beta2.DynamicMutatingAdmissionConfig,
 ) (hooks []admissionv1.MutatingWebhook, err error) {
 	for _, hook := range cfg.Webhooks {
