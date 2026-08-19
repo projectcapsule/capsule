@@ -40,7 +40,7 @@ spec:
         plugins:
           - name: capsule
             source: https://artifacthub.io/packages/headlamp/headlamp-capsule/capsule
-            version: 0.1.0-beta1
+            version: 0.2.0
         installOptions:
           parallel: true
           maxConcurrent: 2

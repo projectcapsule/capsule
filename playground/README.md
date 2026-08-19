@@ -145,6 +145,18 @@ make dev-capsule
 From the repository root, the existing `make dev-setup-capsule` target delegates
 to this playground target.
 
+The repository root's legacy `make dev-setup` target uses a different handoff:
+it runs the Capsule controller on the workstation and points admission webhooks
+at `LAPTOP_HOST_IP`. Before installing that development release, it waits for
+`flux-system/capsule` to become ready and deletes only that HelmRelease. Waiting
+for deletion lets the Flux Helm controller finish uninstalling the pinned
+release before local Helm takes ownership. All other playground HelmReleases
+remain managed by Flux.
+
+```console
+LAPTOP_HOST_IP=192.168.1.10 make dev-setup
+```
+
 Each invocation uses a timestamped development tag. Set one explicitly when a
 predictable image name is useful:
 
@@ -161,3 +173,7 @@ To leave development mode and restore the release declared in
 ```console
 make capsule-stable
 ```
+
+If root `make dev-setup` deleted the Capsule HelmRelease, `capsule-stable`
+recreates it from the playground installation manifests before asking Flux to
+reconcile it.

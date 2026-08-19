@@ -27,6 +27,7 @@ OS_SUPPORTED_VERSION ?= "4.22.0-okd-scos.ec.10"
 ## Tool Binaries
 KUBECTL ?= kubectl
 HELM ?= helm
+DEV_SETUP_TIMEOUT ?= 10m
 
 # Options for 'bundle-build'
 ifneq ($(origin CHANNELS), undefined)
@@ -166,8 +167,8 @@ endef
 export TLS_CNF
 CHART           ?= "./charts/capsule"
 CHART_VERSION   ?= "./charts/capsule"
-dev-setup: dev-setup-cert-manager
-	$(KUBECTL) -n capsule-system scale deployment capsule-controller-manager --replicas=0 || true
+.PHONY: dev-setup dev-setup-flux-handoff
+dev-setup: dev-setup-flux-handoff
 	mkdir -p /tmp/k8s-webhook-server/serving-certs
 	echo "$${TLS_CNF}" > _tls.cnf
 	openssl req -newkey rsa:4096 -days 3650 -nodes -x509 \
@@ -224,6 +225,18 @@ dev-setup: dev-setup-cert-manager
 	mkdir -p ./hack/generated/ || true
 	$(KUBECTL) label clusterrole admin projectcapsule.dev/aggregate-to-controller=true
 	bash ./hack/kubeconfig-for-sa.sh $(CLUSTER_NAME) "capsule-system" "capsule" "./hack/generated/kubeconfig.yaml"
+	$(KUBECTL) -n capsule-system scale deployment capsule-controller-manager --replicas=0 || true
+
+dev-setup-flux-handoff: dev-setup-cert-manager
+	@test -n '$(LAPTOP_HOST_IP)' || { echo "LAPTOP_HOST_IP must be set before handing the Capsule release over to local development" >&2; exit 1; }
+	@if $(KUBECTL) get helmrelease capsule --namespace flux-system >/dev/null 2>&1; then \
+		echo "Waiting for the Flux-managed Capsule release to become ready..."; \
+		$(KUBECTL) wait helmrelease/capsule --namespace flux-system --for=condition=ready --timeout=$(DEV_SETUP_TIMEOUT); \
+		echo "Deleting flux-system/capsule before installing the local development release..."; \
+		$(KUBECTL) delete helmrelease capsule --namespace flux-system --wait=true --timeout=$(DEV_SETUP_TIMEOUT); \
+	else \
+		echo "No Flux-managed Capsule HelmRelease found; continuing with the local development release"; \
+	fi
 
 setup-monitoring: dev-setup-fluxcd
 

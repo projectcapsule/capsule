@@ -18,19 +18,6 @@ spec:
         customer: renewable
   rules:
   - enforce:
-      action: deny
-      workloads:
-        resources:
-          limits:
-            cpu:
-              policy: Remove
-            memory:
-              policy: Ratio
-              value: "1.5"
-
-
-
-  - enforce:
       action: allow
       metadata:
         - kinds:
@@ -43,23 +30,23 @@ spec:
               managed: "true"
         - kinds:
             - Service
-            - Endpoint
+            - Endpoints
           annotations:
             customer.corp/routable:
               managed: "true"
           labels:
             customer.corp/network-tenant:
-              managed: {{$.tenant.metadata.name}}
+              managed: "{{$.tenant.metadata.name}}"
         - apiGroups:
             - "discovery.k8s.io/v1"
           kinds:
-            - Service
+            - EndpointSlice
           annotations:
             customer.corp/routable:
               managed: "true"
           labels:
             customer.corp/network-tenant:
-              managed: {{$.tenant.metadata.name}}
+              managed: "{{$.tenant.metadata.name}}"
   - permissions:
       bindings:
         - clusterRoleName: 'custom:proxy-viewer'

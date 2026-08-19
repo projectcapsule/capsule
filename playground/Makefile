@@ -174,6 +174,10 @@ render: certificates ## Render the installation manifests with environment subst
 apply: certificates ## Apply the rendered installation to the local cluster.
 	@kubectl kustomize installation | envsubst $(SUBSTITUTION_VARIABLES) | $(KUBECTL) apply -f -
 
+apply-headlamp:  ## Apply the rendered installation to the local cluster.
+	@kubectl kustomize installation | envsubst $(SUBSTITUTION_VARIABLES) | $(KUBECTL) apply -f -
+
+
 apply-platform:
 	@kubectl kustomize platform | envsubst $(SUBSTITUTION_VARIABLES) | $(KUBECTL) apply -f -
 
@@ -274,7 +278,10 @@ dev: up ## Bring up the playground and deploy Capsule from the current checkout.
 	@$(MAKE) --no-print-directory dev-capsule
 
 capsule-stable: check ## Restore the Flux-managed Capsule release.
-	@$(KUBECTL) get helmrelease capsule --namespace flux-system >/dev/null 2>&1 || { echo "Capsule is not installed; run make up first" >&2; exit 1; }
+	@if ! $(KUBECTL) get helmrelease capsule --namespace flux-system >/dev/null 2>&1; then \
+		echo "Recreating the Flux-managed Capsule HelmRelease..."; \
+		$(MAKE) --no-print-directory apply; \
+	fi
 	@flux resume helmrelease capsule --context '$(CONTEXT)' --namespace flux-system --wait --timeout '$(TIMEOUT)'
 	@flux reconcile helmrelease capsule --context '$(CONTEXT)' --namespace flux-system --with-source --timeout '$(TIMEOUT)'
 	@$(KUBECTL) rollout status deployment/capsule-controller-manager --namespace capsule-system --timeout='$(TIMEOUT)'

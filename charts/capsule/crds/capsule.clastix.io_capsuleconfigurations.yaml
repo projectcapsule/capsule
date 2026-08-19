@@ -89,7 +89,9 @@ spec:
                         description: Annotations added to the Admission Webhook
                         type: object
                       client:
-                        description: whats the problem
+                        description: |-
+                          Client defines how the Kubernetes API server reaches the admission webhook.
+                          Exactly one of URL or Service must be configured.
                         properties:
                           caBundle:
                             description: |-
@@ -564,6 +566,9 @@ spec:
                     required:
                     - client
                     type: object
+                    x-kubernetes-validations:
+                    - message: client must configure exactly one of url or service
+                      rule: has(self.client.url) != has(self.client.service)
                   serviceName:
                     default: capsule-webhook-service
                     description: Service Name of the Admission Service
@@ -577,7 +582,9 @@ spec:
                         description: Annotations added to the Admission Webhook
                         type: object
                       client:
-                        description: whats the problem
+                        description: |-
+                          Client defines how the Kubernetes API server reaches the admission webhook.
+                          Exactly one of URL or Service must be configured.
                         properties:
                           caBundle:
                             description: |-
@@ -1034,6 +1041,9 @@ spec:
                     required:
                     - client
                     type: object
+                    x-kubernetes-validations:
+                    - message: client must configure exactly one of url or service
+                      rule: has(self.client.url) != has(self.client.service)
                 type: object
               allowServiceAccountPromotion:
                 default: false
