@@ -4,7 +4,6 @@
 package resourcepools
 
 import (
-	"context"
 	"testing"
 
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -57,7 +56,7 @@ func TestResourcePoolFinalize(t *testing.T) {
 				controllerutil.AddFinalizer(pool, meta.ControllerFinalizer)
 			}
 
-			(&resourcePoolController{}).finalize(context.Background(), pool)
+			(&resourcePoolController{}).finalize(pool)
 
 			if got := controllerutil.ContainsFinalizer(pool, meta.ControllerFinalizer); got != tt.wantFinalizer {
 				t.Fatalf("finalizer presence = %v, want %v", got, tt.wantFinalizer)

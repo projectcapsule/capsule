@@ -36,8 +36,8 @@ func (h *validationHandler) OnCreate(
 	_ admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
-		return h.handle(cfg, req)
+	return func(context.Context, admission.Request) *admission.Response {
+		return h.handle(cfg)
 	}
 }
 
@@ -61,14 +61,13 @@ func (h *validationHandler) OnUpdate(
 	_ admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
-		return h.handle(cfg, req)
+	return func(context.Context, admission.Request) *admission.Response {
+		return h.handle(cfg)
 	}
 }
 
 func (h *validationHandler) handle(
 	config *capsulev1beta2.CapsuleConfiguration,
-	req admission.Request,
 ) *admission.Response {
 	if err := h.validateRegex(
 		"spec.protectedNamespaceRegex",

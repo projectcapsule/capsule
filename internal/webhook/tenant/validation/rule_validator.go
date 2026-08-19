@@ -42,8 +42,8 @@ func (h *RuleValidationHandler) OnCreate(
 	decoder admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
-		if err := h.handle(tnt, req); err != nil {
+	return func(context.Context, admission.Request) *admission.Response {
+		if err := h.handle(tnt); err != nil {
 			return err
 		}
 
@@ -71,8 +71,8 @@ func (h *RuleValidationHandler) OnUpdate(
 	decoder admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if response := h.handle(tnt, req); response != nil {
+	return func(ctx context.Context, _ admission.Request) *admission.Response {
+		if response := h.handle(tnt); response != nil {
 			return response
 		}
 
@@ -176,7 +176,6 @@ func validateRuleQuotaUpdates(
 
 func (h *RuleValidationHandler) handle(
 	tnt *capsulev1beta2.Tenant,
-	req admission.Request,
 ) *admission.Response {
 	if tnt == nil || len(tnt.Spec.Rules) == 0 {
 		return nil

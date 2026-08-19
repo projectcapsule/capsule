@@ -39,12 +39,12 @@ func (h *replicaHandler) OnCreate(
 
 func (h *replicaHandler) OnDelete(
 	c client.Client,
-	reader client.Reader,
+	_ client.Reader,
 	_ admission.Decoder,
-	recorder events.EventRecorder,
+	_ events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handler(ctx, c, req, recorder)
+		return h.handler(ctx, c, req)
 	}
 }
 
@@ -52,10 +52,10 @@ func (h *replicaHandler) OnUpdate(
 	c client.Client,
 	_ client.Reader,
 	_ admission.Decoder,
-	recorder events.EventRecorder,
+	_ events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handler(ctx, c, req, recorder)
+		return h.handler(ctx, c, req)
 	}
 }
 
@@ -63,7 +63,6 @@ func (h *replicaHandler) handler(
 	ctx context.Context,
 	c client.Client,
 	req admission.Request,
-	recorder events.EventRecorder,
 ) *admission.Response {
 	// Checking if the object is managed by a TenantResource, local or global
 	ref := gvk.ResourceID{

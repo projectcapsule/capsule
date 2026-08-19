@@ -30,8 +30,8 @@ func (h *ingressClassRegexHandler) OnCreate(
 	_ admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
-		if response := h.validate(tnt, req); response != nil {
+	return func(context.Context, admission.Request) *admission.Response {
+		if response := h.validate(tnt); response != nil {
 			return response
 		}
 
@@ -59,8 +59,8 @@ func (h *ingressClassRegexHandler) OnUpdate(
 	decoder admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
-		if err := h.validate(tnt, req); err != nil {
+	return func(context.Context, admission.Request) *admission.Response {
+		if err := h.validate(tnt); err != nil {
 			return err
 		}
 
@@ -68,7 +68,7 @@ func (h *ingressClassRegexHandler) OnUpdate(
 	}
 }
 
-func (h *ingressClassRegexHandler) validate(tnt *capsulev1beta2.Tenant, req admission.Request) *admission.Response {
+func (h *ingressClassRegexHandler) validate(tnt *capsulev1beta2.Tenant) *admission.Response {
 	//nolint:staticcheck
 	if tnt.Spec.IngressOptions.AllowedClasses != nil && len(tnt.Spec.IngressOptions.AllowedClasses.Regex) > 0 {
 		if _, err := regexp.Compile(tnt.Spec.IngressOptions.AllowedClasses.Regex); err != nil {

@@ -28,8 +28,8 @@ func (h *serviceAccountHandler) OnCreate(
 	_ admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
-		return h.handle(cfg, req)
+	return func(context.Context, admission.Request) *admission.Response {
+		return h.handle(cfg)
 	}
 }
 
@@ -53,12 +53,12 @@ func (h *serviceAccountHandler) OnUpdate(
 	_ admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
-		return h.handle(cfg, req)
+	return func(context.Context, admission.Request) *admission.Response {
+		return h.handle(cfg)
 	}
 }
 
-func (h *serviceAccountHandler) handle(config *capsulev1beta2.CapsuleConfiguration, req admission.Request) *admission.Response {
+func (h *serviceAccountHandler) handle(config *capsulev1beta2.CapsuleConfiguration) *admission.Response {
 	nameSet := config.Spec.Impersonation.GlobalDefaultServiceAccount != ""
 	nsSet := config.Spec.Impersonation.GlobalDefaultServiceAccountNamespace != ""
 

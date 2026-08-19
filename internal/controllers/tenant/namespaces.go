@@ -385,7 +385,7 @@ func (r *Manager) reconcileNamespace(
 
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() (conflictErr error) {
 		_, conflictErr = controllerutil.CreateOrUpdate(ctx, r.Client, namespace, func() error {
-			metaStatus, err = r.reconcileNamespaceMetadata(ctx, namespace, tnt, stat)
+			metaStatus, err = r.reconcileNamespaceMetadata(namespace, tnt, stat)
 
 			return err
 		})
@@ -398,7 +398,6 @@ func (r *Manager) reconcileNamespace(
 
 //nolint:nestif
 func (r *Manager) reconcileNamespaceMetadata(
-	ctx context.Context,
 	ns *corev1.Namespace,
 	tnt *capsulev1beta2.Tenant,
 	stat *capsulev1beta2.TenantStatusNamespaceItem,

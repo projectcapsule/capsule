@@ -97,7 +97,7 @@ func (r Reconciler) conversionManagedCRDs() map[string]ManagedCRD {
 
 // Collects required SANs for certificate
 // desiredWebhookSANs collects required SANs for the webhook serving certificate.
-func (r *Reconciler) desiredWebhookSANs(ctx context.Context) (cert.CertificateSANs, error) {
+func (r *Reconciler) desiredWebhookSANs() (cert.CertificateSANs, error) {
 	sans := cert.CertificateSANs{}
 
 	sans.AddDNSNames(

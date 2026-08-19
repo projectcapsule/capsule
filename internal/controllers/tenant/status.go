@@ -383,9 +383,8 @@ func listObjectNamesBySelector(
 	c client.Reader,
 	allowed *api.DefaultAllowedListSpec,
 	list client.ObjectList,
-	opts ...client.ListOption,
 ) ([]string, error) {
-	if err := c.List(ctx, list, opts...); err != nil {
+	if err := c.List(ctx, list); err != nil {
 		return nil, err
 	}
 

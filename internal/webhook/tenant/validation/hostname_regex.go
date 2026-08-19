@@ -30,8 +30,8 @@ func (h *hostnameRegexHandler) OnCreate(
 	decoder admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
-		if response := h.validate(tnt, req); response != nil {
+	return func(context.Context, admission.Request) *admission.Response {
+		if response := h.validate(tnt); response != nil {
 			return response
 		}
 
@@ -59,8 +59,8 @@ func (h *hostnameRegexHandler) OnUpdate(
 	decoder admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
-		if err := h.validate(tnt, req); err != nil {
+	return func(context.Context, admission.Request) *admission.Response {
+		if err := h.validate(tnt); err != nil {
 			return err
 		}
 
@@ -71,7 +71,6 @@ func (h *hostnameRegexHandler) OnUpdate(
 //nolint:staticcheck
 func (h *hostnameRegexHandler) validate(
 	tnt *capsulev1beta2.Tenant,
-	req admission.Request,
 ) *admission.Response {
 	if tnt.Spec.IngressOptions.AllowedHostnames != nil && len(tnt.Spec.IngressOptions.AllowedHostnames.Regex) > 0 {
 		if _, err := regexp.Compile(tnt.Spec.IngressOptions.AllowedHostnames.Regex); err != nil {

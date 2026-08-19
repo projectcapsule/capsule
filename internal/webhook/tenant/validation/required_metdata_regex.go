@@ -30,8 +30,8 @@ func (h *requiredMetadataHandler) OnCreate(
 	_ admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
-		if response := h.validate(tnt, req); response != nil {
+	return func(context.Context, admission.Request) *admission.Response {
+		if response := h.validate(tnt); response != nil {
 			return response
 		}
 
@@ -59,12 +59,12 @@ func (h *requiredMetadataHandler) OnUpdate(
 	decoder admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
+	return func(context.Context, admission.Request) *admission.Response {
 		if !requiredMetadataChanged(old, tnt) {
 			return nil
 		}
 
-		if err := h.validate(tnt, req); err != nil {
+		if err := h.validate(tnt); err != nil {
 			return err
 		}
 
@@ -72,7 +72,7 @@ func (h *requiredMetadataHandler) OnUpdate(
 	}
 }
 
-func (h *requiredMetadataHandler) validate(tnt *capsulev1beta2.Tenant, req admission.Request) *admission.Response {
+func (h *requiredMetadataHandler) validate(tnt *capsulev1beta2.Tenant) *admission.Response {
 	no := tnt.Spec.NamespaceOptions
 	if no == nil || no.RequiredMetadata == nil {
 		return nil

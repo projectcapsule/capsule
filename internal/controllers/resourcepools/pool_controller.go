@@ -109,7 +109,7 @@ func (r resourcePoolController) Reconcile(ctx context.Context, request ctrl.Requ
 	}
 
 	defer func() {
-		r.finalize(ctx, instance)
+		r.finalize(instance)
 
 		if uerr := r.updateStatus(ctx, instance, err); uerr != nil {
 			if caperrors.IgnoreGone(uerr) {
@@ -186,7 +186,6 @@ func (r *resourcePoolController) resourcePoolsForNamespace(ctx context.Context, 
 }
 
 func (r *resourcePoolController) finalize(
-	ctx context.Context,
 	pool *capsulev1beta2.ResourcePool,
 ) {
 	managedResources := pool.Status.ClaimSize + pool.Status.NamespaceSize
@@ -209,10 +208,7 @@ func (r *resourcePoolController) reconcile(
 ) (err error) {
 	r.handlePoolHardResources(pool)
 
-	namespaces, err := r.gatherMatchingNamespaces(ctx, log, pool)
-	if err != nil {
-		return err
-	}
+	namespaces := r.gatherMatchingNamespaces(ctx, log, pool)
 
 	currentNamespaces := make(map[string]struct{}, len(namespaces))
 	for _, ns := range namespaces {
@@ -297,7 +293,7 @@ func (r *resourcePoolController) reconcile(
 		}
 	}
 
-	if err := r.reconcileClaimsInUse(ctx, log, pool, claimsByNS); err != nil {
+	if err := r.reconcileClaimsInUse(ctx, pool, claimsByNS); err != nil {
 		errs = append(errs, fmt.Errorf("reconcile claims in use: %w", err))
 	}
 
@@ -306,7 +302,6 @@ func (r *resourcePoolController) reconcile(
 
 func (r *resourcePoolController) reconcileClaimsInUse(
 	ctx context.Context,
-	log logr.Logger,
 	pool *capsulev1beta2.ResourcePool,
 	claimsByNS map[string][]capsulev1beta2.ResourcePoolClaim,
 ) error {
@@ -314,7 +309,7 @@ func (r *resourcePoolController) reconcileClaimsInUse(
 
 	for ns, nsClaims := range claimsByNS {
 		group.Go(func() error {
-			if err := r.reconcileClaimsInUseForNamespace(ctx, log, pool, ns, nsClaims); err != nil {
+			if err := r.reconcileClaimsInUseForNamespace(ctx, pool, ns, nsClaims); err != nil {
 				return fmt.Errorf("namespace %s: %w", ns, err)
 			}
 
@@ -327,7 +322,6 @@ func (r *resourcePoolController) reconcileClaimsInUse(
 
 func (r *resourcePoolController) reconcileClaimsInUseForNamespace(
 	ctx context.Context,
-	log logr.Logger,
 	pool *capsulev1beta2.ResourcePool,
 	namespace string,
 	claims []capsulev1beta2.ResourcePoolClaim,
@@ -781,19 +775,19 @@ func (r *resourcePoolController) gatherMatchingNamespaces(
 	ctx context.Context,
 	log logr.Logger,
 	pool *capsulev1beta2.ResourcePool,
-) (namespaces []corev1.Namespace, err error) {
+) (namespaces []corev1.Namespace) {
 	// Collect Namespaces (Matching)
 	namespaces = make([]corev1.Namespace, 0)
 	seenNamespaces := make(map[string]struct{})
 
 	if !pool.DeletionTimestamp.IsZero() {
-		return namespaces, err
+		return namespaces
 	}
 
 	for _, selector := range pool.Spec.Selectors {
 		selected, serr := selector.GetMatchingNamespaces(ctx, r.reader)
 		if serr != nil {
-			log.Error(err, "Cannot get matching namespaces")
+			log.Error(serr, "Cannot get matching namespaces")
 
 			continue
 		}
@@ -813,7 +807,7 @@ func (r *resourcePoolController) gatherMatchingNamespaces(
 		}
 	}
 
-	return namespaces, err
+	return namespaces
 }
 
 // Get Currently selected claims for the resourcepool.

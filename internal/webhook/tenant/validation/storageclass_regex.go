@@ -30,8 +30,8 @@ func (h *storageClassRegexHandler) OnCreate(
 	decoder admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
-		if err := h.validate(tnt, req); err != nil {
+	return func(context.Context, admission.Request) *admission.Response {
+		if err := h.validate(tnt); err != nil {
 			return err
 		}
 
@@ -59,8 +59,8 @@ func (h *storageClassRegexHandler) OnUpdate(
 	_ admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
-		if err := h.validate(tnt, req); err != nil {
+	return func(context.Context, admission.Request) *admission.Response {
+		if err := h.validate(tnt); err != nil {
 			return err
 		}
 
@@ -68,7 +68,7 @@ func (h *storageClassRegexHandler) OnUpdate(
 	}
 }
 
-func (h *storageClassRegexHandler) validate(tnt *capsulev1beta2.Tenant, req admission.Request) *admission.Response {
+func (h *storageClassRegexHandler) validate(tnt *capsulev1beta2.Tenant) *admission.Response {
 	//nolint:staticcheck
 	if tnt.Spec.StorageClasses != nil && len(tnt.Spec.StorageClasses.Regex) > 0 {
 		if _, err := regexp.Compile(tnt.Spec.StorageClasses.Regex); err != nil {

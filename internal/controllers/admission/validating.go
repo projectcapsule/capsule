@@ -88,7 +88,7 @@ func (r *validatingReconciler) reconcileValidatingConfiguration(
 ) error {
 	desiredName := string(cfg.Name)
 
-	desiredHooks, err := r.validatingWebhooks(ctx, cfg)
+	desiredHooks, err := r.validatingWebhooks(cfg)
 	if err != nil {
 		return err
 	}
@@ -242,7 +242,6 @@ func (r *validatingReconciler) deleteValidatingWebhookConfig(ctx context.Context
 }
 
 func (r *validatingReconciler) validatingWebhooks(
-	ctx context.Context,
 	cfg *capsulev1beta2.DynamicValidatingAdmissionConfig,
 ) (hooks []admissionv1.ValidatingWebhook, err error) {
 	for _, hook := range cfg.Webhooks {

@@ -29,8 +29,8 @@ func (h *ownerHandler) OnCreate(
 	_ admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
-		return h.handle(cfg, req)
+	return func(context.Context, admission.Request) *admission.Response {
+		return h.handle(cfg)
 	}
 }
 
@@ -54,12 +54,12 @@ func (h *ownerHandler) OnUpdate(
 	_ admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
-		return h.handle(cfg, req)
+	return func(context.Context, admission.Request) *admission.Response {
+		return h.handle(cfg)
 	}
 }
 
-func (h *ownerHandler) handle(config *capsulev1beta2.CapsuleConfiguration, req admission.Request) *admission.Response {
+func (h *ownerHandler) handle(config *capsulev1beta2.CapsuleConfiguration) *admission.Response {
 	for _, owner := range config.Spec.Users {
 		if err := tenant.ValidateTenantOwner(owner); err != nil {
 			return ad.Deny(
