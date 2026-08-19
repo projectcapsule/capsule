@@ -1,0 +1,8 @@
+fullnameOverride: capsule
+manager:
+  rbac:
+    create: true
+    strict: true
+    bindableClusterRoles:
+      - admin
+      - edit
