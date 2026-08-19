@@ -8,5 +8,5 @@ roleRef:
   kind: ClusterRole
   name: cluster-admin
 subjects:
-  - kind: Group
-    name: capsule-admin
+  - kind: User
+    name: admin

@@ -13,4 +13,4 @@ spec:
       requests.storage: "5Gi"
   selectors:
   - matchLabels:
-      customer: a
+      customer: renewable

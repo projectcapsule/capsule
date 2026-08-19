@@ -20,9 +20,9 @@ spec:
           spec:
             limits:
               - max:
-                  cpu: 0
+                  cpu: "0"
                   memory: "0"
                 min:
-                  cpu: 0
+                  cpu: "0"
                   memory: "0"
                 type: Container
