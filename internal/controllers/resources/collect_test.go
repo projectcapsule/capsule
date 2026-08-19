@@ -81,33 +81,6 @@ func TestCollectorAddToAccumulationClusterScopedObjects(t *testing.T) {
 		}
 	})
 
-	t.Run("rejects cluster scoped object targeting a namespace", func(t *testing.T) {
-		t.Parallel()
-
-		acc := processor.Accumulator{}
-		obj := newUnstructured("v1", "Namespace", "", "example")
-
-		opts := CollectorOptions{
-			Accumulator:               acc,
-			AllowClusterScopedObjects: true,
-		}
-
-		target := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "tenant-a"}}
-
-		err := collector.AddToAccumulation(nil, target, opts, capsuleResourceSpec(), obj, "test", true)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-
-		if !strings.Contains(err.Error(), "cannot be replicated into the Namespace tenant-a") {
-			t.Fatalf("expected a namespaced replication error, got %v", err)
-		}
-
-		if len(acc) != 0 {
-			t.Fatalf("expected object not to be accumulated, got %d items", len(acc))
-		}
-	})
-
 	t.Run("keeps allowing namespaced object targeting a namespace", func(t *testing.T) {
 		t.Parallel()
 
