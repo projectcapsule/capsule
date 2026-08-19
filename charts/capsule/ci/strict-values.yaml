@@ -1,0 +1,5 @@
+fullnameOverride: capsule
+manager:
+  rbac:
+    create: true
+    strict: true

@@ -273,6 +273,7 @@ rules:
   - "get"
   - "list"
   - "watch"
+  - "create"
   - "patch"
   - "update"
   - "delete"
@@ -434,6 +435,14 @@ rules:
   - patch
   - delete
 - apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["clusterroles"]
+  resourceNames:
+    - admin
+    - {{ $.Values.manager.options.rbac.provisioner}}
+    - {{ $.Values.manager.options.rbac.deleter}}
+  verbs:
+  - bind
+- apiGroups: ["rbac.authorization.k8s.io"]
   resources: ["clusterrolebindings"]
   verbs:
   - "list"
@@ -462,6 +471,9 @@ rules:
 - apiGroups: [""]
   resources: ["secrets"]
   verbs: ["get", "list", "watch", "create", "update", "patch"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
 ---
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1

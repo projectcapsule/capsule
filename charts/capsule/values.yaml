@@ -153,7 +153,10 @@ manager:
     create: true
 
     # -- Strongly restrict the RBAC assigned to Capsule Controller.
-    # When set to true you must aggregate further permissions by yourself.
+    # The default owner ClusterRoles (admin, provisioner and deleter) can be bound
+    # to tenant owners out of the box; permissions for anything beyond that (custom
+    # owner clusterRoles, TenantResource replication) must be aggregated by yourself
+    # via ClusterRoles labeled projectcapsule.dev/aggregate-to-controller: "true".
     strict: false
 
     # -- DEPRECATED: use strict instead.
