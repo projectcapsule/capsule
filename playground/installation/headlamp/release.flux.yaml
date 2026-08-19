@@ -15,7 +15,7 @@ spec:
   chart:
     spec:
       chart: headlamp
-      version: "0.42.0"
+      version: "0.44.0"
       sourceRef:
         kind: HelmRepository
         name: headlamp-charts
