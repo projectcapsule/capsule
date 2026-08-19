@@ -186,3 +186,92 @@ func TestProcessedItems_SortDeterministic(t *testing.T) {
 		}
 	}
 }
+
+func TestProcessedItems_InScope(t *testing.T) {
+	now := metav1.NewTime(time.Now())
+
+	inA := mkItem("tenant-a", "ns-a", "name-a", "Secret", metav1.ConditionTrue, "Ready", "", true, now)
+	inB := mkItem("tenant-a", "ns-a", "name-b", "ConfigMap", metav1.ConditionTrue, "Ready", "", true, now)
+	otherNs := mkItem("tenant-a", "ns-b", "name-a", "Secret", metav1.ConditionTrue, "Ready", "", true, now)
+	otherTnt := mkItem("tenant-b", "ns-a", "name-a", "Secret", metav1.ConditionTrue, "Ready", "", true, now)
+	clusterWide := mkItem("tenant-a", "", "name-a", "ClusterRole", metav1.ConditionTrue, "Ready", "", true, now)
+
+	p := meta.ProcessedItems{inA, otherNs, inB, otherTnt, clusterWide}
+
+	scoped := p.InScope("tenant-a", "ns-a")
+
+	if len(scoped) != 2 {
+		t.Fatalf("expected 2 scoped items, got %d", len(scoped))
+	}
+
+	if scoped[0].ResourceID != inA.ResourceID || scoped[1].ResourceID != inB.ResourceID {
+		t.Fatalf("expected the scoped items in their original order, got %+v", scoped)
+	}
+
+	// The receiver must not be affected by any mutation of the returned copy.
+	updated := inA
+	updated.Message = "mutated"
+	scoped.UpdateItem(updated)
+
+	if p[0].Message != "" {
+		t.Fatalf("expected the source item to be untouched, got message %q", p[0].Message)
+	}
+}
+
+func TestProcessedItems_ReplaceScope(t *testing.T) {
+	now := metav1.NewTime(time.Now())
+
+	tracked := mkItem("tenant-a", "ns-a", "name-a", "Secret", metav1.ConditionFalse, "Ready", "failed", true, now)
+	gone := mkItem("tenant-a", "ns-a", "name-gone", "Secret", metav1.ConditionTrue, "Ready", "", true, now)
+	otherNs := mkItem("tenant-a", "ns-b", "name-a", "Secret", metav1.ConditionTrue, "Ready", "keep", true, now)
+	otherTnt := mkItem("tenant-b", "ns-a", "name-a", "Secret", metav1.ConditionTrue, "Ready", "keep", true, now)
+
+	p := meta.ProcessedItems{tracked, otherNs, gone, otherTnt}
+
+	reapplied := mkItem("tenant-a", "ns-a", "name-a", "Secret", metav1.ConditionTrue, "Ready", "applied", true, now)
+	fresh := mkItem("tenant-a", "ns-a", "name-new", "ConfigMap", metav1.ConditionTrue, "Ready", "", false, now)
+	// Out of the replaced scope: it must not leak into the result.
+	foreign := mkItem("tenant-a", "ns-c", "name-a", "Secret", metav1.ConditionTrue, "Ready", "", true, now)
+
+	p.ReplaceScope("tenant-a", "ns-a", meta.ProcessedItems{reapplied, fresh, foreign})
+
+	want := []gvk.ResourceID{
+		reapplied.ResourceID, // updated in place, position preserved
+		otherNs.ResourceID,   // untouched
+		otherTnt.ResourceID,  // untouched, shifted by the dropped item
+		fresh.ResourceID,     // appended
+	}
+
+	if len(p) != len(want) {
+		t.Fatalf("expected %d items, got %d: %+v", len(want), len(p), p)
+	}
+
+	for idx := range want {
+		if p[idx].ResourceID != want[idx] {
+			t.Fatalf("at index %d: expected %v, got %v", idx, want[idx], p[idx].ResourceID)
+		}
+	}
+
+	if p[0].Status != metav1.ConditionTrue || p[0].Message != "applied" {
+		t.Fatalf("expected the tracked item condition to be replaced, got %+v", p[0].ObjectReferenceStatusCondition)
+	}
+
+	if p[1].Message != "keep" || p[2].Message != "keep" {
+		t.Fatal("expected the items of the other scopes to keep their condition")
+	}
+}
+
+func TestProcessedItems_ReplaceScope_EmptyDropsScopeOnly(t *testing.T) {
+	now := metav1.NewTime(time.Now())
+
+	inScope := mkItem("tenant-a", "ns-a", "name-a", "Secret", metav1.ConditionTrue, "Ready", "", true, now)
+	otherNs := mkItem("tenant-a", "ns-b", "name-a", "Secret", metav1.ConditionTrue, "Ready", "", true, now)
+
+	p := meta.ProcessedItems{inScope, otherNs}
+
+	p.ReplaceScope("tenant-a", "ns-a", nil)
+
+	if len(p) != 1 || p[0].ResourceID != otherNs.ResourceID {
+		t.Fatalf("expected only the out of scope item to survive, got %+v", p)
+	}
+}

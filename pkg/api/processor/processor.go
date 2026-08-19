@@ -9,6 +9,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 )
 
 type Processor struct {
@@ -24,4 +25,16 @@ type ProcessorOptions struct {
 	Adopt            bool
 	Force            bool
 	Owner            *metav1.OwnerReference
+}
+
+// Scope narrows a reconciliation down to the items replicated into a
+// single Namespace of a single Tenant.
+type Scope struct {
+	Tenant    string
+	Namespace string
+}
+
+// Matches states whether the given resource identity belongs to the scope.
+func (s Scope) Matches(id gvk.ResourceID) bool {
+	return id.Tenant == s.Tenant && id.Namespace == s.Namespace
 }

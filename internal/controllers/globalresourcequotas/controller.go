@@ -128,13 +128,13 @@ func (r *Controller) reconcile(
 		return nil, false, err
 	}
 
-	if err := r.syncResourceQuotas(ctx, instance, namespaces); err != nil {
-		return nil, false, err
-	}
-
 	status, initialized, err := r.observeUsage(ctx, instance, namespaces)
 	if err != nil {
 		return nil, false, err
+	}
+
+	if err := r.syncResourceQuotas(ctx, instance, namespaces, status); err != nil {
+		return status, false, err
 	}
 
 	ledger, err := r.ensureLedger(ctx, instance)
@@ -160,6 +160,7 @@ func (r *Controller) syncResourceQuotas(
 	ctx context.Context,
 	instance *capsulev1beta2.GlobalResourceQuota,
 	namespaces []corev1.Namespace,
+	status *capsulev1beta2.GlobalResourceQuotaStatus,
 ) error {
 	selected := make(map[string]struct{}, len(namespaces))
 
@@ -184,7 +185,7 @@ func (r *Controller) syncResourceQuotas(
 				targetLabels[meta.NewManagedByCapsuleLabel] = meta.ValueController
 				targetLabels[meta.GlobalResourceQuotaLabel] = instance.Name
 				target.SetLabels(targetLabels)
-				target.Spec = *instance.Spec.Quota.DeepCopy()
+				target.Spec = projectedResourceQuotaSpec(instance.Spec.Quota, status, namespace.Name)
 
 				return controllerutil.SetControllerReference(instance, target, r.Scheme())
 			})
@@ -219,6 +220,40 @@ func (r *Controller) syncResourceQuotas(
 	}
 
 	return nil
+}
+
+// projectedResourceQuotaSpec gives every selected namespace access to the
+// quota which is still available globally, while retaining that namespace's
+// already-observed usage in its native ResourceQuota hard limit. Consequently
+// Spec.Hard-Status.Used exposes the same remaining capacity in every
+// namespace. When the global quota is exhausted or over limit, Hard is pinned
+// to the namespace's current usage so native ResourceQuota admission blocks
+// further consumption.
+func projectedResourceQuotaSpec(
+	quota corev1.ResourceQuotaSpec,
+	status *capsulev1beta2.GlobalResourceQuotaStatus,
+	namespace string,
+) corev1.ResourceQuotaSpec {
+	desired := *quota.DeepCopy()
+	desired.Hard = make(corev1.ResourceList, len(quota.Hard))
+
+	var namespaceUsed corev1.ResourceList
+	if status != nil {
+		namespaceUsed = status.NamespaceUsage[namespace].Used
+	}
+
+	for name, hard := range quota.Hard {
+		available := hard.DeepCopy()
+		if status != nil {
+			available = status.Total.Available[name].DeepCopy()
+		}
+
+		projected := namespaceUsed[name].DeepCopy()
+		projected.Add(available)
+		desired.Hard[name] = projected
+	}
+
+	return desired
 }
 
 func (r *Controller) observeUsage(

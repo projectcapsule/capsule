@@ -693,6 +693,10 @@
                             "description": "Specifies further cluster roles to be added to the Capsule manager service account.",
                             "type": "array"
                         },
+                        "minimal": {
+                            "description": "DEPRECATED: use strict instead. Former name of the strict option; takes effect when either flag is true.",
+                            "type": "boolean"
+                        },
                         "role": {
                             "type": "object",
                             "properties": {

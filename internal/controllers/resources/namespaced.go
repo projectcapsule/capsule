@@ -51,6 +51,7 @@ type namespacedResourceController struct {
 	collector     Collector
 	configuration configuration.Configuration
 	metrics       *metrics.TenantResourceRecorder
+	clients       impersonatedClientLoader[*capsulev1beta2.TenantResource]
 
 	impersonation *cache.ImpersonationCache
 }
@@ -69,6 +70,12 @@ func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager, ctrlCo
 		mgr.GetAPIReader(),
 		mgr.GetRESTMapper(),
 	)
+	r.clients = impersonatedClientLoader[*capsulev1beta2.TenantResource]{
+		client:        r.client,
+		configuration: r.configuration,
+		impersonation: r.impersonation,
+		resolve:       namespacedServiceAccount,
+	}
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(
@@ -181,7 +188,7 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 	// On Deletion these checks are skipped.
 	//nolint:nestif
 	if tntResource.DeletionTimestamp.IsZero() {
-		if tntResource.Spec.Cordoned != nil && *tntResource.Spec.Cordoned {
+		if tntResource.Spec.IsCordoned() {
 			log.V(5).Info("tenant resource cordoned")
 
 			return reconcile.Result{}, nil
@@ -531,63 +538,22 @@ func (r *namespacedResourceController) gatherResources(
 	return nil
 }
 
-//nolint:dupl
 func (r *namespacedResourceController) loadClient(
 	ctx context.Context,
 	log logr.Logger,
 	tntResource *capsulev1beta2.TenantResource,
 ) (client.Client, error) {
-	sa := r.impersonatedServiceAccount(ctx, log, tntResource)
-	if sa == nil {
-		sa, ns := configuration.ControllerServiceAccount()
+	c, sa, err := r.clients.Load(ctx, log, tntResource)
 
-		tntResource.Status.ServiceAccount = &meta.NamespacedRFC1123ObjectReferenceWithNamespace{
-			Name:      meta.RFC1123Name(sa),
-			Namespace: meta.RFC1123SubdomainName(ns),
-		}
+	// The resolved identity is posted to the status even along a failure, as it states
+	// which ServiceAccount the replication was attempted with.
+	tntResource.Status.ServiceAccount = sa
 
-		return r.client, nil
-	}
-
-	tntResource.Status.ServiceAccount = &meta.NamespacedRFC1123ObjectReferenceWithNamespace{
-		Name:      sa.Name,
-		Namespace: sa.Namespace,
-	}
-
-	re, err := r.configuration.ServiceAccountClient(ctx)
 	if err != nil {
-		log.Error(err, "failed to load impersonated rest client")
-
 		return nil, err
 	}
 
-	log.V(5).Info("using impersonation client", "serviceaccount", sa.Name, "namespace", sa.Namespace)
-
-	return r.impersonation.LoadOrCreate(ctx, log, re, r.client.Scheme(), *sa)
-}
-
-func (r *namespacedResourceController) impersonatedServiceAccount(
-	ctx context.Context,
-	log logr.Logger,
-	tntResource *capsulev1beta2.TenantResource,
-) *meta.NamespacedRFC1123ObjectReferenceWithNamespace {
-	if tntResource.Spec.ServiceAccount != nil {
-		return &meta.NamespacedRFC1123ObjectReferenceWithNamespace{
-			Name:      tntResource.Spec.ServiceAccount.Name,
-			Namespace: meta.RFC1123SubdomainName(tntResource.Namespace),
-		}
-	}
-
-	cfg := r.configuration.ServiceAccountClientProperties()
-
-	if cfg.TenantDefaultServiceAccount == "" {
-		return nil
-	}
-
-	return &meta.NamespacedRFC1123ObjectReferenceWithNamespace{
-		Name:      cfg.TenantDefaultServiceAccount,
-		Namespace: meta.RFC1123SubdomainName(tntResource.Namespace),
-	}
+	return c, nil
 }
 
 func (r *namespacedResourceController) updateReconcilingStatus(ctx context.Context, instance *capsulev1beta2.TenantResource) error {

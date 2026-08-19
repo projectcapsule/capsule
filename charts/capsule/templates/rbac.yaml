@@ -106,7 +106,7 @@ subjects:
 - kind: ServiceAccount
   name: {{ include "capsule.serviceAccountName" . }}
   namespace: {{ .Release.Namespace }}
-    {{- if $.Values.manager.rbac.minimal }}
+    {{- if or $.Values.manager.rbac.strict $.Values.manager.rbac.minimal }}
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
