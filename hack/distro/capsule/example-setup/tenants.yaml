@@ -10,6 +10,13 @@ spec:
     - name: alice
       kind: User
   rules:
+    - enforce:
+        action: allow
+        workloads:
+          resources:
+            limits:
+              memory:
+                policy: MatchRequest
     - namespaceSelector:
         matchExpressions:
           - key: env
