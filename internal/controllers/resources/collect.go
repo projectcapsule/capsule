@@ -217,7 +217,7 @@ func (co *Collector) AddToAccumulation(
 		return err
 	}
 
-	if err := co.validateClusterScopedObjectAllowed(opts, obj, ns); err != nil {
+	if err := co.validateClusterScopedObjectAllowed(opts, obj); err != nil {
 		return err
 	}
 
@@ -302,7 +302,7 @@ func (co *Collector) CollectForNamespace(
 
 		// Rejected upfront, before imposing the target Namespace on a copy which could never
 		// be applied as such.
-		if err := co.validateClusterScopedObjectAllowed(opts, obj, target); err != nil {
+		if err := co.validateClusterScopedObjectAllowed(opts, obj); err != nil {
 			return err
 		}
 
@@ -444,12 +444,8 @@ func GatherAdditionalMetadata(
 //
 // Cluster-scoped objects remain replicable through the None and Tenant scopes, which impose
 // no target Namespace at all.
-func (co *Collector) validateClusterScopedObjectAllowed(
-	opts CollectorOptions,
-	obj *unstructured.Unstructured,
-	ns *corev1.Namespace,
-) error {
-	if opts.AllowClusterScopedObjects && ns == nil {
+func (co *Collector) validateClusterScopedObjectAllowed(opts CollectorOptions, obj *unstructured.Unstructured) error {
+	if opts.AllowClusterScopedObjects {
 		return nil
 	}
 
@@ -458,18 +454,11 @@ func (co *Collector) validateClusterScopedObjectAllowed(
 		return err
 	}
 
-	if isNamespaced {
-		return nil
-	}
-
-	if !opts.AllowClusterScopedObjects {
+	if !isNamespaced {
 		return fmt.Errorf("cluster-scoped kind %s/%s is not allowed", obj.GetAPIVersion(), obj.GetKind())
 	}
 
-	return fmt.Errorf(
-		"cluster-scoped kind %s/%s cannot be replicated into the Namespace %s",
-		obj.GetAPIVersion(), obj.GetKind(), ns.GetName(),
-	)
+	return nil
 }
 
 // Handles a single generator item.

@@ -672,6 +672,13 @@
                 "rbac": {
                     "type": "object",
                     "properties": {
+                        "bindableClusterRoles": {
+                            "description": "ClusterRoles the Capsule controller is allowed to bind (verb `bind`) when strict RBAC is enabled, in addition to the roles Capsule manages (manager.options.rbac provisioner, deleter, administrationClusterRoles and promotionClusterRoles), which are always bindable. Add any custom tenant-owner ClusterRoles here.",
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
                         "clusterRole": {
                             "type": "object",
                             "properties": {
@@ -707,7 +714,7 @@
                             }
                         },
                         "strict": {
-                            "description": "Strongly restrict the RBAC assigned to Capsule Controller. When set to true you must aggregate further permissions by yourself.",
+                            "description": "Strongly restrict the RBAC assigned to Capsule Controller. The default owner ClusterRoles (admin, provisioner and deleter) can be bound to tenant owners out of the box; add custom owner ClusterRoles via bindableClusterRoles. Permissions beyond binding (e.g. TenantResource replication) must be aggregated by yourself via ClusterRoles labeled projectcapsule.dev/aggregate-to-controller: \"true\".",
                             "type": "boolean"
                         }
                     }

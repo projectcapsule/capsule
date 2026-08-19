@@ -166,13 +166,14 @@ The following Values have changed key or Value:
 | manager.options.userNames | list | `[]` | DEPRECATED: use users properties. Names of the users considered as Capsule users. |
 | manager.options.users | list | `[{"kind":"Group","name":"projectcapsule.dev"}]` | Define entities which are considered part of the Capsule construct. Users not mentioned here will be ignored by Capsule |
 | manager.options.workers | int | `1` | Workers (MaxConcurrentReconciles) is the maximum number of concurrent Reconciles which can be run (ALPHA). |
+| manager.rbac.bindableClusterRoles | list | `["admin"]` | ClusterRoles the Capsule controller is allowed to bind (verb `bind`) when strict RBAC is enabled, in addition to the roles Capsule manages (manager.options.rbac provisioner, deleter, administrationClusterRoles and promotionClusterRoles), which are always bindable. Add any custom tenant-owner ClusterRoles here. |
 | manager.rbac.clusterRole.extraResources | list | `[]` | Extra cluster-scoped RBAC PolicyRules to add to a ClusterRole created by this chart and bound to the Capsule ServiceAccount. |
 | manager.rbac.create | bool | `true` | Specifies whether RBAC resources should be created. |
 | manager.rbac.existingClusterRoles | list | `[]` | Specifies further cluster roles to be added to the Capsule manager service account. |
 | manager.rbac.existingRoles | list | `[]` | Specifies further cluster roles to be added to the Capsule manager service account. |
 | manager.rbac.minimal | bool | `false` | DEPRECATED: use strict instead. Former name of the strict option; takes effect when either flag is true. |
 | manager.rbac.role.extraResources | list | `[]` | Extra namespaced RBAC PolicyRules to add to a Role created by this chart and bound to the Capsule ServiceAccount. |
-| manager.rbac.strict | bool | `false` | Strongly restrict the RBAC assigned to Capsule Controller. When set to true you must aggregate further permissions by yourself. |
+| manager.rbac.strict | bool | `false` | Strongly restrict the RBAC assigned to Capsule Controller. The default owner ClusterRoles (admin, provisioner and deleter) can be bound to tenant owners out of the box; add custom owner ClusterRoles via bindableClusterRoles. Permissions beyond binding (e.g. TenantResource replication) must be aggregated by yourself via ClusterRoles labeled projectcapsule.dev/aggregate-to-controller: "true". |
 | manager.readinessProbe | object | `{"httpGet":{"path":"/readyz","port":10080}}` | Configure the readiness probe using Deployment probe spec |
 | manager.resources | object | `{}` | Set the resource requests/limits for the Capsule manager container |
 | manager.securityContext | object | `{}` | Set the securityContext for the Capsule container |
