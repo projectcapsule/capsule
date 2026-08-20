@@ -220,6 +220,11 @@ func (r *Reconciler) reconcileTLSSecret(
 	err := retry.OnError(retry.DefaultBackoff, func(err error) bool {
 		return apierrors.IsAlreadyExists(err) || apierrors.IsConflict(err)
 	}, func() error {
+		// Use the TLS type when Capsule creates the Secret itself. If the Secret
+		// already exists, CreateOrUpdate loads its persisted type into desired;
+		// preserve it because Secret type is immutable. In particular, the Helm
+		// chart pre-creates an empty Opaque Secret so the controller Pod can mount
+		// it before this reconciliation supplies the certificate data.
 		desired := &corev1.Secret{
 			ObjectMeta: *certSecret.ObjectMeta.DeepCopy(),
 			Type:       corev1.SecretTypeTLS,
@@ -235,8 +240,6 @@ func (r *Reconciler) reconcileTLSSecret(
 			if desired.Annotations == nil {
 				desired.Annotations = map[string]string{}
 			}
-
-			desired.Type = corev1.SecretTypeTLS
 
 			ca, _, rotateServingCert, err := r.ensureCertificateMaterial(log, desired, sans)
 			if err != nil {

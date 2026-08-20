@@ -121,6 +121,31 @@ func TestReconcileCertificatesConcurrentReplicasAdoptPersistedWinner(t *testing.
 	}
 }
 
+func TestReconcileCertificatesPopulatesChartCreatedOpaqueSecret(t *testing.T) {
+	t.Parallel()
+
+	// The Helm chart must create this empty Secret before the controller Pod can
+	// mount it. Kubernetes does not allow changing a Secret's type afterwards,
+	// so reconciliation must preserve Opaque while adding valid TLS material.
+	secret := testTLSSecret(nil, nil, nil)
+	secret.Type = corev1.SecretTypeOpaque
+	reconciler, kubeClient := newTestTLSReconciler(t, secret)
+
+	if err := reconciler.ReconcileCertificates(context.Background(), logr.Discard(), secret.DeepCopy()); err != nil {
+		t.Fatalf("ReconcileCertificates() error = %v", err)
+	}
+
+	updated := getTestTLSSecret(t, kubeClient)
+	if updated.Type != corev1.SecretTypeOpaque {
+		t.Fatalf("reconciled Secret type = %q, want %q", updated.Type, corev1.SecretTypeOpaque)
+	}
+	if len(updated.Data[corev1.ServiceAccountRootCAKey]) == 0 ||
+		len(updated.Data[corev1.TLSCertKey]) == 0 ||
+		len(updated.Data[corev1.TLSPrivateKeyKey]) == 0 {
+		t.Fatal("reconciled Secret is missing generated TLS material")
+	}
+}
+
 func TestReconcileCertificatesPatchesEveryAdmissionCABundle(t *testing.T) {
 	t.Parallel()
 
