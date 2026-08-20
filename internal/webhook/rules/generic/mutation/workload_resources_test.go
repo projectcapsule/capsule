@@ -12,7 +12,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 )
 
-func TestMutatePodResourcesUsesContainerTargets(t *testing.T) {
+func TestMutatePodResourcesUsesAllDefaultTargets(t *testing.T) {
 	t.Parallel()
 
 	pod := &corev1.Pod{Spec: corev1.PodSpec{
@@ -31,6 +31,7 @@ func TestMutatePodResourcesUsesContainerTargets(t *testing.T) {
 		}},
 		Resources: &corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("500m")},
+			Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
 		},
 	}}
 
@@ -67,9 +68,47 @@ func TestMutatePodResourcesUsesContainerTargets(t *testing.T) {
 	assertResourceQuantity(t, pod.Spec.InitContainers[0].Resources.Requests, corev1.ResourceCPU, "100m")
 	assertResourceQuantity(t, pod.Spec.InitContainers[0].Resources.Limits, corev1.ResourceMemory, "512Mi")
 
-	// Pod-level resources are opt-in even when targets is empty.
 	assertResourceQuantity(t, pod.Spec.Resources.Requests, corev1.ResourceCPU, "500m")
 	assertResourceMissing(t, pod.Spec.Resources.Limits, corev1.ResourceCPU)
+}
+
+func TestMutatePodResourcesDefaultTargetsSkipPodIncompatibleResources(t *testing.T) {
+	t.Parallel()
+
+	pod := &corev1.Pod{Spec: corev1.PodSpec{
+		Containers: []corev1.Container{{Name: "app"}},
+	}}
+
+	bodies := []*rules.NamespaceRuleBodyNamespace{{Enforce: &rules.NamespaceRuleEnforceBody{
+		Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
+			Resources: &rules.WorkloadResourceRules{
+				Requests: map[corev1.ResourceName]rules.WorkloadResourceRequestPolicy{
+					corev1.ResourceEphemeralStorage: {
+						Policy: rules.WorkloadResourceRequestPolicyDefault,
+						Value:  quantityPointer("1Gi"),
+					},
+				},
+			},
+		},
+	}}}
+
+	changed, err := MutatePodResources(pod, bodies)
+	if err != nil {
+		t.Fatalf("MutatePodResources() error = %v", err)
+	}
+	if !changed {
+		t.Fatal("MutatePodResources() changed = false, want true")
+	}
+
+	assertResourceQuantity(
+		t,
+		pod.Spec.Containers[0].Resources.Requests,
+		corev1.ResourceEphemeralStorage,
+		"1Gi",
+	)
+	if pod.Spec.Resources != nil {
+		t.Fatalf("pod.Spec.Resources = %#v, want nil", pod.Spec.Resources)
+	}
 }
 
 func TestMutatePodResourcesPodRatio(t *testing.T) {

@@ -367,6 +367,15 @@ func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *caps
 			errs = append(errs, fmt.Errorf("namespace(s) had reconciliation errors: %w", err))
 		}
 
+		// The managed-resource webhook intentionally denies deletion by the
+		// garbage collector. Remove rule-generated cluster-scoped children as
+		// the Capsule controller before releasing the Tenant finalizer.
+		if err = r.pruneGlobalResourceQuotas(ctx, instance, map[string]struct{}{}); err != nil {
+			errs = append(errs, fmt.Errorf("cannot delete rule global resource quotas: %w", err))
+
+			return errors.Join(errs...)
+		}
+
 		if err = r.ensureMetadata(ctx, instance); err != nil {
 			errs = append(errs, fmt.Errorf("cannot ensure metadata: %w", err))
 		}

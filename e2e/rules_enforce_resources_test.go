@@ -45,7 +45,6 @@ var _ = Describe("enforcing workload resource namespace rules", Ordered, Label("
 						NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{
 							Action: rules.ActionTypeDeny,
 							Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
-								Targets: []rules.WorkloadValidationTarget{rules.ValidateContainers},
 								Resources: &rules.WorkloadResourceRules{
 									Requests: map[corev1.ResourceName]rules.WorkloadResourceRequestPolicy{
 										corev1.ResourceCPU: {
@@ -161,10 +160,14 @@ var _ = Describe("enforcing workload resource namespace rules", Ordered, Label("
 		EventuallyDeletion(tnt)
 	})
 
-	It("defaults, removes, and matches container resources", func() {
+	It("defaults, removes, and matches resources at all default targets", func() {
 		ns := createNamespace("managed")
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 		pod := newPod("managed-resources", "2Gi")
+		pod.Spec.Resources = &corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("500m")},
+			Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+		}
 
 		var created *corev1.Pod
 		EventuallyCreation(func() error {
@@ -178,6 +181,9 @@ var _ = Describe("enforcing workload resource namespace rules", Ordered, Label("
 		Expect(containerResources.Requests.Cpu().Cmp(resource.MustParse("100m"))).To(Equal(0))
 		Expect(containerResources.Limits).NotTo(HaveKey(corev1.ResourceCPU))
 		Expect(containerResources.Limits.Memory().Cmp(resource.MustParse("1Gi"))).To(Equal(0))
+		Expect(created.Spec.Resources).NotTo(BeNil())
+		Expect(created.Spec.Resources.Requests.Cpu().Cmp(resource.MustParse("500m"))).To(Equal(0))
+		Expect(created.Spec.Resources.Limits).NotTo(HaveKey(corev1.ResourceCPU))
 	})
 
 	It("defaults a missing limit from Ratio", func() {

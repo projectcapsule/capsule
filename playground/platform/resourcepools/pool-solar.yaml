@@ -8,8 +8,8 @@ metadata:
 spec:
   quota:
     hard:
-      limits.cpu: "2"
       limits.memory: 2Gi
+      limits.cpu: "0"
       requests.cpu: "2"
       requests.memory: 2Gi
       requests.storage: "5Gi"

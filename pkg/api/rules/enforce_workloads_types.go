@@ -32,8 +32,10 @@ type NamespaceRuleEnforceWorkloadsBody struct {
 
 	// Resources defines mutation and enforcement policies for Pod and container
 	// resource requests and limits. The workload targets select where the
-	// policies apply. With no targets, resource policies apply to regular and
-	// init containers. Pod-level resources require the explicit "pod" target.
+	// policies apply. With no targets, resource policies apply to all compatible
+	// locations: Pod-level resources, regular containers, and init containers.
+	// Resource names unsupported at Pod level still apply to compatible container
+	// locations.
 	// Mutation is applied when a Pod is created. Remove and MatchRequest manage
 	// explicit values, Default fills an absent value, and Ratio fills an absent
 	// limit from its request. An explicit Ratio violation is then handled by the

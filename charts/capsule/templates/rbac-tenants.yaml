@@ -24,3 +24,16 @@ rules:
   resources: ["tenantresources"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 {{- end }}
+{{- if $.Values.rbac.customquotas.create }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: capsule:{{ include "capsule.fullname" $ }}:customquotas
+  labels:
+    {{- toYaml $.Values.rbac.resources.labels | nindent 4 }}
+rules:
+- apiGroups: ["capsule.clastix.io"]
+  resources: ["customquotas"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+{{- end }}

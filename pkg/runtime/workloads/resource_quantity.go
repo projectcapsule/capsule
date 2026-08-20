@@ -5,11 +5,20 @@ package workloads
 
 import (
 	"fmt"
+	"strings"
 
 	inf "gopkg.in/inf.v0"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
+
+// PodLevelResourceSupported reports whether Kubernetes permits the resource
+// name in Pod-level resource requirements.
+func PodLevelResourceSupported(name corev1.ResourceName) bool {
+	return name == corev1.ResourceCPU ||
+		name == corev1.ResourceMemory ||
+		strings.HasPrefix(string(name), corev1.ResourceHugePagesPrefix)
+}
 
 // RatioSupportedResource reports whether Capsule can safely calculate a
 // limit-to-request ratio for the resource. CPU is rounded down to milliCPU;

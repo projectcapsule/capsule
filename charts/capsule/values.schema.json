@@ -1007,6 +1007,18 @@
         "rbac": {
             "type": "object",
             "properties": {
+                "customquotas": {
+                    "description": "Allow the creation of CustomQuotas",
+                    "type": "object",
+                    "properties": {
+                        "create": {
+                            "type": "boolean"
+                        },
+                        "labels": {
+                            "type": "object"
+                        }
+                    }
+                },
                 "resourcepoolclaims": {
                     "description": "Allow the creation of ResourcePoolClaims",
                     "type": "object",
@@ -1015,12 +1027,7 @@
                             "type": "boolean"
                         },
                         "labels": {
-                            "type": "object",
-                            "properties": {
-                                "rbac.authorization.k8s.io/aggregate-to-admin": {
-                                    "type": "string"
-                                }
-                            }
+                            "type": "object"
                         }
                     }
                 },
@@ -1032,12 +1039,7 @@
                             "type": "boolean"
                         },
                         "labels": {
-                            "type": "object",
-                            "properties": {
-                                "rbac.authorization.k8s.io/aggregate-to-admin": {
-                                    "type": "string"
-                                }
-                            }
+                            "type": "object"
                         }
                     }
                 }

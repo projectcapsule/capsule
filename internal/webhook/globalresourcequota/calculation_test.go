@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -301,6 +302,35 @@ func TestRuleManagedGlobalResourceQuotaCannotBeReducedBelowUsage(t *testing.T) {
 	request := globalResourceQuotaUpdateRequest(t, oldQuota, newQuota)
 	if response := validateGlobalResourceQuotaRequest(context.Background(), ledgerClient(t), request); response == nil || response.Allowed {
 		t.Fatalf("managed rule quota decrease below usage was accepted: %#v", response)
+	}
+}
+
+func TestGlobalResourceQuotaCannotChangeScopeAndReduceHardLimit(t *testing.T) {
+	t.Parallel()
+
+	oldQuota := globalQuotaForTest("shared", corev1.ResourceList{
+		corev1.ResourceLimitsCPU: resource.MustParse("8"),
+	})
+	oldQuota.Spec.NamespaceSelectors = []selectors.NamespaceSelector{{
+		LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"tier": "application"}},
+	}}
+
+	newQuota := oldQuota.DeepCopy()
+	newQuota.Spec.NamespaceSelectors = []selectors.NamespaceSelector{{
+		LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"tenant": "wind"}},
+	}}
+	newQuota.Spec.Quota.Hard[corev1.ResourceLimitsCPU] = resource.MustParse("0")
+
+	request := globalResourceQuotaUpdateRequest(t, oldQuota, newQuota)
+	response := validateGlobalResourceQuotaRequest(context.Background(), ledgerClient(t), request)
+	if response == nil || response.Allowed || response.Result == nil {
+		t.Fatalf("scope change with hard-limit decrease was accepted: %#v", response)
+	}
+	if !strings.Contains(
+		response.Result.Message,
+		`spec.quota.hard["limits.cpu"] cannot be reduced from 8 to 0 while namespace selectors are changing`,
+	) {
+		t.Fatalf("denial message = %q", response.Result.Message)
 	}
 }
 

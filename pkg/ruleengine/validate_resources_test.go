@@ -30,6 +30,15 @@ func TestValidateRuleStatusBodyWorkloadResources(t *testing.T) {
 			),
 		},
 		{
+			name: "omitted target permits container-only resource names",
+			body: workloadResourceRuleForValidationWithName(
+				nil,
+				corev1.ResourceEphemeralStorage,
+				rules.WorkloadResourceRequestPolicy{Policy: rules.WorkloadResourceRequestPolicyPreserve},
+				rules.WorkloadResourceLimitPolicy{Policy: rules.WorkloadResourceLimitPolicyRatio, Value: validationQuantity("1.5")},
+			),
+		},
+		{
 			name: "ratio below one",
 			body: workloadResourceRuleForValidation(
 				nil,
@@ -105,6 +114,16 @@ func workloadResourceRuleForValidation(
 	if len(targets) == 1 && targets[0] == rules.ValidatePod {
 		name = corev1.ResourceEphemeralStorage
 	}
+
+	return workloadResourceRuleForValidationWithName(targets, name, requestPolicy, limitPolicy)
+}
+
+func workloadResourceRuleForValidationWithName(
+	targets []rules.WorkloadValidationTarget,
+	name corev1.ResourceName,
+	requestPolicy rules.WorkloadResourceRequestPolicy,
+	limitPolicy rules.WorkloadResourceLimitPolicy,
+) *rules.NamespaceRuleBodyNamespace {
 
 	return &rules.NamespaceRuleBodyNamespace{
 		Enforce: &rules.NamespaceRuleEnforceBody{

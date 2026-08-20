@@ -23,7 +23,7 @@ import (
 	tenantutils "github.com/projectcapsule/capsule/pkg/tenant"
 )
 
-func TestValidateRuleQuotaUpdatesRejectsHardBelowUsageOrAllocation(t *testing.T) {
+func TestValidateRuleQuotaUpdates(t *testing.T) {
 	t.Setenv(configuration.EnvironmentControllerNamespace, "capsule-system")
 
 	scheme := runtime.NewScheme()
@@ -32,11 +32,13 @@ func TestValidateRuleQuotaUpdatesRejectsHardBelowUsageOrAllocation(t *testing.T)
 	}
 
 	oldTenant := ruleQuotaTenant("5")
+	desiredGlobalQuota := tenantutils.RuleGlobalResourceQuota(oldTenant, 0, 0)
 	globalQuota := &capsulev1beta2.GlobalResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: tenantutils.RuleGlobalResourceQuotaName(oldTenant, "services"),
 			UID:  types.UID("global-quota-uid"),
 		},
+		Spec: desiredGlobalQuota.Spec,
 		Status: capsulev1beta2.GlobalResourceQuotaStatus{
 			Total: capsulev1beta2.GlobalResourceQuotaUsage{Used: corev1.ResourceList{
 				corev1.ResourceServices: resource.MustParse("4"),
@@ -69,6 +71,23 @@ func TestValidateRuleQuotaUpdatesRejectsHardBelowUsageOrAllocation(t *testing.T)
 		if response := validateRuleQuotaUpdates(context.Background(), reader, ruleQuotaTenant("4"), oldTenant); response != nil {
 			t.Fatalf("hard limit equal to allocated usage was rejected: %#v", response)
 		}
+	})
+
+	t.Run("scope change with decrease", func(t *testing.T) {
+		oldScoped := ruleQuotaTenant("8")
+		oldScoped.Spec.Rules[0].NamespaceSelector = &metav1.LabelSelector{
+			MatchLabels: map[string]string{"company.example/tier": "application"},
+		}
+		quota := tenantutils.RuleGlobalResourceQuota(oldScoped, 0, 0)
+		quota.UID = types.UID("scoped-global-quota-uid")
+		reader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(quota).Build()
+
+		response := validateRuleQuotaUpdates(context.Background(), reader, ruleQuotaTenant("0"), oldScoped)
+		assertRuleQuotaDenied(
+			t,
+			response,
+			`cannot be reduced from 8 to 0 while namespace selectors are changing`,
+		)
 	})
 
 	t.Run("unchanged", func(t *testing.T) {

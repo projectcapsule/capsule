@@ -193,6 +193,66 @@ func TestValidateResourcesHonorsTarget(t *testing.T) {
 	}
 }
 
+func TestValidateResourcesDefaultTargetsIncludePodResources(t *testing.T) {
+	t.Parallel()
+
+	h := podRulesForTest()
+	pod := resourceValidationPod("1Gi", "1Gi")
+	pod.Spec.Resources = &corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("1Gi")},
+		Limits:   corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("2Gi")},
+	}
+
+	enforce := resourceEnforcement(apirules.ActionTypeDeny, "1.5")
+	enforce.Workloads.Targets = nil
+
+	evaluation, err := h.validateResources(pod, []*apirules.NamespaceRuleEnforceBody{enforce})
+	if err != nil {
+		t.Fatalf("validateResources() error = %v", err)
+	}
+	if evaluation == nil || evaluation.Blocking == nil {
+		t.Fatal("validateResources() did not enforce the omitted target on Pod-level resources")
+	}
+	if !strings.Contains(evaluation.Blocking.Value.Path, "spec.resources") {
+		t.Fatalf("blocking path = %q, want spec.resources", evaluation.Blocking.Value.Path)
+	}
+}
+
+func TestValidateResourcesDefaultTargetsSkipPodIncompatibleResources(t *testing.T) {
+	t.Parallel()
+
+	h := podRulesForTest()
+	pod := &corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{
+		Name: "app",
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{corev1.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+			Limits:   corev1.ResourceList{corev1.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+		},
+	}}}}
+	ratio := resource.MustParse("1.5")
+	enforce := &apirules.NamespaceRuleEnforceBody{
+		Action: apirules.ActionTypeDeny,
+		Workloads: apirules.NamespaceRuleEnforceWorkloadsBody{
+			Resources: &apirules.WorkloadResourceRules{
+				Limits: map[corev1.ResourceName]apirules.WorkloadResourceLimitPolicy{
+					corev1.ResourceEphemeralStorage: {
+						Policy: apirules.WorkloadResourceLimitPolicyRatio,
+						Value:  &ratio,
+					},
+				},
+			},
+		},
+	}
+
+	evaluation, err := h.validateResources(pod, []*apirules.NamespaceRuleEnforceBody{enforce})
+	if err != nil {
+		t.Fatalf("validateResources() error = %v", err)
+	}
+	if evaluation == nil || evaluation.Blocking != nil {
+		t.Fatalf("validateResources() = %#v, want pod-incompatible resource skipped at Pod level", evaluation)
+	}
+}
+
 func resourceValidationPod(request, limit string) *corev1.Pod {
 	resources := corev1.ResourceRequirements{}
 	if request != "" {

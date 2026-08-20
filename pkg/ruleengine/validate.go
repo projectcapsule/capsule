@@ -378,8 +378,7 @@ func validateWorkloadResourceName(name corev1.ResourceName, podTarget bool) erro
 		return nil
 	}
 
-	if name == corev1.ResourceCPU || name == corev1.ResourceMemory ||
-		strings.HasPrefix(string(name), corev1.ResourceHugePagesPrefix) {
+	if workloadruntime.PodLevelResourceSupported(name) {
 		return nil
 	}
 

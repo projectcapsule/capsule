@@ -41,3 +41,41 @@ func ValidateHardLimit(path string, hard, allocated corev1.ResourceList) error {
 
 	return nil
 }
+
+// ValidateHardLimitScopeChange prevents a quota from reducing or removing a
+// hard limit in the same update that changes its namespace selection. Usage
+// from newly selected namespaces is not represented by the quota's previous
+// status yet, so the scope must reconcile before a safe lower bound is known.
+func ValidateHardLimitScopeChange(
+	path string,
+	hard corev1.ResourceList,
+	previous corev1.ResourceList,
+	scopeChanged bool,
+) error {
+	if !scopeChanged {
+		return nil
+	}
+
+	for name, previousLimit := range previous {
+		limit, exists := hard[name]
+		if !exists {
+			return fmt.Errorf(
+				"%s[%q] cannot be removed while namespace selectors are changing; update the selectors first and wait for usage reconciliation",
+				path,
+				name,
+			)
+		}
+
+		if limit.Cmp(previousLimit) < 0 {
+			return fmt.Errorf(
+				"%s[%q] cannot be reduced from %s to %s while namespace selectors are changing; update the selectors first and wait for usage reconciliation",
+				path,
+				name,
+				previousLimit.String(),
+				limit.String(),
+			)
+		}
+	}
+
+	return nil
+}

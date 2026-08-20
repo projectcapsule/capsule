@@ -10,6 +10,31 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
+func TestPodLevelResourceSupported(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      corev1.ResourceName
+		supported bool
+	}{
+		{name: corev1.ResourceCPU, supported: true},
+		{name: corev1.ResourceMemory, supported: true},
+		{name: corev1.ResourceName("hugepages-2Mi"), supported: true},
+		{name: corev1.ResourceEphemeralStorage, supported: false},
+		{name: corev1.ResourceName("example.com/gpu"), supported: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.name), func(t *testing.T) {
+			t.Parallel()
+
+			if got := PodLevelResourceSupported(tt.name); got != tt.supported {
+				t.Fatalf("PodLevelResourceSupported(%q) = %t, want %t", tt.name, got, tt.supported)
+			}
+		})
+	}
+}
+
 func TestLimitForRatio(t *testing.T) {
 	t.Parallel()
 

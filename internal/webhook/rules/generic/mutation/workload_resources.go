@@ -5,7 +5,6 @@ package mutation
 
 import (
 	"fmt"
-	"maps"
 	"slices"
 
 	corev1 "k8s.io/api/core/v1"
@@ -119,17 +118,29 @@ func collectWorkloadResourcePolicies(
 		}
 
 		resources := body.Enforce.Workloads.Resources
-		if len(resources.Requests) > 0 && out.requests == nil {
-			out.requests = make(map[corev1.ResourceName]apirules.WorkloadResourceRequestPolicy)
+		for name, policy := range resources.Requests {
+			if !resourcePolicySupportsTarget(name, target) {
+				continue
+			}
+
+			if out.requests == nil {
+				out.requests = make(map[corev1.ResourceName]apirules.WorkloadResourceRequestPolicy)
+			}
+
+			out.requests[name] = policy
 		}
 
-		maps.Copy(out.requests, resources.Requests)
+		for name, policy := range resources.Limits {
+			if !resourcePolicySupportsTarget(name, target) {
+				continue
+			}
 
-		if len(resources.Limits) > 0 && out.limits == nil {
-			out.limits = make(map[corev1.ResourceName]apirules.WorkloadResourceLimitPolicy)
+			if out.limits == nil {
+				out.limits = make(map[corev1.ResourceName]apirules.WorkloadResourceLimitPolicy)
+			}
+
+			out.limits[name] = policy
 		}
-
-		maps.Copy(out.limits, resources.Limits)
 	}
 
 	return out
@@ -140,10 +151,19 @@ func resourcePoliciesTarget(
 	target apirules.WorkloadValidationTarget,
 ) bool {
 	if len(workload.Targets) == 0 {
-		return target == apirules.ValidateContainers || target == apirules.ValidateInitContainers
+		return target == apirules.ValidatePod ||
+			target == apirules.ValidateContainers ||
+			target == apirules.ValidateInitContainers
 	}
 
 	return slices.Contains(workload.Targets, target)
+}
+
+func resourcePolicySupportsTarget(
+	name corev1.ResourceName,
+	target apirules.WorkloadValidationTarget,
+) bool {
+	return target != apirules.ValidatePod || workloads.PodLevelResourceSupported(name)
 }
 
 func mutateResourceRequirements(

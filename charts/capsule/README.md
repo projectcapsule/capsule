@@ -87,8 +87,9 @@ The following Values have changed key or Value:
 | ports | list | `[]` | Set additional ports for the deployment |
 | priorityClassName | string | `""` | Set the priority class name of the Capsule pod |
 | proxy.enabled | bool | `false` | Enable Installation of Capsule Proxy |
-| rbac.resourcepoolclaims | object | `{"create":false,"labels":{"rbac.authorization.k8s.io/aggregate-to-admin":"true"}}` | Allow the creation of ResourcePoolClaims |
-| rbac.resources | object | `{"create":false,"labels":{"rbac.authorization.k8s.io/aggregate-to-admin":"true"}}` | Allow the creation of TenantResources |
+| rbac.customquotas | object | `{"create":false,"labels":{}}` | Allow the creation of CustomQuotas |
+| rbac.resourcepoolclaims | object | `{"create":false,"labels":{}}` | Allow the creation of ResourcePoolClaims |
+| rbac.resources | object | `{"create":false,"labels":{}}` | Allow the creation of TenantResources |
 | replicaCount | int | `1` | Set the replica count for capsule pod |
 | securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"enabled":true,"readOnlyRootFilesystem":true}` | Set the securityContext for the Capsule container |
 | serviceAccount.annotations | object | `{}` | Annotations to add to the service account. |
@@ -324,7 +325,7 @@ The following Values have changed key or Value:
 | webhooks.hooks.managed.namespaceSelector | object | `{}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
 | webhooks.hooks.managed.objectSelector | object | `{"matchExpressions":[{"key":"projectcapsule.dev/managed-by","operator":"In","values":["controller"]}]}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
 | webhooks.hooks.managed.opts | object | `{}` | Capsule Hook Options |
-| webhooks.hooks.managed.rules | list | `[{"apiGroups":["*"],"apiVersions":["*"],"operations":["CREATE","UPDATE","DELETE"],"resources":["*"],"scope":"Namespaced"}]` | [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules) |
+| webhooks.hooks.managed.rules | list | `[{"apiGroups":["*"],"apiVersions":["*"],"operations":["CREATE","UPDATE","DELETE"],"resources":["*"],"scope":"Namespaced"},{"apiGroups":["capsule.clastix.io"],"apiVersions":["v1beta2"],"operations":["CREATE","UPDATE","DELETE"],"resources":["globalresourcequotas"],"scope":"Cluster"}]` | [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules) |
 | webhooks.hooks.metadata | object | `{"enabled":true,"failurePolicy":"Ignore","matchConditions":[{"expression":"!has(request.subResource) || request.subResource == \"\"","name":"ignore-subresources"},{"expression":"request.resource.resource != \"events\"","name":"ignore-events"}],"matchPolicy":"Equivalent","namespaceSelector":{"matchExpressions":[{"key":"capsule.clastix.io/tenant","operator":"Exists"}]},"objectSelector":{},"opts":{},"reinvocationPolicy":"Never","rules":[{"apiGroups":["*"],"apiVersions":["*"],"operations":["CREATE","UPDATE"],"resources":["*"],"scope":"Namespaced"}]}` | Additional Metadata webhook |
 | webhooks.hooks.metadata.enabled | bool | `true` | Enable the Hook |
 | webhooks.hooks.metadata.failurePolicy | string | `"Ignore"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |

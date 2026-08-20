@@ -139,8 +139,20 @@ func hasWorkloadResourcePolicies(
 			continue
 		}
 
-		if validationResourcePoliciesTarget(enforce.Workloads, target) {
-			return true
+		if !validationResourcePoliciesTarget(enforce.Workloads, target) {
+			continue
+		}
+
+		for name := range enforce.Workloads.Resources.Requests {
+			if validationResourcePolicySupportsTarget(name, target) {
+				return true
+			}
+		}
+
+		for name := range enforce.Workloads.Resources.Limits {
+			if validationResourcePolicySupportsTarget(name, target) {
+				return true
+			}
 		}
 	}
 
@@ -152,10 +164,19 @@ func validationResourcePoliciesTarget(
 	target apirules.WorkloadValidationTarget,
 ) bool {
 	if len(workload.Targets) == 0 {
-		return target == apirules.ValidateContainers || target == apirules.ValidateInitContainers
+		return target == apirules.ValidatePod ||
+			target == apirules.ValidateContainers ||
+			target == apirules.ValidateInitContainers
 	}
 
 	return slices.Contains(workload.Targets, target)
+}
+
+func validationResourcePolicySupportsTarget(
+	name corev1.ResourceName,
+	target apirules.WorkloadValidationTarget,
+) bool {
+	return target != apirules.ValidatePod || workloads.PodLevelResourceSupported(name)
 }
 
 func workloadResourceNames(
@@ -172,12 +193,20 @@ func workloadResourceNames(
 		}
 
 		for name, policy := range enforce.Workloads.Resources.Requests {
+			if !validationResourcePolicySupportsTarget(name, target) {
+				continue
+			}
+
 			if policy.Policy == apirules.WorkloadResourceRequestPolicyRemove {
 				requestSet[name] = struct{}{}
 			}
 		}
 
 		for name, policy := range enforce.Workloads.Resources.Limits {
+			if !validationResourcePolicySupportsTarget(name, target) {
+				continue
+			}
+
 			switch policy.Policy {
 			case apirules.WorkloadResourceLimitPolicyPreserve,
 				apirules.WorkloadResourceLimitPolicyDefault:
