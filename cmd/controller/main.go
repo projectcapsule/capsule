@@ -613,6 +613,21 @@ func main() {
 	_ = manager.AddReadyzCheck("ping", healthz.Ping)
 	_ = manager.AddHealthzCheck("ping", healthz.Ping)
 
+	if directCfg.EnableTLSConfiguration() && webhookCertWatcher != nil {
+		if err := manager.AddReadyzCheck(
+			"webhook-certificate",
+			tlscontroller.WebhookCertificateReadinessCheck(
+				directClient,
+				directCfg,
+				ns,
+				webhookCertWatcher.GetCertificate,
+			),
+		); err != nil {
+			setupLog.Error(err, "unable to add webhook certificate readiness check")
+			os.Exit(1)
+		}
+	}
+
 	dc, err := discovery.NewDiscoveryClientForConfig(manager.GetConfig())
 	if err != nil {
 		setupLog.Error(err, "unable to create discovery client")
