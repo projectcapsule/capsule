@@ -31,7 +31,7 @@ kind: ClusterRole
 metadata:
   name: capsule:{{ include "capsule.fullname" $ }}:customquotas
   labels:
-    {{- toYaml $.Values.rbac.resources.labels | nindent 4 }}
+    {{- toYaml $.Values.rbac.customquotas.labels | nindent 4 }}
 rules:
 - apiGroups: ["capsule.clastix.io"]
   resources: ["customquotas"]
