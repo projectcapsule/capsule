@@ -17,8 +17,6 @@ spec:
     spec:
       terminationGracePeriodSeconds: 10
       resources:
-        limits:
-          cpu: 100m
         requests:
           cpu: 100m
       containers:
@@ -31,11 +29,11 @@ spec:
         - name: www
           mountPath: /usr/share/nginx/html
   volumeClaimTemplates:
-  - metadata:
-      name: www
-    spec:
-      accessModes:
-        - "ReadWriteOnce"
-      resources:
-        requests:
-          storage: 1Gi
+    - metadata:
+        name: www
+      spec:
+        accessModes:
+          - "ReadWriteOnce"
+        resources:
+          requests:
+            storage: 1Gi

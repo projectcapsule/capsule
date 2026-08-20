@@ -391,8 +391,13 @@ var _ = Describe("rule-generated GlobalResourceQuota", Ordered, Label("resourceq
 
 	It("rejects invalid rule limits and projects valid changes to every namespace", func() {
 		quotaKey := clientKey("", tenantutils.RuleGlobalResourceQuotaName(tnt, "service-count"))
-		marker := "e2e.projectcapsule.dev/stable-identity"
 		resourceName := corev1.ResourceServices
+		initialQuota := &capsulev1beta2.GlobalResourceQuota{}
+		Eventually(func() error {
+			return k8sClient.Get(ctx, quotaKey, initialQuota)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		stableUID := initialQuota.UID
+
 		setServiceLimit := func(limit string) error {
 			current := &capsulev1beta2.Tenant{}
 			if err := k8sClient.Get(ctx, clientKey("", tenantName), current); err != nil {
@@ -424,7 +429,7 @@ var _ = Describe("rule-generated GlobalResourceQuota", Ordered, Label("resourceq
 			Eventually(func(g Gomega) {
 				current := &capsulev1beta2.GlobalResourceQuota{}
 				g.Expect(k8sClient.Get(ctx, quotaKey, current)).To(Succeed())
-				g.Expect(current.Annotations).To(HaveKeyWithValue(marker, "preserved"))
+				g.Expect(current.UID).To(Equal(stableUID))
 				g.Expect(current.Labels).To(HaveKeyWithValue(meta.RuleQuotaLabel, "service-count"))
 				g.Expect(current.Status.ObservedGeneration).To(Equal(current.Generation))
 
@@ -456,19 +461,6 @@ var _ = Describe("rule-generated GlobalResourceQuota", Ordered, Label("resourceq
 				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			}
 		}
-
-		Eventually(func() error {
-			current := &capsulev1beta2.GlobalResourceQuota{}
-			if err := k8sClient.Get(ctx, quotaKey, current); err != nil {
-				return err
-			}
-			if current.Annotations == nil {
-				current.Annotations = map[string]string{}
-			}
-			current.Annotations[marker] = "preserved"
-
-			return k8sClient.Update(ctx, current)
-		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 		// The concurrent admission scenario immediately before this test creates
 		// exactly five Services. Wait for native quota accounting before changing
