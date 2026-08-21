@@ -511,6 +511,53 @@ var _ = Describe("GlobalResourceQuota", Ordered, Label("globalresourcequota", "r
 			"requests.ephemeral-storage (requested=600Mi, current=600Mi, projected=1200Mi, hard=1Gi, exceededBy=176Mi)",
 		))
 	})
+
+	It("rejects direct hard-limit reductions and removals below allocated usage", func() {
+		quotaKey := client.ObjectKey{Name: ephemeralQuotaName}
+		Eventually(func(g Gomega) {
+			current := &capsulev1beta2.GlobalResourceQuota{}
+			g.Expect(k8sClient.Get(ctx, quotaKey, current)).To(Succeed())
+			used := current.Status.Total.Used[corev1.ResourceRequestsEphemeralStorage]
+			g.Expect(used.Cmp(resource.MustParse("600Mi"))).To(Equal(0))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		By("rejecting a decrease below usage", func() {
+			current := &capsulev1beta2.GlobalResourceQuota{}
+			Expect(k8sClient.Get(ctx, quotaKey, current)).To(Succeed())
+			current.Spec.Quota.Hard[corev1.ResourceRequestsEphemeralStorage] = resource.MustParse("500Mi")
+
+			err := k8sClient.Update(ctx, current)
+			Expect(err).To(MatchError(ContainSubstring(
+				`spec.quota.hard["requests.ephemeral-storage"] cannot be reduced to 500Mi while 600Mi is allocated`,
+			)))
+		})
+
+		By("rejecting removal of a resource with usage", func() {
+			current := &capsulev1beta2.GlobalResourceQuota{}
+			Expect(k8sClient.Get(ctx, quotaKey, current)).To(Succeed())
+			delete(current.Spec.Quota.Hard, corev1.ResourceRequestsEphemeralStorage)
+
+			err := k8sClient.Update(ctx, current)
+			Expect(err).To(MatchError(ContainSubstring(
+				`spec.quota.hard["requests.ephemeral-storage"] cannot be removed while 600Mi is allocated`,
+			)))
+		})
+
+		By("allowing a decrease exactly to allocated usage", func() {
+			current := &capsulev1beta2.GlobalResourceQuota{}
+			Expect(k8sClient.Get(ctx, quotaKey, current)).To(Succeed())
+			current.Spec.Quota.Hard[corev1.ResourceRequestsEphemeralStorage] = resource.MustParse("600Mi")
+
+			Expect(k8sClient.Update(ctx, current)).To(Succeed())
+			Eventually(func(g Gomega) {
+				reconciled := &capsulev1beta2.GlobalResourceQuota{}
+				g.Expect(k8sClient.Get(ctx, quotaKey, reconciled)).To(Succeed())
+				g.Expect(reconciled.Status.ObservedGeneration).To(Equal(reconciled.Generation))
+				hard := reconciled.Status.Total.Hard[corev1.ResourceRequestsEphemeralStorage]
+				g.Expect(hard.Cmp(resource.MustParse("600Mi"))).To(Equal(0))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		})
+	})
 })
 
 func expectResourceListEqual(g Gomega, actual, expected corev1.ResourceList) {

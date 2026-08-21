@@ -11,7 +11,7 @@ spec:
         capsule.clastix.io/tenant: green
   quota:
     hard:
-      limits.cpu: "8"
+      limits.cpu: "0"
       limits.memory: 16Gi
       requests.cpu: "8"
       requests.memory: 16Gi

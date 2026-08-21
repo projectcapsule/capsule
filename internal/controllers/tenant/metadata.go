@@ -22,7 +22,11 @@ func (r *Manager) ensureMetadata(ctx context.Context, tnt *capsulev1beta2.Tenant
 		tnt.Labels[meta.TenantNameLabel] = tnt.Name
 	}
 
-	if len(tnt.Status.Spaces) == 0 {
+	// Rule-generated GlobalResourceQuotas are cluster scoped and protected from
+	// garbage-collector deletion by the managed-resource webhook. Keep the
+	// Tenant around until its controller can explicitly remove those children.
+	keepForRuleQuotas := tnt.DeletionTimestamp == nil && hasRuleGlobalResourceQuotas(tnt)
+	if len(tnt.Status.Spaces) == 0 && !keepForRuleQuotas {
 		controllerutil.RemoveFinalizer(tnt, meta.ControllerFinalizer)
 	} else {
 		controllerutil.AddFinalizer(tnt, meta.ControllerFinalizer)

@@ -20,6 +20,16 @@ spec:
   - enforce:
       action: allow
       metadata:
+        - apiGroups:
+            - "v1"
+          kinds:
+            - "Namespace"
+          labels:
+            projectcapsule.dev/backup:
+              managed: "true"
+          annotations:
+            storagelocationtype:
+              managed: "s3"
         - kinds:
             - Pod
           annotations:

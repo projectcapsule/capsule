@@ -6,7 +6,7 @@ package template
 import (
 	"fmt"
 
-	"go.yaml.in/yaml/v2"
+	"sigs.k8s.io/yaml"
 
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 )

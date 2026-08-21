@@ -431,6 +431,95 @@ spec:
                             - message: at least one of exact or exp must be set
                               rule: has(self.exact) || has(self.exp)
                           type: array
+                        resources:
+                          description: |-
+                            Resources defines mutation and enforcement policies for Pod and container
+                            resource requests and limits. The workload targets select where the
+                            policies apply. With no targets, resource policies apply to all compatible
+                            locations: Pod-level resources, regular containers, and init containers.
+                            Resource names unsupported at Pod level still apply to compatible container
+                            locations.
+                            Mutation is applied when a Pod is created. Remove and MatchRequest manage
+                            explicit values, Default fills an absent value, and Ratio fills an absent
+                            limit from its request. An explicit Ratio violation is then handled by the
+                            enclosing allow, deny, or audit action.
+                          properties:
+                            limits:
+                              additionalProperties:
+                                description: WorkloadResourceLimitPolicy defines how
+                                  a resource limit is mutated and enforced.
+                                properties:
+                                  policy:
+                                    description: |-
+                                      Policy selects how the limit is handled: Preserve leaves it unchanged,
+                                      Default fills an absent limit, Remove deletes it, MatchRequest manages it
+                                      to equal the request, and Ratio defaults an absent limit and enforces the
+                                      maximum multiplier against explicitly supplied limits.
+                                    enum:
+                                    - Preserve
+                                    - Default
+                                    - Remove
+                                    - MatchRequest
+                                    - Ratio
+                                    type: string
+                                  value:
+                                    anyOf:
+                                    - type: integer
+                                    - type: string
+                                    description: |-
+                                      Value is the quantity applied by Default or the maximum limit-to-request
+                                      multiplier applied by Ratio.
+                                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                    x-kubernetes-int-or-string: true
+                                required:
+                                - policy
+                                type: object
+                                x-kubernetes-validations:
+                                - message: value must be set only for the Default
+                                    and Ratio policies
+                                  rule: 'self.policy == ''Default'' || self.policy
+                                    == ''Ratio'' ? has(self.value) : !has(self.value)'
+                              description: Limits defines policies for resource limits.
+                              minProperties: 1
+                              type: object
+                            requests:
+                              additionalProperties:
+                                description: WorkloadResourceRequestPolicy defines
+                                  how a resource request is mutated.
+                                properties:
+                                  policy:
+                                    description: |-
+                                      Policy selects how the request is handled: Preserve leaves it unchanged,
+                                      Default fills an absent request, and Remove deletes it.
+                                    enum:
+                                    - Preserve
+                                    - Default
+                                    - Remove
+                                    type: string
+                                  value:
+                                    anyOf:
+                                    - type: integer
+                                    - type: string
+                                    description: Value is the quantity applied by
+                                      the Default policy.
+                                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                    x-kubernetes-int-or-string: true
+                                required:
+                                - policy
+                                type: object
+                                x-kubernetes-validations:
+                                - message: value must be set only for the Default
+                                    policy
+                                  rule: 'self.policy == ''Default'' ? has(self.value)
+                                    : !has(self.value)'
+                              description: Requests defines policies for resource
+                                requests.
+                              minProperties: 1
+                              type: object
+                          type: object
+                          x-kubernetes-validations:
+                          - message: at least one of requests or limits must be set
+                            rule: has(self.requests) || has(self.limits)
                         schedulers:
                           description: |-
                             Schedulers defines schedulerName matchers for Pod admission.
@@ -468,6 +557,7 @@ spec:
                             If empty, each webhook applies its own backwards-compatible default.
                           items:
                             enum:
+                            - pod
                             - pod/initcontainers
                             - pod/ephemeralcontainers
                             - pod/containers
@@ -1019,6 +1109,97 @@ spec:
                               - message: at least one of exact or exp must be set
                                 rule: has(self.exact) || has(self.exp)
                             type: array
+                          resources:
+                            description: |-
+                              Resources defines mutation and enforcement policies for Pod and container
+                              resource requests and limits. The workload targets select where the
+                              policies apply. With no targets, resource policies apply to all compatible
+                              locations: Pod-level resources, regular containers, and init containers.
+                              Resource names unsupported at Pod level still apply to compatible container
+                              locations.
+                              Mutation is applied when a Pod is created. Remove and MatchRequest manage
+                              explicit values, Default fills an absent value, and Ratio fills an absent
+                              limit from its request. An explicit Ratio violation is then handled by the
+                              enclosing allow, deny, or audit action.
+                            properties:
+                              limits:
+                                additionalProperties:
+                                  description: WorkloadResourceLimitPolicy defines
+                                    how a resource limit is mutated and enforced.
+                                  properties:
+                                    policy:
+                                      description: |-
+                                        Policy selects how the limit is handled: Preserve leaves it unchanged,
+                                        Default fills an absent limit, Remove deletes it, MatchRequest manages it
+                                        to equal the request, and Ratio defaults an absent limit and enforces the
+                                        maximum multiplier against explicitly supplied limits.
+                                      enum:
+                                      - Preserve
+                                      - Default
+                                      - Remove
+                                      - MatchRequest
+                                      - Ratio
+                                      type: string
+                                    value:
+                                      anyOf:
+                                      - type: integer
+                                      - type: string
+                                      description: |-
+                                        Value is the quantity applied by Default or the maximum limit-to-request
+                                        multiplier applied by Ratio.
+                                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                      x-kubernetes-int-or-string: true
+                                  required:
+                                  - policy
+                                  type: object
+                                  x-kubernetes-validations:
+                                  - message: value must be set only for the Default
+                                      and Ratio policies
+                                    rule: 'self.policy == ''Default'' || self.policy
+                                      == ''Ratio'' ? has(self.value) : !has(self.value)'
+                                description: Limits defines policies for resource
+                                  limits.
+                                minProperties: 1
+                                type: object
+                              requests:
+                                additionalProperties:
+                                  description: WorkloadResourceRequestPolicy defines
+                                    how a resource request is mutated.
+                                  properties:
+                                    policy:
+                                      description: |-
+                                        Policy selects how the request is handled: Preserve leaves it unchanged,
+                                        Default fills an absent request, and Remove deletes it.
+                                      enum:
+                                      - Preserve
+                                      - Default
+                                      - Remove
+                                      type: string
+                                    value:
+                                      anyOf:
+                                      - type: integer
+                                      - type: string
+                                      description: Value is the quantity applied by
+                                        the Default policy.
+                                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                      x-kubernetes-int-or-string: true
+                                  required:
+                                  - policy
+                                  type: object
+                                  x-kubernetes-validations:
+                                  - message: value must be set only for the Default
+                                      policy
+                                    rule: 'self.policy == ''Default'' ? has(self.value)
+                                      : !has(self.value)'
+                                description: Requests defines policies for resource
+                                  requests.
+                                minProperties: 1
+                                type: object
+                            type: object
+                            x-kubernetes-validations:
+                            - message: at least one of requests or limits must be
+                                set
+                              rule: has(self.requests) || has(self.limits)
                           schedulers:
                             description: |-
                               Schedulers defines schedulerName matchers for Pod admission.
@@ -1056,6 +1237,7 @@ spec:
                               If empty, each webhook applies its own backwards-compatible default.
                             items:
                               enum:
+                              - pod
                               - pod/initcontainers
                               - pod/ephemeralcontainers
                               - pod/containers
@@ -1543,6 +1725,97 @@ spec:
                                 - message: at least one of exact or exp must be set
                                   rule: has(self.exact) || has(self.exp)
                               type: array
+                            resources:
+                              description: |-
+                                Resources defines mutation and enforcement policies for Pod and container
+                                resource requests and limits. The workload targets select where the
+                                policies apply. With no targets, resource policies apply to all compatible
+                                locations: Pod-level resources, regular containers, and init containers.
+                                Resource names unsupported at Pod level still apply to compatible container
+                                locations.
+                                Mutation is applied when a Pod is created. Remove and MatchRequest manage
+                                explicit values, Default fills an absent value, and Ratio fills an absent
+                                limit from its request. An explicit Ratio violation is then handled by the
+                                enclosing allow, deny, or audit action.
+                              properties:
+                                limits:
+                                  additionalProperties:
+                                    description: WorkloadResourceLimitPolicy defines
+                                      how a resource limit is mutated and enforced.
+                                    properties:
+                                      policy:
+                                        description: |-
+                                          Policy selects how the limit is handled: Preserve leaves it unchanged,
+                                          Default fills an absent limit, Remove deletes it, MatchRequest manages it
+                                          to equal the request, and Ratio defaults an absent limit and enforces the
+                                          maximum multiplier against explicitly supplied limits.
+                                        enum:
+                                        - Preserve
+                                        - Default
+                                        - Remove
+                                        - MatchRequest
+                                        - Ratio
+                                        type: string
+                                      value:
+                                        anyOf:
+                                        - type: integer
+                                        - type: string
+                                        description: |-
+                                          Value is the quantity applied by Default or the maximum limit-to-request
+                                          multiplier applied by Ratio.
+                                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                        x-kubernetes-int-or-string: true
+                                    required:
+                                    - policy
+                                    type: object
+                                    x-kubernetes-validations:
+                                    - message: value must be set only for the Default
+                                        and Ratio policies
+                                      rule: 'self.policy == ''Default'' || self.policy
+                                        == ''Ratio'' ? has(self.value) : !has(self.value)'
+                                  description: Limits defines policies for resource
+                                    limits.
+                                  minProperties: 1
+                                  type: object
+                                requests:
+                                  additionalProperties:
+                                    description: WorkloadResourceRequestPolicy defines
+                                      how a resource request is mutated.
+                                    properties:
+                                      policy:
+                                        description: |-
+                                          Policy selects how the request is handled: Preserve leaves it unchanged,
+                                          Default fills an absent request, and Remove deletes it.
+                                        enum:
+                                        - Preserve
+                                        - Default
+                                        - Remove
+                                        type: string
+                                      value:
+                                        anyOf:
+                                        - type: integer
+                                        - type: string
+                                        description: Value is the quantity applied
+                                          by the Default policy.
+                                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                        x-kubernetes-int-or-string: true
+                                    required:
+                                    - policy
+                                    type: object
+                                    x-kubernetes-validations:
+                                    - message: value must be set only for the Default
+                                        policy
+                                      rule: 'self.policy == ''Default'' ? has(self.value)
+                                        : !has(self.value)'
+                                  description: Requests defines policies for resource
+                                    requests.
+                                  minProperties: 1
+                                  type: object
+                              type: object
+                              x-kubernetes-validations:
+                              - message: at least one of requests or limits must be
+                                  set
+                                rule: has(self.requests) || has(self.limits)
                             schedulers:
                               description: |-
                                 Schedulers defines schedulerName matchers for Pod admission.
@@ -1580,6 +1853,7 @@ spec:
                                 If empty, each webhook applies its own backwards-compatible default.
                               items:
                                 enum:
+                                - pod
                                 - pod/initcontainers
                                 - pod/ephemeralcontainers
                                 - pod/containers

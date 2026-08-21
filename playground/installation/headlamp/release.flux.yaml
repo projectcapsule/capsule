@@ -10,7 +10,6 @@ spec:
   targetNamespace: capsule-system
   serviceAccountName: kustomize-controller
   dependsOn:
-    - name: capsule
     - name: dex
   chart:
     spec:
@@ -87,12 +86,12 @@ spec:
                 items:
                   - key: ca
                     path: ca.crt
-            - downwardAPI: null
-              items:
-                - fieldRef:
-                    apiVersion: v1
-                    fieldPath: metadata.namespace
-                  path: namespace
+            - downwardAPI:
+                items:
+                  - fieldRef:
+                      apiVersion: v1
+                      fieldPath: metadata.namespace
+                    path: namespace
     initContainers:
       - name: add-ca
         image: docker.io/alpine:3

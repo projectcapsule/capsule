@@ -111,6 +111,8 @@ spec:
       leaderElection: true
       oidcUsernameClaim: "${OIDC_USERNAME_CLAIM}"
       roleBindingReflector: true
+      ignoredUsernames:
+        - "admin"
       extraArgs:
         - "--feature-gates=ProxyClusterScoped=true"
     service:

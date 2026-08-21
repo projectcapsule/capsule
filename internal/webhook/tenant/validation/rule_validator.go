@@ -134,6 +134,20 @@ func validateRuleQuotaUpdates(
 			}
 
 			path := fmt.Sprintf("rules[%d].quota[%d].hard", ruleIndex, quotaIndex)
+
+			desiredQuota := tenantutils.RuleGlobalResourceQuota(tnt, ruleIndex, quotaIndex)
+			if err := runtimequota.ValidateHardLimitScopeChange(
+				path,
+				quota.Hard,
+				globalQuota.Spec.Quota.Hard,
+				!apiequality.Semantic.DeepEqual(
+					desiredQuota.Spec.NamespaceSelectors,
+					globalQuota.Spec.NamespaceSelectors,
+				),
+			); err != nil {
+				return ad.Deny(err.Error())
+			}
+
 			if err := runtimequota.ValidateHardLimit(path, quota.Hard, globalQuota.Status.Total.Used); err != nil {
 				return ad.Deny(err.Error())
 			}

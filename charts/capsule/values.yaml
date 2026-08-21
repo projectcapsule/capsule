@@ -107,13 +107,18 @@ rbac:
   # -- Allow the creation of TenantResources
   resources:
     create: false
-    labels:
-      rbac.authorization.k8s.io/aggregate-to-admin: "true"
+    labels: {}
+    # rbac.authorization.k8s.io/aggregate-to-admin: "true"
   # -- Allow the creation of ResourcePoolClaims
   resourcepoolclaims:
     create: false
-    labels:
-      rbac.authorization.k8s.io/aggregate-to-admin: "true"
+    labels: {}
+    # rbac.authorization.k8s.io/aggregate-to-admin: "true"
+  # -- Allow the creation of CustomQuotas
+  customquotas:
+    create: false
+    labels: {}
+    # rbac.authorization.k8s.io/aggregate-to-admin: "true"
 
 # Manager Options
 manager:
@@ -1149,7 +1154,7 @@ webhooks:
           expression: 'request.resource.resource != "events"'
 
       # -- [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy)
-      reinvocationPolicy: Never
+      reinvocationPolicy: IfNeeded
       # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
       rules:
       - apiGroups:
@@ -1532,6 +1537,20 @@ webhooks:
           resources:
             - '*'
           scope: "Namespaced"
+        # Rule-generated GlobalResourceQuotas carry the managed-by label and
+        # must receive the same drift protection as namespaced managed objects.
+        # The status subresource is intentionally not included.
+        - apiGroups:
+            - capsule.clastix.io
+          apiVersions:
+            - v1beta2
+          operations:
+            - CREATE
+            - UPDATE
+            - DELETE
+          resources:
+            - globalresourcequotas
+          scope: "Cluster"
 
     replications:
       # -- Enable the Hook

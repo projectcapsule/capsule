@@ -9,12 +9,15 @@ import (
 	"regexp"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 	"github.com/projectcapsule/capsule/pkg/api/runtime"
+	workloadruntime "github.com/projectcapsule/capsule/pkg/runtime/workloads"
 )
 
 func ValidateRuleStatusBody(
@@ -172,6 +175,28 @@ func validateWorkloadRules(
 	ruleIndex int,
 	workloads rules.NamespaceRuleEnforceWorkloadsBody,
 ) error {
+	for j, target := range workloads.Targets {
+		switch target {
+		case rules.DeprecatedValidateImages,
+			rules.ValidatePod,
+			rules.ValidateInitContainers,
+			rules.ValidateEphemeralContainers,
+			rules.ValidateContainers,
+			rules.ValidateVolumes:
+		default:
+			return fmt.Errorf(
+				"rules[%d].enforce.workloads.targets[%d] %q is invalid: unsupported workload target",
+				ruleIndex,
+				j,
+				target,
+			)
+		}
+	}
+
+	if err := validateWorkloadResourceRules(ruleIndex, workloads); err != nil {
+		return err
+	}
+
 	for j, registry := range workloads.Registries {
 		if err := validateExpression(
 			registry.Expression,
@@ -191,6 +216,173 @@ func validateWorkloadRules(
 	}
 
 	return nil
+}
+
+func validateWorkloadResourceRules(
+	ruleIndex int,
+	workloads rules.NamespaceRuleEnforceWorkloadsBody,
+) error {
+	resources := workloads.Resources
+	if resources == nil {
+		return nil
+	}
+
+	path := fmt.Sprintf("rules[%d].enforce.workloads.resources", ruleIndex)
+	if len(resources.Requests) == 0 && len(resources.Limits) == 0 {
+		return fmt.Errorf("%s is invalid: at least one request or limit policy is required", path)
+	}
+
+	podTarget, err := validateWorkloadResourceTargets(path, workloads.Targets)
+	if err != nil {
+		return err
+	}
+
+	if err := validateWorkloadRequestPolicies(path, resources.Requests, podTarget); err != nil {
+		return err
+	}
+
+	return validateWorkloadLimitPolicies(path, resources, podTarget)
+}
+
+func validateWorkloadResourceTargets(
+	path string,
+	targets []rules.WorkloadValidationTarget,
+) (bool, error) {
+	podTarget := false
+
+	for _, target := range targets {
+		switch target {
+		case rules.ValidatePod:
+			podTarget = true
+		case rules.ValidateContainers, rules.ValidateInitContainers:
+		case rules.ValidateEphemeralContainers, rules.ValidateVolumes, rules.DeprecatedValidateImages:
+			return false, fmt.Errorf(
+				"%s is invalid: workload target %q does not support resource policies",
+				path,
+				target,
+			)
+		}
+	}
+
+	return podTarget, nil
+}
+
+func validateWorkloadRequestPolicies(
+	path string,
+	policies map[corev1.ResourceName]rules.WorkloadResourceRequestPolicy,
+	podTarget bool,
+) error {
+	for name, policy := range policies {
+		policyPath := fmt.Sprintf("%s.requests[%q]", path, name)
+		if err := validateWorkloadResourceName(name, podTarget); err != nil {
+			return fmt.Errorf("%s is invalid: %w", policyPath, err)
+		}
+
+		switch policy.Policy {
+		case rules.WorkloadResourceRequestPolicyPreserve,
+			rules.WorkloadResourceRequestPolicyRemove:
+			if policy.Value != nil {
+				return fmt.Errorf("%s.value is invalid: value is only supported by the Default policy", policyPath)
+			}
+		case rules.WorkloadResourceRequestPolicyDefault:
+			if err := validateDefaultResourceQuantity(policyPath, policy.Value); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("%s.policy %q is invalid: unsupported request policy", policyPath, policy.Policy)
+		}
+	}
+
+	return nil
+}
+
+func validateWorkloadLimitPolicies(
+	path string,
+	resources *rules.WorkloadResourceRules,
+	podTarget bool,
+) error {
+	one := resource.MustParse("1")
+
+	for name, policy := range resources.Limits {
+		policyPath := fmt.Sprintf("%s.limits[%q]", path, name)
+		if err := validateWorkloadResourceName(name, podTarget); err != nil {
+			return fmt.Errorf("%s is invalid: %w", policyPath, err)
+		}
+
+		switch policy.Policy {
+		case rules.WorkloadResourceLimitPolicyPreserve,
+			rules.WorkloadResourceLimitPolicyRemove,
+			rules.WorkloadResourceLimitPolicyMatchRequest:
+			if policy.Value != nil {
+				return fmt.Errorf(
+					"%s.value is invalid: value is only supported by the Default and Ratio policies",
+					policyPath,
+				)
+			}
+		case rules.WorkloadResourceLimitPolicyDefault:
+			if err := validateDefaultResourceQuantity(policyPath, policy.Value); err != nil {
+				return err
+			}
+		case rules.WorkloadResourceLimitPolicyRatio:
+			if policy.Value == nil {
+				return fmt.Errorf("%s.value is invalid: Ratio requires a value", policyPath)
+			}
+
+			if !workloadruntime.RatioSupportedResource(name) {
+				return fmt.Errorf(
+					"%s.policy is invalid: Ratio is only supported for cpu, memory, and ephemeral-storage",
+					policyPath,
+				)
+			}
+
+			if policy.Value.Cmp(one) < 0 {
+				return fmt.Errorf("%s.value is invalid: Ratio must be greater than or equal to 1", policyPath)
+			}
+		default:
+			return fmt.Errorf("%s.policy %q is invalid: unsupported limit policy", policyPath, policy.Policy)
+		}
+
+		if requestPolicy, found := resources.Requests[name]; found &&
+			requestPolicy.Policy == rules.WorkloadResourceRequestPolicyRemove &&
+			(policy.Policy == rules.WorkloadResourceLimitPolicyMatchRequest ||
+				policy.Policy == rules.WorkloadResourceLimitPolicyRatio) {
+			return fmt.Errorf(
+				"%s is invalid: %s requires a request which is removed by the request policy",
+				policyPath,
+				policy.Policy,
+			)
+		}
+	}
+
+	return nil
+}
+
+func validateDefaultResourceQuantity(path string, value *resource.Quantity) error {
+	if value == nil {
+		return fmt.Errorf("%s.value is invalid: Default requires a value", path)
+	}
+
+	if value.Sign() < 0 {
+		return fmt.Errorf("%s.value is invalid: quantity must not be negative", path)
+	}
+
+	return nil
+}
+
+func validateWorkloadResourceName(name corev1.ResourceName, podTarget bool) error {
+	if errs := k8svalidation.IsQualifiedName(string(name)); len(errs) > 0 {
+		return fmt.Errorf("resource name is invalid: %s", strings.Join(errs, "; "))
+	}
+
+	if !podTarget {
+		return nil
+	}
+
+	if workloadruntime.PodLevelResourceSupported(name) {
+		return nil
+	}
+
+	return fmt.Errorf("resource %q is not supported by pod-level resources", name)
 }
 
 func validateServiceRules(

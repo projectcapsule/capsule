@@ -17,16 +17,24 @@ spec:
     - matchLabels:
         team: devops
   rules:
-    - namespaceSelector:
-        matchLabels:
-          company.example/tier: application
-      quota:
+    # Enforce Resource-Allocation to best-practices
+    - quota:
         - name: billable-compute
           hard:
             requests.cpu: "8"
             requests.memory: 16Gi
-            limits.cpu: "8"
+            limits.cpu: "0"
             limits.memory: 16Gi
+            requests.storage: "5Gi"
+      enforce:
+        action: deny
+        workloads:
+          resources:
+            limits:
+              cpu:
+                policy: Remove
+              memory:
+                policy: MatchRequest
     - permissions:
         bindings:
           - clusterRoleName: 'view'
