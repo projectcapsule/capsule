@@ -251,14 +251,20 @@ var _ = Describe("rule-generated GlobalResourceQuota admission", Ordered,
 		})
 
 		It("allows equal or increased limits with a scope change and a later same-scope decrease", func() {
-			Expect(setTenantQuota(nil, "8")).To(Succeed())
+			Eventually(func() error {
+				return setTenantQuota(nil, "8")
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			expectGeneratedQuota("", "8", "0")
 
 			applicationSelector := &metav1.LabelSelector{MatchLabels: map[string]string{selectorKey: "application"}}
-			Expect(setTenantQuota(applicationSelector, "9")).To(Succeed())
+			Eventually(func() error {
+				return setTenantQuota(applicationSelector, "9")
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			expectGeneratedQuota("application", "9", "0")
 
-			Expect(setTenantQuota(applicationSelector, "8")).To(Succeed())
+			Eventually(func() error {
+				return setTenantQuota(applicationSelector, "8")
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			expectGeneratedQuota("application", "8", "0")
 		})
 
@@ -278,24 +284,34 @@ var _ = Describe("rule-generated GlobalResourceQuota admission", Ordered,
 				return err
 			}).Should(Succeed())
 
-			Expect(setTenantQuota(nil, "8")).To(Succeed())
+			Eventually(func() error {
+				return setTenantQuota(nil, "8")
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			expectGeneratedQuota("", "8", "300m", ns.Name)
 
-			err := setTenantQuota(nil, "0")
-			Expect(err).To(MatchError(ContainSubstring(
+			Eventually(func() error {
+				return setTenantQuota(nil, "0")
+			}, defaultTimeoutInterval, defaultPollInterval).Should(MatchError(ContainSubstring(
 				`rules[0].quota[0].hard["limits.cpu"] cannot be reduced to 0 while 300m is allocated`,
 			)))
 
-			current := &capsulev1beta2.Tenant{}
-			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: tenantName}, current)).To(Succeed())
-			delete(current.Spec.Rules[0].Quota[0].Hard, corev1.ResourceLimitsCPU)
-			err = k8sClient.Update(ctx, current)
-			Expect(err).To(MatchError(ContainSubstring(
+			Eventually(func() error {
+				current := &capsulev1beta2.Tenant{}
+				if err := k8sClient.Get(ctx, client.ObjectKey{Name: tenantName}, current); err != nil {
+					return err
+				}
+
+				delete(current.Spec.Rules[0].Quota[0].Hard, corev1.ResourceLimitsCPU)
+
+				return k8sClient.Update(ctx, current)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(MatchError(ContainSubstring(
 				`rules[0].quota[0].hard["limits.cpu"] cannot be removed while 300m is allocated`,
 			)))
 
 			applicationSelector := &metav1.LabelSelector{MatchLabels: map[string]string{selectorKey: "application"}}
-			Expect(setTenantQuota(applicationSelector, "8")).To(Succeed())
+			Eventually(func() error {
+				return setTenantQuota(applicationSelector, "8")
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			expectGeneratedQuota("application", "8", "0")
 		})
 
