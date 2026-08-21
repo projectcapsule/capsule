@@ -52,16 +52,34 @@ var _ = Describe("enforcing workload resource namespace rules", Ordered, Label("
 											Policy: rules.WorkloadResourceRequestPolicyDefault,
 											Value:  e2eResourceQuantity("100m"),
 										},
-										corev1.ResourceEphemeralStorage: {
-											Policy: rules.WorkloadResourceRequestPolicyDefault,
-											Value:  e2eResourceQuantity("1Gi"),
-										},
 									},
 									Limits: map[corev1.ResourceName]rules.WorkloadResourceLimitPolicy{
 										corev1.ResourceCPU: {Policy: rules.WorkloadResourceLimitPolicyRemove},
 										corev1.ResourceMemory: {
 											Policy: rules.WorkloadResourceLimitPolicyMatchRequest,
 										},
+									},
+								},
+							},
+						}},
+					},
+					{
+						NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"resource-policy": "ephemeral-managed"}},
+						NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{
+							Action: rules.ActionTypeDeny,
+							Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
+								Targets: []rules.WorkloadValidationTarget{
+									rules.ValidateContainers,
+									rules.ValidateInitContainers,
+								},
+								Resources: &rules.WorkloadResourceRules{
+									Requests: map[corev1.ResourceName]rules.WorkloadResourceRequestPolicy{
+										corev1.ResourceEphemeralStorage: {
+											Policy: rules.WorkloadResourceRequestPolicyDefault,
+											Value:  e2eResourceQuantity("1Gi"),
+										},
+									},
+									Limits: map[corev1.ResourceName]rules.WorkloadResourceLimitPolicy{
 										corev1.ResourceEphemeralStorage: {
 											Policy: rules.WorkloadResourceLimitPolicyDefault,
 											Value:  e2eResourceQuantity("2Gi"),
@@ -356,14 +374,12 @@ var _ = Describe("enforcing workload resource namespace rules", Ordered, Label("
 			SecurityContext: restrictedContainerSecurityContext(),
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:              resource.MustParse("50m"),
-					corev1.ResourceMemory:           resource.MustParse("512Mi"),
-					corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+					corev1.ResourceCPU:    resource.MustParse("50m"),
+					corev1.ResourceMemory: resource.MustParse("512Mi"),
 				},
 				Limits: corev1.ResourceList{
-					corev1.ResourceCPU:              resource.MustParse("2"),
-					corev1.ResourceMemory:           resource.MustParse("1Gi"),
-					corev1.ResourceEphemeralStorage: resource.MustParse("3Gi"),
+					corev1.ResourceCPU:    resource.MustParse("2"),
+					corev1.ResourceMemory: resource.MustParse("1Gi"),
 				},
 			},
 		}, {
@@ -392,36 +408,68 @@ var _ = Describe("enforcing workload resource namespace rules", Ordered, Label("
 		Expect(containerResources.Requests.Cpu().Cmp(resource.MustParse("250m"))).To(Equal(0))
 		Expect(containerResources.Limits).NotTo(HaveKey(corev1.ResourceCPU))
 		Expect(containerResources.Limits.Memory().Cmp(resource.MustParse("1Gi"))).To(Equal(0))
-		Expect(containerResources.Requests.StorageEphemeral().Cmp(resource.MustParse("1Gi"))).To(Equal(0))
-		Expect(containerResources.Limits.StorageEphemeral().Cmp(resource.MustParse("2Gi"))).To(Equal(0))
 
 		sidecarResources := created.Spec.Containers[1].Resources
 		Expect(sidecarResources.Requests.Cpu().Cmp(resource.MustParse("100m"))).To(Equal(0))
 		Expect(sidecarResources.Limits).NotTo(HaveKey(corev1.ResourceCPU))
 		Expect(sidecarResources.Limits.Memory().Cmp(resource.MustParse("128Mi"))).To(Equal(0))
-		Expect(sidecarResources.Requests.StorageEphemeral().Cmp(resource.MustParse("1Gi"))).To(Equal(0))
-		Expect(sidecarResources.Limits.StorageEphemeral().Cmp(resource.MustParse("2Gi"))).To(Equal(0))
 
 		initResources := created.Spec.InitContainers[0].Resources
 		Expect(initResources.Requests.Cpu().Cmp(resource.MustParse("50m"))).To(Equal(0))
 		Expect(initResources.Limits).NotTo(HaveKey(corev1.ResourceCPU))
 		Expect(initResources.Limits.Memory().Cmp(resource.MustParse("512Mi"))).To(Equal(0))
-		Expect(initResources.Requests.StorageEphemeral().Cmp(resource.MustParse("1Gi"))).To(Equal(0))
-		Expect(initResources.Limits.StorageEphemeral().Cmp(resource.MustParse("3Gi"))).To(Equal(0))
 
 		defaultedInitResources := created.Spec.InitContainers[1].Resources
 		Expect(defaultedInitResources.Requests.Cpu().Cmp(resource.MustParse("100m"))).To(Equal(0))
 		Expect(defaultedInitResources.Limits).NotTo(HaveKey(corev1.ResourceCPU))
 		Expect(defaultedInitResources.Limits.Memory().Cmp(resource.MustParse("256Mi"))).To(Equal(0))
-		Expect(defaultedInitResources.Requests.StorageEphemeral().Cmp(resource.MustParse("1Gi"))).To(Equal(0))
-		Expect(defaultedInitResources.Limits.StorageEphemeral().Cmp(resource.MustParse("2Gi"))).To(Equal(0))
 
 		Expect(created.Spec.Resources).NotTo(BeNil())
 		Expect(created.Spec.Resources.Requests.Cpu().Cmp(resource.MustParse("2"))).To(Equal(0))
 		Expect(created.Spec.Resources.Limits).NotTo(HaveKey(corev1.ResourceCPU))
 		Expect(created.Spec.Resources.Limits.Memory().Cmp(resource.MustParse("2Gi"))).To(Equal(0))
-		Expect(created.Spec.Resources.Requests).NotTo(HaveKey(corev1.ResourceEphemeralStorage))
-		Expect(created.Spec.Resources.Limits).NotTo(HaveKey(corev1.ResourceEphemeralStorage))
+	})
+
+	It("defaults ephemeral storage only on explicitly targeted containers", func() {
+		ns := createNamespace("ephemeral-managed")
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+		pod := newPod("managed-ephemeral-storage", "")
+		pod.Spec.Containers = append(pod.Spec.Containers, corev1.Container{
+			Name:            "sidecar",
+			Image:           "registry.k8s.io/pause:3.9",
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			SecurityContext: restrictedContainerSecurityContext(),
+			Resources: corev1.ResourceRequirements{Requests: corev1.ResourceList{
+				corev1.ResourceEphemeralStorage: resource.MustParse("1536Mi"),
+			}},
+		})
+		pod.Spec.InitContainers = []corev1.Container{{
+			Name:            "init-with-limit",
+			Image:           "registry.k8s.io/pause:3.9",
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			SecurityContext: restrictedContainerSecurityContext(),
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+				Limits:   corev1.ResourceList{corev1.ResourceEphemeralStorage: resource.MustParse("3Gi")},
+			},
+		}, {
+			Name:            "init-defaulted",
+			Image:           "registry.k8s.io/pause:3.9",
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			SecurityContext: restrictedContainerSecurityContext(),
+		}}
+
+		created := createPodAndExpectAllowed(cs, ns.Name, pod)
+
+		Expect(created.Spec.Containers[0].Resources.Requests.StorageEphemeral().Cmp(resource.MustParse("1Gi"))).To(Equal(0))
+		Expect(created.Spec.Containers[0].Resources.Limits.StorageEphemeral().Cmp(resource.MustParse("2Gi"))).To(Equal(0))
+		Expect(created.Spec.Containers[1].Resources.Requests.StorageEphemeral().Cmp(resource.MustParse("1536Mi"))).To(Equal(0))
+		Expect(created.Spec.Containers[1].Resources.Limits.StorageEphemeral().Cmp(resource.MustParse("2Gi"))).To(Equal(0))
+		Expect(created.Spec.InitContainers[0].Resources.Requests.StorageEphemeral().Cmp(resource.MustParse("1Gi"))).To(Equal(0))
+		Expect(created.Spec.InitContainers[0].Resources.Limits.StorageEphemeral().Cmp(resource.MustParse("3Gi"))).To(Equal(0))
+		Expect(created.Spec.InitContainers[1].Resources.Requests.StorageEphemeral().Cmp(resource.MustParse("1Gi"))).To(Equal(0))
+		Expect(created.Spec.InitContainers[1].Resources.Limits.StorageEphemeral().Cmp(resource.MustParse("2Gi"))).To(Equal(0))
+		Expect(created.Spec.Resources).To(BeNil())
 	})
 
 	It("applies Preserve, Remove, and Default only to an explicitly targeted init container", func() {
@@ -631,14 +679,10 @@ var _ = Describe("enforcing workload resource namespace rules", Ordered, Label("
 				Requests: corev1.ResourceList{corev1.ResourceEphemeralStorage: resource.MustParse("1Gi")},
 			},
 		}}
-		pod.Spec.Resources = &corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("500m")},
-		}
-
 		created := createPodAndExpectAllowed(cs, ns.Name, pod)
 		Expect(created.Spec.Containers[0].Resources.Limits.StorageEphemeral().Cmp(resource.MustParse("3Gi"))).To(Equal(0))
 		Expect(created.Spec.InitContainers[0].Resources.Limits.StorageEphemeral().Cmp(resource.MustParse("1536Mi"))).To(Equal(0))
-		Expect(created.Spec.Resources.Limits).NotTo(HaveKey(corev1.ResourceEphemeralStorage))
+		Expect(created.Spec.Resources).To(BeNil())
 
 		excessive := newPod("ephemeral-ratio-denied", "")
 		excessive.Spec.Containers[0].Resources.Requests[corev1.ResourceEphemeralStorage] = resource.MustParse("2Gi")

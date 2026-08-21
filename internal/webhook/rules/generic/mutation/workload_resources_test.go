@@ -69,7 +69,54 @@ func TestMutatePodResourcesUsesAllDefaultTargets(t *testing.T) {
 	assertResourceQuantity(t, pod.Spec.InitContainers[0].Resources.Limits, corev1.ResourceMemory, "512Mi")
 
 	assertResourceQuantity(t, pod.Spec.Resources.Requests, corev1.ResourceCPU, "500m")
+	assertResourceQuantity(t, pod.Spec.Resources.Requests, corev1.ResourceMemory, "1Gi")
 	assertResourceMissing(t, pod.Spec.Resources.Limits, corev1.ResourceCPU)
+}
+
+func TestMutatePodResourcesBackfillsOnlySupportedMissingPodRequests(t *testing.T) {
+	t.Parallel()
+
+	pod := &corev1.Pod{Spec: corev1.PodSpec{
+		Containers: []corev1.Container{{
+			Name: "app",
+			Resources: corev1.ResourceRequirements{Requests: corev1.ResourceList{
+				corev1.ResourceMemory:           resource.MustParse("1Gi"),
+				corev1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+			}},
+		}, {
+			Name: "sidecar",
+			Resources: corev1.ResourceRequirements{Requests: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("512Mi"),
+			}},
+		}},
+		Resources: &corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("500m")},
+		},
+	}}
+
+	bodies := []*rules.NamespaceRuleBodyNamespace{{Enforce: &rules.NamespaceRuleEnforceBody{
+		Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
+			Targets: []rules.WorkloadValidationTarget{rules.ValidateContainers},
+			Resources: &rules.WorkloadResourceRules{Requests: map[corev1.ResourceName]rules.WorkloadResourceRequestPolicy{
+				corev1.ResourceCPU: {
+					Policy: rules.WorkloadResourceRequestPolicyDefault,
+					Value:  quantityPointer("100m"),
+				},
+			}},
+		},
+	}}}
+
+	changed, err := MutatePodResources(pod, bodies)
+	if err != nil {
+		t.Fatalf("MutatePodResources() error = %v", err)
+	}
+	if !changed {
+		t.Fatal("MutatePodResources() changed = false, want true")
+	}
+
+	assertResourceQuantity(t, pod.Spec.Resources.Requests, corev1.ResourceCPU, "500m")
+	assertResourceQuantity(t, pod.Spec.Resources.Requests, corev1.ResourceMemory, "1536Mi")
+	assertResourceMissing(t, pod.Spec.Resources.Requests, corev1.ResourceEphemeralStorage)
 }
 
 func TestMutatePodResourcesDefaultTargetsSkipPodIncompatibleResources(t *testing.T) {

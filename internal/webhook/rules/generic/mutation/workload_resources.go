@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	resourcehelper "k8s.io/component-helpers/resource"
 
 	apirules "github.com/projectcapsule/capsule/pkg/api/rules"
 	"github.com/projectcapsule/capsule/pkg/runtime/workloads"
@@ -99,7 +100,41 @@ func MutatePodResources(
 		}
 	}
 
+	if mutated {
+		backfillMissingPodRequests(pod)
+	}
+
 	return mutated, nil
+}
+
+// backfillMissingPodRequests keeps Pods mutated by Capsule valid on Kubernetes
+// 1.33. That release validates every aggregate container request as soon as
+// spec.resources is present, treating a missing Pod-level request as zero. We
+// can backfill only resources Kubernetes permits at Pod level. Kubernetes 1.34
+// and later skip missing keys; explicitly storing the effective aggregate keeps
+// the same semantics on those releases.
+func backfillMissingPodRequests(pod *corev1.Pod) {
+	if pod.Spec.Resources == nil {
+		return
+	}
+
+	requests := resourcehelper.AggregateContainerRequests(pod, resourcehelper.PodResourcesOptions{})
+
+	for name, request := range requests {
+		if !workloads.PodLevelResourceSupported(name) {
+			continue
+		}
+
+		if _, found := pod.Spec.Resources.Requests[name]; found {
+			continue
+		}
+
+		if pod.Spec.Resources.Requests == nil {
+			pod.Spec.Resources.Requests = corev1.ResourceList{}
+		}
+
+		pod.Spec.Resources.Requests[name] = request.DeepCopy()
+	}
 }
 
 func collectWorkloadResourcePolicies(
