@@ -28,9 +28,28 @@ var _ = Describe("enforcing workload resource namespace rules", Ordered, Label("
 	const ownerName = "e2e-rules-resources"
 
 	var tnt *capsulev1beta2.Tenant
+	targetCases := []struct {
+		name    string
+		targets []rules.WorkloadValidationTarget
+	}{
+		{name: "pod", targets: []rules.WorkloadValidationTarget{rules.ValidatePod}},
+		{name: "containers", targets: []rules.WorkloadValidationTarget{rules.ValidateContainers}},
+		{name: "initcontainers", targets: []rules.WorkloadValidationTarget{rules.ValidateInitContainers}},
+		{name: "pod-containers", targets: []rules.WorkloadValidationTarget{rules.ValidatePod, rules.ValidateContainers}},
+		{name: "pod-initcontainers", targets: []rules.WorkloadValidationTarget{rules.ValidatePod, rules.ValidateInitContainers}},
+		{name: "containers-initcontainers", targets: []rules.WorkloadValidationTarget{rules.ValidateContainers, rules.ValidateInitContainers}},
+		{
+			name: "pod-containers-initcontainers",
+			targets: []rules.WorkloadValidationTarget{
+				rules.ValidatePod,
+				rules.ValidateContainers,
+				rules.ValidateInitContainers,
+			},
+		},
+	}
 
 	newTenant := func() *capsulev1beta2.Tenant {
-		return &capsulev1beta2.Tenant{
+		tenant := &capsulev1beta2.Tenant{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "e2e-rule-resources",
 				Labels: map[string]string{"env": "e2e"},
@@ -199,6 +218,21 @@ var _ = Describe("enforcing workload resource namespace rules", Ordered, Label("
 				},
 			},
 		}
+
+		for _, targetCase := range targetCases {
+			tenant.Spec.Rules = append(tenant.Spec.Rules, &rules.NamespaceRuleBodyTenant{
+				NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{
+					"resource-policy": "target-matrix-" + targetCase.name,
+				}},
+				NamespaceRuleBodyNamespace: resourceRatioTargetsRule(
+					rules.ActionTypeDeny,
+					targetCase.targets,
+					"1.5",
+				),
+			})
+		}
+
+		return tenant
 	}
 
 	newPod := func(name string, memoryLimit string) *corev1.Pod {
@@ -428,6 +462,65 @@ var _ = Describe("enforcing workload resource namespace rules", Ordered, Label("
 		Expect(created.Spec.Resources.Requests.Cpu().Cmp(resource.MustParse("2"))).To(Equal(0))
 		Expect(created.Spec.Resources.Limits).NotTo(HaveKey(corev1.ResourceCPU))
 		Expect(created.Spec.Resources.Limits.Memory().Cmp(resource.MustParse("2Gi"))).To(Equal(0))
+	})
+
+	It("applies Ratio only to every explicit target combination", func() {
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+
+		for _, targetCase := range targetCases {
+			By(targetCase.name)
+
+			ns := createNamespace("target-matrix-" + targetCase.name)
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "target-matrix-" + targetCase.name},
+				Spec: corev1.PodSpec{
+					SecurityContext: nobodyPodSecurityContext(),
+					Containers: []corev1.Container{{
+						Name:            "app",
+						Image:           "registry.k8s.io/pause:3.9",
+						ImagePullPolicy: corev1.PullIfNotPresent,
+						SecurityContext: restrictedContainerSecurityContext(),
+						Resources: corev1.ResourceRequirements{Requests: corev1.ResourceList{
+							corev1.ResourceMemory: resource.MustParse("200Mi"),
+						}},
+					}},
+					InitContainers: []corev1.Container{{
+						Name:            "init",
+						Image:           "registry.k8s.io/pause:3.9",
+						ImagePullPolicy: corev1.PullIfNotPresent,
+						SecurityContext: restrictedContainerSecurityContext(),
+						Resources: corev1.ResourceRequirements{Requests: corev1.ResourceList{
+							corev1.ResourceMemory: resource.MustParse("400Mi"),
+						}},
+					}},
+					Resources: &corev1.ResourceRequirements{Requests: corev1.ResourceList{
+						corev1.ResourceMemory: resource.MustParse("1Gi"),
+					}},
+				},
+			}
+
+			created := createPodAndExpectAllowed(cs, ns.Name, pod)
+			targeted := make(map[rules.WorkloadValidationTarget]bool, len(targetCase.targets))
+			for _, target := range targetCase.targets {
+				targeted[target] = true
+			}
+
+			assertLimit := func(
+				target rules.WorkloadValidationTarget,
+				resources corev1.ResourceRequirements,
+				expected string,
+			) {
+				limit, found := resources.Limits[corev1.ResourceMemory]
+				Expect(found).To(Equal(targeted[target]), "target %q in case %q", target, targetCase.name)
+				if found {
+					Expect(limit.Cmp(resource.MustParse(expected))).To(Equal(0), "target %q in case %q", target, targetCase.name)
+				}
+			}
+
+			assertLimit(rules.ValidateContainers, created.Spec.Containers[0].Resources, "300Mi")
+			assertLimit(rules.ValidateInitContainers, created.Spec.InitContainers[0].Resources, "600Mi")
+			assertLimit(rules.ValidatePod, *created.Spec.Resources, "1536Mi")
+		}
 	})
 
 	It("defaults ephemeral storage only on explicitly targeted containers", func() {
@@ -710,10 +803,18 @@ func resourceRatioRule(
 	target rules.WorkloadValidationTarget,
 	ratio string,
 ) *rules.NamespaceRuleBodyNamespace {
+	return resourceRatioTargetsRule(action, []rules.WorkloadValidationTarget{target}, ratio)
+}
+
+func resourceRatioTargetsRule(
+	action rules.ActionType,
+	targets []rules.WorkloadValidationTarget,
+	ratio string,
+) *rules.NamespaceRuleBodyNamespace {
 	return &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{
 		Action: action,
 		Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
-			Targets: []rules.WorkloadValidationTarget{target},
+			Targets: targets,
 			Resources: &rules.WorkloadResourceRules{
 				Limits: map[corev1.ResourceName]rules.WorkloadResourceLimitPolicy{
 					corev1.ResourceMemory: {

@@ -182,15 +182,18 @@ var _ = Describe("rule-generated GlobalResourceQuota admission", Ordered,
 				},
 			} {
 				By(test.name, func() {
-					current := &capsulev1beta2.Tenant{}
-					Expect(k8sClient.Get(ctx, client.ObjectKey{Name: tenantName}, current)).To(Succeed())
+					Eventually(func() error {
+						current := &capsulev1beta2.Tenant{}
+						if err := k8sClient.Get(ctx, client.ObjectKey{Name: tenantName}, current); err != nil {
+							return err
+						}
 
-					updated := current.DeepCopy()
-					updated.Spec.Rules[0].NamespaceSelector = nil
-					test.mutate(updated.Spec.Rules[0].Quota[0].Hard)
+						updated := current.DeepCopy()
+						updated.Spec.Rules[0].NamespaceSelector = nil
+						test.mutate(updated.Spec.Rules[0].Quota[0].Hard)
 
-					err := k8sClient.Update(ctx, updated)
-					Expect(err).To(MatchError(ContainSubstring(test.message)))
+						return k8sClient.Update(ctx, updated)
+					}, defaultTimeoutInterval, defaultPollInterval).Should(MatchError(ContainSubstring(test.message)))
 				})
 			}
 
@@ -225,15 +228,18 @@ var _ = Describe("rule-generated GlobalResourceQuota admission", Ordered,
 				},
 			} {
 				By(test.name, func() {
-					current := &capsulev1beta2.GlobalResourceQuota{}
-					Expect(controllerClient.Get(ctx, quotaKey, current)).To(Succeed())
+					Eventually(func() error {
+						current := &capsulev1beta2.GlobalResourceQuota{}
+						if err := controllerClient.Get(ctx, quotaKey, current); err != nil {
+							return err
+						}
 
-					updated := current.DeepCopy()
-					delete(updated.Spec.NamespaceSelectors[0].LabelSelector.MatchLabels, selectorKey)
-					test.mutate(updated.Spec.Quota.Hard)
+						updated := current.DeepCopy()
+						delete(updated.Spec.NamespaceSelectors[0].LabelSelector.MatchLabels, selectorKey)
+						test.mutate(updated.Spec.Quota.Hard)
 
-					err := controllerClient.Update(ctx, updated)
-					Expect(err).To(MatchError(ContainSubstring(test.message)))
+						return controllerClient.Update(ctx, updated)
+					}, defaultTimeoutInterval, defaultPollInterval).Should(MatchError(ContainSubstring(test.message)))
 				})
 			}
 
