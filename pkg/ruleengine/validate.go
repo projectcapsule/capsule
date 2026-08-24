@@ -415,6 +415,20 @@ func validateServiceRules(
 		}
 	}
 
+	if services.ExternalIPs != nil {
+		for j, cidr := range services.ExternalIPs.CIDRs {
+			if err := validateCIDR(cidr); err != nil {
+				return fmt.Errorf(
+					"rules[%d].enforce.services.externalIPs.cidrs[%d] %q is invalid: %w",
+					ruleIndex,
+					j,
+					cidr,
+					err,
+				)
+			}
+		}
+	}
+
 	if services.ExternalNames != nil {
 		for j, hostname := range services.ExternalNames.Hostnames {
 			if err := validateExpressionMatch(
