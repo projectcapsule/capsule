@@ -62,6 +62,7 @@ func ServiceRules(
 	h.rules = []serviceRuleValidator{
 		h.validateServiceTypes,
 		h.validateLoadBalancers,
+		h.validateExternalIPs,
 		h.validateExternalNames,
 		h.validateNodePorts,
 	}

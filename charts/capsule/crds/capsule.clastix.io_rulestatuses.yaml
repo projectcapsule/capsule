@@ -295,6 +295,19 @@ spec:
                     services:
                       description: Enforcement for Services.
                       properties:
+                        externalIPs:
+                          description: ExternalIPs defines constraints for spec.externalIPs.
+                          properties:
+                            cidrs:
+                              description: |-
+                                CIDRs restricts spec.externalIPs. Individual IP addresses are treated as
+                                host CIDRs (/32 for IPv4 and /128 for IPv6).
+                                For deny rules, empty means all external IPs are denied. For allow and
+                                audit rules, empty means no external IP restriction.
+                              items:
+                                type: string
+                              type: array
+                          type: object
                         externalNames:
                           description: ExternalNames defines additional constraints
                             for Services of type ExternalName.
@@ -972,6 +985,19 @@ spec:
                       services:
                         description: Enforcement for Services.
                         properties:
+                          externalIPs:
+                            description: ExternalIPs defines constraints for spec.externalIPs.
+                            properties:
+                              cidrs:
+                                description: |-
+                                  CIDRs restricts spec.externalIPs. Individual IP addresses are treated as
+                                  host CIDRs (/32 for IPv4 and /128 for IPv6).
+                                  For deny rules, empty means all external IPs are denied. For allow and
+                                  audit rules, empty means no external IP restriction.
+                                items:
+                                  type: string
+                                type: array
+                            type: object
                           externalNames:
                             description: ExternalNames defines additional constraints
                               for Services of type ExternalName.
@@ -1588,6 +1614,19 @@ spec:
                         services:
                           description: Enforcement for Services.
                           properties:
+                            externalIPs:
+                              description: ExternalIPs defines constraints for spec.externalIPs.
+                              properties:
+                                cidrs:
+                                  description: |-
+                                    CIDRs restricts spec.externalIPs. Individual IP addresses are treated as
+                                    host CIDRs (/32 for IPv4 and /128 for IPv6).
+                                    For deny rules, empty means all external IPs are denied. For allow and
+                                    audit rules, empty means no external IP restriction.
+                                  items:
+                                    type: string
+                                  type: array
+                              type: object
                             externalNames:
                               description: ExternalNames defines additional constraints
                                 for Services of type ExternalName.
