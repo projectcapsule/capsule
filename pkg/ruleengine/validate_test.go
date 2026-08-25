@@ -648,6 +648,78 @@ func TestValidateRuleStatusBody(t *testing.T) {
 			wantErr: `rules[0].enforce.services.loadBalancers.cidrs[0] "" is invalid: CIDR is empty`,
 		},
 		{
+			name:   "invalid external IP CIDR",
+			mapper: mapper,
+			bodies: []*rules.NamespaceRuleBodyNamespace{
+				{
+					Enforce: &rules.NamespaceRuleEnforceBody{
+						Services: rules.NamespaceRuleEnforceServicesBody{
+							ExternalIPs: &rules.ServiceExternalIPRule{
+								CIDRs: []string{
+									"10.20.0.0/33",
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: `rules[0].enforce.services.externalIPs.cidrs[0] "10.20.0.0/33" is invalid`,
+		},
+		{
+			name:   "empty external IP CIDR entry",
+			mapper: mapper,
+			bodies: []*rules.NamespaceRuleBodyNamespace{
+				{
+					Enforce: &rules.NamespaceRuleEnforceBody{
+						Services: rules.NamespaceRuleEnforceServicesBody{
+							ExternalIPs: &rules.ServiceExternalIPRule{
+								CIDRs: []string{
+									"",
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: `rules[0].enforce.services.externalIPs.cidrs[0] "" is invalid: CIDR is empty`,
+		},
+		{
+			name:   "external IP CIDRs are valid",
+			mapper: mapper,
+			bodies: []*rules.NamespaceRuleBodyNamespace{
+				{
+					Enforce: &rules.NamespaceRuleEnforceBody{
+						Action: rules.ActionTypeAllow,
+						Services: rules.NamespaceRuleEnforceServicesBody{
+							ExternalIPs: &rules.ServiceExternalIPRule{
+								CIDRs: []string{
+									"10.20.0.0/16",
+									"192.168.1.2",
+									"2001:db8::/32",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:   "empty external IP CIDR deny rule is valid",
+			mapper: mapper,
+			bodies: []*rules.NamespaceRuleBodyNamespace{
+				{
+					Enforce: &rules.NamespaceRuleEnforceBody{
+						Action: rules.ActionTypeDeny,
+						Services: rules.NamespaceRuleEnforceServicesBody{
+							ExternalIPs: &rules.ServiceExternalIPRule{
+								CIDRs: []string{},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			name:   "invalid externalName hostname regex",
 			mapper: mapper,
 			bodies: []*rules.NamespaceRuleBodyNamespace{

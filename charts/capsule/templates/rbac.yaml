@@ -106,7 +106,7 @@ subjects:
 - kind: ServiceAccount
   name: {{ include "capsule.serviceAccountName" . }}
   namespace: {{ .Release.Namespace }}
-    {{- if $.Values.manager.rbac.minimal }}
+    {{- if or $.Values.manager.rbac.strict $.Values.manager.rbac.minimal }}
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -273,6 +273,7 @@ rules:
   - "get"
   - "list"
   - "watch"
+  - "create"
   - "patch"
   - "update"
   - "delete"
@@ -433,6 +434,15 @@ rules:
   - update
   - patch
   - delete
+{{- $bindable := concat $.Values.manager.rbac.bindableClusterRoles (list $.Values.manager.options.rbac.provisioner $.Values.manager.options.rbac.deleter) $.Values.manager.options.rbac.administrationClusterRoles $.Values.manager.options.rbac.promotionClusterRoles | uniq | sortAlpha }}
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["clusterroles"]
+  resourceNames:
+    {{- range $bindable }}
+    - {{ . | quote }}
+    {{- end }}
+  verbs:
+  - bind
 - apiGroups: ["rbac.authorization.k8s.io"]
   resources: ["clusterrolebindings"]
   verbs:
@@ -462,6 +472,9 @@ rules:
 - apiGroups: [""]
   resources: ["secrets"]
   verbs: ["get", "list", "watch", "create", "update", "patch"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
 ---
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1

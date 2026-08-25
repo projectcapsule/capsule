@@ -49,6 +49,7 @@ const (
 	ReasonForbiddenPullPolicy        string = "ForbiddenPullPolicy"
 	ReasonForbiddenPodQoSClass       string = "ForbiddenQoSClass"
 	ReasonForbiddenPodScheduler      string = "ForbiddenScheduler"
+	ReasonForbiddenPodResources      string = "ForbiddenPodResources"
 
 	// Ingress.
 	ReasonWildcardDenied           string = "WildcardDenied"

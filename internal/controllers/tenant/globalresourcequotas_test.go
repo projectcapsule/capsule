@@ -59,6 +59,16 @@ func TestSyncGlobalResourceQuotasGeneratesAndPrunesRuleQuotas(t *testing.T) {
 	if generated.Labels[meta.RuleQuotaLabel] != "shared-compute" {
 		t.Fatalf("rule quota label = %q, want shared-compute", generated.Labels[meta.RuleQuotaLabel])
 	}
+	if generated.Labels[meta.NewManagedByCapsuleLabel] != meta.ValueController {
+		t.Fatalf(
+			"managed-by label = %q, want %q",
+			generated.Labels[meta.NewManagedByCapsuleLabel],
+			meta.ValueController,
+		)
+	}
+	if !metav1.IsControlledBy(generated, tnt) {
+		t.Fatalf("generated GlobalResourceQuota is not controlled by Tenant %q", tnt.Name)
+	}
 	selector := generated.Spec.NamespaceSelectors[0].LabelSelector
 	if selector.MatchLabels[meta.TenantLabel] != tnt.Name || selector.MatchLabels["tier"] != "paid" {
 		t.Fatalf("generated selector = %#v", selector)

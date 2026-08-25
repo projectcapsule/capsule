@@ -389,24 +389,16 @@ var _ = Describe("rule-generated GlobalResourceQuota", Ordered, Label("resourceq
 		Expect(failed).To(Equal(5))
 	})
 
-	It("keeps the generated quota identity when rules are reordered and limits change", func() {
+	It("rejects invalid rule limits and projects valid changes to every namespace", func() {
 		quotaKey := clientKey("", tenantutils.RuleGlobalResourceQuotaName(tnt, "service-count"))
-		marker := "e2e.projectcapsule.dev/stable-identity"
-
+		resourceName := corev1.ResourceServices
+		initialQuota := &capsulev1beta2.GlobalResourceQuota{}
 		Eventually(func() error {
-			current := &capsulev1beta2.GlobalResourceQuota{}
-			if err := k8sClient.Get(ctx, quotaKey, current); err != nil {
-				return err
-			}
-			if current.Annotations == nil {
-				current.Annotations = map[string]string{}
-			}
-			current.Annotations[marker] = "preserved"
-
-			return k8sClient.Update(ctx, current)
+			return k8sClient.Get(ctx, quotaKey, initialQuota)
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		stableUID := initialQuota.UID
 
-		Eventually(func() error {
+		setServiceLimit := func(limit string) error {
 			current := &capsulev1beta2.Tenant{}
 			if err := k8sClient.Get(ctx, clientKey("", tenantName), current); err != nil {
 				return err
@@ -417,6 +409,7 @@ var _ = Describe("rule-generated GlobalResourceQuota", Ordered, Label("resourceq
 			for _, rule := range current.Spec.Rules {
 				if rule != nil && len(rule.Quota) == 1 && rule.Quota[0].Name == "service-count" {
 					serviceRule = rule
+
 					continue
 				}
 				remaining = append(remaining, rule)
@@ -424,20 +417,84 @@ var _ = Describe("rule-generated GlobalResourceQuota", Ordered, Label("resourceq
 			if serviceRule == nil {
 				return fmt.Errorf("service-count quota rule was not found")
 			}
-			serviceRule.Quota[0].Hard[corev1.ResourceServices] = resource.MustParse("6")
+
+			serviceRule.Quota[0].Hard[resourceName] = resource.MustParse(limit)
+			// Moving the updated rule also verifies that its name, rather than its
+			// position, remains the generated quota's durable identity.
 			current.Spec.Rules = append([]*rules.NamespaceRuleBodyTenant{serviceRule}, remaining...)
 
 			return k8sClient.Update(ctx, current)
+		}
+		expectGlobalQuota := func(hard, used, available string) {
+			Eventually(func(g Gomega) {
+				current := &capsulev1beta2.GlobalResourceQuota{}
+				g.Expect(k8sClient.Get(ctx, quotaKey, current)).To(Succeed())
+				g.Expect(current.UID).To(Equal(stableUID))
+				g.Expect(current.Labels).To(HaveKeyWithValue(meta.RuleQuotaLabel, "service-count"))
+				g.Expect(current.Status.ObservedGeneration).To(Equal(current.Generation))
+
+				actualHard := current.Spec.Quota.Hard[resourceName]
+				g.Expect(actualHard.Cmp(resource.MustParse(hard))).To(Equal(0))
+				statusHard := current.Status.Total.Hard[resourceName]
+				g.Expect(statusHard.Cmp(resource.MustParse(hard))).To(Equal(0))
+				actualUsed := current.Status.Total.Used[resourceName]
+				g.Expect(actualUsed.Cmp(resource.MustParse(used))).To(Equal(0))
+				actualAvailable := current.Status.Total.Available[resourceName]
+				g.Expect(actualAvailable.Cmp(resource.MustParse(available))).To(Equal(0))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		}
+		expectNamespaceRemaining := func(remaining string) {
+			current := &capsulev1beta2.GlobalResourceQuota{}
+			Expect(k8sClient.Get(ctx, quotaKey, current)).To(Succeed())
+
+			for _, namespace := range []string{serviceA, serviceB} {
+				Eventually(func(g Gomega) {
+					quota := &corev1.ResourceQuota{}
+					g.Expect(k8sClient.Get(ctx, types.NamespacedName{
+						Namespace: namespace,
+						Name:      current.GetResourceQuotaName(),
+					}, quota)).To(Succeed())
+
+					hard := quota.Spec.Hard[resourceName]
+					hard.Sub(quota.Status.Used[resourceName])
+					g.Expect(hard.Cmp(resource.MustParse(remaining))).To(Equal(0))
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			}
+		}
+
+		// The concurrent admission scenario immediately before this test creates
+		// exactly five Services. Wait for native quota accounting before changing
+		// the shared limit.
+		expectGlobalQuota("5", "5", "0")
+
+		By("rejecting a Tenant rule decrease below current usage", func() {
+			err := setServiceLimit("3")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(`hard["services"] cannot be reduced to 3 while 5 is allocated`))
+
+			// Admission rejects the Tenant update before the generated quota can
+			// become stale or diverge from its source rule.
+			expectGlobalQuota("5", "5", "0")
+			expectNamespaceRemaining("0")
+		})
+
+		Eventually(func() error {
+			return setServiceLimit("7")
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
-		Eventually(func(g Gomega) {
-			current := &capsulev1beta2.GlobalResourceQuota{}
-			g.Expect(k8sClient.Get(ctx, quotaKey, current)).To(Succeed())
-			g.Expect(current.Annotations).To(HaveKeyWithValue(marker, "preserved"))
-			g.Expect(current.Labels).To(HaveKeyWithValue(meta.RuleQuotaLabel, "service-count"))
-			actual := current.Spec.Quota.Hard[corev1.ResourceServices]
-			g.Expect(actual.Cmp(resource.MustParse("6"))).To(Equal(0))
+		By("exposing the newly available capacity in every namespaced ResourceQuota", func() {
+			expectGlobalQuota("7", "5", "2")
+			expectNamespaceRemaining("2")
+		})
+
+		Eventually(func() error {
+			return setServiceLimit("5")
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		By("allowing a decrease exactly to current usage", func() {
+			expectGlobalQuota("5", "5", "0")
+			expectNamespaceRemaining("0")
+		})
 	})
 })
 

@@ -38,7 +38,6 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	tenantresourceindexer "github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
-	"github.com/projectcapsule/capsule/pkg/runtime/sanitize"
 )
 
 type globalResourceController struct {
@@ -50,6 +49,7 @@ type globalResourceController struct {
 	collector     Collector
 	configuration configuration.Configuration
 	metrics       *metrics.GlobalTenantResourceRecorder
+	clients       impersonatedClientLoader[*capsulev1beta2.GlobalTenantResource]
 
 	impersonation *cache.ImpersonationCache
 }
@@ -69,6 +69,12 @@ func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, ctrlConfig
 		mgr.GetAPIReader(),
 		mgr.GetRESTMapper(),
 	)
+	r.clients = impersonatedClientLoader[*capsulev1beta2.GlobalTenantResource]{
+		client:        r.client,
+		configuration: r.configuration,
+		impersonation: r.impersonation,
+		resolve:       globalServiceAccount,
+	}
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(
@@ -174,7 +180,7 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 	// On Deletion these checks are skipped.
 	//nolint:nestif
 	if tntResource.DeletionTimestamp.IsZero() {
-		if tntResource.Spec.Cordoned != nil && *tntResource.Spec.Cordoned {
+		if tntResource.Spec.IsCordoned() {
 			log.V(5).Info("global tenant resource cordoned")
 
 			return reconcile.Result{}, nil
@@ -392,7 +398,6 @@ func (r *globalResourceController) reconcile(
 		})
 }
 
-//nolint:gocognit
 func (r *globalResourceController) gatherResources(
 	ctx context.Context,
 	c client.Client,
@@ -478,39 +483,14 @@ func (r *globalResourceController) gatherResources(
 				opts.AllowCrossNamespaceSelection = false
 
 				for _, innerNs := range namespaces {
-					opts.Iterator = NewCollectorIteratorOptions(&tnt, innerNs, resource)
-
-					for _, obj := range objs {
-						if obj.GetNamespace() == innerNs.GetName() {
-							continue
-						}
-
-						target := obj.DeepCopy()
-						if err := sanitize.SanitizeObject(target, c.Scheme(), r.collector.objectSanitizeOptions); err != nil {
-							return err
-						}
-
-						target.SetNamespace(innerNs.GetName())
-
-						log.V(4).Info(
-							"adding replication for namespaced item",
-							"name", target.GetName(),
-							"namespace", target.GetNamespace(),
-							"kind", target.GetKind(),
-						)
-
-						if err := r.collector.AddToAccumulation(&tnt, innerNs, opts, resource, target, "replica", false); err != nil {
-							return err
-						}
-					}
-
-					if err := r.collector.Collect(
+					if err := r.collector.CollectForNamespace(
 						ctx,
 						c,
 						opts,
-						&tnt,
+						tnt,
 						strconv.Itoa(resourceIndex),
 						resource,
+						objs,
 						innerNs,
 					); err != nil {
 						return err
@@ -523,88 +503,22 @@ func (r *globalResourceController) gatherResources(
 	return nil
 }
 
-//nolint:dupl
 func (r *globalResourceController) loadClient(
 	ctx context.Context,
 	log logr.Logger,
 	tntResource *capsulev1beta2.GlobalTenantResource,
 ) (client.Client, error) {
-	sa := r.impersonatedServiceAccount(ctx, log, tntResource)
-	if sa == nil {
-		sa, ns := configuration.ControllerServiceAccount()
+	c, sa, err := r.clients.Load(ctx, log, tntResource)
 
-		tntResource.Status.ServiceAccount = &meta.NamespacedRFC1123ObjectReferenceWithNamespace{
-			Name:      meta.RFC1123Name(sa),
-			Namespace: meta.RFC1123SubdomainName(ns),
-		}
+	// The resolved identity is posted to the status even along a failure, as it states
+	// which ServiceAccount the replication was attempted with.
+	tntResource.Status.ServiceAccount = sa
 
-		return r.client, nil
-	}
-
-	tntResource.Status.ServiceAccount = &meta.NamespacedRFC1123ObjectReferenceWithNamespace{
-		Name:      sa.Name,
-		Namespace: sa.Namespace,
-	}
-
-	re, err := r.configuration.ServiceAccountClient(ctx)
 	if err != nil {
-		log.Error(err, "failed to load impersonated rest client")
-
 		return nil, err
 	}
 
-	log.V(5).Info("using impersonation client", "serviceaccount", sa.Name, "namespace", sa.Namespace)
-
-	return r.impersonation.LoadOrCreate(ctx, log, re, r.client.Scheme(), *sa)
-}
-
-func (r *globalResourceController) impersonatedServiceAccount(
-	ctx context.Context,
-	log logr.Logger,
-	tntResource *capsulev1beta2.GlobalTenantResource,
-) *meta.NamespacedRFC1123ObjectReferenceWithNamespace {
-	if sa := tntResource.Spec.ServiceAccount; sa != nil {
-		name := sa.Name.String()
-		ns := sa.Namespace.String()
-
-		if name == "" || ns == "" {
-			log.V(4).Info("serviceAccount reference is set but incomplete; ignoring",
-				"name", name, "namespace", ns,
-			)
-
-			return nil
-		}
-
-		return &meta.NamespacedRFC1123ObjectReferenceWithNamespace{
-			Name:      sa.Name,
-			Namespace: sa.Namespace,
-		}
-	}
-
-	cfg := r.configuration.ServiceAccountClientProperties()
-
-	name := cfg.GlobalDefaultServiceAccount.String()
-	ns := cfg.GlobalDefaultServiceAccountNamespace.String()
-
-	nameSet := name != ""
-	nsSet := ns != ""
-
-	if nameSet != nsSet {
-		log.V(2).Info("invalid config: global default service account requires both name and namespace",
-			"name", name, "namespace", ns,
-		)
-
-		return nil
-	}
-
-	if !nameSet && !nsSet {
-		return nil
-	}
-
-	return &meta.NamespacedRFC1123ObjectReferenceWithNamespace{
-		Name:      cfg.GlobalDefaultServiceAccount,
-		Namespace: cfg.GlobalDefaultServiceAccountNamespace,
-	}
+	return c, nil
 }
 
 func (r *globalResourceController) updateReconcilingStatus(ctx context.Context, instance *capsulev1beta2.GlobalTenantResource) error {

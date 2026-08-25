@@ -87,8 +87,9 @@ The following Values have changed key or Value:
 | ports | list | `[]` | Set additional ports for the deployment |
 | priorityClassName | string | `""` | Set the priority class name of the Capsule pod |
 | proxy.enabled | bool | `false` | Enable Installation of Capsule Proxy |
-| rbac.resourcepoolclaims | object | `{"create":false,"labels":{"rbac.authorization.k8s.io/aggregate-to-admin":"true"}}` | Allow the creation of ResourcePoolClaims |
-| rbac.resources | object | `{"create":false,"labels":{"rbac.authorization.k8s.io/aggregate-to-admin":"true"}}` | Allow the creation of TenantResources |
+| rbac.customquotas | object | `{"create":false,"labels":{}}` | Allow the creation of CustomQuotas |
+| rbac.resourcepoolclaims | object | `{"create":false,"labels":{}}` | Allow the creation of ResourcePoolClaims |
+| rbac.resources | object | `{"create":false,"labels":{}}` | Allow the creation of TenantResources |
 | replicaCount | int | `1` | Set the replica count for capsule pod |
 | securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"enabled":true,"readOnlyRootFilesystem":true}` | Set the securityContext for the Capsule container |
 | serviceAccount.annotations | object | `{}` | Annotations to add to the service account. |
@@ -166,12 +167,14 @@ The following Values have changed key or Value:
 | manager.options.userNames | list | `[]` | DEPRECATED: use users properties. Names of the users considered as Capsule users. |
 | manager.options.users | list | `[{"kind":"Group","name":"projectcapsule.dev"}]` | Define entities which are considered part of the Capsule construct. Users not mentioned here will be ignored by Capsule |
 | manager.options.workers | int | `1` | Workers (MaxConcurrentReconciles) is the maximum number of concurrent Reconciles which can be run (ALPHA). |
+| manager.rbac.bindableClusterRoles | list | `["admin"]` | ClusterRoles the Capsule controller is allowed to bind (verb `bind`) when strict RBAC is enabled, in addition to the roles Capsule manages (manager.options.rbac provisioner, deleter, administrationClusterRoles and promotionClusterRoles), which are always bindable. Add any custom tenant-owner ClusterRoles here. |
 | manager.rbac.clusterRole.extraResources | list | `[]` | Extra cluster-scoped RBAC PolicyRules to add to a ClusterRole created by this chart and bound to the Capsule ServiceAccount. |
 | manager.rbac.create | bool | `true` | Specifies whether RBAC resources should be created. |
 | manager.rbac.existingClusterRoles | list | `[]` | Specifies further cluster roles to be added to the Capsule manager service account. |
 | manager.rbac.existingRoles | list | `[]` | Specifies further cluster roles to be added to the Capsule manager service account. |
+| manager.rbac.minimal | bool | `false` | DEPRECATED: use strict instead. Former name of the strict option; takes effect when either flag is true. |
 | manager.rbac.role.extraResources | list | `[]` | Extra namespaced RBAC PolicyRules to add to a Role created by this chart and bound to the Capsule ServiceAccount. |
-| manager.rbac.strict | bool | `false` | Strongly restrict the RBAC assigned to Capsule Controller. When set to true you must aggregate further permissions by yourself. |
+| manager.rbac.strict | bool | `false` | Strongly restrict the RBAC assigned to Capsule Controller. The default owner ClusterRoles (admin, provisioner and deleter) can be bound to tenant owners out of the box; add custom owner ClusterRoles via bindableClusterRoles. Permissions beyond binding (e.g. TenantResource replication) must be aggregated by yourself via ClusterRoles labeled projectcapsule.dev/aggregate-to-controller: "true". |
 | manager.readinessProbe | object | `{"httpGet":{"path":"/readyz","port":10080}}` | Configure the readiness probe using Deployment probe spec |
 | manager.resources | object | `{}` | Set the resource requests/limits for the Capsule manager container |
 | manager.securityContext | object | `{}` | Set the securityContext for the Capsule container |
@@ -281,7 +284,7 @@ The following Values have changed key or Value:
 | webhooks.hooks.gateways.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
 | webhooks.hooks.gateways.opts | object | `{}` | Capsule Hook Options |
 | webhooks.hooks.gateways.reinvocationPolicy | string | `"Never"` | [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy) |
-| webhooks.hooks.generic | object | `{"enabled":true,"failurePolicy":"Fail","matchConditions":[{"expression":"request.resource.resource != \"events\"","name":"ignore-events"}],"matchPolicy":"Equivalent","namespaceSelector":{"matchExpressions":[{"key":"capsule.clastix.io/tenant","operator":"Exists"}]},"objectSelector":{},"opts":{},"reinvocationPolicy":"Never","rules":[{"apiGroups":["*"],"apiVersions":["*"],"operations":["CREATE","UPDATE"],"resources":["*/*"],"scope":"Namespaced"}]}` | Generic Rules API, including the rule-engine validation for Pods and Services |
+| webhooks.hooks.generic | object | `{"enabled":true,"failurePolicy":"Fail","matchConditions":[{"expression":"request.resource.resource != \"events\"","name":"ignore-events"}],"matchPolicy":"Equivalent","namespaceSelector":{"matchExpressions":[{"key":"capsule.clastix.io/tenant","operator":"Exists"}]},"objectSelector":{},"opts":{},"reinvocationPolicy":"IfNeeded","rules":[{"apiGroups":["*"],"apiVersions":["*"],"operations":["CREATE","UPDATE"],"resources":["*/*"],"scope":"Namespaced"}]}` | Generic Rules API, including the rule-engine validation for Pods and Services |
 | webhooks.hooks.generic.enabled | bool | `true` | Enable the Hook |
 | webhooks.hooks.generic.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
 | webhooks.hooks.generic.matchConditions | list | `[{"expression":"request.resource.resource != \"events\"","name":"ignore-events"}]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
@@ -289,7 +292,7 @@ The following Values have changed key or Value:
 | webhooks.hooks.generic.namespaceSelector | object | `{"matchExpressions":[{"key":"capsule.clastix.io/tenant","operator":"Exists"}]}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
 | webhooks.hooks.generic.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
 | webhooks.hooks.generic.opts | object | `{}` | Capsule Hook Options |
-| webhooks.hooks.generic.reinvocationPolicy | string | `"Never"` | [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy) |
+| webhooks.hooks.generic.reinvocationPolicy | string | `"IfNeeded"` | [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy) |
 | webhooks.hooks.generic.rules | list | `[{"apiGroups":["*"],"apiVersions":["*"],"operations":["CREATE","UPDATE"],"resources":["*/*"],"scope":"Namespaced"}]` | [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules) |
 | webhooks.hooks.globalcustomquotas.enabled | bool | `true` | Enable the Hook |
 | webhooks.hooks.globalcustomquotas.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
@@ -322,7 +325,7 @@ The following Values have changed key or Value:
 | webhooks.hooks.managed.namespaceSelector | object | `{}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
 | webhooks.hooks.managed.objectSelector | object | `{"matchExpressions":[{"key":"projectcapsule.dev/managed-by","operator":"In","values":["controller"]}]}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
 | webhooks.hooks.managed.opts | object | `{}` | Capsule Hook Options |
-| webhooks.hooks.managed.rules | list | `[{"apiGroups":["*"],"apiVersions":["*"],"operations":["CREATE","UPDATE","DELETE"],"resources":["*"],"scope":"Namespaced"}]` | [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules) |
+| webhooks.hooks.managed.rules | list | `[{"apiGroups":["*"],"apiVersions":["*"],"operations":["CREATE","UPDATE","DELETE"],"resources":["*"],"scope":"Namespaced"},{"apiGroups":["capsule.clastix.io"],"apiVersions":["v1beta2"],"operations":["CREATE","UPDATE","DELETE"],"resources":["globalresourcequotas"],"scope":"Cluster"}]` | [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules) |
 | webhooks.hooks.metadata | object | `{"enabled":true,"failurePolicy":"Ignore","matchConditions":[{"expression":"!has(request.subResource) || request.subResource == \"\"","name":"ignore-subresources"},{"expression":"request.resource.resource != \"events\"","name":"ignore-events"}],"matchPolicy":"Equivalent","namespaceSelector":{"matchExpressions":[{"key":"capsule.clastix.io/tenant","operator":"Exists"}]},"objectSelector":{},"opts":{},"reinvocationPolicy":"Never","rules":[{"apiGroups":["*"],"apiVersions":["*"],"operations":["CREATE","UPDATE"],"resources":["*"],"scope":"Namespaced"}]}` | Additional Metadata webhook |
 | webhooks.hooks.metadata.enabled | bool | `true` | Enable the Hook |
 | webhooks.hooks.metadata.failurePolicy | string | `"Ignore"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |

@@ -7,6 +7,9 @@ import (
 	"context"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -15,8 +18,10 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 	"github.com/projectcapsule/capsule/pkg/ruleengine"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	runtimequota "github.com/projectcapsule/capsule/pkg/runtime/quota"
 	tenantutils "github.com/projectcapsule/capsule/pkg/tenant"
 )
 
@@ -59,20 +64,128 @@ func (h *RuleValidationHandler) OnDelete(
 }
 
 func (h *RuleValidationHandler) OnUpdate(
-	_ client.Client,
-	_ client.Reader,
+	c client.Client,
+	reader client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	old *capsulev1beta2.Tenant,
 	decoder admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
+	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if response := h.handle(tnt, req); response != nil {
 			return response
 		}
 
+		if reader == nil {
+			reader = c
+		}
+
+		return validateRuleQuotaUpdates(ctx, reader, tnt, old)
+	}
+}
+
+func validateRuleQuotaUpdates(
+	ctx context.Context,
+	reader client.Reader,
+	tnt *capsulev1beta2.Tenant,
+	old *capsulev1beta2.Tenant,
+) *admission.Response {
+	if reader == nil || tnt == nil || old == nil {
 		return nil
 	}
+
+	oldHard := make(map[string]corev1.ResourceList)
+
+	for _, rule := range old.Spec.Rules {
+		if rule == nil || rule.NamespaceRuleBodyNamespace == nil {
+			continue
+		}
+
+		for _, quota := range rule.Quota {
+			oldHard[quota.Name] = quota.Hard
+		}
+	}
+
+	for ruleIndex, rule := range tnt.Spec.Rules {
+		if rule == nil || rule.NamespaceRuleBodyNamespace == nil {
+			continue
+		}
+
+		for quotaIndex, quota := range rule.Quota {
+			previous, existed := oldHard[quota.Name]
+			if !existed || apiequality.Semantic.DeepEqual(previous, quota.Hard) {
+				continue
+			}
+
+			globalQuota := &capsulev1beta2.GlobalResourceQuota{}
+			if err := reader.Get(ctx, client.ObjectKey{
+				Name: tenantutils.RuleGlobalResourceQuotaName(tnt, quota.Name),
+			}, globalQuota); err != nil {
+				if apierrors.IsNotFound(err) {
+					continue
+				}
+
+				return ad.ErroredResponse(fmt.Errorf(
+					"cannot validate rules[%d].quota[%d] against its GlobalResourceQuota: %w",
+					ruleIndex,
+					quotaIndex,
+					err,
+				))
+			}
+
+			path := fmt.Sprintf("rules[%d].quota[%d].hard", ruleIndex, quotaIndex)
+
+			desiredQuota := tenantutils.RuleGlobalResourceQuota(tnt, ruleIndex, quotaIndex)
+			if err := runtimequota.ValidateHardLimitScopeChange(
+				path,
+				quota.Hard,
+				globalQuota.Spec.Quota.Hard,
+				!apiequality.Semantic.DeepEqual(
+					desiredQuota.Spec.NamespaceSelectors,
+					globalQuota.Spec.NamespaceSelectors,
+				),
+			); err != nil {
+				return ad.Deny(err.Error())
+			}
+
+			if err := runtimequota.ValidateHardLimit(path, quota.Hard, globalQuota.Status.Total.Used); err != nil {
+				return ad.Deny(err.Error())
+			}
+
+			ledger := &capsulev1beta2.QuantityLedger{}
+
+			err := reader.Get(ctx, client.ObjectKey{
+				Namespace: configuration.ControllerNamespace(),
+				Name:      globalQuota.GetLedgerName(),
+			}, ledger)
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+
+			if err != nil {
+				return ad.ErroredResponse(fmt.Errorf(
+					"cannot validate rules[%d].quota[%d] against its QuantityLedger: %w",
+					ruleIndex,
+					quotaIndex,
+					err,
+				))
+			}
+
+			if ledger.Spec.TargetRef.UID != globalQuota.UID || ledger.Status.ResourceQuota == nil {
+				continue
+			}
+
+			if err := runtimequota.ValidateHardLimit(
+				path,
+				quota.Hard,
+				ledger.Status.ResourceQuota.Allocated,
+			); err != nil {
+				return ad.Deny(err.Error())
+			}
+		}
+	}
+
+	return nil
 }
 
 func (h *RuleValidationHandler) handle(

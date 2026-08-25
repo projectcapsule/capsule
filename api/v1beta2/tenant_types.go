@@ -40,10 +40,6 @@ type TenantSpec struct {
 	Owners rbac.OwnerListSpec `json:"owners,omitempty"`
 	// Specifies options for the Namespaces, such as additional metadata or maximum number of namespaces allowed for that Tenant. Once the namespace quota assigned to the Tenant has been reached, the Tenant owner cannot create further namespaces. Optional.
 	NamespaceOptions *NamespaceOptions `json:"namespaceOptions,omitempty"`
-	// Specifies options for the Service, such as additional metadata or block of certain type of Services. Optional.
-	ServiceOptions *api.ServiceOptions `json:"serviceOptions,omitempty"`
-	// Specifies options for the Pods deployed in the Tenant namespaces, such as additional metadata.
-	PodOptions *api.PodOptions `json:"podOptions,omitempty"`
 	// Specifies the allowed StorageClasses assigned to the Tenant.
 	// Capsule assures that all PersistentVolumeClaim resources created in the Tenant can use only one of the allowed StorageClasses.
 	// A default value can be specified, and all the PersistentVolumeClaim resources created will inherit the declared class.
@@ -54,9 +50,6 @@ type TenantSpec struct {
 	IngressOptions IngressOptions `json:"ingressOptions,omitzero"`
 	// Specifies the label to control the placement of pods on a given pool of worker nodes. All namespaces created within the Tenant will have the node selector annotation. This annotation tells the Kubernetes scheduler to place pods on the nodes having the selector label. Optional.
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-	// Specifies a list of ResourceQuota resources assigned to the Tenant. The assigned values are inherited by any namespace created in the Tenant. The Capsule operator aggregates ResourceQuota at Tenant level, so that the hard quota is never crossed for the given Tenant. This permits the Tenant owner to consume resources in the Tenant regardless of the namespace. Optional.
-	// +optional
-	ResourceQuota api.ResourceQuotaSpec `json:"resourceQuotas,omitzero"`
 	// Specifies additional RoleBindings assigned to the Tenant. Capsule will ensure that all namespaces in the Tenant always contain the RoleBinding for the given ClusterRole. Optional.
 	AdditionalRoleBindings []rbac.AdditionalRoleBindingsSpec `json:"additionalRoleBindings,omitempty"`
 	// Specifies the allowed RuntimeClasses assigned to the Tenant.
@@ -90,6 +83,19 @@ type TenantSpec struct {
 	// Optional
 	ForceTenantPrefix *bool `json:"forceTenantPrefix,omitempty"`
 
+	// Deprecated: Use Rules Quota (https://projectcapsule.dev/docs/tenants/rules/#quotas)
+	//
+	// Specifies a list of ResourceQuota resources assigned to the Tenant. The assigned values are inherited by any namespace created in the Tenant. The Capsule operator aggregates ResourceQuota at Tenant level, so that the hard quota is never crossed for the given Tenant. This permits the Tenant owner to consume resources in the Tenant regardless of the namespace. Optional.
+	// +optional
+	ResourceQuota api.ResourceQuotaSpec `json:"resourceQuotas,omitzero"`
+	// Deprecated: Use Rules Metadata instead (https://projectcapsule.dev/docs/rules/enforcement/metadata/)
+	//
+	// Specifies options for the Service, such as additional metadata or block of certain type of Services. Optional.
+	ServiceOptions *api.ServiceOptions `json:"serviceOptions,omitempty"`
+	// Deprecated: Use Rules Metadata instead (https://projectcapsule.dev/docs/rules/enforcement/metadata/)
+	//
+	// Specifies options for the Pods deployed in the Tenant namespaces, such as additional metadata.
+	PodOptions *api.PodOptions `json:"podOptions,omitempty"`
 	// Deprecated: Use Enforcement.Registries instead
 	//
 	// Specifies the trusted Image Registries assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed trusted registries. Optional.
@@ -98,7 +104,6 @@ type TenantSpec struct {
 	//
 	// Specify the allowed values for the imagePullPolicies option in Pod resources. Capsule assures that all Pod resources created in the Tenant can use only one of the allowed policy. Optional.
 	ImagePullPolicies []rules.ImagePullPolicySpec `json:"imagePullPolicies,omitempty"`
-
 	// Deprecated: Use Tenant Replications instead (https://projectcapsule.dev/docs/replications/)
 	//
 	// Specifies the NetworkPolicies assigned to the Tenant. The assigned NetworkPolicies are inherited by any namespace created in the Tenant. Optional.

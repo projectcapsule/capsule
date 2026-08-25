@@ -13,6 +13,7 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -113,6 +114,18 @@ func validateGlobalResourceQuotaRequest(
 	oldQuota := &capsulev1beta2.GlobalResourceQuota{}
 	if err := json.Unmarshal(req.OldObject.Raw, oldQuota); err != nil {
 		return ad.Denyf("previous GlobalResourceQuota could not be decoded: %v", err)
+	}
+
+	if err := runtimequota.ValidateHardLimitScopeChange(
+		"spec.quota.hard",
+		quota.Spec.Quota.Hard,
+		oldQuota.Spec.Quota.Hard,
+		!apiequality.Semantic.DeepEqual(
+			quota.Spec.NamespaceSelectors,
+			oldQuota.Spec.NamespaceSelectors,
+		),
+	); err != nil {
+		return ad.Denyf("invalid GlobalResourceQuota: %v", err)
 	}
 
 	if err := validateHardLimit(quota.Spec.Quota.Hard, oldQuota.Status.Total.Used); err != nil {
@@ -310,31 +323,7 @@ func validateGlobalResourceQuota(quota *capsulev1beta2.GlobalResourceQuota) erro
 }
 
 func validateHardLimit(hard, allocated corev1.ResourceList) error {
-	for name, usage := range allocated {
-		if usage.Sign() <= 0 {
-			continue
-		}
-
-		limit, exists := hard[name]
-		if !exists {
-			return fmt.Errorf(
-				"spec.quota.hard[%q] cannot be removed while %s is allocated",
-				name,
-				usage.String(),
-			)
-		}
-
-		if limit.Cmp(usage) < 0 {
-			return fmt.Errorf(
-				"spec.quota.hard[%q] cannot be reduced to %s while %s is allocated",
-				name,
-				limit.String(),
-				usage.String(),
-			)
-		}
-	}
-
-	return nil
+	return runtimequota.ValidateHardLimit("spec.quota.hard", hard, allocated)
 }
 
 func isManagedResourceQuota(req admission.Request, object any) bool {

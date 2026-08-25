@@ -24,6 +24,10 @@ type WebhookOptions struct {
 }
 
 func NewValidatingWebhook(in *ValidatingWebhook, c *admissionregistrationv1.WebhookClientConfig, users rbac.UserListSpec, admins rbac.UserListSpec) (admissionregistrationv1.ValidatingWebhook, error) {
+	if err := ValidateWebhookClientConfig(c); err != nil {
+		return admissionregistrationv1.ValidatingWebhook{}, err
+	}
+
 	out := admissionregistrationv1.ValidatingWebhook{
 		Name:                    in.Name,
 		Rules:                   in.Rules,
@@ -212,6 +216,10 @@ type ValidatingWebhook struct {
 }
 
 func NewMutatingWebhook(in *MutatingWebhook, c *admissionregistrationv1.WebhookClientConfig, users rbac.UserListSpec, admins rbac.UserListSpec) (admissionregistrationv1.MutatingWebhook, error) {
+	if err := ValidateWebhookClientConfig(c); err != nil {
+		return admissionregistrationv1.MutatingWebhook{}, err
+	}
+
 	out := admissionregistrationv1.MutatingWebhook{
 		Name:                    in.Name,
 		Rules:                   in.Rules,

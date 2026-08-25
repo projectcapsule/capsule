@@ -96,7 +96,13 @@ func (r *Manager) pruneGlobalResourceQuotas(
 		meta.NewManagedByCapsuleLabel: meta.ValueController,
 		meta.NewTenantLabel:           tnt.Name,
 	})
-	if err := r.List(ctx, list, &client.ListOptions{LabelSelector: selector}); err != nil {
+
+	reader := client.Reader(r.Client)
+	if r.reader != nil {
+		reader = r.reader
+	}
+
+	if err := reader.List(ctx, list, &client.ListOptions{LabelSelector: selector}); err != nil {
 		return err
 	}
 
@@ -116,4 +122,14 @@ func (r *Manager) pruneGlobalResourceQuotas(
 	}
 
 	return nil
+}
+
+func hasRuleGlobalResourceQuotas(tnt *capsulev1beta2.Tenant) bool {
+	for _, rule := range tnt.Spec.Rules {
+		if rule != nil && rule.NamespaceRuleBodyNamespace != nil && len(rule.Quota) > 0 {
+			return true
+		}
+	}
+
+	return false
 }

@@ -23,6 +23,10 @@ type NamespaceRuleEnforceServicesBody struct {
 	// +optional
 	LoadBalancers *ServiceLoadBalancerRule `json:"loadBalancers,omitempty"`
 
+	// ExternalIPs defines constraints for spec.externalIPs.
+	// +optional
+	ExternalIPs *ServiceExternalIPRule `json:"externalIPs,omitempty"`
+
 	// ExternalNames defines additional constraints for Services of type ExternalName.
 	// +optional
 	ExternalNames *ServiceExternalNameRule `json:"externalNames,omitempty"`
@@ -46,6 +50,16 @@ const (
 type ServiceLoadBalancerRule struct {
 	// CIDRs restricts spec.loadBalancerIP and spec.loadBalancerSourceRanges.
 	// Empty means no additional CIDR restriction once LoadBalancer is allowed by types.
+	// +optional
+	CIDRs []string `json:"cidrs,omitempty"`
+}
+
+// +kubebuilder:object:generate=true
+type ServiceExternalIPRule struct {
+	// CIDRs restricts spec.externalIPs. Individual IP addresses are treated as
+	// host CIDRs (/32 for IPv4 and /128 for IPv6).
+	// For deny rules, empty means all external IPs are denied. For allow and
+	// audit rules, empty means no external IP restriction.
 	// +optional
 	CIDRs []string `json:"cidrs,omitempty"`
 }

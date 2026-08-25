@@ -149,6 +149,47 @@ func TestMatchingNamespaceSelectorsUseOR(t *testing.T) {
 	}
 }
 
+func TestProjectedResourceQuotaSpecExposesGlobalRemainingCapacity(t *testing.T) {
+	t.Parallel()
+
+	quota := corev1.ResourceQuotaSpec{
+		Hard: corev1.ResourceList{
+			corev1.ResourceRequestsCPU:    resource.MustParse("10"),
+			corev1.ResourceRequestsMemory: resource.MustParse("4Gi"),
+		},
+		Scopes: []corev1.ResourceQuotaScope{corev1.ResourceQuotaScopeNotTerminating},
+	}
+	status := &capsulev1beta2.GlobalResourceQuotaStatus{
+		Total: capsulev1beta2.GlobalResourceQuotaUsage{
+			Available: corev1.ResourceList{
+				corev1.ResourceRequestsCPU:    resource.MustParse("4"),
+				corev1.ResourceRequestsMemory: resource.MustParse("0"),
+			},
+		},
+		NamespaceUsage: capsulev1beta2.GlobalResourceQuotaNamespaceUsage{
+			"team-a": {
+				Used: corev1.ResourceList{
+					corev1.ResourceRequestsCPU:    resource.MustParse("2"),
+					corev1.ResourceRequestsMemory: resource.MustParse("5Gi"),
+				},
+			},
+		},
+	}
+
+	projected := projectedResourceQuotaSpec(quota, status, "team-a")
+
+	assertResource(t, projected.Hard, corev1.ResourceRequestsCPU, "6")
+	assertResource(t, projected.Hard, corev1.ResourceRequestsMemory, "5Gi")
+	if len(projected.Scopes) != 1 || projected.Scopes[0] != corev1.ResourceQuotaScopeNotTerminating {
+		t.Fatalf("projected scopes = %#v, want NotTerminating", projected.Scopes)
+	}
+
+	// The desired shared limit remains immutable while projecting a namespace's
+	// native hard values.
+	assertResource(t, quota.Hard, corev1.ResourceRequestsCPU, "10")
+	assertResource(t, quota.Hard, corev1.ResourceRequestsMemory, "4Gi")
+}
+
 func observedResourceQuota(
 	quota *capsulev1beta2.GlobalResourceQuota,
 	namespace string,

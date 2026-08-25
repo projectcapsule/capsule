@@ -275,6 +275,8 @@ type TenantPodOptionsChangedPredicate struct{ predicate.Funcs }
 func (TenantPodOptionsChangedPredicate) Create(event.CreateEvent) bool   { return false }
 func (TenantPodOptionsChangedPredicate) Delete(event.DeleteEvent) bool   { return false }
 func (TenantPodOptionsChangedPredicate) Generic(event.GenericEvent) bool { return false }
+
+//nolint:staticcheck
 func (TenantPodOptionsChangedPredicate) Update(e event.UpdateEvent) bool {
 	oldTenant, oldOK := e.ObjectOld.(*capsulev1beta2.Tenant)
 	newTenant, newOK := e.ObjectNew.(*capsulev1beta2.Tenant)
@@ -287,6 +289,8 @@ type TenantServiceOptionsChangedPredicate struct{ predicate.Funcs }
 func (TenantServiceOptionsChangedPredicate) Create(event.CreateEvent) bool   { return false }
 func (TenantServiceOptionsChangedPredicate) Delete(event.DeleteEvent) bool   { return false }
 func (TenantServiceOptionsChangedPredicate) Generic(event.GenericEvent) bool { return false }
+
+//nolint:staticcheck
 func (TenantServiceOptionsChangedPredicate) Update(e event.UpdateEvent) bool {
 	oldTenant, oldOK := e.ObjectOld.(*capsulev1beta2.Tenant)
 	newTenant, newOK := e.ObjectNew.(*capsulev1beta2.Tenant)

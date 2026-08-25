@@ -55,6 +55,10 @@ func (h persistentVolumeValidatingVolume) OnUpdate(
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
+		if isBoundPVC(oldPVC) {
+			return nil
+		}
+
 		if err := validatePVCSelector(newPVC, tnt); err != nil {
 			return ad.ErroredResponse(err)
 		}

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -64,6 +65,9 @@ type Manager struct {
 	classes       supportedClasses
 
 	discoveryCache cache.DiscoveryNamespacedResourceCache
+
+	resourceQuotaSyncMu sync.Mutex
+	resourceQuotaSyncs  map[string]*tenantResourceQuotaSync
 }
 
 type supportedClasses struct {
@@ -354,12 +358,22 @@ func (r *Manager) Reconcile(ctx context.Context, request ctrl.Request) (result c
 	return reconcile.Result{}, reconcileError
 }
 
+//nolint:staticcheck
 func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *capsulev1beta2.Tenant) (err error) {
 	var errs []error
 
 	if instance.DeletionTimestamp != nil {
 		if err = r.reconcileNamespaces(ctx, log, instance); err != nil {
 			errs = append(errs, fmt.Errorf("namespace(s) had reconciliation errors: %w", err))
+		}
+
+		// The managed-resource webhook intentionally denies deletion by the
+		// garbage collector. Remove rule-generated cluster-scoped children as
+		// the Capsule controller before releasing the Tenant finalizer.
+		if err = r.pruneGlobalResourceQuotas(ctx, instance, map[string]struct{}{}); err != nil {
+			errs = append(errs, fmt.Errorf("cannot delete rule global resource quotas: %w", err))
+
+			return errors.Join(errs...)
 		}
 
 		if err = r.ensureMetadata(ctx, instance); err != nil {
@@ -438,8 +452,13 @@ func (r *Manager) syncResourceQuotasForResourceQuota(ctx context.Context, quota 
 		return
 	}
 
+	reader := r.reader
+	if reader == nil {
+		reader = r.Client
+	}
+
 	tenant := &capsulev1beta2.Tenant{}
-	if err := r.Get(ctx, client.ObjectKey{Name: owner.Name}, tenant); err != nil {
+	if err := reader.Get(ctx, client.ObjectKey{Name: owner.Name}, tenant); err != nil {
 		if !apierrors.IsNotFound(err) {
 			r.Log.Error(err, "cannot retrieve Tenant for ResourceQuota sync", "tenant", owner.Name)
 		}

@@ -42,10 +42,14 @@ type Manager struct {
 	Log           logr.Logger
 	Client        client.Client
 	Configuration configuration.Configuration
+
+	reader client.Reader
 }
 
 //nolint:revive
 func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) (err error) {
+	r.reader = mgr.GetAPIReader()
+
 	namesPredicate := predicates.LabelsMatching(map[string]string{
 		meta.CreatedByCapsuleLabel: controllerManager,
 	})
@@ -186,7 +190,16 @@ func (r *Manager) EnsureClusterRoleBindingsProvisioner(ctx context.Context) erro
 
 				listStarted := time.Now()
 
-				if err := r.Client.List(ctx, saList, client.MatchingLabels{
+				reader := r.reader
+				if reader == nil {
+					reader = r.Client
+				}
+
+				// ServiceAccount events are sourced from the metadata-only cache.
+				// Reading full objects from the regular cache here can observe the
+				// previous label value and permanently lose a promotion/demotion
+				// reconcile. The API reader provides an authoritative snapshot.
+				if err := reader.List(ctx, saList, client.MatchingLabels{
 					meta.OwnerPromotionLabel: meta.ValueTrue,
 				}); err != nil {
 					logOperationDuration(log, "list promoted ServiceAccounts", listStarted)

@@ -1,0 +1,10 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: TenantOwner
+metadata:
+  labels:
+    customer: renewable
+  name: renewable-user
+spec:
+  kind: User
+  name: "renewable"

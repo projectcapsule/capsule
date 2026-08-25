@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 	"github.com/projectcapsule/capsule/pkg/api/runtime"
@@ -271,6 +272,57 @@ func TestRenderNamespaceRuleBodies(t *testing.T) {
 				tt.assertFn(t, got)
 			}
 		})
+	}
+}
+
+func TestRenderNamespaceRuleBodiesPreservesResourceQuantities(t *testing.T) {
+	t.Parallel()
+
+	ratio := resource.MustParse("1.5")
+	request := resource.MustParse("250m")
+	bodies := []*rules.NamespaceRuleBodyNamespace{{
+		Enforce: &rules.NamespaceRuleEnforceBody{
+			Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
+				Resources: &rules.WorkloadResourceRules{
+					Requests: map[corev1.ResourceName]rules.WorkloadResourceRequestPolicy{
+						corev1.ResourceCPU: {
+							Policy: rules.WorkloadResourceRequestPolicyDefault,
+							Value:  &request,
+						},
+					},
+					Limits: map[corev1.ResourceName]rules.WorkloadResourceLimitPolicy{
+						corev1.ResourceCPU: {
+							Policy: rules.WorkloadResourceLimitPolicyRatio,
+							Value:  &ratio,
+						},
+					},
+				},
+			},
+		},
+	}}
+
+	got, err := RenderNamespaceRuleBodies(nil, MissingKeyError, bodies)
+	if err != nil {
+		t.Fatalf("RenderNamespaceRuleBodies() unexpected error: %v", err)
+	}
+
+	if len(got) != 1 || got[0] == nil || got[0].Enforce == nil {
+		t.Fatalf("RenderNamespaceRuleBodies() = %#v, want one enforce body", got)
+	}
+
+	resources := got[0].Enforce.Workloads.Resources
+	if resources == nil {
+		t.Fatal("rendered resources are nil")
+	}
+
+	gotRequest := resources.Requests[corev1.ResourceCPU].Value
+	if gotRequest == nil || gotRequest.Cmp(request) != 0 {
+		t.Fatalf("rendered request = %v, want %s", gotRequest, request.String())
+	}
+
+	gotRatio := resources.Limits[corev1.ResourceCPU].Value
+	if gotRatio == nil || gotRatio.Cmp(ratio) != 0 {
+		t.Fatalf("rendered ratio = %v, want %s", gotRatio, ratio.String())
 	}
 }
 

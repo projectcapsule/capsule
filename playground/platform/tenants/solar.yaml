@@ -1,0 +1,73 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: solar
+  labels:
+    customer: renewable
+  annotations:
+    info.projectcapsule.dev/icon: https://cdn-icons-png.flaticon.com/512/3463/3463440.png
+    info.projectcapsule.dev/description: "Production tenant for the solar team"
+    info.projectcapsule.dev/links: '[{"title":"Grafana","url":"https://grafana.example.com/d/payments","icon":"mdi:grafana"},{"title":"Runbook","url":"https://wiki.example.com/payments-runbook", "icon":  "icon": "fa-solid fa-chart-line"}]'
+spec:
+  permissions:
+    matchOwners:
+    - matchLabels:
+        team: platform
+    - matchLabels:
+        customer: renewable
+  rules:
+    - namespaceSelector:
+        matchExpressions:
+          - key: env
+            operator: In
+            values:
+              - "test"
+      permissions:
+        promotions:
+          - clusterRoles:
+              - "secret-replicator"
+    - permissions:
+        bindings:
+          - clusterRoleName: 'custom:proxy-viewer'
+            subjects:
+              - apiGroup: rbac.authorization.k8s.io
+                kind: User
+                name: gatsby
+            labels:
+              reflection.proxy.projectcapsule.dev/enabled: "true"
+      enforce:
+        action: deny
+        metadata:
+          - apiGroups:
+              - "v1"
+            kinds:
+              - "Namespace"
+            labels:
+              pod-security.kubernetes.io/enforce:
+                managed: "baseline"
+    - audience:
+        - kind: "Custom"
+          name: "CapsuleUser"
+      enforce:
+        action: deny
+        metadata:
+          - apiGroups:
+              - "v1"
+            kinds:
+              - "Namespace"
+            labels:
+              "openshift.io/*":
+                required: false
+                values:
+                  - exp: "^.*$"
+    - namespaceSelector:
+        matchExpressions:
+          - key: env
+            operator: In
+            values:
+              - "test"
+      permissions:
+        promotions:
+          - clusterRoles:
+              - "secret-replicator"

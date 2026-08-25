@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 
+	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -48,7 +49,22 @@ func (*metadataRules) mutate(obj *unstructured.Unstructured, bodies []*apirules.
 			return &response
 		}
 
-		if !MutateMetadata(obj, gvk, bodies) {
+		metadataMutated := MutateMetadata(obj, gvk, bodies)
+
+		resourcesMutated := false
+
+		if req.Operation == admissionv1.Create {
+			var err error
+
+			resourcesMutated, err = MutateWorkloadResources(obj, gvk, bodies)
+			if err != nil {
+				response := admission.Errored(http.StatusInternalServerError, err)
+
+				return &response
+			}
+		}
+
+		if !metadataMutated && !resourcesMutated {
 			return nil
 		}
 
