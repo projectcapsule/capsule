@@ -94,7 +94,7 @@ var _ = Describe("terminating namespace with guardrails", Ordered, Label("namesp
 	JustAfterEach(func() {
 		EventuallyDeletion(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: podKey.Name, Namespace: podKey.Namespace}})
 		EventuallyDeletion(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: nsName}})
-		EventuallyDeletion(tnt)
+		EventuallyDeletionWithoutPodCleanup(tnt)
 	})
 
 	It("keeps managed rolebindings during namespace termination and cleans up after finalizer removal", func() {

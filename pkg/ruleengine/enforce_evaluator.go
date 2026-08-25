@@ -94,9 +94,13 @@ type Set[R any, O any] struct {
 	Name        string
 	EventReason string
 
-	Values  func(O) []Value
-	Rules   func(*api.NamespaceRuleEnforceBody) []R
-	Matches func(R, Value) (Match, error)
+	Values func(O) []Value
+	// Rules extracts rules when extraction cannot fail.
+	Rules func(*api.NamespaceRuleEnforceBody) []R
+	// RulesWithError extracts rules that require runtime parsing or matching.
+	// When set, it takes precedence over Rules.
+	RulesWithError func(*api.NamespaceRuleEnforceBody) ([]R, error)
+	Matches        func(R, Value) (Match, error)
 
 	// Message can fully override the default message.
 	// Prefer leaving this nil unless a rule requires very specific wording.
@@ -124,7 +128,7 @@ func EvaluateEnforce[R any, T any](
 		return nil, fmt.Errorf("%s: values extractor is nil", set.Name)
 	}
 
-	if set.Rules == nil {
+	if set.Rules == nil && set.RulesWithError == nil {
 		return nil, fmt.Errorf("%s: rules extractor is nil", set.Name)
 	}
 
@@ -154,7 +158,19 @@ func EvaluateEnforce[R any, T any](
 				continue
 			}
 
-			items := set.Rules(enforce)
+			var items []R
+
+			if set.RulesWithError != nil {
+				var err error
+
+				items, err = set.RulesWithError(enforce)
+				if err != nil {
+					return evaluation, fmt.Errorf("%s: invalid rules: %w", set.Name, err)
+				}
+			} else {
+				items = set.Rules(enforce)
+			}
+
 			if len(items) == 0 {
 				continue
 			}

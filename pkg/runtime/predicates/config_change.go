@@ -4,6 +4,8 @@
 package predicates
 
 import (
+	"reflect"
+
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -23,7 +25,7 @@ func (CapsuleConfigSpecAdministratorsChangedPredicate) Update(e event.UpdateEven
 		return false
 	}
 
-	return len(oldObj.Spec.Administrators) != len(newObj.Spec.Administrators)
+	return !reflect.DeepEqual(oldObj.Spec.Administrators, newObj.Spec.Administrators)
 }
 
 type CapsuleConfigSpecImpersonationChangedPredicate struct{}
@@ -48,7 +50,7 @@ func (CapsuleConfigSpecImpersonationChangedPredicate) Update(e event.UpdateEvent
 
 type CapsuleConfigSpecAdmissionChangedPredicate struct{}
 
-func (CapsuleConfigSpecAdmissionChangedPredicate) Create(event.CreateEvent) bool   { return false }
+func (CapsuleConfigSpecAdmissionChangedPredicate) Create(event.CreateEvent) bool   { return true }
 func (CapsuleConfigSpecAdmissionChangedPredicate) Delete(event.DeleteEvent) bool   { return false }
 func (CapsuleConfigSpecAdmissionChangedPredicate) Generic(event.GenericEvent) bool { return false }
 
@@ -60,8 +62,5 @@ func (CapsuleConfigSpecAdmissionChangedPredicate) Update(e event.UpdateEvent) bo
 		return false
 	}
 
-	oldSpec := oldCfg.Spec
-	newSpec := newCfg.Spec
-
-	return oldSpec.Admission != newSpec.Admission
+	return !reflect.DeepEqual(oldCfg.Spec.Admission, newCfg.Spec.Admission)
 }

@@ -185,15 +185,6 @@ func (h *metadataHandler) resolveTenantForUpdate(
 			return nil, ad.ErroredResponse(err)
 		}
 
-		if tnt != nil {
-			return tnt, nil
-		}
-
-		tnt, err = tenant.GetTenantByLabels(ctx, reader, oldNs)
-		if err != nil {
-			return nil, ad.ErroredResponse(err)
-		}
-
 		return tnt, nil
 	}
 

@@ -6,11 +6,14 @@ package customquota
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"slices"
 	"sort"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -32,7 +35,6 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
-	index "github.com/projectcapsule/capsule/pkg/runtime/indexers/customquota"
 	"github.com/projectcapsule/capsule/pkg/runtime/quota"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
@@ -55,15 +57,18 @@ var ledgerMutationBackoff = wait.Backoff{
 type objectCalculationHandler struct {
 	targetsCache  *cache.CompiledTargetsCache[string]
 	jsonPathCache *cache.JSONPathCache
+	celCache      *cache.CELCache
 }
 
 func ObjectCalculationHandler(
 	targetsCache *cache.CompiledTargetsCache[string],
 	jsonPathCache *cache.JSONPathCache,
+	celCache *cache.CELCache,
 ) handlers.Handler {
 	return &objectCalculationHandler{
 		targetsCache:  targetsCache,
 		jsonPathCache: jsonPathCache,
+		celCache:      celCache,
 	}
 }
 
@@ -74,6 +79,8 @@ func (h *objectCalculationHandler) OnCreate(
 	recorder events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
+		dryRun := req.DryRun != nil && *req.DryRun
+
 		log := log.FromContext(ctx).WithValues(
 			"op", "create",
 			"kind", req.Kind.String(),
@@ -90,7 +97,7 @@ func (h *objectCalculationHandler) OnCreate(
 		var finalResp *admission.Response
 
 		err = retry.OnError(customAdmissionBackoff, apierrors.IsConflict, func() error {
-			matched, err := h.matchAllQuotas(ctx, c, req, u)
+			matched, err := h.matchAllQuotas(ctx, reader, req, u)
 			if err != nil {
 				finalResp = ad.ErroredResponse(err)
 
@@ -124,7 +131,7 @@ func (h *objectCalculationHandler) OnCreate(
 			for _, item := range evaluated {
 				ledgerKey := quantityLedgerKeyForMatchedQuota(item)
 
-				reservation := buildReservation(req, u, item.Usage, item.Key)
+				reservation := buildReservation(req, u, item.Usage, item.Usage, item.Key)
 
 				allowed, effectiveUsed, reserved, err := reserveCreateOnLedger(
 					ctx,
@@ -132,6 +139,7 @@ func (h *objectCalculationHandler) OnCreate(
 					reader,
 					item,
 					&reservation,
+					dryRun,
 				)
 				if err != nil {
 					for _, a := range applied {
@@ -178,10 +186,12 @@ func (h *objectCalculationHandler) OnCreate(
 					return nil
 				}
 
-				applied = append(applied, appliedReservation{
-					LedgerKey:     ledgerKey,
-					ReservationID: reservation.ID,
-				})
+				if !dryRun {
+					applied = append(applied, appliedReservation{
+						LedgerKey:     ledgerKey,
+						ReservationID: reservation.ID,
+					})
+				}
 			}
 
 			finalResp = nil
@@ -204,7 +214,7 @@ func (h *objectCalculationHandler) OnCreate(
 	}
 }
 
-//nolint:gocognit,cyclop,maintidx
+//nolint:gocognit,gocyclo,cyclop,maintidx
 func (h *objectCalculationHandler) OnUpdate(
 	c client.Client,
 	reader client.Reader,
@@ -212,28 +222,90 @@ func (h *objectCalculationHandler) OnUpdate(
 	recorder events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
+		dryRun := req.DryRun != nil && *req.DryRun
+		statusUpdate := req.SubResource == "status"
+		logger := log.FromContext(ctx).WithValues(
+			"op", "update",
+			"kind", req.Kind.String(),
+			"namespace", req.Namespace,
+			"name", req.Name,
+			"subresource", req.SubResource,
+		)
+
+		terminating, namespaceErr := namespaceTerminating(ctx, c, req.Namespace)
+		if namespaceErr != nil {
+			logger.Error(namespaceErr, "cannot determine whether namespace is terminating")
+		} else if terminating {
+			logger.V(5).Info("allowing update without quota processing because namespace is terminating")
+
+			return nil
+		}
+
 		oldObj, err := getUnstructured(req.OldObject)
 		if err != nil {
+			if statusUpdate {
+				logger.Error(err, "allowing status update because the previous object could not be decoded")
+
+				return nil
+			}
+
 			return ad.ErroredResponse(err)
 		}
 
 		newObj, err := getUnstructured(req.Object)
 		if err != nil {
+			if statusUpdate {
+				logger.Error(err, "allowing status update because the new object could not be decoded")
+
+				return nil
+			}
+
 			return ad.ErroredResponse(err)
 		}
 
 		var finalResp *admission.Response
 
 		err = retry.OnError(customAdmissionBackoff, apierrors.IsConflict, func() error {
-			oldMatched, err := h.matchAllQuotas(ctx, c, req, oldObj)
+			policies, err := loadQuotaPolicySnapshot(ctx, reader, req.Namespace)
 			if err != nil {
+				if statusUpdate {
+					logger.Error(err, "allowing status update because quota policies could not be loaded")
+
+					finalResp = nil
+
+					return nil
+				}
+
 				finalResp = ad.ErroredResponse(err)
 
 				return nil
 			}
 
-			newMatched, err := h.matchAllQuotas(ctx, c, req, newObj)
+			oldMatched, err := h.matchAllQuotasFromSnapshot(ctx, reader, req, oldObj, policies)
 			if err != nil {
+				if statusUpdate {
+					logger.Error(err, "allowing status update because previous quota matches could not be evaluated")
+
+					finalResp = nil
+
+					return nil
+				}
+
+				finalResp = ad.ErroredResponse(err)
+
+				return nil
+			}
+
+			newMatched, err := h.matchAllQuotasFromSnapshot(ctx, reader, req, newObj, policies)
+			if err != nil {
+				if statusUpdate {
+					logger.Error(err, "allowing status update because new quota matches could not be evaluated")
+
+					finalResp = nil
+
+					return nil
+				}
+
 				finalResp = ad.ErroredResponse(err)
 
 				return nil
@@ -241,6 +313,14 @@ func (h *objectCalculationHandler) OnUpdate(
 
 			oldEvaluated, err := h.evaluateMatchedQuotas(ctx, oldObj, oldMatched)
 			if err != nil {
+				if statusUpdate {
+					logger.Error(err, "allowing status update because previous quota usage could not be calculated")
+
+					finalResp = nil
+
+					return nil
+				}
+
 				finalResp = ad.Denyf(
 					"updating resource %s/%s (%s) cannot be admitted because previous custom quota usage could not be calculated: %v",
 					req.Namespace,
@@ -254,6 +334,14 @@ func (h *objectCalculationHandler) OnUpdate(
 
 			newEvaluated, err := h.evaluateMatchedQuotas(ctx, newObj, newMatched)
 			if err != nil {
+				if statusUpdate {
+					logger.Error(err, "allowing status update because new quota usage could not be calculated")
+
+					finalResp = nil
+
+					return nil
+				}
+
 				finalResp = ad.Denyf(
 					"updating resource %s/%s (%s) cannot be admitted because new custom quota usage could not be calculated: %v",
 					req.Namespace,
@@ -291,6 +379,7 @@ func (h *objectCalculationHandler) OnUpdate(
 				ReservationID string
 				OldUsage      resource.Quantity
 				NewUsage      resource.Quantity
+				PendingDelete *capsulev1beta2.QuantityLedgerPendingDelete
 			}
 
 			applied := make([]appliedUpdate, 0, len(oldByKey)+len(newByKey))
@@ -322,22 +411,36 @@ func (h *objectCalculationHandler) OnUpdate(
 
 				ledgerKey := quantityLedgerKeyForMatchedQuota(base)
 
-				var pendingDelete *capsulev1beta2.QuantityLedgerObjectRef
-				if hadOld {
-					pendingDelete = &capsulev1beta2.QuantityLedgerObjectRef{
-						APIGroup:   req.Kind.Group,
-						APIVersion: req.Kind.Version,
-						Kind:       req.Kind.Kind,
-						Namespace:  oldObj.GetNamespace(),
-						Name:       oldObj.GetName(),
-						UID:        oldObj.GetUID(),
+				var pendingDelete *capsulev1beta2.QuantityLedgerPendingDelete
+				if hadOld && !hadNew {
+					pendingDelete = &capsulev1beta2.QuantityLedgerPendingDelete{
+						ID: fmt.Sprintf("%s/%s", req.UID, base.Key),
+						ObjectRef: capsulev1beta2.QuantityLedgerObjectRef{
+							APIGroup:   req.Kind.Group,
+							APIVersion: req.Kind.Version,
+							Kind:       req.Kind.Kind,
+							Namespace:  oldObj.GetNamespace(),
+							Name:       oldObj.GetName(),
+							UID:        oldObj.GetUID(),
+						},
 					}
 				}
 
 				var reservation *capsulev1beta2.QuantityLedgerReservation
 
-				if hadNew && newUsage.Sign() > 0 {
-					r := buildReservation(req, newObj, newUsage, base.Key)
+				if hadNew {
+					delta := newUsage.DeepCopy()
+					delta.Sub(oldUsage)
+					quota.ClampQuantityToZero(&delta)
+
+					// Status is observed state owned by Kubernetes controllers.
+					// It must notify quota reconciliation, but it must never
+					// reserve capacity or be rejected for exceeding a quota.
+					if statusUpdate {
+						delta = resource.MustParse("0")
+					}
+
+					r := buildReservation(req, newObj, newUsage, delta, base.Key)
 					reservation = &r
 				}
 
@@ -350,6 +453,8 @@ func (h *objectCalculationHandler) OnUpdate(
 					newUsage,
 					reservation,
 					pendingDelete,
+					!statusUpdate,
+					dryRun,
 				)
 				if err != nil {
 					for _, v := range slices.Backward(applied) {
@@ -361,6 +466,7 @@ func (h *objectCalculationHandler) OnUpdate(
 							v.ReservationID,
 							v.OldUsage,
 							v.NewUsage,
+							v.PendingDelete,
 						)
 					}
 
@@ -377,7 +483,16 @@ func (h *objectCalculationHandler) OnUpdate(
 							v.ReservationID,
 							v.OldUsage,
 							v.NewUsage,
+							v.PendingDelete,
 						)
+					}
+
+					if statusUpdate {
+						logger.Info("allowing status update despite quota limit")
+
+						finalResp = nil
+
+						return nil
 					}
 
 					available := base.Limit.DeepCopy()
@@ -406,12 +521,15 @@ func (h *objectCalculationHandler) OnUpdate(
 					reservationID = reservation.ID
 				}
 
-				applied = append(applied, appliedUpdate{
-					LedgerKey:     ledgerKey,
-					ReservationID: reservationID,
-					OldUsage:      oldUsage.DeepCopy(),
-					NewUsage:      newUsage.DeepCopy(),
-				})
+				if !dryRun {
+					applied = append(applied, appliedUpdate{
+						LedgerKey:     ledgerKey,
+						ReservationID: reservationID,
+						OldUsage:      oldUsage.DeepCopy(),
+						NewUsage:      newUsage.DeepCopy(),
+						PendingDelete: pendingDelete,
+					})
+				}
 			}
 
 			finalResp = nil
@@ -419,6 +537,12 @@ func (h *objectCalculationHandler) OnUpdate(
 			return nil
 		})
 		if err != nil {
+			if statusUpdate {
+				logger.Error(err, "allowing status update because quota reconciliation could not be queued")
+
+				return nil
+			}
+
 			if apierrors.IsConflict(err) {
 				return ad.Denyf(
 					"custom quota admission could not reserve usage due to concurrent quota updates after %d attempts; please retry the request: %v",
@@ -441,6 +565,31 @@ func (h *objectCalculationHandler) OnDelete(
 	recorder events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
+		if req.DryRun != nil && *req.DryRun {
+			return nil
+		}
+
+		logger := log.FromContext(ctx).WithValues(
+			"op", "delete",
+			"kind", req.Kind.String(),
+			"namespace", req.Namespace,
+			"name", req.Name,
+		)
+
+		// Namespace termination can fan out into many object deletions at once.
+		// Use the local informer for this best-effort fast path so those deletes
+		// do not each add an API read before quota processing can be skipped.
+		// A stale non-terminating result only falls back to the normal,
+		// conservative ledger path.
+		terminating, err := namespaceTerminating(ctx, c, req.Namespace)
+		if err != nil {
+			logger.Error(err, "cannot determine whether namespace is terminating")
+		} else if terminating {
+			logger.V(5).Info("allowing delete without quota processing because namespace is terminating")
+
+			return nil
+		}
+
 		oldObj, err := getUnstructured(req.OldObject)
 		if err != nil {
 			return ad.ErroredResponse(err)
@@ -461,13 +610,15 @@ func (h *objectCalculationHandler) OnDelete(
 		}
 
 		namespacedcq := &capsulev1beta2.CustomQuotaList{}
-		if err := c.List(ctx, namespacedcq, client.InNamespace(req.Namespace), client.MatchingFields{
-			index.ObjectUIDIndexerFieldName: string(uid),
-		}); err != nil {
+		if err := reader.List(ctx, namespacedcq, client.InNamespace(req.Namespace)); err != nil {
 			return ad.ErroredResponse(err)
 		}
 
 		for _, nscq := range namespacedcq.Items {
+			if !nscq.Status.HasClaimUID(uid) {
+				continue
+			}
+
 			ledgerKey := types.NamespacedName{
 				Name:      nscq.GetName(),
 				Namespace: nscq.GetNamespace(),
@@ -479,13 +630,15 @@ func (h *objectCalculationHandler) OnDelete(
 		}
 
 		globalcq := &capsulev1beta2.GlobalCustomQuotaList{}
-		if err := c.List(ctx, globalcq, client.MatchingFields{
-			index.ObjectUIDIndexerFieldName: string(uid),
-		}); err != nil {
+		if err := reader.List(ctx, globalcq); err != nil {
 			return ad.ErroredResponse(err)
 		}
 
 		for _, gcq := range globalcq.Items {
+			if !gcq.Status.HasClaimUID(uid) {
+				continue
+			}
+
 			ledgerKey := types.NamespacedName{
 				Name:      gcq.GetName(),
 				Namespace: configuration.ControllerNamespace(),
@@ -522,7 +675,7 @@ func deleteLedgerReservation(
 
 		for _, res := range ledger.Status.Reservations {
 			if res.ID == reservationID {
-				released.Add(res.Usage)
+				released.Add(reservationDelta(res))
 
 				continue
 			}
@@ -540,7 +693,7 @@ func deleteLedgerReservation(
 
 		reserved := resource.MustParse("0")
 		for _, res := range active {
-			reserved.Add(res.Usage)
+			reserved.Add(reservationDelta(res))
 		}
 
 		ledger.Status.Reservations = active
@@ -551,18 +704,67 @@ func deleteLedgerReservation(
 	})
 }
 
+type quotaPolicySnapshot struct {
+	namespaced []capsulev1beta2.CustomQuota
+	global     []capsulev1beta2.GlobalCustomQuota
+}
+
+func loadQuotaPolicySnapshot(
+	ctx context.Context,
+	reader client.Reader,
+	namespace string,
+) (quotaPolicySnapshot, error) {
+	snapshot := quotaPolicySnapshot{}
+
+	// Correctness requires an authoritative policy set. A single snapshot is
+	// also reused for both sides of UPDATE admission so transient readiness
+	// changes cannot turn an unchanged object into a false quota transition.
+	if namespace != "" {
+		list := &capsulev1beta2.CustomQuotaList{}
+		if err := reader.List(ctx, list, client.InNamespace(namespace)); err != nil {
+			return quotaPolicySnapshot{}, err
+		}
+
+		snapshot.namespaced = list.Items
+	}
+
+	global := &capsulev1beta2.GlobalCustomQuotaList{}
+	if err := reader.List(ctx, global); err != nil {
+		return quotaPolicySnapshot{}, err
+	}
+
+	snapshot.global = global.Items
+
+	return snapshot, nil
+}
+
 func (h *objectCalculationHandler) matchAllQuotas(
 	ctx context.Context,
-	c client.Client,
+	reader client.Reader,
 	req admission.Request,
 	u unstructured.Unstructured,
 ) ([]quota.MatchedQuota, error) {
-	namespaced, err := h.matchCustomQuotas(ctx, c, req, u)
+	snapshot, err := loadQuotaPolicySnapshot(ctx, reader, req.Namespace)
 	if err != nil {
 		return nil, err
 	}
 
-	global, err := h.matchGlobalCustomQuotas(ctx, c, req, u)
+	return h.matchAllQuotasFromSnapshot(ctx, reader, req, u, snapshot)
+}
+
+func (h *objectCalculationHandler) matchAllQuotasFromSnapshot(
+	ctx context.Context,
+	reader client.Reader,
+	req admission.Request,
+	u unstructured.Unstructured,
+	snapshot quotaPolicySnapshot,
+) ([]quota.MatchedQuota, error) {
+	namespaced, err := h.matchCustomQuotasFromItems(ctx, req, u, snapshot.namespaced)
+	if err != nil {
+		return nil, err
+	}
+
+	global, err := h.matchGlobalCustomQuotasFromItems(ctx, reader, req, u, snapshot.global)
 	if err != nil {
 		return nil, err
 	}
@@ -596,36 +798,40 @@ func (h *objectCalculationHandler) matchAllQuotas(
 	return out, nil
 }
 
-func (h *objectCalculationHandler) matchCustomQuotas(
+func (h *objectCalculationHandler) matchCustomQuotasFromItems(
 	ctx context.Context,
-	c client.Client,
 	req admission.Request,
 	u unstructured.Unstructured,
+	items []capsulev1beta2.CustomQuota,
 ) ([]quota.MatchedQuota, error) {
-	if req.Namespace == "" {
-		return nil, nil
-	}
-
-	list := &capsulev1beta2.CustomQuotaList{}
-
-	err := c.List(ctx, list,
-		client.InNamespace(req.Namespace),
-		client.MatchingFields{
-			index.TargetIndexerFieldName: req.Kind.String(),
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(list.Items) == 0 {
+	if req.Namespace == "" || len(items) == 0 {
 		return nil, nil
 	}
 
 	objLabels := labels.Set(u.GetLabels())
 	out := make([]quota.MatchedQuota, 0)
 
-	for _, cq := range list.Items {
+	for _, cq := range items {
+		if !sourcesTargetKind(cq.Spec.Sources, req.Kind) {
+			continue
+		}
+
+		if !customQuotaReadyForAdmission(cq.Generation, cq.Status) {
+			// Status is observed state and cannot be blocked by quota policy.
+			// A NotReady quota has no reliable selector/usage model to notify,
+			// so skip it and allow Kubernetes to persist the status update.
+			if req.SubResource == "status" {
+				continue
+			}
+
+			return nil, fmt.Errorf(
+				"CustomQuota %s/%s is not ready for generation %d",
+				cq.Namespace,
+				cq.Name,
+				cq.Generation,
+			)
+		}
+
 		if !selectors.MatchesSelectors(objLabels, cq.Spec.ScopeSelectors) {
 			continue
 		}
@@ -642,7 +848,7 @@ func (h *objectCalculationHandler) matchCustomQuotas(
 				continue
 			}
 
-			matches, err := controller.MatchesCompiledSelectorsWithFields(u, target.CompiledSelectors)
+			matches, err := controller.MatchesCompiledSelectorsWithFields(ctx, u, target.CompiledSelectors)
 			if err != nil {
 				return nil, fmt.Errorf(
 					"evaluate selectors for %s/%s on CustomQuota %s/%s: %w",
@@ -664,6 +870,8 @@ func (h *objectCalculationHandler) matchCustomQuotas(
 				Namespace:    cq.Namespace,
 				Path:         target.Path,
 				CompiledPath: target.CompiledPath,
+				CEL:          target.CEL,
+				CompiledCEL:  target.CompiledCEL,
 				Operation:    target.Operation,
 				Limit:        cq.Spec.Limit.DeepCopy(),
 				Used:         cq.Status.Usage.Used.DeepCopy(),
@@ -676,22 +884,14 @@ func (h *objectCalculationHandler) matchCustomQuotas(
 	return out, nil
 }
 
-func (h *objectCalculationHandler) matchGlobalCustomQuotas(
+func (h *objectCalculationHandler) matchGlobalCustomQuotasFromItems(
 	ctx context.Context,
-	c client.Client,
+	reader client.Reader,
 	req admission.Request,
 	u unstructured.Unstructured,
+	items []capsulev1beta2.GlobalCustomQuota,
 ) ([]quota.MatchedQuota, error) {
-	list := &capsulev1beta2.GlobalCustomQuotaList{}
-
-	err := c.List(ctx, list, client.MatchingFields{
-		index.TargetIndexerFieldName: req.Kind.String(),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if len(list.Items) == 0 {
+	if len(items) == 0 {
 		return nil, nil
 	}
 
@@ -699,7 +899,37 @@ func (h *objectCalculationHandler) matchGlobalCustomQuotas(
 
 	out := make([]quota.MatchedQuota, 0)
 
-	for _, gcq := range list.Items {
+	for _, gcq := range items {
+		if !sourcesTargetKind(gcq.Spec.Sources, req.Kind) {
+			continue
+		}
+
+		if !customQuotaReadyForAdmission(gcq.Generation, gcq.Status.CustomQuotaStatus) {
+			if req.SubResource == "status" {
+				continue
+			}
+
+			applies, err := desiredGlobalQuotaAppliesToNamespace(ctx, reader, &gcq, req.Namespace)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"evaluate namespaces for GlobalCustomQuota %s generation %d: %w",
+					gcq.Name,
+					gcq.Generation,
+					err,
+				)
+			}
+
+			if !applies {
+				continue
+			}
+
+			return nil, fmt.Errorf(
+				"GlobalCustomQuota %s is not ready for generation %d",
+				gcq.Name,
+				gcq.Generation,
+			)
+		}
+
 		if !gcq.Status.NamespacePresent("*") && !gcq.Status.NamespacePresent(req.Namespace) {
 			continue
 		}
@@ -720,7 +950,7 @@ func (h *objectCalculationHandler) matchGlobalCustomQuotas(
 				continue
 			}
 
-			matches, err := controller.MatchesCompiledSelectorsWithFields(u, target.CompiledSelectors)
+			matches, err := controller.MatchesCompiledSelectorsWithFields(ctx, u, target.CompiledSelectors)
 			if err != nil {
 				return nil, fmt.Errorf(
 					"evaluate selectors for %s/%s on GlobalCustomQuota %s: %w",
@@ -741,6 +971,8 @@ func (h *objectCalculationHandler) matchGlobalCustomQuotas(
 				Namespace:    "",
 				Path:         target.Path,
 				CompiledPath: target.CompiledPath,
+				CEL:          target.CEL,
+				CompiledCEL:  target.CompiledCEL,
 				Operation:    target.Operation,
 				Limit:        gcq.Spec.Limit.DeepCopy(),
 				Used:         gcq.Status.Usage.Used.DeepCopy(),
@@ -774,6 +1006,27 @@ func getUnstructured(rawExt runtime.RawExtension) (unstructured.Unstructured, er
 	return u, nil
 }
 
+func namespaceTerminating(
+	ctx context.Context,
+	reader client.Reader,
+	namespace string,
+) (bool, error) {
+	if namespace == "" {
+		return false, nil
+	}
+
+	ns := &corev1.Namespace{}
+	if err := reader.Get(ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+
+		return false, err
+	}
+
+	return ns.DeletionTimestamp != nil, nil
+}
+
 func quotaTypeName(global bool) string {
 	if global {
 		return "GlobalCustomQuota"
@@ -795,33 +1048,53 @@ func (h *objectCalculationHandler) evaluateMatchedQuotas(
 ) ([]evaluatedQuota, error) {
 	log := log.FromContext(ctx)
 
-	usageByPath := make(map[string]resource.Quantity, len(matched))
+	usageByExpression := make(map[string]resource.Quantity, len(matched))
 
 	for _, mq := range matched {
-		// count does not use a path
+		// count does not use a calculation expression
 		if mq.Operation == quota.OpCount {
 			continue
 		}
 
-		if _, ok := usageByPath[mq.Path]; ok {
+		expressionKey := matchedQuotaExpressionKey(mq)
+		if _, ok := usageByExpression[expressionKey]; ok {
 			continue
 		}
 
-		usage, err := quota.ParseQuantityFromUnstructured(u, mq.CompiledPath)
+		var (
+			usage resource.Quantity
+			err   error
+		)
+
+		switch {
+		case mq.CompiledCEL != nil:
+			usage, err = mq.CompiledCEL.EvaluateQuantity(ctx, u)
+		case mq.CompiledPath != nil:
+			usage, err = quota.ParseQuantityFromUnstructured(u, mq.CompiledPath)
+		default:
+			err = fmt.Errorf("compiled usage expression is missing")
+		}
+
 		if err != nil {
 			return nil, fmt.Errorf(
-				"%s %q source path %q op %q did not resolve to a valid quantity: %w",
+				"%s %q source path %q cel %q op %q did not resolve to a valid quantity: %w",
 				quotaTypeName(mq.IsGlobal),
 				mq.Name,
 				mq.Path,
+				mq.CEL,
 				mq.Operation,
 				err,
 			)
 		}
 
-		log.V(5).Info("parsed usage", "path", mq.Path, "parsed", usage.String())
+		log.V(5).Info(
+			"evaluated usage",
+			"path", mq.Path,
+			"cel", mq.CEL,
+			"quantity", usage.String(),
+		)
 
-		usageByPath[mq.Path] = usage
+		usageByExpression[expressionKey] = usage
 	}
 
 	byKey := make(map[string]evaluatedQuota, len(matched))
@@ -846,7 +1119,7 @@ func (h *objectCalculationHandler) evaluateMatchedQuotas(
 			usage = *resource.NewQuantity(1, resource.DecimalSI)
 
 		case quota.OpSub:
-			usage = usageByPath[mq.Path].DeepCopy()
+			usage = usageByExpression[matchedQuotaExpressionKey(mq)].DeepCopy()
 			usage.Neg()
 			ev.Usage.Add(usage)
 			quota.ClampQuantityToZero(&ev.Usage)
@@ -855,7 +1128,7 @@ func (h *objectCalculationHandler) evaluateMatchedQuotas(
 			continue
 
 		case quota.OpAdd:
-			usage = usageByPath[mq.Path].DeepCopy()
+			usage = usageByExpression[matchedQuotaExpressionKey(mq)].DeepCopy()
 
 		default:
 			return nil, fmt.Errorf("unsupported quota operation %q for key %q", mq.Operation, mq.Key)
@@ -871,6 +1144,14 @@ func (h *objectCalculationHandler) evaluateMatchedQuotas(
 	}
 
 	return out, nil
+}
+
+func matchedQuotaExpressionKey(matched quota.MatchedQuota) string {
+	if matched.CEL != "" {
+		return "cel:" + matched.CEL
+	}
+
+	return "path:" + matched.Path
 }
 
 func addLedgerPendingDelete(
@@ -894,6 +1175,14 @@ func addLedgerPendingDelete(
 			}
 		}
 
+		if len(ledger.Status.PendingDeletes) >= maxQuantityLedgerPendingDeletes {
+			return fmt.Errorf(
+				"quantity ledger %s has reached the maximum of %d pending deletes",
+				ledgerKey.String(),
+				maxQuantityLedgerPendingDeletes,
+			)
+		}
+
 		ledger.Status.PendingDeletes = append(ledger.Status.PendingDeletes, capsulev1beta2.QuantityLedgerPendingDelete{
 			ObjectRef: objRef,
 			CreatedAt: now,
@@ -907,36 +1196,138 @@ func (h *objectCalculationHandler) getOrCompileCustomQuotaTargets(
 	cq *capsulev1beta2.CustomQuota,
 ) ([]cache.CompiledTarget, error) {
 	key := controller.MakeCustomQuotaCacheKey(cq.Namespace, cq.Name)
+	targets := customQuotaTargets(cq.Spec.Sources, cq.Status.Targets)
 
-	return h.targetsCache.GetOrBuild(key, func() ([]cache.CompiledTarget, error) {
-		targets := make([]capsulev1beta2.CustomQuotaStatusTarget, 0, len(cq.Spec.Sources))
-		for _, src := range cq.Spec.Sources {
-			targets = append(targets, capsulev1beta2.CustomQuotaStatusTarget{
-				GroupVersionKind:            metav1.GroupVersionKind(src.GroupVersionKind()),
-				CustomQuotaSpecSourceConfig: src.CustomQuotaSpecSourceConfig,
-			})
-		}
-
-		return controller.CompileTargets(h.jsonPathCache, targets)
-	})
+	return h.getOrCompileCurrentTargets(key, targets)
 }
 
 func (h *objectCalculationHandler) getOrCompileGlobalCustomQuotaTargets(
 	gcq *capsulev1beta2.GlobalCustomQuota,
 ) ([]cache.CompiledTarget, error) {
 	key := controller.MakeGlobalCustomQuotaCacheKey(gcq.Name)
+	targets := customQuotaTargets(gcq.Spec.Sources, gcq.Status.Targets)
 
-	return h.targetsCache.GetOrBuild(key, func() ([]cache.CompiledTarget, error) {
-		targets := make([]capsulev1beta2.CustomQuotaStatusTarget, 0, len(gcq.Spec.Sources))
-		for _, src := range gcq.Spec.Sources {
-			targets = append(targets, capsulev1beta2.CustomQuotaStatusTarget{
-				GroupVersionKind:            metav1.GroupVersionKind(src.GroupVersionKind()),
-				CustomQuotaSpecSourceConfig: src.CustomQuotaSpecSourceConfig,
-			})
+	return h.getOrCompileCurrentTargets(key, targets)
+}
+
+func customQuotaTargets(
+	sources []capsulev1beta2.CustomQuotaSpecSource,
+	statusTargets []capsulev1beta2.CustomQuotaStatusTarget,
+) []capsulev1beta2.CustomQuotaStatusTarget {
+	targets := make([]capsulev1beta2.CustomQuotaStatusTarget, 0, len(sources))
+
+	for i, source := range sources {
+		scope := k8smeta.RESTScopeName("")
+		if i < len(statusTargets) {
+			scope = statusTargets[i].Scope
 		}
 
-		return controller.CompileTargets(h.jsonPathCache, targets)
-	})
+		targets = append(targets, capsulev1beta2.CustomQuotaStatusTarget{
+			GroupVersionKind:            metav1.GroupVersionKind(source.GroupVersionKind()),
+			CustomQuotaSpecSourceConfig: source.CustomQuotaSpecSourceConfig,
+			Scope:                       scope,
+		})
+	}
+
+	return targets
+}
+
+func (h *objectCalculationHandler) getOrCompileCurrentTargets(
+	key string,
+	targets []capsulev1beta2.CustomQuotaStatusTarget,
+) ([]cache.CompiledTarget, error) {
+	if compiled, ok := h.targetsCache.Get(key); ok && compiledTargetsCurrent(compiled, targets) {
+		return compiled, nil
+	}
+
+	compiled, err := controller.CompileTargets(h.jsonPathCache, h.celCache, targets)
+	if err != nil {
+		return nil, err
+	}
+
+	h.targetsCache.Set(key, compiled)
+
+	return compiled, nil
+}
+
+func compiledTargetsCurrent(
+	compiled []cache.CompiledTarget,
+	targets []capsulev1beta2.CustomQuotaStatusTarget,
+) bool {
+	if len(compiled) != len(targets) {
+		return false
+	}
+
+	for i := range targets {
+		if !reflect.DeepEqual(compiled[i].CustomQuotaStatusTarget, targets[i]) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func desiredGlobalQuotaAppliesToNamespace(
+	ctx context.Context,
+	reader client.Reader,
+	quota *capsulev1beta2.GlobalCustomQuota,
+	namespace string,
+) (bool, error) {
+	if len(quota.Spec.NamespaceSelectors) == 0 {
+		return true, nil
+	}
+
+	if namespace == "" {
+		return false, nil
+	}
+
+	ns := &corev1.Namespace{}
+	if err := reader.Get(ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
+		return false, err
+	}
+
+	nsLabels := labels.Set(ns.Labels)
+
+	for _, rawSelector := range quota.Spec.NamespaceSelectors {
+		if rawSelector.LabelSelector == nil {
+			continue
+		}
+
+		selector, err := metav1.LabelSelectorAsSelector(rawSelector.LabelSelector)
+		if err != nil {
+			return false, err
+		}
+
+		if selector.Matches(nsLabels) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func sourcesTargetKind(
+	sources []capsulev1beta2.CustomQuotaSpecSource,
+	kind metav1.GroupVersionKind,
+) bool {
+	for _, source := range sources {
+		target := source.GroupVersionKind()
+		if target.Group == kind.Group &&
+			target.Version == kind.Version &&
+			target.Kind == kind.Kind {
+			return true
+		}
+	}
+
+	return false
+}
+
+func customQuotaReadyForAdmission(
+	generation int64,
+	status capsulev1beta2.CustomQuotaStatus,
+) bool {
+	return status.ObservedGeneration == generation &&
+		meta.IsStatusConditionTrue(status.Conditions, meta.ReadyCondition)
 }
 
 func evaluatedByKey(in []evaluatedQuota) map[string]evaluatedQuota {

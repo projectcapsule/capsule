@@ -6,10 +6,12 @@ package rulestatus
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
@@ -42,10 +44,12 @@ type Manager struct {
 	Recorder      events.EventRecorder
 	Configuration configuration.Configuration
 	RESTConfig    *rest.Config
+	RESTMapper    k8smeta.RESTMapper
 }
 
 func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
 	r.reader = mgr.GetAPIReader()
+	r.RESTMapper = mgr.GetRESTMapper()
 
 	ctrlBuilder := ctrl.NewControllerManagedBy(mgr).
 		Named("capsule/rule-status").
@@ -144,6 +148,8 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 }
 
 func (r Manager) reconcile(ctx context.Context, instance *capsulev1beta2.RuleStatus) error {
+	previousRules := instance.Status.Rules
+	hadManagedMetadata := hasManagedMetadata(previousRules)
 	ruleStatus := make([]*rules.NamespaceRuleBodyNamespace, 0, len(instance.Spec))
 
 	for _, rule := range instance.Spec {
@@ -151,23 +157,51 @@ func (r Manager) reconcile(ctx context.Context, instance *capsulev1beta2.RuleSta
 			continue
 		}
 
-		enforce := rule.Enforce.DeepCopy()
+		statusRule := rule.DeepCopy()
+		// RuleStatus is an enforcement cache. Quota definitions are reconciled
+		// independently as GlobalResourceQuotas and may include legacy entries
+		// which predate stable quota names.
+		statusRule.Quota = nil
 
+		enforce := rule.Enforce.DeepCopy()
 		for i := range enforce.Metadata {
 			enforce.Metadata[i].APIGroups = enforce.Metadata[i].StatusAPIGroups()
 		}
 
-		ruleStatus = append(ruleStatus, &rules.NamespaceRuleBodyNamespace{
-			Enforce: enforce,
-		})
+		statusRule.Enforce = enforce
+		ruleStatus = append(ruleStatus, statusRule)
 	}
 
 	instance.Status.Rules = ruleStatus
-
 	//nolint:staticcheck
 	instance.Status.Rule = rules.NamespaceRuleBodyNamespace{}
 
+	if hadManagedMetadata || hasManagedMetadata(ruleStatus) {
+		if err := r.publishRulesStatus(ctx, instance); err != nil {
+			return fmt.Errorf("publish rules before managed metadata reconciliation: %w", err)
+		}
+
+		if err := r.reconcileManagedMetadata(ctx, instance, previousRules, ruleStatus); err != nil {
+			return fmt.Errorf("reconcile managed metadata: %w", err)
+		}
+	}
+
 	return nil
+}
+
+func (r *Manager) publishRulesStatus(ctx context.Context, instance *capsulev1beta2.RuleStatus) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		latest := &capsulev1beta2.RuleStatus{}
+		if err := r.reader.Get(ctx, client.ObjectKeyFromObject(instance), latest); err != nil {
+			return err
+		}
+
+		latest.Status.Rules = instance.Status.Rules
+		//nolint:staticcheck
+		latest.Status.Rule = instance.Status.Rule
+
+		return r.Client.Status().Update(ctx, latest)
+	})
 }
 
 func (r *Manager) updateStatus(ctx context.Context, instance *capsulev1beta2.RuleStatus, reconcileError error) error {
@@ -181,6 +215,8 @@ func (r *Manager) updateStatus(ctx context.Context, instance *capsulev1beta2.Rul
 			return err
 		}
 
+		originalStatus := latest.Status.DeepCopy()
+
 		latest.Status = instance.Status
 		latest.Status.ObservedGeneration = instance.GetGeneration()
 
@@ -193,6 +229,10 @@ func (r *Manager) updateStatus(ctx context.Context, instance *capsulev1beta2.Rul
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(readyCondition)
+
+		if reflect.DeepEqual(*originalStatus, latest.Status) {
+			return nil
+		}
 
 		if err := r.Client.Status().Update(ctx, latest); err != nil {
 			return err
@@ -212,8 +252,37 @@ func (r *Manager) updateReconcilingStatus(ctx context.Context, instance *capsule
 			return err
 		}
 
+		cleanedQuota := removeQuotaDefinitions(&latest.Status)
+		if latest.Status.ObservedGeneration == instance.GetGeneration() {
+			if !cleanedQuota {
+				return nil
+			}
+
+			return r.Status().Update(ctx, latest)
+		}
+
 		latest.Status.Conditions.UpdateConditionByType(meta.NewReadyConditionReconcilingReason(instance))
 
 		return r.Status().Update(ctx, latest)
 	})
+}
+
+//nolint:staticcheck // The deprecated flattened Rule must be cleaned for objects written by older Capsule versions.
+func removeQuotaDefinitions(status *capsulev1beta2.RuleStatusStatus) bool {
+	if status == nil {
+		return false
+	}
+
+	changed := len(status.Rule.Quota) > 0
+
+	for _, rule := range status.Rules {
+		if rule != nil && len(rule.Quota) > 0 {
+			changed = true
+			rule.Quota = nil
+		}
+	}
+
+	status.Rule.Quota = nil
+
+	return changed
 }

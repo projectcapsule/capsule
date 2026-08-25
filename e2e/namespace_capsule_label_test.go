@@ -51,7 +51,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 		EventuallyDeletion(tnt)
 	})
 
-	It("should contains the default Capsule label", func() {
+	It("should contains the default Capsule label", Label("skip-on-openshift"), func() {
 		namespaces := []*v1.Namespace{
 			NewNamespace("", map[string]string{
 				meta.TenantLabel: tnt.GetName(),

@@ -1,6 +1,7 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
+//nolint:dupl
 package tenant
 
 import (
@@ -23,6 +24,10 @@ import (
 //
 
 func (r *Manager) syncNetworkPolicies(ctx context.Context, log logr.Logger, tenant *capsulev1beta2.Tenant) error {
+	if err := r.runGarbageCollection(ctx, tenant, &networkingv1.NetworkPolicy{}); err != nil {
+		return err
+	}
+
 	//nolint:staticcheck
 	keys := make([]string, 0, len(tenant.Spec.NetworkPolicies.Items))
 
@@ -50,9 +55,9 @@ func (r *Manager) syncNetworkPolicy(ctx context.Context, log logr.Logger, tenant
 			},
 		}
 
-		var res controllerutil.OperationResult
+		var result controllerutil.OperationResult
 
-		res, err = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() (err error) {
+		result, err = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() (err error) {
 			labels := target.GetLabels()
 			if labels == nil {
 				labels = map[string]string{}
@@ -85,7 +90,7 @@ func (r *Manager) syncNetworkPolicy(ctx context.Context, log logr.Logger, tenant
 			return err
 		}
 
-		log.V(4).Info("network Policy sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
+		log.V(4).Info("NetworkPolicy sync result", "result", result, "name", target.Name, "namespace", target.Namespace)
 	}
 
 	return nil

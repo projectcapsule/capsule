@@ -22,15 +22,18 @@ import (
 type globalCustomQuotaValidationHandler struct {
 	targetsCache  *cache.CompiledTargetsCache[string]
 	jsonPathCache *cache.JSONPathCache
+	celCache      *cache.CELCache
 }
 
 func GlobalCustomQuotaValidationHandler(
 	targetsCache *cache.CompiledTargetsCache[string],
 	jsonPathCache *cache.JSONPathCache,
+	celCache *cache.CELCache,
 ) handlers.Handler {
 	return &globalCustomQuotaValidationHandler{
 		targetsCache:  targetsCache,
 		jsonPathCache: jsonPathCache,
+		celCache:      celCache,
 	}
 }
 
@@ -50,6 +53,10 @@ func (h *globalCustomQuotaValidationHandler) OnCreate(
 
 		if err := quota.ValidateQuantity(q.Spec.Limit); err != nil {
 			return ad.Denyf("invalid spec.limit: %v", err)
+		}
+
+		if err := validateCELExpressions(h.celCache, q.Spec.Sources); err != nil {
+			return ad.Denyf("invalid CEL expression: %v", err)
 		}
 
 		return nil
@@ -75,6 +82,7 @@ func (h *globalCustomQuotaValidationHandler) OnDelete(
 		}
 
 		h.jsonPathCache.DeleteMany(obj.Spec.CollectJSONPathExpressions()...)
+		h.celCache.DeleteMany(obj.Spec.CollectCELExpressions()...)
 
 		return nil
 	}
@@ -101,6 +109,10 @@ func (h *globalCustomQuotaValidationHandler) OnUpdate(
 
 		if err := quota.ValidateQuantity(newQuota.Spec.Limit); err != nil {
 			return ad.Denyf("invalid spec.limit: %v", err)
+		}
+
+		if err := validateCELExpressions(h.celCache, newQuota.Spec.Sources); err != nil {
+			return ad.Denyf("invalid CEL expression: %v", err)
 		}
 
 		used := oldQuota.Status.Usage.Used

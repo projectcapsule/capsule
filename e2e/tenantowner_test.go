@@ -10,6 +10,7 @@ import (
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -135,7 +136,7 @@ var _ = Describe("Owners", Ordered, Label("config", "tenantowner", "tenant", "pe
 			},
 		},
 		Spec: capsulev1beta2.TenantOwnerSpec{
-			Aggregate: true,
+			Aggregate: ptr.To(true),
 			CoreOwnerSpec: rbac.CoreOwnerSpec{
 				UserSpec: rbac.UserSpec{
 					Kind: rbac.GroupOwner,
@@ -157,7 +158,7 @@ var _ = Describe("Owners", Ordered, Label("config", "tenantowner", "tenant", "pe
 			},
 		},
 		Spec: capsulev1beta2.TenantOwnerSpec{
-			Aggregate: true,
+			Aggregate: ptr.To(true),
 			CoreOwnerSpec: rbac.CoreOwnerSpec{
 				UserSpec: rbac.UserSpec{
 					Kind: rbac.GroupOwner,
@@ -180,7 +181,7 @@ var _ = Describe("Owners", Ordered, Label("config", "tenantowner", "tenant", "pe
 			},
 		},
 		Spec: capsulev1beta2.TenantOwnerSpec{
-			Aggregate: true,
+			Aggregate: ptr.To(true),
 			CoreOwnerSpec: rbac.CoreOwnerSpec{
 				UserSpec: rbac.UserSpec{
 					Kind: rbac.ServiceAccountOwner,
@@ -201,7 +202,7 @@ var _ = Describe("Owners", Ordered, Label("config", "tenantowner", "tenant", "pe
 			},
 		},
 		Spec: capsulev1beta2.TenantOwnerSpec{
-			Aggregate: true,
+			Aggregate: ptr.To(true),
 			CoreOwnerSpec: rbac.CoreOwnerSpec{
 				UserSpec: rbac.UserSpec{
 					Kind: rbac.UserOwner,
@@ -224,7 +225,7 @@ var _ = Describe("Owners", Ordered, Label("config", "tenantowner", "tenant", "pe
 			},
 		},
 		Spec: capsulev1beta2.TenantOwnerSpec{
-			Aggregate: false,
+			Aggregate: ptr.To(false),
 			CoreOwnerSpec: rbac.CoreOwnerSpec{
 				UserSpec: rbac.UserSpec{
 					Kind: rbac.UserOwner,

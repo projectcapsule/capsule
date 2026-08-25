@@ -50,7 +50,7 @@ type CustomQuotaStatusTarget struct {
 	metav1.GroupVersionKind     `json:",inline"`
 	CustomQuotaSpecSourceConfig `json:",inline"`
 
-	// Path on GVK where usage is evaluated
+	// Scope of the GVK where usage is evaluated.
 	Scope k8smeta.RESTScopeName `json:"scope,omitempty"`
 }
 

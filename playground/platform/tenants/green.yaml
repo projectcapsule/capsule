@@ -1,0 +1,84 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: green
+  labels:
+    customer: renewable
+  annotations:
+    info.projectcapsule.dev/icon: https://www.pngall.com/wp-content/uploads/12/Green-Energy-Environment-PNG-Photo-thumb.webp
+    info.projectcapsule.dev/description: "Production tenant for the wind team"
+    info.projectcapsule.dev/links: '[{"title":"Grafana","url":"https://grafana.example.com/d/payments"},{"title":"Runbook","url":"https://wiki.example.com/payments-runbook"}]'
+spec:
+  permissions:
+    matchOwners:
+    - matchLabels:
+        team: devops
+    - matchLabels:
+        customer: renewable
+  rules:
+  - enforce:
+      action: allow
+      metadata:
+        - apiGroups:
+            - "v1"
+          kinds:
+            - "Namespace"
+          labels:
+            projectcapsule.dev/backup:
+              managed: "true"
+          annotations:
+            storagelocationtype:
+              managed: "s3"
+        - kinds:
+            - Pod
+          annotations:
+            storagelocationtype:
+              managed: s3
+          labels:
+            projectcapsule.dev/backup:
+              managed: "true"
+        - kinds:
+            - Service
+            - Endpoints
+          annotations:
+            customer.corp/routable:
+              managed: "true"
+          labels:
+            customer.corp/network-tenant:
+              managed: "{{$.tenant.metadata.name}}"
+        - apiGroups:
+            - "discovery.k8s.io/v1"
+          kinds:
+            - EndpointSlice
+          annotations:
+            customer.corp/routable:
+              managed: "true"
+          labels:
+            customer.corp/network-tenant:
+              managed: "{{$.tenant.metadata.name}}"
+  - permissions:
+      bindings:
+        - clusterRoleName: 'custom:proxy-viewer'
+          subjects:
+          - apiGroup: rbac.authorization.k8s.io
+            kind: User
+            name: alice
+          labels:
+            reflection.proxy.projectcapsule.dev/enabled: "true"
+  - enforce:
+      action: "allow"
+      services:
+        types: ["ClusterIP", "NodePort", "LoadBalancer", "ExternalName"]
+        loadBalancers:
+          cidrs:
+            - 10.0.0.2/32
+        externalNames:
+          hostnames:
+            - exp: ".*\\.example\\.com"
+              exact:
+                - "internal.git.com"
+        nodePorts:
+          ports:
+            - from: 30000
+              to: 32767

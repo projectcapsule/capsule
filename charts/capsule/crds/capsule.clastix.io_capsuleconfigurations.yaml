@@ -89,39 +89,41 @@ spec:
                         description: Annotations added to the Admission Webhook
                         type: object
                       client:
-                        description: whats the problem
+                        description: |-
+                          Client defines how the Kubernetes API server reaches the admission webhook.
+                          Exactly one of URL or Service must be configured.
                         properties:
                           caBundle:
                             description: |-
-                              `caBundle` is a PEM encoded CA bundle which will be used to validate the webhook's server certificate.
+                              caBundle is a PEM encoded CA bundle which will be used to validate the webhook's server certificate.
                               If unspecified, system trust roots on the apiserver are used.
                             format: byte
                             type: string
                           service:
                             description: |-
-                              `service` is a reference to the service for this webhook. Either
+                              service is a reference to the service for this webhook. Either
                               `service` or `url` must be specified.
 
                               If the webhook is running within the cluster, then you should use `service`.
                             properties:
                               name:
                                 description: |-
-                                  `name` is the name of the service.
+                                  name is the name of the service.
                                   Required
                                 type: string
                               namespace:
                                 description: |-
-                                  `namespace` is the namespace of the service.
+                                  namespace is the namespace of the service.
                                   Required
                                 type: string
                               path:
                                 description: |-
-                                  `path` is an optional URL path which will be sent in any request to
+                                  path is an optional URL path which will be sent in any request to
                                   this service.
                                 type: string
                               port:
                                 description: |-
-                                  If specified, the port on the service that hosting webhook.
+                                  port is the port on the service that hosts the webhook.
                                   Default to 443 for backward compatibility.
                                   `port` should be a valid port number (1-65535, inclusive).
                                 format: int32
@@ -132,7 +134,7 @@ spec:
                             type: object
                           url:
                             description: |-
-                              `url` gives the location of the webhook, in standard URL form
+                              url gives the location of the webhook, in standard URL form
                               (`scheme://host:port/path`). Exactly one of `url` or `service`
                               must be specified.
 
@@ -211,7 +213,7 @@ spec:
                                 properties:
                                   expression:
                                     description: |-
-                                      Expression represents the expression which will be evaluated by CEL. Must evaluate to bool.
+                                      expression represents the expression which will be evaluated by CEL. Must evaluate to bool.
                                       CEL expressions have access to the contents of the AdmissionRequest and Authorizer, organized into CEL variables:
 
                                       'object' - The object from the incoming request. The value is null for DELETE requests.
@@ -227,7 +229,7 @@ spec:
                                     type: string
                                   name:
                                     description: |-
-                                      Name is an identifier for this match condition, used for strategic merging of MatchConditions,
+                                      name is an identifier for this match condition, used for strategic merging of MatchConditions,
                                       as well as providing an identifier for logging purposes. A good name should be descriptive of
                                       the associated expression.
                                       Name must be a qualified name consisting of alphanumeric characters, '-', '_' or '.', and
@@ -473,7 +475,7 @@ spec:
                                 properties:
                                   apiGroups:
                                     description: |-
-                                      APIGroups is the API groups the resources belong to. '*' is all groups.
+                                      apiGroups is the API groups the resources belong to. '*' is all groups.
                                       If '*' is present, the length of the slice must be one.
                                       Required.
                                     items:
@@ -482,7 +484,7 @@ spec:
                                     x-kubernetes-list-type: atomic
                                   apiVersions:
                                     description: |-
-                                      APIVersions is the API versions the resources belong to. '*' is all versions.
+                                      apiVersions is the API versions the resources belong to. '*' is all versions.
                                       If '*' is present, the length of the slice must be one.
                                       Required.
                                     items:
@@ -491,7 +493,7 @@ spec:
                                     x-kubernetes-list-type: atomic
                                   operations:
                                     description: |-
-                                      Operations is the operations the admission hook cares about - CREATE, UPDATE, DELETE, CONNECT or *
+                                      operations is the operations the admission hook cares about - CREATE, UPDATE, DELETE, CONNECT or *
                                       for all of those operations and any future admission operations that are added.
                                       If '*' is present, the length of the slice must be one.
                                       Required.
@@ -503,7 +505,7 @@ spec:
                                     x-kubernetes-list-type: atomic
                                   resources:
                                     description: |-
-                                      Resources is a list of resources this rule applies to.
+                                      resources is a list of resources this rule applies to.
 
                                       For example:
                                       'pods' means pods.
@@ -564,6 +566,9 @@ spec:
                     required:
                     - client
                     type: object
+                    x-kubernetes-validations:
+                    - message: client must configure exactly one of url or service
+                      rule: has(self.client.url) != has(self.client.service)
                   serviceName:
                     default: capsule-webhook-service
                     description: Service Name of the Admission Service
@@ -577,39 +582,41 @@ spec:
                         description: Annotations added to the Admission Webhook
                         type: object
                       client:
-                        description: whats the problem
+                        description: |-
+                          Client defines how the Kubernetes API server reaches the admission webhook.
+                          Exactly one of URL or Service must be configured.
                         properties:
                           caBundle:
                             description: |-
-                              `caBundle` is a PEM encoded CA bundle which will be used to validate the webhook's server certificate.
+                              caBundle is a PEM encoded CA bundle which will be used to validate the webhook's server certificate.
                               If unspecified, system trust roots on the apiserver are used.
                             format: byte
                             type: string
                           service:
                             description: |-
-                              `service` is a reference to the service for this webhook. Either
+                              service is a reference to the service for this webhook. Either
                               `service` or `url` must be specified.
 
                               If the webhook is running within the cluster, then you should use `service`.
                             properties:
                               name:
                                 description: |-
-                                  `name` is the name of the service.
+                                  name is the name of the service.
                                   Required
                                 type: string
                               namespace:
                                 description: |-
-                                  `namespace` is the namespace of the service.
+                                  namespace is the namespace of the service.
                                   Required
                                 type: string
                               path:
                                 description: |-
-                                  `path` is an optional URL path which will be sent in any request to
+                                  path is an optional URL path which will be sent in any request to
                                   this service.
                                 type: string
                               port:
                                 description: |-
-                                  If specified, the port on the service that hosting webhook.
+                                  port is the port on the service that hosts the webhook.
                                   Default to 443 for backward compatibility.
                                   `port` should be a valid port number (1-65535, inclusive).
                                 format: int32
@@ -620,7 +627,7 @@ spec:
                             type: object
                           url:
                             description: |-
-                              `url` gives the location of the webhook, in standard URL form
+                              url gives the location of the webhook, in standard URL form
                               (`scheme://host:port/path`). Exactly one of `url` or `service`
                               must be specified.
 
@@ -699,7 +706,7 @@ spec:
                                 properties:
                                   expression:
                                     description: |-
-                                      Expression represents the expression which will be evaluated by CEL. Must evaluate to bool.
+                                      expression represents the expression which will be evaluated by CEL. Must evaluate to bool.
                                       CEL expressions have access to the contents of the AdmissionRequest and Authorizer, organized into CEL variables:
 
                                       'object' - The object from the incoming request. The value is null for DELETE requests.
@@ -715,7 +722,7 @@ spec:
                                     type: string
                                   name:
                                     description: |-
-                                      Name is an identifier for this match condition, used for strategic merging of MatchConditions,
+                                      name is an identifier for this match condition, used for strategic merging of MatchConditions,
                                       as well as providing an identifier for logging purposes. A good name should be descriptive of
                                       the associated expression.
                                       Name must be a qualified name consisting of alphanumeric characters, '-', '_' or '.', and
@@ -943,7 +950,7 @@ spec:
                                 properties:
                                   apiGroups:
                                     description: |-
-                                      APIGroups is the API groups the resources belong to. '*' is all groups.
+                                      apiGroups is the API groups the resources belong to. '*' is all groups.
                                       If '*' is present, the length of the slice must be one.
                                       Required.
                                     items:
@@ -952,7 +959,7 @@ spec:
                                     x-kubernetes-list-type: atomic
                                   apiVersions:
                                     description: |-
-                                      APIVersions is the API versions the resources belong to. '*' is all versions.
+                                      apiVersions is the API versions the resources belong to. '*' is all versions.
                                       If '*' is present, the length of the slice must be one.
                                       Required.
                                     items:
@@ -961,7 +968,7 @@ spec:
                                     x-kubernetes-list-type: atomic
                                   operations:
                                     description: |-
-                                      Operations is the operations the admission hook cares about - CREATE, UPDATE, DELETE, CONNECT or *
+                                      operations is the operations the admission hook cares about - CREATE, UPDATE, DELETE, CONNECT or *
                                       for all of those operations and any future admission operations that are added.
                                       If '*' is present, the length of the slice must be one.
                                       Required.
@@ -973,7 +980,7 @@ spec:
                                     x-kubernetes-list-type: atomic
                                   resources:
                                     description: |-
-                                      Resources is a list of resources this rule applies to.
+                                      resources is a list of resources this rule applies to.
 
                                       For example:
                                       'pods' means pods.
@@ -1034,6 +1041,9 @@ spec:
                     required:
                     - client
                     type: object
+                    x-kubernetes-validations:
+                    - message: client must configure exactly one of url or service
+                      rule: has(self.client.url) != has(self.client.service)
                 type: object
               allowServiceAccountPromotion:
                 default: false

@@ -48,12 +48,14 @@ func ValidateResourceTemplates(schema k8sruntime.RawExtension, resources []apiru
 		for targetIndex, target := range resourceTemplate.Targets {
 			targetData := target.Raw
 			if len(targetData) == 0 && target.Object != nil {
-				var err error
-				targetData, err = json.Marshal(target.Object)
+				marshaled, err := json.Marshal(target.Object)
 				if err != nil {
 					return fmt.Errorf("resource %d target %d is invalid: %w", resourceIndex, targetIndex, err)
 				}
+
+				targetData = marshaled
 			}
+
 			if len(targetData) == 0 {
 				return fmt.Errorf("resource %d target %d is empty", resourceIndex, targetIndex)
 			}

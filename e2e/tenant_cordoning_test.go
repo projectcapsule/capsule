@@ -222,7 +222,7 @@ var _ = Describe("cordoning a Tenant", Ordered, Label("tenant", "operations", "c
 				Containers: []corev1.Container{
 					{
 						Name:            "container",
-						Image:           "quay.io/google-containers/pause-amd64:3.0",
+						Image:           "registry.k8s.io/pause:3.10",
 						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
@@ -257,7 +257,7 @@ var _ = Describe("cordoning a Tenant", Ordered, Label("tenant", "operations", "c
 				Containers: []corev1.Container{
 					{
 						Name:            "container",
-						Image:           "quay.io/google-containers/pause-amd64:3.0",
+						Image:           "registry.k8s.io/pause:3.10",
 						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},

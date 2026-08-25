@@ -1,6 +1,7 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
+//nolint:dupl
 package tenant
 
 import (
@@ -22,6 +23,10 @@ import (
 //
 
 func (r *Manager) syncLimitRanges(ctx context.Context, log logr.Logger, tenant *capsulev1beta2.Tenant) error {
+	if err := r.runGarbageCollection(ctx, tenant, &corev1.LimitRange{}); err != nil {
+		return err
+	}
+
 	// getting requested LimitRange keys
 	//nolint:staticcheck
 	keys := make([]string, 0, len(tenant.Spec.LimitRanges.Items))
@@ -56,9 +61,9 @@ func (r *Manager) syncLimitRange(
 			},
 		}
 
-		var res controllerutil.OperationResult
+		var result controllerutil.OperationResult
 
-		res, err = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() (err error) {
+		result, err = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() (err error) {
 			labels := target.GetLabels()
 			if labels == nil {
 				labels = map[string]string{}
@@ -78,7 +83,7 @@ func (r *Manager) syncLimitRange(
 		})
 		if err != nil {
 			if apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
-				log.Info(
+				log.V(4).Info(
 					"skipping LimitRange sync because namespace is terminating",
 					"name", target.Name,
 					"namespace", target.Namespace,
@@ -91,7 +96,7 @@ func (r *Manager) syncLimitRange(
 			return err
 		}
 
-		log.Info("LimitRange sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
+		log.V(4).Info("LimitRange sync result", "result", result, "name", target.Name, "namespace", target.Namespace)
 	}
 
 	return nil

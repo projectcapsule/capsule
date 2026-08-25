@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -20,18 +21,20 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
+	celruntime "github.com/projectcapsule/capsule/pkg/runtime/cel"
 	"github.com/projectcapsule/capsule/pkg/runtime/jsonpath"
 	"github.com/projectcapsule/capsule/pkg/runtime/quota"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
-const immediatePendingDeleteRequeue = 500 * time.Millisecond
+const immediatePendingDeleteRequeue = 2 * time.Second
 
 func usagePercentage(used, limit resource.Quantity) float64 {
 	if limit.MilliValue() <= 0 {
@@ -50,11 +53,13 @@ type CompiledTarget struct {
 	capsulev1beta2.CustomQuotaStatusTarget
 
 	CompiledPath      *jsonpath.CompiledJSONPath
+	CompiledCEL       *celruntime.CompiledExpression
 	CompiledSelectors []selectors.CompiledSelectorWithFields
 }
 
 func CompileTargets(
 	jcache *cache.JSONPathCache,
+	ccache *cache.CELCache,
 	targets []capsulev1beta2.CustomQuotaStatusTarget,
 ) ([]cache.CompiledTarget, error) {
 	out := make([]cache.CompiledTarget, 0, len(targets))
@@ -66,27 +71,51 @@ func CompileTargets(
 
 		switch target.Operation {
 		case quota.OpCount:
-			// no usage path needed
+			// no usage expression needed
 
 		case quota.OpAdd, quota.OpSub:
-			compiledPath, err := jcache.GetOrCompile(target.Path)
-			if err != nil {
+			switch {
+			case target.Path != "" && target.CEL == "":
+				compiledPath, err := jcache.GetOrCompile(target.Path)
+				if err != nil {
+					return nil, fmt.Errorf(
+						"compile usage path %q for %s %q: %w",
+						target.Path,
+						target.String(),
+						target.Operation,
+						err,
+					)
+				}
+
+				pt.CompiledPath = compiledPath
+
+			case target.CEL != "" && target.Path == "":
+				compiledCEL, err := ccache.GetOrCompileQuantity(target.CEL, environment.StoredExpressions)
+				if err != nil {
+					return nil, fmt.Errorf(
+						"compile usage CEL expression %q for %s %q: %w",
+						target.CEL,
+						target.String(),
+						target.Operation,
+						err,
+					)
+				}
+
+				pt.CompiledCEL = compiledCEL
+
+			default:
 				return nil, fmt.Errorf(
-					"compile usage path %q for %s %q: %w",
-					target.Path,
+					"exactly one of path or cel must be set for %s %q",
 					target.String(),
 					target.Operation,
-					err,
 				)
 			}
-
-			pt.CompiledPath = compiledPath
 
 		default:
 			return nil, fmt.Errorf("unsupported operation %q for %s", target.Operation, target.String())
 		}
 
-		compiledSelectors, err := CompileSelectorsWithFields(jcache, target.Selectors)
+		compiledSelectors, err := CompileSelectorsWithFields(jcache, ccache, target.Selectors)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"compile selectors for %s: %w",
@@ -104,6 +133,7 @@ func CompileTargets(
 }
 
 func MatchesCompiledSelectorsWithFields(
+	ctx context.Context,
 	u unstructured.Unstructured,
 	selectors []selectors.CompiledSelectorWithFields,
 ) (bool, error) {
@@ -122,6 +152,23 @@ func MatchesCompiledSelectorsWithFields(
 
 		for _, matcher := range sel.FieldMatchers {
 			ok, err := evaluateCompiledFieldSelector(u, matcher)
+			if err != nil {
+				return false, err
+			}
+
+			if !ok {
+				allFieldsMatch = false
+
+				break
+			}
+		}
+
+		if !allFieldsMatch {
+			continue
+		}
+
+		for _, matcher := range sel.CELMatchers {
+			ok, err := matcher.EvaluateBoolean(ctx, u)
 			if err != nil {
 				return false, err
 			}
@@ -179,7 +226,8 @@ func MakeGlobalCustomQuotaCacheKey(name string) string {
 }
 
 func CompileSelectorsWithFields(
-	cache *cache.JSONPathCache,
+	jcache *cache.JSONPathCache,
+	ccache *cache.CELCache,
 	in []selectors.SelectorWithFields,
 ) ([]selectors.CompiledSelectorWithFields, error) {
 	if len(in) == 0 {
@@ -203,7 +251,7 @@ func CompileSelectorsWithFields(
 		fieldMatchers := make([]selectors.CompiledFieldSelector, 0, len(selector.FieldSelectors))
 
 		for _, raw := range selector.FieldSelectors {
-			compiledSelector, err := utils.CompileFieldSelector(cache, raw)
+			compiledSelector, err := utils.CompileFieldSelector(jcache, raw)
 			if err != nil {
 				return nil, fmt.Errorf("compile field selector %q: %w", raw, err)
 			}
@@ -211,9 +259,21 @@ func CompileSelectorsWithFields(
 			fieldMatchers = append(fieldMatchers, compiledSelector)
 		}
 
+		celMatchers := make([]*celruntime.CompiledExpression, 0, len(selector.CELExpressions))
+
+		for _, expression := range selector.CELExpressions {
+			compiledExpression, err := ccache.GetOrCompileBoolean(expression, environment.StoredExpressions)
+			if err != nil {
+				return nil, fmt.Errorf("compile CEL selector %q: %w", expression, err)
+			}
+
+			celMatchers = append(celMatchers, compiledExpression)
+		}
+
 		out = append(out, selectors.CompiledSelectorWithFields{
 			LabelSelector: lblSel,
 			FieldMatchers: fieldMatchers,
+			CELMatchers:   celMatchers,
 		})
 	}
 
@@ -248,95 +308,42 @@ func getResourcesByGVK(
 	ctx context.Context,
 	gvk schema.GroupVersionKind,
 	kubeClient client.Reader,
+	namespaced bool,
 	scopeSelectors []metav1.LabelSelector,
 	namespaces ...string,
 ) ([]unstructured.Unstructured, error) {
-	compiledSelectors := make([]labels.Selector, 0, len(scopeSelectors))
+	compiledSelectors, err := compileScopeSelectors(scopeSelectors)
+	if err != nil {
+		return nil, err
+	}
 
-	for _, selector := range scopeSelectors {
-		sel, err := metav1.LabelSelectorAsSelector(&selector)
+	filterByNamespace, namespaceSet := namespaceFilter(namespaces)
+	listNamespaces := resourceListNamespaces(namespaced, filterByNamespace, namespaceSet)
+
+	items := make([]unstructured.Unstructured, 0)
+	seen := make(map[string]struct{})
+
+	for _, namespace := range listNamespaces {
+		candidates, err := listResourcesForGVK(ctx, gvk, kubeClient, namespace, compiledSelectors)
 		if err != nil {
 			return nil, err
 		}
 
-		compiledSelectors = append(compiledSelectors, sel)
-	}
-
-	filterByNamespace := true
-	namespaceSet := make(map[string]struct{}, len(namespaces))
-
-	for _, ns := range namespaces {
-		if ns == "*" {
-			filterByNamespace = false
-			namespaceSet = nil
-
-			break
-		}
-
-		namespaceSet[ns] = struct{}{}
-	}
-
-	list := &unstructured.UnstructuredList{}
-	list.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   gvk.Group,
-		Version: gvk.Version,
-		Kind:    gvk.Kind + "List",
-	})
-
-	if err := kubeClient.List(ctx, list); err != nil {
-		return nil, err
-	}
-
-	items := make([]unstructured.Unstructured, 0, len(list.Items))
-	seen := make(map[string]struct{}, len(list.Items))
-
-	for i := range list.Items {
-		item := list.Items[i]
-
-		// Skip objects that are already definitely deleting:
-		// deletionTimestamp is set and there are no finalizers left.
-		if item.GetDeletionTimestamp() != nil && len(item.GetFinalizers()) == 0 {
-			continue
-		}
-
-		// Namespace filter
-		if filterByNamespace {
-			if _, ok := namespaceSet[item.GetNamespace()]; !ok {
+		for i := range candidates {
+			item := candidates[i]
+			if !resourceMatchesQuotaScope(item, filterByNamespace, namespaceSet, compiledSelectors) {
 				continue
 			}
-		}
 
-		// Label selector filter (OR semantics)
-		if len(compiledSelectors) > 0 {
-			itemLabels := labels.Set(item.GetLabels())
-
-			matched := false
-
-			for _, sel := range compiledSelectors {
-				if sel.Matches(itemLabels) {
-					matched = true
-
-					break
-				}
-			}
-
-			if !matched {
+			key := client.ObjectKeyFromObject(&item).String()
+			if _, exists := seen[key]; exists {
 				continue
 			}
+
+			seen[key] = struct{}{}
+
+			items = append(items, item)
 		}
-
-		key := item.GetNamespace() + "/" + item.GetName()
-		if item.GetNamespace() == "" {
-			key = item.GetName()
-		}
-
-		if _, exists := seen[key]; exists {
-			continue
-		}
-
-		seen[key] = struct{}{}
-
-		items = append(items, item)
 	}
 
 	// Sort by oldest first
@@ -345,6 +352,120 @@ func getResourcesByGVK(
 	})
 
 	return items, nil
+}
+
+func compileScopeSelectors(scopeSelectors []metav1.LabelSelector) ([]labels.Selector, error) {
+	compiledSelectors := make([]labels.Selector, 0, len(scopeSelectors))
+
+	for _, selector := range scopeSelectors {
+		compiled, err := metav1.LabelSelectorAsSelector(&selector)
+		if err != nil {
+			return nil, err
+		}
+
+		compiledSelectors = append(compiledSelectors, compiled)
+	}
+
+	return compiledSelectors, nil
+}
+
+func namespaceFilter(namespaces []string) (filter bool, namespaceSet map[string]struct{}) {
+	namespaceSet = make(map[string]struct{}, len(namespaces))
+
+	for _, namespace := range namespaces {
+		if namespace == "*" {
+			return false, nil
+		}
+
+		namespaceSet[namespace] = struct{}{}
+	}
+
+	return true, namespaceSet
+}
+
+func resourceListNamespaces(
+	namespaced bool,
+	filterByNamespace bool,
+	namespaceSet map[string]struct{},
+) []string {
+	if !namespaced || !filterByNamespace {
+		return []string{""}
+	}
+
+	orderedNamespaces := make([]string, 0, len(namespaceSet))
+	for namespace := range namespaceSet {
+		orderedNamespaces = append(orderedNamespaces, namespace)
+	}
+
+	sort.Strings(orderedNamespaces)
+
+	return orderedNamespaces
+}
+
+func listResourcesForGVK(
+	ctx context.Context,
+	gvk schema.GroupVersionKind,
+	kubeClient client.Reader,
+	namespace string,
+	compiledSelectors []labels.Selector,
+) ([]unstructured.Unstructured, error) {
+	list := &unstructured.UnstructuredList{}
+	list.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   gvk.Group,
+		Version: gvk.Version,
+		Kind:    gvk.Kind + "List",
+	})
+
+	options := make([]client.ListOption, 0, 2)
+	if namespace != "" {
+		options = append(options, client.InNamespace(namespace))
+	}
+
+	// A single scope selector can be pushed into the informer/API list.
+	// Multiple selectors have OR semantics and are filtered below.
+	if len(compiledSelectors) == 1 {
+		options = append(options, client.MatchingLabelsSelector{Selector: compiledSelectors[0]})
+	}
+
+	if err := kubeClient.List(ctx, list, options...); err != nil {
+		return nil, err
+	}
+
+	return list.Items, nil
+}
+
+func resourceMatchesQuotaScope(
+	item unstructured.Unstructured,
+	filterByNamespace bool,
+	namespaceSet map[string]struct{},
+	compiledSelectors []labels.Selector,
+) bool {
+	// Skip objects that are already definitely deleting:
+	// deletionTimestamp is set and there are no finalizers left.
+	if item.GetDeletionTimestamp() != nil && len(item.GetFinalizers()) == 0 {
+		return false
+	}
+
+	// Namespace filtering remains necessary for cluster-wide lists and
+	// preserves the previous behavior for cluster-scoped targets.
+	if filterByNamespace {
+		if _, ok := namespaceSet[item.GetNamespace()]; !ok {
+			return false
+		}
+	}
+
+	if len(compiledSelectors) == 0 {
+		return true
+	}
+
+	itemLabels := labels.Set(item.GetLabels())
+	for _, selector := range compiledSelectors {
+		if selector.Matches(itemLabels) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func minDurationPtr(cur *time.Duration, cand time.Duration) *time.Duration {
@@ -364,15 +485,7 @@ func pendingDeleteStillPresent(
 	claims []capsulev1beta2.CustomQuotaClaimItem,
 ) bool {
 	for _, claim := range claims {
-		if pd.ObjectRef.UID != "" && claim.UID != "" && pd.ObjectRef.UID == claim.UID {
-			return true
-		}
-
-		if pd.ObjectRef.APIGroup == claim.Group &&
-			pd.ObjectRef.APIVersion == claim.Version &&
-			pd.ObjectRef.Kind == claim.Kind &&
-			pd.ObjectRef.Namespace == string(claim.Namespace) &&
-			pd.ObjectRef.Name == claim.Name {
+		if sameLedgerObject(pd.ObjectRef, claim) {
 			return true
 		}
 	}
@@ -380,7 +493,66 @@ func pendingDeleteStillPresent(
 	return false
 }
 
-const unresolvedReservationRequeue = 250 * time.Millisecond
+const (
+	unresolvedReservationInitialRequeue = 2 * time.Second
+	unresolvedReservationRequeue        = 5 * time.Second
+	unresolvedReservationLongRequeue    = 15 * time.Second
+	ledgerWorkDebounce                  = 500 * time.Millisecond
+	ledgerWorkMaximumDelay              = 2 * time.Second
+)
+
+func quantityLedgerWorkDelay(
+	now time.Time,
+	ledger *capsulev1beta2.QuantityLedger,
+) (hasWork bool, delay time.Duration) {
+	var oldest, newest time.Time
+
+	record := func(ts time.Time) {
+		hasWork = true
+
+		if ts.IsZero() {
+			return
+		}
+
+		if oldest.IsZero() || ts.Before(oldest) {
+			oldest = ts
+		}
+
+		if newest.IsZero() || ts.After(newest) {
+			newest = ts
+		}
+	}
+
+	for _, reservation := range ledger.Status.Reservations {
+		ts := reservation.UpdatedAt.Time
+		if ts.IsZero() {
+			ts = reservation.CreatedAt.Time
+		}
+
+		record(ts)
+	}
+
+	for _, pendingDelete := range ledger.Status.PendingDeletes {
+		record(pendingDelete.CreatedAt.Time)
+	}
+
+	if !hasWork || oldest.IsZero() || newest.IsZero() {
+		return hasWork, 0
+	}
+
+	readyAt := newest.Add(ledgerWorkDebounce)
+
+	maximumAt := oldest.Add(ledgerWorkMaximumDelay)
+	if maximumAt.Before(readyAt) {
+		readyAt = maximumAt
+	}
+
+	if !now.Before(readyAt) {
+		return true, 0
+	}
+
+	return true, readyAt.Sub(now)
+}
 
 func nextReservationMaterializationRequeue(
 	now metav1.Time,
@@ -390,21 +562,35 @@ func nextReservationMaterializationRequeue(
 		return unresolvedReservationRequeue
 	}
 
-	untilExpiry := time.Until(res.ExpiresAt.Time)
+	untilExpiry := res.ExpiresAt.Sub(now.Time)
 	if untilExpiry <= 0 {
 		return 0
 	}
 
-	if untilExpiry < unresolvedReservationRequeue {
+	age := now.Sub(res.UpdatedAt.Time)
+
+	var candidate time.Duration
+
+	switch {
+	case age < 5*time.Second:
+		candidate = unresolvedReservationInitialRequeue
+	case age < 30*time.Second:
+		candidate = unresolvedReservationRequeue
+	default:
+		candidate = unresolvedReservationLongRequeue
+	}
+
+	if untilExpiry < candidate {
 		return untilExpiry
 	}
 
-	return unresolvedReservationRequeue
+	return candidate
 }
 
 func reconcileQuantityLedgerAllocation(
 	ctx context.Context,
 	c client.Client,
+	reader client.Reader,
 	log logr.Logger,
 	key types.NamespacedName,
 	observedUsed resource.Quantity,
@@ -414,7 +600,10 @@ func reconcileQuantityLedgerAllocation(
 
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		ledger := &capsulev1beta2.QuantityLedger{}
-		if err := c.Get(ctx, key, ledger); err != nil {
+		// Conflicts here are normally caused by admission updating the ledger.
+		// The informer cache can keep returning the same stale resourceVersion,
+		// making RetryOnConflict ineffective, so retries must read directly.
+		if err := reader.Get(ctx, key, ledger); err != nil {
 			if apierrors.IsNotFound(err) {
 				return nil
 			}
@@ -425,10 +614,25 @@ func reconcileQuantityLedgerAllocation(
 		now := metav1.Now()
 		pendingDeleteTTL := 30 * time.Second
 
-		activeReservations := make([]capsulev1beta2.QuantityLedgerReservation, 0, len(ledger.Status.Reservations))
+		pendingDeletePresent := make([]bool, len(ledger.Status.PendingDeletes))
+		confirmedTransitions := make(map[string][]capsulev1beta2.QuantityLedgerObjectRef)
 
-		for _, res := range ledger.Status.Reservations {
-			materialized := reservationMaterializedLedger(res, claims)
+		for i, pendingDelete := range ledger.Status.PendingDeletes {
+			pendingDeletePresent[i] = pendingDeleteStillPresent(pendingDelete, claims)
+			if pendingDeletePresent[i] {
+				continue
+			}
+
+			key := ledgerReservationObjectKey(pendingDelete.ObjectRef)
+			confirmedTransitions[key] = append(confirmedTransitions[key], pendingDelete.ObjectRef)
+		}
+
+		activeReservations := make([]capsulev1beta2.QuantityLedgerReservation, 0, len(ledger.Status.Reservations))
+		materializedThrough := materializedReservationPositions(ledger.Status.Reservations, claims)
+
+		for i, res := range ledger.Status.Reservations {
+			materialized := materializedThrough[ledgerReservationObjectKey(res.ObjectRef)] > i
+			transitioned := reservationHasConfirmedTransition(res, confirmedTransitions)
 			expired := res.ExpiresAt != nil && res.ExpiresAt.Before(&now)
 
 			log.V(5).Info("evaluating ledger reservation",
@@ -442,11 +646,20 @@ func reconcileQuantityLedgerAllocation(
 				"namespace", res.ObjectRef.Namespace,
 				"name", res.ObjectRef.Name,
 				"materialized", materialized,
+				"transitioned", transitioned,
 				"expired", expired,
 			)
 
 			switch {
 			case materialized:
+				continue
+
+			case transitioned:
+				// A persisted update/delete moved this object out of the
+				// matching claims before reconciliation observed its earlier
+				// state. Its pending-delete hint confirms that the admission
+				// operation materialized, so older reservations for the same
+				// object can be released without waiting for their TTL.
 				continue
 
 			case expired:
@@ -464,8 +677,8 @@ func reconcileQuantityLedgerAllocation(
 
 		activeDeletes := make([]capsulev1beta2.QuantityLedgerPendingDelete, 0, len(ledger.Status.PendingDeletes))
 
-		for _, pd := range ledger.Status.PendingDeletes {
-			stillPresent := pendingDeleteStillPresent(pd, claims)
+		for i, pd := range ledger.Status.PendingDeletes {
+			stillPresent := pendingDeletePresent[i]
 			expired := now.Sub(pd.CreatedAt.Time) >= pendingDeleteTTL
 
 			log.V(5).Info("evaluating pending delete",
@@ -480,25 +693,38 @@ func reconcileQuantityLedgerAllocation(
 				"expired", expired,
 			)
 
-			if stillPresent {
-				activeDeletes = append(activeDeletes, pd)
-				requeueAfter = minDurationPtr(requeueAfter, immediatePendingDeleteRequeue)
+			// Pending deletes are admission hints, not durable desired state.
+			// The admitted update/delete may fail after the webhook returns,
+			// and a transient policy snapshot must not leave a hint that
+			// requeues this quota forever. Once the hint expires, the current
+			// observed claims are authoritative.
+			if !stillPresent || expired {
+				continue
 			}
+
+			activeDeletes = append(activeDeletes, pd)
+			requeueAfter = minDurationPtr(requeueAfter, immediatePendingDeleteRequeue)
 		}
 
 		reserved := resource.MustParse("0")
 		for _, res := range activeReservations {
-			reserved.Add(res.Usage)
+			reserved.Add(quantityLedgerReservationDelta(res))
 		}
 
 		allocated := observedUsed.DeepCopy()
 		allocated.Add(reserved)
 		quota.ClampQuantityToZero(&allocated)
 
+		originalStatus := ledger.Status.DeepCopy()
+
 		ledger.Status.Reservations = activeReservations
 		ledger.Status.PendingDeletes = activeDeletes
 		ledger.Status.Reserved = reserved
 		ledger.Status.Allocated = allocated
+
+		if reflect.DeepEqual(*originalStatus, ledger.Status) {
+			return nil
+		}
 
 		return c.Status().Update(ctx, ledger)
 	})
@@ -507,6 +733,58 @@ func reconcileQuantityLedgerAllocation(
 	}
 
 	return requeueAfter, nil
+}
+
+func reservationHasConfirmedTransition(
+	reservation capsulev1beta2.QuantityLedgerReservation,
+	confirmed map[string][]capsulev1beta2.QuantityLedgerObjectRef,
+) bool {
+	for _, ref := range confirmed[ledgerReservationObjectKey(reservation.ObjectRef)] {
+		if sameLedgerObjectRef(reservation.ObjectRef, ref) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func quantityLedgerReservationDelta(
+	res capsulev1beta2.QuantityLedgerReservation,
+) resource.Quantity {
+	if res.Delta == nil {
+		return res.Usage.DeepCopy()
+	}
+
+	return res.Delta.DeepCopy()
+}
+
+func materializedReservationPositions(
+	reservations []capsulev1beta2.QuantityLedgerReservation,
+	claims []capsulev1beta2.CustomQuotaClaimItem,
+) map[string]int {
+	positions := make(map[string]int)
+
+	// Reservations are kept in ledger update order. When a later update for
+	// the same object is observed, its persisted usage also supersedes every
+	// earlier reservation for that object. Clearing the prefix avoids holding
+	// already-materialized deltas until their TTL after rapid updates.
+	for i, reservation := range reservations {
+		if reservationMaterializedLedger(reservation, claims) {
+			positions[ledgerReservationObjectKey(reservation.ObjectRef)] = i + 1
+		}
+	}
+
+	return positions
+}
+
+func ledgerReservationObjectKey(ref capsulev1beta2.QuantityLedgerObjectRef) string {
+	return strings.Join([]string{
+		ref.APIGroup,
+		ref.APIVersion,
+		ref.Kind,
+		ref.Namespace,
+		ref.Name,
+	}, "\x00")
 }
 
 func reservationMaterializedLedger(
@@ -535,17 +813,31 @@ func sameLedgerObject(
 	ref capsulev1beta2.QuantityLedgerObjectRef,
 	claim capsulev1beta2.CustomQuotaClaimItem,
 ) bool {
-	if ref.APIGroup != claim.Group ||
-		ref.APIVersion != claim.Version ||
-		ref.Kind != claim.Kind ||
-		ref.Namespace != string(claim.Namespace) ||
-		ref.Name != claim.Name {
+	return sameLedgerObjectRef(ref, capsulev1beta2.QuantityLedgerObjectRef{
+		APIGroup:   claim.Group,
+		APIVersion: claim.Version,
+		Kind:       claim.Kind,
+		Namespace:  string(claim.Namespace),
+		Name:       claim.Name,
+		UID:        claim.UID,
+	})
+}
+
+func sameLedgerObjectRef(
+	a capsulev1beta2.QuantityLedgerObjectRef,
+	b capsulev1beta2.QuantityLedgerObjectRef,
+) bool {
+	if a.APIGroup != b.APIGroup ||
+		a.APIVersion != b.APIVersion ||
+		a.Kind != b.Kind ||
+		a.Namespace != b.Namespace ||
+		a.Name != b.Name {
 		return false
 	}
 
 	// CREATE admissions often do not have a UID yet.
-	if ref.UID != "" && claim.UID != "" {
-		return ref.UID == claim.UID
+	if a.UID != "" && b.UID != "" {
+		return a.UID == b.UID
 	}
 
 	return true

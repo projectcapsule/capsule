@@ -42,6 +42,9 @@ func (r Reconciler) managedCRDs() map[string]ManagedCRD {
 		"globalcustomquotas": {
 			Name: "globalcustomquotas.capsule.clastix.io",
 		},
+		"globalresourcequotas": {
+			Name: "globalresourcequotas.capsule.clastix.io",
+		},
 		"globaltenantresources": {
 			Name: "globaltenantresources.capsule.clastix.io",
 		},

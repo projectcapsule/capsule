@@ -145,7 +145,3 @@ type BreakRequestList struct {
 
 	Items []BreakRequest `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&BreakRequest{}, &BreakRequestList{})
-}

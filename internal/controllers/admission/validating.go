@@ -8,6 +8,7 @@ import (
 	"context"
 	"maps"
 	"sort"
+	"time"
 
 	"github.com/go-logr/logr"
 	admissionv1 "k8s.io/api/admissionregistration/v1"
@@ -18,9 +19,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -45,7 +45,7 @@ func (r *validatingReconciler) SetupWithManager(mgr ctrl.Manager, ctrlConfig uti
 		For(
 			&admissionv1.ValidatingWebhookConfiguration{},
 			builder.WithPredicates(
-				predicate.GenerationChangedPredicate{},
+				predicates.ValidatingAdmissionConfigurationChangedPredicate{},
 				predicates.NamesMatchingPredicate{Names: []string{string(r.configuration.Admission().Validating.Name)}},
 			),
 		).
@@ -53,18 +53,14 @@ func (r *validatingReconciler) SetupWithManager(mgr ctrl.Manager, ctrlConfig uti
 			&capsulev1beta2.CapsuleConfiguration{},
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 				return []reconcile.Request{{
-					NamespacedName: types.NamespacedName{Name: string(r.configuration.Admission().Validating.Name)},
+					NamespacedName: types.NamespacedName{
+						Name:      string(r.configuration.Admission().Validating.Name),
+						Namespace: admissionConfigurationEventMarker,
+					},
 				}}
 			}),
 			builder.WithPredicates(
-				predicate.Or(
-					predicate.Funcs{
-						CreateFunc: func(e event.CreateEvent) bool {
-							return e.Object.GetName() == ctrlConfig.ConfigurationName
-						},
-					},
-					predicates.CapsuleConfigSpecAdmissionChangedPredicate{},
-				),
+				predicates.CapsuleConfigSpecAdmissionChangedPredicate{},
 				predicates.NamesMatchingPredicate{Names: []string{ctrlConfig.ConfigurationName}},
 			),
 		).
@@ -73,7 +69,14 @@ func (r *validatingReconciler) SetupWithManager(mgr ctrl.Manager, ctrlConfig uti
 }
 
 func (r *validatingReconciler) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
-	err = r.reconcileValidatingConfiguration(ctx, r.configuration.Admission().Validating)
+	started := time.Now()
+	defer logOperationDuration(ctrllog.FromContext(ctx), "reconcile validating configuration", started)
+
+	err = r.reconcileValidatingConfiguration(
+		ctx,
+		r.configuration.Admission().Validating,
+		request.Namespace == admissionConfigurationEventMarker,
+	)
 
 	return res, err
 }
@@ -81,6 +84,7 @@ func (r *validatingReconciler) Reconcile(ctx context.Context, request reconcile.
 func (r *validatingReconciler) reconcileValidatingConfiguration(
 	ctx context.Context,
 	cfg *capsulev1beta2.DynamicValidatingAdmissionConfig,
+	cleanup bool,
 ) error {
 	desiredName := string(cfg.Name)
 
@@ -116,6 +120,7 @@ func (r *validatingReconciler) reconcileValidatingConfiguration(
 		},
 	}
 
+	updateStarted := time.Now()
 	_, err = controllerutil.CreateOrUpdate(ctx, r.client, obj, func() error {
 		if err := controllerutil.SetOwnerReference(
 			r.configuration.GetConfigObject(),
@@ -153,7 +158,10 @@ func (r *validatingReconciler) reconcileValidatingConfiguration(
 		var caCert []byte
 
 		if r.configuration.EnableTLSConfiguration() {
+			caStarted := time.Now()
 			caCert, err = tls.FetchCurrentCaBundleForAdmission(ctx, r.client, r.configuration)
+			logOperationDuration(ctrllog.FromContext(ctx), "fetch validating admission CA bundle", caStarted)
+
 			if err != nil {
 				return err
 			}
@@ -167,10 +175,20 @@ func (r *validatingReconciler) reconcileValidatingConfiguration(
 			restoreValidatingWebhookCABundles(obj.Webhooks, existingCABundles)
 		}
 
+		annotations[predicates.AdmissionStateHashAnnotation] = predicates.ValidatingAdmissionStateHash(obj)
+		obj.SetAnnotations(annotations)
+
 		return err
 	})
+
+	logOperationDuration(ctrllog.FromContext(ctx), "create or update validating webhook configuration", updateStarted)
+
 	if err != nil {
 		return err
+	}
+
+	if !cleanup {
+		return nil
 	}
 
 	// Garbage-collect any old managed validating webhook configs with different name
@@ -193,6 +211,9 @@ func (r *validatingReconciler) reconcileValidatingConfiguration(
 }
 
 func (r *validatingReconciler) listManagedValidatingWebhookConfigs(ctx context.Context) ([]admissionv1.ValidatingWebhookConfiguration, error) {
+	started := time.Now()
+	defer logOperationDuration(ctrllog.FromContext(ctx), "list managed validating webhook configurations", started)
+
 	list := &admissionv1.ValidatingWebhookConfigurationList{}
 	if err := r.client.List(ctx, list, client.MatchingLabels{
 		meta.CreatedByCapsuleLabel: meta.ValueController,

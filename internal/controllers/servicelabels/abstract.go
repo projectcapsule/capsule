@@ -21,6 +21,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
@@ -31,6 +32,7 @@ type abstractServiceLabelsReconciler struct {
 	log    logr.Logger
 }
 
+//nolint:staticcheck
 func (r *abstractServiceLabelsReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
 	tenant, err := r.getTenant(ctx, request.NamespacedName, r.client)
 	if err != nil {
@@ -65,6 +67,7 @@ func (r *abstractServiceLabelsReconciler) Reconcile(ctx context.Context, request
 	return reconcile.Result{}, err
 }
 
+//nolint:staticcheck
 func (r *abstractServiceLabelsReconciler) getTenant(ctx context.Context, namespacedName types.NamespacedName, client client.Client) (*capsulev1beta2.Tenant, error) {
 	ns := &corev1.Namespace{}
 	tenant := &capsulev1beta2.Tenant{}
@@ -106,12 +109,15 @@ func (r *abstractServiceLabelsReconciler) sync(available map[string]string, tena
 }
 
 func (r *abstractServiceLabelsReconciler) forOptionPerInstanceName(ctx context.Context) builder.ForOption {
-	return builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
-		status, err := tenant.IsNamespaceInTenant(ctx, r.client, object.GetNamespace())
-		if err != nil {
-			r.log.Error(err, "failed resolving instances")
-		}
+	return builder.WithPredicates(predicate.And(
+		predicates.ObjectMetadataChangedPredicate{},
+		predicate.NewPredicateFuncs(func(object client.Object) bool {
+			status, err := tenant.IsNamespaceInTenant(ctx, r.client, object.GetNamespace())
+			if err != nil {
+				r.log.Error(err, "failed resolving instances")
+			}
 
-		return status
-	}))
+			return status
+		}),
+	))
 }

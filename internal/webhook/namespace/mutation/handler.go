@@ -11,6 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	webhookutils "github.com/projectcapsule/capsule/internal/webhook/utils"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
@@ -37,6 +38,8 @@ func (h *handler) OnCreate(
 	recorder events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
+		reader = webhookutils.NewTenantCachingReader(reader)
+
 		user := handlers.ResolveAdmissionUser(ctx, c, req, h.cfg)
 
 		if !user.IsAdmin() && !user.IsCapsule() {
@@ -92,12 +95,6 @@ func (h *handler) OnUpdate(
 	recorder events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		user := handlers.ResolveAdmissionUser(ctx, c, req, h.cfg)
-
-		if !user.IsAdmin() && !user.IsCapsule() {
-			return nil
-		}
-
 		ns := &corev1.Namespace{}
 		if err := decoder.Decode(req, ns); err != nil {
 			return ad.ErroredResponse(err)
@@ -106,6 +103,25 @@ func (h *handler) OnUpdate(
 		oldNs := &corev1.Namespace{}
 		if err := decoder.DecodeRaw(req.OldObject, oldNs); err != nil {
 			return ad.ErroredResponse(err)
+		}
+
+		// Namespace finalization and terminating updates must never depend on
+		// Tenant resolution. The standard mutating rule excludes subresources,
+		// but retain this guard for custom webhook configurations.
+		if req.SubResource != "" ||
+			ns.DeletionTimestamp != nil ||
+			oldNs.DeletionTimestamp != nil ||
+			ns.Status.Phase == corev1.NamespaceTerminating ||
+			oldNs.Status.Phase == corev1.NamespaceTerminating {
+			return nil
+		}
+
+		reader = webhookutils.NewTenantCachingReader(reader)
+
+		user := handlers.ResolveAdmissionUser(ctx, c, req, h.cfg)
+
+		if !user.IsAdmin() && !user.IsCapsule() {
+			return nil
 		}
 
 		for _, hndl := range h.handlers {

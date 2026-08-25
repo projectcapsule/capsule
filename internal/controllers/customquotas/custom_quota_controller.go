@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -45,6 +46,7 @@ type customQuotaClaimController struct {
 	mapper   k8smeta.RESTMapper
 
 	jsonPathCache *cache.JSONPathCache
+	celCache      *cache.CELCache
 	targetsCache  *cache.CompiledTargetsCache[string]
 }
 
@@ -69,6 +71,7 @@ func (r *customQuotaClaimController) SetupWithManager(mgr ctrl.Manager, ctrlConf
 				mgr.GetRESTMapper(),
 				&capsulev1beta2.CustomQuota{},
 			),
+			builder.WithPredicates(predicates.QuantityLedgerWorkChangedPredicate{}),
 		).
 		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
 		Complete(r)
@@ -96,7 +99,8 @@ func (r *customQuotaClaimController) Reconcile(ctx context.Context, request ctrl
 		return reconcile.Result{}, err
 	}
 
-	if err := r.ensureQuotaLedger(ctx, instance); err != nil {
+	ledger, err := r.ensureQuotaLedger(ctx, instance)
+	if err != nil {
 		if instance.DeletionTimestamp != nil || shouldIgnoreLedgerEnsureError(err) {
 			log.V(4).Info("skipping QuantityLedger ensure because CustomQuota or namespace is terminating",
 				"customQuota", request.String(),
@@ -109,7 +113,19 @@ func (r *customQuotaClaimController) Reconcile(ctx context.Context, request ctrl
 		return reconcile.Result{}, err
 	}
 
+	if hasWork, delay := quantityLedgerWorkDelay(time.Now(), ledger); hasWork && delay > 0 {
+		log.V(5).Info("debouncing QuantityLedger work",
+			"customQuota", request.String(),
+			"after", delay.String(),
+		)
+
+		return ctrl.Result{RequeueAfter: delay}, nil
+	}
+
 	reconcileErr := r.reconcile(ctx, log, instance)
+	if reconcileErr == nil {
+		meta.RemoveReconcileTriggerAnnotation(instance)
+	}
 
 	requeueAfter, ledgerErr := r.reconcileLedger(ctx, log, instance)
 
@@ -131,6 +147,10 @@ func (r *customQuotaClaimController) Reconcile(ctx context.Context, request ctrl
 		}
 
 		return reconcile.Result{}, fmt.Errorf("cannot patch: %w", err)
+	}
+
+	if ledgerErr != nil {
+		return ctrl.Result{}, fmt.Errorf("reconcile QuantityLedger: %w", ledgerErr)
 	}
 
 	if requeueAfter != nil {
@@ -158,6 +178,7 @@ func (r *customQuotaClaimController) reconcile(
 		Mapper: r.mapper,
 
 		JSONPathCache: r.jsonPathCache,
+		CELCache:      r.celCache,
 
 		Sources:        instance.Spec.Sources,
 		ScopeSelectors: instance.Spec.ScopeSelectors,
@@ -190,6 +211,7 @@ func (r *customQuotaClaimController) reconcileLedger(
 	return reconcileQuantityLedgerAllocation(
 		ctx,
 		r.Client,
+		r.reader,
 		log,
 		key,
 		instance.Status.Usage.Used.DeepCopy(),
@@ -200,7 +222,7 @@ func (r *customQuotaClaimController) reconcileLedger(
 func (r *customQuotaClaimController) ensureQuotaLedger(
 	ctx context.Context,
 	instance *capsulev1beta2.CustomQuota,
-) error {
+) (*capsulev1beta2.QuantityLedger, error) {
 	ledger := &capsulev1beta2.QuantityLedger{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      instance.GetName(),
@@ -226,11 +248,11 @@ func (r *customQuotaClaimController) ensureQuotaLedger(
 		return controllerutil.SetControllerReference(instance, ledger, r.Scheme())
 	})
 	if err != nil {
-		return fmt.Errorf("create or update QuantityLedger %s/%s for CustomQuota %s/%s: %w",
+		return nil, fmt.Errorf("create or update QuantityLedger %s/%s for CustomQuota %s/%s: %w",
 			ledger.Namespace, ledger.Name, instance.Namespace, instance.Name, err)
 	}
 
-	return nil
+	return ledger, nil
 }
 
 func (r *customQuotaClaimController) emitMetrics(
@@ -297,6 +319,8 @@ func (r *customQuotaClaimController) updateStatus(
 			return err
 		}
 
+		originalStatus := latest.Status.DeepCopy()
+
 		latest.Status = instance.Status
 		latest.Status.ObservedGeneration = instance.GetGeneration()
 
@@ -309,6 +333,10 @@ func (r *customQuotaClaimController) updateStatus(
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(readyCondition)
+
+		if reflect.DeepEqual(*originalStatus, latest.Status) {
+			return nil
+		}
 
 		if err := r.Client.Status().Update(ctx, latest); err != nil {
 			return err

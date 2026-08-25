@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	celruntime "github.com/projectcapsule/capsule/pkg/runtime/cel"
 	"github.com/projectcapsule/capsule/pkg/runtime/jsonpath"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
@@ -15,6 +16,7 @@ type CompiledTarget struct {
 	capsulev1beta2.CustomQuotaStatusTarget
 
 	CompiledPath       *jsonpath.CompiledJSONPath
+	CompiledCEL        *celruntime.CompiledExpression
 	CompiledSelectors  []selectors.CompiledSelectorWithFields
 	CompiledConditions []*jsonpath.CompiledJSONPath
 }

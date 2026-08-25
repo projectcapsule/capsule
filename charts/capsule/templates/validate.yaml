@@ -1,0 +1,3 @@
+{{- if and .Values.tls.enableController .Values.certManager.generateCertificates -}}
+{{- fail "tls.enableController and certManager.generateCertificates cannot both be enabled: choose exactly one controller to own the webhook TLS Secret and caBundles" -}}
+{{- end -}}

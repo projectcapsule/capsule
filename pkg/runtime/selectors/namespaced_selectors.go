@@ -62,16 +62,42 @@ func GetNamespacesMatchingSelectors(
 		return nil, nil
 	}
 
-	byName := make(map[string]corev1.Namespace)
+	compiled := make([]labels.Selector, 0, len(namespaceSelector))
 
 	for _, selector := range namespaceSelector {
-		matches, err := selector.GetMatchingNamespaces(ctx, c)
-		if err != nil {
-			return nil, err
+		if selector.LabelSelector == nil {
+			continue
 		}
 
-		for _, ns := range matches {
-			byName[ns.Name] = ns
+		match, err := metav1.LabelSelectorAsSelector(selector.LabelSelector)
+		if err != nil {
+			return nil, fmt.Errorf("invalid namespace selector: %w", err)
+		}
+
+		compiled = append(compiled, match)
+	}
+
+	if len(compiled) == 0 {
+		return nil, nil
+	}
+
+	namespaceList := &corev1.NamespaceList{}
+	if err := c.List(ctx, namespaceList); err != nil {
+		return nil, fmt.Errorf("failed to list namespaces: %w", err)
+	}
+
+	byName := make(map[string]corev1.Namespace)
+
+	for i := range namespaceList.Items {
+		ns := namespaceList.Items[i]
+		nsLabels := labels.Set(ns.Labels)
+
+		for _, match := range compiled {
+			if match.Matches(nsLabels) {
+				byName[ns.Name] = ns
+
+				break
+			}
 		}
 	}
 

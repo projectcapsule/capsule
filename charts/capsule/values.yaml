@@ -107,13 +107,18 @@ rbac:
   # -- Allow the creation of TenantResources
   resources:
     create: false
-    labels:
-      rbac.authorization.k8s.io/aggregate-to-admin: "true"
+    labels: {}
+    # rbac.authorization.k8s.io/aggregate-to-admin: "true"
   # -- Allow the creation of ResourcePoolClaims
   resourcepoolclaims:
     create: false
-    labels:
-      rbac.authorization.k8s.io/aggregate-to-admin: "true"
+    labels: {}
+    # rbac.authorization.k8s.io/aggregate-to-admin: "true"
+  # -- Allow the creation of CustomQuotas
+  customquotas:
+    create: false
+    labels: {}
+    # rbac.authorization.k8s.io/aggregate-to-admin: "true"
 
 # Manager Options
 manager:
@@ -153,8 +158,24 @@ manager:
     create: true
 
     # -- Strongly restrict the RBAC assigned to Capsule Controller.
-    # When set to true you must aggregate further permissions by yourself.
+    # The default owner ClusterRoles (admin, provisioner and deleter) can be bound
+    # to tenant owners out of the box; add custom owner ClusterRoles via
+    # bindableClusterRoles. Permissions beyond binding (e.g. TenantResource
+    # replication) must be aggregated by yourself via ClusterRoles labeled
+    # projectcapsule.dev/aggregate-to-controller: "true".
     strict: false
+
+    # -- DEPRECATED: use strict instead.
+    # Former name of the strict option; takes effect when either flag is true.
+    minimal: false
+
+    # -- ClusterRoles the Capsule controller is allowed to bind (verb `bind`) when
+    # strict RBAC is enabled, in addition to the roles Capsule manages
+    # (manager.options.rbac provisioner, deleter, administrationClusterRoles and
+    # promotionClusterRoles), which are always bindable. Add any custom
+    # tenant-owner ClusterRoles here.
+    bindableClusterRoles:
+      - admin
 
     # -- Specifies further cluster roles to be added to the Capsule manager service account.
     existingClusterRoles: []
@@ -300,8 +321,17 @@ manager:
       deleter: capsule-namespace-deleter
       # -- Name for the ClusterRole required to grant Namespace Provision permissions.
       provisioner: capsule-namespace-provisioner
+
+    # @schema type: object
+    # @schema additionalProperties: true
     # -- Impersonation
-    impersonation: {}
+    impersonation:
+      # Default ServiceAccount for tenant resources (TenantResource) [Namespaced Scope]
+      # When defined, users are required to use this ServiceAccount anywhere in the cluster
+      # unless they explicitly provide their own. Once this is set, Capsule will add this ServiceAccount
+      # for all GlobalTenantResources, if they don't already have a ServiceAccount defined.
+      tenantDefaultServiceAccount: "default"
+
     # Tracing Configuration
     tracing:
       # -- Enable OpenTelemetry tracing for admission webhook requests.
@@ -678,6 +708,42 @@ monitoring:
               summary: "Critical resource usage in Resourcepool {{ $labels.pool }}"
               description: "Resource {{ $labels.resource }} in pool {{ $labels.pool }} has exceeded 95% usage for the last 10 minutes."
 
+      - name: capsule.globalresourcequotas
+        rules:
+          - alert: CapsuleGlobalResourceQuotaNotReady
+            expr: |
+              capsule_global_resource_quota_condition{condition="Ready"} != 1
+            for: 10m
+            labels:
+              severity: warning
+              app: capsule
+              component: globalresourcequotas
+            annotations:
+              summary: "Capsule GlobalResourceQuota {{ $labels.global_resource_quota }} is not ready"
+              description: "GlobalResourceQuota {{ $labels.global_resource_quota }} is not in Ready state for the last 10 minutes."
+          - alert: CapsuleGlobalResourceQuotaHighUsage
+            expr: |
+              capsule_global_resource_quota_usage_percentage > 90
+            for: 10m
+            labels:
+              severity: warning
+              app: capsule
+              component: globalresourcequotas
+            annotations:
+              summary: "High resource usage in GlobalResourceQuota {{ $labels.global_resource_quota }}"
+              description: "Resource {{ $labels.resource }} in GlobalResourceQuota {{ $labels.global_resource_quota }} is at {{ $value }}% usage for the last 10 minutes."
+          - alert: CapsuleGlobalResourceQuotaCriticalUsage
+            expr: |
+              capsule_global_resource_quota_usage_percentage > 95
+            for: 10m
+            labels:
+              severity: critical
+              app: capsule
+              component: globalresourcequotas
+            annotations:
+              summary: "Critical resource usage in GlobalResourceQuota {{ $labels.global_resource_quota }}"
+              description: "Resource {{ $labels.resource }} in GlobalResourceQuota {{ $labels.global_resource_quota }} has exceeded 95% usage for the last 10 minutes."
+
       - name: capsule.replications
         rules:
           - alert: CapsuleGlobalTenantResourceNotReady
@@ -851,6 +917,17 @@ webhooks:
     # -- (integer, null) Custom service port for the webhook service
     port: # @schema type:[integer, null]
 
+  # -- MatchConditions for all webhooks
+  matchConditions: []
+  #  - name: "exclude-privileged-users"
+  #    expression: >
+  #      request.resource.group == "capsule.clastix.io" ||
+  #      !(
+  #        request.userInfo.username in [
+  #          "kubernetes-admin"
+  #        ]
+  #      )
+
   # Admission Webhook Configuration
   hooks:
     customquotas:
@@ -914,6 +991,52 @@ webhooks:
             - globalcustomquotas
           scope: 'Cluster'
 
+    # -- Webhook for admission-time GlobalResourceQuota calculations
+    globalresourcequotas:
+      # -- Enable the Hook
+      enabled: true
+      # -- Capsule Hook Options
+      opts: {}
+      # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
+      failurePolicy: Fail
+      # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
+      matchPolicy: Equivalent
+      # @schema type: object
+      # @schema additionalProperties: true
+      # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
+      objectSelector: {}
+      # @schema type: object
+      # @schema additionalProperties: true
+      # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
+      namespaceSelector:
+        matchExpressions:
+          - key: capsule.clastix.io/tenant
+            operator: Exists
+      # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
+      matchConditions: []
+      # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
+      rules:
+        - apiGroups:
+            - '*'
+          apiVersions:
+            - '*'
+          operations:
+            - CREATE
+            - UPDATE
+          resources:
+            - '*/*'
+          scope: Namespaced
+        - apiGroups:
+            - capsule.clastix.io
+          apiVersions:
+            - v1beta2
+          operations:
+            - CREATE
+            - UPDATE
+          resources:
+            - globalresourcequotas
+          scope: Cluster
+
     # -- Webhook for Custom Quota Calculations ([Read More](https://projectcapsule.dev/docs/resource-management/customquotas/#admission))
     calculations:
       # -- Enable the Hook
@@ -936,6 +1059,8 @@ webhooks:
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchConditions: []
       # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
+      # Include an explicit status subresource (for example, pods/status) when
+      # CustomQuota field selectors depend on status fields.
       rules: []
 
     # -- Webhook for Rule Status ([Read More](https://projectcapsule.dev/docs/resource-management/customquotas/#admission))
@@ -1002,8 +1127,7 @@ webhooks:
         resources:
           - '*'
         scope: Namespaced
-
-    # -- Generic Rules API
+    # -- Generic Rules API, including the rule-engine validation for Pods and Services
     generic:
       # -- Enable the Hook
       enabled: true
@@ -1026,13 +1150,11 @@ webhooks:
             operator: Exists
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchConditions:
-        - name: ignore-subresources
-          expression: '!has(request.subResource) || request.subResource == ""'
         - name: ignore-events
           expression: 'request.resource.resource != "events"'
 
       # -- [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy)
-      reinvocationPolicy: Never
+      reinvocationPolicy: IfNeeded
       # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
       rules:
       - apiGroups:
@@ -1043,9 +1165,8 @@ webhooks:
           - CREATE
           - UPDATE
         resources:
-          - '*'
+          - '*/*'
         scope: Namespaced
-
 
     resourcepools:
       pools:
@@ -1385,7 +1506,7 @@ webhooks:
       # -- Capsule Hook Options
       opts: {}
       # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
-      failurePolicy: Ignore
+      failurePolicy: Fail
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Equivalent
       # @schema type: object
@@ -1416,6 +1537,20 @@ webhooks:
           resources:
             - '*'
           scope: "Namespaced"
+        # Rule-generated GlobalResourceQuotas carry the managed-by label and
+        # must receive the same drift protection as namespaced managed objects.
+        # The status subresource is intentionally not included.
+        - apiGroups:
+            - capsule.clastix.io
+          apiVersions:
+            - v1beta2
+          operations:
+            - CREATE
+            - UPDATE
+            - DELETE
+          resources:
+            - globalresourcequotas
+          scope: "Cluster"
 
     replications:
       # -- Enable the Hook

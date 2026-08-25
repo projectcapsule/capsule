@@ -1,0 +1,18 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: ResourcePool
+metadata:
+  name: solar
+  labels:
+    projectcapsule.dev/tenant: solar
+spec:
+  quota:
+    hard:
+      limits.memory: 2Gi
+      limits.cpu: "0"
+      requests.cpu: "2"
+      requests.memory: 2Gi
+      requests.storage: "5Gi"
+  selectors:
+  - matchLabels:
+      capsule.clastix.io/tenant: solar

@@ -90,31 +90,11 @@ func (o OwnerStatusListSpec) IsOwner(name string, groups []string) bool {
 	return false
 }
 
-//nolint:dupl
 func (o OwnerStatusListSpec) FindOwner(name string, kind OwnerKind) (CoreOwnerSpec, bool) {
-	// Sort in-place by (Kind.String(), Name).
-	sort.Sort(GetByKindAndName(o))
-
-	targetKind := kind.String()
-	n := len(o)
-
-	idx := sort.Search(n, func(i int) bool {
-		ki := o[i].Kind.String()
-
-		switch {
-		case ki > targetKind:
-			return true
-		case ki < targetKind:
-			return false
-		default:
-			return o[i].Name >= name
+	for _, owner := range o {
+		if owner.Kind == kind && owner.Name == name {
+			return owner, true
 		}
-	})
-
-	if idx < n &&
-		o[idx].Kind.String() == targetKind &&
-		o[idx].Name == name {
-		return o[idx], true
 	}
 
 	return CoreOwnerSpec{}, false

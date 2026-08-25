@@ -183,8 +183,9 @@ func TestGetNamespacesMatchingSelectors(t *testing.T) {
 		namespace("alpha", map[string]string{"team": "a", "region": "us"}),
 		namespace("beta", map[string]string{"team": "b", "region": "eu"}),
 	)
+	counting := &listCountingReader{Reader: cl}
 
-	got, err := selectors.GetNamespacesMatchingSelectors(ctx, cl, []selectors.NamespaceSelector{
+	got, err := selectors.GetNamespacesMatchingSelectors(ctx, counting, []selectors.NamespaceSelector{
 		{LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"team": "a"}}},
 		{LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"region": "eu"}}},
 	})
@@ -194,6 +195,9 @@ func TestGetNamespacesMatchingSelectors(t *testing.T) {
 
 	if names := namespaceNames(got); !reflect.DeepEqual(names, []string{"alpha", "beta", "zeta"}) {
 		t.Fatalf("GetNamespacesMatchingSelectors() names = %#v, want sorted unique names", names)
+	}
+	if counting.listCalls != 1 {
+		t.Fatalf("GetNamespacesMatchingSelectors() list calls = %d, want 1", counting.listCalls)
 	}
 
 	gotNames, err := selectors.GetNamespacesMatchingSelectorsStrings(ctx, cl, []selectors.NamespaceSelector{
@@ -213,6 +217,22 @@ func TestGetNamespacesMatchingSelectors(t *testing.T) {
 	if empty != nil {
 		t.Fatalf("GetNamespacesMatchingSelectors() = %#v, want nil for no selectors", empty)
 	}
+}
+
+type listCountingReader struct {
+	client.Reader
+
+	listCalls int
+}
+
+func (r *listCountingReader) List(
+	ctx context.Context,
+	list client.ObjectList,
+	opts ...client.ListOption,
+) error {
+	r.listCalls++
+
+	return r.Reader.List(ctx, list, opts...)
 }
 
 func TestSelectorWithNamespaceSelectorMatchObjects(t *testing.T) {

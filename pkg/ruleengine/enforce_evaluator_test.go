@@ -108,6 +108,34 @@ func TestEvaluateEnforce_ValidationErrors(t *testing.T) {
 	}
 }
 
+func TestEvaluateEnforce_RulesWithError(t *testing.T) {
+	t.Parallel()
+
+	wantErr := errors.New("invalid selector")
+	evaluation, err := EvaluateEnforce(
+		testObject{Values: []Value{{Value: "prod", Path: "metadata.labels[env]"}}},
+		[]*api.NamespaceRuleEnforceBody{{Action: api.ActionTypeAllow}},
+		Set[testRule, testObject]{
+			Name: "metadata labels",
+			Values: func(obj testObject) []Value {
+				return obj.Values
+			},
+			RulesWithError: func(*api.NamespaceRuleEnforceBody) ([]testRule, error) {
+				return nil, wantErr
+			},
+			Matches: func(testRule, Value) (Match, error) {
+				return Match{}, nil
+			},
+		},
+	)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("EvaluateEnforce() error = %v, want %v", err, wantErr)
+	}
+	if evaluation == nil {
+		t.Fatal("EvaluateEnforce() evaluation = nil, want partial evaluation")
+	}
+}
+
 func TestEvaluateEnforce_EmptyInputs(t *testing.T) {
 	t.Parallel()
 

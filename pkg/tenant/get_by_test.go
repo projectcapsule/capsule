@@ -158,6 +158,11 @@ func TestGetTenantByUserInfo(t *testing.T) {
 		tenantObject("short", withSpecOwner(rbac.UserOwner, "alice")),
 		tenantObject("very-long-name", withSpecOwner(rbac.GroupOwner, "developers")),
 		tenantObject("service", withSpecOwner(rbac.ServiceAccountOwner, users.ServiceAccountUsername("tenant-a", "builder"))),
+		tenantObject(
+			"shared",
+			withSpecOwner(rbac.ServiceAccountOwner, users.ServiceAccountUsername("tenant-a", "builder")),
+			withSpecOwner(rbac.GroupOwner, "developers"),
+		),
 	)
 
 	got, err := tenant.GetTenantByUserInfo(ctx, cl, nil, nil, users.AdmissionUser{
@@ -173,8 +178,8 @@ func TestGetTenantByUserInfo(t *testing.T) {
 		names = append(names, tnt.Name)
 	}
 
-	if !reflect.DeepEqual(names, []string{"very-long-name", "service"}) {
-		t.Fatalf("GetTenantByUserInfo() names = %#v, want sorted matching tenants", names)
+	if !reflect.DeepEqual(names, []string{"very-long-name", "service", "shared"}) {
+		t.Fatalf("GetTenantByUserInfo() names = %#v, want unique sorted matching tenants", names)
 	}
 }
 

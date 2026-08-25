@@ -81,6 +81,7 @@ func (m Manager) Apply(
 		meta.NewManagedByCapsuleLabel: {},
 		meta.ProtectedByCapsuleLabel:  {},
 	})
+
 	if opts.Protect && m.Metadata.ProtectedByValue != "" {
 		labels := desired.GetLabels()
 		if labels == nil {
@@ -257,7 +258,6 @@ func (m Manager) managedMetadataPatches(
 	switch {
 	case apierrors.IsNotFound(err):
 		created = true
-		err = nil
 	case err != nil:
 		return nil, false, err
 	default:
@@ -271,6 +271,7 @@ func (m Manager) managedMetadataPatches(
 		if m.Metadata.LegacyCreatedLabel != "" {
 			if _, ok := labels[m.Metadata.LegacyCreatedLabel]; ok {
 				created = true
+
 				patches = append(patches, clt.PatchRemoveLabels(labels, []string{
 					m.Metadata.LegacyCreatedLabel,
 				})...)
@@ -363,6 +364,7 @@ func (m Manager) isDeletable(actual *unstructured.Unstructured, opts PruneOption
 	if value, ok := actual.GetLabels()[meta.CreatedByCapsuleLabel]; !ok || value != m.Metadata.CreatedByValue {
 		return false
 	}
+
 	if opts.OwnerReference != nil && meta.HasLooseOwnerReference(actual, *opts.OwnerReference) {
 		owners := meta.CapsuleFieldOwners(actual, meta.FieldManagerCapsulePrefix+"/resource/")
 		for owner := range owners {

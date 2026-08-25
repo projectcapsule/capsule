@@ -4,6 +4,7 @@
 package admission
 
 import (
+	"errors"
 	"strings"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
@@ -12,6 +13,7 @@ import (
 )
 
 // +kubebuilder:object:generate=true
+// +kubebuilder:validation:XValidation:rule="has(self.client.url) != has(self.client.service)",message="client must configure exactly one of url or service"
 type DynamicAdmissionConfig struct {
 	// Name the Admission Webhook
 	Name meta.RFC1123Name `json:"name,omitempty"`
@@ -21,8 +23,26 @@ type DynamicAdmissionConfig struct {
 	// Annotations added to the Admission Webhook
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
-	// whats the problem
+	// Client defines how the Kubernetes API server reaches the admission webhook.
+	// Exactly one of URL or Service must be configured.
 	Client *admissionregistrationv1.WebhookClientConfig `json:"client"`
+}
+
+// ValidateWebhookClientConfig checks the invariant required by the Kubernetes
+// admissionregistration API before a dynamic webhook object is constructed.
+func ValidateWebhookClientConfig(client *admissionregistrationv1.WebhookClientConfig) error {
+	if client == nil {
+		return errors.New("webhook client config is required")
+	}
+
+	hasURL := client.URL != nil
+
+	hasService := client.Service != nil
+	if hasURL == hasService {
+		return errors.New("webhook client config must configure exactly one of url or service")
+	}
+
+	return nil
 }
 
 func DynamicWebhookURL(baseURL *string, webhookPath string) *string {

@@ -203,6 +203,47 @@ func TestNamespaceOwnershipAndContexts(t *testing.T) {
 	}
 }
 
+func TestTenantNamespaceContextIncludesStatusWhenRetained(t *testing.T) {
+	t.Parallel()
+
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("adding core scheme: %v", err)
+	}
+	if err := capsulev1beta2.AddToScheme(scheme); err != nil {
+		t.Fatalf("adding Capsule scheme: %v", err)
+	}
+
+	tnt := &capsulev1beta2.Tenant{
+		ObjectMeta: metav1.ObjectMeta{Name: "tenant-a"},
+		Status:     capsulev1beta2.TenantStatus{State: capsulev1beta2.TenantStateActive},
+	}
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: "tenant-a-ns"},
+		Status:     corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
+	}
+
+	opts := sanitize.DefaultSanitizeOptions()
+	opts.StripStatus = false
+
+	ctx, err := tenant.NewTenantNamespaceContext(tnt, ns, scheme, opts)
+	if err != nil {
+		t.Fatalf("NewTenantNamespaceContext() unexpected error: %v", err)
+	}
+
+	tenantContext := ctx["tenant"].(map[string]any)
+	tenantStatus := tenantContext["status"].(map[string]any)
+	if tenantStatus["state"] != string(capsulev1beta2.TenantStateActive) {
+		t.Fatalf("tenant status state = %#v, want Active", tenantStatus["state"])
+	}
+
+	namespaceContext := ctx["namespace"].(map[string]any)
+	namespaceStatus := namespaceContext["status"].(map[string]any)
+	if namespaceStatus["phase"] != string(corev1.NamespaceActive) {
+		t.Fatalf("namespace status phase = %#v, want Active", namespaceStatus["phase"])
+	}
+}
+
 func collectedNamespaceNames(namespaces []corev1.Namespace) []string {
 	names := make([]string, 0, len(namespaces))
 	for _, ns := range namespaces {

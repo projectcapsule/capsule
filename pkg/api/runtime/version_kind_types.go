@@ -182,6 +182,17 @@ func (s VersionKinds) HasWildcard() bool {
 // Wildcard API groups or wildcard kinds are intentionally skipped because they are selectors,
 // not concrete Kubernetes resources.
 func (s VersionKinds) ValidateKnownKinds(mapper apimeta.RESTMapper, fieldPath string) error {
+	return s.ValidateKnownKindsWithScope(mapper, fieldPath, nil)
+}
+
+// ValidateKnownKindsWithScope validates concrete targets and optionally their
+// REST scope. Wildcard selectors are skipped because discovery cannot enumerate
+// their complete set reliably.
+func (s VersionKinds) ValidateKnownKindsWithScope(
+	mapper apimeta.RESTMapper,
+	fieldPath string,
+	allowScope func(schema.GroupVersionKind, apimeta.RESTScope) bool,
+) error {
 	if mapper == nil {
 		return nil
 	}
@@ -199,7 +210,8 @@ func (s VersionKinds) ValidateKnownKinds(mapper apimeta.RESTMapper, fieldPath st
 				continue
 			}
 
-			if err := validateKnownKindForAPIGroup(mapper, apiGroup, kind); err != nil {
+			mapping, err := restMappingForAPIGroup(mapper, apiGroup, kind)
+			if err != nil {
 				return fmt.Errorf(
 					"%s.kinds[%d] %q for apiGroups[%d] %q is invalid: %w",
 					fieldPath,
@@ -210,10 +222,38 @@ func (s VersionKinds) ValidateKnownKinds(mapper apimeta.RESTMapper, fieldPath st
 					err,
 				)
 			}
+
+			if allowScope != nil && !allowScope(mapping.GroupVersionKind, mapping.Scope) {
+				return fmt.Errorf(
+					"%s.kinds[%d] %q for apiGroups[%d] %q is invalid: GVK %s has unsupported scope %q",
+					fieldPath, kindIndex, kind, apiGroupIndex, apiGroup,
+					mapping.GroupVersionKind.String(), mapping.Scope.Name(),
+				)
+			}
 		}
 	}
 
 	return nil
+}
+
+func restMappingForAPIGroup(
+	mapper apimeta.RESTMapper,
+	apiGroup string,
+	kind string,
+) (*apimeta.RESTMapping, error) {
+	apiGroup = strings.TrimSpace(apiGroup)
+
+	apiGroup = normalizeAPIVersion(apiGroup)
+
+	if apiGroup == CoreAPIVersion {
+		return mapper.RESTMapping(schema.GroupKind{Kind: kind}, CoreAPIVersion)
+	}
+
+	if gv, err := schema.ParseGroupVersion(apiGroup); err == nil && strings.Contains(apiGroup, "/") {
+		return mapper.RESTMapping(schema.GroupKind{Group: gv.Group, Kind: kind}, gv.Version)
+	}
+
+	return mapper.RESTMapping(schema.GroupKind{Group: apiGroup, Kind: kind})
 }
 
 func (s VersionKinds) StatusAPIGroups() []string {
@@ -245,52 +285,6 @@ func (s VersionKinds) StatusAPIGroups() []string {
 	}
 
 	return out
-}
-
-func validateKnownKindForAPIGroup(
-	mapper apimeta.RESTMapper,
-	apiGroup string,
-	kind string,
-) error {
-	apiGroup = normalizeAPIVersion(apiGroup)
-
-	if apiGroup == CoreAPIVersion {
-		_, err := mapper.RESTMapping(
-			schema.GroupKind{
-				Group: "",
-				Kind:  kind,
-			},
-			CoreAPIVersion,
-		)
-
-		return err
-	}
-
-	if strings.Contains(apiGroup, "/") {
-		gv, err := schema.ParseGroupVersion(apiGroup)
-		if err != nil {
-			return err
-		}
-
-		_, err = mapper.RESTMapping(
-			schema.GroupKind{
-				Group: gv.Group,
-				Kind:  kind,
-			},
-			gv.Version,
-		)
-
-		return err
-	}
-
-	_, err := mapper.RESTMapping(
-		schema.GroupKind{
-			Group: apiGroup,
-			Kind:  kind,
-		},
-	)
-
-	return err
 }
 
 func (s VersionKinds) NormalizedAPIGroups() []string {

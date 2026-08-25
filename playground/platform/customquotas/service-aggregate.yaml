@@ -1,0 +1,18 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: GlobalCustomQuota
+metadata:
+  name: service-aggregate
+spec:
+  limit: 5
+  namespaceSelectors:
+  - matchExpressions:
+    - key: capsule.clastix.io/tenant
+      operator: Exists
+  sources:
+    - apiVersion: v1
+      kind: Service
+      op: count
+      selectors:
+        - fieldSelectors:
+            - .spec.type=="ClusterIP"

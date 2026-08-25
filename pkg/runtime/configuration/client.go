@@ -32,6 +32,8 @@ type capsuleConfiguration struct {
 	client      client.Client
 }
 
+const informerConfigurationReadTimeout = 25 * time.Millisecond
+
 func DefaultCapsuleConfiguration() capsulev1beta2.CapsuleConfigurationSpec {
 	d, _ := time.ParseDuration("1h")
 
@@ -62,21 +64,31 @@ func NewCapsuleConfiguration(ctx context.Context, c client.Client, reader client
 			cfg := &capsulev1beta2.CapsuleConfiguration{}
 			key := types.NamespacedName{Name: name}
 
-			if err := reader.Get(ctx, key, cfg); err == nil {
+			// Configuration accessors are used repeatedly within admission
+			// requests. Prefer the manager's informer-backed client so each
+			// accessor does not become a live API/etcd read. The direct reader
+			// remains the authoritative fallback while the informer is
+			// starting or has not observed a newly created configuration yet.
+			cacheCtx, cancel := context.WithTimeout(ctx, informerConfigurationReadTimeout)
+			cacheErr := c.Get(cacheCtx, key, cfg)
+
+			cancel()
+
+			if cacheErr == nil {
 				return cfg
-			} else if !apierrors.IsNotFound(err) {
-				panic(errors.Wrap(err, "cannot retrieve Capsule configuration with name "+name))
 			}
 
-			err := c.Get(ctx, key, cfg)
-			if err == nil {
+			directErr := reader.Get(ctx, key, cfg)
+			if directErr == nil {
 				return cfg
 			}
 
-			if !apierrors.IsNotFound(err) {
-				panic(errors.Wrap(err, "cannot retrieve Capsule configuration with name "+name))
+			if !apierrors.IsNotFound(directErr) {
+				panic(errors.Wrap(directErr, "cannot retrieve Capsule configuration with name "+name))
 			}
 
+			// The direct reader is authoritative and reported NotFound.
+			// Ignore the failed cached read and create the default configuration.
 			cfg = &capsulev1beta2.CapsuleConfiguration{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: name,

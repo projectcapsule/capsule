@@ -18,7 +18,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("creating a Service with user-specified labels and annotations", Ordered, Label("tenant", "networking", "service"), func() {
+var _ = Describe("creating a Service with user-specified labels and annotations", Ordered, Label("tenant", "networking", "service", "skip-on-openshift"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "e2e-service-user-metadata-forbidden",

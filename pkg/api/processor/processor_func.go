@@ -48,6 +48,74 @@ func (p *Processor) Reconcile(
 	return nil
 }
 
+// ReconcileNamespace applies the accumulated items targeting a single Namespace of a
+// single Tenant, returning the processed items of that scope only.
+//
+// Contrarily to Reconcile, the given Accumulator is not authoritative for the whole
+// Tenant: nothing is pruned, nor disowned, since the items missing from it may just
+// belong to a Namespace this run knows nothing about. Pruning remains a duty of the
+// full reconciliation.
+//
+// The returned items are meant to be grafted on the persisted status through
+// meta.ProcessedItems.ReplaceScope, which leaves the other Namespaces untouched.
+// They are returned along an error too, since they carry the outcome of the single
+// items which have been processed.
+func (p *Processor) ReconcileNamespace(
+	ctx context.Context,
+	log logr.Logger,
+	c client.Client,
+	current meta.ProcessedItems,
+	acc Accumulator,
+	opts ProcessorOptions,
+	scope Scope,
+) (meta.ProcessedItems, error) {
+	if scope.Namespace == "" {
+		return nil, fmt.Errorf("cannot process a Namespace scope without a Namespace")
+	}
+
+	log = log.WithValues("tenant", scope.Tenant, "namespace", scope.Namespace)
+
+	processed := current.InScope(scope.Tenant, scope.Namespace)
+
+	scoped, skipped := scopedAccumulator(acc, scope)
+	if skipped > 0 {
+		log.V(5).Info("ignored accumulated items out of the processed scope", "ignored", skipped)
+	}
+
+	log.V(5).Info("starting scoped processing", "present", len(processed), "items", len(scoped))
+
+	if itemErrors := p.applyAccumulatedItems(ctx, log, c, &processed, scoped, opts); itemErrors > 0 {
+		return processed, fmt.Errorf("applying of %d resources failed", itemErrors)
+	}
+
+	log.V(4).Info("scoped processing completed")
+
+	return processed, nil
+}
+
+// Retains the accumulated items belonging to the given scope only, along with the
+// amount of the ignored ones.
+func scopedAccumulator(acc Accumulator, scope Scope) (Accumulator, int) {
+	scoped := make(Accumulator, len(acc))
+	ignored := 0
+
+	for key, item := range acc {
+		if item == nil {
+			continue
+		}
+
+		if !scope.Matches(item.Resource) {
+			ignored++
+
+			continue
+		}
+
+		scoped[key] = item
+	}
+
+	return scoped, ignored
+}
+
 func (p *Processor) pruneProcessedItems(
 	ctx context.Context,
 	log logr.Logger,

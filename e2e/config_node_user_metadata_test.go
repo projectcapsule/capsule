@@ -211,13 +211,16 @@ var _ = Describe("modifying node labels and annotations", Ordered, Label("config
 			}
 		})
 
-		Expect(ModifyNode(func(node *corev1.Node) error {
-			node.Labels["foo"] = "bar"
-			node.Labels["gatsby-foo"] = "bar"
-			node.Annotations["foo"] = "bar"
-			node.Annotations["gatsby-foo"] = "bar"
-			return k8sClient.Update(context.Background(), node)
-		})).Should(Succeed())
+		EventuallyCreation(func() error {
+			return ModifyNode(func(node *corev1.Node) error {
+				node.Labels["foo"] = "bar"
+				node.Labels["gatsby-foo"] = "bar"
+				node.Annotations["foo"] = "bar"
+				node.Annotations["gatsby-foo"] = "bar"
+
+				return k8sClient.Update(context.Background(), node)
+			})
+		}).Should(Succeed())
 
 		By("adding forbidden labels using exact match", func() {
 			EventuallyCreation(func() error {
@@ -228,7 +231,7 @@ var _ = Describe("modifying node labels and annotations", Ordered, Label("config
 					_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
 					return err
 				})
-			}).ShouldNot(Succeed())
+			}).Should(MatchError(ContainSubstring("some labels are marked as forbidden")))
 		})
 		By("adding forbidden labels using regex match", func() {
 			EventuallyCreation(func() error {
@@ -239,7 +242,7 @@ var _ = Describe("modifying node labels and annotations", Ordered, Label("config
 					_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
 					return err
 				})
-			}).ShouldNot(Succeed())
+			}).Should(MatchError(ContainSubstring("some labels are marked as forbidden")))
 		})
 		By("modifying forbidden labels", func() {
 			EventuallyCreation(func() error {
@@ -250,7 +253,7 @@ var _ = Describe("modifying node labels and annotations", Ordered, Label("config
 					_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
 					return err
 				})
-			}).ShouldNot(Succeed())
+			}).Should(MatchError(ContainSubstring("some labels are marked as forbidden")))
 		})
 		By("adding forbidden annotations using exact match", func() {
 			EventuallyCreation(func() error {
@@ -261,7 +264,7 @@ var _ = Describe("modifying node labels and annotations", Ordered, Label("config
 					_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
 					return err
 				})
-			}).ShouldNot(Succeed())
+			}).Should(MatchError(ContainSubstring("some annotations are marked as forbidden")))
 		})
 		By("adding forbidden annotations using regex match", func() {
 			EventuallyCreation(func() error {
@@ -272,7 +275,7 @@ var _ = Describe("modifying node labels and annotations", Ordered, Label("config
 					_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
 					return err
 				})
-			}).ShouldNot(Succeed())
+			}).Should(MatchError(ContainSubstring("some annotations are marked as forbidden")))
 		})
 		By("modifying forbidden annotations", func() {
 			EventuallyCreation(func() error {
@@ -283,7 +286,7 @@ var _ = Describe("modifying node labels and annotations", Ordered, Label("config
 					_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
 					return err
 				})
-			}).ShouldNot(Succeed())
+			}).Should(MatchError(ContainSubstring("some annotations are marked as forbidden")))
 		})
 	})
 

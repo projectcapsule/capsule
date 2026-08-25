@@ -33,7 +33,7 @@ type CustomQuotaOptionsSpec struct {
 	EmitPerClaimMetrics bool `json:"emitMetricPerClaimUsage,omitempty"`
 }
 
-// +kubebuilder:validation:XValidation:rule="self.op == 'count' ? !has(self.path) || size(self.path) == 0 : has(self.path) && size(self.path) > 0",message="path must be empty when op is 'count'; otherwise path must be set and non-empty"
+// +kubebuilder:validation:XValidation:rule="self.op == 'count' ? ((!has(self.path) || size(self.path) == 0) && (!has(self.cel) || size(self.cel) == 0)) : ((has(self.path) && size(self.path) > 0) != (has(self.cel) && size(self.cel) > 0))",message="path and cel must be empty when op is 'count'; otherwise exactly one of path or cel must be set and non-empty"
 type CustomQuotaSpecSource struct {
 	runtime.VersionKind         `json:",inline"`
 	CustomQuotaSpecSourceConfig `json:",inline"`
@@ -45,6 +45,14 @@ type CustomQuotaSpecSourceConfig struct {
 	// Required and non-empty for all other operations.
 	// +optional
 	Path string `json:"path,omitempty"`
+
+	// CEL expression evaluated against the source object.
+	// The object is available as "object".
+	// Must evaluate to kubernetes.Quantity or list<kubernetes.Quantity>.
+	// Mutually exclusive with path and must be empty when op is "count".
+	// +kubebuilder:validation:MaxLength=4096
+	// +optional
+	CEL string `json:"cel,omitempty"`
 
 	// Operation used to evaluate usage.
 	// +kubebuilder:default:=add
@@ -88,8 +96,4 @@ type CustomQuotaList struct {
 	metav1.ListMeta `json:"metadata,omitzero"`
 
 	Items []CustomQuota `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(&CustomQuota{}, &CustomQuotaList{})
 }

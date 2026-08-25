@@ -54,7 +54,10 @@ func BuildNamespaceRuleBodyStatus(
 		nsLabels = labels.Set(ns.Labels)
 	}
 
-	templateContext, err := NewTenantNamespaceContext(tnt, ns, scheme, sanitize.DefaultSanitizeOptions())
+	templateOptions := sanitize.DefaultSanitizeOptions()
+	templateOptions.StripStatus = false
+
+	templateContext, err := NewTenantNamespaceContext(tnt, ns, scheme, templateOptions)
 	if err != nil {
 		return nil, fmt.Errorf("build namespace rule template context: %w", err)
 	}
@@ -82,7 +85,12 @@ func BuildNamespaceRuleBodyStatus(
 			continue
 		}
 
-		selected = append(selected, body.DeepCopy())
+		statusBody := body.DeepCopy()
+		// Quotas are Tenant-level inputs used to generate cluster-scoped
+		// GlobalResourceQuotas. They are not evaluated from per-namespace
+		// RuleStatus objects and must not be projected into them.
+		statusBody.Quota = nil
+		selected = append(selected, statusBody)
 	}
 
 	rendered, err := template.RenderNamespaceRuleBodies(
@@ -101,6 +109,7 @@ func BuildNamespaceRuleBodyStatus(
 			continue
 		}
 
+		body.Quota = nil
 		out = append(out, body)
 	}
 

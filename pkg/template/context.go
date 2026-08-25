@@ -50,9 +50,12 @@ func (t *TemplateContext) ValidateVariables(values map[string]string) error {
 			errs = append(errs, validateReferenceVariables(prefix+".selector.matchLabels key", key, values)...)
 			errs = append(errs, validateReferenceVariables(prefix+".selector.matchLabels."+key, value, values)...)
 		}
+
 		for expressionIndex, expression := range resource.Selector.MatchExpressions {
 			field := fmt.Sprintf("%s.selector.matchExpressions[%d]", prefix, expressionIndex)
+
 			errs = append(errs, validateReferenceVariables(field+".key", expression.Key, values)...)
+
 			for valueIndex, value := range expression.Values {
 				errs = append(errs, validateReferenceVariables(
 					fmt.Sprintf("%s.values[%d]", field, valueIndex),
@@ -77,6 +80,7 @@ func validateReferenceVariables(field, value string, variables map[string]string
 	}
 
 	remaining := value
+
 	var errs []error
 
 	for _, match := range matches {

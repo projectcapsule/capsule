@@ -41,6 +41,8 @@ var _ = Describe("Deleting a tenant with protected annotation", Ordered, Label("
 		UpdateTenantEventually(tnt, func(t *capsulev1beta2.Tenant) {
 			t.Spec.PreventDeletion = false
 		})
+
+		EventuallyDeletion(tnt)
 	})
 
 	It("should fail", func() {

@@ -109,7 +109,7 @@ var _ = Describe("enforcing some defined ImagePullPolicy", Ordered, Label("tenan
 					Containers: []corev1.Container{
 						{
 							Name:            "container",
-							Image:           "gcr.io/google_containers/pause-amd64:3.0",
+							Image:           "registry.k8s.io/pause:3.10",
 							ImagePullPolicy: corev1.PullAlways,
 							SecurityContext: restrictedContainerSecurityContext(),
 						},
@@ -128,7 +128,7 @@ var _ = Describe("enforcing some defined ImagePullPolicy", Ordered, Label("tenan
 					{
 						EphemeralContainerCommon: corev1.EphemeralContainerCommon{
 							Name:            "dbg",
-							Image:           "gcr.io/google_containers/pause-amd64:3.0",
+							Image:           "registry.k8s.io/pause:3.10",
 							ImagePullPolicy: corev1.PullAlways,
 							SecurityContext: restrictedContainerSecurityContext(),
 						},
@@ -154,7 +154,7 @@ var _ = Describe("enforcing some defined ImagePullPolicy", Ordered, Label("tenan
 					Containers: []corev1.Container{
 						{
 							Name:            "container",
-							Image:           "gcr.io/google_containers/pause-amd64:3.0",
+							Image:           "registry.k8s.io/pause:3.10",
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							SecurityContext: restrictedContainerSecurityContext(),
 						},
@@ -173,7 +173,7 @@ var _ = Describe("enforcing some defined ImagePullPolicy", Ordered, Label("tenan
 					{
 						EphemeralContainerCommon: corev1.EphemeralContainerCommon{
 							Name:            "dbg",
-							Image:           "gcr.io/google_containers/pause-amd64:3.0",
+							Image:           "registry.k8s.io/pause:3.10",
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							SecurityContext: restrictedContainerSecurityContext(),
 						},
@@ -198,7 +198,7 @@ var _ = Describe("enforcing some defined ImagePullPolicy", Ordered, Label("tenan
 					Containers: []corev1.Container{
 						{
 							Name:            "container",
-							Image:           "gcr.io/google_containers/pause-amd64:3.0",
+							Image:           "registry.k8s.io/pause:3.10",
 							ImagePullPolicy: corev1.PullNever,
 							SecurityContext: restrictedContainerSecurityContext(),
 						},
@@ -217,7 +217,7 @@ var _ = Describe("enforcing some defined ImagePullPolicy", Ordered, Label("tenan
 					{
 						EphemeralContainerCommon: corev1.EphemeralContainerCommon{
 							Name:            "dbg",
-							Image:           "gcr.io/google_containers/pause-amd64:3.0",
+							Image:           "registry.k8s.io/pause:3.10",
 							ImagePullPolicy: corev1.PullNever,
 							SecurityContext: restrictedContainerSecurityContext(),
 						},

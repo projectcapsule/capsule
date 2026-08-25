@@ -1,0 +1,44 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: wind
+  labels:
+    customer: renewable
+  annotations:
+    info.projectcapsule.dev/icon: https://www.hiclipart.com/search?clipart=wind+Icon
+    info.projectcapsule.dev/description: "Production tenant for the wind team"
+    info.projectcapsule.dev/links: '[{"title":"Grafana","url":"https://grafana.example.com/d/payments"},{"title":"Runbook","url":"https://wiki.example.com/payments-runbook"}]'
+spec:
+  permissions:
+    matchOwners:
+    - matchLabels:
+        customer: renewable
+    - matchLabels:
+        team: devops
+  rules:
+    # Enforce Resource-Allocation to best-practices
+    - quota:
+        - name: billable-compute
+          hard:
+            requests.cpu: "8"
+            requests.memory: 16Gi
+            limits.cpu: "0"
+            limits.memory: 16Gi
+            requests.storage: "5Gi"
+      enforce:
+        action: deny
+        workloads:
+          resources:
+            limits:
+              cpu:
+                policy: Remove
+              memory:
+                policy: MatchRequest
+    - permissions:
+        bindings:
+          - clusterRoleName: 'view'
+            subjects:
+              - apiGroup: rbac.authorization.k8s.io
+                kind: Group
+                name: wind-users

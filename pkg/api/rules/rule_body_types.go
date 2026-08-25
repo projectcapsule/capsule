@@ -3,13 +3,24 @@
 
 package rules
 
-import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
+import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // For future implementation where users might manage RuleStatus CRs themselves
 // +kubebuilder:object:generate=true
 type NamespaceRuleBodyNamespace struct {
+	// Audience limits this rule to matching request subjects.
+	// An empty audience matches every request.
+	// +optional
+	Audience []Audience `json:"audience,omitempty"`
+
+	// Quota contains native Kubernetes ResourceQuota specifications shared by
+	// all namespaces selected by this rule. Unlike Enforce, quota accounting is
+	// independent of the request audience.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	Quota []ResourceQuotaRule `json:"quota,omitempty"`
+
 	// Enforcement for given rule
 	//+optional
 	Enforce *NamespaceRuleEnforceBody `json:"enforce,omitzero"`

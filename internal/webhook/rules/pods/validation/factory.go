@@ -38,10 +38,13 @@ func evaluatePodRules[R any](
 	)
 }
 
-type podRuleValidator func(
-	*corev1.Pod,
-	[]*apirules.NamespaceRuleEnforceBody,
-) (*ruleengine.Evaluation, error)
+type podRuleValidator struct {
+	evaluate func(
+		*corev1.Pod,
+		[]*apirules.NamespaceRuleEnforceBody,
+	) (*ruleengine.Evaluation, error)
+	includeSubresources bool
+}
 
 type podRules struct {
 	rules         []podRuleValidator
@@ -67,9 +70,10 @@ func PodRules(
 	}
 
 	h.rules = []podRuleValidator{
-		h.validateSchedulers,
-		h.validateQoSClasses,
-		h.validateRegistries,
+		{evaluate: h.validateResources},
+		{evaluate: h.validateSchedulers, includeSubresources: true},
+		{evaluate: h.validateQoSClasses, includeSubresources: true},
+		{evaluate: h.validateRegistries, includeSubresources: true},
 	}
 
 	return h
@@ -138,8 +142,12 @@ func (h *podRules) validatePodRules(
 	recorder events.EventRecorder,
 	enforceBodies []*apirules.NamespaceRuleEnforceBody,
 ) error {
-	for _, evaluate := range h.rules {
-		evaluation, err := evaluate(pod, enforceBodies)
+	for _, rule := range h.rules {
+		if req.SubResource != "" && !rule.includeSubresources {
+			continue
+		}
+
+		evaluation, err := rule.evaluate(pod, enforceBodies)
 		if err != nil {
 			return err
 		}

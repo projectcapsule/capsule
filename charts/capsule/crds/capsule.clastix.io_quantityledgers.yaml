@@ -172,6 +172,11 @@ spec:
                     createdAt:
                       format: date-time
                       type: string
+                    id:
+                      description: |-
+                        ID identifies the admission request that added this hint. It allows a
+                        failed multi-quota admission to roll back only its own hint.
+                      type: string
                     objectRef:
                       description: |-
                         QuotaLedgerObjectRef identifies the object for which a reservation exists.
@@ -219,6 +224,20 @@ spec:
                       description: Time the reservation was first created.
                       format: date-time
                       type: string
+                    delta:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      description: |-
+                        Delta is the additional amount held against the quota while the admitted
+                        object is materializing. For creates this is normally equal to Usage. For
+                        updates it is max(newUsage-oldUsage, 0), so admission never releases
+                        capacity before the API server has persisted the update.
+
+                        A nil value is interpreted as Usage for backwards compatibility with
+                        ledgers written before this field was introduced.
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
                     expiresAt:
                       description: Time after which the reservation may be considered
                         stale.
@@ -284,6 +303,135 @@ spec:
                   Controllers/webhooks should treat this as derived data from Reservations.
                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                 x-kubernetes-int-or-string: true
+              resourceQuota:
+                description: |-
+                  ResourceQuota contains coordination state for GlobalResourceQuota.
+                  It is unset for CustomQuota and GlobalCustomQuota ledgers.
+                properties:
+                  allocated:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: Allocated is Used plus all active reservations.
+                    type: object
+                  initialized:
+                    description: |-
+                      Initialized is true after every selected namespace has reported
+                      ResourceQuota status for this quota.
+                    type: boolean
+                  namespaces:
+                    description: Namespaces is the selected namespace set represented
+                      by Used.
+                    items:
+                      type: string
+                    type: array
+                  observedGeneration:
+                    description: |-
+                      ObservedGeneration is the GlobalResourceQuota generation represented by
+                      this ledger state.
+                    format: int64
+                    type: integer
+                  reservations:
+                    description: Reservations contains inflight admission operations.
+                    items:
+                      description: |-
+                        QuantityLedgerResourceQuotaReservation is an atomic reservation against all
+                        resources tracked by a GlobalResourceQuota.
+                      properties:
+                        createdAt:
+                          format: date-time
+                          type: string
+                        delta:
+                          additionalProperties:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
+                          description: Delta is the positive amount held while ResourceQuota
+                            status catches up.
+                          type: object
+                        expiresAt:
+                          format: date-time
+                          type: string
+                        id:
+                          description: Unique reservation identifier.
+                          minLength: 1
+                          type: string
+                        objectRef:
+                          description: Object that this reservation is intended to
+                            create/update.
+                          properties:
+                            apiGroup:
+                              description: APIGroup of the tracked object.
+                              type: string
+                            apiVersion:
+                              description: APIVersion of the tracked object, for example
+                                "v1".
+                              minLength: 1
+                              type: string
+                            kind:
+                              description: Kind of the tracked object, for example
+                                "Pod".
+                              minLength: 1
+                              type: string
+                            name:
+                              description: Name of the tracked object.
+                              type: string
+                            namespace:
+                              description: Namespace of the tracked object.
+                              type: string
+                            uid:
+                              description: UID of the tracked object.
+                              type: string
+                          required:
+                          - apiVersion
+                          - kind
+                          type: object
+                        updatedAt:
+                          format: date-time
+                          type: string
+                        usage:
+                          additionalProperties:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
+                          description: Usage is the calculated usage of the admitted
+                            object.
+                          type: object
+                      required:
+                      - createdAt
+                      - id
+                      - objectRef
+                      - updatedAt
+                      type: object
+                    type: array
+                  reserved:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: Reserved is derived from Reservations.
+                    type: object
+                  used:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: |-
+                      Used is the usage observed from ResourceQuota status across all selected
+                      namespaces.
+                    type: object
+                type: object
             type: object
         type: object
     served: true

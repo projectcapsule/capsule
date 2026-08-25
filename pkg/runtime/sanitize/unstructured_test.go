@@ -186,6 +186,10 @@ func TestSanitizeUnstructured_AllOptionsEnabled_RemovesAllTargets(t *testing.T) 
 	obj := &unstructured.Unstructured{
 		Object: map[string]any{
 			"metadata": map[string]any{
+				"uid":             "uid",
+				"resourceVersion": "123",
+				"generation":      int64(2),
+				"ownerReferences": []any{map[string]any{"name": "owner"}},
 				"managedFields": []any{
 					map[string]any{"manager": "foo"},
 				},
@@ -199,13 +203,19 @@ func TestSanitizeUnstructured_AllOptionsEnabled_RemovesAllTargets(t *testing.T) 
 	}
 
 	sanitize.SanitizeUnstructured(obj, sanitize.SanitizeOptions{
-		StripManagedFields: true,
-		StripLastApplied:   true,
-		StripStatus:        true,
+		StripUID:             true,
+		StripResourceVersion: true,
+		StripOwnerreferences: true,
+		StripGeneration:      true,
+		StripManagedFields:   true,
+		StripLastApplied:     true,
+		StripStatus:          true,
 	})
 
-	if _, found, _ := unstructured.NestedFieldNoCopy(obj.Object, "metadata", "managedFields"); found {
-		t.Fatalf("expected managedFields removed")
+	for _, field := range []string{"uid", "resourceVersion", "ownerReferences", "generation", "managedFields"} {
+		if _, found, _ := unstructured.NestedFieldNoCopy(obj.Object, "metadata", field); found {
+			t.Fatalf("expected metadata.%s removed", field)
+		}
 	}
 
 	anns, found, err := unstructured.NestedStringMap(obj.Object, "metadata", "annotations")

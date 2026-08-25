@@ -103,7 +103,7 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 				Containers: []corev1.Container{
 					{
 						Name:            "container",
-						Image:           "gcr.io/google_containers/pause-amd64:3.0",
+						Image:           "gcr.io/invalid/pause:3.10",
 						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
@@ -213,7 +213,7 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 			payload := []Patch{{
 				Op:    "replace",
 				Path:  "/spec/containers/0/image",
-				Value: "attacker/google-containers/pause-amd64:3.0",
+				Value: "attacker/pause:3.10",
 			}}
 			payloadBytes, _ := json.Marshal(payload)
 			_, err := cs.CoreV1().Pods(ns.GetName()).Patch(context.TODO(), pod.GetName(), types.JSONPatchType, payloadBytes, metav1.PatchOptions{})
@@ -238,7 +238,7 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 				Containers: []corev1.Container{
 					{
 						Name:            "container",
-						Image:           "docker.io/google-containers/pause-amd64:3.0",
+						Image:           "docker.io/library/busybox:1.36.1",
 						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
@@ -297,7 +297,7 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 				{
 					EphemeralContainerCommon: corev1.EphemeralContainerCommon{
 						Name:            "dbg",
-						Image:           "attacker/google-containers/pause-amd64:3.0",
+						Image:           "attacker/pause:3.10",
 						ImagePullPolicy: corev1.PullIfNotPresent,
 					},
 				},
@@ -354,7 +354,7 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 			payload := []Patch{{
 				Op:    "replace",
 				Path:  "/spec/initContainers/0/image",
-				Value: "attacker/google-containers/pause-amd64:3.0",
+				Value: "attacker/pause:3.10",
 			}}
 			payloadBytes, _ := json.Marshal(payload)
 			_, err := cs.CoreV1().Pods(ns.GetName()).Patch(context.TODO(), pod.GetName(), types.JSONPatchType, payloadBytes, metav1.PatchOptions{})
@@ -401,7 +401,7 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 			payload := []Patch{{
 				Op:    "replace",
 				Path:  "/spec/initContainers/0/image",
-				Value: "attacker/google-containers/pause-amd64:3.0",
+				Value: "attacker/pause:3.10",
 			}}
 			payloadBytes, _ := json.Marshal(payload)
 			_, err := cs.CoreV1().Pods(ns.GetName()).Patch(context.TODO(), pod.GetName(), types.JSONPatchType, payloadBytes, metav1.PatchOptions{})
@@ -426,7 +426,7 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 				Containers: []corev1.Container{
 					{
 						Name:            "container",
-						Image:           "docker.io/google-containers/pause-amd64:3.0",
+						Image:           "docker.io/library/busybox:1.36.1",
 						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
@@ -485,7 +485,7 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 				{
 					EphemeralContainerCommon: corev1.EphemeralContainerCommon{
 						Name:            "dbg",
-						Image:           "myregistry.azurecr.io/google-containers/pause-amd64:3.1",
+						Image:           "myregistry.azurecr.io/pause:3.10",
 						ImagePullPolicy: corev1.PullIfNotPresent,
 					},
 				},
@@ -521,7 +521,7 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 				Containers: []corev1.Container{
 					{
 						Name:            "container",
-						Image:           "docker.io/google-containers/pause-amd64:3.0",
+						Image:           "docker.io/library/busybox:1.36.1",
 						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
@@ -543,7 +543,7 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 			payload := []Patch{{
 				Op:    "replace",
 				Path:  "/spec/initContainers/0/image",
-				Value: "myregistry.azurecr.io/google-containers/pause-amd64:3.1",
+				Value: "myregistry.azurecr.io/pause:3.10",
 			}}
 			payloadBytes, _ := json.Marshal(payload)
 			_, err := cs.CoreV1().Pods(ns.GetName()).Patch(context.TODO(), pod.GetName(), types.JSONPatchType, payloadBytes, metav1.PatchOptions{})
@@ -596,7 +596,7 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 				Containers: []corev1.Container{
 					{
 						Name:            "container",
-						Image:           "quay.io/google-containers/pause-amd64:3.0",
+						Image:           "quay.io/prometheus/busybox:latest",
 						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},

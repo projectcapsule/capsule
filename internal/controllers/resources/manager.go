@@ -22,6 +22,14 @@ func Add(
 	opts utils.ControllerOptions,
 	cache *cache.ImpersonationCache,
 ) (err error) {
+	if err = (&NamespaceTrigger{
+		log:           log.WithName("Global"),
+		configuration: configuration,
+		impersonation: cache,
+	}).SetupWithManager(mgr, opts); err != nil {
+		return fmt.Errorf("unable to create watcher controller: %w", err)
+	}
+
 	if err = (&globalResourceController{
 		log:           log.WithName("Global"),
 		configuration: configuration,

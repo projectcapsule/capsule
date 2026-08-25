@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"time"
 
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
@@ -283,9 +284,8 @@ func (br *BreakRequest) RenderResources(
 	}
 
 	directContext := make(template.ReferenceContext, len(params))
-	for key, value := range params {
-		directContext[key] = value
-	}
+	maps.Copy(directContext, params)
+
 	loadedResources := template.ReferenceContext{}
 
 	for _, additional := range contexts {
@@ -293,6 +293,7 @@ func (br *BreakRequest) RenderResources(
 			if _, found := params[key]; found {
 				return nil, fmt.Errorf("template context key %q conflicts with a request parameter", key)
 			}
+
 			if _, found := loadedResources[key]; found {
 				return nil, fmt.Errorf("template context key %q is defined more than once", key)
 			}
@@ -310,6 +311,7 @@ func (br *BreakRequest) RenderResources(
 	}
 
 	rendered := make([]apiruntime.ResourceTemplate, 0, len(resources))
+
 	var renderErr error
 
 	for resourceIndex, resource := range resources {
@@ -376,6 +378,7 @@ func rawExtensionBytes(target k8sruntime.RawExtension) ([]byte, error) {
 	if len(target.Raw) > 0 {
 		return target.Raw, nil
 	}
+
 	if target.Object != nil {
 		data, err := json.Marshal(target.Object)
 		if err != nil {
@@ -400,12 +403,15 @@ func (br *BreakRequest) LoadTemplateContext(
 	if tpl == nil {
 		return nil, errors.New("template not set")
 	}
+
 	if tpl.Context == nil {
 		return template.ReferenceContext{}, nil
 	}
+
 	if c == nil {
-		return nil, errors.New("Kubernetes client is required to load template context")
+		return nil, errors.New("kubernetes client is required to load template context")
 	}
+
 	if mapper == nil {
 		return nil, errors.New("REST mapper is required to load template context")
 	}
@@ -414,7 +420,9 @@ func (br *BreakRequest) LoadTemplateContext(
 	if err != nil {
 		return nil, err
 	}
+
 	fastContext := parameterFastContext(params)
+
 	if err := tpl.Context.ValidateVariables(fastContext); err != nil {
 		return nil, fmt.Errorf("validating template context: %w", err)
 	}
@@ -472,9 +480,8 @@ func parameterFastContext(params template.ReferenceContext) map[string]string {
 	for key, value := range result {
 		aliases["."+key] = value
 	}
-	for key, value := range aliases {
-		result[key] = value
-	}
+
+	maps.Copy(result, aliases)
 
 	return result
 }

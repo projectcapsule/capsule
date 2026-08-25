@@ -19,7 +19,7 @@ CAPSULE_IMG     ?= $(REGISTRY)/$(IMG_BASE)
 CLUSTER_NAME    ?= capsule
 FILTER		 	?= && !skip
 ## Kubernetes Version Support
-KUBERNETES_SUPPORTED_VERSION ?= "v1.35.0"
+KUBERNETES_SUPPORTED_VERSION ?= "v1.36.1"
 
 ## Openshift Version Support
 OS_SUPPORTED_VERSION ?= "4.22.0-okd-scos.ec.10"
@@ -27,6 +27,7 @@ OS_SUPPORTED_VERSION ?= "4.22.0-okd-scos.ec.10"
 ## Tool Binaries
 KUBECTL ?= kubectl
 HELM ?= helm
+DEV_SETUP_TIMEOUT ?= 10m
 
 # Options for 'bundle-build'
 ifneq ($(origin CHANNELS), undefined)
@@ -114,6 +115,7 @@ helm-test-exec: ct helm-controller-version ko-build-all
 # Setup development env
 dev-build: kind
 	$(KIND) create cluster --wait=60s --name $(CLUSTER_NAME) --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION) --config ./hack/kind-cluster.yaml
+	$(KUBECTL) apply --force-conflicts --server-side=true -f ./e2e/rbac.yaml
 	$(MAKE) dev-install-gw-api-crds
 
 .PHONY: dev-destroy
@@ -136,7 +138,7 @@ dev-install-grafana-operator-crds:
 	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/grafana/grafana-operator/releases/download/$(GRAFANA_VERSION)/crds.yaml
 
 PROMETHEUS         := none
-PROMETHEUS_VERSION := v0.92.0
+PROMETHEUS_VERSION := v0.92.1
 PROMETHEUS_LOOKUP  := prometheus-operator/prometheus-operator
 dev-install-prometheus-crds:
 	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/prometheus-operator/prometheus-operator/releases/download/$(PROMETHEUS_VERSION)/bundle.yaml
@@ -165,8 +167,8 @@ endef
 export TLS_CNF
 CHART           ?= "./charts/capsule"
 CHART_VERSION   ?= "./charts/capsule"
-dev-setup: dev-setup-cert-manager
-	$(KUBECTL) -n capsule-system scale deployment capsule-controller-manager --replicas=0 || true
+.PHONY: dev-setup dev-setup-flux-handoff
+dev-setup: dev-setup-flux-handoff
 	mkdir -p /tmp/k8s-webhook-server/serving-certs
 	echo "$${TLS_CNF}" > _tls.cnf
 	openssl req -newkey rsa:4096 -days 3650 -nodes -x509 \
@@ -214,7 +216,8 @@ dev-setup: dev-setup-cert-manager
 		--set 'webhooks.hooks.calculations.rules[0].operations[1]=UPDATE' \
 		--set 'webhooks.hooks.calculations.rules[0].operations[2]=DELETE' \
 		--set 'webhooks.hooks.calculations.rules[0].resources[0]=pods' \
-		--set 'webhooks.hooks.calculations.rules[0].resources[1]=persistentvolumeclaims' \
+		--set 'webhooks.hooks.calculations.rules[0].resources[1]=pods/status' \
+		--set 'webhooks.hooks.calculations.rules[0].resources[2]=persistentvolumeclaims' \
 		--set 'webhooks.hooks.calculations.rules[0].scope=Namespaced' \
 		--set 'webhooks.hooks.calculations.namespaceSelector.matchLabels.env=e2e' \
 		capsule \
@@ -222,6 +225,18 @@ dev-setup: dev-setup-cert-manager
 	mkdir -p ./hack/generated/ || true
 	$(KUBECTL) label clusterrole admin projectcapsule.dev/aggregate-to-controller=true
 	bash ./hack/kubeconfig-for-sa.sh $(CLUSTER_NAME) "capsule-system" "capsule" "./hack/generated/kubeconfig.yaml"
+	$(KUBECTL) -n capsule-system scale deployment capsule-controller-manager --replicas=0 || true
+
+dev-setup-flux-handoff: dev-setup-cert-manager
+	@test -n '$(LAPTOP_HOST_IP)' || { echo "LAPTOP_HOST_IP must be set before handing the Capsule release over to local development" >&2; exit 1; }
+	@if $(KUBECTL) get helmrelease capsule --namespace flux-system >/dev/null 2>&1; then \
+		echo "Waiting for the Flux-managed Capsule release to become ready..."; \
+		$(KUBECTL) wait helmrelease/capsule --namespace flux-system --for=condition=ready --timeout=$(DEV_SETUP_TIMEOUT); \
+		echo "Deleting flux-system/capsule before installing the local development release..."; \
+		$(KUBECTL) delete helmrelease capsule --namespace flux-system --wait=true --timeout=$(DEV_SETUP_TIMEOUT); \
+	else \
+		echo "No Flux-managed Capsule HelmRelease found; continuing with the local development release"; \
+	fi
 
 setup-monitoring: dev-setup-fluxcd
 
@@ -254,34 +269,10 @@ dev-setup-fluxcd-openshift:
 dev-setup-openshift-specifics:
 	@$(KUBECTL) apply -f hack/distro/openshift/extend-admin-role.yaml
 	@$(KUBECTL) apply -f hack/distro/openshift/capsule-namespace-deleter.yaml
-# Here to setup the current capsule version
-# Intended to test updates to new version
-dev-setup-capsule: dev-setup-fluxcd
-	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/capsule | envsubst | kubectl apply -f -
-	@$(MAKE) wait-for-helmreleases
-	@$(MAKE) dev-setup-capsule-example
-
-dev-setup-capsule-example:
-	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/capsule/example-setup | envsubst | kubectl apply -f -
-	@$(KUBECTL) create ns wind-uat --as joe --as-group projectcapsule.dev || true
-	@$(KUBECTL) label ns wind-uat env=test
-	@$(KUBECTL) create ns wind-test --as joe --as-group projectcapsule.dev || true
-	@$(KUBECTL) label ns wind-test env=test
-	@$(KUBECTL) create ns wind-prod --as joe --as-group projectcapsule.dev || true
-	@$(KUBECTL) label ns wind-prod env=prod
-	@$(KUBECTL) create ns green-uat --as bob --as-group projectcapsule.dev || true
-	@$(KUBECTL) label ns green-uat env=test
-	@$(KUBECTL) create ns green-test --as bob --as-group projectcapsule.dev || true
-	@$(KUBECTL) label ns green-test env=test
-	@$(KUBECTL) create ns green-prod --as bob --as-group projectcapsule.dev || true
-	@$(KUBECTL) label ns green-prod env=prod
-	@$(KUBECTL) create ns solar-uat --as alice --as-group projectcapsule.dev || true
-	@$(KUBECTL) label ns solar-uat env=test
-	@$(KUBECTL) create ns solar-test --as alice --as-group projectcapsule.dev || true
-	@$(KUBECTL) label ns solar-test env=test
-	@$(KUBECTL) create ns solar-prod --as alice --as-group projectcapsule.dev || true
-	@$(KUBECTL) label ns solar-prod env=prod
-	@$(KUBECTL) apply -f hack/distro/capsule/example-setup/claims.yaml
+# Build and deploy the current Capsule checkout in the local playground.
+.PHONY: dev-setup-capsule
+dev-setup-capsule:
+	@$(MAKE) -C playground dev-capsule
 
 
 wait-for-helmreleases:
@@ -503,7 +494,8 @@ e2e-install: helm-controller-version ko-build-all dev-install-gw-api-crds
 		--set 'webhooks.hooks.calculations.rules[0].operations[1]=UPDATE' \
 		--set 'webhooks.hooks.calculations.rules[0].operations[2]=DELETE' \
 		--set 'webhooks.hooks.calculations.rules[0].resources[0]=pods' \
-		--set 'webhooks.hooks.calculations.rules[0].resources[1]=persistentvolumeclaims' \
+		--set 'webhooks.hooks.calculations.rules[0].resources[1]=pods/status' \
+		--set 'webhooks.hooks.calculations.rules[0].resources[2]=persistentvolumeclaims' \
 		--set 'webhooks.hooks.calculations.rules[0].scope=Namespaced' \
 		--set 'webhooks.hooks.calculations.namespaceSelector.matchLabels.env=e2e' \
 		capsule \
@@ -688,14 +680,14 @@ mockgen:
 	$(call go-install-tool,$(MOCKGEN),$(MOCKGEN_LOOKUP)@$(MOCKGEN_VERSION))
 
 GORELEASER          := $(LOCALBIN)/goreleaser
-GORELEASER_VERSION  := 2.16.0
+GORELEASER_VERSION  := 2.17.1
 GORELEASER_LOOKUP   := goreleaser/goreleaser
 goreleaser: ## Download goreleaser locally if necessary.
 		test -s $(GORELEASER) && $(GORELEASER) --version | grep -q $(GORELEASER_VERSION) ||  \
 	$(call go-install-tool,$(GORELEASER),github.com/$(GORELEASER_LOOKUP)/v2@v$(GORELEASER_VERSION))
 
 SYFT          := $(LOCALBIN)/syft
-SYFT_VERSION  := 1.46.0
+SYFT_VERSION  := 1.50.0
 SYFT_LOOKUP   := anchore/syft
 syft: ## Download syft locally if necessary.
 		test -s $(SYFT) && $(SYFT) --version | grep -q $(SYFT_VERSION) ||  \

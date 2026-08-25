@@ -6,6 +6,9 @@ package generic
 import (
 	"context"
 
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -43,6 +46,29 @@ func (h *managedValidatingHandler) OnDelete(
 	recorder events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
+		user := handlers.ResolveAdmissionUser(ctx, c, req, h.configuration)
+		if user.IsAdmin() {
+			return nil
+		}
+
+		// Namespace deletion must be able to finish. Once Kubernetes has marked
+		// the namespace terminating, allow its garbage collector and finalizers
+		// to remove controller-managed namespaced objects.
+		if req.Namespace != "" {
+			ns := &corev1.Namespace{}
+			if err := c.Get(ctx, types.NamespacedName{Name: req.Namespace}, ns); err != nil {
+				if apierrors.IsNotFound(err) {
+					return nil
+				}
+
+				return ad.ErroredResponse(err)
+			}
+
+			if ns.DeletionTimestamp != nil || ns.Status.Phase == corev1.NamespaceTerminating {
+				return nil
+			}
+		}
+
 		return h.handle(ctx, req, c)
 	}
 }

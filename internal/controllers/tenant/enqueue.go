@@ -45,7 +45,7 @@ func (r *Manager) enqueueForTenantsWithCondition(
 func (r *Manager) enqueueAllTenants(ctx context.Context, _ client.Object) []reconcile.Request {
 	var tenants capsulev1beta2.TenantList
 	if err := r.List(ctx, &tenants); err != nil {
-		r.Log.Error(err, "failed to list Tenants for class event")
+		r.Log.Error(err, "failed to list Tenants")
 
 		return nil
 	}

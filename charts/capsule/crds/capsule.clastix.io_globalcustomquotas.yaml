@@ -204,6 +204,14 @@ spec:
                         - "apps/v1" means the "apps/v1" API group/version.
                         - "apps/*" means any version in the "apps" API group.
                       type: string
+                    cel:
+                      description: |-
+                        CEL expression evaluated against the source object.
+                        The object is available as "object".
+                        Must evaluate to kubernetes.Quantity or list<kubernetes.Quantity>.
+                        Mutually exclusive with path and must be empty when op is "count".
+                      maxLength: 4096
+                      type: string
                     kind:
                       description: |-
                         Kind of the referent.
@@ -232,6 +240,18 @@ spec:
                         Allowing these selectors to make further selecting on the resulting subset.
                       items:
                         properties:
+                          celExpressions:
+                            description: |-
+                              Additional CEL expressions evaluated against the selected object.
+                              The object is available as "object".
+                              All must evaluate to true for this selector to match.
+                              CEL expressions and fieldSelectors may be used together.
+                            items:
+                              maxLength: 4096
+                              minLength: 1
+                              type: string
+                            maxItems: 64
+                            type: array
                           fieldSelectors:
                             description: |-
                               Additional boolean JSONPath expressions.
@@ -287,10 +307,12 @@ spec:
                   - kind
                   type: object
                   x-kubernetes-validations:
-                  - message: path must be empty when op is 'count'; otherwise path
-                      must be set and non-empty
-                    rule: 'self.op == ''count'' ? !has(self.path) || size(self.path)
-                      == 0 : has(self.path) && size(self.path) > 0'
+                  - message: path and cel must be empty when op is 'count'; otherwise
+                      exactly one of path or cel must be set and non-empty
+                    rule: 'self.op == ''count'' ? ((!has(self.path) || size(self.path)
+                      == 0) && (!has(self.cel) || size(self.cel) == 0)) : ((has(self.path)
+                      && size(self.path) > 0) != (has(self.cel) && size(self.cel)
+                      > 0))'
                 type: array
             required:
             - limit
@@ -409,6 +431,14 @@ spec:
                 description: Targeting GVK
                 items:
                   properties:
+                    cel:
+                      description: |-
+                        CEL expression evaluated against the source object.
+                        The object is available as "object".
+                        Must evaluate to kubernetes.Quantity or list<kubernetes.Quantity>.
+                        Mutually exclusive with path and must be empty when op is "count".
+                      maxLength: 4096
+                      type: string
                     group:
                       type: string
                     kind:
@@ -428,7 +458,7 @@ spec:
                         Required and non-empty for all other operations.
                       type: string
                     scope:
-                      description: Path on GVK where usage is evaluated
+                      description: Scope of the GVK where usage is evaluated.
                       type: string
                     selectors:
                       description: |-
@@ -437,6 +467,18 @@ spec:
                         Allowing these selectors to make further selecting on the resulting subset.
                       items:
                         properties:
+                          celExpressions:
+                            description: |-
+                              Additional CEL expressions evaluated against the selected object.
+                              The object is available as "object".
+                              All must evaluate to true for this selector to match.
+                              CEL expressions and fieldSelectors may be used together.
+                            items:
+                              maxLength: 4096
+                              minLength: 1
+                              type: string
+                            maxItems: 64
+                            type: array
                           fieldSelectors:
                             description: |-
                               Additional boolean JSONPath expressions.

@@ -22,10 +22,11 @@ func (r *Manager) reconcileRuleStatus(
 	ctx context.Context,
 	log logr.Logger,
 	tnt *capsulev1beta2.Tenant,
+	templateTenant *capsulev1beta2.Tenant,
 	ns *corev1.Namespace,
 ) error {
 	// Collect Rules for namespace
-	ruleBody, err := tenant.BuildNamespaceRuleBodyStatus(r.Scheme(), ns, tnt)
+	ruleBody, err := tenant.BuildNamespaceRuleBodyStatus(r.Scheme(), ns, templateTenant)
 	if err != nil {
 		return err
 	}
@@ -60,6 +61,7 @@ func (r *Manager) ensureRuleStatus(
 		}
 
 		labels[meta.NewManagedByCapsuleLabel] = meta.ValueController
+		labels[meta.NewTenantLabel] = tnt.Name
 		labels[meta.CapsuleNameLabel] = rule.GetName()
 
 		rule.SetLabels(labels)

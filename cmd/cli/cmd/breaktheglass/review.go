@@ -101,6 +101,7 @@ var reviewCmd = &cobra.Command{
 		} else {
 			props, err = br.GenerateApprovedProperties()
 		}
+
 		if err != nil {
 			return err
 		}

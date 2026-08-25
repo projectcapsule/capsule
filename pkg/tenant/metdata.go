@@ -39,6 +39,23 @@ func HasTenantReference(ns *corev1.Namespace) bool {
 	return false
 }
 
+// HasConsistentTenantReference reports whether Tenant ownership is either
+// completely absent or represented by one matching label and ownerReference.
+func HasConsistentTenantReference(ns *corev1.Namespace) bool {
+	if ns == nil {
+		return true
+	}
+
+	label := TenanLabelValue(ns)
+	refs := TenantOwnerReferences(ns)
+
+	if label == "" {
+		return len(refs) == 0
+	}
+
+	return len(refs) == 1 && refs[0].Name == label
+}
+
 func TenantOwnerReferences(ns *corev1.Namespace) []metav1.OwnerReference {
 	if ns == nil {
 		return nil
@@ -113,6 +130,7 @@ func BuildInstanceMetadataForNamespace(ns *corev1.Namespace, tnt *capsulev1beta2
 	return labels, annotations
 }
 
+//nolint:staticcheck
 func BuildNamespaceMetadataForTenant(ns *corev1.Namespace, tnt *capsulev1beta2.Tenant) (labels map[string]string, annotations map[string]string, err error) {
 	annotations = BuildNamespaceAnnotationsForTenant(tnt)
 	labels = BuildNamespaceLabelsForTenant(tnt)
@@ -160,7 +178,7 @@ func BuildNamespaceAnnotationsForTenant(tnt *capsulev1beta2.Tenant) map[string]s
 			annotations[meta.AvailableIngressClassesAnnotation] = strings.Join(ic.Exact, ",")
 		}
 
-		//nolint:staticcheck
+		//nolint:staticcheck,nolintlint // Preserve annotations for the deprecated v1beta2 field until it is removed.
 		if len(ic.Regex) > 0 {
 			annotations[meta.AvailableIngressClassesRegexpAnnotation] = ic.Regex
 		}
@@ -171,7 +189,7 @@ func BuildNamespaceAnnotationsForTenant(tnt *capsulev1beta2.Tenant) map[string]s
 			annotations[meta.AvailableStorageClassesAnnotation] = strings.Join(sc.Exact, ",")
 		}
 
-		//nolint:staticcheck
+		//nolint:staticcheck,nolintlint // Preserve annotations for the deprecated v1beta2 field until it is removed.
 		if len(sc.Regex) > 0 {
 			annotations[meta.AvailableStorageClassesRegexpAnnotation] = sc.Regex
 		}

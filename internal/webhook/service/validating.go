@@ -72,6 +72,7 @@ func (h *validating) OnDelete(
 	}
 }
 
+//nolint:staticcheck
 func (h *validating) handle(
 	ctx context.Context,
 	req admission.Request,
@@ -171,15 +172,22 @@ func (h *validating) handle(
 		return nil
 	}
 
+	allowedNetworks := make([]*net.IPNet, 0, len(tnt.Spec.ServiceOptions.ExternalServiceIPs.Allowed))
+
+	for _, allowed := range tnt.Spec.ServiceOptions.ExternalServiceIPs.Allowed {
+		if !strings.Contains(string(allowed), "/") {
+			allowed += "/32"
+		}
+
+		_, allowedIP, _ := net.ParseCIDR(string(allowed))
+		if allowedIP != nil {
+			allowedNetworks = append(allowedNetworks, allowedIP)
+		}
+	}
+
 	ipInCIDR := func(ip net.IP) bool {
-		for _, allowed := range tnt.Spec.ServiceOptions.ExternalServiceIPs.Allowed {
-			if !strings.Contains(string(allowed), "/") {
-				allowed += "/32"
-			}
-
-			_, allowedIP, _ := net.ParseCIDR(string(allowed))
-
-			if allowedIP.Contains(ip) {
+		for i := range allowedNetworks {
+			if allowedNetworks[i].Contains(ip) {
 				return true
 			}
 		}

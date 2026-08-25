@@ -53,6 +53,26 @@ spec:
               description: For future implementation where users might manage RuleStatus
                 CRs themselves
               properties:
+                audience:
+                  description: |-
+                    Audience limits this rule to matching request subjects.
+                    An empty audience matches every request.
+                  items:
+                    properties:
+                      kind:
+                        enum:
+                        - User
+                        - Group
+                        - ServiceAccount
+                        - Custom
+                        type: string
+                      name:
+                        type: string
+                    required:
+                    - kind
+                    - name
+                    type: object
+                  type: array
                 enforce:
                   description: Enforcement for given rule
                   properties:
@@ -68,6 +88,58 @@ spec:
                       - deny
                       - audit
                       type: string
+                    ingress:
+                      description: Enforcement for Ingress and Gateway API resource
+                        hostnames.
+                      properties:
+                        hostnames:
+                          description: |-
+                            Hostnames defines allowed, denied, or audited hostname expressions.
+                            A resource targeted by an allow or deny rule must declare non-empty values
+                            in all hostname fields. Audit-only rules record missing hostnames without
+                            denying them.
+                          items:
+                            description: |-
+                              At least one of Exact or Exp must be set.
+                              Both may be set together.
+                            properties:
+                              exact:
+                                description: Exact matches one of the provided values
+                                  exactly.
+                                items:
+                                  type: string
+                                minItems: 1
+                                type: array
+                              exp:
+                                description: Exp matches regular expression.
+                                minLength: 1
+                                type: string
+                              negate:
+                                default: false
+                                description: Negate regular Expression
+                                type: boolean
+                            type: object
+                            x-kubernetes-validations:
+                            - message: at least one of exact or exp must be set
+                              rule: has(self.exact) || has(self.exp)
+                          minItems: 1
+                          type: array
+                        types:
+                          description: Types defines the resource kinds to which hostname
+                            enforcement applies.
+                          items:
+                            enum:
+                            - Ingress
+                            - Route
+                            - ListenerSet
+                            - HTTPRoute
+                            - Gateway
+                            - TLSRoute
+                            - GRPCRoute
+                            type: string
+                          minItems: 1
+                          type: array
+                      type: object
                     metadata:
                       description: Enforcement for object metadata on namespaced resources.
                       items:
@@ -77,6 +149,16 @@ spec:
                           annotations:
                             additionalProperties:
                               properties:
+                                default:
+                                  description: |-
+                                    Default is applied by admission mutation when the concrete metadata key is absent.
+                                    It is not reconciled after admission.
+                                  type: string
+                                managed:
+                                  description: |-
+                                    Managed is enforced by admission mutation and reconciled by the RuleStatus
+                                    controller using server-side apply when the rule configuration changes.
+                                  type: string
                                 required:
                                   default: false
                                   description: |-
@@ -150,6 +232,16 @@ spec:
                           labels:
                             additionalProperties:
                               properties:
+                                default:
+                                  description: |-
+                                    Default is applied by admission mutation when the concrete metadata key is absent.
+                                    It is not reconciled after admission.
+                                  type: string
+                                managed:
+                                  description: |-
+                                    Managed is enforced by admission mutation and reconciled by the RuleStatus
+                                    controller using server-side apply when the rule configuration changes.
+                                  type: string
                                 required:
                                   default: false
                                   description: |-
@@ -203,6 +295,19 @@ spec:
                     services:
                       description: Enforcement for Services.
                       properties:
+                        externalIPs:
+                          description: ExternalIPs defines constraints for spec.externalIPs.
+                          properties:
+                            cidrs:
+                              description: |-
+                                CIDRs restricts spec.externalIPs. Individual IP addresses are treated as
+                                host CIDRs (/32 for IPv4 and /128 for IPv6).
+                                For deny rules, empty means all external IPs are denied. For allow and
+                                audit rules, empty means no external IP restriction.
+                              items:
+                                type: string
+                              type: array
+                          type: object
                         externalNames:
                           description: ExternalNames defines additional constraints
                             for Services of type ExternalName.
@@ -339,6 +444,95 @@ spec:
                             - message: at least one of exact or exp must be set
                               rule: has(self.exact) || has(self.exp)
                           type: array
+                        resources:
+                          description: |-
+                            Resources defines mutation and enforcement policies for Pod and container
+                            resource requests and limits. The workload targets select where the
+                            policies apply. With no targets, resource policies apply to all compatible
+                            locations: Pod-level resources, regular containers, and init containers.
+                            Resource names unsupported at Pod level still apply to compatible container
+                            locations.
+                            Mutation is applied when a Pod is created. Remove and MatchRequest manage
+                            explicit values, Default fills an absent value, and Ratio fills an absent
+                            limit from its request. An explicit Ratio violation is then handled by the
+                            enclosing allow, deny, or audit action.
+                          properties:
+                            limits:
+                              additionalProperties:
+                                description: WorkloadResourceLimitPolicy defines how
+                                  a resource limit is mutated and enforced.
+                                properties:
+                                  policy:
+                                    description: |-
+                                      Policy selects how the limit is handled: Preserve leaves it unchanged,
+                                      Default fills an absent limit, Remove deletes it, MatchRequest manages it
+                                      to equal the request, and Ratio defaults an absent limit and enforces the
+                                      maximum multiplier against explicitly supplied limits.
+                                    enum:
+                                    - Preserve
+                                    - Default
+                                    - Remove
+                                    - MatchRequest
+                                    - Ratio
+                                    type: string
+                                  value:
+                                    anyOf:
+                                    - type: integer
+                                    - type: string
+                                    description: |-
+                                      Value is the quantity applied by Default or the maximum limit-to-request
+                                      multiplier applied by Ratio.
+                                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                    x-kubernetes-int-or-string: true
+                                required:
+                                - policy
+                                type: object
+                                x-kubernetes-validations:
+                                - message: value must be set only for the Default
+                                    and Ratio policies
+                                  rule: 'self.policy == ''Default'' || self.policy
+                                    == ''Ratio'' ? has(self.value) : !has(self.value)'
+                              description: Limits defines policies for resource limits.
+                              minProperties: 1
+                              type: object
+                            requests:
+                              additionalProperties:
+                                description: WorkloadResourceRequestPolicy defines
+                                  how a resource request is mutated.
+                                properties:
+                                  policy:
+                                    description: |-
+                                      Policy selects how the request is handled: Preserve leaves it unchanged,
+                                      Default fills an absent request, and Remove deletes it.
+                                    enum:
+                                    - Preserve
+                                    - Default
+                                    - Remove
+                                    type: string
+                                  value:
+                                    anyOf:
+                                    - type: integer
+                                    - type: string
+                                    description: Value is the quantity applied by
+                                      the Default policy.
+                                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                    x-kubernetes-int-or-string: true
+                                required:
+                                - policy
+                                type: object
+                                x-kubernetes-validations:
+                                - message: value must be set only for the Default
+                                    policy
+                                  rule: 'self.policy == ''Default'' ? has(self.value)
+                                    : !has(self.value)'
+                              description: Requests defines policies for resource
+                                requests.
+                              minProperties: 1
+                              type: object
+                          type: object
+                          x-kubernetes-validations:
+                          - message: at least one of requests or limits must be set
+                            rule: has(self.requests) || has(self.limits)
                         schedulers:
                           description: |-
                             Schedulers defines schedulerName matchers for Pod admission.
@@ -376,6 +570,7 @@ spec:
                             If empty, each webhook applies its own backwards-compatible default.
                           items:
                             enum:
+                            - pod
                             - pod/initcontainers
                             - pod/ephemeralcontainers
                             - pod/containers
@@ -384,6 +579,95 @@ spec:
                           type: array
                       type: object
                   type: object
+                quota:
+                  description: |-
+                    Quota contains native Kubernetes ResourceQuota specifications shared by
+                    all namespaces selected by this rule. Unlike Enforce, quota accounting is
+                    independent of the request audience.
+                  items:
+                    description: |-
+                      ResourceQuotaRule defines a named ResourceQuota specification generated by a
+                      Tenant rule. Name is the durable identity of the generated
+                      GlobalResourceQuota and must be unique across all rules of a Tenant.
+                    properties:
+                      hard:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: |-
+                          hard is the set of desired hard limits for each named resource.
+                          More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/
+                        type: object
+                      name:
+                        description: |-
+                          Name is the stable identity of this quota within the Tenant. Changing the
+                          name replaces the generated GlobalResourceQuota; changing the quota or its
+                          namespace selector updates the existing object.
+                        maxLength: 63
+                        minLength: 1
+                        pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                        type: string
+                      scopeSelector:
+                        description: |-
+                          scopeSelector is also a collection of filters like scopes that must match each object tracked by a quota
+                          but expressed using ScopeSelectorOperator in combination with possible values.
+                          For a resource to match, both scopes AND scopeSelector (if specified in spec), must be matched.
+                        properties:
+                          matchExpressions:
+                            description: A list of scope selector requirements by
+                              scope of the resources.
+                            items:
+                              description: |-
+                                A scoped-resource selector requirement is a selector that contains values, a scope name, and an operator
+                                that relates the scope name and values.
+                              properties:
+                                operator:
+                                  description: |-
+                                    Represents a scope's relationship to a set of values.
+                                    Valid operators are In, NotIn, Exists, DoesNotExist.
+                                  type: string
+                                scopeName:
+                                  description: The name of the scope that the selector
+                                    applies to.
+                                  type: string
+                                values:
+                                  description: |-
+                                    An array of string values. If the operator is In or NotIn,
+                                    the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                    the values array must be empty.
+                                    This array is replaced during a strategic merge patch.
+                                  items:
+                                    type: string
+                                  type: array
+                                  x-kubernetes-list-type: atomic
+                              required:
+                              - operator
+                              - scopeName
+                              type: object
+                            type: array
+                            x-kubernetes-list-type: atomic
+                        type: object
+                        x-kubernetes-map-type: atomic
+                      scopes:
+                        description: |-
+                          A collection of filters that must match each object tracked by a quota.
+                          If not specified, the quota matches all objects.
+                        items:
+                          description: A ResourceQuotaScope defines a filter that
+                            must match each object tracked by a quota
+                          type: string
+                        type: array
+                        x-kubernetes-list-type: atomic
+                    required:
+                    - name
+                    type: object
+                  type: array
+                  x-kubernetes-list-map-keys:
+                  - name
+                  x-kubernetes-list-type: map
               type: object
             type: array
           status:
@@ -457,6 +741,26 @@ spec:
                   Deprecated: use Rules.
                   Rule contains a legacy flattened view and cannot fully represent action-aware rules.
                 properties:
+                  audience:
+                    description: |-
+                      Audience limits this rule to matching request subjects.
+                      An empty audience matches every request.
+                    items:
+                      properties:
+                        kind:
+                          enum:
+                          - User
+                          - Group
+                          - ServiceAccount
+                          - Custom
+                          type: string
+                        name:
+                          type: string
+                      required:
+                      - kind
+                      - name
+                      type: object
+                    type: array
                   enforce:
                     description: Enforcement for given rule
                     properties:
@@ -472,6 +776,58 @@ spec:
                         - deny
                         - audit
                         type: string
+                      ingress:
+                        description: Enforcement for Ingress and Gateway API resource
+                          hostnames.
+                        properties:
+                          hostnames:
+                            description: |-
+                              Hostnames defines allowed, denied, or audited hostname expressions.
+                              A resource targeted by an allow or deny rule must declare non-empty values
+                              in all hostname fields. Audit-only rules record missing hostnames without
+                              denying them.
+                            items:
+                              description: |-
+                                At least one of Exact or Exp must be set.
+                                Both may be set together.
+                              properties:
+                                exact:
+                                  description: Exact matches one of the provided values
+                                    exactly.
+                                  items:
+                                    type: string
+                                  minItems: 1
+                                  type: array
+                                exp:
+                                  description: Exp matches regular expression.
+                                  minLength: 1
+                                  type: string
+                                negate:
+                                  default: false
+                                  description: Negate regular Expression
+                                  type: boolean
+                              type: object
+                              x-kubernetes-validations:
+                              - message: at least one of exact or exp must be set
+                                rule: has(self.exact) || has(self.exp)
+                            minItems: 1
+                            type: array
+                          types:
+                            description: Types defines the resource kinds to which
+                              hostname enforcement applies.
+                            items:
+                              enum:
+                              - Ingress
+                              - Route
+                              - ListenerSet
+                              - HTTPRoute
+                              - Gateway
+                              - TLSRoute
+                              - GRPCRoute
+                              type: string
+                            minItems: 1
+                            type: array
+                        type: object
                       metadata:
                         description: Enforcement for object metadata on namespaced
                           resources.
@@ -482,6 +838,16 @@ spec:
                             annotations:
                               additionalProperties:
                                 properties:
+                                  default:
+                                    description: |-
+                                      Default is applied by admission mutation when the concrete metadata key is absent.
+                                      It is not reconciled after admission.
+                                    type: string
+                                  managed:
+                                    description: |-
+                                      Managed is enforced by admission mutation and reconciled by the RuleStatus
+                                      controller using server-side apply when the rule configuration changes.
+                                    type: string
                                   required:
                                     default: false
                                     description: |-
@@ -555,6 +921,16 @@ spec:
                             labels:
                               additionalProperties:
                                 properties:
+                                  default:
+                                    description: |-
+                                      Default is applied by admission mutation when the concrete metadata key is absent.
+                                      It is not reconciled after admission.
+                                    type: string
+                                  managed:
+                                    description: |-
+                                      Managed is enforced by admission mutation and reconciled by the RuleStatus
+                                      controller using server-side apply when the rule configuration changes.
+                                    type: string
                                   required:
                                     default: false
                                     description: |-
@@ -609,6 +985,19 @@ spec:
                       services:
                         description: Enforcement for Services.
                         properties:
+                          externalIPs:
+                            description: ExternalIPs defines constraints for spec.externalIPs.
+                            properties:
+                              cidrs:
+                                description: |-
+                                  CIDRs restricts spec.externalIPs. Individual IP addresses are treated as
+                                  host CIDRs (/32 for IPv4 and /128 for IPv6).
+                                  For deny rules, empty means all external IPs are denied. For allow and
+                                  audit rules, empty means no external IP restriction.
+                                items:
+                                  type: string
+                                type: array
+                            type: object
                           externalNames:
                             description: ExternalNames defines additional constraints
                               for Services of type ExternalName.
@@ -746,6 +1135,97 @@ spec:
                               - message: at least one of exact or exp must be set
                                 rule: has(self.exact) || has(self.exp)
                             type: array
+                          resources:
+                            description: |-
+                              Resources defines mutation and enforcement policies for Pod and container
+                              resource requests and limits. The workload targets select where the
+                              policies apply. With no targets, resource policies apply to all compatible
+                              locations: Pod-level resources, regular containers, and init containers.
+                              Resource names unsupported at Pod level still apply to compatible container
+                              locations.
+                              Mutation is applied when a Pod is created. Remove and MatchRequest manage
+                              explicit values, Default fills an absent value, and Ratio fills an absent
+                              limit from its request. An explicit Ratio violation is then handled by the
+                              enclosing allow, deny, or audit action.
+                            properties:
+                              limits:
+                                additionalProperties:
+                                  description: WorkloadResourceLimitPolicy defines
+                                    how a resource limit is mutated and enforced.
+                                  properties:
+                                    policy:
+                                      description: |-
+                                        Policy selects how the limit is handled: Preserve leaves it unchanged,
+                                        Default fills an absent limit, Remove deletes it, MatchRequest manages it
+                                        to equal the request, and Ratio defaults an absent limit and enforces the
+                                        maximum multiplier against explicitly supplied limits.
+                                      enum:
+                                      - Preserve
+                                      - Default
+                                      - Remove
+                                      - MatchRequest
+                                      - Ratio
+                                      type: string
+                                    value:
+                                      anyOf:
+                                      - type: integer
+                                      - type: string
+                                      description: |-
+                                        Value is the quantity applied by Default or the maximum limit-to-request
+                                        multiplier applied by Ratio.
+                                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                      x-kubernetes-int-or-string: true
+                                  required:
+                                  - policy
+                                  type: object
+                                  x-kubernetes-validations:
+                                  - message: value must be set only for the Default
+                                      and Ratio policies
+                                    rule: 'self.policy == ''Default'' || self.policy
+                                      == ''Ratio'' ? has(self.value) : !has(self.value)'
+                                description: Limits defines policies for resource
+                                  limits.
+                                minProperties: 1
+                                type: object
+                              requests:
+                                additionalProperties:
+                                  description: WorkloadResourceRequestPolicy defines
+                                    how a resource request is mutated.
+                                  properties:
+                                    policy:
+                                      description: |-
+                                        Policy selects how the request is handled: Preserve leaves it unchanged,
+                                        Default fills an absent request, and Remove deletes it.
+                                      enum:
+                                      - Preserve
+                                      - Default
+                                      - Remove
+                                      type: string
+                                    value:
+                                      anyOf:
+                                      - type: integer
+                                      - type: string
+                                      description: Value is the quantity applied by
+                                        the Default policy.
+                                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                      x-kubernetes-int-or-string: true
+                                  required:
+                                  - policy
+                                  type: object
+                                  x-kubernetes-validations:
+                                  - message: value must be set only for the Default
+                                      policy
+                                    rule: 'self.policy == ''Default'' ? has(self.value)
+                                      : !has(self.value)'
+                                description: Requests defines policies for resource
+                                  requests.
+                                minProperties: 1
+                                type: object
+                            type: object
+                            x-kubernetes-validations:
+                            - message: at least one of requests or limits must be
+                                set
+                              rule: has(self.requests) || has(self.limits)
                           schedulers:
                             description: |-
                               Schedulers defines schedulerName matchers for Pod admission.
@@ -783,6 +1263,7 @@ spec:
                               If empty, each webhook applies its own backwards-compatible default.
                             items:
                               enum:
+                              - pod
                               - pod/initcontainers
                               - pod/ephemeralcontainers
                               - pod/containers
@@ -791,6 +1272,95 @@ spec:
                             type: array
                         type: object
                     type: object
+                  quota:
+                    description: |-
+                      Quota contains native Kubernetes ResourceQuota specifications shared by
+                      all namespaces selected by this rule. Unlike Enforce, quota accounting is
+                      independent of the request audience.
+                    items:
+                      description: |-
+                        ResourceQuotaRule defines a named ResourceQuota specification generated by a
+                        Tenant rule. Name is the durable identity of the generated
+                        GlobalResourceQuota and must be unique across all rules of a Tenant.
+                      properties:
+                        hard:
+                          additionalProperties:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
+                          description: |-
+                            hard is the set of desired hard limits for each named resource.
+                            More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/
+                          type: object
+                        name:
+                          description: |-
+                            Name is the stable identity of this quota within the Tenant. Changing the
+                            name replaces the generated GlobalResourceQuota; changing the quota or its
+                            namespace selector updates the existing object.
+                          maxLength: 63
+                          minLength: 1
+                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                          type: string
+                        scopeSelector:
+                          description: |-
+                            scopeSelector is also a collection of filters like scopes that must match each object tracked by a quota
+                            but expressed using ScopeSelectorOperator in combination with possible values.
+                            For a resource to match, both scopes AND scopeSelector (if specified in spec), must be matched.
+                          properties:
+                            matchExpressions:
+                              description: A list of scope selector requirements by
+                                scope of the resources.
+                              items:
+                                description: |-
+                                  A scoped-resource selector requirement is a selector that contains values, a scope name, and an operator
+                                  that relates the scope name and values.
+                                properties:
+                                  operator:
+                                    description: |-
+                                      Represents a scope's relationship to a set of values.
+                                      Valid operators are In, NotIn, Exists, DoesNotExist.
+                                    type: string
+                                  scopeName:
+                                    description: The name of the scope that the selector
+                                      applies to.
+                                    type: string
+                                  values:
+                                    description: |-
+                                      An array of string values. If the operator is In or NotIn,
+                                      the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                      the values array must be empty.
+                                      This array is replaced during a strategic merge patch.
+                                    items:
+                                      type: string
+                                    type: array
+                                    x-kubernetes-list-type: atomic
+                                required:
+                                - operator
+                                - scopeName
+                                type: object
+                              type: array
+                              x-kubernetes-list-type: atomic
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        scopes:
+                          description: |-
+                            A collection of filters that must match each object tracked by a quota.
+                            If not specified, the quota matches all objects.
+                          items:
+                            description: A ResourceQuotaScope defines a filter that
+                              must match each object tracked by a quota
+                            type: string
+                          type: array
+                          x-kubernetes-list-type: atomic
+                      required:
+                      - name
+                      type: object
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
                 type: object
               rules:
                 description: |-
@@ -800,6 +1370,26 @@ spec:
                   description: For future implementation where users might manage
                     RuleStatus CRs themselves
                   properties:
+                    audience:
+                      description: |-
+                        Audience limits this rule to matching request subjects.
+                        An empty audience matches every request.
+                      items:
+                        properties:
+                          kind:
+                            enum:
+                            - User
+                            - Group
+                            - ServiceAccount
+                            - Custom
+                            type: string
+                          name:
+                            type: string
+                        required:
+                        - kind
+                        - name
+                        type: object
+                      type: array
                     enforce:
                       description: Enforcement for given rule
                       properties:
@@ -815,6 +1405,58 @@ spec:
                           - deny
                           - audit
                           type: string
+                        ingress:
+                          description: Enforcement for Ingress and Gateway API resource
+                            hostnames.
+                          properties:
+                            hostnames:
+                              description: |-
+                                Hostnames defines allowed, denied, or audited hostname expressions.
+                                A resource targeted by an allow or deny rule must declare non-empty values
+                                in all hostname fields. Audit-only rules record missing hostnames without
+                                denying them.
+                              items:
+                                description: |-
+                                  At least one of Exact or Exp must be set.
+                                  Both may be set together.
+                                properties:
+                                  exact:
+                                    description: Exact matches one of the provided
+                                      values exactly.
+                                    items:
+                                      type: string
+                                    minItems: 1
+                                    type: array
+                                  exp:
+                                    description: Exp matches regular expression.
+                                    minLength: 1
+                                    type: string
+                                  negate:
+                                    default: false
+                                    description: Negate regular Expression
+                                    type: boolean
+                                type: object
+                                x-kubernetes-validations:
+                                - message: at least one of exact or exp must be set
+                                  rule: has(self.exact) || has(self.exp)
+                              minItems: 1
+                              type: array
+                            types:
+                              description: Types defines the resource kinds to which
+                                hostname enforcement applies.
+                              items:
+                                enum:
+                                - Ingress
+                                - Route
+                                - ListenerSet
+                                - HTTPRoute
+                                - Gateway
+                                - TLSRoute
+                                - GRPCRoute
+                                type: string
+                              minItems: 1
+                              type: array
+                          type: object
                         metadata:
                           description: Enforcement for object metadata on namespaced
                             resources.
@@ -825,6 +1467,16 @@ spec:
                               annotations:
                                 additionalProperties:
                                   properties:
+                                    default:
+                                      description: |-
+                                        Default is applied by admission mutation when the concrete metadata key is absent.
+                                        It is not reconciled after admission.
+                                      type: string
+                                    managed:
+                                      description: |-
+                                        Managed is enforced by admission mutation and reconciled by the RuleStatus
+                                        controller using server-side apply when the rule configuration changes.
+                                      type: string
                                     required:
                                       default: false
                                       description: |-
@@ -898,6 +1550,16 @@ spec:
                               labels:
                                 additionalProperties:
                                   properties:
+                                    default:
+                                      description: |-
+                                        Default is applied by admission mutation when the concrete metadata key is absent.
+                                        It is not reconciled after admission.
+                                      type: string
+                                    managed:
+                                      description: |-
+                                        Managed is enforced by admission mutation and reconciled by the RuleStatus
+                                        controller using server-side apply when the rule configuration changes.
+                                      type: string
                                     required:
                                       default: false
                                       description: |-
@@ -952,6 +1614,19 @@ spec:
                         services:
                           description: Enforcement for Services.
                           properties:
+                            externalIPs:
+                              description: ExternalIPs defines constraints for spec.externalIPs.
+                              properties:
+                                cidrs:
+                                  description: |-
+                                    CIDRs restricts spec.externalIPs. Individual IP addresses are treated as
+                                    host CIDRs (/32 for IPv4 and /128 for IPv6).
+                                    For deny rules, empty means all external IPs are denied. For allow and
+                                    audit rules, empty means no external IP restriction.
+                                  items:
+                                    type: string
+                                  type: array
+                              type: object
                             externalNames:
                               description: ExternalNames defines additional constraints
                                 for Services of type ExternalName.
@@ -1089,6 +1764,97 @@ spec:
                                 - message: at least one of exact or exp must be set
                                   rule: has(self.exact) || has(self.exp)
                               type: array
+                            resources:
+                              description: |-
+                                Resources defines mutation and enforcement policies for Pod and container
+                                resource requests and limits. The workload targets select where the
+                                policies apply. With no targets, resource policies apply to all compatible
+                                locations: Pod-level resources, regular containers, and init containers.
+                                Resource names unsupported at Pod level still apply to compatible container
+                                locations.
+                                Mutation is applied when a Pod is created. Remove and MatchRequest manage
+                                explicit values, Default fills an absent value, and Ratio fills an absent
+                                limit from its request. An explicit Ratio violation is then handled by the
+                                enclosing allow, deny, or audit action.
+                              properties:
+                                limits:
+                                  additionalProperties:
+                                    description: WorkloadResourceLimitPolicy defines
+                                      how a resource limit is mutated and enforced.
+                                    properties:
+                                      policy:
+                                        description: |-
+                                          Policy selects how the limit is handled: Preserve leaves it unchanged,
+                                          Default fills an absent limit, Remove deletes it, MatchRequest manages it
+                                          to equal the request, and Ratio defaults an absent limit and enforces the
+                                          maximum multiplier against explicitly supplied limits.
+                                        enum:
+                                        - Preserve
+                                        - Default
+                                        - Remove
+                                        - MatchRequest
+                                        - Ratio
+                                        type: string
+                                      value:
+                                        anyOf:
+                                        - type: integer
+                                        - type: string
+                                        description: |-
+                                          Value is the quantity applied by Default or the maximum limit-to-request
+                                          multiplier applied by Ratio.
+                                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                        x-kubernetes-int-or-string: true
+                                    required:
+                                    - policy
+                                    type: object
+                                    x-kubernetes-validations:
+                                    - message: value must be set only for the Default
+                                        and Ratio policies
+                                      rule: 'self.policy == ''Default'' || self.policy
+                                        == ''Ratio'' ? has(self.value) : !has(self.value)'
+                                  description: Limits defines policies for resource
+                                    limits.
+                                  minProperties: 1
+                                  type: object
+                                requests:
+                                  additionalProperties:
+                                    description: WorkloadResourceRequestPolicy defines
+                                      how a resource request is mutated.
+                                    properties:
+                                      policy:
+                                        description: |-
+                                          Policy selects how the request is handled: Preserve leaves it unchanged,
+                                          Default fills an absent request, and Remove deletes it.
+                                        enum:
+                                        - Preserve
+                                        - Default
+                                        - Remove
+                                        type: string
+                                      value:
+                                        anyOf:
+                                        - type: integer
+                                        - type: string
+                                        description: Value is the quantity applied
+                                          by the Default policy.
+                                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                        x-kubernetes-int-or-string: true
+                                    required:
+                                    - policy
+                                    type: object
+                                    x-kubernetes-validations:
+                                    - message: value must be set only for the Default
+                                        policy
+                                      rule: 'self.policy == ''Default'' ? has(self.value)
+                                        : !has(self.value)'
+                                  description: Requests defines policies for resource
+                                    requests.
+                                  minProperties: 1
+                                  type: object
+                              type: object
+                              x-kubernetes-validations:
+                              - message: at least one of requests or limits must be
+                                  set
+                                rule: has(self.requests) || has(self.limits)
                             schedulers:
                               description: |-
                                 Schedulers defines schedulerName matchers for Pod admission.
@@ -1126,6 +1892,7 @@ spec:
                                 If empty, each webhook applies its own backwards-compatible default.
                               items:
                                 enum:
+                                - pod
                                 - pod/initcontainers
                                 - pod/ephemeralcontainers
                                 - pod/containers
@@ -1134,6 +1901,95 @@ spec:
                               type: array
                           type: object
                       type: object
+                    quota:
+                      description: |-
+                        Quota contains native Kubernetes ResourceQuota specifications shared by
+                        all namespaces selected by this rule. Unlike Enforce, quota accounting is
+                        independent of the request audience.
+                      items:
+                        description: |-
+                          ResourceQuotaRule defines a named ResourceQuota specification generated by a
+                          Tenant rule. Name is the durable identity of the generated
+                          GlobalResourceQuota and must be unique across all rules of a Tenant.
+                        properties:
+                          hard:
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: |-
+                              hard is the set of desired hard limits for each named resource.
+                              More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/
+                            type: object
+                          name:
+                            description: |-
+                              Name is the stable identity of this quota within the Tenant. Changing the
+                              name replaces the generated GlobalResourceQuota; changing the quota or its
+                              namespace selector updates the existing object.
+                            maxLength: 63
+                            minLength: 1
+                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                            type: string
+                          scopeSelector:
+                            description: |-
+                              scopeSelector is also a collection of filters like scopes that must match each object tracked by a quota
+                              but expressed using ScopeSelectorOperator in combination with possible values.
+                              For a resource to match, both scopes AND scopeSelector (if specified in spec), must be matched.
+                            properties:
+                              matchExpressions:
+                                description: A list of scope selector requirements
+                                  by scope of the resources.
+                                items:
+                                  description: |-
+                                    A scoped-resource selector requirement is a selector that contains values, a scope name, and an operator
+                                    that relates the scope name and values.
+                                  properties:
+                                    operator:
+                                      description: |-
+                                        Represents a scope's relationship to a set of values.
+                                        Valid operators are In, NotIn, Exists, DoesNotExist.
+                                      type: string
+                                    scopeName:
+                                      description: The name of the scope that the
+                                        selector applies to.
+                                      type: string
+                                    values:
+                                      description: |-
+                                        An array of string values. If the operator is In or NotIn,
+                                        the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                        the values array must be empty.
+                                        This array is replaced during a strategic merge patch.
+                                      items:
+                                        type: string
+                                      type: array
+                                      x-kubernetes-list-type: atomic
+                                  required:
+                                  - operator
+                                  - scopeName
+                                  type: object
+                                type: array
+                                x-kubernetes-list-type: atomic
+                            type: object
+                            x-kubernetes-map-type: atomic
+                          scopes:
+                            description: |-
+                              A collection of filters that must match each object tracked by a quota.
+                              If not specified, the quota matches all objects.
+                            items:
+                              description: A ResourceQuotaScope defines a filter that
+                                must match each object tracked by a quota
+                              type: string
+                            type: array
+                            x-kubernetes-list-type: atomic
+                        required:
+                        - name
+                        type: object
+                      type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
                   type: object
                 type: array
             required:

@@ -6,6 +6,7 @@ package config
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"slices"
 	"sort"
 
@@ -116,7 +117,7 @@ func (r *Manager) SetupWithManager(
 				CreateFunc: func(e event.CreateEvent) bool {
 					to, ok := e.Object.(*capsulev1beta2.TenantOwner)
 
-					return ok && to.Spec.Aggregate
+					return ok && to.Spec.AggregateEnabled()
 				},
 				UpdateFunc: func(e event.UpdateEvent) bool {
 					oldTo, ok1 := e.ObjectOld.(*capsulev1beta2.TenantOwner)
@@ -126,7 +127,7 @@ func (r *Manager) SetupWithManager(
 						return false
 					}
 
-					if oldTo.Spec.Aggregate != newTo.Spec.Aggregate {
+					if oldTo.Spec.AggregateEnabled() != newTo.Spec.AggregateEnabled() {
 						return true
 					}
 
@@ -143,7 +144,7 @@ func (r *Manager) SetupWithManager(
 				DeleteFunc: func(e event.DeleteEvent) bool {
 					to, ok := e.Object.(*capsulev1beta2.TenantOwner)
 
-					return ok && to.Spec.Aggregate
+					return ok && to.Spec.AggregateEnabled()
 				},
 			}),
 		).
@@ -231,7 +232,7 @@ func (r *Manager) gatherCapsuleUsers(
 	for i := range toList.Items {
 		to := &toList.Items[i]
 
-		if !to.Spec.Aggregate {
+		if !to.Spec.AggregateEnabled() {
 			continue
 		}
 
@@ -292,6 +293,8 @@ func (r *Manager) updateConfigStatus(
 			return err
 		}
 
+		originalStatus := latest.Status.DeepCopy()
+
 		// Update only the fields this reconcile is authoritative for.
 		// Avoid wholesale status replacement: a non-tenant reconcile must not
 		// clobber a newer status.tenants written by a concurrent tenant-event
@@ -324,6 +327,10 @@ func (r *Manager) updateConfigStatus(
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(readyCondition)
+
+		if reflect.DeepEqual(*originalStatus, latest.Status) {
+			return nil
+		}
 
 		return r.Client.Status().Update(ctx, latest)
 	})

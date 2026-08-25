@@ -471,7 +471,13 @@
                         },
                         "impersonation": {
                             "description": "Impersonation",
-                            "type": "object"
+                            "type": "object",
+                            "properties": {
+                                "tenantDefaultServiceAccount": {
+                                    "type": "string"
+                                }
+                            },
+                            "additionalProperties": true
                         },
                         "labels": {
                             "description": "Additional labels to add to the CapsuleConfiguration resource",
@@ -666,6 +672,13 @@
                 "rbac": {
                     "type": "object",
                     "properties": {
+                        "bindableClusterRoles": {
+                            "description": "ClusterRoles the Capsule controller is allowed to bind (verb `bind`) when strict RBAC is enabled, in addition to the roles Capsule manages (manager.options.rbac provisioner, deleter, administrationClusterRoles and promotionClusterRoles), which are always bindable. Add any custom tenant-owner ClusterRoles here.",
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
                         "clusterRole": {
                             "type": "object",
                             "properties": {
@@ -687,6 +700,10 @@
                             "description": "Specifies further cluster roles to be added to the Capsule manager service account.",
                             "type": "array"
                         },
+                        "minimal": {
+                            "description": "DEPRECATED: use strict instead. Former name of the strict option; takes effect when either flag is true.",
+                            "type": "boolean"
+                        },
                         "role": {
                             "type": "object",
                             "properties": {
@@ -697,7 +714,7 @@
                             }
                         },
                         "strict": {
-                            "description": "Strongly restrict the RBAC assigned to Capsule Controller. When set to true you must aggregate further permissions by yourself.",
+                            "description": "Strongly restrict the RBAC assigned to Capsule Controller. The default owner ClusterRoles (admin, provisioner and deleter) can be bound to tenant owners out of the box; add custom owner ClusterRoles via bindableClusterRoles. Permissions beyond binding (e.g. TenantResource replication) must be aggregated by yourself via ClusterRoles labeled projectcapsule.dev/aggregate-to-controller: \"true\".",
                             "type": "boolean"
                         }
                     }
@@ -990,6 +1007,18 @@
         "rbac": {
             "type": "object",
             "properties": {
+                "customquotas": {
+                    "description": "Allow the creation of CustomQuotas",
+                    "type": "object",
+                    "properties": {
+                        "create": {
+                            "type": "boolean"
+                        },
+                        "labels": {
+                            "type": "object"
+                        }
+                    }
+                },
                 "resourcepoolclaims": {
                     "description": "Allow the creation of ResourcePoolClaims",
                     "type": "object",
@@ -998,12 +1027,7 @@
                             "type": "boolean"
                         },
                         "labels": {
-                            "type": "object",
-                            "properties": {
-                                "rbac.authorization.k8s.io/aggregate-to-admin": {
-                                    "type": "string"
-                                }
-                            }
+                            "type": "object"
                         }
                     }
                 },
@@ -1015,12 +1039,7 @@
                             "type": "boolean"
                         },
                         "labels": {
-                            "type": "object",
-                            "properties": {
-                                "rbac.authorization.k8s.io/aggregate-to-admin": {
-                                    "type": "string"
-                                }
-                            }
+                            "type": "object"
                         }
                     }
                 }
@@ -1385,7 +1404,7 @@
                                     "additionalProperties": true
                                 },
                                 "rules": {
-                                    "description": "[Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)",
+                                    "description": "[Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules) Include an explicit status subresource (for example, pods/status) when CustomQuota field selectors depend on status fields.",
                                     "type": "array"
                                 }
                             }
@@ -1790,7 +1809,7 @@
                             }
                         },
                         "generic": {
-                            "description": "Generic Rules API",
+                            "description": "Generic Rules API, including the rule-engine validation for Pods and Services",
                             "type": "object",
                             "properties": {
                                 "enabled": {
@@ -1920,6 +1939,94 @@
                                     "description": "[ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)",
                                     "type": "object",
                                     "additionalProperties": true
+                                },
+                                "rules": {
+                                    "description": "[Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)",
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "apiGroups": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "apiVersions": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "operations": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "resources": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "scope": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "globalresourcequotas": {
+                            "description": "Webhook for admission-time GlobalResourceQuota calculations",
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "description": "Enable the Hook",
+                                    "type": "boolean"
+                                },
+                                "failurePolicy": {
+                                    "description": "[FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)",
+                                    "type": "string"
+                                },
+                                "matchConditions": {
+                                    "description": "[MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
+                                    "type": "array"
+                                },
+                                "matchPolicy": {
+                                    "description": "[MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
+                                    "type": "string"
+                                },
+                                "namespaceSelector": {
+                                    "description": "[NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)",
+                                    "type": "object",
+                                    "properties": {
+                                        "matchExpressions": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "key": {
+                                                        "type": "string"
+                                                    },
+                                                    "operator": {
+                                                        "type": "string"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "additionalProperties": true
+                                },
+                                "objectSelector": {
+                                    "description": "[ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)",
+                                    "type": "object",
+                                    "additionalProperties": true
+                                },
+                                "opts": {
+                                    "description": "Capsule Hook Options",
+                                    "type": "object"
                                 },
                                 "rules": {
                                     "description": "[Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)",
@@ -2793,6 +2900,10 @@
                 "labels": {
                     "description": "Additional Labels for all webhooks",
                     "type": "object"
+                },
+                "matchConditions": {
+                    "description": "MatchConditions for all webhooks",
+                    "type": "array"
                 },
                 "mutatingWebhooksTimeoutSeconds": {
                     "description": "Timeout in seconds for mutating webhooks",

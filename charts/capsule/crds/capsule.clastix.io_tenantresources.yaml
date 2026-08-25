@@ -11,6 +11,8 @@ spec:
     kind: TenantResource
     listKind: TenantResourceList
     plural: tenantresources
+    shortNames:
+    - tr
     singular: tenantresource
   scope: Namespaced
   versions:

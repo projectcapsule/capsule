@@ -1,0 +1,49 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: GlobalTenantResource
+metadata:
+  name: capsule-proxy-settings
+spec:
+  scope: Tenant
+  resyncPeriod: 30s
+  serviceAccount:
+    name: gtr-reconciler
+    namespace: capsule-system
+  resources:
+    - generators:
+        - missingKey: zero
+          template: |
+            ---
+            apiVersion: capsule.clastix.io/v1beta1
+            kind: GlobalProxySettings
+            metadata:
+              name: {{ $.tenant.metadata.name }}-proxy-settings
+            spec:
+              rules:
+              - subjects:
+                {{- range $.tenant.status.owners }}
+                - kind: {{ .kind }}
+                  name: {{ .name }}
+                {{- end }}
+                clusterResources:
+                - apiGroups:
+                  - ""
+                  resources:
+                  - "namespaces"
+                  operations:
+                  - List
+                  selector:
+                    matchLabels:
+                      capsule.clastix.io/tenant: {{ $.tenant.metadata.name }}
+                - apiGroups:
+                  - "capsule.clastix.io"
+                  resources:
+                  - "resourcepools"
+                  - "globalcustomquotas"
+                  - "globalresourcequotas"
+                  - "tenantowners"
+                  operations:
+                  - List
+                  selector:
+                    matchLabels:
+                      projectcapsule.dev/tenant: {{ $.tenant.metadata.name }}

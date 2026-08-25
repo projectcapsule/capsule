@@ -20,7 +20,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
-var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, Label("namespaced", "namespacedcustomquota", "customquota", "ledger"), Ordered, func() {
+var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, Label("namespaced", "namespacedcustomquota", "customquota", "ledger", "skip-on-openshift"), Ordered, func() {
 	const (
 		testNamespace = "custom-quota-e2e-test"
 		tenantLabel   = "e2e.capsule.dev/test-suite"
@@ -55,8 +55,8 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 	})
 
 	AfterEach(func() {
-		ForceDeleteNamespace(ctx, testNamespace)
-		// delete all global quotas used by tests
+		// Delete quota coordination resources while the namespace still accepts
+		// updates. Namespace termination must not race ledger settlement.
 		quotaList := &capsulev1beta2.CustomQuotaList{}
 		if err := k8sClient.List(ctx, quotaList); err == nil {
 			for i := range quotaList.Items {
@@ -70,7 +70,6 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 			}
 		}
 
-		// delete all global quotas used by tests
 		gquotaList := &capsulev1beta2.GlobalCustomQuotaList{}
 		if err := k8sClient.List(ctx, gquotaList); err == nil {
 			for i := range gquotaList.Items {
@@ -83,6 +82,8 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				}
 			}
 		}
+
+		ForceDeleteNamespace(ctx, testNamespace)
 	})
 
 	It("marks the quota not ready when an existing matching object has no value at the configured quantity path", func() {
@@ -136,7 +137,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 
-	It("denies creating a matching object when the configured quantity path resolves to no value", func() {
+	It("denies creating a matching object when the configured quantity path resolves to no value", Label("skip-on-openshift"), func() {
 		q := &capsulev1beta2.CustomQuota{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "cq-missing-path-deny-create",
@@ -178,7 +179,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 		expectLedgerSettled(ctx, testNamespace, q.GetName())
 	})
 
-	It("remains consistent under concurrent pod creations for a CustomQuota", func() {
+	It("remains consistent under concurrent pod creations for a CustomQuota", Label("skip-on-openshift"), func() {
 		q := &capsulev1beta2.CustomQuota{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "cq-concurrent-pod-count",
@@ -261,7 +262,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 		expectLedgerSettled(ctx, testNamespace, q.GetName())
 	})
 
-	It("tracks different paths independently when global and namespaced quotas match the same pod gvk", func() {
+	It("tracks different paths independently when global and namespaced quotas match the same pod gvk", Label("skip-on-openshift"), func() {
 		gq := &capsulev1beta2.GlobalCustomQuota{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "gq-mixed-path-cpu-from-cq-suite",
@@ -725,6 +726,84 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 		expectCustomQuotaUsedAndClaims(ctx, testNamespace, q.GetName(), "1", 1)
 
 		UpdatePodImage(ctx, testNamespace, "multi-fieldselector", "nginx:1.26.0")
+		expectLedgerSettled(ctx, testNamespace, q.GetName())
+		expectCustomQuotaUsedAndClaims(ctx, testNamespace, q.GetName(), "0", 0)
+	})
+
+	It("calculates usage with CEL while combining JSONPath and CEL selectors", func() {
+		q := &capsulev1beta2.CustomQuota{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cq-cel-usage-mixed-selectors",
+				Namespace: testNamespace,
+				Labels: map[string]string{
+					"e2e.capsule.dev/test-suite": "customquota-ledger",
+				},
+			},
+			Spec: capsulev1beta2.CustomQuotaSpec{
+				Limit: resource.MustParse("500m"),
+				Sources: []capsulev1beta2.CustomQuotaSpecSource{
+					{
+						VersionKind: runtime.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
+						},
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpAdd,
+							CEL: `object.spec.containers` +
+								`.map(c, quantity(c.resources.requests["cpu"]))`,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									FieldSelectors: []string{
+										".spec.restartPolicy=Always",
+									},
+									CELExpressions: []string{
+										`object.spec.containers.exists(c, c.image == "nginx:1.27.0")`,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		EventuallyCreation(func() error {
+			return k8sClient.Create(ctx, q)
+		}).Should(Succeed())
+		awaitCustomQuotaReady(ctx, testNamespace, q.GetName())
+
+		matching := MakePod(
+			testNamespace,
+			"cel-usage-matching",
+			nil,
+			nil,
+			"nginx:1.27.0",
+			"100m",
+			"",
+		)
+		EventuallyCreation(func() error {
+			matching.ResourceVersion = ""
+			return k8sClient.Create(ctx, matching)
+		}).Should(Succeed())
+
+		ignored := MakePod(
+			testNamespace,
+			"cel-usage-ignored",
+			nil,
+			nil,
+			"nginx:1.26.0",
+			"200m",
+			"",
+		)
+		EventuallyCreation(func() error {
+			ignored.ResourceVersion = ""
+			return k8sClient.Create(ctx, ignored)
+		}).Should(Succeed())
+
+		expectCustomQuotaUsedAndClaims(ctx, testNamespace, q.GetName(), "100m", 1)
+		expectLedgerSettled(ctx, testNamespace, q.GetName())
+
+		UpdatePodImage(ctx, testNamespace, "cel-usage-matching", "nginx:1.26.0")
 		expectLedgerSettled(ctx, testNamespace, q.GetName())
 		expectCustomQuotaUsedAndClaims(ctx, testNamespace, q.GetName(), "0", 0)
 	})

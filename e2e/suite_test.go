@@ -83,28 +83,28 @@ var _ = SynchronizedAfterSuite(
 	},
 	func() {
 		Eventually(func() error {
-			var tnts capsulev1beta2.TenantList
+			var quotas capsulev1beta2.GlobalResourceQuotaList
 
 			if err := k8sClient.List(
 				context.TODO(),
-				&tnts,
+				&quotas,
 				client.MatchingLabels{"env": "e2e"},
 			); err != nil {
 				return err
 			}
 
-			if len(tnts.Items) == 0 {
+			if len(quotas.Items) == 0 {
 				return nil
 			}
 
-			for i := range tnts.Items {
-				ns := &tnts.Items[i]
-				if err := k8sClient.Delete(context.TODO(), ns); err != nil && !apierrors.IsNotFound(err) {
+			for i := range quotas.Items {
+				quota := &quotas.Items[i]
+				if err := k8sClient.Delete(context.TODO(), quota); err != nil && !apierrors.IsNotFound(err) {
 					return err
 				}
 			}
 
-			return fmt.Errorf("still have %d tenants with env=e2e", len(tnts.Items))
+			return fmt.Errorf("still have %d global resource quotas with env=e2e", len(quotas.Items))
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 		Eventually(func() error {
@@ -130,6 +130,31 @@ var _ = SynchronizedAfterSuite(
 			}
 
 			return fmt.Errorf("still have %d namespaces with env=e2e", len(nsList.Items))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		Eventually(func() error {
+			var tnts capsulev1beta2.TenantList
+
+			if err := k8sClient.List(
+				context.TODO(),
+				&tnts,
+				client.MatchingLabels{"env": "e2e"},
+			); err != nil {
+				return err
+			}
+
+			if len(tnts.Items) == 0 {
+				return nil
+			}
+
+			for i := range tnts.Items {
+				ns := &tnts.Items[i]
+				if err := k8sClient.Delete(context.TODO(), ns); err != nil && !apierrors.IsNotFound(err) {
+					return err
+				}
+			}
+
+			return fmt.Errorf("still have %d tenants with env=e2e", len(tnts.Items))
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 		By("tearing down the test environment")

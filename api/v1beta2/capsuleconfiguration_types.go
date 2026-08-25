@@ -207,7 +207,3 @@ type CapsuleConfigurationList struct {
 
 	Items []CapsuleConfiguration `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&CapsuleConfiguration{}, &CapsuleConfigurationList{})
-}

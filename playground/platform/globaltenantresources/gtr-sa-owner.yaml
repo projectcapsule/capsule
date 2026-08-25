@@ -1,0 +1,25 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: GlobalTenantResource
+metadata:
+  name: gitops-sa-owners
+spec:
+  resyncPeriod: 60s
+  serviceAccount:
+    name: gtr-reconciler
+    namespace: capsule-system
+  resources:
+    - additionalMetadata:
+        labels:
+          "replicated-by": "capsule"
+      rawItems:
+        - apiVersion: capsule.clastix.io/v1beta2
+          kind: TenantOwner
+          metadata:
+            name: "{{tenant.name}}-{{namespace}}"
+          spec:
+            clusterRoles:
+              - capsule-namespace-deleter
+              - admin
+            kind: ServiceAccount
+            name: "system:serviceaccount:{{namespace}}:gitops-reconciler"

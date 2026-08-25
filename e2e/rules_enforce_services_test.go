@@ -96,6 +96,21 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 		}
 	}
 
+	externalIPCIDRRule := func(action rules.ActionType, cidrs ...string) *rules.NamespaceRuleBodyTenant {
+		return &rules.NamespaceRuleBodyTenant{
+			NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
+				Enforce: &rules.NamespaceRuleEnforceBody{
+					Action: action,
+					Services: rules.NamespaceRuleEnforceServicesBody{
+						ExternalIPs: &rules.ServiceExternalIPRule{
+							CIDRs: cidrs,
+						},
+					},
+				},
+			},
+		}
+	}
+
 	externalNameRule := func(action rules.ActionType, hostnames ...runtime.ExpressionMatch) *rules.NamespaceRuleBodyTenant {
 		return &rules.NamespaceRuleBodyTenant{
 			NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
@@ -260,6 +275,8 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 		action              rules.ActionType
 		types               []rules.ServiceType
 		loadBalancerCIDRs   []string
+		externalIPs         bool
+		externalIPCIDRs     []string
 		nodePortRanges      []rules.ServiceNodePortRange
 		externalExpressions []string
 		externalExact       [][]string
@@ -301,6 +318,13 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 				} else {
 					g.Expect(got.Enforce.Services.LoadBalancers).NotTo(BeNil())
 					g.Expect(got.Enforce.Services.LoadBalancers.CIDRs).To(Equal(expected.loadBalancerCIDRs))
+				}
+
+				if expected.externalIPs {
+					g.Expect(got.Enforce.Services.ExternalIPs).NotTo(BeNil())
+					g.Expect(got.Enforce.Services.ExternalIPs.CIDRs).To(Equal(expected.externalIPCIDRs))
+				} else {
+					g.Expect(got.Enforce.Services.ExternalIPs).To(BeNil())
 				}
 
 				if len(expected.nodePortRanges) == 0 {
@@ -593,6 +617,13 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 		}
 	}
 
+	externalIPService := func(name string, externalIPs ...string) *corev1.Service {
+		svc := clusterIPService(name)
+		svc.Spec.ExternalIPs = externalIPs
+
+		return svc
+	}
+
 	nodePortService := func(name string, nodePort int32) *corev1.Service {
 		port := servicePort()
 		port.NodePort = nodePort
@@ -859,6 +890,105 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 		)
 	})
 
+	It("allows only Service external IPs contained in configured CIDRs", func() {
+		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
+			serviceTypeRule(
+				rules.ActionTypeAllow,
+				rules.ServiceTypeClusterIP,
+			),
+			externalIPCIDRRule(
+				rules.ActionTypeAllow,
+				"10.20.0.0/16",
+				"192.168.1.2",
+			),
+		})
+
+		ns := createNamespace(nil)
+
+		expectNamespaceStatusRules(ns.Name, []expectedServiceStatusRule{
+			{
+				action: rules.ActionTypeAllow,
+				types: []rules.ServiceType{
+					rules.ServiceTypeClusterIP,
+				},
+			},
+			{
+				action:      rules.ActionTypeAllow,
+				externalIPs: true,
+				externalIPCIDRs: []string{
+					"10.20.0.0/16",
+					"192.168.1.2",
+				},
+			},
+		})
+
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+
+		createServiceAndExpectAllowed(cs, ns.Name, clusterIPService("external-ip-omitted-allowed"))
+
+		allowed := externalIPService("external-ip-cidr-allowed", "10.20.1.44")
+		createServiceAndExpectAllowed(cs, ns.Name, allowed)
+		createServiceAndExpectAllowed(cs, ns.Name, externalIPService("external-ip-host-allowed", "192.168.1.2"))
+
+		createServiceAndExpectDenied(cs, ns.Name, externalIPService("external-ip-denied", "8.8.8.8"),
+			"external IP",
+			"8.8.8.8",
+			"spec.externalIPs[0]",
+			"not allowed",
+			"Allowed CIDRs",
+			"10.20.0.0/16",
+			"192.168.1.2",
+		)
+
+		updateServiceAndExpectDenied(
+			cs,
+			ns.Name,
+			allowed.Name,
+			func(svc *corev1.Service) {
+				svc.Spec.ExternalIPs = []string{"8.8.4.4"}
+			},
+			"external IP",
+			"8.8.4.4",
+			"spec.externalIPs[0]",
+			"not allowed",
+		)
+	})
+
+	It("denies every specified Service external IP when a deny rule has empty CIDRs", func() {
+		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
+			serviceTypeRule(
+				rules.ActionTypeAllow,
+				rules.ServiceTypeClusterIP,
+			),
+			externalIPCIDRRule(rules.ActionTypeDeny),
+		})
+
+		ns := createNamespace(nil)
+
+		expectNamespaceStatusRules(ns.Name, []expectedServiceStatusRule{
+			{
+				action: rules.ActionTypeAllow,
+				types: []rules.ServiceType{
+					rules.ServiceTypeClusterIP,
+				},
+			},
+			{
+				action:      rules.ActionTypeDeny,
+				externalIPs: true,
+			},
+		})
+
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+
+		createServiceAndExpectAllowed(cs, ns.Name, clusterIPService("external-ip-empty-deny-omitted"))
+		createServiceAndExpectDenied(cs, ns.Name, externalIPService("external-ip-empty-denied", "10.20.1.44"),
+			"external IP",
+			"10.20.1.44",
+			"denied",
+			"all external IPs",
+		)
+	})
+
 	It("allows exact, regex, and combined ExternalName hostname matchers", func() {
 		ns := createNamespace(nil)
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
@@ -997,9 +1127,9 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 		ns := createNamespace(nil)
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
-		createServiceAndExpectDenied(cs, ns.Name, loadBalancerService("lb-source-range-denied", "", []string{"10.0.1.0/23"}, ptr.To(false)),
+		createServiceAndExpectDenied(cs, ns.Name, loadBalancerService("lb-source-range-denied", "", []string{"10.0.0.0/23"}, ptr.To(false)),
 			"loadBalancer CIDR",
-			"10.0.1.0/23",
+			"10.0.0.0/23",
 			"spec.loadBalancerSourceRanges[0]",
 			"Allowed CIDRs",
 		)

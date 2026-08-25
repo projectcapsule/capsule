@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -78,6 +79,78 @@ func TestAddTenantNameLabel(t *testing.T) {
 
 	if got := labels[meta.TenantLabel]; got != "mytenant" {
 		t.Fatalf("expected %s to be %q, got %q", meta.TenantLabel, "mytenant", got)
+	}
+}
+
+func TestHasConsistentTenantReference(t *testing.T) {
+	t.Parallel()
+
+	tenantRef := func(name string) metav1.OwnerReference {
+		return metav1.OwnerReference{
+			APIVersion: capsulev1beta2.GroupVersion.String(),
+			Kind:       tenant.ObjectReferenceTenantKind,
+			Name:       name,
+		}
+	}
+
+	tests := []struct {
+		name string
+		ns   *corev1.Namespace
+		want bool
+	}{
+		{name: "nil namespace", want: true},
+		{name: "unmanaged namespace", ns: &corev1.Namespace{}, want: true},
+		{
+			name: "matching label and owner reference",
+			ns: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+				Labels:          map[string]string{meta.TenantLabel: "green"},
+				OwnerReferences: []metav1.OwnerReference{tenantRef("green")},
+			}},
+			want: true,
+		},
+		{
+			name: "label only",
+			ns: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{meta.TenantLabel: "green"},
+			}},
+			want: false,
+		},
+		{
+			name: "owner reference only",
+			ns: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+				OwnerReferences: []metav1.OwnerReference{tenantRef("green")},
+			}},
+			want: false,
+		},
+		{
+			name: "mismatched label and owner reference",
+			ns: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+				Labels:          map[string]string{meta.TenantLabel: "green"},
+				OwnerReferences: []metav1.OwnerReference{tenantRef("blue")},
+			}},
+			want: false,
+		},
+		{
+			name: "multiple tenant owner references",
+			ns: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{meta.TenantLabel: "green"},
+				OwnerReferences: []metav1.OwnerReference{
+					tenantRef("green"),
+					tenantRef("blue"),
+				},
+			}},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := tenant.HasConsistentTenantReference(tt.ns); got != tt.want {
+				t.Fatalf("HasConsistentTenantReference() = %t, want %t", got, tt.want)
+			}
+		})
 	}
 }
 

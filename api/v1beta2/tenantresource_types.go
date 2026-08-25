@@ -60,6 +60,12 @@ type TenantResourceCommonSpec struct {
 	Resources []ResourceSpec `json:"resources"`
 }
 
+// IsCordoned states whether the replication is paused, in which case no apply nor deletion
+// must be performed. Being an optional field, an unset value is not cordoned.
+func (s *TenantResourceCommonSpec) IsCordoned() bool {
+	return s.Cordoned != nil && *s.Cordoned
+}
+
 type TenantResourceCommonSpecSettings struct {
 	// Enabling this allows TenanResources to interact with objects which were not created by a TenantResource. In this case on prune no deletion of the entire object is made.
 	// +kubebuilder:default=false

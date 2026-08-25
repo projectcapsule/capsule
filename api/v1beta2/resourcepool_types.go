@@ -81,7 +81,3 @@ type ResourcePoolList struct {
 
 	Items []ResourcePool `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&ResourcePool{}, &ResourcePoolList{})
-}

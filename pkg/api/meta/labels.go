@@ -22,6 +22,8 @@ const (
 
 	ResourcePoolLabel = "projectcapsule.dev/pool"
 
+	GlobalResourceQuotaLabel = "projectcapsule.dev/global-resource-quota"
+
 	FreezeLabel = "projectcapsule.dev/freeze"
 
 	OwnerPromotionLabel          = "owner.projectcapsule.dev/promote"
@@ -43,6 +45,7 @@ const (
 	LimitRangeLabel    = "capsule.clastix.io/limit-range"
 	NetworkPolicyLabel = "capsule.clastix.io/network-policy"
 	ResourceQuotaLabel = "capsule.clastix.io/resource-quota"
+	RuleQuotaLabel     = "projectcapsule.dev/rule-quota"
 	RolebindingLabel   = "capsule.clastix.io/role-binding"
 )
 

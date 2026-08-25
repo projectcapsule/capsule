@@ -7,8 +7,11 @@ import (
 	"strings"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/utils/ptr"
 
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 	"github.com/projectcapsule/capsule/pkg/api/runtime"
@@ -35,6 +38,73 @@ func TestValidateRuleStatusBody(t *testing.T) {
 					Enforce: nil,
 				},
 			},
+		},
+		{
+			name:   "valid quota-only rule",
+			mapper: mapper,
+			bodies: []*rules.NamespaceRuleBodyNamespace{{
+				Quota: []rules.ResourceQuotaRule{{
+					Name: "shared-compute",
+					ResourceQuotaSpec: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{
+						corev1.ResourceRequestsCPU: resource.MustParse("8"),
+					}},
+				}},
+			}},
+		},
+		{
+			name:   "quota name is required",
+			mapper: mapper,
+			bodies: []*rules.NamespaceRuleBodyNamespace{{
+				Quota: []rules.ResourceQuotaRule{{
+					ResourceQuotaSpec: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{
+						corev1.ResourceRequestsCPU: resource.MustParse("8"),
+					}},
+				}},
+			}},
+			wantErr: "rules[0].quota[0].name",
+		},
+		{
+			name:   "quota name must be a DNS label",
+			mapper: mapper,
+			bodies: []*rules.NamespaceRuleBodyNamespace{{
+				Quota: []rules.ResourceQuotaRule{{
+					Name: "Shared_Compute",
+					ResourceQuotaSpec: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{
+						corev1.ResourceRequestsCPU: resource.MustParse("8"),
+					}},
+				}},
+			}},
+			wantErr: `rules[0].quota[0].name "Shared_Compute" is invalid`,
+		},
+		{
+			name:   "quota hard must not be empty",
+			mapper: mapper,
+			bodies: []*rules.NamespaceRuleBodyNamespace{{
+				Quota: []rules.ResourceQuotaRule{{Name: "shared-compute"}},
+			}},
+			wantErr: "rules[0].quota[0].hard is invalid",
+		},
+		{
+			name:   "quota hard must not be negative",
+			mapper: mapper,
+			bodies: []*rules.NamespaceRuleBodyNamespace{{
+				Quota: []rules.ResourceQuotaRule{{
+					Name: "shared-compute",
+					ResourceQuotaSpec: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{
+						corev1.ResourceRequestsCPU: resource.MustParse("-1"),
+					}},
+				}},
+			}},
+			wantErr: `rules[0].quota[0].hard["requests.cpu"] is invalid`,
+		},
+		{
+			name:   "quota names must be unique across rules",
+			mapper: mapper,
+			bodies: []*rules.NamespaceRuleBodyNamespace{
+				{Quota: []rules.ResourceQuotaRule{{Name: "shared-compute", ResourceQuotaSpec: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}}}}},
+				{Quota: []rules.ResourceQuotaRule{{Name: "shared-compute", ResourceQuotaSpec: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("1Gi")}}}}},
+			},
+			wantErr: `rules[1].quota[0].name "shared-compute" is invalid: quota name is already used by rules[0].quota[0]`,
 		},
 		{
 			name:   "valid workload service and metadata rules",
@@ -578,6 +648,78 @@ func TestValidateRuleStatusBody(t *testing.T) {
 			wantErr: `rules[0].enforce.services.loadBalancers.cidrs[0] "" is invalid: CIDR is empty`,
 		},
 		{
+			name:   "invalid external IP CIDR",
+			mapper: mapper,
+			bodies: []*rules.NamespaceRuleBodyNamespace{
+				{
+					Enforce: &rules.NamespaceRuleEnforceBody{
+						Services: rules.NamespaceRuleEnforceServicesBody{
+							ExternalIPs: &rules.ServiceExternalIPRule{
+								CIDRs: []string{
+									"10.20.0.0/33",
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: `rules[0].enforce.services.externalIPs.cidrs[0] "10.20.0.0/33" is invalid`,
+		},
+		{
+			name:   "empty external IP CIDR entry",
+			mapper: mapper,
+			bodies: []*rules.NamespaceRuleBodyNamespace{
+				{
+					Enforce: &rules.NamespaceRuleEnforceBody{
+						Services: rules.NamespaceRuleEnforceServicesBody{
+							ExternalIPs: &rules.ServiceExternalIPRule{
+								CIDRs: []string{
+									"",
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: `rules[0].enforce.services.externalIPs.cidrs[0] "" is invalid: CIDR is empty`,
+		},
+		{
+			name:   "external IP CIDRs are valid",
+			mapper: mapper,
+			bodies: []*rules.NamespaceRuleBodyNamespace{
+				{
+					Enforce: &rules.NamespaceRuleEnforceBody{
+						Action: rules.ActionTypeAllow,
+						Services: rules.NamespaceRuleEnforceServicesBody{
+							ExternalIPs: &rules.ServiceExternalIPRule{
+								CIDRs: []string{
+									"10.20.0.0/16",
+									"192.168.1.2",
+									"2001:db8::/32",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:   "empty external IP CIDR deny rule is valid",
+			mapper: mapper,
+			bodies: []*rules.NamespaceRuleBodyNamespace{
+				{
+					Enforce: &rules.NamespaceRuleEnforceBody{
+						Action: rules.ActionTypeDeny,
+						Services: rules.NamespaceRuleEnforceServicesBody{
+							ExternalIPs: &rules.ServiceExternalIPRule{
+								CIDRs: []string{},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			name:   "invalid externalName hostname regex",
 			mapper: mapper,
 			bodies: []*rules.NamespaceRuleBodyNamespace{
@@ -745,6 +887,42 @@ func TestValidateRuleStatusBody(t *testing.T) {
 	}
 }
 
+func TestValidateMetadataKeyPatterns(t *testing.T) {
+	t.Parallel()
+
+	if err := validateMetadataKey("example.corp/*"); err != nil {
+		t.Fatalf("expected wildcard key selector to be valid: %v", err)
+	}
+	if err := validateMetadataKey(`example\.corp/.*`); err != nil {
+		t.Fatalf("expected regexp key selector to be valid: %v", err)
+	}
+	if err := validateMetadataKey("example.corp/["); err == nil {
+		t.Fatal("expected invalid regexp key selector to be rejected")
+	}
+}
+
+func TestMutableMetadataRequiresConcreteKey(t *testing.T) {
+	t.Parallel()
+	policy := rules.MetadataValueRule{Managed: ptr.To("controlled")}
+	if err := validateMutableMetadataKey("example.corp/key", policy); err != nil {
+		t.Fatalf("concrete key rejected: %v", err)
+	}
+	if err := validateMutableMetadataKey("example.corp/*", policy); err == nil {
+		t.Fatal("wildcard managed key was accepted")
+	}
+	if err := validateMutableMetadataKey(`example\.corp/.*`, policy); err == nil {
+		t.Fatal("regexp managed key was accepted")
+	}
+
+	rule := rules.MetadataRule{
+		VersionKinds: runtime.VersionKinds{APIGroups: []string{"*"}, Kinds: []string{"ConfigMap"}},
+		Labels:       map[string]rules.MetadataValueRule{"example.corp/key": policy},
+	}
+	if err := validateMetadataRules(0, []rules.MetadataRule{rule}, nil); err == nil || !strings.Contains(err.Error(), "managed metadata requires concrete apiGroups and kinds") {
+		t.Fatalf("wildcard managed target error = %v", err)
+	}
+}
+
 func TestValidateRuleStatusBodyWithRESTMapper(t *testing.T) {
 	t.Parallel()
 
@@ -818,6 +996,18 @@ func TestValidateRuleStatusBodyWithRESTMapper(t *testing.T) {
 					},
 				},
 			},
+		},
+		{
+			name:   "core namespace is a valid metadata target",
+			mapper: mapper,
+			bodies: []*rules.NamespaceRuleBodyNamespace{{
+				Enforce: &rules.NamespaceRuleEnforceBody{Metadata: []rules.MetadataRule{{
+					VersionKinds: runtime.VersionKinds{APIGroups: []string{""}, Kinds: []string{"Namespace"}},
+					Annotations: map[string]rules.MetadataValueRule{
+						"example.corp/*": {Values: []runtime.ExpressionMatch{{Exact: []string{"allowed"}}}},
+					},
+				}}},
+			}},
 		},
 		{
 			name:   "known grouped apiVersion kind is valid",
@@ -1145,6 +1335,15 @@ func newRuleValidationRESTMapper() apimeta.RESTMapper {
 			Version: "v1",
 		},
 	})
+
+	mapper.Add(
+		schema.GroupVersionKind{
+			Group:   "",
+			Version: "v1",
+			Kind:    "Namespace",
+		},
+		apimeta.RESTScopeRoot,
+	)
 
 	mapper.Add(
 		schema.GroupVersionKind{

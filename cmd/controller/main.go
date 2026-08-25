@@ -32,7 +32,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
@@ -48,6 +47,7 @@ import (
 	cacheinvalidator "github.com/projectcapsule/capsule/internal/controllers/cfg/invalidator"
 	configcontroller "github.com/projectcapsule/capsule/internal/controllers/cfg/status"
 	customquotacontroller "github.com/projectcapsule/capsule/internal/controllers/customquotas"
+	globalresourcequotacontroller "github.com/projectcapsule/capsule/internal/controllers/globalresourcequotas"
 	podlabelscontroller "github.com/projectcapsule/capsule/internal/controllers/pod"
 	"github.com/projectcapsule/capsule/internal/controllers/pv"
 	rbaccontroller "github.com/projectcapsule/capsule/internal/controllers/rbac"
@@ -69,6 +69,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/dra"
 	"github.com/projectcapsule/capsule/internal/webhook/gateway"
 	"github.com/projectcapsule/capsule/internal/webhook/generic"
+	globalresourcequotavalidation "github.com/projectcapsule/capsule/internal/webhook/globalresourcequota"
 	"github.com/projectcapsule/capsule/internal/webhook/ingress"
 	namespacemutation "github.com/projectcapsule/capsule/internal/webhook/namespace/mutation"
 	namespacevalidation "github.com/projectcapsule/capsule/internal/webhook/namespace/validation"
@@ -78,6 +79,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/pvc"
 	"github.com/projectcapsule/capsule/internal/webhook/resourcepool"
 	"github.com/projectcapsule/capsule/internal/webhook/route"
+	rulesgenericmutation "github.com/projectcapsule/capsule/internal/webhook/rules/generic/mutation"
 	rulesgenericvalidation "github.com/projectcapsule/capsule/internal/webhook/rules/generic/validation"
 	podrules "github.com/projectcapsule/capsule/internal/webhook/rules/pods/validation"
 	servicerules "github.com/projectcapsule/capsule/internal/webhook/rules/services/validation"
@@ -556,9 +558,10 @@ func main() {
 			Port:    webhookPort,
 			TLSOpts: webhookTLSOpts,
 		}),
-		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "42c733ea.clastix.capsule.io",
-		HealthProbeBindAddress: ":10080",
+		LeaderElection:          enableLeaderElection,
+		LeaderElectionID:        "42c733ea.clastix.capsule.io",
+		LeaderElectionNamespace: ns,
+		HealthProbeBindAddress:  ":10080",
 		NewClient: func(config *rest.Config, options client.Options) (client.Client, error) {
 			options.Cache.Unstructured = true
 
@@ -612,6 +615,21 @@ func main() {
 	_ = manager.AddReadyzCheck("ping", healthz.Ping)
 	_ = manager.AddHealthzCheck("ping", healthz.Ping)
 
+	if directCfg.EnableTLSConfiguration() && webhookCertWatcher != nil {
+		if err := manager.AddReadyzCheck(
+			"webhook-certificate",
+			tlscontroller.WebhookCertificateReadinessCheck(
+				directClient,
+				directCfg,
+				ns,
+				webhookCertWatcher.GetCertificate,
+			),
+		); err != nil {
+			setupLog.Error(err, "unable to add webhook certificate readiness check")
+			os.Exit(1)
+		}
+	}
+
 	dc, err := discovery.NewDiscoveryClientForConfig(manager.GetConfig())
 	if err != nil {
 		setupLog.Error(err, "unable to create discovery client")
@@ -630,16 +648,18 @@ func main() {
 
 	setupLog.Info("initializing caches")
 
-	// Initialize Notifiers (Channels)
-	customQuotaCh := make(chan event.TypedGenericEvent[*capsulev1beta2.CustomQuota], 1024)
-	globalCustomQuotaCh := make(chan event.TypedGenericEvent[*capsulev1beta2.GlobalCustomQuota], 1024)
-
 	// Initialize Caches
 	impersonationCache := cache.NewImpersonationCache()
 	regexCache := cache.NewRegexCache()
 	registryCache := cache.NewRegistryRuleSetCache(regexCache)
-	customQuotaQuantityCache := cache.NewQuantityCache[string]()
 	jsonPathCache := cache.NewJSONPathCache()
+
+	celCache, err := cache.NewCELCache()
+	if err != nil {
+		setupLog.Error(err, "unable to initialize Kubernetes CEL cache")
+		os.Exit(1)
+	}
+
 	targetsCache := cache.NewCompiledTargetsCache[string]()
 
 	if directCfg.EnableTLSConfiguration() {
@@ -687,12 +707,28 @@ func main() {
 	// webhooks: the order matters, don't change it and just append
 	webhooksList := append(
 		make([]handlers.Webhook, 0),
-		rulesgenericvalidation.Register(regexCache),
+		rulesgenericmutation.Register(cfg),
+		rulesgenericvalidation.Register(
+			regexCache,
+			cfg,
+			rulesgenericvalidation.ForKind(
+				corev1.SchemeGroupVersion.WithKind("Pod").GroupKind(),
+				pod.Handler(cfg,
+					podrules.PodRules(regexCache, registryCache),
+				),
+				"ephemeralcontainers",
+			),
+			rulesgenericvalidation.ForKind(
+				corev1.SchemeGroupVersion.WithKind("Service").GroupKind(),
+				service.Handler(cfg,
+					servicerules.ServiceRules(regexCache),
+				),
+			),
+		),
 		route.GenericReplicasHandler(),
 		route.GenericManagedHandler(cfg),
 		route.Pod(
-			pod.Handler(
-				podrules.PodRules(regexCache, registryCache),
+			pod.Handler(cfg,
 				pod.ImagePullPolicy(),
 				pod.ContainerRegistryLegacy(cfg),
 				pod.PriorityClass(),
@@ -707,13 +743,12 @@ func main() {
 			),
 		),
 		route.PVCMutating(
-			pvc.Handler(
+			pvc.MutatingHandler(
 				pvc.PersistentVolumeMutatingVolume(),
 			),
 		),
 		route.Service(
-			service.Handler(
-				servicerules.ServiceRules(regexCache),
+			service.Handler(cfg,
 				service.Validating(),
 			),
 		),
@@ -761,6 +796,7 @@ func main() {
 				namespacevalidation.CordoningHandler(cfg),
 				namespacevalidation.QuotaHandler(),
 				namespacevalidation.PrefixHandler(cfg),
+				namespacevalidation.RulesMetadataHandler(regexCache, cfg),
 				namespacevalidation.UserMetadataHandler(),
 				namespacevalidation.RequiredMetadataHandler(),
 			),
@@ -770,7 +806,8 @@ func main() {
 				cfg,
 				namespacemutation.OwnerReferenceHandler(cfg),
 				namespacemutation.MetadataHandler(cfg),
-				namespacemutation.NamespacePatchGuardHandler(cfg),
+				// Tenant metadata must be resolved before applying namespace rules.
+				namespacemutation.RulesMetadataHandler(cfg),
 			),
 		),
 		route.ResourcePoolMutation(resourcepool.PoolMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool"))),
@@ -780,15 +817,19 @@ func main() {
 		route.CustomQuotaValidation(customquotavalidation.CustomQuotaValidationHandler(
 			targetsCache,
 			jsonPathCache,
+			celCache,
 		)),
 		route.GlobalCustomQuotaValidation(customquotavalidation.GlobalCustomQuotaValidationHandler(
 			targetsCache,
 			jsonPathCache,
+			celCache,
 		)),
+		route.GlobalResourceQuotaCalculation(globalresourcequotavalidation.Handler()),
 		route.CalculationCustomQuotas(
 			customquotavalidation.ObjectCalculationHandler(
 				targetsCache,
 				jsonPathCache,
+				celCache,
 			),
 		),
 		route.GenericTenantAssignment(
@@ -895,9 +936,10 @@ func main() {
 	}
 
 	if err = (&rulestatuscontroller.Manager{
-		Client:  manager.GetClient(),
-		Log:     ctrl.Log.WithName("capsule.ctrl").WithName("ruleset"),
-		Metrics: metrics.MustMakeRuleStatusRecorder(),
+		Client:     manager.GetClient(),
+		RESTConfig: manager.GetConfig(),
+		Log:        ctrl.Log.WithName("capsule.ctrl").WithName("ruleset"),
+		Metrics:    metrics.MustMakeRuleStatusRecorder(),
 	}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RuleSet")
 		os.Exit(1)
@@ -927,6 +969,7 @@ func main() {
 		ImpersonationCache: impersonationCache,
 		RegistryCache:      registryCache,
 		JSONPathCache:      jsonPathCache,
+		CELCache:           celCache,
 		TargetsCache:       targetsCache,
 		RegexCache:         regexCache,
 	}
@@ -968,15 +1011,23 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := globalresourcequotacontroller.Add(
+		ctrl.Log.WithName("capsule.ctrl").WithName("globalresourcequotas"),
+		manager,
+		manager.GetEventRecorder("globalresourcequotas-ctrl"),
+		controllerConfig,
+	); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "globalresourcequotas")
+		os.Exit(1)
+	}
+
 	if err = customquotacontroller.Add(ctrl.Log.WithName("controllers").WithName("CustomQuotas"),
 		manager,
 		manager.GetEventRecorder("customquotas-ctrl"),
 		controllerConfig,
-		customQuotaQuantityCache,
 		jsonPathCache,
+		celCache,
 		targetsCache,
-		customQuotaCh,
-		globalCustomQuotaCh,
 	); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "customquotas")
 		os.Exit(1)

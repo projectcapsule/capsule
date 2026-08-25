@@ -120,7 +120,9 @@ func resolveTenantByClosestNamespacePrefix(
 			ambiguous = false
 
 		case len(prefix) == matchedPrefixLen:
-			ambiguous = true
+			if matched.GetName() != tnts[i].GetName() {
+				ambiguous = true
+			}
 		}
 	}
 
