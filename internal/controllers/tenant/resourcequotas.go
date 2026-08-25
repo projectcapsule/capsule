@@ -388,9 +388,9 @@ func (r *Manager) syncResourceQuota(ctx context.Context, log logr.Logger, tenant
 			return retryErr
 		})
 		if err != nil {
-			if apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
+			if apierrors.IsNotFound(err) || apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
 				log.V(4).Info(
-					"skipping ResourceQuota sync because namespace is terminating",
+					"skipping ResourceQuota sync because namespace is gone or terminating",
 					"name", target.Name,
 					"namespace", target.Namespace,
 					"tenant", tenant.Name,
