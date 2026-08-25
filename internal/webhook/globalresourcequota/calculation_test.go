@@ -24,6 +24,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
 
@@ -269,8 +270,34 @@ func TestValidateHardLimitAgainstAllocatedUsage(t *testing.T) {
 	}, allocated); err == nil {
 		t.Fatal("hard limit below allocated usage was accepted")
 	}
-	if err := validateHardLimit(corev1.ResourceList{}, allocated); err == nil {
-		t.Fatal("allocated resource was removed from hard limit")
+	if err := validateHardLimit(corev1.ResourceList{}, allocated); err != nil {
+		t.Fatalf("allocated resource removal was rejected: %v", err)
+	}
+}
+
+func TestGlobalResourceQuotaAllowsRemovingAllocatedResource(t *testing.T) {
+	t.Parallel()
+
+	oldQuota := globalQuotaForTest("shared", corev1.ResourceList{
+		corev1.ResourceLimitsCPU:      resource.MustParse("8"),
+		corev1.ResourceRequestsMemory: resource.MustParse("8Gi"),
+	})
+	oldQuota.Status.Total.Used = corev1.ResourceList{
+		corev1.ResourceLimitsCPU: resource.MustParse("4"),
+	}
+	ledger := initializedLedger(types.NamespacedName{
+		Namespace: configuration.ControllerNamespace(),
+		Name:      oldQuota.GetLedgerName(),
+	}, oldQuota, corev1.ResourceList{
+		corev1.ResourceLimitsCPU: resource.MustParse("6"),
+	})
+
+	newQuota := oldQuota.DeepCopy()
+	delete(newQuota.Spec.Quota.Hard, corev1.ResourceLimitsCPU)
+
+	request := globalResourceQuotaUpdateRequest(t, oldQuota, newQuota)
+	if response := validateGlobalResourceQuotaRequest(context.Background(), ledgerClient(t, ledger), request); response != nil {
+		t.Fatalf("allocated resource removal was rejected: %#v", response)
 	}
 }
 
