@@ -20,7 +20,6 @@ import (
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/discovery"
@@ -93,24 +92,6 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 				predicate.GenerationChangedPredicate{},
 				predicates.UpdatedMetadataPredicate{},
 				predicates.DeletionChangedPredicate{},
-			)),
-		).
-		Watches(
-			&corev1.ResourceQuota{},
-			handler.Funcs{
-				CreateFunc: func(ctx context.Context, e event.TypedCreateEvent[client.Object], _ workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-					r.syncResourceQuotasForResourceQuota(ctx, e.Object)
-				},
-				UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[client.Object], _ workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-					r.syncResourceQuotasForResourceQuota(ctx, e.ObjectNew)
-				},
-				DeleteFunc: func(ctx context.Context, e event.TypedDeleteEvent[client.Object], _ workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-					r.syncResourceQuotasForResourceQuota(ctx, e.Object)
-				},
-			},
-			builder.WithPredicates(predicate.Or(
-				predicates.TenantManagedResourceChangedPredicate{},
-				predicates.ResourceQuotaUsageChangedPredicate{},
 			)),
 		).
 		Owns(&rbacv1.RoleBinding{}, builder.WithPredicates(predicates.TenantManagedResourceChangedPredicate{})).
@@ -263,7 +244,11 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 		)
 	}
 
-	return ctrlBuilder.Complete(r)
+	if err := ctrlBuilder.Complete(r); err != nil {
+		return err
+	}
+
+	return r.setupResourceQuotaController(mgr, ctrlConfig)
 }
 
 func (r *Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ctrl.Result, err error) {
@@ -444,37 +429,4 @@ func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *caps
 	log.V(4).Info("Tenant reconciling completed")
 
 	return err
-}
-
-func (r *Manager) syncResourceQuotasForResourceQuota(ctx context.Context, quota client.Object) {
-	owner := metav1.GetControllerOf(quota)
-	if owner == nil || owner.APIVersion != capsulev1beta2.GroupVersion.String() || owner.Kind != "Tenant" {
-		return
-	}
-
-	reader := r.reader
-	if reader == nil {
-		reader = r.Client
-	}
-
-	tenant := &capsulev1beta2.Tenant{}
-	if err := reader.Get(ctx, client.ObjectKey{Name: owner.Name}, tenant); err != nil {
-		if !apierrors.IsNotFound(err) {
-			r.Log.Error(err, "cannot retrieve Tenant for ResourceQuota sync", "tenant", owner.Name)
-		}
-
-		return
-	}
-
-	if tenant.DeletionTimestamp != nil {
-		return
-	}
-
-	if err := r.syncCustomResourceQuotaUsages(ctx, tenant); err != nil {
-		r.Log.Error(err, "cannot update custom ResourceQuota usages", "tenant", tenant.Name)
-	}
-
-	if err := r.syncResourceQuotas(ctx, r.Log, tenant); err != nil {
-		r.Log.Error(err, "cannot sync ResourceQuotas", "tenant", tenant.Name)
-	}
 }
