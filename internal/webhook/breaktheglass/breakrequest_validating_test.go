@@ -12,15 +12,23 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	gm "go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
 	apierr "k8s.io/apimachinery/pkg/api/errors"
+	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	mc "github.com/projectcapsule/capsule/internal/mocks/client"
 	"github.com/projectcapsule/capsule/internal/webhook/test"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
+	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
+	tpl "github.com/projectcapsule/capsule/pkg/template"
 )
 
 func TestBreakRequestValidationHandler(t *testing.T) {
@@ -100,6 +108,74 @@ func TestBreakRequestValidationHandler(t *testing.T) {
 				errMsg:   "requested duration 1h0m0s exceeds template maxDuration 1m0s",
 			},
 			{
+				name: "allow template in a selected namespace",
+				br: &capsulev1beta2.BreakRequest{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "team-a"},
+					Spec: capsulev1beta2.BreakRequestSpec{
+						TemplateName: defaultTemplateName,
+					},
+				},
+				setup: func(reader *mc.MockReader) {
+					reader.EXPECT().
+						Get(gm.Any(), client.ObjectKey{Name: defaultTemplateName}, gm.Any()).
+						Do(func(_ any, _ any, brt *capsulev1beta2.BreakRequestTemplate, _ ...any) {
+							brt.Generation = 2
+							brt.Spec.NamespaceSelectors = []selectors.NamespaceSelector{{
+								LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"access": "enabled"}},
+							}}
+							brt.Status.ObservedGeneration = 2
+							brt.Status.Namespaces = []string{"team-a"}
+						})
+				},
+				expected: 0,
+			},
+			{
+				name: "deny template outside selected namespaces",
+				br: &capsulev1beta2.BreakRequest{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "team-b"},
+					Spec: capsulev1beta2.BreakRequestSpec{
+						TemplateName: defaultTemplateName,
+					},
+				},
+				setup: func(reader *mc.MockReader) {
+					reader.EXPECT().
+						Get(gm.Any(), client.ObjectKey{Name: defaultTemplateName}, gm.Any()).
+						Do(func(_ any, _ any, brt *capsulev1beta2.BreakRequestTemplate, _ ...any) {
+							brt.Generation = 2
+							brt.Spec.NamespaceSelectors = []selectors.NamespaceSelector{{
+								LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"access": "enabled"}},
+							}}
+							brt.Status.ObservedGeneration = 2
+							brt.Status.Namespaces = []string{"team-a"}
+						})
+				},
+				expected: http.StatusForbidden,
+				errMsg:   "template foo is not available in namespace team-b",
+			},
+			{
+				name: "deny while selected namespaces are stale",
+				br: &capsulev1beta2.BreakRequest{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "team-a"},
+					Spec: capsulev1beta2.BreakRequestSpec{
+						TemplateName: defaultTemplateName,
+					},
+				},
+				setup: func(reader *mc.MockReader) {
+					reader.EXPECT().
+						Get(gm.Any(), client.ObjectKey{Name: defaultTemplateName}, gm.Any()).
+						Do(func(_ any, _ any, brt *capsulev1beta2.BreakRequestTemplate, _ ...any) {
+							brt.Generation = 3
+							brt.Spec.NamespaceSelectors = []selectors.NamespaceSelector{{
+								LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"access": "enabled"}},
+							}}
+							brt.Status.ObservedGeneration = 2
+							brt.Status.Namespaces = []string{"team-a"}
+						})
+				},
+				expected: http.StatusForbidden,
+				errMsg:   "template foo namespace selection is not ready",
+			},
+			{
 				name: "deny if startTime is not in the future",
 				br: &capsulev1beta2.BreakRequest{
 					Spec: capsulev1beta2.BreakRequestSpec{
@@ -125,7 +201,7 @@ func TestBreakRequestValidationHandler(t *testing.T) {
 				decoder := &test.Decoder[*capsulev1beta2.BreakRequest]{
 					Object: tt.br,
 				}
-				validator := BreakRequestValidationHandler(log)
+				validator := BreakRequestValidationHandler(log, nil)
 
 				if tt.setup != nil {
 					tt.setup(reader)
@@ -186,7 +262,7 @@ func TestBreakRequestValidationHandler(t *testing.T) {
 					Object:    tt.newBr,
 					OldObject: tt.oldBr,
 				}
-				validator := BreakRequestValidationHandler(log)
+				validator := BreakRequestValidationHandler(log, nil)
 
 				resp := validator.OnUpdate(nil, nil, decoder, nil)(ctx, admission.Request{})
 				if tt.expected == 0 {
@@ -197,4 +273,54 @@ func TestBreakRequestValidationHandler(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestBreakRequestValidationLoadsParameterizedContext(t *testing.T) {
+	t.Parallel()
+
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := capsulev1beta2.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+
+	brt := &capsulev1beta2.BreakRequestTemplate{
+		ObjectMeta: metav1.ObjectMeta{Name: "context-template"},
+		Spec: capsulev1beta2.BreakRequestTemplateSpec{
+			ParamSchema: runtime.RawExtension{Raw: []byte(`{"type":"object","required":["source"],"properties":{"source":{"type":"string"}}}`)},
+			Context: &tpl.TemplateContext{Resources: []*tpl.TemplateResourceReference{{
+				ResourceReference: tpl.ResourceReference{
+					VersionKind: apiruntime.VersionKind{APIVersion: "v1", Kind: "ConfigMap"},
+					Name:        "{{ .source }}",
+				},
+				Index: "settings",
+			}}},
+			Resources: []apiruntime.ResourceTemplate{{Targets: []runtime.RawExtension{{Raw: []byte(`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"rendered"},"data":{"value":"{{ (index .settings 0).data.value }}"}}`)}}}},
+		},
+	}
+	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(
+		brt,
+		&corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{Name: "source-config", Namespace: "team-a"},
+			Data:       map[string]string{"value": "loaded"},
+		},
+	).Build()
+	mapper := k8smeta.NewDefaultRESTMapper([]schema.GroupVersion{{Version: "v1"}})
+	mapper.Add(corev1.SchemeGroupVersion.WithKind("ConfigMap"), k8smeta.RESTScopeNamespace)
+
+	br := &capsulev1beta2.BreakRequest{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "team-a"},
+		Spec: capsulev1beta2.BreakRequestSpec{
+			TemplateName: brt.Name,
+			Params:       &runtime.RawExtension{Raw: []byte(`{"source":"source-config"}`)},
+		},
+	}
+	decoder := &test.Decoder[*capsulev1beta2.BreakRequest]{Object: br}
+	validator := BreakRequestValidationHandler(ctrl.Log.WithName("test"), mapper)
+
+	if resp := validator.OnCreate(cl, cl, decoder, nil)(context.Background(), admission.Request{}); resp != nil {
+		t.Fatalf("expected request with loadable context to be allowed, got %#v", resp)
+	}
 }

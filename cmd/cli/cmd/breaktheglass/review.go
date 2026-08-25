@@ -12,8 +12,10 @@ import (
 	"github.com/xhit/go-str2duration/v2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	"github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/breaktheglass"
@@ -77,7 +79,28 @@ var reviewCmd = &cobra.Command{
 			)
 		}
 
-		props, err := br.GenerateApprovedProperties()
+		var props *v1beta2.ApprovedProperties
+
+		if br.Status.Template != nil && br.Status.Template.Context != nil {
+			httpClient, clientErr := rest.HTTPClientFor(cfg)
+			if clientErr != nil {
+				return clientErr
+			}
+
+			mapper, mapperErr := apiutil.NewDynamicRESTMapper(cfg, httpClient)
+			if mapperErr != nil {
+				return mapperErr
+			}
+
+			loadedContext, contextErr := br.LoadTemplateContext(ctx, k8sClient, mapper)
+			if contextErr != nil {
+				return contextErr
+			}
+
+			props, err = br.GenerateApprovedProperties(loadedContext)
+		} else {
+			props, err = br.GenerateApprovedProperties()
+		}
 		if err != nil {
 			return err
 		}

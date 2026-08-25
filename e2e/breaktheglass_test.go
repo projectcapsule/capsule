@@ -12,7 +12,12 @@ import (
 	. "github.com/onsi/gomega"
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/breaktheglass"
+	apimeta "github.com/projectcapsule/capsule/pkg/api/meta"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
+	tpl "github.com/projectcapsule/capsule/pkg/template"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -37,8 +42,8 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 				DefaultDuration: &metav1.Duration{
 					Duration: defaultDuration,
 				},
-				Templates: []runtime.RawExtension{{
-					Object: &corev1.ConfigMap{
+				Resources: []apiruntime.ResourceTemplate{{
+					Targets: []runtime.RawExtension{{Object: &corev1.ConfigMap{
 						TypeMeta: metav1.TypeMeta{
 							Kind:       "ConfigMap",
 							APIVersion: "v1",
@@ -47,7 +52,7 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 							Name: "e2e-btg-cm",
 						},
 						Data: map[string]string{"key": "value"},
-					},
+					}}},
 				},
 				},
 			},
@@ -88,13 +93,82 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 			}).Should(Succeed())
 
 			cm := &corev1.ConfigMap{}
-			Eventually(func() (err error) {
-				return k8sClient.Get(ctx, types.NamespacedName{Name: "e2e-btg-cm", Namespace: br.Namespace}, cm)
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "e2e-btg-cm", Namespace: br.Namespace}, cm)).To(Succeed())
+				g.Expect(cm.Labels).To(HaveKeyWithValue(apimeta.CreatedByCapsuleLabel, apimeta.ValueControllerBreakTheGlass))
+				g.Expect(cm.Labels).To(HaveKeyWithValue(apimeta.ProtectedByCapsuleLabel, apimeta.ValueControllerBreakTheGlass))
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+			cm.Data["key"] = "tampered"
+			err := k8sClient.Update(ctx, cm)
+			Expect(apierrors.IsForbidden(err)).To(BeTrue())
+			Expect(err).To(MatchError(ContainSubstring("can only be changed by the Capsule controller")))
 
 			// should be deleted after duration
 			Eventually(func() (err error) {
 				return k8sClient.Get(ctx, types.NamespacedName{Name: "e2e-btg-cm", Namespace: br.Namespace}, cm)
+			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
+		})
+	})
+
+	Describe("Protection disabled for a target", func() {
+		BeforeEach(func() {
+			protect := false
+			brt.Spec.Resources[0].Policy.Protect = &protect
+		})
+
+		It("allows the managed resource to be changed", func() {
+			br := &capsulev1beta2.BreakRequest{
+				ObjectMeta: metav1.ObjectMeta{Name: "e2e-btg-unprotected", Namespace: "default"},
+				Spec:       capsulev1beta2.BreakRequestSpec{TemplateName: brt.GetName()},
+			}
+			defer EventuallyDeletion(br)
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, br) }).Should(Succeed())
+
+			cm := &corev1.ConfigMap{}
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "e2e-btg-cm", Namespace: br.Namespace}, cm)).To(Succeed())
+				g.Expect(cm.Labels).NotTo(HaveKey(apimeta.ProtectedByCapsuleLabel))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+			cm.Data["key"] = "changed"
+			Expect(k8sClient.Update(ctx, cm)).To(Succeed())
+		})
+	})
+
+	Describe("Cluster-scoped targets", func() {
+		BeforeEach(func() {
+			brt.Spec.DefaultDuration = nil
+			brt.Spec.Resources = []apiruntime.ResourceTemplate{{
+				Targets: []runtime.RawExtension{{Object: &rbacv1.ClusterRole{
+					TypeMeta:   metav1.TypeMeta{APIVersion: rbacv1.SchemeGroupVersion.String(), Kind: "ClusterRole"},
+					ObjectMeta: metav1.ObjectMeta{Name: "e2e-btg-cluster-role"},
+					Rules: []rbacv1.PolicyRule{{
+						APIGroups: []string{"apps"},
+						Resources: []string{"deployments"},
+						Verbs:     []string{"get"},
+					}},
+				}}},
+			}}
+		})
+
+		It("cascades deletion through the BreakRequest finalizer without an owner reference", func() {
+			br := &capsulev1beta2.BreakRequest{
+				ObjectMeta: metav1.ObjectMeta{Name: "e2e-btg-cluster-scope", Namespace: "default"},
+				Spec:       capsulev1beta2.BreakRequestSpec{TemplateName: brt.GetName()},
+			}
+			defer EventuallyDeletion(br)
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, br) }).Should(Succeed())
+
+			role := &rbacv1.ClusterRole{}
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "e2e-btg-cluster-role"}, role)).To(Succeed())
+				g.Expect(role.OwnerReferences).To(BeEmpty())
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+			Expect(k8sClient.Delete(ctx, br)).To(Succeed())
+			Eventually(func() error {
+				return k8sClient.Get(ctx, types.NamespacedName{Name: role.Name}, role)
 			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
 		})
 	})
@@ -230,9 +304,9 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 
 	Describe("Template with parameter", func() {
 		BeforeEach(func() {
-			brt.Spec.Templates = []runtime.RawExtension{
+			brt.Spec.Resources = []apiruntime.ResourceTemplate{
 				{
-					Object: &corev1.ConfigMap{
+					Targets: []runtime.RawExtension{{Object: &corev1.ConfigMap{
 						TypeMeta: metav1.TypeMeta{
 							Kind:       "ConfigMap",
 							APIVersion: "v1",
@@ -241,7 +315,7 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 							Name: "e2e-btg-cm",
 						},
 						Data: map[string]string{"key": "{{.value}}"},
-					},
+					}}},
 				},
 			}
 			brt.Spec.ParamSchema = runtime.RawExtension{Raw: []byte(`{"type": "object", "required": ["value"], "properties": {"value": {"type": "string"}}}`)}
@@ -269,6 +343,110 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 				return k8sClient.Get(ctx, types.NamespacedName{Name: "e2e-btg-cm", Namespace: br.Namespace}, cm)
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			Expect(cm.Data["key"]).Should(Equal("test-value"))
+		})
+	})
+
+	Describe("Adopting an existing resource", func() {
+		BeforeEach(func() {
+			brt.Spec.Resources[0].Policy.Creation = apiruntime.ResourceCreationPolicyMerge
+		})
+
+		It("should prune only the fields managed by the break request", func() {
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "e2e-btg-cm",
+					Namespace: "default",
+				},
+				Data: map[string]string{"existing": "preserved"},
+			}
+			defer EventuallyDeletion(cm)
+			EventuallyCreation(func() error {
+				cm.ResourceVersion = ""
+
+				return k8sClient.Create(ctx, cm)
+			}).Should(Succeed())
+
+			br := &capsulev1beta2.BreakRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "e2e-btg-adopt",
+					Namespace: "default",
+				},
+				Spec: capsulev1beta2.BreakRequestSpec{TemplateName: brt.GetName()},
+			}
+			defer EventuallyDeletion(br)
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, br) }).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				actual := &corev1.ConfigMap{}
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{
+					Name: cm.Name, Namespace: cm.Namespace,
+				}, actual)).To(Succeed())
+				g.Expect(actual.Data).To(HaveKeyWithValue("existing", "preserved"))
+				g.Expect(actual.Data).To(HaveKeyWithValue("key", "value"))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				actual := &corev1.ConfigMap{}
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{
+					Name: cm.Name, Namespace: cm.Namespace,
+				}, actual)).To(Succeed())
+				g.Expect(actual.Data).To(Equal(map[string]string{"existing": "preserved"}))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		})
+	})
+
+	Describe("Loading template context", func() {
+		BeforeEach(func() {
+			brt.Spec.ParamSchema = runtime.RawExtension{Raw: []byte(`{
+				"type":"object",
+				"required":["sourceName"],
+				"properties":{"sourceName":{"type":"string"}}
+			}`)}
+			brt.Spec.Context = &tpl.TemplateContext{Resources: []*tpl.TemplateResourceReference{{
+				ResourceReference: tpl.ResourceReference{
+					VersionKind: apiruntime.VersionKind{APIVersion: "v1", Kind: "ConfigMap"},
+					Name:        "{{ .sourceName }}",
+				},
+				Index: "settings",
+			}}}
+			brt.Spec.Resources = []apiruntime.ResourceTemplate{{Template: `
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: e2e-btg-cm
+data:
+  loaded: {{ (index $.context.resources.settings 0).data.value }}
+`}}
+		})
+
+		It("makes parameter-selected context available to every rendered template", func() {
+			source := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: "e2e-btg-context", Namespace: "default"},
+				Data:       map[string]string{"value": "from-context"},
+			}
+			defer EventuallyDeletion(source)
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, source) }).Should(Succeed())
+
+			br := &capsulev1beta2.BreakRequest{
+				ObjectMeta: metav1.ObjectMeta{Name: "e2e-btg-context", Namespace: "default"},
+				Spec: capsulev1beta2.BreakRequestSpec{
+					TemplateName: brt.Name,
+					Params: &runtime.RawExtension{Raw: []byte(`{
+						"sourceName":"e2e-btg-context"
+					}`)},
+				},
+			}
+			defer EventuallyDeletion(br)
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, br) }).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				actual := &corev1.ConfigMap{}
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{
+					Name: "e2e-btg-cm", Namespace: "default",
+				}, actual)).To(Succeed())
+				g.Expect(actual.Data).To(HaveKeyWithValue("loaded", "from-context"))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 	})
 })

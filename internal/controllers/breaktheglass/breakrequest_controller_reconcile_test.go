@@ -11,9 +11,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	gm "go.uber.org/mock/gomock"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -21,6 +23,8 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	mc "github.com/projectcapsule/capsule/internal/mocks/client"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 )
 
 const (
@@ -108,7 +112,8 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 				},
 			},
 			mocks: func(cl *mc.MockClient, scl *mc.MockSubResourceWriter) {
-				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil)
+				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil).Times(3)
+				cl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
 				scl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
 			},
 			verify: func(t *testing.T, br *capsulev1beta2.BreakRequest) {
@@ -149,20 +154,26 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 						StartTime: v1.Now(),
 					},
 					Template: &capsulev1beta2.TemplateProperties{
-						Templates:   []runtime.RawExtension{mtConfigMapParameterized},
+						Resources: []apiruntime.ResourceTemplate{{
+							Targets: []runtime.RawExtension{mtConfigMapParameterized},
+						}},
 						ParamSchema: psString,
 					},
 				},
 			},
 			mocks: func(cl *mc.MockClient, scl *mc.MockSubResourceWriter) {
-				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil)
+				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil).Times(3)
+				cl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
+				cl.EXPECT().Get(gm.Any(), gm.Any(), matchUs).
+					Return(apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, "test-configmap"))
+				cl.EXPECT().Patch(gm.Any(), matchUs, gm.Any(), gm.Any()).Return(nil).Times(2)
 				cl.EXPECT().Get(gm.Any(), gm.Any(), matchUs).Return(nil)
-				cl.EXPECT().Update(gm.Any(), matchUs, gm.Any()).Return(nil)
 				scl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
 			},
 			verify: func(t *testing.T, br *capsulev1beta2.BreakRequest) {
 				assert.Equal(t, capsulev1beta2.RequestPhaseActive, br.Status.Phase)
-				assert.Len(t, br.Status.Approved.Templates, 1)
+				assert.Len(t, br.Status.Approved.Resources, 1)
+				assert.Len(t, br.Status.Approved.Resources[0].Targets, 1)
 
 				foundApproved := false
 				foundActive := false
@@ -177,10 +188,11 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 				assert.True(t, foundApproved)
 				assert.True(t, foundActive)
 
-				obj := br.Status.Approved.Templates[0].Object
+				obj := br.Status.Approved.Resources[0].Targets[0].Object
 				co, ok := obj.(client.Object)
 				assert.True(t, ok)
-				assert.Len(t, co.GetOwnerReferences(), 1)
+				assert.Empty(t, co.GetOwnerReferences())
+				assert.Equal(t, meta.ValueAppBreakTheGlassManager, co.GetLabels()[meta.AppManagedByLabel])
 			},
 		},
 	}
@@ -202,7 +214,6 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 
 			r := &BreakRequestReconciler{
 				Client:   cl,
-				scheme:   s,
 				recorder: &events.FakeRecorder{},
 				Log:      ctrl.Log,
 			}

@@ -4,8 +4,11 @@
 package meta
 
 import (
+	"hash/fnv"
+	"strconv"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -23,7 +26,26 @@ func ControllerFieldOwner() string {
 }
 
 func ResourceControllerFieldOwnerPrefix() string {
-	return FieldManagerCapsulePrefix + "/resource/controller"
+	return ResourceFieldOwner("controller")
+}
+
+// ResourceFieldOwner returns a Capsule field manager for an applied resource.
+func ResourceFieldOwner(fieldowner string) string {
+	return FieldManagerCapsulePrefix + "/resource/" + fieldowner
+}
+
+// BreakRequestFieldOwner returns a stable field manager for a BreakRequest.
+func BreakRequestFieldOwner(obj metav1.Object) string {
+	identity := string(obj.GetUID())
+	if identity == "" {
+		hash := fnv.New64a()
+		_, _ = hash.Write([]byte(obj.GetNamespace()))
+		_, _ = hash.Write([]byte{0})
+		_, _ = hash.Write([]byte(obj.GetName()))
+		identity = strconv.FormatUint(hash.Sum64(), 36)
+	}
+
+	return ResourceFieldOwner("breakrequest/" + identity)
 }
 
 // CapsuleFieldOwners returns the set of managers that start with the Capsule prefix.

@@ -15,7 +15,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -28,31 +27,36 @@ import (
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/api/breaktheglass"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/conditions"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/ssa"
 )
 
-const (
-	controllerName        = "breakrequest"
-	labelKeyManagedBy     = "app.kubernetes.io/managed-by"
-	labelValueManagedBy   = "break-the-glass-controller"
-	annotationActiveUntil = "projectcapsule.dev/active-until"
-)
+const controllerName = "breakrequest"
 
 type BreakRequestReconciler struct {
 	client.Client
 
-	scheme   *runtime.Scheme
-	Metrics  metrics.BreakRequestsRecorder
-	recorder events.EventRecorder
-	Log      logr.Logger
+	Metrics   metrics.BreakRequestsRecorder
+	recorder  events.EventRecorder
+	Log       logr.Logger
+	resources ssa.Manager
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *BreakRequestReconciler) SetupWithManager(mgr ctrl.Manager, _ utils.ControllerOptions) error {
-	r.scheme = mgr.GetScheme()
 	r.Client = mgr.GetClient()
 	r.recorder = mgr.GetEventRecorder(controllerName)
+	r.resources = ssa.Manager{
+		Reader: mgr.GetAPIReader(),
+		Mapper: mgr.GetRESTMapper(),
+		Metadata: ssa.Metadata{
+			CreatedByValue:   meta.ValueControllerBreakTheGlass,
+			ManagedByValue:   meta.ValueControllerBreakTheGlass,
+			ProtectedByValue: meta.ValueControllerBreakTheGlass,
+		},
+	}
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&capsulev1beta2.BreakRequest{}).
@@ -92,12 +96,18 @@ func (r *BreakRequestReconciler) Reconcile(
 
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.4/pkg/reconcile
+//
+//nolint:cyclop
 func (r *BreakRequestReconciler) reconcile(
 	ctx context.Context,
 	log logr.Logger,
 	br *capsulev1beta2.BreakRequest,
 ) (res ctrl.Result, err error) {
 	defer r.updateStatus(ctx, log, br)()
+
+	if !br.DeletionTimestamp.IsZero() {
+		return r.reconcileDelete(ctx, br)
+	}
 
 	switch br.Status.Phase {
 	case capsulev1beta2.RequestPhasePending:
@@ -110,6 +120,10 @@ func (r *BreakRequestReconciler) reconcile(
 
 		if br.Status.Approved == nil {
 			return ctrl.Result{}, fmt.Errorf("BreakRequest is in Approved phase but status.approved is nil")
+		}
+
+		if err := r.addFinalizer(ctx, log, br); err != nil {
+			return ctrl.Result{}, err
 		}
 
 		if !br.Status.Approved.StartTime.IsZero() {
@@ -145,10 +159,6 @@ func (r *BreakRequestReconciler) reconcile(
 		return ctrl.Result{}, nil
 
 	case capsulev1beta2.RequestPhaseDenied:
-		if err := r.addFinalizer(ctx, log, br); err != nil {
-			return ctrl.Result{}, err
-		}
-
 		log.V(5).Info("BreakRequest is denied, handling denied state")
 
 		return ctrl.Result{}, nil
@@ -186,6 +196,10 @@ func (r *BreakRequestReconciler) reconcile(
 
 	// When the BreakRequest has expired
 	case capsulev1beta2.RequestPhaseExpired:
+		if err := r.pruneItems(ctx, br); err != nil {
+			return ctrl.Result{}, err
+		}
+
 		if br.Status.KeepUntil.Time.IsZero() ||
 			time.Until(br.Status.KeepUntil.Time) <= 0 {
 			log.V(5).Info("BreakRequest is expired, deleting br")
@@ -200,10 +214,6 @@ func (r *BreakRequestReconciler) reconcile(
 
 		log.V(5).WithValues("keep-date", br.Status.KeepUntil.Time).
 			Info("BreakRequest is expired, Holding expired state until keep date is reached")
-
-		if err := r.deleteItems(ctx, br); err != nil {
-			return ctrl.Result{}, err
-		}
 
 		return ctrl.Result{RequeueAfter: time.Until(br.Status.KeepUntil.Time)}, nil
 
@@ -221,7 +231,12 @@ func (r *BreakRequestReconciler) reconcile(
 		br.InitializeFromTemplate(brt)
 
 		if ok, err := conditions.IsApproved(brt, br); ok {
-			props, err := br.GenerateApprovedProperties()
+			loadedContext, err := br.LoadTemplateContext(ctx, r.Client, r.managedResourceManager().Mapper)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+
+			props, err := br.GenerateApprovedProperties(loadedContext)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -300,16 +315,13 @@ func (r *BreakRequestReconciler) updateStatus(
 	}
 }
 
-// We are adding a finalizer to the BreakRequest to ensure it's not deleted before the request is processed (KeepFor period).
+// Add a finalizer so managed resources are pruned before deletion and the
+// BreakRequest can be retained for its configured audit period.
 func (r *BreakRequestReconciler) addFinalizer(
 	ctx context.Context,
 	log logr.Logger,
 	br *capsulev1beta2.BreakRequest,
 ) error {
-	if br.Status.KeepUntil.Time.IsZero() || time.Until(br.Status.KeepUntil.Time) <= 0 {
-		return nil
-	}
-
 	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, br, func() error {
 		finalizerName := meta.ControllerFinalizer
 		if controllerutil.ContainsFinalizer(br, finalizerName) {
@@ -329,6 +341,29 @@ func (r *BreakRequestReconciler) addFinalizer(
 	return r.Get(ctx, client.ObjectKeyFromObject(br), br)
 }
 
+func (r *BreakRequestReconciler) reconcileDelete(
+	ctx context.Context,
+	br *capsulev1beta2.BreakRequest,
+) (ctrl.Result, error) {
+	if !controllerutil.ContainsFinalizer(br, meta.ControllerFinalizer) {
+		return ctrl.Result{}, nil
+	}
+
+	if err := r.pruneItems(ctx, br); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if !br.Status.KeepUntil.IsZero() {
+		if wait := time.Until(br.Status.KeepUntil.Time); wait > 0 {
+			return ctrl.Result{RequeueAfter: wait}, nil
+		}
+	}
+
+	controllerutil.RemoveFinalizer(br, meta.ControllerFinalizer)
+
+	return ctrl.Result{}, r.Update(ctx, br)
+}
+
 // When a request is approved, it can be activated immediately or after a certain duration.
 func (r *BreakRequestReconciler) transitionRequestActivation(
 	ctx context.Context,
@@ -343,6 +378,10 @@ func (r *BreakRequestReconciler) transitionRequestActivation(
 
 	// Reflect Binding
 	if err := r.reconcileItems(ctx, brCopy); err != nil {
+		// Persist the rendered identities so partially applied resources can be
+		// pruned if activation is cancelled or the request is deleted.
+		br.Status.Approved.Resources = brCopy.Status.Approved.Resources
+
 		return fmt.Errorf("failed to create BreakRequest items %s: %w", brCopy.Name, err)
 	}
 
@@ -373,61 +412,39 @@ func (r *BreakRequestReconciler) reconcileItems(
 	}
 
 	// reset the approved items; only the effective items should be kept
-	br.Status.Approved.Templates = nil
+	br.Status.Approved.Resources = nil
 
-	rendered, err := br.RenderItems(tpl.ParamSchema, tpl.Templates)
+	loadedContext, err := br.LoadTemplateContext(ctx, r.Client, r.managedResourceManager().Mapper)
 	if err != nil {
 		return err
 	}
 
-	codecFactory := serializer.NewCodecFactory(r.Scheme())
+	rendered, err := br.RenderResources(tpl.ParamSchema, tpl.Resources, loadedContext)
+	if err != nil {
+		return err
+	}
 
-	for _, raw := range rendered {
-		obj := &unstructured.Unstructured{}
-		if _, _, decodeErr := codecFactory.UniversalDeserializer().
-			Decode(raw.Raw, nil, obj); decodeErr != nil {
-			syncErr = errors.Join(syncErr, decodeErr)
+	for _, resource := range rendered {
+		effective := apiruntime.ResourceTemplate{Policy: resource.Policy}
 
-			continue
-		}
+		for _, raw := range resource.Targets {
+			obj, decodeErr := object(raw)
+			if decodeErr != nil {
+				syncErr = errors.Join(syncErr, decodeErr)
 
-		obj.SetNamespace(br.Namespace)
-
-		if !br.Status.Active.ActiveUntil.IsZero() {
-			ann := obj.GetAnnotations()
-			if ann == nil {
-				ann = map[string]string{}
+				continue
 			}
 
-			ann[annotationActiveUntil] = br.Status.Active.ActiveUntil.Format(time.RFC3339)
-			obj.SetAnnotations(ann)
-		}
+			obj.SetNamespace(br.Namespace)
 
-		if orerr := controllerutil.SetOwnerReference(br, obj, r.scheme); orerr != nil {
-			syncErr = errors.Join(syncErr, orerr)
-
-			continue
-		}
-
-		// append the item to the approved items (use deep copy to avoid using the cluster object)
-		br.Status.Approved.Templates = append(br.Status.Approved.Templates, runtime.RawExtension{Object: obj.DeepCopy()})
-
-		// Apply the object to the cluster
-		_, err = controllerutil.CreateOrUpdate(ctx, r.Client, obj, func() error {
-			// CreateOrUpdate re-fetches the live object before running this function, so any
-			// metadata that must be enforced needs to be applied here as well.
 			if !br.Status.Active.ActiveUntil.IsZero() {
 				ann := obj.GetAnnotations()
 				if ann == nil {
 					ann = map[string]string{}
 				}
 
-				ann[annotationActiveUntil] = br.Status.Active.ActiveUntil.Format(time.RFC3339)
+				ann[meta.BreakRequestActiveUntilAnnotation] = br.Status.Active.ActiveUntil.Format(time.RFC3339)
 				obj.SetAnnotations(ann)
-			}
-
-			if err := controllerutil.SetOwnerReference(br, obj, r.scheme); err != nil {
-				return err
 			}
 
 			labels := obj.GetLabels()
@@ -435,21 +452,36 @@ func (r *BreakRequestReconciler) reconcileItems(
 				labels = map[string]string{}
 			}
 
-			labels[labelKeyManagedBy] = labelValueManagedBy
+			labels[meta.AppManagedByLabel] = meta.ValueAppBreakTheGlassManager
 			obj.SetLabels(labels)
 
-			return nil
-		})
-		if err != nil {
-			syncErr = errors.Join(syncErr, err)
+			// Keep the rendered identity even when apply fails so it can be pruned.
+			effective.Targets = append(effective.Targets, runtime.RawExtension{Object: obj.DeepCopy()})
+
+			// BreakRequests are namespaced but may manage cluster-scoped objects,
+			// so their lifecycle cannot rely on Kubernetes owner references. The
+			// BreakRequest finalizer and recorded target identities provide the
+			// explicit cascade during expiration or deletion.
+			if _, applyErr := r.managedResourceManager().Apply(ctx, r.Client, obj, ssa.ApplyOptions{
+				FieldOwner: meta.BreakRequestFieldOwner(br),
+				Force:      resource.Policy.Force,
+				Adopt:      resource.Policy.AllowsAdoption(),
+				Protect:    resource.Policy.IsProtected(),
+			}); applyErr != nil {
+				syncErr = errors.Join(syncErr, applyErr)
+			}
+		}
+
+		if len(effective.Targets) > 0 {
+			br.Status.Approved.Resources = append(br.Status.Approved.Resources, effective)
 		}
 	}
 
 	return syncErr
 }
 
-// deletes items of the BreakRequest.
-func (r *BreakRequestReconciler) deleteItems(
+// pruneItems relinquishes the BreakRequest field manager's resources.
+func (r *BreakRequestReconciler) pruneItems(
 	ctx context.Context,
 	br *capsulev1beta2.BreakRequest,
 ) (err error) {
@@ -459,19 +491,31 @@ func (r *BreakRequestReconciler) deleteItems(
 		return errors.New("approved status is nil")
 	}
 
-	for _, item := range br.Status.Approved.Templates {
-		obj, err := object(item)
-		if err != nil {
-			syncErr = errors.Join(syncErr, err)
+	manager := r.managedResourceManager()
+	fieldOwner := meta.BreakRequestFieldOwner(br)
 
-			continue
-		}
-
-		if derr := r.Delete(ctx, obj); derr != nil {
-			if !apierrors.IsNotFound(derr) {
-				syncErr = errors.Join(syncErr, derr)
+	for _, resource := range br.Status.Approved.Resources {
+		for _, target := range resource.Targets {
+			obj, err := object(target)
+			if err != nil {
+				syncErr = errors.Join(syncErr, err)
 
 				continue
+			}
+
+			deleted, pruneErr := manager.Prune(ctx, r.Client, obj, ssa.PruneOptions{
+				FieldOwner: fieldOwner,
+			})
+			if pruneErr != nil {
+				syncErr = errors.Join(syncErr, pruneErr)
+
+				continue
+			}
+
+			if !deleted {
+				if disownErr := manager.Disown(ctx, r.Client, obj, nil); disownErr != nil {
+					syncErr = errors.Join(syncErr, disownErr)
+				}
 			}
 		}
 	}
@@ -479,11 +523,11 @@ func (r *BreakRequestReconciler) deleteItems(
 	return syncErr
 }
 
-func object(re runtime.RawExtension) (client.Object, error) {
+func object(re runtime.RawExtension) (*unstructured.Unstructured, error) {
 	// Prefer decoded object when present.
 	if re.Object != nil {
-		if co, ok := re.Object.(client.Object); ok {
-			return co, nil
+		if obj, ok := re.Object.(*unstructured.Unstructured); ok {
+			return obj.DeepCopy(), nil
 		}
 
 		us, err := runtime.DefaultUnstructuredConverter.ToUnstructured(re.Object)
@@ -505,4 +549,25 @@ func object(re runtime.RawExtension) (client.Object, error) {
 	}
 
 	return obj, nil
+}
+
+func (r *BreakRequestReconciler) managedResourceManager() ssa.Manager {
+	manager := r.resources
+	if manager.Reader == nil {
+		manager.Reader = r.Client
+	}
+
+	if manager.Metadata.CreatedByValue == "" {
+		manager.Metadata.CreatedByValue = meta.ValueControllerBreakTheGlass
+	}
+
+	if manager.Metadata.ManagedByValue == "" {
+		manager.Metadata.ManagedByValue = meta.ValueControllerBreakTheGlass
+	}
+
+	if manager.Metadata.ProtectedByValue == "" {
+		manager.Metadata.ProtectedByValue = meta.ValueControllerBreakTheGlass
+	}
+
+	return manager
 }

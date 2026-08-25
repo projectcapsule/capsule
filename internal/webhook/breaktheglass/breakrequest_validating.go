@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -18,17 +19,19 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
-func BreakRequestValidationHandler(log logr.Logger) handlers.Handler {
+func BreakRequestValidationHandler(log logr.Logger, mapper k8smeta.RESTMapper) handlers.Handler {
 	return &breakRequestValidationHandler{
-		log: log,
+		log:    log,
+		mapper: mapper,
 	}
 }
 
 type breakRequestValidationHandler struct {
-	log logr.Logger
+	log    logr.Logger
+	mapper k8smeta.RESTMapper
 }
 
-func (b *breakRequestValidationHandler) OnCreate(_ client.Client, reader client.Reader, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (b *breakRequestValidationHandler) OnCreate(c client.Client, reader client.Reader, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		b.log.Info("Validation for BreakRequest upon creation", "name", req.Name)
 
@@ -46,6 +49,25 @@ func (b *breakRequestValidationHandler) OnCreate(_ client.Client, reader client.
 			return ad.ErroredResponse(fmt.Errorf("error loading template %s: %w", br.Spec.TemplateName, err))
 		}
 
+		if len(brt.Spec.NamespaceSelectors) > 0 {
+			if brt.Status.ObservedGeneration != brt.Generation {
+				return ad.Denyf("template %s namespace selection is not ready", br.Spec.TemplateName)
+			}
+
+			namespace := req.Namespace
+			if namespace == "" {
+				namespace = br.Namespace
+			}
+
+			if !brt.Status.NamespacePresent(namespace) {
+				return ad.Denyf(
+					"template %s is not available in namespace %s",
+					br.Spec.TemplateName,
+					namespace,
+				)
+			}
+		}
+
 		if brt.Spec.MaxDuration.Duration > 0 &&
 			br.Spec.Duration != nil &&
 			br.Spec.Duration.Duration > brt.Spec.MaxDuration.Duration {
@@ -58,7 +80,14 @@ func (b *breakRequestValidationHandler) OnCreate(_ client.Client, reader client.
 			return ad.Denyf("start time %s must be in the future", br.Spec.StartTime.String())
 		}
 
-		if _, err := br.RenderItems(brt.Spec.ParamSchema, brt.Spec.Templates); err != nil {
+		br.InitializeFromTemplate(brt)
+
+		loadedContext, err := br.LoadTemplateContext(ctx, c, b.mapper)
+		if err != nil {
+			return ad.Denyf("invalid template context for %s: %v", br.Spec.TemplateName, err)
+		}
+
+		if _, err := br.RenderResources(brt.Spec.ParamSchema, brt.Spec.Resources, loadedContext); err != nil {
 			return ad.Denyf("invalid template rendering for %s: %v", br.Spec.TemplateName, err)
 		}
 

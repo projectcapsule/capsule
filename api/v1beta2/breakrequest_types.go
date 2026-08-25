@@ -5,9 +5,11 @@ package v1beta2
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/projectcapsule/capsule/pkg/api/breaktheglass"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
+	tpl "github.com/projectcapsule/capsule/pkg/template"
 )
 
 // BreakRequestSpec defines the desired state of BreakRequest.
@@ -16,7 +18,7 @@ type BreakRequestSpec struct {
 	// +kubebuilder:validation:Required
 	TemplateName string `json:"templateName"`
 	// Params the parameters to use for the template.
-	Params *runtime.RawExtension `json:"params,omitempty"`
+	Params *k8sruntime.RawExtension `json:"params,omitempty"`
 	// Requesting actor for the access request.
 	Requestor breaktheglass.AccessEntity `json:"requestor,omitempty"`
 	// A reason on why the request is needed
@@ -63,10 +65,12 @@ type ActivePeriod struct {
 
 // TemplateProperties contains properties copied from the assigned template.
 type TemplateProperties struct {
-	// The templates that are created by this request, provided by the template.
-	Templates []runtime.RawExtension `json:"templates,omitempty"`
+	// Resources rendered by this request, provided by the template.
+	Resources []apiruntime.ResourceTemplate `json:"resources,omitempty"`
 	// ParamSchema template parameter schema
-	ParamSchema runtime.RawExtension `json:"paramSchema,omitempty"`
+	ParamSchema k8sruntime.RawExtension `json:"paramSchema,omitempty"`
+	// Context loads additional Kubernetes resources for use by all resource targets and templates.
+	Context *tpl.TemplateContext `json:"context,omitempty"`
 	// The default duration of the BreakRequest referencing this template should be valid for.
 	DefaultDuration *metav1.Duration `json:"defaultDuration,omitempty"`
 	// The max allowed duration of the BreakRequest referencing this template should be valid for.
@@ -81,7 +85,7 @@ type ApprovedProperties struct {
 	KeepFor   breaktheglass.ExtendedDuration `json:"keepFor,omitempty"`
 	Duration  *metav1.Duration               `json:"duration,omitempty"`
 	StartTime metav1.Time                    `json:"startTime,omitempty"`
-	Templates []runtime.RawExtension         `json:"templates,omitempty"`
+	Resources []apiruntime.ResourceTemplate  `json:"resources,omitempty"`
 }
 
 // ReviewInfo contains information about the review of a request.

@@ -1,0 +1,56 @@
+# BreakRequest examples for the cluster-scoped `crd-resource-crud`
+# BreakRequestTemplate. Both referenced CRDs are installed by Capsule and are
+# namespaced resources. Change the namespace and identities for your cluster.
+apiVersion: capsule.clastix.io/v1beta2
+kind: BreakRequest
+metadata:
+  name: customquotas-editor-alice
+  namespace: default
+spec:
+  templateName: crd-resource-crud
+  requestor:
+    type: User
+    name: alice@example.com
+  reason: Temporarily investigate and repair CustomQuota configuration.
+  duration: 30m
+  params:
+    name: customquotas-editor-alice
+    crdName: customquotas.capsule.clastix.io
+    subjectKind: User
+    subjectName: alice@example.com
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: BreakRequest
+metadata:
+  name: tenantresources-editor-platform
+  namespace: default
+spec:
+  templateName: crd-resource-crud
+  requestor:
+    type: User
+    name: platform-lead@example.com
+  reason: Allow the platform team to perform a temporary TenantResource migration.
+  duration: 2h
+  params:
+    name: tenantresources-editor-platform
+    crdName: tenantresources.capsule.clastix.io
+    subjectKind: Group
+    subjectName: platform-engineers
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: BreakRequest
+metadata:
+  name: tenantresources-editor-platform-2
+  namespace: default
+spec:
+  templateName: crd-resource-crud-2
+  requestor:
+    type: User
+    name: platform-lead@example.com
+  reason: Allow the platform team to perform a temporary TenantResource migration.
+  duration: 2h
+  params:
+    name: tenantresources-editor-platform
+    crdName: tenantresources.capsule.clastix.io
+    subjectKind: Group
+    subjectName: platform-engineers

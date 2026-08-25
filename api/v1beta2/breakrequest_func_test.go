@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/projectcapsule/capsule/pkg/api/breaktheglass"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
+	tpl "github.com/projectcapsule/capsule/pkg/template"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -101,7 +103,9 @@ func TestInitializeFromTemplate(t *testing.T) {
 	br := &BreakRequest{}
 	brt := &BreakRequestTemplate{
 		Spec: BreakRequestTemplateSpec{
-			Templates:       []runtime.RawExtension{},
+			Resources:       []apiruntime.ResourceTemplate{},
+			ParamSchema:     runtime.RawExtension{Raw: []byte(`{"type":"object"}`)},
+			Context:         &tpl.TemplateContext{},
 			DefaultDuration: &metav1.Duration{Duration: time.Minute},
 			MaxDuration:     metav1.Duration{Duration: time.Hour},
 			KeepFor:         5,
@@ -110,7 +114,9 @@ func TestInitializeFromTemplate(t *testing.T) {
 
 	br.InitializeFromTemplate(brt)
 	assert.NotNil(t, br.Status.Template)
-	assert.Equal(t, brt.Spec.Templates, br.Status.Template.Templates)
+	assert.Equal(t, brt.Spec.Resources, br.Status.Template.Resources)
+	assert.Equal(t, brt.Spec.ParamSchema, br.Status.Template.ParamSchema)
+	assert.Equal(t, brt.Spec.Context, br.Status.Template.Context)
 	assert.Equal(t, brt.Spec.DefaultDuration, br.Status.Template.DefaultDuration)
 	assert.Equal(t, brt.Spec.MaxDuration, br.Status.Template.MaxDuration)
 	assert.Equal(t, brt.Spec.KeepFor, br.Status.Template.KeepFor)
@@ -137,18 +143,23 @@ func TestDenyRequest(t *testing.T) {
 	assert.Equal(t, "Denied", br.Status.Review.Message)
 }
 
-func TestRenderItems(t *testing.T) {
+func TestRenderResources(t *testing.T) {
 	br := &BreakRequest{
 		Spec: BreakRequestSpec{
 			Params: &runtime.RawExtension{Raw: []byte(`{"key":"value"}`)},
 		},
 	}
 	schema := runtime.RawExtension{Raw: []byte(`{"type":"object","properties":{"key":{"type":"string"}}}`)}
-	tpl := runtime.RawExtension{Raw: []byte(`{"kind":"ConfigMap"}`)}
+	resource := apiruntime.ResourceTemplate{
+		Policy:  apiruntime.ResourceTemplatePolicy{Creation: apiruntime.ResourceCreationPolicyMerge, Force: true},
+		Targets: []runtime.RawExtension{{Raw: []byte(`{"kind":"ConfigMap"}`)}},
+	}
 
-	items, err := br.RenderItems(schema, []runtime.RawExtension{tpl})
+	items, err := br.RenderResources(schema, []apiruntime.ResourceTemplate{resource})
 	require.NoError(t, err)
 	assert.Len(t, items, 1)
+	assert.Equal(t, resource.Policy, items[0].Policy)
+	assert.Len(t, items[0].Targets, 1)
 }
 func TestActiveRequest(t *testing.T) {
 	tests := []struct {

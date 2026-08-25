@@ -76,8 +76,8 @@ func validate(decoder admission.Decoder, req admission.Request) *admission.Respo
 		)
 	}
 
-	if err := template.ValidateItems(brt.Spec.ParamSchema, brt.Spec.Templates); err != nil {
-		return ad.Denyf("invalid templates: %v", err)
+	if err := template.ValidateResourceTemplates(brt.Spec.ParamSchema, brt.Spec.Resources); err != nil {
+		return ad.Denyf("invalid resources: %v", err)
 	}
 
 	return nil
