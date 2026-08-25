@@ -9,9 +9,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// ValidateHardLimit rejects removal or reduction of a hard resource below an
-// already allocated quantity. Path identifies the hard-limit field in the
-// returned validation error.
+// ValidateHardLimit rejects an explicitly configured hard resource below an
+// already allocated quantity. Resources omitted from hard are no longer
+// governed by the quota and are therefore ignored. Path identifies the
+// hard-limit field in the returned validation error.
 func ValidateHardLimit(path string, hard, allocated corev1.ResourceList) error {
 	for name, usage := range allocated {
 		if usage.Sign() <= 0 {
@@ -20,12 +21,7 @@ func ValidateHardLimit(path string, hard, allocated corev1.ResourceList) error {
 
 		limit, exists := hard[name]
 		if !exists {
-			return fmt.Errorf(
-				"%s[%q] cannot be removed while %s is allocated",
-				path,
-				name,
-				usage.String(),
-			)
+			continue
 		}
 
 		if limit.Cmp(usage) < 0 {
@@ -42,10 +38,11 @@ func ValidateHardLimit(path string, hard, allocated corev1.ResourceList) error {
 	return nil
 }
 
-// ValidateHardLimitScopeChange prevents a quota from reducing or removing a
-// hard limit in the same update that changes its namespace selection. Usage
-// from newly selected namespaces is not represented by the quota's previous
-// status yet, so the scope must reconcile before a safe lower bound is known.
+// ValidateHardLimitScopeChange prevents a quota from reducing a retained hard
+// limit in the same update that changes its namespace selection. An omitted
+// resource is no longer governed by the quota and is ignored. Usage from newly
+// selected namespaces is not represented by the quota's previous status yet,
+// so the scope must reconcile before a safe lower bound is known.
 func ValidateHardLimitScopeChange(
 	path string,
 	hard corev1.ResourceList,
@@ -59,11 +56,7 @@ func ValidateHardLimitScopeChange(
 	for name, previousLimit := range previous {
 		limit, exists := hard[name]
 		if !exists {
-			return fmt.Errorf(
-				"%s[%q] cannot be removed while namespace selectors are changing; update the selectors first and wait for usage reconciliation",
-				path,
-				name,
-			)
+			continue
 		}
 
 		if limit.Cmp(previousLimit) < 0 {

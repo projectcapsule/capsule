@@ -11,6 +11,57 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
+func TestValidateHardLimit(t *testing.T) {
+	t.Parallel()
+
+	allocated := corev1.ResourceList{
+		corev1.ResourceLimitsCPU: resource.MustParse("4"),
+	}
+
+	tests := []struct {
+		name    string
+		hard    corev1.ResourceList
+		wantErr string
+	}{
+		{
+			name: "rejects configured limit below allocation",
+			hard: corev1.ResourceList{
+				corev1.ResourceLimitsCPU: resource.MustParse("3"),
+			},
+			wantErr: "cannot be reduced to 3 while 4 is allocated",
+		},
+		{
+			name: "allows configured limit equal to allocation",
+			hard: corev1.ResourceList{
+				corev1.ResourceLimitsCPU: resource.MustParse("4"),
+			},
+		},
+		{
+			name: "allows removal of allocated resource",
+			hard: corev1.ResourceList{},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := ValidateHardLimit("spec.quota.hard", test.hard, allocated)
+			if test.wantErr == "" {
+				if err != nil {
+					t.Fatalf("ValidateHardLimit() error = %v", err)
+				}
+
+				return
+			}
+
+			if err == nil || !strings.Contains(err.Error(), test.wantErr) {
+				t.Fatalf("ValidateHardLimit() error = %v, want containing %q", err, test.wantErr)
+			}
+		})
+	}
+}
+
 func TestValidateHardLimitScopeChange(t *testing.T) {
 	t.Parallel()
 
@@ -33,10 +84,9 @@ func TestValidateHardLimitScopeChange(t *testing.T) {
 			wantErr:      "cannot be reduced from 8 to 0 while namespace selectors are changing",
 		},
 		{
-			name:         "rejects removal while scope changes",
+			name:         "allows removal while scope changes",
 			hard:         corev1.ResourceList{},
 			scopeChanged: true,
-			wantErr:      "cannot be removed while namespace selectors are changing",
 		},
 		{
 			name: "allows equal limit while scope changes",

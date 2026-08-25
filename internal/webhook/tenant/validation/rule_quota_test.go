@@ -73,6 +73,24 @@ func TestValidateRuleQuotaUpdates(t *testing.T) {
 		}
 	})
 
+	t.Run("removal with allocation", func(t *testing.T) {
+		old := oldTenant.DeepCopy()
+		old.Spec.Rules[0].Quota[0].Hard[corev1.ResourceRequestsCPU] = resource.MustParse("1")
+		quota := tenantutils.RuleGlobalResourceQuota(old, 0, 0)
+		quota.UID = types.UID("removal-global-quota-uid")
+		quota.Status.Total.Used = corev1.ResourceList{
+			corev1.ResourceServices: resource.MustParse("2"),
+		}
+		ledger := ruleQuotaLedger(quota, "4")
+		reader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(quota, ledger).Build()
+
+		updated := old.DeepCopy()
+		delete(updated.Spec.Rules[0].Quota[0].Hard, corev1.ResourceServices)
+		if response := validateRuleQuotaUpdates(context.Background(), reader, updated, old); response != nil {
+			t.Fatalf("allocated rule quota resource removal was rejected: %#v", response)
+		}
+	})
+
 	t.Run("scope change with decrease", func(t *testing.T) {
 		oldScoped := ruleQuotaTenant("8")
 		oldScoped.Spec.Rules[0].NamespaceSelector = &metav1.LabelSelector{
