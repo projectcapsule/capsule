@@ -17,6 +17,15 @@ spec:
     - matchLabels:
         customer: renewable
   rules:
+
+    # Promote only the dedicated TenantResource ServiceAccount. Capsule binds
+    # this distributor role in every solar namespace so the TenantResource can
+    # create the temporary user-facing RoleBindings there.
+    - permissions:
+        promotions:
+          - clusterRoles:
+              - gateway-api-role-distributor
+              - admin
     - namespaceSelector:
         matchExpressions:
           - key: env

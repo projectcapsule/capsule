@@ -47,6 +47,7 @@ type CollectorOptions struct {
 	Iterator                     CollectorIteratorOptions
 	ReplicationContext           map[string]any
 	ValidatorNamespaces          tpl.NamespaceValidator
+	preserveOwnerReferences      bool
 }
 
 type CollectorIteratorOptions struct {
@@ -160,6 +161,9 @@ func (co *Collector) Collect(
 
 	log.V(7).Info("available context", "context", tplContext)
 
+	authoredOpts := opts
+	authoredOpts.preserveOwnerReferences = true
+
 	// Run Raw Items
 	for rawIndex, item := range spec.RawItems {
 		log.V(5).Info("processing raw item", "index", rawIndex)
@@ -173,7 +177,7 @@ func (co *Collector) Collect(
 
 		log.V(7).Info("evaluated raw item", "object", p)
 
-		rawError = co.AddToAccumulation(tnt, ns, opts, spec, p, resourceIndex+"/raw-"+strconv.Itoa(rawIndex), true)
+		rawError = co.AddToAccumulation(tnt, ns, authoredOpts, spec, p, resourceIndex+"/raw-"+strconv.Itoa(rawIndex), true)
 		if rawError != nil {
 			syncErr = errors.Join(syncErr, rawError)
 
@@ -195,7 +199,7 @@ func (co *Collector) Collect(
 		log.V(5).Info("loaded resources", "amount", len(p))
 
 		for i, o := range p {
-			genError = co.AddToAccumulation(tnt, ns, opts, spec, o, resourceIndex+"/generator-"+strconv.Itoa(generatorIndex)+"-"+strconv.Itoa(i), true)
+			genError = co.AddToAccumulation(tnt, ns, authoredOpts, spec, o, resourceIndex+"/generator-"+strconv.Itoa(generatorIndex)+"-"+strconv.Itoa(i), true)
 			if genError != nil {
 				syncErr = errors.Join(syncErr, genError)
 
@@ -266,7 +270,12 @@ func (co *Collector) AddToAccumulation(
 		obj.SetAnnotations(dst)
 	}
 
-	sanitize.SanitizeUnstructured(obj, co.objectSanitizeOptions)
+	sanitizeOptions := co.objectSanitizeOptions
+	if opts.preserveOwnerReferences {
+		sanitizeOptions.StripOwnerreferences = false
+	}
+
+	sanitize.SanitizeUnstructured(obj, sanitizeOptions)
 
 	processor.AccumulatorAdd(opts.Accumulator, resource, processor.AccumulatorObject{
 		Object: obj,

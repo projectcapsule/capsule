@@ -12,6 +12,7 @@ import (
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -167,6 +168,123 @@ metadata:
 		if object.GetAnnotations()["replication-namespace"] != "solar-system" {
 			t.Fatalf("generated annotations = %#v", object.GetAnnotations())
 		}
+	}
+}
+
+func TestCollectorPreservesOwnerReferencesInAuthoredResources(t *testing.T) {
+	t.Parallel()
+
+	mapper := k8smeta.NewDefaultRESTMapper([]schema.GroupVersion{{Version: "v1"}})
+	mapper.Add(schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"}, k8smeta.RESTScopeNamespace)
+
+	const objectTemplate = `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: %s
+  ownerReferences:
+    - apiVersion: capsule.clastix.io/v1beta2
+      kind: TenantResource
+      name: tenant-distribution
+      uid: replication-uid
+      controller: true
+      blockOwnerDeletion: true
+`
+
+	spec := capsulev1beta2.ResourceSpec{
+		RawItems: []capsulev1beta2.RawExtension{{
+			RawExtension: runtime.RawExtension{Raw: []byte(`{
+  "apiVersion": "v1",
+  "kind": "ConfigMap",
+  "metadata": {
+    "name": "raw-item",
+    "ownerReferences": [{
+      "apiVersion": "capsule.clastix.io/v1beta2",
+      "kind": "TenantResource",
+      "name": "tenant-distribution",
+      "uid": "replication-uid",
+      "controller": true,
+      "blockOwnerDeletion": true
+    }]
+  }
+}`)},
+		}},
+		Generators: []capsulev1beta2.TemplateItemSpec{{
+			MissingKey: "error",
+			Template:   strings.Replace(objectTemplate, "%s", "generated-item", 1),
+		}},
+	}
+
+	acc := processor.Accumulator{}
+	collector := NewCollector(nil, mapper)
+
+	if err := collector.Collect(
+		context.Background(),
+		nil,
+		CollectorOptions{Accumulator: acc},
+		nil,
+		"0",
+		spec,
+		nil,
+	); err != nil {
+		t.Fatalf("Collect() error = %v", err)
+	}
+	if len(acc) != 2 {
+		t.Fatalf("Collect() accumulated %d objects, want 2", len(acc))
+	}
+
+	for _, item := range acc {
+		if item == nil || item.Objects == nil || len(*item.Objects) != 1 {
+			t.Fatalf("accumulated item = %#v", item)
+		}
+
+		object := (*item.Objects)[0].Object
+		ownerReferences := object.GetOwnerReferences()
+		if len(ownerReferences) != 1 {
+			t.Fatalf("%s ownerReferences = %#v, want one", object.GetName(), ownerReferences)
+		}
+
+		owner := ownerReferences[0]
+		if owner.APIVersion != "capsule.clastix.io/v1beta2" ||
+			owner.Kind != "TenantResource" ||
+			owner.Name != "tenant-distribution" ||
+			owner.UID != "replication-uid" ||
+			owner.Controller == nil || !*owner.Controller ||
+			owner.BlockOwnerDeletion == nil || !*owner.BlockOwnerDeletion {
+			t.Fatalf("%s ownerReference = %#v", object.GetName(), owner)
+		}
+	}
+}
+
+func TestCollectorStripsOwnerReferencesFromReplicatedResources(t *testing.T) {
+	t.Parallel()
+
+	mapper := k8smeta.NewDefaultRESTMapper([]schema.GroupVersion{{Version: "v1"}})
+	mapper.Add(schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"}, k8smeta.RESTScopeNamespace)
+
+	obj := newUnstructured("v1", "ConfigMap", "source", "replicated-item")
+	obj.SetOwnerReferences([]metav1.OwnerReference{{
+		APIVersion: "apps/v1",
+		Kind:       "Deployment",
+		Name:       "source-owner",
+		UID:        "source-owner-uid",
+	}})
+
+	acc := processor.Accumulator{}
+	collector := NewCollector(nil, mapper)
+
+	if err := collector.AddToAccumulation(
+		nil,
+		nil,
+		CollectorOptions{Accumulator: acc},
+		capsuleResourceSpec(),
+		obj,
+		"replica",
+		false,
+	); err != nil {
+		t.Fatalf("AddToAccumulation() error = %v", err)
+	}
+	if ownerReferences := obj.GetOwnerReferences(); len(ownerReferences) != 0 {
+		t.Fatalf("ownerReferences = %#v, want none", ownerReferences)
 	}
 }
 
