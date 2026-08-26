@@ -4,6 +4,7 @@
 package resources
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -102,6 +103,71 @@ func TestCollectorAddToAccumulationClusterScopedObjects(t *testing.T) {
 			t.Fatalf("expected object to be accumulated, got %d items", len(acc))
 		}
 	})
+}
+
+func TestCollectorAddsReplicationMetadataToGeneratorContext(t *testing.T) {
+	t.Parallel()
+
+	mapper := k8smeta.NewDefaultRESTMapper([]schema.GroupVersion{{Version: "v1"}})
+	mapper.Add(schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"}, k8smeta.RESTScopeNamespace)
+
+	replicationContext, err := newReplicationContext(&capsulev1beta2.TenantResource{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "tenant-distribution",
+			Namespace: "solar-system",
+		},
+	})
+	if err != nil {
+		t.Fatalf("newReplicationContext() error = %v", err)
+	}
+
+	acc := processor.Accumulator{}
+	collector := NewCollector(nil, mapper)
+	spec := capsulev1beta2.ResourceSpec{
+		Generators: []capsulev1beta2.TemplateItemSpec{{
+			MissingKey: "error",
+			Template: `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $.replications.metadata.name }}
+  annotations:
+    replication-namespace: {{ $.replications.metadata.namespace }}
+`,
+		}},
+	}
+
+	err = collector.Collect(
+		context.Background(),
+		nil,
+		CollectorOptions{
+			Accumulator:        acc,
+			ReplicationContext: replicationContext,
+		},
+		nil,
+		"0",
+		spec,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("Collect() error = %v", err)
+	}
+	if len(acc) != 1 {
+		t.Fatalf("Collect() accumulated %d objects, want 1", len(acc))
+	}
+
+	for _, item := range acc {
+		if item == nil || item.Objects == nil || len(*item.Objects) != 1 {
+			t.Fatalf("accumulated item = %#v", item)
+		}
+
+		object := (*item.Objects)[0].Object
+		if object.GetName() != "tenant-distribution" {
+			t.Fatalf("generated name = %q", object.GetName())
+		}
+		if object.GetAnnotations()["replication-namespace"] != "solar-system" {
+			t.Fatalf("generated annotations = %#v", object.GetAnnotations())
+		}
+	}
 }
 
 func newUnstructured(apiVersion, kind, namespace, name string) *unstructured.Unstructured {

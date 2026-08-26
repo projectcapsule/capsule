@@ -45,6 +45,7 @@ type CollectorOptions struct {
 	AllowCrossNamespaceSelection bool
 	Accumulator                  processor.Accumulator
 	Iterator                     CollectorIteratorOptions
+	ReplicationContext           map[string]any
 	ValidatorNamespaces          tpl.NamespaceValidator
 }
 
@@ -128,6 +129,10 @@ func (co *Collector) Collect(
 		if err != nil {
 			return err
 		}
+	}
+
+	if opts.ReplicationContext != nil {
+		tplContext[replicationContextKey] = opts.ReplicationContext
 	}
 
 	if tnt != nil {

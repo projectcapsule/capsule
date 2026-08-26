@@ -406,10 +406,16 @@ func (r *globalResourceController) gatherResources(
 	tnts capsulev1beta2.TenantList,
 	acc processor.Accumulator,
 ) error {
+	replicationContext, err := newReplicationContext(tntResource)
+	if err != nil {
+		return err
+	}
+
 	opts := CollectorOptions{
 		Accumulator:                  acc,
 		AllowCrossNamespaceSelection: true,
 		AllowClusterScopedObjects:    true,
+		ReplicationContext:           replicationContext,
 	}
 
 	// Collect Available Generated Items
