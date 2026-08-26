@@ -55,6 +55,23 @@ func TestProcessedItems_UpdateItem_AppendsNew(t *testing.T) {
 	}
 }
 
+func TestManagedResourcesStatusUpdateStats(t *testing.T) {
+	t.Parallel()
+
+	status := meta.ManagedResourcesStatus{
+		ProcessedItems: meta.ProcessedItems{
+			mkItem("", "ns1", "first", "ConfigMap", metav1.ConditionTrue, meta.ReadyCondition, "", true, metav1.Time{}),
+			mkItem("", "", "second", "ClusterRole", metav1.ConditionTrue, meta.ReadyCondition, "", false, metav1.Time{}),
+		},
+	}
+
+	status.UpdateStats()
+
+	if status.Size != 2 {
+		t.Fatalf("ManagedResourcesStatus.Size = %d, want 2", status.Size)
+	}
+}
+
 func TestProcessedItems_UpdateItem_UpdatesExistingWithoutDuplicate(t *testing.T) {
 	now1 := metav1.NewTime(time.Now().Add(-1 * time.Hour))
 	now2 := metav1.NewTime(time.Now())

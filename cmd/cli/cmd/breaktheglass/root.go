@@ -13,8 +13,9 @@ import (
 )
 
 var (
-	name      string
-	namespace string
+	name          string
+	namespace     string
+	impersonation impersonationOptions
 )
 
 var RootCmd = &cobra.Command{
@@ -34,6 +35,10 @@ func init() {
 func init() {
 	RootCmd.PersistentFlags().
 		StringVarP(&namespace, "namespace", "n", "default", "Namespace of the BreakRequests")
+	RootCmd.PersistentFlags().
+		StringVar(&impersonation.User, "as", "", "Username to impersonate for the operation")
+	RootCmd.PersistentFlags().
+		StringArrayVar(&impersonation.Groups, "as-group", nil, "Group to impersonate; may be repeated")
 
 	// Add subcommands
 	RootCmd.AddCommand(reviewCmd)

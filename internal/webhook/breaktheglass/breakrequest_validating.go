@@ -40,18 +40,23 @@ func (b *breakRequestValidationHandler) OnCreate(c client.Client, reader client.
 			return ad.ErroredResponse(fmt.Errorf("failed to decode new object: %w", err))
 		}
 
+		if br.Spec.Template.Kind != capsulev1beta2.BreakRequestTemplateKind {
+			return ad.Denyf("template kind %q is not supported", br.Spec.Template.Kind)
+		}
+
+		templateName := br.Spec.Template.Name
 		brt := &capsulev1beta2.BreakRequestTemplate{}
-		if err := reader.Get(ctx, client.ObjectKey{Name: br.Spec.TemplateName}, brt); err != nil {
+		if err := reader.Get(ctx, client.ObjectKey{Name: templateName}, brt); err != nil {
 			if client.IgnoreNotFound(err) == nil {
-				return ad.Denyf("template %s not found", br.Spec.TemplateName)
+				return ad.Denyf("template %s not found", templateName)
 			}
 
-			return ad.ErroredResponse(fmt.Errorf("error loading template %s: %w", br.Spec.TemplateName, err))
+			return ad.ErroredResponse(fmt.Errorf("error loading template %s: %w", templateName, err))
 		}
 
 		if len(brt.Spec.NamespaceSelectors) > 0 {
 			if brt.Status.ObservedGeneration != brt.Generation {
-				return ad.Denyf("template %s namespace selection is not ready", br.Spec.TemplateName)
+				return ad.Denyf("template %s namespace selection is not ready", templateName)
 			}
 
 			namespace := req.Namespace
@@ -62,7 +67,7 @@ func (b *breakRequestValidationHandler) OnCreate(c client.Client, reader client.
 			if !brt.Status.NamespacePresent(namespace) {
 				return ad.Denyf(
 					"template %s is not available in namespace %s",
-					br.Spec.TemplateName,
+					templateName,
 					namespace,
 				)
 			}
@@ -84,11 +89,11 @@ func (b *breakRequestValidationHandler) OnCreate(c client.Client, reader client.
 
 		loadedContext, err := br.LoadTemplateContext(ctx, c, b.mapper)
 		if err != nil {
-			return ad.Denyf("invalid template context for %s: %v", br.Spec.TemplateName, err)
+			return ad.Denyf("invalid template context for %s: %v", templateName, err)
 		}
 
 		if _, err := br.RenderResources(brt.Spec.ParamSchema, brt.Spec.Resources, loadedContext); err != nil {
-			return ad.Denyf("invalid template rendering for %s: %v", br.Spec.TemplateName, err)
+			return ad.Denyf("invalid template rendering for %s: %v", templateName, err)
 		}
 
 		return nil
@@ -114,11 +119,13 @@ func (b *breakRequestValidationHandler) OnUpdate(_ client.Client, _ client.Reade
 			return ad.ErroredResponse(err)
 		}
 
-		if oldBr.Spec.TemplateName != newBr.Spec.TemplateName {
+		if oldBr.Spec.Template != newBr.Spec.Template {
 			return ad.Denyf(
-				"templateName cannot be changed. old: %s, new: %s",
-				oldBr.Spec.TemplateName,
-				newBr.Spec.TemplateName,
+				"template cannot be changed. old: %s/%s, new: %s/%s",
+				oldBr.Spec.Template.Kind,
+				oldBr.Spec.Template.Name,
+				newBr.Spec.Template.Kind,
+				newBr.Spec.Template.Name,
 			)
 		}
 

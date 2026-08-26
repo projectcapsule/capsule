@@ -152,10 +152,45 @@ func newK8sClient() (*rest.Config, ctrlclient.Client, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	if err := impersonation.applyTo(cfg); err != nil {
+		return nil, nil, err
+	}
 
 	cl, err := ctrlclient.New(cfg, ctrlclient.Options{Scheme: scheme})
 
 	return cfg, cl, err
+}
+
+type impersonationOptions struct {
+	User   string
+	Groups []string
+}
+
+func (o impersonationOptions) applyTo(cfg *rest.Config) error {
+	if o.User != "" {
+		cfg.Impersonate.UserName = o.User
+		cfg.Impersonate.Groups = append([]string(nil), o.Groups...)
+	} else if len(o.Groups) > 0 {
+		cfg.Impersonate.Groups = append([]string(nil), o.Groups...)
+	}
+
+	if len(cfg.Impersonate.Groups) > 0 && cfg.Impersonate.UserName == "" {
+		return fmt.Errorf("--as-group requires --as or an impersonated user in the kubeconfig")
+	}
+
+	return nil
+}
+
+func accessEntityForConfig(cfg *rest.Config) *breaktheglass.AccessEntity {
+	username := cfg.Username
+	if cfg.Impersonate.UserName != "" {
+		username = cfg.Impersonate.UserName
+	}
+
+	return &breaktheglass.AccessEntity{
+		Type: breaktheglass.AccessEntityTypeUser,
+		Name: username,
+	}
 }
 
 func runBreakRequestAction(
@@ -168,10 +203,7 @@ func runBreakRequestAction(
 		return err
 	}
 
-	user := &breaktheglass.AccessEntity{
-		Type: breaktheglass.AccessEntityTypeUser,
-		Name: cfg.Username,
-	}
+	user := accessEntityForConfig(cfg)
 
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		br := &capsulev1beta2.BreakRequest{}

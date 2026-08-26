@@ -13,26 +13,17 @@ import (
 )
 
 type TenantResourceCommonStatus struct {
+	meta.ManagedResourcesStatus `json:",inline"`
+
 	// ObservedGeneration is the most recent generation the controller has observed.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 	// Condition of the GlobalTenantResource.
 	Conditions meta.ConditionList `json:"conditions,omitempty"`
 
-	// List of the replicated resources for the given TenantResource.
-	//+optional
-	ProcessedItems meta.ProcessedItems `json:"processedItems,omitzero"`
-
-	// How many items are being replicated by the TenantResource.
-	Size uint `json:"size"`
-
 	// Serviceaccount used for impersonation
 	//+optional
 	ServiceAccount *meta.NamespacedRFC1123ObjectReferenceWithNamespace `json:"serviceAccount,omitzero"`
-}
-
-func (s *TenantResourceCommonStatus) UpdateStats() {
-	s.Size = uint(len(s.ProcessedItems))
 }
 
 type TenantResourceCommonSpec struct {

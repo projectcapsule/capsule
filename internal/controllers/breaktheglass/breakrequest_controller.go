@@ -219,11 +219,18 @@ func (r *BreakRequestReconciler) reconcile(
 
 	// The case when the BreakRequest is newly created
 	case "":
+		if br.Spec.Template.Kind != capsulev1beta2.BreakRequestTemplateKind {
+			return ctrl.Result{}, fmt.Errorf(
+				"unsupported BreakRequest template kind %q",
+				br.Spec.Template.Kind,
+			)
+		}
+
 		brt := &capsulev1beta2.BreakRequestTemplate{}
-		if err := r.Get(ctx, client.ObjectKey{Name: br.Spec.TemplateName}, brt); err != nil {
+		if err := r.Get(ctx, client.ObjectKey{Name: br.Spec.Template.Name}, brt); err != nil {
 			return ctrl.Result{}, fmt.Errorf(
 				"failed to get BreakRequest Template %s: %w",
-				br.Spec.TemplateName,
+				br.Spec.Template.Name,
 				err,
 			)
 		}
@@ -381,6 +388,7 @@ func (r *BreakRequestReconciler) transitionRequestActivation(
 		// Persist the rendered identities so partially applied resources can be
 		// pruned if activation is cancelled or the request is deleted.
 		br.Status.Approved.Resources = brCopy.Status.Approved.Resources
+		br.Status.ManagedResourcesStatus = brCopy.Status.ManagedResourcesStatus
 
 		return fmt.Errorf("failed to create BreakRequest items %s: %w", brCopy.Name, err)
 	}
@@ -413,6 +421,8 @@ func (r *BreakRequestReconciler) reconcileItems(
 
 	// reset the approved items; only the effective items should be kept
 	br.Status.Approved.Resources = nil
+	currentItems := br.Status.ProcessedItems
+	processedItems := make(meta.ProcessedItems, 0)
 
 	loadedContext, err := br.LoadTemplateContext(ctx, r.Client, r.managedResourceManager().Mapper)
 	if err != nil {
@@ -423,6 +433,9 @@ func (r *BreakRequestReconciler) reconcileItems(
 	if err != nil {
 		return err
 	}
+
+	manager := r.managedResourceManager()
+	fieldOwner := meta.BreakRequestFieldOwner(br)
 
 	for _, resource := range rendered {
 		effective := apiruntime.ResourceTemplate{Policy: resource.Policy}
@@ -462,20 +475,46 @@ func (r *BreakRequestReconciler) reconcileItems(
 			// so their lifecycle cannot rely on Kubernetes owner references. The
 			// BreakRequest finalizer and recorded target identities provide the
 			// explicit cascade during expiration or deletion.
-			if _, applyErr := r.managedResourceManager().Apply(ctx, r.Client, obj, ssa.ApplyOptions{
-				FieldOwner: meta.BreakRequestFieldOwner(br),
-				Force:      resource.Policy.Force,
-				Adopt:      resource.Policy.AllowsAdoption(),
-				Protect:    resource.Policy.IsProtected(),
-			}); applyErr != nil {
-				syncErr = errors.Join(syncErr, applyErr)
+			item, statusErr := managedResourceStatus(manager, obj)
+			if statusErr != nil {
+				syncErr = errors.Join(syncErr, statusErr)
+
+				continue
 			}
+
+			current := currentItems.GetItem(item.ResourceID)
+			result, applyErr := manager.Apply(ctx, r.Client, obj, ssa.ApplyOptions{
+				FieldOwner:        fieldOwner,
+				Force:             resource.Policy.Force,
+				Adopt:             resource.Policy.AllowsAdoption(),
+				Protect:           resource.Policy.IsProtected(),
+				PreviouslyCreated: current != nil && current.Created,
+			})
+			item.Created = result.Created
+
+			if result.LastApply != nil {
+				item.LastApply = *result.LastApply
+			}
+
+			if applyErr != nil {
+				item.Status = metav1.ConditionFalse
+				item.Message = "apply failed: " + applyErr.Error()
+				syncErr = errors.Join(syncErr, applyErr)
+			} else {
+				item.Status = metav1.ConditionTrue
+			}
+
+			processedItems.UpdateItem(item)
 		}
 
 		if len(effective.Targets) > 0 {
 			br.Status.Approved.Resources = append(br.Status.Approved.Resources, effective)
 		}
 	}
+
+	processedItems.SortDeterministic()
+	br.Status.ProcessedItems = processedItems
+	br.Status.UpdateStats()
 
 	return syncErr
 }
@@ -503,10 +542,24 @@ func (r *BreakRequestReconciler) pruneItems(
 				continue
 			}
 
+			item, statusErr := managedResourceStatus(manager, obj)
+			if statusErr != nil {
+				syncErr = errors.Join(syncErr, statusErr)
+
+				continue
+			}
+
+			current := br.Status.ProcessedItems.GetItem(item.ResourceID)
+
 			deleted, pruneErr := manager.Prune(ctx, r.Client, obj, ssa.PruneOptions{
-				FieldOwner: fieldOwner,
+				FieldOwner:        fieldOwner,
+				PreviouslyCreated: current != nil && current.Created,
 			})
 			if pruneErr != nil {
+				item.Status = metav1.ConditionFalse
+				item.Message = "prune failed: " + pruneErr.Error()
+				br.Status.ProcessedItems.UpdateItem(item)
+
 				syncErr = errors.Join(syncErr, pruneErr)
 
 				continue
@@ -514,13 +567,42 @@ func (r *BreakRequestReconciler) pruneItems(
 
 			if !deleted {
 				if disownErr := manager.Disown(ctx, r.Client, obj, nil); disownErr != nil {
+					item.Status = metav1.ConditionFalse
+					item.Message = "disown failed: " + disownErr.Error()
+					br.Status.ProcessedItems.UpdateItem(item)
+
 					syncErr = errors.Join(syncErr, disownErr)
+
+					continue
 				}
 			}
+
+			br.Status.ProcessedItems.RemoveItem(item)
 		}
 	}
 
+	br.Status.ProcessedItems.SortDeterministic()
+	br.Status.UpdateStats()
+
 	return syncErr
+}
+
+func managedResourceStatus(
+	manager ssa.Manager,
+	obj *unstructured.Unstructured,
+) (meta.ObjectReferenceStatus, error) {
+	id, clusterScoped, err := manager.ResolveResourceID(obj, "", "")
+	if err != nil {
+		return meta.ObjectReferenceStatus{}, fmt.Errorf("resolving managed resource identity: %w", err)
+	}
+
+	return meta.ObjectReferenceStatus{
+		ResourceID: id,
+		ObjectReferenceStatusCondition: meta.ObjectReferenceStatusCondition{
+			Type:          meta.ReadyCondition,
+			ClusterScoped: clusterScoped,
+		},
+	}, nil
 }
 
 func object(re runtime.RawExtension) (*unstructured.Unstructured, error) {

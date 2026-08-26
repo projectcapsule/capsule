@@ -8,15 +8,16 @@ import (
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/projectcapsule/capsule/pkg/api/breaktheglass"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
 )
 
 // BreakRequestSpec defines the desired state of BreakRequest.
 type BreakRequestSpec struct {
-	// TemplateName the name of the template to use for this request
+	// Template references the template to use for this request.
 	// +kubebuilder:validation:Required
-	TemplateName string `json:"templateName"`
+	Template BreakRequestTemplateReference `json:"template"`
 	// Params the parameters to use for the template.
 	Params *k8sruntime.RawExtension `json:"params,omitempty"`
 	// Requesting actor for the access request.
@@ -36,8 +37,27 @@ type BreakRequestSpec struct {
 	StartTime *metav1.Time `json:"startTime,omitempty"`
 }
 
+const BreakRequestTemplateKind = "BreakRequestTemplate"
+
+// BreakRequestTemplateReference identifies the cluster-scoped template used
+// by a BreakRequest.
+type BreakRequestTemplateReference struct {
+	// Kind of template being referenced.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum=BreakRequestTemplate
+	Kind string `json:"kind"`
+	// Name of the template being referenced.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`
+	Name string `json:"name"`
+}
+
 // BreakRequestStatus defines the observed state of BreakRequest.
 type BreakRequestStatus struct {
+	meta.ManagedResourcesStatus `json:",inline"`
+
 	// Review refers to the subject that either approved or denied the request
 	Review *ReviewInfo `json:"review,omitempty"`
 	// Template properties copied from the assigned template
@@ -126,6 +146,7 @@ const (
 // +kubebuilder:printcolumn:name="ActiveUntil",type=string,JSONPath=`.status.active.until`,priority=10
 // +kubebuilder:printcolumn:name="Duration",type=string,JSONPath=`.status.approved.duration`,priority=10
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
+// +kubebuilder:printcolumn:name="Items",type="integer",JSONPath=".status.size",description="The number of managed resources"
 
 // BreakRequest is the Schema for the BreakRequests API.
 type BreakRequest struct {

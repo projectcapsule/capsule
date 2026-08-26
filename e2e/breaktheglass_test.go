@@ -23,6 +23,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+func breakRequestTemplateReference(name string) capsulev1beta2.BreakRequestTemplateReference {
+	return capsulev1beta2.BreakRequestTemplateReference{
+		Kind: capsulev1beta2.BreakRequestTemplateKind,
+		Name: name,
+	}
+}
+
 var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-glass"), func() {
 
 	var (
@@ -83,7 +90,7 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 					Namespace: "default",
 				},
 				Spec: capsulev1beta2.BreakRequestSpec{
-					TemplateName: brt.GetName(),
+					Template: breakRequestTemplateReference(brt.GetName()),
 				},
 			}
 			defer EventuallyDeletion(br)
@@ -120,7 +127,7 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 		It("allows the managed resource to be changed", func() {
 			br := &capsulev1beta2.BreakRequest{
 				ObjectMeta: metav1.ObjectMeta{Name: "e2e-btg-unprotected", Namespace: "default"},
-				Spec:       capsulev1beta2.BreakRequestSpec{TemplateName: brt.GetName()},
+				Spec:       capsulev1beta2.BreakRequestSpec{Template: breakRequestTemplateReference(brt.GetName())},
 			}
 			defer EventuallyDeletion(br)
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, br) }).Should(Succeed())
@@ -155,7 +162,7 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 		It("cascades deletion through the BreakRequest finalizer without an owner reference", func() {
 			br := &capsulev1beta2.BreakRequest{
 				ObjectMeta: metav1.ObjectMeta{Name: "e2e-btg-cluster-scope", Namespace: "default"},
-				Spec:       capsulev1beta2.BreakRequestSpec{TemplateName: brt.GetName()},
+				Spec:       capsulev1beta2.BreakRequestSpec{Template: breakRequestTemplateReference(brt.GetName())},
 			}
 			defer EventuallyDeletion(br)
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, br) }).Should(Succeed())
@@ -184,7 +191,7 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 					Namespace: "default",
 				},
 				Spec: capsulev1beta2.BreakRequestSpec{
-					TemplateName: brt.GetName(),
+					Template: breakRequestTemplateReference(brt.GetName()),
 				},
 			}
 			defer EventuallyDeletion(br)
@@ -214,7 +221,7 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 					Namespace: "default",
 				},
 				Spec: capsulev1beta2.BreakRequestSpec{
-					TemplateName: brt.GetName(),
+					Template: breakRequestTemplateReference(brt.GetName()),
 				},
 			}
 			defer EventuallyDeletion(br)
@@ -249,8 +256,8 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 					Namespace: "default",
 				},
 				Spec: capsulev1beta2.BreakRequestSpec{
-					TemplateName: brt.GetName(),
-					Reason:       "open sesame",
+					Template: breakRequestTemplateReference(brt.GetName()),
+					Reason:   "open sesame",
 				},
 			}
 			defer EventuallyDeletion(br)
@@ -278,8 +285,8 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 					Namespace: "default",
 				},
 				Spec: capsulev1beta2.BreakRequestSpec{
-					TemplateName: brt.GetName(),
-					Reason:       "test",
+					Template: breakRequestTemplateReference(brt.GetName()),
+					Reason:   "test",
 				},
 			}
 			defer EventuallyDeletion(br)
@@ -327,8 +334,8 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 					Namespace: "default",
 				},
 				Spec: capsulev1beta2.BreakRequestSpec{
-					TemplateName: brt.GetName(),
-					Params:       &runtime.RawExtension{Raw: []byte(`{"value": "test-value"}`)},
+					Template: breakRequestTemplateReference(brt.GetName()),
+					Params:   &runtime.RawExtension{Raw: []byte(`{"value": "test-value"}`)},
 				},
 			}
 			defer EventuallyDeletion(br)
@@ -371,7 +378,7 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 					Name:      "e2e-btg-adopt",
 					Namespace: "default",
 				},
-				Spec: capsulev1beta2.BreakRequestSpec{TemplateName: brt.GetName()},
+				Spec: capsulev1beta2.BreakRequestSpec{Template: breakRequestTemplateReference(brt.GetName())},
 			}
 			defer EventuallyDeletion(br)
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, br) }).Should(Succeed())
@@ -431,7 +438,7 @@ data:
 			br := &capsulev1beta2.BreakRequest{
 				ObjectMeta: metav1.ObjectMeta{Name: "e2e-btg-context", Namespace: "default"},
 				Spec: capsulev1beta2.BreakRequestSpec{
-					TemplateName: brt.Name,
+					Template: breakRequestTemplateReference(brt.Name),
 					Params: &runtime.RawExtension{Raw: []byte(`{
 						"sourceName":"e2e-btg-context"
 					}`)},

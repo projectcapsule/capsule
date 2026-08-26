@@ -20,6 +20,7 @@ import (
 
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	clt "github.com/projectcapsule/capsule/pkg/runtime/client"
+	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 )
 
 // Metadata configures the labels used to track resources managed by a Manager.
@@ -246,6 +247,22 @@ func (m Manager) Disown(
 	return nil
 }
 
+// ResolveResourceID returns the canonical identity and scope of a resource as
+// it will be managed. In particular, a namespace rendered onto a cluster-scoped
+// resource is removed from the returned identity.
+func (m Manager) ResolveResourceID(
+	obj *unstructured.Unstructured,
+	tenant string,
+	origin string,
+) (gvk.ResourceID, bool, error) {
+	scoped, clusterScoped, err := m.scopedObjectWithScope(obj)
+	if err != nil {
+		return gvk.ResourceID{}, false, err
+	}
+
+	return gvk.NewResourceID(scoped, tenant, origin), clusterScoped, nil
+}
+
 func (m Manager) managedMetadataPatches(
 	ctx context.Context,
 	c client.Client,
@@ -336,9 +353,17 @@ func (m Manager) scopedObjectReference(obj *unstructured.Unstructured) (*unstruc
 }
 
 func (m Manager) scopedObject(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	scoped, _, err := m.scopedObjectWithScope(obj)
+
+	return scoped, err
+}
+
+func (m Manager) scopedObjectWithScope(
+	obj *unstructured.Unstructured,
+) (*unstructured.Unstructured, bool, error) {
 	scoped := obj.DeepCopy()
 	if m.Mapper == nil {
-		return scoped, nil
+		return scoped, false, nil
 	}
 
 	mapping, err := m.Mapper.RESTMapping(
@@ -346,14 +371,15 @@ func (m Manager) scopedObject(obj *unstructured.Unstructured) (*unstructured.Uns
 		obj.GroupVersionKind().Version,
 	)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
-	if mapping.Scope.Name() == k8smeta.RESTScopeNameRoot {
+	clusterScoped := mapping.Scope.Name() == k8smeta.RESTScopeNameRoot
+	if clusterScoped {
 		scoped.SetNamespace("")
 	}
 
-	return scoped, nil
+	return scoped, clusterScoped, nil
 }
 
 func (m Manager) isDeletable(actual *unstructured.Unstructured, opts PruneOptions) bool {

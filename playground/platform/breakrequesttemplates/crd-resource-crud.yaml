@@ -17,7 +17,7 @@ spec:
   # namespaceSelectors:
   #   - matchLabels:
   #       projectcapsule.dev/break-the-glass: enabled
-  autoApprove: false
+  autoApprove: true
   defaultDuration: 1h
   maxDuration: 8h
   keepFor: 7d

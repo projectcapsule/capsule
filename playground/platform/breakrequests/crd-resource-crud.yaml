@@ -7,7 +7,9 @@ metadata:
   name: customquotas-editor-alice
   namespace: default
 spec:
-  templateName: crd-resource-crud
+  template:
+    kind: BreakRequestTemplate
+    name: crd-resource-crud
   requestor:
     type: User
     name: alice@example.com
@@ -25,7 +27,9 @@ metadata:
   name: tenantresources-editor-platform
   namespace: default
 spec:
-  templateName: crd-resource-crud
+  template:
+    kind: BreakRequestTemplate
+    name: crd-resource-crud
   requestor:
     type: User
     name: platform-lead@example.com
@@ -43,7 +47,9 @@ metadata:
   name: tenantresources-editor-platform-2
   namespace: default
 spec:
-  templateName: crd-resource-crud-2
+  template:
+    kind: BreakRequestTemplate
+    name: crd-resource-crud-2
   requestor:
     type: User
     name: platform-lead@example.com

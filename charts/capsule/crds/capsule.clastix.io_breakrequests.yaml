@@ -36,6 +36,10 @@ spec:
     - jsonPath: .status.phase
       name: Phase
       type: string
+    - description: The number of managed resources
+      jsonPath: .status.size
+      name: Items
+      type: integer
     name: v1beta2
     schema:
       openAPIV3Schema:
@@ -95,12 +99,26 @@ spec:
                   If omitted, this is set to the current time. The Request must already be approved before the start time.
                 format: date-time
                 type: string
-              templateName:
-                description: TemplateName the name of the template to use for this
-                  request
-                type: string
+              template:
+                description: Template references the template to use for this request.
+                properties:
+                  kind:
+                    description: Kind of template being referenced.
+                    enum:
+                    - BreakRequestTemplate
+                    type: string
+                  name:
+                    description: Name of the template being referenced.
+                    maxLength: 253
+                    minLength: 1
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                    type: string
+                required:
+                - kind
+                - name
+                type: object
             required:
-            - templateName
+            - template
             type: object
           status:
             description: BreakRequestStatus defines the observed state of BreakRequest.
@@ -255,6 +273,74 @@ spec:
                 - Active
                 - Expired
                 type: string
+              processedItems:
+                description: List of resources managed by the API object.
+                items:
+                  description: Advanced Status Item for pin pointing items in tenants/namespaces.
+                  properties:
+                    group:
+                      type: string
+                    kind:
+                      type: string
+                    name:
+                      type: string
+                    namespace:
+                      type: string
+                    origin:
+                      type: string
+                    status:
+                      properties:
+                        clusterScoped:
+                          description: Indicates whether the referenced resource is
+                            cluster-scoped.
+                          type: boolean
+                        created:
+                          description: Indicates wether the resource was created or
+                            adopted
+                          type: boolean
+                        lastApply:
+                          description: |-
+                            An opaque value that represents the internal version of this object that can
+                            be used by clients to determine when objects have changed. May be used for optimistic
+                            concurrency, change detection, and the watch operation on a resource or set of resources.
+                            Clients must treat these values as opaque and passed unmodified back to the server.
+                            They may only be valid for a particular resource or set of resources.
+
+                            Populated by the system.
+                            Read-only.
+                            Value must be treated as opaque by clients and .
+                            More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                          format: date-time
+                          type: string
+                        message:
+                          description: |-
+                            message is a human readable message indicating details about the transition.
+                            This may be an empty string.
+                          maxLength: 32768
+                          type: string
+                        status:
+                          description: status of the condition, one of True, False,
+                            Unknown.
+                          enum:
+                          - "True"
+                          - "False"
+                          - Unknown
+                          type: string
+                        type:
+                          description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                          maxLength: 316
+                          pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                          type: string
+                      required:
+                      - status
+                      - type
+                      type: object
+                    tenant:
+                      type: string
+                    version:
+                      type: string
+                  type: object
+                type: array
               review:
                 description: Review refers to the subject that either approved or
                   denied the request
@@ -284,6 +370,9 @@ spec:
                     - Approved
                     type: string
                 type: object
+              size:
+                description: Number of managed resources.
+                type: integer
               template:
                 description: Template properties copied from the assigned template
                 properties:
@@ -460,6 +549,8 @@ spec:
                         rule: (has(self.targets) && size(self.targets) > 0) || has(self.template)
                     type: array
                 type: object
+            required:
+            - size
             type: object
         type: object
     served: true

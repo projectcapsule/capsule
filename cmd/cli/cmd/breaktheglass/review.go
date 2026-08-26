@@ -38,11 +38,15 @@ var reviewCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Example: `
   # interactive review
-  capsule break-the-glass review grant-admin --namespace default
+  kubectl capsule break-the-glass review grant-admin --namespace default
 
   # non-interactive approve/deny
-  capsule review grant-admin --namespace default --approve
-  capsule review grant-admin --namespace default --deny
+  kubectl capsule break-the-glass review grant-admin --namespace default --approve
+  kubectl capsule break-the-glass review grant-admin --namespace default --deny
+
+  # review as another user with explicit groups
+  kubectl capsule break-the-glass review grant-admin --namespace default --approve \
+    --as alice@example.com --as-group platform-engineers
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name = args[0]
@@ -169,10 +173,7 @@ var reviewCmd = &cobra.Command{
 			}
 		}
 
-		user := &breaktheglass.AccessEntity{
-			Type: breaktheglass.AccessEntityTypeUser,
-			Name: cfg.Username,
-		}
+		user := accessEntityForConfig(cfg)
 
 		return retry.OnError(
 			retry.DefaultRetry,

@@ -72,7 +72,10 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: capsulev1beta2.BreakRequestSpec{
-					TemplateName: templateName,
+					Template: capsulev1beta2.BreakRequestTemplateReference{
+						Kind: capsulev1beta2.BreakRequestTemplateKind,
+						Name: templateName,
+					},
 				},
 			},
 			mocks: func(cl *mc.MockClient, scl *mc.MockSubResourceWriter) {
@@ -93,7 +96,10 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: capsulev1beta2.BreakRequestSpec{
-					TemplateName: templateName,
+					Template: capsulev1beta2.BreakRequestTemplateReference{
+						Kind: capsulev1beta2.BreakRequestTemplateKind,
+						Name: templateName,
+					},
 				},
 				Status: capsulev1beta2.BreakRequestStatus{
 					Phase: capsulev1beta2.RequestPhaseApproved,
@@ -136,8 +142,11 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: capsulev1beta2.BreakRequestSpec{
-					TemplateName: templateName,
-					Params:       &runtime.RawExtension{Raw: []byte(`{"testValue": "test-value"}`)},
+					Template: capsulev1beta2.BreakRequestTemplateReference{
+						Kind: capsulev1beta2.BreakRequestTemplateKind,
+						Name: templateName,
+					},
+					Params: &runtime.RawExtension{Raw: []byte(`{"testValue": "test-value"}`)},
 				},
 				Status: capsulev1beta2.BreakRequestStatus{
 					Phase: capsulev1beta2.RequestPhaseApproved,
@@ -174,6 +183,17 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 				assert.Equal(t, capsulev1beta2.RequestPhaseActive, br.Status.Phase)
 				assert.Len(t, br.Status.Approved.Resources, 1)
 				assert.Len(t, br.Status.Approved.Resources[0].Targets, 1)
+				assert.Equal(t, uint(1), br.Status.Size)
+				require.Len(t, br.Status.ProcessedItems, 1)
+
+				managed := br.Status.ProcessedItems[0]
+				assert.Equal(t, "ConfigMap", managed.Kind)
+				assert.Equal(t, "test-configmap", managed.Name)
+				assert.Equal(t, "default", managed.Namespace)
+				assert.Equal(t, v1.ConditionTrue, managed.Status)
+				assert.Equal(t, meta.ReadyCondition, managed.Type)
+				assert.True(t, managed.Created)
+				assert.False(t, managed.ClusterScoped)
 
 				foundApproved := false
 				foundActive := false
@@ -194,6 +214,51 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 				assert.Empty(t, co.GetOwnerReferences())
 				assert.Equal(t, meta.ValueAppBreakTheGlassManager, co.GetLabels()[meta.AppManagedByLabel])
 			},
+		},
+		{
+			name: "approved target apply fails",
+			br: &capsulev1beta2.BreakRequest{
+				ObjectMeta: v1.ObjectMeta{
+					Name:      resourceName,
+					Namespace: "default",
+				},
+				Spec: capsulev1beta2.BreakRequestSpec{
+					Template: capsulev1beta2.BreakRequestTemplateReference{
+						Kind: capsulev1beta2.BreakRequestTemplateKind,
+						Name: templateName,
+					},
+					Params: &runtime.RawExtension{Raw: []byte(`{"testValue": "test-value"}`)},
+				},
+				Status: capsulev1beta2.BreakRequestStatus{
+					Phase: capsulev1beta2.RequestPhaseApproved,
+					Approved: &capsulev1beta2.ApprovedProperties{
+						StartTime: v1.Now(),
+					},
+					Template: &capsulev1beta2.TemplateProperties{
+						Resources: []apiruntime.ResourceTemplate{{
+							Targets: []runtime.RawExtension{mtConfigMapParameterized},
+						}},
+						ParamSchema: psString,
+					},
+				},
+			},
+			mocks: func(cl *mc.MockClient, scl *mc.MockSubResourceWriter) {
+				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil).Times(3)
+				cl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
+				cl.EXPECT().Get(gm.Any(), gm.Any(), matchUs).
+					Return(apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, "test-configmap"))
+				cl.EXPECT().Patch(gm.Any(), matchUs, gm.Any(), gm.Any()).Return(assert.AnError)
+				scl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
+			},
+			verify: func(t *testing.T, br *capsulev1beta2.BreakRequest) {
+				assert.Equal(t, capsulev1beta2.RequestPhaseApproved, br.Status.Phase)
+				assert.Equal(t, uint(1), br.Status.Size)
+				require.Len(t, br.Status.ProcessedItems, 1)
+				assert.Equal(t, v1.ConditionFalse, br.Status.ProcessedItems[0].Status)
+				assert.Contains(t, br.Status.ProcessedItems[0].Message, "apply failed")
+				assert.True(t, br.Status.ProcessedItems[0].Created)
+			},
+			wantErr: true,
 		},
 	}
 

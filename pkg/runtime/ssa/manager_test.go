@@ -241,6 +241,49 @@ func TestApplyNormalizesClusterScope(t *testing.T) {
 	}
 }
 
+func TestResolveResourceID(t *testing.T) {
+	t.Parallel()
+
+	mapper := k8smeta.NewDefaultRESTMapper([]schema.GroupVersion{{Version: "v1"}})
+	mapper.Add(corev1.SchemeGroupVersion.WithKind("ConfigMap"), k8smeta.RESTScopeNamespace)
+	mapper.Add(corev1.SchemeGroupVersion.WithKind("Namespace"), k8smeta.RESTScopeRoot)
+	manager := Manager{Mapper: mapper}
+
+	t.Run("namespaced", func(t *testing.T) {
+		obj := configMap("config", nil)
+
+		id, clusterScoped, err := manager.ResolveResourceID(obj, "tenant-a", "template")
+		if err != nil {
+			t.Fatalf("ResolveResourceID() error = %v", err)
+		}
+		if clusterScoped {
+			t.Fatal("ResolveResourceID() clusterScoped = true, want false")
+		}
+		if id.Namespace != "default" || id.Name != "config" || id.Tenant != "tenant-a" || id.Origin != "template" {
+			t.Fatalf("ResolveResourceID() = %#v", id)
+		}
+	})
+
+	t.Run("cluster scoped", func(t *testing.T) {
+		obj := &unstructured.Unstructured{}
+		obj.SetAPIVersion("v1")
+		obj.SetKind("Namespace")
+		obj.SetName("managed")
+		obj.SetNamespace("request-namespace")
+
+		id, clusterScoped, err := manager.ResolveResourceID(obj, "", "")
+		if err != nil {
+			t.Fatalf("ResolveResourceID() error = %v", err)
+		}
+		if !clusterScoped {
+			t.Fatal("ResolveResourceID() clusterScoped = false, want true")
+		}
+		if id.Namespace != "" || id.Name != "managed" {
+			t.Fatalf("ResolveResourceID() = %#v", id)
+		}
+	})
+}
+
 func TestPrune(t *testing.T) {
 	t.Parallel()
 

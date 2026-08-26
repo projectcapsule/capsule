@@ -36,6 +36,12 @@ func TestBreakRequestValidationHandler(t *testing.T) {
 	alternateTemplateName := "bar"
 	ctx := context.Background()
 	log := ctrl.Log.WithName("test")
+	templateRef := func(name string) capsulev1beta2.BreakRequestTemplateReference {
+		return capsulev1beta2.BreakRequestTemplateReference{
+			Kind: capsulev1beta2.BreakRequestTemplateKind,
+			Name: name,
+		}
+	}
 
 	t.Run("OnCreate", func(t *testing.T) {
 		tests := []struct {
@@ -49,7 +55,7 @@ func TestBreakRequestValidationHandler(t *testing.T) {
 				name: "deny if template not found",
 				br: &capsulev1beta2.BreakRequest{
 					Spec: capsulev1beta2.BreakRequestSpec{
-						TemplateName: defaultTemplateName,
+						Template: templateRef(defaultTemplateName),
 					},
 				},
 				setup: func(reader *mc.MockReader) {
@@ -64,7 +70,7 @@ func TestBreakRequestValidationHandler(t *testing.T) {
 				name: "deny if template can not be loaded",
 				br: &capsulev1beta2.BreakRequest{
 					Spec: capsulev1beta2.BreakRequestSpec{
-						TemplateName: defaultTemplateName,
+						Template: templateRef(defaultTemplateName),
 					},
 				},
 				setup: func(reader *mc.MockReader) {
@@ -79,7 +85,7 @@ func TestBreakRequestValidationHandler(t *testing.T) {
 				name: "allow if template found",
 				br: &capsulev1beta2.BreakRequest{
 					Spec: capsulev1beta2.BreakRequestSpec{
-						TemplateName: alternateTemplateName,
+						Template: templateRef(alternateTemplateName),
 					},
 				},
 				setup: func(reader *mc.MockReader) {
@@ -93,8 +99,8 @@ func TestBreakRequestValidationHandler(t *testing.T) {
 				name: "deny if duration exceeds maxDuration",
 				br: &capsulev1beta2.BreakRequest{
 					Spec: capsulev1beta2.BreakRequestSpec{
-						TemplateName: defaultTemplateName,
-						Duration:     &metav1.Duration{Duration: time.Hour},
+						Template: templateRef(defaultTemplateName),
+						Duration: &metav1.Duration{Duration: time.Hour},
 					},
 				},
 				setup: func(reader *mc.MockReader) {
@@ -112,7 +118,7 @@ func TestBreakRequestValidationHandler(t *testing.T) {
 				br: &capsulev1beta2.BreakRequest{
 					ObjectMeta: metav1.ObjectMeta{Namespace: "team-a"},
 					Spec: capsulev1beta2.BreakRequestSpec{
-						TemplateName: defaultTemplateName,
+						Template: templateRef(defaultTemplateName),
 					},
 				},
 				setup: func(reader *mc.MockReader) {
@@ -134,7 +140,7 @@ func TestBreakRequestValidationHandler(t *testing.T) {
 				br: &capsulev1beta2.BreakRequest{
 					ObjectMeta: metav1.ObjectMeta{Namespace: "team-b"},
 					Spec: capsulev1beta2.BreakRequestSpec{
-						TemplateName: defaultTemplateName,
+						Template: templateRef(defaultTemplateName),
 					},
 				},
 				setup: func(reader *mc.MockReader) {
@@ -157,7 +163,7 @@ func TestBreakRequestValidationHandler(t *testing.T) {
 				br: &capsulev1beta2.BreakRequest{
 					ObjectMeta: metav1.ObjectMeta{Namespace: "team-a"},
 					Spec: capsulev1beta2.BreakRequestSpec{
-						TemplateName: defaultTemplateName,
+						Template: templateRef(defaultTemplateName),
 					},
 				},
 				setup: func(reader *mc.MockReader) {
@@ -179,8 +185,8 @@ func TestBreakRequestValidationHandler(t *testing.T) {
 				name: "deny if startTime is not in the future",
 				br: &capsulev1beta2.BreakRequest{
 					Spec: capsulev1beta2.BreakRequestSpec{
-						TemplateName: alternateTemplateName,
-						StartTime:    &metav1.Time{Time: time.Now().Add(-time.Minute)},
+						Template:  templateRef(alternateTemplateName),
+						StartTime: &metav1.Time{Time: time.Now().Add(-time.Minute)},
 					},
 				},
 				setup: func(reader *mc.MockReader) {
@@ -190,6 +196,19 @@ func TestBreakRequestValidationHandler(t *testing.T) {
 				},
 				expected: http.StatusForbidden,
 				errMsg:   "must be in the future",
+			},
+			{
+				name: "deny unsupported template kind",
+				br: &capsulev1beta2.BreakRequest{
+					Spec: capsulev1beta2.BreakRequestSpec{
+						Template: capsulev1beta2.BreakRequestTemplateReference{
+							Kind: "OtherTemplate",
+							Name: defaultTemplateName,
+						},
+					},
+				},
+				expected: http.StatusForbidden,
+				errMsg:   `template kind "OtherTemplate" is not supported`,
 			},
 		}
 
@@ -226,33 +245,33 @@ func TestBreakRequestValidationHandler(t *testing.T) {
 			errMsg   string
 		}{
 			{
-				name: "allow if templateName not changed",
+				name: "allow if template not changed",
 				oldBr: &capsulev1beta2.BreakRequest{
 					Spec: capsulev1beta2.BreakRequestSpec{
-						TemplateName: defaultTemplateName,
+						Template: templateRef(defaultTemplateName),
 					},
 				},
 				newBr: &capsulev1beta2.BreakRequest{
 					Spec: capsulev1beta2.BreakRequestSpec{
-						TemplateName: defaultTemplateName,
+						Template: templateRef(defaultTemplateName),
 					},
 				},
 				expected: 0,
 			},
 			{
-				name: "deny if templateName changed",
+				name: "deny if template changed",
 				oldBr: &capsulev1beta2.BreakRequest{
 					Spec: capsulev1beta2.BreakRequestSpec{
-						TemplateName: defaultTemplateName,
+						Template: templateRef(defaultTemplateName),
 					},
 				},
 				newBr: &capsulev1beta2.BreakRequest{
 					Spec: capsulev1beta2.BreakRequestSpec{
-						TemplateName: alternateTemplateName,
+						Template: templateRef(alternateTemplateName),
 					},
 				},
 				expected: http.StatusForbidden,
-				errMsg:   "templateName cannot be changed. old: foo, new: bar",
+				errMsg:   "template cannot be changed. old: BreakRequestTemplate/foo, new: BreakRequestTemplate/bar",
 			},
 		}
 
@@ -313,8 +332,11 @@ func TestBreakRequestValidationLoadsParameterizedContext(t *testing.T) {
 	br := &capsulev1beta2.BreakRequest{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "team-a"},
 		Spec: capsulev1beta2.BreakRequestSpec{
-			TemplateName: brt.Name,
-			Params:       &runtime.RawExtension{Raw: []byte(`{"source":"source-config"}`)},
+			Template: capsulev1beta2.BreakRequestTemplateReference{
+				Kind: capsulev1beta2.BreakRequestTemplateKind,
+				Name: brt.Name,
+			},
+			Params: &runtime.RawExtension{Raw: []byte(`{"source":"source-config"}`)},
 		},
 	}
 	decoder := &test.Decoder[*capsulev1beta2.BreakRequest]{Object: br}
