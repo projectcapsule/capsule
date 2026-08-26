@@ -205,6 +205,12 @@ dev-setup: dev-setup-flux-handoff
 		--set 'certManager.generateCertificates=false' \
 		--set 'tls.enableController=false' \
 		--set 'tls.create=false' \
+		--set rbac.resources.create=true \
+		--set-string 'rbac.resources.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
+		--set rbac.resourcepoolclaims.create=true \
+		--set-string 'rbac.resourcepoolclaims.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
+		--set rbac.customquotas.create=true \
+		--set-string 'rbac.customquotas.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set "webhooks.exclusive=true"\
 		--set "webhooks.service.url=$${WEBHOOK_URL}" \
 		--set "webhooks.service.caBundle=$${CA_BUNDLE}" \
@@ -480,6 +486,12 @@ e2e-install: helm-controller-version ko-build-all dev-install-gw-api-crds
 		--set 'manager.options.leaderElection.leaseDuration=60s' \
 		--set 'manager.options.leaderElection.renewDeadline=40s' \
 		--set 'manager.rbac.minimal=true' \
+		--set rbac.resources.create=true \
+		--set-string 'rbac.resources.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
+		--set rbac.resourcepoolclaims.create=true \
+		--set-string 'rbac.resourcepoolclaims.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
+		--set rbac.customquotas.create=true \
+		--set-string 'rbac.customquotas.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set 'webhooks.hooks.nodes.enabled=true' \
 		--set "webhooks.exclusive=true"\
 		--set 'webhooks.hooks.calculations.enabled=true' \

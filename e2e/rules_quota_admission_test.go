@@ -160,94 +160,87 @@ var _ = Describe("rule-generated GlobalResourceQuota admission", Ordered,
 			EventuallyDeletion(tamperRole)
 		})
 
-		It("rejects a Tenant rule update that decreases or removes a hard limit while changing scope", func() {
-			for _, test := range []struct {
-				name    string
-				mutate  func(corev1.ResourceList)
-				message string
-			}{
-				{
-					name: "decrease",
-					mutate: func(hard corev1.ResourceList) {
-						hard[corev1.ResourceLimitsCPU] = resource.MustParse("0")
-					},
-					message: `rules[0].quota[0].hard["limits.cpu"] cannot be reduced from 8 to 0 while namespace selectors are changing`,
-				},
-				{
-					name: "removal",
-					mutate: func(hard corev1.ResourceList) {
-						delete(hard, corev1.ResourceLimitsCPU)
-					},
-					message: `rules[0].quota[0].hard["limits.cpu"] cannot be removed while namespace selectors are changing`,
-				},
-			} {
-				By(test.name, func() {
-					Eventually(func() error {
-						current := &capsulev1beta2.Tenant{}
-						if err := k8sClient.Get(ctx, client.ObjectKey{Name: tenantName}, current); err != nil {
-							return err
-						}
+		It("rejects a Tenant rule decrease while changing scope and allows removal", func() {
+			By("rejecting the explicit decrease", func() {
+				Eventually(func() error {
+					current := &capsulev1beta2.Tenant{}
+					if err := k8sClient.Get(ctx, client.ObjectKey{Name: tenantName}, current); err != nil {
+						return err
+					}
 
-						updated := current.DeepCopy()
-						updated.Spec.Rules[0].NamespaceSelector = nil
-						test.mutate(updated.Spec.Rules[0].Quota[0].Hard)
+					updated := current.DeepCopy()
+					updated.Spec.Rules[0].NamespaceSelector = nil
+					updated.Spec.Rules[0].Quota[0].Hard[corev1.ResourceLimitsCPU] = resource.MustParse("0")
 
-						return k8sClient.Update(ctx, updated)
-					}, defaultTimeoutInterval, defaultPollInterval).Should(MatchError(ContainSubstring(test.message)))
-				})
-			}
+					return k8sClient.Update(ctx, updated)
+				}, defaultTimeoutInterval, defaultPollInterval).Should(MatchError(ContainSubstring(
+					`rules[0].quota[0].hard["limits.cpu"] cannot be reduced from 8 to 0 while namespace selectors are changing`,
+				)))
+			})
 
-			persisted := &capsulev1beta2.Tenant{}
-			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: tenantName}, persisted)).To(Succeed())
-			Expect(persisted.Spec.Rules[0].NamespaceSelector).NotTo(BeNil())
-			Expect(persisted.Spec.Rules[0].NamespaceSelector.MatchLabels).To(HaveKeyWithValue(selectorKey, "application"))
-			persistedLimit := persisted.Spec.Rules[0].Quota[0].Hard[corev1.ResourceLimitsCPU]
-			Expect(persistedLimit.Cmp(resource.MustParse("8"))).To(Equal(0))
+			By("allowing the resource limit to be removed", func() {
+				Eventually(func() error {
+					current := &capsulev1beta2.Tenant{}
+					if err := k8sClient.Get(ctx, client.ObjectKey{Name: tenantName}, current); err != nil {
+						return err
+					}
+
+					updated := current.DeepCopy()
+					updated.Spec.Rules[0].NamespaceSelector = nil
+					delete(updated.Spec.Rules[0].Quota[0].Hard, corev1.ResourceLimitsCPU)
+
+					return k8sClient.Update(ctx, updated)
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+				persisted := &capsulev1beta2.Tenant{}
+				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: tenantName}, persisted)).To(Succeed())
+				Expect(persisted.Spec.Rules[0].NamespaceSelector).To(BeNil())
+				Expect(persisted.Spec.Rules[0].Quota[0].Hard).NotTo(HaveKey(corev1.ResourceLimitsCPU))
+			})
+
+			applicationSelector := &metav1.LabelSelector{MatchLabels: map[string]string{selectorKey: "application"}}
+			Eventually(func() error {
+				return setTenantQuota(applicationSelector, "8")
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			expectGeneratedQuota("application", "8", "0")
 		})
 
-		It("rejects the same unsafe scope and hard-limit changes on the generated quota", func() {
+		It("rejects a generated quota decrease while changing scope and allows removal", func() {
 			controllerClient := impersonationClient(ControllerServiceAccountFull, nil)
-			for _, test := range []struct {
-				name    string
-				mutate  func(corev1.ResourceList)
-				message string
-			}{
-				{
-					name: "decrease",
-					mutate: func(hard corev1.ResourceList) {
-						hard[corev1.ResourceLimitsCPU] = resource.MustParse("0")
-					},
-					message: `spec.quota.hard["limits.cpu"] cannot be reduced from 8 to 0 while namespace selectors are changing`,
-				},
-				{
-					name: "removal",
-					mutate: func(hard corev1.ResourceList) {
-						delete(hard, corev1.ResourceLimitsCPU)
-					},
-					message: `spec.quota.hard["limits.cpu"] cannot be removed while namespace selectors are changing`,
-				},
-			} {
-				By(test.name, func() {
-					Eventually(func() error {
-						current := &capsulev1beta2.GlobalResourceQuota{}
-						if err := controllerClient.Get(ctx, quotaKey, current); err != nil {
-							return err
-						}
 
-						updated := current.DeepCopy()
-						delete(updated.Spec.NamespaceSelectors[0].LabelSelector.MatchLabels, selectorKey)
-						test.mutate(updated.Spec.Quota.Hard)
+			By("rejecting the explicit decrease", func() {
+				Eventually(func() error {
+					current := &capsulev1beta2.GlobalResourceQuota{}
+					if err := controllerClient.Get(ctx, quotaKey, current); err != nil {
+						return err
+					}
 
-						return controllerClient.Update(ctx, updated)
-					}, defaultTimeoutInterval, defaultPollInterval).Should(MatchError(ContainSubstring(test.message)))
-				})
-			}
+					updated := current.DeepCopy()
+					delete(updated.Spec.NamespaceSelectors[0].LabelSelector.MatchLabels, selectorKey)
+					updated.Spec.Quota.Hard[corev1.ResourceLimitsCPU] = resource.MustParse("0")
 
-			persisted := &capsulev1beta2.GlobalResourceQuota{}
-			Expect(k8sClient.Get(ctx, quotaKey, persisted)).To(Succeed())
-			Expect(persisted.Spec.NamespaceSelectors[0].LabelSelector.MatchLabels).To(HaveKeyWithValue(selectorKey, "application"))
-			persistedLimit := persisted.Spec.Quota.Hard[corev1.ResourceLimitsCPU]
-			Expect(persistedLimit.Cmp(resource.MustParse("8"))).To(Equal(0))
+					return controllerClient.Update(ctx, updated)
+				}, defaultTimeoutInterval, defaultPollInterval).Should(MatchError(ContainSubstring(
+					`spec.quota.hard["limits.cpu"] cannot be reduced from 8 to 0 while namespace selectors are changing`,
+				)))
+			})
+
+			By("allowing the resource limit to be removed", func() {
+				Eventually(func() error {
+					current := &capsulev1beta2.GlobalResourceQuota{}
+					if err := controllerClient.Get(ctx, quotaKey, current); err != nil {
+						return err
+					}
+
+					updated := current.DeepCopy()
+					delete(updated.Spec.NamespaceSelectors[0].LabelSelector.MatchLabels, selectorKey)
+					delete(updated.Spec.Quota.Hard, corev1.ResourceLimitsCPU)
+
+					return controllerClient.Update(ctx, updated)
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			})
+
+			expectGeneratedQuota("application", "8", "0")
 		})
 
 		It("allows equal or increased limits with a scope change and a later same-scope decrease", func() {
@@ -304,9 +297,11 @@ var _ = Describe("rule-generated GlobalResourceQuota admission", Ordered,
 				delete(current.Spec.Rules[0].Quota[0].Hard, corev1.ResourceLimitsCPU)
 
 				return k8sClient.Update(ctx, current)
-			}, defaultTimeoutInterval, defaultPollInterval).Should(MatchError(ContainSubstring(
-				`rules[0].quota[0].hard["limits.cpu"] cannot be removed while 300m is allocated`,
-			)))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+			persisted := &capsulev1beta2.Tenant{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: tenantName}, persisted)).To(Succeed())
+			Expect(persisted.Spec.Rules[0].Quota[0].Hard).NotTo(HaveKey(corev1.ResourceLimitsCPU))
 
 			applicationSelector := &metav1.LabelSelector{MatchLabels: map[string]string{selectorKey: "application"}}
 			Eventually(func() error {

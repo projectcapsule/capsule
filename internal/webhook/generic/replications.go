@@ -18,6 +18,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 type replicaHandler struct{}
@@ -65,6 +66,14 @@ func (h *replicaHandler) handler(
 	req admission.Request,
 	recorder events.EventRecorder,
 ) *admission.Response {
+	// Replicated objects are applied with the replication's impersonated client,
+	// but controllers reconcile their own metadata, finalizers, and status with
+	// the Capsule manager client. This is especially relevant when the replicated
+	// object is itself a TenantResource or GlobalTenantResource.
+	if users.IsControllerServiceAccount(req.UserInfo.Username) {
+		return nil
+	}
+
 	// Checking if the object is managed by a TenantResource, local or global
 	ref := gvk.ResourceID{
 		Group:     req.Kind.Group,
