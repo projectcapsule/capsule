@@ -63,10 +63,10 @@ spec:
         {{- include "admission.annotations" $ | nindent 8 }}
       {{- end }}
       webhooks:
-      {{- $any := false -}}
+      {{- $anyValidating := false -}}
       {{- with .Values.webhooks.hooks.generic }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyValidating = true }}
       - name: generic.rules.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -103,7 +103,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.namespaces }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyValidating = true }}
       - name: namespaces.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -147,7 +147,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.rulestatus }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyValidating = true }}
       - name: rulestatus.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -194,7 +194,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.customresources }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyValidating = true }}
       - name: customresources.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -241,7 +241,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.cordoning }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyValidating = true }}
       - name: cordoning.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -280,7 +280,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.devices }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyValidating = true }}
       - name: devices.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -327,7 +327,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.gateways }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyValidating = true }}
       - name: gateway.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -373,7 +373,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.ingresses }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyValidating = true }}
       - name: ingress.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -421,7 +421,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.nodes }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyValidating = true }}
       - name: nodes.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -465,7 +465,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.pods }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyValidating = true }}
       - name: pods.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -512,7 +512,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.persistentvolumeclaims }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyValidating = true }}
       - name: pvc.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -566,7 +566,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.services }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyValidating = true }}
       - name: services.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -612,7 +612,7 @@ spec:
       {{- end }}
       {{- with (mergeOverwrite .Values.webhooks.hooks.managed .Values.webhooks.hooks.tenantResourceObjects) }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyValidating = true }}
       - name: managed.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -648,7 +648,7 @@ spec:
       {{- end }}
       {{- with  .Values.webhooks.hooks.replications }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyValidating = true }}
       - name: replications.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -684,7 +684,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.breakrequests }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyValidating = true }}
       - name: breakrequests.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -703,8 +703,13 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- with .matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
         matchConditions:
+        {{- end }}
+        {{- with .matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -715,7 +720,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.breakrequesttemplates }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyValidating = true }}
       - name: breakrequesttemplates.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -734,8 +739,13 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- with .matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
         matchConditions:
+        {{- end }}
+        {{- with .matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -746,7 +756,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.breakTheGlass }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyValidating = true }}
       - name: break-the-glass.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -777,7 +787,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.tenants }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyValidating = true }}
       - name: tenants.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -824,7 +834,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.owners }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyValidating = true }}
       - name: owners.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -871,7 +881,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.resourcepools.pools }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyValidating = true }}
       - name: resourcepools.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -917,7 +927,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.resourcepools.pools }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyValidating = true }}
       - name: resourcepoolclaims.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -964,7 +974,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.serviceaccounts }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyValidating = true }}
       - name: serviceaccounts.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -1015,7 +1025,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.config }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyValidating = true }}
       - name: config.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -1061,7 +1071,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.customquotas }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyValidating = true }}
       - name: namespaced.custom-quotas.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -1098,7 +1108,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.globalcustomquotas }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyValidating = true }}
       - name: cluster.custom-quotas.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -1135,7 +1145,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.globalresourcequotas }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyValidating = true }}
       - name: calculation.global-resource-quotas.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -1172,7 +1182,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.calculations }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyValidating = true }}
       - name: calculation.custom-quotas.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -1202,8 +1212,7 @@ spec:
         timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
         {{- end }}
       {{- end }}
-
-      {{- if not $any }}
+      {{- if not $anyValidating }}
         []
       {{- end }}
     mutating:
@@ -1219,10 +1228,10 @@ spec:
         {{- include "admission.annotations" $ | nindent 8 }}
       {{- end }}
       webhooks:
-      {{- $any := false -}}
+      {{- $anyMutating := false -}}
       {{- with .Values.webhooks.hooks.generic }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyMutating = true }}
       - name: generic.rules.mutating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -1260,7 +1269,7 @@ spec:
       {{- end }}
       {{- with (mergeOverwrite .Values.webhooks.hooks.namespaces .Values.webhooks.hooks.namespaceOwnerReference) }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyMutating = true }}
       - name: namespaces.mutating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -1308,7 +1317,7 @@ spec:
 
       {{- with .Values.webhooks.hooks.persistentvolumeclaims }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyMutating = true }}
       - name: pvc.mutating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -1372,7 +1381,7 @@ spec:
 
       {{- with (mergeOverwrite .Values.webhooks.hooks.pods .Values.webhooks.hooks.defaults.pods) }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyMutating = true }}
       - name: pod.mutating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -1417,7 +1426,7 @@ spec:
       {{- end }}
       {{- with (mergeOverwrite .Values.webhooks.hooks.persistentvolumeclaims .Values.webhooks.hooks.defaults.pvc) }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyMutating = true }}
       - name: storage.mutating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -1462,7 +1471,7 @@ spec:
       {{- end }}
       {{- with (mergeOverwrite .Values.webhooks.hooks.ingresses .Values.webhooks.hooks.defaults.ingress) }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyMutating = true }}
       - name: ingress.mutating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -1509,7 +1518,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.gateways }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyMutating = true }}
       - name: gateway.mutating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -1555,7 +1564,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.resourcepools.pools }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyMutating = true }}
       - name: resourcepools.mutating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -1602,7 +1611,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.resourcepools.claims }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyMutating = true }}
       - name: resourcepoolclaims.mutating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -1649,7 +1658,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.tenants }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyMutating = true }}
       - name: tenants.mutating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -1697,7 +1706,7 @@ spec:
       {{- end }}
       {{- with .Values.webhooks.hooks.metadata }}
         {{- if .enabled }}
-          {{- $any = true }}
+          {{- $anyMutating = true }}
       - name: metadata.mutating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -1733,7 +1742,45 @@ spec:
         timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
         {{- end }}
       {{- end }}
-      {{- if not $any }}
+      {{- with .Values.webhooks.hooks.breakrequests }}
+        {{- if .enabled }}
+          {{- $anyMutating = true }}
+      - name: breakrequests.mutating.projectcapsule.dev
+        {{- with .opts }}
+        opts:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        admissionReviewVersions:
+          - v1
+          - v1beta1
+        path: "/breakrequests/mutating"
+        failurePolicy:  {{ .failurePolicy }}
+        matchPolicy: {{ .matchPolicy }}
+        reinvocationPolicy: {{ .reinvocationPolicy }}
+        {{- with .namespaceSelector }}
+        namespaceSelector:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with .objectSelector }}
+        objectSelector:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        matchConditions:
+        {{- end }}
+        {{- with .matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        rules:
+          {{- toYaml .rules | nindent 10 }}
+        sideEffects: None
+        timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
+        {{- end }}
+      {{- end }}
+      {{- if not $anyMutating }}
         []
       {{- end }}
 {{- end }}

@@ -12,7 +12,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/conditions"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -57,12 +56,8 @@ func validate(decoder admission.Decoder, req admission.Request) *admission.Respo
 		return ad.ErroredResponse(fmt.Errorf("failed to decode new object: %w", err))
 	}
 
-	if !brt.Spec.AutoApprove {
-		if brt.Spec.ApprovalCondition != "" {
-			return ad.Denyf("approvalCondition should not be set when autoApprove is false")
-		}
-	} else if brt.Spec.ApprovalCondition != "" {
-		if _, err := conditions.PrepareCondition(brt); err != nil {
+	if brt.Spec.ApprovalCondition != "" {
+		if err := brt.ValidateApprovalCondition(); err != nil {
 			return ad.Denyf("approvalCondition is invalid: %v", err)
 		}
 	}

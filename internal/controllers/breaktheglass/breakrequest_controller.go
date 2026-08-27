@@ -28,7 +28,6 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/breaktheglass"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
-	"github.com/projectcapsule/capsule/pkg/conditions"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/ssa"
 )
@@ -120,6 +119,18 @@ func (r *BreakRequestReconciler) reconcile(
 
 		if br.Status.Approved == nil {
 			return ctrl.Result{}, fmt.Errorf("BreakRequest is in Approved phase but status.approved is nil")
+		}
+
+		brt := &capsulev1beta2.BreakRequestTemplate{}
+		if err := r.Get(ctx, client.ObjectKey{Name: br.Spec.Template.Name}, brt); err != nil {
+			return ctrl.Result{}, fmt.Errorf(
+				"failed to get BreakRequest Template %s: %w",
+				br.Spec.Template.Name,
+				err,
+			)
+		}
+		if err := brt.CheckApprovalCondition(ctx, br); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to verify approval for BreakRequest %s: %w", br.Name, err)
 		}
 
 		if err := r.addFinalizer(ctx, log, br); err != nil {
@@ -237,28 +248,33 @@ func (r *BreakRequestReconciler) reconcile(
 		// initialize br with all requirements from brt
 		br.InitializeFromTemplate(brt)
 
-		if ok, err := conditions.IsApproved(brt, br); ok {
-			loadedContext, err := br.LoadTemplateContext(ctx, r.Client, r.managedResourceManager().Mapper)
+		if brt.Spec.AutoApprove {
+			approved, err := brt.EvaluateApprovalCondition(ctx, br)
 			if err != nil {
-				return ctrl.Result{}, err
+				return ctrl.Result{}, fmt.Errorf(
+					"auto approval could not be evaluated for BreakRequest %s: %w",
+					br.Name,
+					err,
+				)
 			}
 
-			props, err := br.GenerateApprovedProperties(loadedContext)
-			if err != nil {
+			if approved {
+				loadedContext, err := br.LoadTemplateContext(ctx, r.Client, r.managedResourceManager().Mapper)
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+
+				props, err := br.GenerateApprovedProperties(loadedContext)
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+
+				err = br.ApproveRequest(&breaktheglass.AccessEntity{
+					Type: breaktheglass.AccessEntityTypeSystem,
+				}, props, "Auto Approved")
+
 				return ctrl.Result{}, err
 			}
-
-			err = br.ApproveRequest(&breaktheglass.AccessEntity{
-				Type: breaktheglass.AccessEntityTypeSystem,
-			}, props, "Auto Approved")
-
-			return ctrl.Result{}, err
-		} else if err != nil {
-			return ctrl.Result{}, fmt.Errorf(
-				"auto approval could not be evaluated for BreakRequest %s: %w",
-				br.Name,
-				err,
-			)
 		}
 
 		log.V(5).Info("BreakRequest is newly created, moving to pending phase")

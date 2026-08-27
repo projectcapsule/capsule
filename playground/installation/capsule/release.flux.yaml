@@ -52,6 +52,19 @@ spec:
       enableController: false
       create: false
       name: capsule-tls
+    rbac:
+      resources:
+        create: true
+        labels:
+          rbac.authorization.k8s.io/aggregate-to-admin: "true"
+      resourcepoolclaims:
+        create: true
+        labels:
+          rbac.authorization.k8s.io/aggregate-to-admin: "true"
+      customquotas:
+        create: true
+        labels:
+          rbac.authorization.k8s.io/aggregate-to-admin: "true"
     webhooks:
       service:
         caBundle: "${PLAYGROUND_CA_BUNDLE}"

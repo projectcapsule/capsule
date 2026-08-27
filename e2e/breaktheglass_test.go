@@ -277,8 +277,7 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
 		})
 
-		It("break request needs approval when condition not matches", func() {
-
+		It("rejects a break request when the automatic approval condition does not match", func() {
 			br := &capsulev1beta2.BreakRequest{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "e2e-btg-br",
@@ -289,23 +288,94 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 					Reason:   "test",
 				},
 			}
+
+			err := k8sClient.Create(ctx, br)
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(ContainSubstring("approval conditions not satisfied for template")))
+		})
+	})
+
+	Describe("Approval based on requestor identity", func() {
+		BeforeEach(func() {
+			brt.Spec.AutoApprove = true
+			brt.Spec.ApprovalCondition = `requestor.name == "alice" && "developers" in requestor.groups`
+		})
+
+		It("auto-approves a matching authenticated requestor", func() {
+			aliceClient := impersonationClient("alice", []string{"developers"})
+			br := &capsulev1beta2.BreakRequest{
+				ObjectMeta: metav1.ObjectMeta{Name: "e2e-btg-requestor-alice", Namespace: "default"},
+				Spec: capsulev1beta2.BreakRequestSpec{
+					Template: breakRequestTemplateReference(brt.GetName()),
+				},
+			}
 			defer EventuallyDeletion(br)
 
-			EventuallyCreation(func() error {
-				return k8sClient.Create(ctx, br)
-			}).Should(Succeed())
-
-			approveBreakRequest(ctx, br)
+			EventuallyCreation(func() error { return aliceClient.Create(ctx, br) }).Should(Succeed())
 
 			cm := &corev1.ConfigMap{}
-			Eventually(func() (err error) {
+			Eventually(func() error {
 				return k8sClient.Get(ctx, types.NamespacedName{Name: "e2e-btg-cm", Namespace: br.Namespace}, cm)
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		})
 
-			// should be deleted after duration
-			Eventually(func() (err error) {
+		It("rejects a non-matching authenticated requestor", func() {
+			bobClient := impersonationClient("bob", []string{"developers"})
+			br := &capsulev1beta2.BreakRequest{
+				ObjectMeta: metav1.ObjectMeta{Name: "e2e-btg-requestor-bob", Namespace: "default"},
+				Spec: capsulev1beta2.BreakRequestSpec{
+					Template: breakRequestTemplateReference(brt.GetName()),
+				},
+			}
+
+			err := bobClient.Create(ctx, br)
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(ContainSubstring("approval conditions not satisfied for template")))
+		})
+	})
+
+	Describe("Approval based on reviewer identity", func() {
+		BeforeEach(func() {
+			brt.Spec.AutoApprove = false
+			brt.Spec.ApprovalCondition = `"admin" in reviewer.groups`
+		})
+
+		It("only permits an authenticated reviewer in the required group", func() {
+			br := &capsulev1beta2.BreakRequest{
+				ObjectMeta: metav1.ObjectMeta{Name: "e2e-btg-reviewer", Namespace: "default"},
+				Spec: capsulev1beta2.BreakRequestSpec{
+					Template: breakRequestTemplateReference(brt.GetName()),
+				},
+			}
+			defer EventuallyDeletion(br)
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, br) }).Should(Succeed())
+
+			bobClient := impersonationClient("bob", []string{"users"})
+			requested := &capsulev1beta2.BreakRequest{}
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: br.Name, Namespace: br.Namespace}, requested)).To(Succeed())
+				g.Expect(requested.Status.Phase).To(Equal(capsulev1beta2.RequestPhaseRequested))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+			properties, err := requested.GenerateApprovedProperties()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(requested.ApproveRequest(&breaktheglass.AccessEntity{Name: "spoofed"}, properties, "")).To(Succeed())
+			err = bobClient.Status().Update(ctx, requested)
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(ContainSubstring("approval conditions not satisfied for template")))
+
+			charlieClient := impersonationClient("charlie", []string{"users", "admin"})
+			requested = &capsulev1beta2.BreakRequest{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: br.Name, Namespace: br.Namespace}, requested)).To(Succeed())
+			properties, err = requested.GenerateApprovedProperties()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(requested.ApproveRequest(&breaktheglass.AccessEntity{Name: "spoofed"}, properties, "")).To(Succeed())
+			Expect(charlieClient.Status().Update(ctx, requested)).To(Succeed())
+
+			cm := &corev1.ConfigMap{}
+			Eventually(func() error {
 				return k8sClient.Get(ctx, types.NamespacedName{Name: "e2e-btg-cm", Namespace: br.Namespace}, cm)
-			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 	})
 

@@ -471,10 +471,16 @@ func (r *namespacedResourceController) gatherResources(
 	tnt capsulev1beta2.Tenant,
 	acc processor.Accumulator,
 ) (err error) {
+	replicationContext, err := newReplicationContext(tntResource)
+	if err != nil {
+		return err
+	}
+
 	opts := CollectorOptions{
 		Accumulator:                  acc,
 		AllowCrossNamespaceSelection: false,
 		AllowClusterScopedObjects:    false,
+		ReplicationContext:           replicationContext,
 		ValidatorNamespaces:          tpl.NewNamespaceValidator(false, sets.New[string](tnt.Status.Namespaces...)),
 	}
 

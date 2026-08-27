@@ -118,6 +118,7 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 				},
 			},
 			mocks: func(cl *mc.MockClient, scl *mc.MockSubResourceWriter) {
+				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBrt).Return(nil)
 				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil).Times(3)
 				cl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
 				scl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
@@ -171,6 +172,7 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 				},
 			},
 			mocks: func(cl *mc.MockClient, scl *mc.MockSubResourceWriter) {
+				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBrt).Return(nil)
 				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil).Times(3)
 				cl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
 				cl.EXPECT().Get(gm.Any(), gm.Any(), matchUs).
@@ -243,6 +245,7 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 				},
 			},
 			mocks: func(cl *mc.MockClient, scl *mc.MockSubResourceWriter) {
+				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBrt).Return(nil)
 				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil).Times(3)
 				cl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
 				cl.EXPECT().Get(gm.Any(), gm.Any(), matchUs).

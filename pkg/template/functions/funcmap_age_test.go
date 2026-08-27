@@ -17,6 +17,9 @@ func TestFuncMaps(t *testing.T) {
 		"deterministicUUID",
 		"generateAgeKey",
 		"generateAgePQKey",
+		"getResourceByName",
+		"mustGetResourceByName",
+		"getResourceByNamespacedName",
 	} {
 		if custom[name] == nil {
 			t.Fatalf("CustomFuncMap()[%q] is nil", name)

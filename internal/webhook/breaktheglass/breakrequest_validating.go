@@ -96,6 +96,12 @@ func (b *breakRequestValidationHandler) OnCreate(c client.Client, reader client.
 			return ad.Denyf("invalid template rendering for %s: %v", templateName, err)
 		}
 
+		if brt.Spec.AutoApprove {
+			if err := brt.CheckApprovalCondition(ctx, br); err != nil {
+				return ad.Denyf("approval conditions not satisfied for template %s: %v", templateName, err)
+			}
+		}
+
 		return nil
 	}
 }
@@ -106,8 +112,8 @@ func (b *breakRequestValidationHandler) OnDelete(_ client.Client, _ client.Reade
 	}
 }
 
-func (b *breakRequestValidationHandler) OnUpdate(_ client.Client, _ client.Reader, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
+func (b *breakRequestValidationHandler) OnUpdate(_ client.Client, reader client.Reader, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+	return func(ctx context.Context, req admission.Request) *admission.Response {
 		oldBr := &capsulev1beta2.BreakRequest{}
 		newBr := &capsulev1beta2.BreakRequest{}
 
@@ -119,7 +125,7 @@ func (b *breakRequestValidationHandler) OnUpdate(_ client.Client, _ client.Reade
 			return ad.ErroredResponse(err)
 		}
 
-		if oldBr.Spec.Template != newBr.Spec.Template {
+		if req.SubResource == "" && oldBr.Spec.Template != newBr.Spec.Template {
 			return ad.Denyf(
 				"template cannot be changed. old: %s/%s, new: %s/%s",
 				oldBr.Spec.Template.Kind,
@@ -127,6 +133,26 @@ func (b *breakRequestValidationHandler) OnUpdate(_ client.Client, _ client.Reade
 				newBr.Spec.Template.Kind,
 				newBr.Spec.Template.Name,
 			)
+		}
+
+		if oldBr.Status.Phase != capsulev1beta2.RequestPhaseApproved &&
+			newBr.Status.Phase == capsulev1beta2.RequestPhaseApproved {
+			brt := &capsulev1beta2.BreakRequestTemplate{}
+			if err := reader.Get(ctx, client.ObjectKey{Name: newBr.Spec.Template.Name}, brt); err != nil {
+				return ad.ErroredResponse(fmt.Errorf(
+					"failed to get template %s: %w",
+					newBr.Spec.Template.Name,
+					err,
+				))
+			}
+
+			if err := brt.CheckApprovalCondition(ctx, newBr); err != nil {
+				return ad.Denyf(
+					"approval conditions not satisfied for template %s: %v",
+					newBr.Spec.Template.Name,
+					err,
+				)
+			}
 		}
 
 		return nil

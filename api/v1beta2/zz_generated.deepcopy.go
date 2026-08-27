@@ -156,7 +156,7 @@ func (in *BreakRequestSpec) DeepCopyInto(out *BreakRequestSpec) {
 		*out = new(runtime.RawExtension)
 		(*in).DeepCopyInto(*out)
 	}
-	out.Requestor = in.Requestor
+	in.Requestor.DeepCopyInto(&out.Requestor)
 	if in.Duration != nil {
 		in, out := &in.Duration, &out.Duration
 		*out = new(metav1.Duration)
@@ -2197,7 +2197,7 @@ func (in *ReviewInfo) DeepCopyInto(out *ReviewInfo) {
 	if in.Reviewer != nil {
 		in, out := &in.Reviewer, &out.Reviewer
 		*out = new(breaktheglass.AccessEntity)
-		**out = **in
+		(*in).DeepCopyInto(*out)
 	}
 }
 

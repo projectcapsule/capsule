@@ -1617,6 +1617,8 @@ webhooks:
       namespaceSelector: {}
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchConditions: []
+      # -- [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy)
+      reinvocationPolicy: Never
       # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
       rules:
         - apiGroups:
@@ -1629,6 +1631,7 @@ webhooks:
             - DELETE
           resources:
             - breakrequests
+            - breakrequests/status
           scope: Namespaced
 
     # -- Validate cluster-scoped BreakRequestTemplates

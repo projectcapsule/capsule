@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	gm "go.uber.org/mock/gomock"
+	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierr "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
@@ -26,6 +27,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	mc "github.com/projectcapsule/capsule/internal/mocks/client"
 	"github.com/projectcapsule/capsule/internal/webhook/test"
+	"github.com/projectcapsule/capsule/pkg/api/breaktheglass"
 	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
@@ -94,6 +96,46 @@ func TestBreakRequestValidationHandler(t *testing.T) {
 						Return(nil)
 				},
 				expected: 0, // allowed
+			},
+			{
+				name: "allow auto approval when requestor condition matches",
+				br: &capsulev1beta2.BreakRequest{
+					Spec: capsulev1beta2.BreakRequestSpec{
+						Template: templateRef(defaultTemplateName),
+						Requestor: breaktheglass.AccessEntity{
+							Name:   "alice",
+							Groups: []string{"developers"},
+						},
+					},
+				},
+				setup: func(reader *mc.MockReader) {
+					reader.EXPECT().
+						Get(gm.Any(), client.ObjectKey{Name: defaultTemplateName}, gm.Any()).
+						Do(func(_ any, _ any, brt *capsulev1beta2.BreakRequestTemplate, _ ...any) {
+							brt.Spec.AutoApprove = true
+							brt.Spec.ApprovalCondition = `requestor.name == "alice" && "developers" in requestor.groups`
+						})
+				},
+				expected: 0,
+			},
+			{
+				name: "deny auto approval when requestor condition does not match",
+				br: &capsulev1beta2.BreakRequest{
+					Spec: capsulev1beta2.BreakRequestSpec{
+						Template:  templateRef(defaultTemplateName),
+						Requestor: breaktheglass.AccessEntity{Name: "bob"},
+					},
+				},
+				setup: func(reader *mc.MockReader) {
+					reader.EXPECT().
+						Get(gm.Any(), client.ObjectKey{Name: defaultTemplateName}, gm.Any()).
+						Do(func(_ any, _ any, brt *capsulev1beta2.BreakRequestTemplate, _ ...any) {
+							brt.Spec.AutoApprove = true
+							brt.Spec.ApprovalCondition = `requestor.name == "alice"`
+						})
+				},
+				expected: http.StatusForbidden,
+				errMsg:   "approval conditions not satisfied",
 			},
 			{
 				name: "deny if duration exceeds maxDuration",
@@ -241,6 +283,8 @@ func TestBreakRequestValidationHandler(t *testing.T) {
 			name     string
 			oldBr    *capsulev1beta2.BreakRequest
 			newBr    *capsulev1beta2.BreakRequest
+			setup    func(reader *mc.MockReader)
+			request  admission.Request
 			expected int32
 			errMsg   string
 		}{
@@ -273,17 +317,74 @@ func TestBreakRequestValidationHandler(t *testing.T) {
 				expected: http.StatusForbidden,
 				errMsg:   "template cannot be changed. old: BreakRequestTemplate/foo, new: BreakRequestTemplate/bar",
 			},
+			{
+				name: "allow approval when reviewer condition matches",
+				oldBr: &capsulev1beta2.BreakRequest{
+					Spec:   capsulev1beta2.BreakRequestSpec{Template: templateRef(defaultTemplateName)},
+					Status: capsulev1beta2.BreakRequestStatus{Phase: capsulev1beta2.RequestPhaseRequested},
+				},
+				newBr: &capsulev1beta2.BreakRequest{
+					Spec: capsulev1beta2.BreakRequestSpec{Template: templateRef(defaultTemplateName)},
+					Status: capsulev1beta2.BreakRequestStatus{
+						Phase: capsulev1beta2.RequestPhaseApproved,
+						Review: &capsulev1beta2.ReviewInfo{Reviewer: &breaktheglass.AccessEntity{
+							Name:   "alice",
+							Groups: []string{"reviewers"},
+						}},
+					},
+				},
+				setup: func(reader *mc.MockReader) {
+					reader.EXPECT().Get(gm.Any(), client.ObjectKey{Name: defaultTemplateName}, gm.Any()).
+						Do(func(_ any, _ any, brt *capsulev1beta2.BreakRequestTemplate, _ ...any) {
+							brt.Spec.ApprovalCondition = `"reviewers" in reviewer.groups`
+						})
+				},
+				request:  admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{SubResource: "status"}},
+				expected: 0,
+			},
+			{
+				name: "deny approval when reviewer condition does not match",
+				oldBr: &capsulev1beta2.BreakRequest{
+					Spec:   capsulev1beta2.BreakRequestSpec{Template: templateRef(defaultTemplateName)},
+					Status: capsulev1beta2.BreakRequestStatus{Phase: capsulev1beta2.RequestPhaseRequested},
+				},
+				newBr: &capsulev1beta2.BreakRequest{
+					Spec: capsulev1beta2.BreakRequestSpec{Template: templateRef(defaultTemplateName)},
+					Status: capsulev1beta2.BreakRequestStatus{
+						Phase: capsulev1beta2.RequestPhaseApproved,
+						Review: &capsulev1beta2.ReviewInfo{Reviewer: &breaktheglass.AccessEntity{
+							Name:   "bob",
+							Groups: []string{"users"},
+						}},
+					},
+				},
+				setup: func(reader *mc.MockReader) {
+					reader.EXPECT().Get(gm.Any(), client.ObjectKey{Name: defaultTemplateName}, gm.Any()).
+						Do(func(_ any, _ any, brt *capsulev1beta2.BreakRequestTemplate, _ ...any) {
+							brt.Spec.ApprovalCondition = `"reviewers" in reviewer.groups`
+						})
+				},
+				request:  admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{SubResource: "status"}},
+				expected: http.StatusForbidden,
+				errMsg:   "approval conditions not satisfied",
+			},
 		}
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
+				mockCtrl := gm.NewController(t)
+				defer mockCtrl.Finish()
+				reader := mc.NewMockReader(mockCtrl)
 				decoder := &test.Decoder[*capsulev1beta2.BreakRequest]{
 					Object:    tt.newBr,
 					OldObject: tt.oldBr,
 				}
 				validator := BreakRequestValidationHandler(log, nil)
+				if tt.setup != nil {
+					tt.setup(reader)
+				}
 
-				resp := validator.OnUpdate(nil, nil, decoder, nil)(ctx, admission.Request{})
+				resp := validator.OnUpdate(nil, reader, decoder, nil)(ctx, tt.request)
 				if tt.expected == 0 {
 					assert.Nil(t, resp)
 				} else {

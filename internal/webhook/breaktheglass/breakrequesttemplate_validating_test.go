@@ -35,16 +35,15 @@ func TestBreakRequestTemplateValidationHandler(t *testing.T) {
 		errMsg   string
 	}{
 		{
-			name: "deny if autoApprove is false but approvalCondition is set",
+			name: "allow manual approval condition",
 			brt: &capsulev1beta2.BreakRequestTemplate{
 				Spec: capsulev1beta2.BreakRequestTemplateSpec{
 					AutoApprove:       false,
-					ApprovalCondition: "foo",
+					ApprovalCondition: `"reviewers" in reviewer.groups`,
 					Resources:         []apiruntime.ResourceTemplate{{Targets: []runtime.RawExtension{{Object: &corev1.ConfigMap{}}}}},
 				},
 			},
-			expected: http.StatusForbidden,
-			errMsg:   "approvalCondition should not be set when autoApprove is false",
+			expected: 0,
 		},
 		{
 			name: "allow if autoApprove is true and condition is empty",
@@ -72,7 +71,7 @@ func TestBreakRequestTemplateValidationHandler(t *testing.T) {
 				},
 			},
 			expected: http.StatusForbidden,
-			errMsg:   "approvalCondition is invalid: ERROR: <input>:1:1: undeclared reference to 'foo'",
+			errMsg:   "approvalCondition is invalid: compile approval condition: compile CEL expression",
 		},
 		{
 			name: "allow if approvalCondition is valid",

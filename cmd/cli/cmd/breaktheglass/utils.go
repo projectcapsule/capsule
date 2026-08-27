@@ -16,6 +16,7 @@ import (
 	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
+	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -186,10 +187,15 @@ func accessEntityForConfig(cfg *rest.Config) *breaktheglass.AccessEntity {
 	if cfg.Impersonate.UserName != "" {
 		username = cfg.Impersonate.UserName
 	}
+	entityType := breaktheglass.AccessEntityTypeUser
+	if strings.HasPrefix(username, serviceaccount.ServiceAccountUsernamePrefix) {
+		entityType = breaktheglass.AccessEntityTypeServiceAccount
+	}
 
 	return &breaktheglass.AccessEntity{
-		Type: breaktheglass.AccessEntityTypeUser,
-		Name: username,
+		Type:   entityType,
+		Name:   username,
+		Groups: append([]string(nil), cfg.Impersonate.Groups...),
 	}
 }
 

@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/client-go/rest"
+
+	breaktheglassapi "github.com/projectcapsule/capsule/pkg/api/breaktheglass"
 )
 
 func TestImpersonationOptionsApplyTo(t *testing.T) {
@@ -78,8 +80,15 @@ func TestAccessEntityForConfig(t *testing.T) {
 	t.Parallel()
 
 	assert.Equal(t, "configured", accessEntityForConfig(&rest.Config{Username: "configured"}).Name)
-	assert.Equal(t, "alice", accessEntityForConfig(&rest.Config{
+	entity := accessEntityForConfig(&rest.Config{
 		Username:    "configured",
-		Impersonate: rest.ImpersonationConfig{UserName: "alice"},
-	}).Name)
+		Impersonate: rest.ImpersonationConfig{UserName: "alice", Groups: []string{"developers"}},
+	})
+	assert.Equal(t, "alice", entity.Name)
+	assert.Equal(t, []string{"developers"}, entity.Groups)
+
+	serviceAccount := accessEntityForConfig(&rest.Config{
+		Impersonate: rest.ImpersonationConfig{UserName: "system:serviceaccount:team-a:reviewer"},
+	})
+	assert.Equal(t, breaktheglassapi.AccessEntityTypeServiceAccount, serviceAccount.Type)
 }
