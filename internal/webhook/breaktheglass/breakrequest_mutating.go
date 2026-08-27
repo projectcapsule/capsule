@@ -5,11 +5,11 @@ package breaktheglass
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/go-logr/logr"
+	jsonpatch "gomodules.xyz/jsonpatch/v2"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -32,31 +32,33 @@ type breakRequestMutationHandler struct {
 }
 
 func (h *breakRequestMutationHandler) OnCreate(_ client.Client, _ client.Reader, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+	return func(_ context.Context, req admission.Request) *admission.Response {
 		br := &capsulev1beta2.BreakRequest{}
 		if err := decoder.Decode(req, br); err != nil {
 			return ad.ErroredResponse(fmt.Errorf("failed to decode new object: %w", err))
 		}
 
-		br.Spec.Requestor = breaktheglass.AccessEntity{
+		requestor := breaktheglass.AccessEntity{
 			Name:   req.UserInfo.Username,
 			Type:   h.getAccessEntityType(req.UserInfo.Username),
 			Groups: req.UserInfo.Groups,
 		}
 
-		marshaled, err := json.Marshal(br)
-		if err != nil {
-			return ad.ErroredResponse(err)
-		}
-
-		response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
+		response := admission.Patched(
+			"set authenticated BreakRequest requestor",
+			jsonpatch.NewOperation("add", "/spec/requestor", requestor),
+		)
 
 		return &response
 	}
 }
 
 func (h *breakRequestMutationHandler) OnUpdate(_ client.Client, _ client.Reader, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+	return func(_ context.Context, req admission.Request) *admission.Response {
+		if req.SubResource != "status" {
+			return nil
+		}
+
 		oldBr := &capsulev1beta2.BreakRequest{}
 		newBr := &capsulev1beta2.BreakRequest{}
 
@@ -68,33 +70,35 @@ func (h *breakRequestMutationHandler) OnUpdate(_ client.Client, _ client.Reader,
 			return ad.ErroredResponse(err)
 		}
 
-		// Capture the authenticated reviewer on manual approval. Preserve the
-		// controller's explicit System identity for automatic approvals.
-		if oldBr.Status.Phase != capsulev1beta2.RequestPhaseApproved &&
-			newBr.Status.Phase == capsulev1beta2.RequestPhaseApproved {
-			if newBr.Status.Review == nil {
-				newBr.Status.Review = &capsulev1beta2.ReviewInfo{}
-			}
-
-			if newBr.Status.Review.Reviewer == nil ||
-				newBr.Status.Review.Reviewer.Type != breaktheglass.AccessEntityTypeSystem {
-				newBr.Status.Review.Reviewer = &breaktheglass.AccessEntity{
-					Name:   req.UserInfo.Username,
-					Type:   h.getAccessEntityType(req.UserInfo.Username),
-					Groups: req.UserInfo.Groups,
-				}
-			}
-		}
-
-		marshaled, err := json.Marshal(newBr)
-		if err != nil {
-			return ad.ErroredResponse(err)
-		}
-
-		response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
-		if len(response.Patches) == 0 {
+		if oldBr.Status.Phase == capsulev1beta2.RequestPhaseApproved ||
+			newBr.Status.Phase != capsulev1beta2.RequestPhaseApproved {
 			return nil
 		}
+
+		// Capture the authenticated reviewer on manual approval. Preserve the
+		// controller's explicit System identity for automatic approvals.
+		if newBr.Status.Review != nil &&
+			newBr.Status.Review.Reviewer != nil &&
+			newBr.Status.Review.Reviewer.Type == breaktheglass.AccessEntityTypeSystem {
+			return nil
+		}
+
+		reviewer := breaktheglass.AccessEntity{
+			Name:   req.UserInfo.Username,
+			Type:   h.getAccessEntityType(req.UserInfo.Username),
+			Groups: req.UserInfo.Groups,
+		}
+
+		var patch jsonpatch.JsonPatchOperation
+		if newBr.Status.Review == nil {
+			patch = jsonpatch.NewOperation("add", "/status/review", capsulev1beta2.ReviewInfo{
+				Reviewer: &reviewer,
+			})
+		} else {
+			patch = jsonpatch.NewOperation("add", "/status/review/reviewer", reviewer)
+		}
+
+		response := admission.Patched("set authenticated BreakRequest reviewer", patch)
 
 		return &response
 	}

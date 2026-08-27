@@ -25,13 +25,15 @@ import (
 
 // InitializeFromTemplate Copies all relevant values from the Template.
 func (br *BreakRequest) InitializeFromTemplate(brt *BreakRequestTemplate) {
+	spec := brt.Spec.DeepCopy()
+
 	br.Status.Template = &TemplateProperties{
-		Resources:       brt.Spec.Resources,
-		ParamSchema:     brt.Spec.ParamSchema,
-		Context:         brt.Spec.Context,
-		DefaultDuration: brt.Spec.DefaultDuration,
-		MaxDuration:     brt.Spec.MaxDuration,
-		KeepFor:         brt.Spec.KeepFor,
+		Resources:       spec.Resources,
+		ParamSchema:     spec.ParamSchema,
+		Context:         spec.Context,
+		DefaultDuration: spec.DefaultDuration,
+		MaxDuration:     spec.MaxDuration,
+		KeepFor:         spec.KeepFor,
 	}
 }
 
@@ -163,19 +165,15 @@ func (br *BreakRequest) ActiveRequest(entity *breaktheglass.AccessEntity) (err e
 		duration = tpl.DefaultDuration
 	}
 
-	if tpl.MaxDuration.Duration > 0 && duration != nil &&
+	if tpl.MaxDuration != nil && tpl.MaxDuration.Duration > 0 && duration != nil &&
 		duration.Duration > tpl.MaxDuration.Duration {
 		return fmt.Errorf("requested duration %s exceeds template maxDuration %s",
 			duration.Duration, tpl.MaxDuration.Duration)
 	}
 
-	br.Status.Active.ActiveFrom = now
+	br.Status.Active.ActiveFrom = &now
 
-	keepFor := tpl.KeepFor
-
-	if br.Status.Approved != nil {
-		keepFor = br.Status.Approved.KeepFor
-	}
+	keepFor := br.effectiveKeepFor()
 
 	if keepFor > 0 {
 		controllerutil.AddFinalizer(br, meta.ControllerFinalizer)
@@ -184,10 +182,12 @@ func (br *BreakRequest) ActiveRequest(entity *breaktheglass.AccessEntity) (err e
 	if duration != nil && duration.Duration > 0 {
 		// If a duration was set, otherwise the lifecycle must be canceled manually
 		activeUntil := now.Add(duration.Duration)
-		br.Status.Active.ActiveUntil = metav1.NewTime(activeUntil)
+		activeUntilTime := metav1.NewTime(activeUntil)
+		br.Status.Active.ActiveUntil = &activeUntilTime
 
 		if keepFor > 0 {
-			br.Status.KeepUntil = metav1.NewTime(activeUntil.Add(time.Duration(keepFor)))
+			keepUntil := metav1.NewTime(activeUntil.Add(time.Duration(keepFor)))
+			br.Status.KeepUntil = &keepUntil
 		}
 	}
 
@@ -209,10 +209,7 @@ func (br *BreakRequest) ExpireRequest(entity *breaktheglass.AccessEntity) (err e
 		return err
 	}
 
-	keepFor := breaktheglass.ExtendedDuration(0)
-	if br.Status.Approved != nil {
-		keepFor = br.Status.Approved.KeepFor
-	}
+	keepFor := br.effectiveKeepFor()
 
 	if keepFor > 0 {
 		controllerutil.AddFinalizer(br, meta.ControllerFinalizer)
@@ -220,8 +217,9 @@ func (br *BreakRequest) ExpireRequest(entity *breaktheglass.AccessEntity) (err e
 
 	// If the request had no bounded ActiveUntil (e.g., "unlimited" duration) but keepFor is set,
 	// compute KeepUntil from the expiration time so the controller can retain the object for auditing.
-	if br.Status.KeepUntil.IsZero() && keepFor > 0 {
-		br.Status.KeepUntil = metav1.NewTime(now.Add(time.Duration(keepFor)))
+	if br.Status.KeepUntil == nil && keepFor > 0 {
+		keepUntil := metav1.NewTime(now.Add(time.Duration(keepFor)))
+		br.Status.KeepUntil = &keepUntil
 	}
 
 	return nil
@@ -264,7 +262,7 @@ func (br *BreakRequest) GenerateApprovedProperties(contexts ...template.Referenc
 
 	return &ApprovedProperties{
 		Duration:  br.Spec.Duration,
-		StartTime: startTime,
+		StartTime: &startTime,
 		Resources: resources,
 		KeepFor:   tpl.KeepFor,
 	}, nil
@@ -274,7 +272,7 @@ func (br *BreakRequest) GenerateApprovedProperties(contexts ...template.Referenc
 // values and expands optional multi-document templates with the structured
 // .params and .context.resources values.
 func (br *BreakRequest) RenderResources(
-	schema k8sruntime.RawExtension,
+	schema *k8sruntime.RawExtension,
 	resources []apiruntime.ResourceTemplate,
 	contexts ...template.ReferenceContext,
 ) ([]apiruntime.ResourceTemplate, error) {
@@ -449,13 +447,18 @@ func (br *BreakRequest) LoadTemplateContext(
 	return loaded, nil
 }
 
-func (br *BreakRequest) templateParameters(schema k8sruntime.RawExtension) (template.ReferenceContext, error) {
+func (br *BreakRequest) templateParameters(schema *k8sruntime.RawExtension) (template.ReferenceContext, error) {
 	var paramBytes []byte
 	if br.Spec.Params != nil {
 		paramBytes = br.Spec.Params.Raw
 	}
 
-	if err := template.Validate(schema.Raw, paramBytes); err != nil {
+	var schemaBytes []byte
+	if schema != nil {
+		schemaBytes = schema.Raw
+	}
+
+	if err := template.Validate(schemaBytes, paramBytes); err != nil {
 		return nil, fmt.Errorf("invalid params: %w", err)
 	}
 
@@ -467,6 +470,20 @@ func (br *BreakRequest) templateParameters(schema k8sruntime.RawExtension) (temp
 	}
 
 	return params, nil
+}
+
+func (br *BreakRequest) effectiveKeepFor() breaktheglass.ExtendedDuration {
+	var keepFor breaktheglass.ExtendedDuration
+
+	if br.Status.Template != nil && br.Status.Template.KeepFor != nil {
+		keepFor = *br.Status.Template.KeepFor
+	}
+
+	if br.Status.Approved != nil && br.Status.Approved.KeepFor != nil {
+		keepFor = *br.Status.Approved.KeepFor
+	}
+
+	return keepFor
 }
 
 func parameterFastContext(params template.ReferenceContext) map[string]string {

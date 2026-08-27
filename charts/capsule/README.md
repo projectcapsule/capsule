@@ -87,6 +87,7 @@ The following Values have changed key or Value:
 | ports | list | `[]` | Set additional ports for the deployment |
 | priorityClassName | string | `""` | Set the priority class name of the Capsule pod |
 | proxy.enabled | bool | `false` | Enable Installation of Capsule Proxy |
+| rbac.breakrequests | object | `{"create":false,"labels":{}}` | Allow the creation and review of BreakRequests |
 | rbac.customquotas | object | `{"create":false,"labels":{}}` | Allow the creation of CustomQuotas |
 | rbac.resourcepoolclaims | object | `{"create":false,"labels":{}}` | Allow the creation of ResourcePoolClaims |
 | rbac.resources | object | `{"create":false,"labels":{}}` | Allow the creation of TenantResources |

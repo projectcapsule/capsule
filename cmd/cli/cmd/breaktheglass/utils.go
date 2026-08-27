@@ -45,7 +45,7 @@ func printBreakRequestsApprovalTable(
 	}
 
 	keepForStr := "Undefined"
-	if app.KeepFor != 0 {
+	if app.KeepFor != nil && *app.KeepFor != 0 {
 		keepForStr = app.KeepFor.String()
 	}
 
@@ -153,6 +153,7 @@ func newK8sClient() (*rest.Config, ctrlclient.Client, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+
 	if err := impersonation.applyTo(cfg); err != nil {
 		return nil, nil, err
 	}
@@ -187,16 +188,20 @@ func accessEntityForConfig(cfg *rest.Config) *breaktheglass.AccessEntity {
 	if cfg.Impersonate.UserName != "" {
 		username = cfg.Impersonate.UserName
 	}
-	entityType := breaktheglass.AccessEntityTypeUser
-	if strings.HasPrefix(username, serviceaccount.ServiceAccountUsernamePrefix) {
-		entityType = breaktheglass.AccessEntityTypeServiceAccount
-	}
 
 	return &breaktheglass.AccessEntity{
-		Type:   entityType,
+		Type:   accessEntityTypeForUsername(username),
 		Name:   username,
 		Groups: append([]string(nil), cfg.Impersonate.Groups...),
 	}
+}
+
+func accessEntityTypeForUsername(username string) breaktheglass.AccessEntityType {
+	if strings.HasPrefix(username, serviceaccount.ServiceAccountUsernamePrefix) {
+		return breaktheglass.AccessEntityTypeServiceAccount
+	}
+
+	return breaktheglass.AccessEntityTypeUser
 }
 
 func runBreakRequestAction(

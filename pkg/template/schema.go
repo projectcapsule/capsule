@@ -35,8 +35,13 @@ func ValidateItems(schema k8sruntime.RawExtension, tis []k8sruntime.RawExtension
 
 // ValidateResourceTemplates validates a parameter schema and the targets of
 // reusable resource templates.
-func ValidateResourceTemplates(schema k8sruntime.RawExtension, resources []apiruntime.ResourceTemplate) error {
-	if _, err := ValidateSchema(schema.Raw); err != nil {
+func ValidateResourceTemplates(schema *k8sruntime.RawExtension, resources []apiruntime.ResourceTemplate) error {
+	var schemaBytes []byte
+	if schema != nil {
+		schemaBytes = schema.Raw
+	}
+
+	if _, err := ValidateSchema(schemaBytes); err != nil {
 		return fmt.Errorf("paramSchema is invalid: %w", err)
 	}
 

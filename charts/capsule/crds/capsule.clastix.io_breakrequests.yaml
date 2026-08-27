@@ -267,7 +267,7 @@ spec:
               keepUntil:
                 description: |-
                   The time until which the BreakRequest should be retained after it expires (e.g. for auditing).
-                  If zero, the BreakRequest can be deleted immediately after expiring.
+                  If unset, the BreakRequest can be deleted immediately after expiring.
                 format: date-time
                 type: string
               phase:

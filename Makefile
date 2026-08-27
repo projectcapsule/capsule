@@ -214,6 +214,8 @@ dev-setup: dev-setup-flux-handoff
 		--set 'certManager.generateCertificates=false' \
 		--set 'tls.enableController=false' \
 		--set 'tls.create=false' \
+		--set rbac.breakrequests.create=true \
+		--set-string 'rbac.breakrequests.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set rbac.resources.create=true \
 		--set-string 'rbac.resources.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set rbac.resourcepoolclaims.create=true \
@@ -500,6 +502,8 @@ e2e-install: helm-controller-version ko-build-all dev-install-gw-api-crds
 		--set 'manager.options.leaderElection.leaseDuration=60s' \
 		--set 'manager.options.leaderElection.renewDeadline=40s' \
 		--set 'manager.rbac.minimal=true' \
+		--set rbac.breakrequests.create=true \
+		--set-string 'rbac.breakrequests.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set rbac.resources.create=true \
 		--set-string 'rbac.resources.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set rbac.resourcepoolclaims.create=true \

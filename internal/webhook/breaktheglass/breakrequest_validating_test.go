@@ -149,7 +149,7 @@ func TestBreakRequestValidationHandler(t *testing.T) {
 					reader.EXPECT().
 						Get(gm.Any(), client.ObjectKey{Name: defaultTemplateName}, gm.Any()).
 						Do(func(_ any, _ any, brt *capsulev1beta2.BreakRequestTemplate, _ ...any) {
-							brt.Spec.MaxDuration.Duration = time.Minute
+							brt.Spec.MaxDuration = &metav1.Duration{Duration: time.Minute}
 						})
 				},
 				expected: http.StatusForbidden,
@@ -409,7 +409,7 @@ func TestBreakRequestValidationLoadsParameterizedContext(t *testing.T) {
 	brt := &capsulev1beta2.BreakRequestTemplate{
 		ObjectMeta: metav1.ObjectMeta{Name: "context-template"},
 		Spec: capsulev1beta2.BreakRequestTemplateSpec{
-			ParamSchema: runtime.RawExtension{Raw: []byte(`{"type":"object","required":["source"],"properties":{"source":{"type":"string"}}}`)},
+			ParamSchema: &runtime.RawExtension{Raw: []byte(`{"type":"object","required":["source"],"properties":{"source":{"type":"string"}}}`)},
 			Context: &tpl.TemplateContext{Resources: []*tpl.TemplateResourceReference{{
 				ResourceReference: tpl.ResourceReference{
 					VersionKind: apiruntime.VersionKind{APIVersion: "v1", Kind: "ConfigMap"},

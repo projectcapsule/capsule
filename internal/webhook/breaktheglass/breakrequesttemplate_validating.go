@@ -62,7 +62,7 @@ func validate(decoder admission.Decoder, req admission.Request) *admission.Respo
 		}
 	}
 	// Ensure the template's own defaults are consistent.
-	if brt.Spec.MaxDuration.Duration > 0 && brt.Spec.DefaultDuration != nil &&
+	if brt.Spec.MaxDuration != nil && brt.Spec.MaxDuration.Duration > 0 && brt.Spec.DefaultDuration != nil &&
 		brt.Spec.DefaultDuration.Duration > brt.Spec.MaxDuration.Duration {
 		return ad.Denyf(
 			"defaultDuration %s exceeds maxDuration %s",

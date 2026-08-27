@@ -104,6 +104,11 @@ proxy:
 
 # These are ClusterRoles which grant permissions for Capsule CRDs to Tenant Owners
 rbac:
+  # -- Allow the creation and review of BreakRequests
+  breakrequests:
+    create: false
+    labels: {}
+    # rbac.authorization.k8s.io/aggregate-to-admin: "true"
   # -- Allow the creation of TenantResources
   resources:
     create: false

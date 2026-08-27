@@ -46,6 +46,7 @@ func (b *breakRequestValidationHandler) OnCreate(c client.Client, reader client.
 
 		templateName := br.Spec.Template.Name
 		brt := &capsulev1beta2.BreakRequestTemplate{}
+
 		if err := reader.Get(ctx, client.ObjectKey{Name: templateName}, brt); err != nil {
 			if client.IgnoreNotFound(err) == nil {
 				return ad.Denyf("template %s not found", templateName)
@@ -73,7 +74,7 @@ func (b *breakRequestValidationHandler) OnCreate(c client.Client, reader client.
 			}
 		}
 
-		if brt.Spec.MaxDuration.Duration > 0 &&
+		if brt.Spec.MaxDuration != nil && brt.Spec.MaxDuration.Duration > 0 &&
 			br.Spec.Duration != nil &&
 			br.Spec.Duration.Duration > brt.Spec.MaxDuration.Duration {
 			return ad.Denyf("requested duration %s exceeds template maxDuration %s",

@@ -50,7 +50,7 @@ func TestBreakRequestLoadsParameterTemplatedContextForAllItems(t *testing.T) {
 			"source":{"name":"platform-settings"}
 		}`)}},
 		Status: BreakRequestStatus{Template: &TemplateProperties{
-			ParamSchema: paramSchema,
+			ParamSchema: &paramSchema,
 			Context: &tpl.TemplateContext{Resources: []*tpl.TemplateResourceReference{{
 				ResourceReference: tpl.ResourceReference{
 					VersionKind: apiruntime.VersionKind{APIVersion: "v1", Kind: "ConfigMap"},
@@ -69,7 +69,7 @@ func TestBreakRequestLoadsParameterTemplatedContextForAllItems(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadTemplateContext() error = %v", err)
 	}
-	items, err := br.RenderResources(paramSchema, br.Status.Template.Resources, loaded)
+	items, err := br.RenderResources(&paramSchema, br.Status.Template.Resources, loaded)
 	if err != nil {
 		t.Fatalf("RenderResources() error = %v", err)
 	}
@@ -90,7 +90,7 @@ func TestBreakRequestRendersTargetsAndStructuredMultiYAMLTemplate(t *testing.T) 
 
 	br := &BreakRequest{Spec: BreakRequestSpec{Params: &runtime.RawExtension{Raw: []byte(`{"name":"temporary-access"}`)}}}
 	resources, err := br.RenderResources(
-		runtime.RawExtension{Raw: []byte(`{"type":"object","required":["name"],"properties":{"name":{"type":"string"}}}`)},
+		&runtime.RawExtension{Raw: []byte(`{"type":"object","required":["name"],"properties":{"name":{"type":"string"}}}`)},
 		[]apiruntime.ResourceTemplate{{
 			Policy:  apiruntime.ResourceTemplatePolicy{Force: true},
 			Targets: []runtime.RawExtension{{Raw: []byte(`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"{{ .name }}-direct"}}`)}},
@@ -148,7 +148,7 @@ func TestBreakRequestContextCannotReplaceParameter(t *testing.T) {
 
 	br := &BreakRequest{Spec: BreakRequestSpec{Params: &runtime.RawExtension{Raw: []byte(`{"name":"request-value"}`)}}}
 	_, err := br.RenderResources(
-		runtime.RawExtension{Raw: []byte(`{"type":"object","properties":{"name":{"type":"string"}}}`)},
+		&runtime.RawExtension{Raw: []byte(`{"type":"object","properties":{"name":{"type":"string"}}}`)},
 		[]apiruntime.ResourceTemplate{{Targets: []runtime.RawExtension{{Raw: []byte(`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"{{ .name }}"}}`)}}}},
 		tpl.ReferenceContext{"name": "context-value"},
 	)

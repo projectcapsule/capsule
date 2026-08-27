@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -113,7 +114,7 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 						},
 					},
 					Approved: &capsulev1beta2.ApprovedProperties{
-						StartTime: v1.NewTime(time.Now().Add(time.Hour)),
+						StartTime: ptr.To(v1.NewTime(time.Now().Add(time.Hour))),
 					},
 				},
 			},
@@ -161,13 +162,13 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 						},
 					},
 					Approved: &capsulev1beta2.ApprovedProperties{
-						StartTime: v1.Now(),
+						StartTime: ptr.To(v1.Now()),
 					},
 					Template: &capsulev1beta2.TemplateProperties{
 						Resources: []apiruntime.ResourceTemplate{{
 							Targets: []runtime.RawExtension{mtConfigMapParameterized},
 						}},
-						ParamSchema: psString,
+						ParamSchema: &psString,
 					},
 				},
 			},
@@ -234,13 +235,13 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 				Status: capsulev1beta2.BreakRequestStatus{
 					Phase: capsulev1beta2.RequestPhaseApproved,
 					Approved: &capsulev1beta2.ApprovedProperties{
-						StartTime: v1.Now(),
+						StartTime: ptr.To(v1.Now()),
 					},
 					Template: &capsulev1beta2.TemplateProperties{
 						Resources: []apiruntime.ResourceTemplate{{
 							Targets: []runtime.RawExtension{mtConfigMapParameterized},
 						}},
-						ParamSchema: psString,
+						ParamSchema: &psString,
 					},
 				},
 			},

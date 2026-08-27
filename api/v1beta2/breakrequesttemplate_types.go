@@ -26,7 +26,7 @@ type BreakRequestTemplateSpec struct {
 	Resources []apiruntime.ResourceTemplate `json:"resources"`
 
 	// ParamSchema template parameter schema
-	ParamSchema k8sruntime.RawExtension `json:"paramSchema,omitempty"`
+	ParamSchema *k8sruntime.RawExtension `json:"paramSchema,omitempty"`
 
 	// Context loads additional Kubernetes resources for use by all resource targets and templates.
 	// Resource reference fields may use parameters declared by ParamSchema.
@@ -37,11 +37,11 @@ type BreakRequestTemplateSpec struct {
 	// the resource will be kept until the request is deleted.
 	DefaultDuration *metav1.Duration `json:"defaultDuration,omitempty"`
 	// The max allowed duration of the BreakRequest referencing this template should be valid for.
-	MaxDuration metav1.Duration `json:"maxDuration,omitempty"`
+	MaxDuration *metav1.Duration `json:"maxDuration,omitempty"`
 
 	// The duration of this BreakRequest will be kept in the system after it has been expired (eg. auditing purposes)
 	// If not set, the BreakRequest will be deleted after expiring.
-	KeepFor breaktheglass.ExtendedDuration `json:"keepFor,omitempty"`
+	KeepFor *breaktheglass.ExtendedDuration `json:"keepFor,omitempty"`
 
 	// AutoApprove requests created by this template will be automatically approved.
 	AutoApprove bool `json:"autoApprove,omitempty"`

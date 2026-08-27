@@ -1007,6 +1007,18 @@
         "rbac": {
             "type": "object",
             "properties": {
+                "breakrequests": {
+                    "description": "Allow the creation and review of BreakRequests",
+                    "type": "object",
+                    "properties": {
+                        "create": {
+                            "type": "boolean"
+                        },
+                        "labels": {
+                            "type": "object"
+                        }
+                    }
+                },
                 "customquotas": {
                     "description": "Allow the creation of CustomQuotas",
                     "type": "object",

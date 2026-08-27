@@ -80,6 +80,7 @@ func (brt *BreakRequestTemplate) EvaluateApprovalCondition(
 	if err != nil {
 		return false, fmt.Errorf("convert requestor for approval condition: %w", err)
 	}
+
 	ensureGroups(requestor)
 
 	reviewer := map[string]any{}
@@ -89,6 +90,7 @@ func (brt *BreakRequestTemplate) EvaluateApprovalCondition(
 			return false, fmt.Errorf("convert reviewer for approval condition: %w", err)
 		}
 	}
+
 	ensureGroups(reviewer)
 
 	matched, err := compiled.EvaluateBooleanWithVariables(ctx, map[string]any{
@@ -114,6 +116,7 @@ func (brt *BreakRequestTemplate) CheckApprovalCondition(ctx context.Context, br 
 	if err != nil {
 		return err
 	}
+
 	if !matched {
 		return fmt.Errorf("approval condition (%s) not met", brt.Spec.ApprovalCondition)
 	}

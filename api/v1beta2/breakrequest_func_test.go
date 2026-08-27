@@ -4,6 +4,7 @@
 package v1beta2
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -14,7 +15,49 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
 )
+
+func TestOptionalBreakRequestFieldsAreOmitted(t *testing.T) {
+	t.Parallel()
+
+	values := map[string]struct {
+		value  any
+		fields []string
+	}{
+		"status": {
+			value:  BreakRequestStatus{},
+			fields: []string{"review", "template", "approved", "active", "keepUntil"},
+		},
+		"active period": {
+			value:  ActivePeriod{},
+			fields: []string{"from", "until"},
+		},
+		"template properties": {
+			value:  TemplateProperties{},
+			fields: []string{"paramSchema", "context", "defaultDuration", "maxDuration", "keepFor"},
+		},
+		"approved properties": {
+			value:  ApprovedProperties{},
+			fields: []string{"keepFor", "duration", "startTime"},
+		},
+	}
+
+	for name, testCase := range values {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			raw, err := json.Marshal(testCase.value)
+			require.NoError(t, err)
+
+			serialized := map[string]any{}
+			require.NoError(t, json.Unmarshal(raw, &serialized))
+			for _, field := range testCase.fields {
+				assert.NotContains(t, serialized, field)
+			}
+		})
+	}
+}
 
 func TestSetReviewer(t *testing.T) {
 	reviewer := &breaktheglass.AccessEntity{Type: breaktheglass.AccessEntityTypeUser, Name: "test-user"}
@@ -104,11 +147,11 @@ func TestInitializeFromTemplate(t *testing.T) {
 	brt := &BreakRequestTemplate{
 		Spec: BreakRequestTemplateSpec{
 			Resources:       []apiruntime.ResourceTemplate{},
-			ParamSchema:     runtime.RawExtension{Raw: []byte(`{"type":"object"}`)},
+			ParamSchema:     &runtime.RawExtension{Raw: []byte(`{"type":"object"}`)},
 			Context:         &tpl.TemplateContext{},
 			DefaultDuration: &metav1.Duration{Duration: time.Minute},
-			MaxDuration:     metav1.Duration{Duration: time.Hour},
-			KeepFor:         5,
+			MaxDuration:     &metav1.Duration{Duration: time.Hour},
+			KeepFor:         ptr.To(breaktheglass.ExtendedDuration(5)),
 		},
 	}
 
@@ -120,6 +163,11 @@ func TestInitializeFromTemplate(t *testing.T) {
 	assert.Equal(t, brt.Spec.DefaultDuration, br.Status.Template.DefaultDuration)
 	assert.Equal(t, brt.Spec.MaxDuration, br.Status.Template.MaxDuration)
 	assert.Equal(t, brt.Spec.KeepFor, br.Status.Template.KeepFor)
+	assert.NotSame(t, brt.Spec.ParamSchema, br.Status.Template.ParamSchema)
+	assert.NotSame(t, brt.Spec.Context, br.Status.Template.Context)
+	assert.NotSame(t, brt.Spec.DefaultDuration, br.Status.Template.DefaultDuration)
+	assert.NotSame(t, brt.Spec.MaxDuration, br.Status.Template.MaxDuration)
+	assert.NotSame(t, brt.Spec.KeepFor, br.Status.Template.KeepFor)
 }
 
 func TestApproveRequest(t *testing.T) {
@@ -155,7 +203,7 @@ func TestRenderResources(t *testing.T) {
 		Targets: []runtime.RawExtension{{Raw: []byte(`{"kind":"ConfigMap"}`)}},
 	}
 
-	items, err := br.RenderResources(schema, []apiruntime.ResourceTemplate{resource})
+	items, err := br.RenderResources(&schema, []apiruntime.ResourceTemplate{resource})
 	require.NoError(t, err)
 	assert.Len(t, items, 1)
 	assert.Equal(t, resource.Policy, items[0].Policy)
@@ -176,7 +224,7 @@ func TestActiveRequest(t *testing.T) {
 			br: &BreakRequest{
 				Status: BreakRequestStatus{
 					Template: &TemplateProperties{
-						MaxDuration:     metav1.Duration{Duration: time.Hour},
+						MaxDuration:     &metav1.Duration{Duration: time.Hour},
 						DefaultDuration: &metav1.Duration{Duration: time.Minute},
 					},
 				},
@@ -192,7 +240,7 @@ func TestActiveRequest(t *testing.T) {
 			br: &BreakRequest{
 				Status: BreakRequestStatus{
 					Template: &TemplateProperties{
-						MaxDuration:     metav1.Duration{Duration: time.Hour},
+						MaxDuration:     &metav1.Duration{Duration: time.Hour},
 						DefaultDuration: &metav1.Duration{Duration: time.Minute},
 					},
 					Approved: &ApprovedProperties{
@@ -212,7 +260,7 @@ func TestActiveRequest(t *testing.T) {
 			br: &BreakRequest{
 				Status: BreakRequestStatus{
 					Template: &TemplateProperties{
-						MaxDuration:     metav1.Duration{Duration: time.Hour},
+						MaxDuration:     &metav1.Duration{Duration: time.Hour},
 						DefaultDuration: &metav1.Duration{Duration: time.Minute},
 					},
 					Approved: &ApprovedProperties{
@@ -232,7 +280,7 @@ func TestActiveRequest(t *testing.T) {
 			br: &BreakRequest{
 				Status: BreakRequestStatus{
 					Template: &TemplateProperties{
-						MaxDuration:     metav1.Duration{Duration: time.Hour},
+						MaxDuration:     &metav1.Duration{Duration: time.Hour},
 						DefaultDuration: &metav1.Duration{Duration: time.Minute},
 					},
 					Approved: nil,
@@ -250,7 +298,7 @@ func TestActiveRequest(t *testing.T) {
 			br: &BreakRequest{
 				Status: BreakRequestStatus{
 					Template: &TemplateProperties{
-						MaxDuration:     metav1.Duration{Duration: time.Hour},
+						MaxDuration:     &metav1.Duration{Duration: time.Hour},
 						DefaultDuration: &metav1.Duration{Duration: time.Minute},
 					},
 					Approved: &ApprovedProperties{

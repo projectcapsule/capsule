@@ -73,7 +73,8 @@ func TestBreakRequestMutationHandlerOnCreate(t *testing.T) {
 			resp := BreakRequestMutationHandler(log.Log.WithName("test")).OnCreate(nil, nil, decoder, nil)(context.Background(), req)
 			require.NotNil(t, resp)
 			assert.True(t, resp.Allowed)
-			assert.NotEmpty(t, resp.Patches)
+			require.Len(t, resp.Patches, 1)
+			assert.Equal(t, "/spec/requestor", resp.Patches[0].Path)
 			mutated := applyResponsePatches(t, raw, resp)
 			assert.Equal(t, breaktheglassapi.AccessEntity{
 				Name:   tt.username,
@@ -91,6 +92,7 @@ func TestBreakRequestMutationHandlerOnApproval(t *testing.T) {
 		name         string
 		reviewer     *breaktheglassapi.AccessEntity
 		wantReviewer breaktheglassapi.AccessEntity
+		wantPath     string
 		wantPatch    bool
 	}{
 		{
@@ -104,6 +106,18 @@ func TestBreakRequestMutationHandlerOnApproval(t *testing.T) {
 				Type:   breaktheglassapi.AccessEntityTypeUser,
 				Groups: []string{"reviewers"},
 			},
+			wantPath:  "/status/review/reviewer",
+			wantPatch: true,
+		},
+		{
+			name:     "creates missing review without patching unrelated status fields",
+			reviewer: nil,
+			wantReviewer: breaktheglassapi.AccessEntity{
+				Name:   "alice",
+				Type:   breaktheglassapi.AccessEntityTypeUser,
+				Groups: []string{"reviewers"},
+			},
+			wantPath:  "/status/review",
 			wantPatch: true,
 		},
 		{
@@ -127,9 +141,14 @@ func TestBreakRequestMutationHandlerOnApproval(t *testing.T) {
 			oldBr := &capsulev1beta2.BreakRequest{Status: capsulev1beta2.BreakRequestStatus{
 				Phase: capsulev1beta2.RequestPhaseRequested,
 			}}
+			var review *capsulev1beta2.ReviewInfo
+			if tt.reviewer != nil {
+				review = &capsulev1beta2.ReviewInfo{Reviewer: tt.reviewer.DeepCopy()}
+			}
+
 			newBr := &capsulev1beta2.BreakRequest{Status: capsulev1beta2.BreakRequestStatus{
 				Phase:  capsulev1beta2.RequestPhaseApproved,
-				Review: &capsulev1beta2.ReviewInfo{Reviewer: tt.reviewer.DeepCopy()},
+				Review: review,
 			}}
 			raw, err := json.Marshal(newBr)
 			require.NoError(t, err)
@@ -149,7 +168,9 @@ func TestBreakRequestMutationHandlerOnApproval(t *testing.T) {
 			if tt.wantPatch {
 				require.NotNil(t, resp)
 				assert.True(t, resp.Allowed)
-				assert.NotEmpty(t, resp.Patches)
+				require.Len(t, resp.Patches, 1)
+				assert.Equal(t, tt.wantPath, resp.Patches[0].Path)
+				assert.NotContains(t, resp.Patches[0].Path, "keepUntil")
 				mutated := applyResponsePatches(t, raw, resp)
 				require.NotNil(t, mutated.Status.Review)
 				require.NotNil(t, mutated.Status.Review.Reviewer)
@@ -160,6 +181,32 @@ func TestBreakRequestMutationHandlerOnApproval(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBreakRequestMutationHandlerIgnoresApprovalOutsideStatusSubresource(t *testing.T) {
+	t.Parallel()
+
+	oldBr := &capsulev1beta2.BreakRequest{Status: capsulev1beta2.BreakRequestStatus{
+		Phase: capsulev1beta2.RequestPhaseRequested,
+	}}
+	newBr := &capsulev1beta2.BreakRequest{Status: capsulev1beta2.BreakRequestStatus{
+		Phase: capsulev1beta2.RequestPhaseApproved,
+	}}
+	raw, err := json.Marshal(newBr)
+	require.NoError(t, err)
+
+	decoder := &test.Decoder[*capsulev1beta2.BreakRequest]{Object: newBr, OldObject: oldBr}
+	req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+		Object:    runtime.RawExtension{Raw: raw},
+		OldObject: runtime.RawExtension{Raw: []byte(`{}`)},
+		UserInfo: authenticationv1.UserInfo{
+			Username: "alice",
+			Groups:   []string{"reviewers"},
+		},
+	}}
+
+	resp := BreakRequestMutationHandler(log.Log.WithName("test")).OnUpdate(nil, nil, decoder, nil)(context.Background(), req)
+	assert.Nil(t, resp)
 }
 
 func applyResponsePatches(

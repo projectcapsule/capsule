@@ -98,31 +98,36 @@ func (c *Compiler) compile(
 	}
 
 	envSet := c.envSet
+
 	if len(variables) > 0 {
 		envOptions := make([]celgo.EnvOption, 0, len(variables))
 		seen := map[string]struct{}{ObjectVariable: {}}
 
 		for _, variable := range variables {
 			variable = strings.TrimSpace(variable)
+
 			if variable == "" {
 				return nil, fmt.Errorf("CEL variable must not be empty")
 			}
+
 			if _, exists := seen[variable]; exists {
 				continue
 			}
 
 			seen[variable] = struct{}{}
+
 			envOptions = append(envOptions, celgo.Variable(variable, celgo.DynType))
 		}
 
-		var err error
-		envSet, err = envSet.Extend(environment.VersionedOptions{
+		extendedEnvSet, err := envSet.Extend(environment.VersionedOptions{
 			IntroducedVersion: version.MajorMinor(1, 0),
 			EnvOptions:        envOptions,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("extend Kubernetes CEL environment: %w", err)
 		}
+
+		envSet = extendedEnvSet
 	}
 
 	env, err := envSet.Env(mode)

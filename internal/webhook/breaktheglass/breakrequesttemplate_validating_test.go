@@ -95,7 +95,7 @@ func TestBreakRequestTemplateValidationHandler(t *testing.T) {
 			brt: &capsulev1beta2.BreakRequestTemplate{
 				Spec: capsulev1beta2.BreakRequestTemplateSpec{
 					Resources:   []apiruntime.ResourceTemplate{{Targets: []runtime.RawExtension{{Object: &corev1.ConfigMap{}}}}},
-					ParamSchema: runtime.RawExtension{Raw: []byte(`{"type": "string"}`)},
+					ParamSchema: &runtime.RawExtension{Raw: []byte(`{"type": "string"}`)},
 				},
 			},
 			setup: func(cl *mc.MockClient) {
@@ -111,7 +111,7 @@ func TestBreakRequestTemplateValidationHandler(t *testing.T) {
 			brt: &capsulev1beta2.BreakRequestTemplate{
 				Spec: capsulev1beta2.BreakRequestTemplateSpec{
 					Resources:   []apiruntime.ResourceTemplate{{Targets: []runtime.RawExtension{{Object: &corev1.ConfigMap{}}}}},
-					ParamSchema: runtime.RawExtension{Raw: []byte(`"type": `)},
+					ParamSchema: &runtime.RawExtension{Raw: []byte(`"type": `)},
 				},
 			},
 			expected: http.StatusForbidden,

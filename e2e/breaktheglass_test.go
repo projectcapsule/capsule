@@ -14,6 +14,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/breaktheglass"
 	apimeta "github.com/projectcapsule/capsule/pkg/api/meta"
 	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
+	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -22,6 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 )
+
+const breakRequestTemplateSelectorLabel = "e2e.projectcapsule.dev/breakrequest-template"
 
 func breakRequestTemplateReference(name string) capsulev1beta2.BreakRequestTemplateReference {
 	return capsulev1beta2.BreakRequestTemplateReference{
@@ -82,6 +85,9 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 		It("should exist", func() {
 			t := &capsulev1beta2.BreakRequestTemplate{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: brt.GetName()}, t)).Should(Succeed())
+		})
+		It("reconciles unrestricted namespace access into status", func() {
+			expectBreakRequestTemplateNamespaces(ctx, brt.Name, "*")
 		})
 		It("should create a ConfigMap and delete it after timeout", func() {
 			br := &capsulev1beta2.BreakRequest{
@@ -302,6 +308,8 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 		})
 
 		It("auto-approves a matching authenticated requestor", func() {
+			grantBreakRequestNamespaceAdmin(ctx, "default", "alice")
+
 			aliceClient := impersonationClient("alice", []string{"developers"})
 			br := &capsulev1beta2.BreakRequest{
 				ObjectMeta: metav1.ObjectMeta{Name: "e2e-btg-requestor-alice", Namespace: "default"},
@@ -320,6 +328,8 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 		})
 
 		It("rejects a non-matching authenticated requestor", func() {
+			grantBreakRequestNamespaceAdmin(ctx, "default", "bob")
+
 			bobClient := impersonationClient("bob", []string{"developers"})
 			br := &capsulev1beta2.BreakRequest{
 				ObjectMeta: metav1.ObjectMeta{Name: "e2e-btg-requestor-bob", Namespace: "default"},
@@ -328,9 +338,11 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 				},
 			}
 
-			err := bobClient.Create(ctx, br)
-			Expect(err).To(HaveOccurred())
-			Expect(err).To(MatchError(ContainSubstring("approval conditions not satisfied for template")))
+			Eventually(func(g Gomega) {
+				err := bobClient.Create(ctx, br)
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err).To(MatchError(ContainSubstring("approval conditions not satisfied for template")))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 	})
 
@@ -341,6 +353,9 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 		})
 
 		It("only permits an authenticated reviewer in the required group", func() {
+			grantBreakRequestNamespaceAdmin(ctx, "default", "bob")
+			grantBreakRequestNamespaceAdmin(ctx, "default", "charlie")
+
 			br := &capsulev1beta2.BreakRequest{
 				ObjectMeta: metav1.ObjectMeta{Name: "e2e-btg-reviewer", Namespace: "default"},
 				Spec: capsulev1beta2.BreakRequestSpec{
@@ -379,6 +394,100 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 		})
 	})
 
+	Describe("Namespace selection", func() {
+		var (
+			allowedNamespace *corev1.Namespace
+			deniedNamespace  *corev1.Namespace
+		)
+
+		BeforeEach(func() {
+			allowedNamespace = NewNamespace("")
+			allowedNamespace.Labels[breakRequestTemplateSelectorLabel] = allowedNamespace.Name
+			deniedNamespace = NewNamespace("")
+
+			NamespaceCreationAdmin(allowedNamespace, defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreationAdmin(deniedNamespace, defaultTimeoutInterval).Should(Succeed())
+			DeferCleanup(func() {
+				EventuallyDeletion(allowedNamespace)
+				EventuallyDeletion(deniedNamespace)
+			})
+
+			brt.Spec.AutoApprove = false
+			brt.Spec.NamespaceSelectors = []selectors.NamespaceSelector{{
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{breakRequestTemplateSelectorLabel: allowedNamespace.Name},
+				},
+			}}
+		})
+
+		It("reconciles namespace label changes into template status", func() {
+			expectBreakRequestTemplateNamespaces(ctx, brt.Name, allowedNamespace.Name)
+
+			deniedNamespace.Labels[breakRequestTemplateSelectorLabel] = allowedNamespace.Name
+			Expect(k8sClient.Update(ctx, deniedNamespace)).To(Succeed())
+			expectBreakRequestTemplateNamespaces(ctx, brt.Name, allowedNamespace.Name, deniedNamespace.Name)
+
+			delete(allowedNamespace.Labels, breakRequestTemplateSelectorLabel)
+			Expect(k8sClient.Update(ctx, allowedNamespace)).To(Succeed())
+			expectBreakRequestTemplateNamespaces(ctx, brt.Name, deniedNamespace.Name)
+		})
+
+		It("allows a selected namespace to reference the template", func() {
+			expectBreakRequestTemplateNamespaces(ctx, brt.Name, allowedNamespace.Name)
+
+			request := &capsulev1beta2.BreakRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "e2e-btg-selected-namespace",
+					Namespace: allowedNamespace.Name,
+				},
+				Spec: capsulev1beta2.BreakRequestSpec{
+					Template: breakRequestTemplateReference(brt.Name),
+				},
+			}
+			DeferCleanup(func() {
+				EventuallyDeletion(request)
+			})
+
+			EventuallyCreation(func() error {
+				return k8sClient.Create(ctx, request)
+			}).Should(Succeed())
+		})
+
+		It("rejects an unselected namespace referencing the template", func() {
+			expectBreakRequestTemplateNamespaces(ctx, brt.Name, allowedNamespace.Name)
+
+			request := &capsulev1beta2.BreakRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "e2e-btg-unselected-namespace",
+					Namespace: deniedNamespace.Name,
+				},
+				Spec: capsulev1beta2.BreakRequestSpec{
+					Template: breakRequestTemplateReference(brt.Name),
+				},
+			}
+
+			err := k8sClient.Create(ctx, request)
+			Expect(err).To(MatchError(ContainSubstring(
+				"template " + brt.Name + " is not available in namespace " + deniedNamespace.Name,
+			)))
+		})
+
+		It("rejects a reference to a template that does not exist", func() {
+			request := &capsulev1beta2.BreakRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "e2e-btg-missing-template",
+					Namespace: allowedNamespace.Name,
+				},
+				Spec: capsulev1beta2.BreakRequestSpec{
+					Template: breakRequestTemplateReference(brt.Name + "-missing"),
+				},
+			}
+
+			err := k8sClient.Create(ctx, request)
+			Expect(err).To(MatchError(ContainSubstring("template " + brt.Name + "-missing not found")))
+		})
+	})
+
 	Describe("Template with parameter", func() {
 		BeforeEach(func() {
 			brt.Spec.Resources = []apiruntime.ResourceTemplate{
@@ -395,7 +504,7 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 					}}},
 				},
 			}
-			brt.Spec.ParamSchema = runtime.RawExtension{Raw: []byte(`{"type": "object", "required": ["value"], "properties": {"value": {"type": "string"}}}`)}
+			brt.Spec.ParamSchema = &runtime.RawExtension{Raw: []byte(`{"type": "object", "required": ["value"], "properties": {"value": {"type": "string"}}}`)}
 		})
 		It("should create correct a ConfigMap data", func() {
 			br := &capsulev1beta2.BreakRequest{
@@ -474,7 +583,7 @@ var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-gl
 
 	Describe("Loading template context", func() {
 		BeforeEach(func() {
-			brt.Spec.ParamSchema = runtime.RawExtension{Raw: []byte(`{
+			brt.Spec.ParamSchema = &runtime.RawExtension{Raw: []byte(`{
 				"type":"object",
 				"required":["sourceName"],
 				"properties":{"sourceName":{"type":"string"}}
@@ -527,6 +636,39 @@ data:
 		})
 	})
 })
+
+func expectBreakRequestTemplateNamespaces(ctx context.Context, name string, expected ...string) {
+	Eventually(func(g Gomega) {
+		current := &capsulev1beta2.BreakRequestTemplate{}
+		g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: name}, current)).To(Succeed())
+		g.Expect(current.Status.ObservedGeneration).To(Equal(current.Generation))
+		g.Expect(current.Status.Namespaces).To(ConsistOf(expected))
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func grantBreakRequestNamespaceAdmin(ctx context.Context, namespace, username string) {
+	roleBinding := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "e2e-btg-admin-",
+			Namespace:    namespace,
+		},
+		Subjects: []rbacv1.Subject{{
+			APIGroup: rbacv1.GroupName,
+			Kind:     rbacv1.UserKind,
+			Name:     username,
+		}},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "ClusterRole",
+			Name:     "admin",
+		},
+	}
+
+	Expect(k8sClient.Create(ctx, roleBinding)).To(Succeed())
+	DeferCleanup(func() {
+		EventuallyDeletion(roleBinding)
+	})
+}
 
 func approveBreakRequest(ctx context.Context, br *capsulev1beta2.BreakRequest) {
 	br2 := &capsulev1beta2.BreakRequest{}

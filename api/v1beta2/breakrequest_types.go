@@ -67,8 +67,8 @@ type BreakRequestStatus struct {
 	// Shows timestamps between approval and termination of the request.
 	Active *ActivePeriod `json:"active,omitempty"`
 	// The time until which the BreakRequest should be retained after it expires (e.g. for auditing).
-	// If zero, the BreakRequest can be deleted immediately after expiring.
-	KeepUntil metav1.Time `json:"keepUntil,omitempty"`
+	// If unset, the BreakRequest can be deleted immediately after expiring.
+	KeepUntil *metav1.Time `json:"keepUntil,omitempty"`
 	// Conditions applied to the request.
 	// Known conditions are "Requested", "Pending", "Denied", "Approved", "Active" and "Expired".
 	// The latest condition is reflected in the phase.
@@ -79,8 +79,8 @@ type BreakRequestStatus struct {
 
 // ActivePeriod represents the time window when a request is active.
 type ActivePeriod struct {
-	ActiveFrom  metav1.Time `json:"from,omitempty"`
-	ActiveUntil metav1.Time `json:"until,omitempty"`
+	ActiveFrom  *metav1.Time `json:"from,omitempty"`
+	ActiveUntil *metav1.Time `json:"until,omitempty"`
 }
 
 // TemplateProperties contains properties copied from the assigned template.
@@ -88,24 +88,24 @@ type TemplateProperties struct {
 	// Resources rendered by this request, provided by the template.
 	Resources []apiruntime.ResourceTemplate `json:"resources,omitempty"`
 	// ParamSchema template parameter schema
-	ParamSchema k8sruntime.RawExtension `json:"paramSchema,omitempty"`
+	ParamSchema *k8sruntime.RawExtension `json:"paramSchema,omitempty"`
 	// Context loads additional Kubernetes resources for use by all resource targets and templates.
 	Context *tpl.TemplateContext `json:"context,omitempty"`
 	// The default duration of the BreakRequest referencing this template should be valid for.
 	DefaultDuration *metav1.Duration `json:"defaultDuration,omitempty"`
 	// The max allowed duration of the BreakRequest referencing this template should be valid for.
-	MaxDuration metav1.Duration `json:"maxDuration,omitempty"`
+	MaxDuration *metav1.Duration `json:"maxDuration,omitempty"`
 	// The duration of this BreakRequest will be kept in the system after it has been expired (eg. auditing purposes)
 	// If not set, the BreakRequest will be deleted after expiring.
-	KeepFor breaktheglass.ExtendedDuration `json:"keepFor,omitempty"`
+	KeepFor *breaktheglass.ExtendedDuration `json:"keepFor,omitempty"`
 }
 
 // ApprovedProperties contains the properties set when a request is approved.
 type ApprovedProperties struct {
-	KeepFor   breaktheglass.ExtendedDuration `json:"keepFor,omitempty"`
-	Duration  *metav1.Duration               `json:"duration,omitempty"`
-	StartTime metav1.Time                    `json:"startTime,omitempty"`
-	Resources []apiruntime.ResourceTemplate  `json:"resources,omitempty"`
+	KeepFor   *breaktheglass.ExtendedDuration `json:"keepFor,omitempty"`
+	Duration  *metav1.Duration                `json:"duration,omitempty"`
+	StartTime *metav1.Time                    `json:"startTime,omitempty"`
+	Resources []apiruntime.ResourceTemplate   `json:"resources,omitempty"`
 }
 
 // ReviewInfo contains information about the review of a request.

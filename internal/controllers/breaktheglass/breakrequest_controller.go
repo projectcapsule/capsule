@@ -95,8 +95,6 @@ func (r *BreakRequestReconciler) Reconcile(
 
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.4/pkg/reconcile
-//
-//nolint:cyclop
 func (r *BreakRequestReconciler) reconcile(
 	ctx context.Context,
 	log logr.Logger,
@@ -115,59 +113,7 @@ func (r *BreakRequestReconciler) reconcile(
 		return ctrl.Result{}, nil
 
 	case capsulev1beta2.RequestPhaseApproved:
-		log.V(5).Info("BreakRequest is approved, checking if duration can be started")
-
-		if br.Status.Approved == nil {
-			return ctrl.Result{}, fmt.Errorf("BreakRequest is in Approved phase but status.approved is nil")
-		}
-
-		brt := &capsulev1beta2.BreakRequestTemplate{}
-		if err := r.Get(ctx, client.ObjectKey{Name: br.Spec.Template.Name}, brt); err != nil {
-			return ctrl.Result{}, fmt.Errorf(
-				"failed to get BreakRequest Template %s: %w",
-				br.Spec.Template.Name,
-				err,
-			)
-		}
-		if err := brt.CheckApprovalCondition(ctx, br); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to verify approval for BreakRequest %s: %w", br.Name, err)
-		}
-
-		if err := r.addFinalizer(ctx, log, br); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		if !br.Status.Approved.StartTime.IsZero() {
-			if wait := time.Until(br.Status.Approved.StartTime.Time); wait > 0 {
-				log.V(5).Info("BreakRequest is approved, waiting for startTime", "startTime", br.Status.Approved.StartTime.Time)
-
-				return ctrl.Result{RequeueAfter: wait}, nil
-			}
-		}
-
-		log.V(5).Info("BreakRequest is approved, activating br")
-
-		// Transition to Active Phase
-		if err := r.transitionRequestActivation(ctx, br); err != nil {
-			return ctrl.Result{}, fmt.Errorf(
-				"failed to activate BreakRequest %s: %w",
-				br.Name,
-				err,
-			)
-		}
-
-		log.V(5).Info("BreakRequest activated successfully")
-
-		r.recorder.Eventf(
-			br,
-			nil,
-			corev1.EventTypeNormal,
-			evt.ReasonBreakRequestActivated,
-			evt.ActionActivated,
-			"Break request activated",
-		)
-
-		return ctrl.Result{}, nil
+		return r.reconcileApproved(ctx, log, br)
 
 	case capsulev1beta2.RequestPhaseDenied:
 		log.V(5).Info("BreakRequest is denied, handling denied state")
@@ -180,7 +126,7 @@ func (r *BreakRequestReconciler) reconcile(
 		}
 
 		if br.Status.Active != nil {
-			if !br.Status.Active.ActiveUntil.IsZero() {
+			if br.Status.Active.ActiveUntil != nil {
 				ts := metav1.Now()
 				if ts.After(br.Status.Active.ActiveUntil.Time) {
 					r.recorder.Eventf(
@@ -211,7 +157,7 @@ func (r *BreakRequestReconciler) reconcile(
 			return ctrl.Result{}, err
 		}
 
-		if br.Status.KeepUntil.Time.IsZero() ||
+		if br.Status.KeepUntil == nil ||
 			time.Until(br.Status.KeepUntil.Time) <= 0 {
 			log.V(5).Info("BreakRequest is expired, deleting br")
 			br.DeleteRequest()
@@ -230,69 +176,7 @@ func (r *BreakRequestReconciler) reconcile(
 
 	// The case when the BreakRequest is newly created
 	case "":
-		if br.Spec.Template.Kind != capsulev1beta2.BreakRequestTemplateKind {
-			return ctrl.Result{}, fmt.Errorf(
-				"unsupported BreakRequest template kind %q",
-				br.Spec.Template.Kind,
-			)
-		}
-
-		brt := &capsulev1beta2.BreakRequestTemplate{}
-		if err := r.Get(ctx, client.ObjectKey{Name: br.Spec.Template.Name}, brt); err != nil {
-			return ctrl.Result{}, fmt.Errorf(
-				"failed to get BreakRequest Template %s: %w",
-				br.Spec.Template.Name,
-				err,
-			)
-		}
-		// initialize br with all requirements from brt
-		br.InitializeFromTemplate(brt)
-
-		if brt.Spec.AutoApprove {
-			approved, err := brt.EvaluateApprovalCondition(ctx, br)
-			if err != nil {
-				return ctrl.Result{}, fmt.Errorf(
-					"auto approval could not be evaluated for BreakRequest %s: %w",
-					br.Name,
-					err,
-				)
-			}
-
-			if approved {
-				loadedContext, err := br.LoadTemplateContext(ctx, r.Client, r.managedResourceManager().Mapper)
-				if err != nil {
-					return ctrl.Result{}, err
-				}
-
-				props, err := br.GenerateApprovedProperties(loadedContext)
-				if err != nil {
-					return ctrl.Result{}, err
-				}
-
-				err = br.ApproveRequest(&breaktheglass.AccessEntity{
-					Type: breaktheglass.AccessEntityTypeSystem,
-				}, props, "Auto Approved")
-
-				return ctrl.Result{}, err
-			}
-		}
-
-		log.V(5).Info("BreakRequest is newly created, moving to pending phase")
-
-		if err := br.SetRequested(); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		r.recorder.Eventf(
-			br,
-			nil,
-			corev1.EventTypeNormal,
-			evt.ReasonBreakRequestReviewNeeded,
-			evt.ActionPendingReview,
-			"Break request review pending",
-		)
-
-		return ctrl.Result{}, nil
+		return r.reconcileNew(ctx, log, br)
 
 	case capsulev1beta2.RequestPhaseRequested:
 		return ctrl.Result{}, nil
@@ -301,6 +185,145 @@ func (r *BreakRequestReconciler) reconcile(
 
 		return ctrl.Result{}, nil
 	}
+}
+
+func (r *BreakRequestReconciler) reconcileApproved(
+	ctx context.Context,
+	log logr.Logger,
+	br *capsulev1beta2.BreakRequest,
+) (ctrl.Result, error) {
+	log.V(5).Info("BreakRequest is approved, checking if duration can be started")
+
+	if br.Status.Approved == nil {
+		return ctrl.Result{}, fmt.Errorf("BreakRequest is in Approved phase but status.approved is nil")
+	}
+
+	brt := &capsulev1beta2.BreakRequestTemplate{}
+	if err := r.Get(ctx, client.ObjectKey{Name: br.Spec.Template.Name}, brt); err != nil {
+		return ctrl.Result{}, fmt.Errorf(
+			"failed to get BreakRequest Template %s: %w",
+			br.Spec.Template.Name,
+			err,
+		)
+	}
+
+	if err := brt.CheckApprovalCondition(ctx, br); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to verify approval for BreakRequest %s: %w", br.Name, err)
+	}
+
+	if err := r.addFinalizer(ctx, log, br); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if br.Status.Approved.StartTime != nil {
+		if wait := time.Until(br.Status.Approved.StartTime.Time); wait > 0 {
+			log.V(5).Info("BreakRequest is approved, waiting for startTime", "startTime", br.Status.Approved.StartTime.Time)
+
+			return ctrl.Result{RequeueAfter: wait}, nil
+		}
+	}
+
+	log.V(5).Info("BreakRequest is approved, activating br")
+
+	if err := r.transitionRequestActivation(ctx, br); err != nil {
+		return ctrl.Result{}, fmt.Errorf(
+			"failed to activate BreakRequest %s: %w",
+			br.Name,
+			err,
+		)
+	}
+
+	log.V(5).Info("BreakRequest activated successfully")
+
+	r.recorder.Eventf(
+		br,
+		nil,
+		corev1.EventTypeNormal,
+		evt.ReasonBreakRequestActivated,
+		evt.ActionActivated,
+		"Break request activated",
+	)
+
+	return ctrl.Result{}, nil
+}
+
+func (r *BreakRequestReconciler) reconcileNew(
+	ctx context.Context,
+	log logr.Logger,
+	br *capsulev1beta2.BreakRequest,
+) (ctrl.Result, error) {
+	if br.Spec.Template.Kind != capsulev1beta2.BreakRequestTemplateKind {
+		return ctrl.Result{}, fmt.Errorf(
+			"unsupported BreakRequest template kind %q",
+			br.Spec.Template.Kind,
+		)
+	}
+
+	brt := &capsulev1beta2.BreakRequestTemplate{}
+	if err := r.Get(ctx, client.ObjectKey{Name: br.Spec.Template.Name}, brt); err != nil {
+		return ctrl.Result{}, fmt.Errorf(
+			"failed to get BreakRequest Template %s: %w",
+			br.Spec.Template.Name,
+			err,
+		)
+	}
+
+	br.InitializeFromTemplate(brt)
+
+	if !brt.Spec.AutoApprove {
+		return r.requestReview(log, br)
+	}
+
+	approved, err := brt.EvaluateApprovalCondition(ctx, br)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf(
+			"auto approval could not be evaluated for BreakRequest %s: %w",
+			br.Name,
+			err,
+		)
+	}
+
+	if !approved {
+		return r.requestReview(log, br)
+	}
+
+	loadedContext, err := br.LoadTemplateContext(ctx, r.Client, r.managedResourceManager().Mapper)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	properties, err := br.GenerateApprovedProperties(loadedContext)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	err = br.ApproveRequest(&breaktheglass.AccessEntity{
+		Type: breaktheglass.AccessEntityTypeSystem,
+	}, properties, "Auto Approved")
+
+	return ctrl.Result{}, err
+}
+
+func (r *BreakRequestReconciler) requestReview(
+	log logr.Logger,
+	br *capsulev1beta2.BreakRequest,
+) (ctrl.Result, error) {
+	log.V(5).Info("BreakRequest is newly created, moving to pending phase")
+
+	if err := br.SetRequested(); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	r.recorder.Eventf(
+		br,
+		nil,
+		corev1.EventTypeNormal,
+		evt.ReasonBreakRequestReviewNeeded,
+		evt.ActionPendingReview,
+		"Break request review pending",
+	)
+
+	return ctrl.Result{}, nil
 }
 
 func (r *BreakRequestReconciler) updateStatus(
@@ -376,7 +399,7 @@ func (r *BreakRequestReconciler) reconcileDelete(
 		return ctrl.Result{}, err
 	}
 
-	if !br.Status.KeepUntil.IsZero() {
+	if br.Status.KeepUntil != nil {
 		if wait := time.Until(br.Status.KeepUntil.Time); wait > 0 {
 			return ctrl.Result{RequeueAfter: wait}, nil
 		}
@@ -466,7 +489,7 @@ func (r *BreakRequestReconciler) reconcileItems(
 
 			obj.SetNamespace(br.Namespace)
 
-			if !br.Status.Active.ActiveUntil.IsZero() {
+			if br.Status.Active.ActiveUntil != nil {
 				ann := obj.GetAnnotations()
 				if ann == nil {
 					ann = map[string]string{}
