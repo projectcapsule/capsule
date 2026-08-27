@@ -44,7 +44,7 @@ func printBreakRequestsApprovalTable(
 	}
 
 	keepForStr := "Undefined"
-	if app.KeepFor != 0 {
+	if app.KeepFor != nil && *app.KeepFor > 0 {
 		keepForStr = app.KeepFor.String()
 	}
 

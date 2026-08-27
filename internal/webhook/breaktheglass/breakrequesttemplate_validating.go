@@ -57,17 +57,13 @@ func validate(decoder admission.Decoder, req admission.Request) *admission.Respo
 		return ad.ErroredResponse(fmt.Errorf("failed to decode new object: %w", err))
 	}
 
-	if !brt.Spec.AutoApprove {
-		if brt.Spec.ApprovalCondition != "" {
-			return ad.Denyf("approvalCondition should not be set when autoApprove is false")
-		}
-	} else if brt.Spec.ApprovalCondition != "" {
+	if brt.Spec.ApprovalCondition != "" {
 		if _, err := conditions.PrepareCondition(brt); err != nil {
 			return ad.Denyf("approvalCondition is invalid: %v", err)
 		}
 	}
 	// Ensure the template's own defaults are consistent.
-	if brt.Spec.MaxDuration.Duration > 0 && brt.Spec.DefaultDuration != nil &&
+	if brt.Spec.MaxDuration != nil && brt.Spec.MaxDuration.Duration > 0 && brt.Spec.DefaultDuration != nil &&
 		brt.Spec.DefaultDuration.Duration > brt.Spec.MaxDuration.Duration {
 		return ad.Denyf(
 			"defaultDuration %s exceeds maxDuration %s",

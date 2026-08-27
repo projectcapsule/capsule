@@ -14,46 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func TestSetReviewer(t *testing.T) {
-	reviewer := &breaktheglass.AccessEntity{Type: breaktheglass.AccessEntityTypeUser, Name: "test-user"}
-	tests := []struct {
-		name             string
-		ar               *BreakRequest
-		entity           *breaktheglass.AccessEntity
-		conditionMessage string
-		verdict          RequestVerdict
-		expectedReview   *ReviewInfo
-	}{
-		{
-			name:             "set reviewer successfully",
-			ar:               &BreakRequest{},
-			entity:           reviewer,
-			conditionMessage: "Approved",
-			verdict:          RequestVerdictApproved,
-			expectedReview: &ReviewInfo{
-				Reviewer: reviewer,
-				Message:  "Approved",
-				Verdict:  RequestVerdictApproved,
-			},
-		},
-		{
-			name:             "nil entity does not set reviewer",
-			ar:               &BreakRequest{},
-			entity:           nil,
-			conditionMessage: "No review",
-			verdict:          RequestVerdictDenied,
-			expectedReview:   nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			setReviewer(tt.ar, tt.entity, tt.conditionMessage, tt.verdict)
-			assert.Equal(t, tt.expectedReview, tt.ar.Status.Review)
-		})
-	}
-}
-
 func TestTransitionRequestPhase(t *testing.T) {
 	request := &BreakRequest{}
 	now := metav1.Now()
@@ -99,12 +59,13 @@ func TestTransitionRequestPhase(t *testing.T) {
 
 func TestInitializeFromTemplate(t *testing.T) {
 	br := &BreakRequest{}
+	keepFor := breaktheglass.ExtendedDuration(5)
 	brt := &BreakRequestTemplate{
 		Spec: BreakRequestTemplateSpec{
 			Templates:       []runtime.RawExtension{},
 			DefaultDuration: &metav1.Duration{Duration: time.Minute},
-			MaxDuration:     metav1.Duration{Duration: time.Hour},
-			KeepFor:         5,
+			MaxDuration:     &metav1.Duration{Duration: time.Hour},
+			KeepFor:         &keepFor,
 		},
 	}
 
@@ -146,10 +107,11 @@ func TestRenderItems(t *testing.T) {
 	schema := runtime.RawExtension{Raw: []byte(`{"type":"object","properties":{"key":{"type":"string"}}}`)}
 	tpl := runtime.RawExtension{Raw: []byte(`{"kind":"ConfigMap"}`)}
 
-	items, err := br.RenderItems(schema, []runtime.RawExtension{tpl})
+	items, err := br.RenderItems(&schema, []runtime.RawExtension{tpl})
 	require.NoError(t, err)
 	assert.Len(t, items, 1)
 }
+
 func TestActiveRequest(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -165,7 +127,7 @@ func TestActiveRequest(t *testing.T) {
 			br: &BreakRequest{
 				Status: BreakRequestStatus{
 					Template: &TemplateProperties{
-						MaxDuration:     metav1.Duration{Duration: time.Hour},
+						MaxDuration:     &metav1.Duration{Duration: time.Hour},
 						DefaultDuration: &metav1.Duration{Duration: time.Minute},
 					},
 				},
@@ -181,7 +143,7 @@ func TestActiveRequest(t *testing.T) {
 			br: &BreakRequest{
 				Status: BreakRequestStatus{
 					Template: &TemplateProperties{
-						MaxDuration:     metav1.Duration{Duration: time.Hour},
+						MaxDuration:     &metav1.Duration{Duration: time.Hour},
 						DefaultDuration: &metav1.Duration{Duration: time.Minute},
 					},
 					Approved: &ApprovedProperties{
@@ -201,7 +163,7 @@ func TestActiveRequest(t *testing.T) {
 			br: &BreakRequest{
 				Status: BreakRequestStatus{
 					Template: &TemplateProperties{
-						MaxDuration:     metav1.Duration{Duration: time.Hour},
+						MaxDuration:     &metav1.Duration{Duration: time.Hour},
 						DefaultDuration: &metav1.Duration{Duration: time.Minute},
 					},
 					Approved: &ApprovedProperties{
@@ -221,7 +183,7 @@ func TestActiveRequest(t *testing.T) {
 			br: &BreakRequest{
 				Status: BreakRequestStatus{
 					Template: &TemplateProperties{
-						MaxDuration:     metav1.Duration{Duration: time.Hour},
+						MaxDuration:     &metav1.Duration{Duration: time.Hour},
 						DefaultDuration: &metav1.Duration{Duration: time.Minute},
 					},
 					Approved: nil,
@@ -239,7 +201,7 @@ func TestActiveRequest(t *testing.T) {
 			br: &BreakRequest{
 				Status: BreakRequestStatus{
 					Template: &TemplateProperties{
-						MaxDuration:     metav1.Duration{Duration: time.Hour},
+						MaxDuration:     &metav1.Duration{Duration: time.Hour},
 						DefaultDuration: &metav1.Duration{Duration: time.Minute},
 					},
 					Approved: &ApprovedProperties{

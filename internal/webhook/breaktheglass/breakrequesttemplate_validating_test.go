@@ -34,18 +34,6 @@ func TestBreakRequestTemplateValidationHandler(t *testing.T) {
 		errMsg   string
 	}{
 		{
-			name: "deny if autoApprove is false but approvalCondition is set",
-			brt: &capsulev1beta2.BreakRequestTemplate{
-				Spec: capsulev1beta2.BreakRequestTemplateSpec{
-					AutoApprove:       false,
-					ApprovalCondition: "foo",
-					Templates:         []runtime.RawExtension{{Object: &corev1.ConfigMap{}}},
-				},
-			},
-			expected: http.StatusForbidden,
-			errMsg:   "approvalCondition should not be set when autoApprove is false",
-		},
-		{
 			name: "allow if autoApprove is true and condition is empty",
 			brt: &capsulev1beta2.BreakRequestTemplate{
 				Spec: capsulev1beta2.BreakRequestTemplateSpec{
@@ -95,7 +83,7 @@ func TestBreakRequestTemplateValidationHandler(t *testing.T) {
 			brt: &capsulev1beta2.BreakRequestTemplate{
 				Spec: capsulev1beta2.BreakRequestTemplateSpec{
 					Templates:   []runtime.RawExtension{{Object: &corev1.ConfigMap{}}},
-					ParamSchema: runtime.RawExtension{Raw: []byte(`{"type": "string"}`)},
+					ParamSchema: &runtime.RawExtension{Raw: []byte(`{"type": "string"}`)},
 				},
 			},
 			setup: func(cl *mc.MockClient) {
@@ -111,7 +99,7 @@ func TestBreakRequestTemplateValidationHandler(t *testing.T) {
 			brt: &capsulev1beta2.BreakRequestTemplate{
 				Spec: capsulev1beta2.BreakRequestTemplateSpec{
 					Templates:   []runtime.RawExtension{{Object: &corev1.ConfigMap{}}},
-					ParamSchema: runtime.RawExtension{Raw: []byte(`"type": `)},
+					ParamSchema: &runtime.RawExtension{Raw: []byte(`"type": `)},
 				},
 			},
 			expected: http.StatusForbidden,

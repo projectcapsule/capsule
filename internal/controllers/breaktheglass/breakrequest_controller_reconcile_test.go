@@ -21,6 +21,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	mc "github.com/projectcapsule/capsule/internal/mocks/client"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 const (
@@ -93,22 +94,23 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 				},
 				Status: capsulev1beta2.BreakRequestStatus{
 					Phase: capsulev1beta2.RequestPhaseApproved,
-					Conditions: []v1.Condition{
+					Conditions: meta.ConditionList{
 						{
 							LastTransitionTime: v1.Now(),
 							Message:            "Access request approved",
 							Reason:             "ApprovedByUser",
-							Status:             "True",
+							Status:             v1.ConditionTrue,
 							Type:               "Approved",
 						},
 					},
 					Approved: &capsulev1beta2.ApprovedProperties{
-						StartTime: v1.NewTime(time.Now().Add(time.Hour)),
+						StartTime: func() *v1.Time { t := v1.NewTime(time.Now().Add(time.Hour)); return &t }(),
 					},
 				},
 			},
 			mocks: func(cl *mc.MockClient, scl *mc.MockSubResourceWriter) {
 				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil)
+				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBrt).Return(nil)
 				scl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
 			},
 			verify: func(t *testing.T, br *capsulev1beta2.BreakRequest) {
@@ -136,26 +138,27 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 				},
 				Status: capsulev1beta2.BreakRequestStatus{
 					Phase: capsulev1beta2.RequestPhaseApproved,
-					Conditions: []v1.Condition{
+					Conditions: meta.ConditionList{
 						{
 							LastTransitionTime: v1.Now(),
 							Message:            "Access request approved",
 							Reason:             "ApprovedByUser",
-							Status:             "True",
+							Status:             v1.ConditionTrue,
 							Type:               "Approved",
 						},
 					},
 					Approved: &capsulev1beta2.ApprovedProperties{
-						StartTime: v1.Now(),
+						StartTime: func() *v1.Time { t := v1.Now(); return &t }(),
 					},
 					Template: &capsulev1beta2.TemplateProperties{
 						Templates:   []runtime.RawExtension{mtConfigMapParameterized},
-						ParamSchema: psString,
+						ParamSchema: &psString,
 					},
 				},
 			},
 			mocks: func(cl *mc.MockClient, scl *mc.MockSubResourceWriter) {
 				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil)
+				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBrt).Return(nil)
 				cl.EXPECT().Get(gm.Any(), gm.Any(), matchUs).Return(nil)
 				cl.EXPECT().Update(gm.Any(), matchUs, gm.Any()).Return(nil)
 				scl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
@@ -165,17 +168,17 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 				assert.Len(t, br.Status.Approved.Templates, 1)
 
 				foundApproved := false
-				foundActive := false
+				foundReady := false
 				for _, c := range br.Status.Conditions {
-					if c.Type == "Approved" {
+					if c.Type == meta.ApprovedCondition {
 						foundApproved = true
 					}
-					if c.Type == "Active" {
-						foundActive = true
+					if c.Type == meta.ReadyCondition {
+						foundReady = true
 					}
 				}
 				assert.True(t, foundApproved)
-				assert.True(t, foundActive)
+				assert.True(t, foundReady)
 
 				obj := br.Status.Approved.Templates[0].Object
 				co, ok := obj.(client.Object)

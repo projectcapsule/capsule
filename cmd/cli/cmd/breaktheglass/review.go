@@ -89,7 +89,7 @@ var reviewCmd = &cobra.Command{
 				return fmt.Errorf("invalid duration %q: %w", keepForStr, err)
 			}
 
-			props.KeepFor = breaktheglass.ExtendedDuration(d)
+			props.KeepFor = new(breaktheglass.ExtendedDuration(d))
 		}
 
 		if durationStr != "" {
@@ -107,7 +107,7 @@ var reviewCmd = &cobra.Command{
 				return fmt.Errorf("invalid start time %q: %w", startTimeStr, err)
 			}
 
-			props.StartTime = st
+			props.StartTime = new(st)
 		}
 
 		// Validate Action

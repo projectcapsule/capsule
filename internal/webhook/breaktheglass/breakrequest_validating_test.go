@@ -93,7 +93,7 @@ func TestBreakRequestValidationHandler(t *testing.T) {
 					reader.EXPECT().
 						Get(gm.Any(), client.ObjectKey{Name: defaultTemplateName}, gm.Any()).
 						Do(func(_ any, _ any, brt *capsulev1beta2.BreakRequestTemplate, _ ...any) {
-							brt.Spec.MaxDuration.Duration = time.Minute
+							brt.Spec.MaxDuration = &metav1.Duration{Duration: time.Minute}
 						})
 				},
 				expected: http.StatusForbidden,
@@ -146,6 +146,7 @@ func TestBreakRequestValidationHandler(t *testing.T) {
 			name     string
 			oldBr    *capsulev1beta2.BreakRequest
 			newBr    *capsulev1beta2.BreakRequest
+			setup    func(reader *mc.MockReader)
 			expected int32
 			errMsg   string
 		}{
@@ -182,13 +183,21 @@ func TestBreakRequestValidationHandler(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
+				mockCtrl := gm.NewController(t)
+				defer mockCtrl.Finish()
+				reader := mc.NewMockReader(mockCtrl)
+
 				decoder := &test.Decoder[*capsulev1beta2.BreakRequest]{
 					Object:    tt.newBr,
 					OldObject: tt.oldBr,
 				}
 				validator := BreakRequestValidationHandler(log)
 
-				resp := validator.OnUpdate(nil, nil, decoder, nil)(ctx, admission.Request{})
+				if tt.setup != nil {
+					tt.setup(reader)
+				}
+
+				resp := validator.OnUpdate(nil, reader, decoder, nil)(ctx, admission.Request{})
 				if tt.expected == 0 {
 					assert.Nil(t, resp)
 				} else {

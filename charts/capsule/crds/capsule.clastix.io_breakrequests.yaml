@@ -78,6 +78,11 @@ spec:
               requestor:
                 description: Requesting actor for the access request.
                 properties:
+                  groups:
+                    description: The groups the entity belongs to
+                    items:
+                      type: string
+                    type: array
                   name:
                     description: The name of the entity
                     type: string
@@ -87,6 +92,7 @@ spec:
                     - User
                     - Group
                     - System
+                    - ServiceAccount
                     type: string
                 type: object
               startTime:
@@ -134,10 +140,7 @@ spec:
                     type: array
                 type: object
               conditions:
-                description: |-
-                  Conditions applied to the request.
-                  Known conditions are "Requested", "Pending", "Denied", "Approved", "Active" and "Expired".
-                  The latest condition is reflected in the phase.
+                description: Conditions applied to the request.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -218,6 +221,11 @@ spec:
                   reviewer:
                     description: The Entity reviewing this request
                     properties:
+                      groups:
+                        description: The groups the entity belongs to
+                        items:
+                          type: string
+                        type: array
                       name:
                         description: The name of the entity
                         type: string
@@ -227,6 +235,7 @@ spec:
                         - User
                         - Group
                         - System
+                        - ServiceAccount
                         type: string
                     type: object
                   verdict:

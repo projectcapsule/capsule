@@ -16,8 +16,13 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/validate"
 )
 
-func ValidateItems(schema runtime.RawExtension, tis []runtime.RawExtension) error {
-	if _, err := ValidateSchema(schema.Raw); err != nil {
+func ValidateItems(schema *runtime.RawExtension, tis []runtime.RawExtension) error {
+	var schemaRaw []byte
+	if schema != nil {
+		schemaRaw = schema.Raw
+	}
+
+	if _, err := ValidateSchema(schemaRaw); err != nil {
 		return fmt.Errorf("paramSchema is invalid: %w", err)
 	}
 

@@ -845,6 +845,7 @@ func main() {
 			),
 		),
 		route.RulesValidating(manager.GetRESTMapper(), cfg),
+		route.BreakRequestMutation(breaktheglass.BreakRequestMutationHandler(ctrl.Log.WithName("webhooks").WithName("breakrequests"))),
 		route.BreakRequestValidation(breaktheglass.BreakRequestValidationHandler(ctrl.Log.WithName("webhooks").WithName("breakrequests"))),
 		route.BreakRequestTemplateValidation(breaktheglass.BreakRequestTemplateValidationHandler(ctrl.Log.WithName("webhooks").WithName("breakrequesttemplates"))),
 	)

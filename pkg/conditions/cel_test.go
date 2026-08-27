@@ -7,63 +7,121 @@ import (
 	"testing"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/breaktheglass"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestIsApproved(t *testing.T) {
+func TestIsAllowed(t *testing.T) {
 	tests := []struct {
 		name        string
 		spec        capsulev1beta2.BreakRequestTemplateSpec
 		br          capsulev1beta2.BreakRequest
-		approved    bool
-		expectError bool
+		expectError string
 	}{
 		{
-			name:        "Not approved if no auto approval case 1",
-			spec:        capsulev1beta2.BreakRequestTemplateSpec{AutoApprove: false},
-			br:          capsulev1beta2.BreakRequest{},
-			approved:    false,
-			expectError: false,
-		},
-		{
-			name:        "Approved if auto approval and no condition",
-			spec:        capsulev1beta2.BreakRequestTemplateSpec{AutoApprove: true, ApprovalCondition: ""},
-			br:          capsulev1beta2.BreakRequest{},
-			approved:    true,
-			expectError: false,
+			name: "Approved if no condition",
+			spec: capsulev1beta2.BreakRequestTemplateSpec{ApprovalCondition: ""},
+			br:   capsulev1beta2.BreakRequest{},
 		},
 		{
 			name: "Reason is correct",
 			spec: capsulev1beta2.BreakRequestTemplateSpec{
-				AutoApprove:       true,
 				ApprovalCondition: "request.spec.reason == 'test'",
 			},
-			br:          capsulev1beta2.BreakRequest{Spec: capsulev1beta2.BreakRequestSpec{Reason: "test"}},
-			approved:    true,
-			expectError: false,
+			br: capsulev1beta2.BreakRequest{Spec: capsulev1beta2.BreakRequestSpec{Reason: "test"}},
 		},
 		{
-			name: "Reason is incorrect",
+			name: "Requestor name is correct",
 			spec: capsulev1beta2.BreakRequestTemplateSpec{
-				AutoApprove:       true,
+				ApprovalCondition: "requestor.name == 'alice'",
+			},
+			br: capsulev1beta2.BreakRequest{
+				Spec: capsulev1beta2.BreakRequestSpec{
+					Requestor: breaktheglass.AccessEntity{Name: "alice"},
+				},
+			},
+		},
+		{
+			name: "Reviewer group is correct",
+			spec: capsulev1beta2.BreakRequestTemplateSpec{
+				ApprovalCondition: "'admin' in reviewer.groups",
+			},
+			br: capsulev1beta2.BreakRequest{
+				Status: capsulev1beta2.BreakRequestStatus{
+					Review: &capsulev1beta2.ReviewInfo{
+						Reviewer: &breaktheglass.AccessEntity{
+							Groups: []string{"admin", "users"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Requestor service account type is correct",
+			spec: capsulev1beta2.BreakRequestTemplateSpec{
+				ApprovalCondition: "requestor.type == 'ServiceAccount'",
+			},
+			br: capsulev1beta2.BreakRequest{
+				Spec: capsulev1beta2.BreakRequestSpec{
+					Requestor: breaktheglass.AccessEntity{
+						Name: "system:serviceaccount:ns:sa",
+						Type: breaktheglass.AccessEntityTypeServiceAccount,
+					},
+				},
+			},
+		},
+		{
+			name: "Condition not met",
+			spec: capsulev1beta2.BreakRequestTemplateSpec{
 				ApprovalCondition: "request.spec.reason == 'test'",
 			},
-			br:          capsulev1beta2.BreakRequest{Spec: capsulev1beta2.BreakRequestSpec{Reason: "TEST"}},
-			approved:    false,
-			expectError: false,
+			br:          capsulev1beta2.BreakRequest{Spec: capsulev1beta2.BreakRequestSpec{Reason: "not-test"}},
+			expectError: "approval condition (request.spec.reason == 'test') not met",
+		},
+		{
+			name: "Syntax error in CEL",
+			spec: capsulev1beta2.BreakRequestTemplateSpec{
+				ApprovalCondition: "request.spec.reason ==",
+			},
+			br:          capsulev1beta2.BreakRequest{},
+			expectError: "failed to compile CEL expression",
+		},
+		{
+			name: "Non-boolean result",
+			spec: capsulev1beta2.BreakRequestTemplateSpec{
+				ApprovalCondition: "request.spec.reason",
+			},
+			br:          capsulev1beta2.BreakRequest{Spec: capsulev1beta2.BreakRequestSpec{Reason: "test"}},
+			expectError: "approval condition (request.spec.reason) did not evaluate to a boolean",
+		},
+		{
+			name: "Reviewer is nil",
+			spec: capsulev1beta2.BreakRequestTemplateSpec{
+				ApprovalCondition: "'admin' in reviewer.groups",
+			},
+			br:          capsulev1beta2.BreakRequest{},
+			expectError: "runtime error evaluating approval condition ('admin' in reviewer.groups): no such key: groups",
+		},
+		{
+			name: "Undefined variable",
+			spec: capsulev1beta2.BreakRequestTemplateSpec{
+				ApprovalCondition: "undefined_var == true",
+			},
+			br:          capsulev1beta2.BreakRequest{},
+			expectError: "undeclared reference to 'undefined_var'",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			brt := &capsulev1beta2.BreakRequestTemplate{Spec: tt.spec}
-			result, err := IsApproved(brt, &tt.br)
-			if tt.expectError {
+			err := IsAllowed(brt, &tt.br)
+			if tt.expectError != "" {
 				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectError)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.approved, result)
 			}
 		})
 	}

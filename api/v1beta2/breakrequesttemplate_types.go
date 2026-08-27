@@ -18,17 +18,17 @@ type BreakRequestTemplateSpec struct {
 	Templates []runtime.RawExtension `json:"templates"`
 
 	// ParamSchema template parameter schema
-	ParamSchema runtime.RawExtension `json:"paramSchema,omitempty"`
+	ParamSchema *runtime.RawExtension `json:"paramSchema,omitempty"`
 
 	// The default duration of the BreakRequest referencing this template should be valid for. If not set,
 	// the resource will be kept until the request is deleted.
 	DefaultDuration *metav1.Duration `json:"defaultDuration,omitempty"`
 	// The max allowed duration of the BreakRequest referencing this template should be valid for.
-	MaxDuration metav1.Duration `json:"maxDuration,omitempty"`
+	MaxDuration *metav1.Duration `json:"maxDuration,omitempty"`
 
 	// The duration of this BreakRequest will be kept in the system after it has been expired (eg. auditing purposes)
 	// If not set, the BreakRequest will be deleted after expiring.
-	KeepFor breaktheglass.ExtendedDuration `json:"keepFor,omitempty"`
+	KeepFor *breaktheglass.ExtendedDuration `json:"keepFor,omitempty"`
 
 	// AutoApprove requests created by this template will be automatically approved.
 	AutoApprove bool `json:"autoApprove,omitempty"`

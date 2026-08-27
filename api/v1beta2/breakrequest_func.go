@@ -22,6 +22,7 @@ import (
 func (br *BreakRequest) InitializeFromTemplate(brt *BreakRequestTemplate) {
 	br.Status.Template = &TemplateProperties{
 		Templates:       brt.Spec.Templates,
+		ParamSchema:     brt.Spec.ParamSchema,
 		DefaultDuration: brt.Spec.DefaultDuration,
 		MaxDuration:     brt.Spec.MaxDuration,
 		KeepFor:         brt.Spec.KeepFor,
@@ -67,7 +68,7 @@ func (br *BreakRequest) ApproveRequest(
 	entity *breaktheglass.AccessEntity,
 	properties *ApprovedProperties,
 	reason string,
-) (err error) {
+) error {
 	if reason == "" {
 		reason = "Access request approved"
 	}
@@ -93,11 +94,11 @@ func (br *BreakRequest) ApproveRequest(
 		Message:  reason,
 	}
 
-	return err
+	return nil
 }
 
 // DenyRequest Denies the BreakRequest. It may directly transition to the Denied phase or set a reason for denial.
-func (br *BreakRequest) DenyRequest(entity *breaktheglass.AccessEntity, reason string) (err error) {
+func (br *BreakRequest) DenyRequest(entity *breaktheglass.AccessEntity, reason string) error {
 	if reason == "" {
 		reason = "Access request denied"
 	}
@@ -118,11 +119,11 @@ func (br *BreakRequest) DenyRequest(entity *breaktheglass.AccessEntity, reason s
 		Message:  reason,
 	}
 
-	return err
+	return nil
 }
 
 // ActiveRequest Activates the BreakRequest, allowing the subject to access the requested resources.
-func (br *BreakRequest) ActiveRequest(entity *breaktheglass.AccessEntity) (err error) {
+func (br *BreakRequest) ActiveRequest(entity *breaktheglass.AccessEntity) error {
 	now := metav1.Now()
 
 	if err := br.transitionRequestPhase(
@@ -156,18 +157,21 @@ func (br *BreakRequest) ActiveRequest(entity *breaktheglass.AccessEntity) (err e
 		duration = tpl.DefaultDuration
 	}
 
-	if tpl.MaxDuration.Duration > 0 && duration != nil &&
+	if tpl.MaxDuration != nil && tpl.MaxDuration.Duration > 0 && duration != nil &&
 		duration.Duration > tpl.MaxDuration.Duration {
 		return fmt.Errorf("requested duration %s exceeds template maxDuration %s",
 			duration.Duration, tpl.MaxDuration.Duration)
 	}
 
-	br.Status.Active.ActiveFrom = now
+	br.Status.Active.ActiveFrom = &now
 
-	keepFor := tpl.KeepFor
+	var keepFor breaktheglass.ExtendedDuration
+	if tpl.KeepFor != nil {
+		keepFor = *tpl.KeepFor
+	}
 
-	if br.Status.Approved != nil {
-		keepFor = br.Status.Approved.KeepFor
+	if br.Status.Approved != nil && br.Status.Approved.KeepFor != nil {
+		keepFor = *br.Status.Approved.KeepFor
 	}
 
 	if keepFor > 0 {
@@ -177,10 +181,12 @@ func (br *BreakRequest) ActiveRequest(entity *breaktheglass.AccessEntity) (err e
 	if duration != nil && duration.Duration > 0 {
 		// If a duration was set, otherwise the lifecycle must be canceled manually
 		activeUntil := now.Add(duration.Duration)
-		br.Status.Active.ActiveUntil = metav1.NewTime(activeUntil)
+		au := metav1.NewTime(activeUntil)
+		br.Status.Active.ActiveUntil = &au
 
 		if keepFor > 0 {
-			br.Status.KeepUntil = metav1.NewTime(activeUntil.Add(time.Duration(keepFor)))
+			ku := metav1.NewTime(activeUntil.Add(time.Duration(keepFor)))
+			br.Status.KeepUntil = &ku
 		}
 	}
 
@@ -189,7 +195,7 @@ func (br *BreakRequest) ActiveRequest(entity *breaktheglass.AccessEntity) (err e
 
 // ExpireRequest When a request is active, it can be expired. This indicates that the granted access is revoked, however,
 // this Request itself may be present longer, for auditing purposes.
-func (br *BreakRequest) ExpireRequest(entity *breaktheglass.AccessEntity) (err error) {
+func (br *BreakRequest) ExpireRequest(entity *breaktheglass.AccessEntity) error {
 	now := metav1.Now()
 
 	if err := br.transitionRequestPhase(
@@ -202,9 +208,9 @@ func (br *BreakRequest) ExpireRequest(entity *breaktheglass.AccessEntity) (err e
 		return err
 	}
 
-	keepFor := breaktheglass.ExtendedDuration(0)
-	if br.Status.Approved != nil {
-		keepFor = br.Status.Approved.KeepFor
+	var keepFor breaktheglass.ExtendedDuration
+	if br.Status.Approved != nil && br.Status.Approved.KeepFor != nil {
+		keepFor = *br.Status.Approved.KeepFor
 	}
 
 	if keepFor > 0 {
@@ -213,8 +219,9 @@ func (br *BreakRequest) ExpireRequest(entity *breaktheglass.AccessEntity) (err e
 
 	// If the request had no bounded ActiveUntil (e.g., "unlimited" duration) but keepFor is set,
 	// compute KeepUntil from the expiration time so the controller can retain the object for auditing.
-	if br.Status.KeepUntil.IsZero() && keepFor > 0 {
-		br.Status.KeepUntil = metav1.NewTime(now.Add(time.Duration(keepFor)))
+	if (br.Status.KeepUntil == nil || br.Status.KeepUntil.IsZero()) && keepFor > 0 {
+		ku := metav1.NewTime(now.Add(time.Duration(keepFor)))
+		br.Status.KeepUntil = &ku
 	}
 
 	return nil
@@ -244,13 +251,13 @@ func (br *BreakRequest) GenerateApprovedProperties() (*ApprovedProperties, error
 
 	return &ApprovedProperties{
 		Duration:  br.Spec.Duration,
-		StartTime: startTime,
+		StartTime: &startTime,
 		Templates: it,
 		KeepFor:   tpl.KeepFor,
 	}, nil
 }
 
-func (br *BreakRequest) RenderItems(schema runtime.RawExtension, templates []runtime.RawExtension) ([]runtime.RawExtension, error) {
+func (br *BreakRequest) RenderItems(schema *runtime.RawExtension, templates []runtime.RawExtension) ([]runtime.RawExtension, error) {
 	var paramBytes []byte
 	if br.Spec.Params != nil {
 		paramBytes = br.Spec.Params.Raw
@@ -258,7 +265,12 @@ func (br *BreakRequest) RenderItems(schema runtime.RawExtension, templates []run
 
 	rendered := make([]runtime.RawExtension, 0, len(templates))
 
-	if err := template.Validate(schema.Raw, paramBytes); err != nil {
+	var schemaRaw []byte
+	if schema != nil {
+		schemaRaw = schema.Raw
+	}
+
+	if err := template.Validate(schemaRaw, paramBytes); err != nil {
 		return nil, fmt.Errorf("invalid params: %w", err)
 	}
 
@@ -293,13 +305,6 @@ func (br *BreakRequest) transitionRequestPhase(
 	now metav1.Time,
 	entity *breaktheglass.AccessEntity,
 ) error {
-	// Prevent duplicate condition entries of the same type
-	for _, cond := range br.Status.Conditions {
-		if RequestPhase(cond.Type) == newPhase {
-			return nil
-		}
-	}
-
 	// Disallow invalid transitions
 	switch newPhase {
 	case RequestPhaseDenied:
@@ -307,14 +312,10 @@ func (br *BreakRequest) transitionRequestPhase(
 			return fmt.Errorf("cannot deny an already approved or active request")
 		}
 
-		setReviewer(br, entity, conditionMessage, RequestVerdictDenied)
-
 	case RequestPhaseApproved:
 		if br.Status.Phase == RequestPhaseDenied {
 			return fmt.Errorf("cannot approve a denied request")
 		}
-
-		setReviewer(br, entity, conditionMessage, RequestVerdictApproved)
 
 	case RequestPhaseActive:
 		if br.Status.Phase != RequestPhaseApproved {
@@ -328,37 +329,34 @@ func (br *BreakRequest) transitionRequestPhase(
 	case RequestPhasePending, RequestPhaseRequested: // nothing to do here
 	}
 
-	// Duplicate condition check already performed above.
-
-	// Add new condition
-	br.Status.Conditions = append(
-		[]metav1.Condition{{
-			Type:               string(newPhase),
-			Status:             metav1.ConditionTrue,
+	// Update semantic conditions
+	switch newPhase {
+	case RequestPhaseRequested, RequestPhasePending, RequestPhaseDenied:
+		br.Status.Conditions.UpdateConditionByType(meta.Condition{
+			Type:               meta.ApprovedCondition,
+			Status:             metav1.ConditionFalse,
 			Reason:             reason,
 			Message:            conditionMessage,
 			LastTransitionTime: now,
-		}},
-		br.Status.Conditions...,
-	)
+			ObservedGeneration: br.Generation,
+		})
+	case RequestPhaseApproved:
+		br.Status.Conditions.UpdateConditionByType(meta.NewApprovedCondition(br, reason, conditionMessage))
+	case RequestPhaseActive:
+		br.Status.Conditions.UpdateConditionByType(meta.NewReadyCondition(br))
+	case RequestPhaseExpired:
+		br.Status.Conditions.UpdateConditionByType(meta.Condition{
+			Type:               meta.ReadyCondition,
+			Status:             metav1.ConditionFalse,
+			Reason:             reason,
+			Message:            conditionMessage,
+			LastTransitionTime: now,
+			ObservedGeneration: br.Generation,
+		})
+	}
 
 	// Set the current phase
 	br.Status.Phase = newPhase
 
 	return nil
-}
-
-func setReviewer(
-	ar *BreakRequest,
-	entity *breaktheglass.AccessEntity,
-	conditionMessage string,
-	verdict RequestVerdict,
-) {
-	if entity != nil {
-		ar.Status.Review = &ReviewInfo{
-			Reviewer: entity,
-			Message:  conditionMessage,
-			Verdict:  verdict,
-		}
-	}
 }
