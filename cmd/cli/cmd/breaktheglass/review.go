@@ -39,8 +39,8 @@ var reviewCmd = &cobra.Command{
   capsule break-the-glass review grant-admin --namespace default
 
   # non-interactive approve/deny
-  capsule review grant-admin --namespace default --approve
-  capsule review grant-admin --namespace default --deny
+  capsule break-the-glass review grant-admin --namespace default --approve
+  capsule break-the-glass review grant-admin --namespace default --deny
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name = args[0]

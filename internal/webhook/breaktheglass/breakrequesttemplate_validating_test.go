@@ -59,7 +59,7 @@ func TestBreakRequestTemplateValidationHandler(t *testing.T) {
 				},
 			},
 			expected: http.StatusForbidden,
-			errMsg:   "approvalCondition is invalid: ERROR: <input>:1:1: undeclared reference to 'foo'",
+			errMsg:   "approvalCondition is invalid: failed to compile CEL expression",
 		},
 		{
 			name: "allow if approvalCondition is valid",

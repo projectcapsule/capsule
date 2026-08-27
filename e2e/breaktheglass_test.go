@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-var _ = FDescribe("creating a BreakRequestTemplate", Ordered, Label("break-the-glass"), func() {
+var _ = Describe("creating a BreakRequestTemplate", Ordered, Label("break-the-glass"), func() {
 
 	var (
 		ctx             context.Context
