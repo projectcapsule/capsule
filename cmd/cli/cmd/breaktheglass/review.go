@@ -12,8 +12,10 @@ import (
 	"github.com/xhit/go-str2duration/v2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	"github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/breaktheglass"
@@ -36,11 +38,15 @@ var reviewCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Example: `
   # interactive review
-  capsule break-the-glass review grant-admin --namespace default
+  kubectl capsule break-the-glass review grant-admin --namespace default
 
   # non-interactive approve/deny
-  capsule break-the-glass review grant-admin --namespace default --approve
-  capsule break-the-glass review grant-admin --namespace default --deny
+  kubectl capsule break-the-glass review grant-admin --namespace default --approve
+  kubectl capsule break-the-glass review grant-admin --namespace default --deny
+
+  # review as another user with explicit groups
+  kubectl capsule break-the-glass review grant-admin --namespace default --approve \
+    --as alice@example.com --as-group platform-engineers
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name = args[0]
@@ -77,7 +83,29 @@ var reviewCmd = &cobra.Command{
 			)
 		}
 
-		props, err := br.GenerateApprovedProperties()
+		var props *v1beta2.ApprovedProperties
+
+		if br.Status.Template != nil && br.Status.Template.Context != nil {
+			httpClient, clientErr := rest.HTTPClientFor(cfg)
+			if clientErr != nil {
+				return clientErr
+			}
+
+			mapper, mapperErr := apiutil.NewDynamicRESTMapper(cfg, httpClient)
+			if mapperErr != nil {
+				return mapperErr
+			}
+
+			loadedContext, contextErr := br.LoadTemplateContext(ctx, k8sClient, mapper)
+			if contextErr != nil {
+				return contextErr
+			}
+
+			props, err = br.GenerateApprovedProperties(loadedContext)
+		} else {
+			props, err = br.GenerateApprovedProperties()
+		}
+
 		if err != nil {
 			return err
 		}
@@ -89,7 +117,8 @@ var reviewCmd = &cobra.Command{
 				return fmt.Errorf("invalid duration %q: %w", keepForStr, err)
 			}
 
-			props.KeepFor = new(breaktheglass.ExtendedDuration(d))
+			keepFor := breaktheglass.ExtendedDuration(d)
+			props.KeepFor = &keepFor
 		}
 
 		if durationStr != "" {
@@ -107,7 +136,7 @@ var reviewCmd = &cobra.Command{
 				return fmt.Errorf("invalid start time %q: %w", startTimeStr, err)
 			}
 
-			props.StartTime = new(st)
+			props.StartTime = &st
 		}
 
 		// Validate Action
@@ -145,10 +174,7 @@ var reviewCmd = &cobra.Command{
 			}
 		}
 
-		user := &breaktheglass.AccessEntity{
-			Type: breaktheglass.AccessEntityTypeUser,
-			Name: cfg.Username,
-		}
+		user := accessEntityForConfig(cfg)
 
 		return retry.OnError(
 			retry.DefaultRetry,

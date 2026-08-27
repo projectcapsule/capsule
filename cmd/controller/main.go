@@ -845,9 +845,15 @@ func main() {
 			),
 		),
 		route.RulesValidating(manager.GetRESTMapper(), cfg),
-		route.BreakRequestMutation(breaktheglass.BreakRequestMutationHandler(ctrl.Log.WithName("webhooks").WithName("breakrequests"))),
-		route.BreakRequestValidation(breaktheglass.BreakRequestValidationHandler(ctrl.Log.WithName("webhooks").WithName("breakrequests"))),
+		route.BreakRequestMutation(breaktheglass.BreakRequestMutationHandler(
+			ctrl.Log.WithName("webhooks").WithName("breakrequests"),
+		)),
+		route.BreakRequestValidation(breaktheglass.BreakRequestValidationHandler(
+			ctrl.Log.WithName("webhooks").WithName("breakrequests"),
+			manager.GetRESTMapper(),
+		)),
 		route.BreakRequestTemplateValidation(breaktheglass.BreakRequestTemplateValidationHandler(ctrl.Log.WithName("webhooks").WithName("breakrequesttemplates"))),
+		route.GenericBreakTheGlassHandler(),
 	)
 
 	nodeWebhookSupported, _ := utils.NodeWebhookSupported(kubeVersion)
@@ -947,6 +953,13 @@ func main() {
 		Metrics: *metrics.MustMakeBreakRequestsRecorder(),
 	}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "BreakRequestReconciler")
+		os.Exit(1)
+	}
+
+	if err = (&breaktheglasscontroller.BreakRequestTemplateReconciler{
+		Log: ctrl.Log.WithName("capsule.ctrl").WithName("breakrequesttemplate"),
+	}).SetupWithManager(manager, controllerConfig); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "BreakRequestTemplateReconciler")
 		os.Exit(1)
 	}
 

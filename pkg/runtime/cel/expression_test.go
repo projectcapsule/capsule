@@ -60,6 +60,36 @@ func TestCompileBooleanRejectsNonBooleanResult(t *testing.T) {
 	}
 }
 
+func TestCompileBooleanWithVariables(t *testing.T) {
+	t.Parallel()
+
+	compiler, err := NewCompiler()
+	if err != nil {
+		t.Fatalf("NewCompiler() error = %v", err)
+	}
+
+	compiled, err := compiler.CompileBooleanWithVariables(
+		`requestor.name == "alice" && "admin" in reviewer.groups`,
+		environment.StoredExpressions,
+		"requestor",
+		"reviewer",
+	)
+	if err != nil {
+		t.Fatalf("CompileBooleanWithVariables() error = %v", err)
+	}
+
+	got, err := compiled.EvaluateBooleanWithVariables(context.Background(), map[string]any{
+		"requestor": map[string]any{"name": "alice"},
+		"reviewer":  map[string]any{"groups": []string{"users", "admin"}},
+	})
+	if err != nil {
+		t.Fatalf("EvaluateBooleanWithVariables() error = %v", err)
+	}
+	if !got {
+		t.Fatal("EvaluateBooleanWithVariables() = false, want true")
+	}
+}
+
 func TestCompiledExpressionEvaluateSingleQuantity(t *testing.T) {
 	t.Parallel()
 

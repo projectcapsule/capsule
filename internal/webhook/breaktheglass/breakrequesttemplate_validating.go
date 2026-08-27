@@ -12,7 +12,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/conditions"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -58,7 +57,7 @@ func validate(decoder admission.Decoder, req admission.Request) *admission.Respo
 	}
 
 	if brt.Spec.ApprovalCondition != "" {
-		if _, err := conditions.PrepareCondition(brt); err != nil {
+		if err := brt.ValidateApprovalCondition(); err != nil {
 			return ad.Denyf("approvalCondition is invalid: %v", err)
 		}
 	}
@@ -72,8 +71,8 @@ func validate(decoder admission.Decoder, req admission.Request) *admission.Respo
 		)
 	}
 
-	if err := template.ValidateItems(brt.Spec.ParamSchema, brt.Spec.Templates); err != nil {
-		return ad.Denyf("invalid templates: %v", err)
+	if err := template.ValidateResourceTemplates(brt.Spec.ParamSchema, brt.Spec.Resources); err != nil {
+		return ad.Denyf("invalid resources: %v", err)
 	}
 
 	return nil

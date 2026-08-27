@@ -20,6 +20,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	mc "github.com/projectcapsule/capsule/internal/mocks/client"
 	"github.com/projectcapsule/capsule/internal/webhook/test"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 )
 
 func TestBreakRequestTemplateValidationHandler(t *testing.T) {
@@ -34,11 +35,22 @@ func TestBreakRequestTemplateValidationHandler(t *testing.T) {
 		errMsg   string
 	}{
 		{
+			name: "allow manual approval condition",
+			brt: &capsulev1beta2.BreakRequestTemplate{
+				Spec: capsulev1beta2.BreakRequestTemplateSpec{
+					AutoApprove:       false,
+					ApprovalCondition: `"reviewers" in reviewer.groups`,
+					Resources:         []apiruntime.ResourceTemplate{{Targets: []runtime.RawExtension{{Object: &corev1.ConfigMap{}}}}},
+				},
+			},
+			expected: 0,
+		},
+		{
 			name: "allow if autoApprove is true and condition is empty",
 			brt: &capsulev1beta2.BreakRequestTemplate{
 				Spec: capsulev1beta2.BreakRequestTemplateSpec{
 					AutoApprove: true,
-					Templates:   []runtime.RawExtension{{Object: &corev1.ConfigMap{}}},
+					Resources:   []apiruntime.ResourceTemplate{{Targets: []runtime.RawExtension{{Object: &corev1.ConfigMap{}}}}},
 				},
 			},
 			setup: func(cl *mc.MockClient) {
@@ -55,11 +67,11 @@ func TestBreakRequestTemplateValidationHandler(t *testing.T) {
 				Spec: capsulev1beta2.BreakRequestTemplateSpec{
 					AutoApprove:       true,
 					ApprovalCondition: "foo.spec.reason == 'test'",
-					Templates:         []runtime.RawExtension{{Object: &corev1.ConfigMap{}}},
+					Resources:         []apiruntime.ResourceTemplate{{Targets: []runtime.RawExtension{{Object: &corev1.ConfigMap{}}}}},
 				},
 			},
 			expected: http.StatusForbidden,
-			errMsg:   "approvalCondition is invalid: failed to compile CEL expression",
+			errMsg:   "approvalCondition is invalid: compile approval condition: compile CEL expression",
 		},
 		{
 			name: "allow if approvalCondition is valid",
@@ -67,7 +79,7 @@ func TestBreakRequestTemplateValidationHandler(t *testing.T) {
 				Spec: capsulev1beta2.BreakRequestTemplateSpec{
 					AutoApprove:       true,
 					ApprovalCondition: "request.spec.reason == 'test'",
-					Templates:         []runtime.RawExtension{{Object: &corev1.ConfigMap{}}},
+					Resources:         []apiruntime.ResourceTemplate{{Targets: []runtime.RawExtension{{Object: &corev1.ConfigMap{}}}}},
 				},
 			},
 			setup: func(cl *mc.MockClient) {
@@ -82,7 +94,7 @@ func TestBreakRequestTemplateValidationHandler(t *testing.T) {
 			name: "allow if item schema is valid",
 			brt: &capsulev1beta2.BreakRequestTemplate{
 				Spec: capsulev1beta2.BreakRequestTemplateSpec{
-					Templates:   []runtime.RawExtension{{Object: &corev1.ConfigMap{}}},
+					Resources:   []apiruntime.ResourceTemplate{{Targets: []runtime.RawExtension{{Object: &corev1.ConfigMap{}}}}},
 					ParamSchema: &runtime.RawExtension{Raw: []byte(`{"type": "string"}`)},
 				},
 			},
@@ -98,12 +110,53 @@ func TestBreakRequestTemplateValidationHandler(t *testing.T) {
 			name: "deny if item schema is invalid",
 			brt: &capsulev1beta2.BreakRequestTemplate{
 				Spec: capsulev1beta2.BreakRequestTemplateSpec{
-					Templates:   []runtime.RawExtension{{Object: &corev1.ConfigMap{}}},
+					Resources:   []apiruntime.ResourceTemplate{{Targets: []runtime.RawExtension{{Object: &corev1.ConfigMap{}}}}},
 					ParamSchema: &runtime.RawExtension{Raw: []byte(`"type": `)},
 				},
 			},
 			expected: http.StatusForbidden,
-			errMsg:   `invalid templates: paramSchema is invalid: failed to validate OpenAPI schemaData: schema invalid`,
+			errMsg:   `invalid resources: paramSchema is invalid: failed to validate OpenAPI schemaData: schema invalid`,
+		},
+		{
+			name: "allow a multi-document string template",
+			brt: &capsulev1beta2.BreakRequestTemplate{Spec: capsulev1beta2.BreakRequestTemplateSpec{
+				Resources: []apiruntime.ResourceTemplate{{Template: `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ default "fallback" $.params.name }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $.params.name }}
+`}},
+			}},
+			expected: 0,
+		},
+		{
+			name: "deny a resource without targets or template",
+			brt: &capsulev1beta2.BreakRequestTemplate{Spec: capsulev1beta2.BreakRequestTemplateSpec{
+				Resources: []apiruntime.ResourceTemplate{{}},
+			}},
+			expected: http.StatusForbidden,
+			errMsg:   "invalid resources: resource 0 must define at least one target or a template",
+		},
+		{
+			name: "deny an empty target",
+			brt: &capsulev1beta2.BreakRequestTemplate{Spec: capsulev1beta2.BreakRequestTemplateSpec{
+				Resources: []apiruntime.ResourceTemplate{{Targets: []runtime.RawExtension{{}}}},
+			}},
+			expected: http.StatusForbidden,
+			errMsg:   "invalid resources: resource 0 target 0 is empty",
+		},
+		{
+			name: "deny an invalid string template",
+			brt: &capsulev1beta2.BreakRequestTemplate{Spec: capsulev1beta2.BreakRequestTemplateSpec{
+				Resources: []apiruntime.ResourceTemplate{{Template: `{{ if }}`}},
+			}},
+			expected: http.StatusForbidden,
+			errMsg:   "invalid resources: resource 0 template is invalid",
 		},
 	}
 

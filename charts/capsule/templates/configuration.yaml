@@ -682,6 +682,109 @@ spec:
         timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
         {{- end }}
       {{- end }}
+      {{- with .Values.webhooks.hooks.breakrequests }}
+        {{- if .enabled }}
+          {{- $anyValidating = true }}
+      - name: breakrequests.validating.projectcapsule.dev
+        {{- with .opts }}
+        opts:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        admissionReviewVersions:
+          - v1
+        path: "/breakrequests/validating"
+        failurePolicy: {{ .failurePolicy }}
+        matchPolicy: {{ .matchPolicy }}
+        {{- with .namespaceSelector }}
+        namespaceSelector:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with .objectSelector }}
+        objectSelector:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        matchConditions:
+        {{- end }}
+        {{- with .matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        rules:
+          {{- toYaml .rules | nindent 10 }}
+        sideEffects: None
+        timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+        {{- end }}
+      {{- end }}
+      {{- with .Values.webhooks.hooks.breakrequesttemplates }}
+        {{- if .enabled }}
+          {{- $anyValidating = true }}
+      - name: breakrequesttemplates.validating.projectcapsule.dev
+        {{- with .opts }}
+        opts:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        admissionReviewVersions:
+          - v1
+        path: "/breakrequesttemplates/validating"
+        failurePolicy: {{ .failurePolicy }}
+        matchPolicy: {{ .matchPolicy }}
+        {{- with .namespaceSelector }}
+        namespaceSelector:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with .objectSelector }}
+        objectSelector:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        matchConditions:
+        {{- end }}
+        {{- with .matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        rules:
+          {{- toYaml .rules | nindent 10 }}
+        sideEffects: None
+        timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+        {{- end }}
+      {{- end }}
+      {{- with .Values.webhooks.hooks.breakTheGlass }}
+        {{- if .enabled }}
+          {{- $anyValidating = true }}
+      - name: break-the-glass.validating.projectcapsule.dev
+        {{- with .opts }}
+        opts:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        admissionReviewVersions:
+          - v1
+        path: "/generic/breaktheglass"
+        failurePolicy: {{ .failurePolicy }}
+        matchPolicy: {{ .matchPolicy }}
+        {{- with .namespaceSelector }}
+        namespaceSelector:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with .objectSelector }}
+        objectSelector:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with .matchConditions }}
+        matchConditions:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        rules:
+          {{- toYaml .rules | nindent 10 }}
+        sideEffects: None
+        timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+        {{- end }}
+      {{- end }}
       {{- with .Values.webhooks.hooks.tenants }}
         {{- if .enabled }}
           {{- $anyValidating = true }}
@@ -1109,100 +1212,6 @@ spec:
         timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
         {{- end }}
       {{- end }}
-      {{- with .Values.webhooks.hooks.breakrequests }}
-        {{- if .enabled }}
-          {{- $anyValidating = true }}
-      - name: breakrequests.validating.projectcapsule.dev
-        {{- with .opts }}
-        opts:
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        admissionReviewVersions:
-          - v1
-          - v1beta1
-        path: "/breakrequests/validating"
-        failurePolicy:  {{ .failurePolicy }}
-        matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
-        namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        {{- with .objectSelector }}
-        objectSelector:
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
-        matchConditions:
-        {{- end }}
-        {{- with .matchConditions }}
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        {{- with $.Values.webhooks.matchConditions }}
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        rules:
-          - apiGroups:
-              - capsule.clastix.io
-            apiVersions:
-              - v1beta2
-            operations:
-              - CREATE
-              - UPDATE
-            resources:
-              - breakrequests
-              - breakrequests/status
-            scope: "Namespaced"
-        sideEffects: None
-        timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
-        {{- end }}
-      {{- end }}
-      {{- with .Values.webhooks.hooks.breakrequesttemplates }}
-        {{- if .enabled }}
-          {{- $anyValidating = true }}
-      - name: breakrequesttemplates.validating.projectcapsule.dev
-        {{- with .opts }}
-        opts:
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        admissionReviewVersions:
-          - v1
-          - v1beta1
-        path: "/breakrequesttemplates/validating"
-        failurePolicy:  {{ .failurePolicy }}
-        matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
-        namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        {{- with .objectSelector }}
-        objectSelector:
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
-        matchConditions:
-        {{- end }}
-        {{- with .matchConditions }}
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        {{- with $.Values.webhooks.matchConditions }}
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        rules:
-          - apiGroups:
-              - capsule.clastix.io
-            apiVersions:
-              - v1beta2
-            operations:
-              - CREATE
-              - UPDATE
-            resources:
-              - breakrequesttemplates
-            scope: "Cluster"
-        sideEffects: None
-        timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
-        {{- end }}
-      {{- end }}
-
       {{- if not $anyValidating }}
         []
       {{- end }}
@@ -1766,17 +1775,7 @@ spec:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
-          - apiGroups:
-              - capsule.clastix.io
-            apiVersions:
-              - v1beta2
-            operations:
-              - CREATE
-              - UPDATE
-            resources:
-              - breakrequests
-              - breakrequests/status
-            scope: "Namespaced"
+          {{- toYaml .rules | nindent 10 }}
         sideEffects: None
         timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
         {{- end }}

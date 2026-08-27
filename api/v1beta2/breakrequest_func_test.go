@@ -4,15 +4,100 @@
 package v1beta2
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/projectcapsule/capsule/pkg/api/breaktheglass"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
+	tpl "github.com/projectcapsule/capsule/pkg/template"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
 )
+
+func TestOptionalBreakRequestFieldsAreOmitted(t *testing.T) {
+	t.Parallel()
+
+	values := map[string]struct {
+		value  any
+		fields []string
+	}{
+		"status": {
+			value:  BreakRequestStatus{},
+			fields: []string{"review", "template", "approved", "active", "keepUntil"},
+		},
+		"active period": {
+			value:  ActivePeriod{},
+			fields: []string{"from", "until"},
+		},
+		"template properties": {
+			value:  TemplateProperties{},
+			fields: []string{"paramSchema", "context", "defaultDuration", "maxDuration", "keepFor"},
+		},
+		"approved properties": {
+			value:  ApprovedProperties{},
+			fields: []string{"keepFor", "duration", "startTime"},
+		},
+	}
+
+	for name, testCase := range values {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			raw, err := json.Marshal(testCase.value)
+			require.NoError(t, err)
+
+			serialized := map[string]any{}
+			require.NoError(t, json.Unmarshal(raw, &serialized))
+			for _, field := range testCase.fields {
+				assert.NotContains(t, serialized, field)
+			}
+		})
+	}
+}
+
+func TestSetReviewer(t *testing.T) {
+	reviewer := &breaktheglass.AccessEntity{Type: breaktheglass.AccessEntityTypeUser, Name: "test-user"}
+	tests := []struct {
+		name             string
+		ar               *BreakRequest
+		entity           *breaktheglass.AccessEntity
+		conditionMessage string
+		verdict          RequestVerdict
+		expectedReview   *ReviewInfo
+	}{
+		{
+			name:             "set reviewer successfully",
+			ar:               &BreakRequest{},
+			entity:           reviewer,
+			conditionMessage: "Approved",
+			verdict:          RequestVerdictApproved,
+			expectedReview: &ReviewInfo{
+				Reviewer: reviewer,
+				Message:  "Approved",
+				Verdict:  RequestVerdictApproved,
+			},
+		},
+		{
+			name:             "nil entity does not set reviewer",
+			ar:               &BreakRequest{},
+			entity:           nil,
+			conditionMessage: "No review",
+			verdict:          RequestVerdictDenied,
+			expectedReview:   nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setReviewer(tt.ar, tt.entity, tt.conditionMessage, tt.verdict)
+			assert.Equal(t, tt.expectedReview, tt.ar.Status.Review)
+		})
+	}
+}
 
 func TestTransitionRequestPhase(t *testing.T) {
 	request := &BreakRequest{}
@@ -59,22 +144,30 @@ func TestTransitionRequestPhase(t *testing.T) {
 
 func TestInitializeFromTemplate(t *testing.T) {
 	br := &BreakRequest{}
-	keepFor := breaktheglass.ExtendedDuration(5)
 	brt := &BreakRequestTemplate{
 		Spec: BreakRequestTemplateSpec{
-			Templates:       []runtime.RawExtension{},
+			Resources:       []apiruntime.ResourceTemplate{},
+			ParamSchema:     &runtime.RawExtension{Raw: []byte(`{"type":"object"}`)},
+			Context:         &tpl.TemplateContext{},
 			DefaultDuration: &metav1.Duration{Duration: time.Minute},
 			MaxDuration:     &metav1.Duration{Duration: time.Hour},
-			KeepFor:         &keepFor,
+			KeepFor:         ptr.To(breaktheglass.ExtendedDuration(5)),
 		},
 	}
 
 	br.InitializeFromTemplate(brt)
 	assert.NotNil(t, br.Status.Template)
-	assert.Equal(t, brt.Spec.Templates, br.Status.Template.Templates)
+	assert.Equal(t, brt.Spec.Resources, br.Status.Template.Resources)
+	assert.Equal(t, brt.Spec.ParamSchema, br.Status.Template.ParamSchema)
+	assert.Equal(t, brt.Spec.Context, br.Status.Template.Context)
 	assert.Equal(t, brt.Spec.DefaultDuration, br.Status.Template.DefaultDuration)
 	assert.Equal(t, brt.Spec.MaxDuration, br.Status.Template.MaxDuration)
 	assert.Equal(t, brt.Spec.KeepFor, br.Status.Template.KeepFor)
+	assert.NotSame(t, brt.Spec.ParamSchema, br.Status.Template.ParamSchema)
+	assert.NotSame(t, brt.Spec.Context, br.Status.Template.Context)
+	assert.NotSame(t, brt.Spec.DefaultDuration, br.Status.Template.DefaultDuration)
+	assert.NotSame(t, brt.Spec.MaxDuration, br.Status.Template.MaxDuration)
+	assert.NotSame(t, brt.Spec.KeepFor, br.Status.Template.KeepFor)
 }
 
 func TestApproveRequest(t *testing.T) {
@@ -98,20 +191,24 @@ func TestDenyRequest(t *testing.T) {
 	assert.Equal(t, "Denied", br.Status.Review.Message)
 }
 
-func TestRenderItems(t *testing.T) {
+func TestRenderResources(t *testing.T) {
 	br := &BreakRequest{
 		Spec: BreakRequestSpec{
 			Params: &runtime.RawExtension{Raw: []byte(`{"key":"value"}`)},
 		},
 	}
 	schema := runtime.RawExtension{Raw: []byte(`{"type":"object","properties":{"key":{"type":"string"}}}`)}
-	tpl := runtime.RawExtension{Raw: []byte(`{"kind":"ConfigMap"}`)}
+	resource := apiruntime.ResourceTemplate{
+		Policy:  apiruntime.ResourceTemplatePolicy{Creation: apiruntime.ResourceCreationPolicyMerge, Force: true},
+		Targets: []runtime.RawExtension{{Raw: []byte(`{"kind":"ConfigMap"}`)}},
+	}
 
-	items, err := br.RenderItems(&schema, []runtime.RawExtension{tpl})
+	items, err := br.RenderResources(&schema, []apiruntime.ResourceTemplate{resource})
 	require.NoError(t, err)
 	assert.Len(t, items, 1)
+	assert.Equal(t, resource.Policy, items[0].Policy)
+	assert.Len(t, items[0].Targets, 1)
 }
-
 func TestActiveRequest(t *testing.T) {
 	tests := []struct {
 		name               string

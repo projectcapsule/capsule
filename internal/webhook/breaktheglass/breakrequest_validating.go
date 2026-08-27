@@ -9,42 +9,69 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/conditions"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
-func BreakRequestValidationHandler(log logr.Logger) handlers.Handler {
+func BreakRequestValidationHandler(log logr.Logger, mapper k8smeta.RESTMapper) handlers.Handler {
 	return &breakRequestValidationHandler{
-		log: log,
+		log:    log,
+		mapper: mapper,
 	}
 }
 
 type breakRequestValidationHandler struct {
-	log logr.Logger
+	log    logr.Logger
+	mapper k8smeta.RESTMapper
 }
 
-func (b *breakRequestValidationHandler) OnCreate(_ client.Client, reader client.Reader, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (b *breakRequestValidationHandler) OnCreate(c client.Client, reader client.Reader, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		b.log.Info("Starting validation for BreakRequest upon creation", "name", req.Name, "namespace", req.Namespace, "user", req.UserInfo.Username, "SUBRESOURCE", req.SubResource)
+		b.log.Info("Validation for BreakRequest upon creation", "name", req.Name)
 
 		br := &capsulev1beta2.BreakRequest{}
 		if err := decoder.Decode(req, br); err != nil {
 			return ad.ErroredResponse(fmt.Errorf("failed to decode new object: %w", err))
 		}
 
+		if br.Spec.Template.Kind != capsulev1beta2.BreakRequestTemplateKind {
+			return ad.Denyf("template kind %q is not supported", br.Spec.Template.Kind)
+		}
+
+		templateName := br.Spec.Template.Name
 		brt := &capsulev1beta2.BreakRequestTemplate{}
-		if err := reader.Get(ctx, client.ObjectKey{Name: br.Spec.TemplateName}, brt); err != nil {
+
+		if err := reader.Get(ctx, client.ObjectKey{Name: templateName}, brt); err != nil {
 			if client.IgnoreNotFound(err) == nil {
-				return ad.Denyf("template %s not found", br.Spec.TemplateName)
+				return ad.Denyf("template %s not found", templateName)
 			}
 
-			return ad.ErroredResponse(fmt.Errorf("error loading template %s: %w", br.Spec.TemplateName, err))
+			return ad.ErroredResponse(fmt.Errorf("error loading template %s: %w", templateName, err))
+		}
+
+		if len(brt.Spec.NamespaceSelectors) > 0 {
+			if brt.Status.ObservedGeneration != brt.Generation {
+				return ad.Denyf("template %s namespace selection is not ready", templateName)
+			}
+
+			namespace := req.Namespace
+			if namespace == "" {
+				namespace = br.Namespace
+			}
+
+			if !brt.Status.NamespacePresent(namespace) {
+				return ad.Denyf(
+					"template %s is not available in namespace %s",
+					templateName,
+					namespace,
+				)
+			}
 		}
 
 		if brt.Spec.MaxDuration != nil && brt.Spec.MaxDuration.Duration > 0 &&
@@ -59,13 +86,20 @@ func (b *breakRequestValidationHandler) OnCreate(_ client.Client, reader client.
 			return ad.Denyf("start time %s must be in the future", br.Spec.StartTime.String())
 		}
 
-		if _, err := br.RenderItems(brt.Spec.ParamSchema, brt.Spec.Templates); err != nil {
-			return ad.Denyf("invalid template rendering for %s: %v", br.Spec.TemplateName, err)
+		br.InitializeFromTemplate(brt)
+
+		loadedContext, err := br.LoadTemplateContext(ctx, c, b.mapper)
+		if err != nil {
+			return ad.Denyf("invalid template context for %s: %v", templateName, err)
+		}
+
+		if _, err := br.RenderResources(brt.Spec.ParamSchema, brt.Spec.Resources, loadedContext); err != nil {
+			return ad.Denyf("invalid template rendering for %s: %v", templateName, err)
 		}
 
 		if brt.Spec.AutoApprove {
-			if response := verifyCondition(brt, br); response != nil {
-				return response
+			if err := brt.CheckApprovalCondition(ctx, br); err != nil {
+				return ad.Denyf("approval conditions not satisfied for template %s: %v", templateName, err)
 			}
 		}
 
@@ -73,16 +107,8 @@ func (b *breakRequestValidationHandler) OnCreate(_ client.Client, reader client.
 	}
 }
 
-func verifyCondition(brt *capsulev1beta2.BreakRequestTemplate, br *capsulev1beta2.BreakRequest) *admission.Response {
-	if err := conditions.IsAllowed(brt, br); err != nil {
-		return ad.Denyf("approval conditions not satisfied for template %s: %s", br.Spec.TemplateName, err.Error())
-	}
-
-	return nil
-}
-
 func (b *breakRequestValidationHandler) OnDelete(_ client.Client, _ client.Reader, _ admission.Decoder, _ events.EventRecorder) handlers.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
+	return func(_ context.Context, _ admission.Request) *admission.Response {
 		return nil
 	}
 }
@@ -100,27 +126,33 @@ func (b *breakRequestValidationHandler) OnUpdate(_ client.Client, reader client.
 			return ad.ErroredResponse(err)
 		}
 
-		if req.SubResource != "" {
-			newBr.Spec = oldBr.Spec
-		}
-
-		if req.SubResource == "" && oldBr.Spec.TemplateName != newBr.Spec.TemplateName {
+		if req.SubResource == "" && oldBr.Spec.Template != newBr.Spec.Template {
 			return ad.Denyf(
-				"templateName cannot be changed. old: %s, new: %s",
-				oldBr.Spec.TemplateName,
-				newBr.Spec.TemplateName,
+				"template cannot be changed. old: %s/%s, new: %s/%s",
+				oldBr.Spec.Template.Kind,
+				oldBr.Spec.Template.Name,
+				newBr.Spec.Template.Kind,
+				newBr.Spec.Template.Name,
 			)
 		}
 
 		if oldBr.Status.Phase != capsulev1beta2.RequestPhaseApproved &&
 			newBr.Status.Phase == capsulev1beta2.RequestPhaseApproved {
 			brt := &capsulev1beta2.BreakRequestTemplate{}
-			if err := reader.Get(ctx, client.ObjectKey{Name: newBr.Spec.TemplateName}, brt); err != nil {
-				return ad.ErroredResponse(fmt.Errorf("failed to get template %s: %w", newBr.Spec.TemplateName, err))
+			if err := reader.Get(ctx, client.ObjectKey{Name: newBr.Spec.Template.Name}, brt); err != nil {
+				return ad.ErroredResponse(fmt.Errorf(
+					"failed to get template %s: %w",
+					newBr.Spec.Template.Name,
+					err,
+				))
 			}
 
-			if response := verifyCondition(brt, newBr); response != nil {
-				return response
+			if err := brt.CheckApprovalCondition(ctx, newBr); err != nil {
+				return ad.Denyf(
+					"approval conditions not satisfied for template %s: %v",
+					newBr.Spec.Template.Name,
+					err,
+				)
 			}
 		}
 

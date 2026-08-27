@@ -11,17 +11,21 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	gm "go.uber.org/mock/gomock"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	mc "github.com/projectcapsule/capsule/internal/mocks/client"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 )
 
 const (
@@ -69,7 +73,10 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: capsulev1beta2.BreakRequestSpec{
-					TemplateName: templateName,
+					Template: capsulev1beta2.BreakRequestTemplateReference{
+						Kind: capsulev1beta2.BreakRequestTemplateKind,
+						Name: templateName,
+					},
 				},
 			},
 			mocks: func(cl *mc.MockClient, scl *mc.MockSubResourceWriter) {
@@ -90,27 +97,31 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: capsulev1beta2.BreakRequestSpec{
-					TemplateName: templateName,
+					Template: capsulev1beta2.BreakRequestTemplateReference{
+						Kind: capsulev1beta2.BreakRequestTemplateKind,
+						Name: templateName,
+					},
 				},
 				Status: capsulev1beta2.BreakRequestStatus{
 					Phase: capsulev1beta2.RequestPhaseApproved,
-					Conditions: meta.ConditionList{
+					Conditions: []v1.Condition{
 						{
 							LastTransitionTime: v1.Now(),
 							Message:            "Access request approved",
 							Reason:             "ApprovedByUser",
-							Status:             v1.ConditionTrue,
+							Status:             "True",
 							Type:               "Approved",
 						},
 					},
 					Approved: &capsulev1beta2.ApprovedProperties{
-						StartTime: func() *v1.Time { t := v1.NewTime(time.Now().Add(time.Hour)); return &t }(),
+						StartTime: ptr.To(v1.NewTime(time.Now().Add(time.Hour))),
 					},
 				},
 			},
 			mocks: func(cl *mc.MockClient, scl *mc.MockSubResourceWriter) {
-				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil)
 				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBrt).Return(nil)
+				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil).Times(3)
+				cl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
 				scl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
 			},
 			verify: func(t *testing.T, br *capsulev1beta2.BreakRequest) {
@@ -133,58 +144,125 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: capsulev1beta2.BreakRequestSpec{
-					TemplateName: templateName,
-					Params:       &runtime.RawExtension{Raw: []byte(`{"testValue": "test-value"}`)},
+					Template: capsulev1beta2.BreakRequestTemplateReference{
+						Kind: capsulev1beta2.BreakRequestTemplateKind,
+						Name: templateName,
+					},
+					Params: &runtime.RawExtension{Raw: []byte(`{"testValue": "test-value"}`)},
 				},
 				Status: capsulev1beta2.BreakRequestStatus{
 					Phase: capsulev1beta2.RequestPhaseApproved,
-					Conditions: meta.ConditionList{
+					Conditions: []v1.Condition{
 						{
 							LastTransitionTime: v1.Now(),
 							Message:            "Access request approved",
 							Reason:             "ApprovedByUser",
-							Status:             v1.ConditionTrue,
+							Status:             "True",
 							Type:               "Approved",
 						},
 					},
 					Approved: &capsulev1beta2.ApprovedProperties{
-						StartTime: func() *v1.Time { t := v1.Now(); return &t }(),
+						StartTime: ptr.To(v1.Now()),
 					},
 					Template: &capsulev1beta2.TemplateProperties{
-						Templates:   []runtime.RawExtension{mtConfigMapParameterized},
+						Resources: []apiruntime.ResourceTemplate{{
+							Targets: []runtime.RawExtension{mtConfigMapParameterized},
+						}},
 						ParamSchema: &psString,
 					},
 				},
 			},
 			mocks: func(cl *mc.MockClient, scl *mc.MockSubResourceWriter) {
-				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil)
 				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBrt).Return(nil)
+				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil).Times(3)
+				cl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
+				cl.EXPECT().Get(gm.Any(), gm.Any(), matchUs).
+					Return(apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, "test-configmap"))
+				cl.EXPECT().Patch(gm.Any(), matchUs, gm.Any(), gm.Any()).Return(nil).Times(2)
 				cl.EXPECT().Get(gm.Any(), gm.Any(), matchUs).Return(nil)
-				cl.EXPECT().Update(gm.Any(), matchUs, gm.Any()).Return(nil)
 				scl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
 			},
 			verify: func(t *testing.T, br *capsulev1beta2.BreakRequest) {
 				assert.Equal(t, capsulev1beta2.RequestPhaseActive, br.Status.Phase)
-				assert.Len(t, br.Status.Approved.Templates, 1)
+				assert.Len(t, br.Status.Approved.Resources, 1)
+				assert.Len(t, br.Status.Approved.Resources[0].Targets, 1)
+				assert.Equal(t, uint(1), br.Status.Size)
+				require.Len(t, br.Status.ProcessedItems, 1)
+
+				managed := br.Status.ProcessedItems[0]
+				assert.Equal(t, "ConfigMap", managed.Kind)
+				assert.Equal(t, "test-configmap", managed.Name)
+				assert.Equal(t, "default", managed.Namespace)
+				assert.Equal(t, v1.ConditionTrue, managed.Status)
+				assert.Equal(t, meta.ReadyCondition, managed.Type)
+				assert.True(t, managed.Created)
+				assert.False(t, managed.ClusterScoped)
 
 				foundApproved := false
-				foundReady := false
+				foundActive := false
 				for _, c := range br.Status.Conditions {
-					if c.Type == meta.ApprovedCondition {
+					if c.Type == "Approved" {
 						foundApproved = true
 					}
-					if c.Type == meta.ReadyCondition {
-						foundReady = true
+					if c.Type == "Active" {
+						foundActive = true
 					}
 				}
 				assert.True(t, foundApproved)
-				assert.True(t, foundReady)
+				assert.True(t, foundActive)
 
-				obj := br.Status.Approved.Templates[0].Object
+				obj := br.Status.Approved.Resources[0].Targets[0].Object
 				co, ok := obj.(client.Object)
 				assert.True(t, ok)
-				assert.Len(t, co.GetOwnerReferences(), 1)
+				assert.Empty(t, co.GetOwnerReferences())
+				assert.Equal(t, meta.ValueAppBreakTheGlassManager, co.GetLabels()[meta.AppManagedByLabel])
 			},
+		},
+		{
+			name: "approved target apply fails",
+			br: &capsulev1beta2.BreakRequest{
+				ObjectMeta: v1.ObjectMeta{
+					Name:      resourceName,
+					Namespace: "default",
+				},
+				Spec: capsulev1beta2.BreakRequestSpec{
+					Template: capsulev1beta2.BreakRequestTemplateReference{
+						Kind: capsulev1beta2.BreakRequestTemplateKind,
+						Name: templateName,
+					},
+					Params: &runtime.RawExtension{Raw: []byte(`{"testValue": "test-value"}`)},
+				},
+				Status: capsulev1beta2.BreakRequestStatus{
+					Phase: capsulev1beta2.RequestPhaseApproved,
+					Approved: &capsulev1beta2.ApprovedProperties{
+						StartTime: ptr.To(v1.Now()),
+					},
+					Template: &capsulev1beta2.TemplateProperties{
+						Resources: []apiruntime.ResourceTemplate{{
+							Targets: []runtime.RawExtension{mtConfigMapParameterized},
+						}},
+						ParamSchema: &psString,
+					},
+				},
+			},
+			mocks: func(cl *mc.MockClient, scl *mc.MockSubResourceWriter) {
+				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBrt).Return(nil)
+				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil).Times(3)
+				cl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
+				cl.EXPECT().Get(gm.Any(), gm.Any(), matchUs).
+					Return(apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, "test-configmap"))
+				cl.EXPECT().Patch(gm.Any(), matchUs, gm.Any(), gm.Any()).Return(assert.AnError)
+				scl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
+			},
+			verify: func(t *testing.T, br *capsulev1beta2.BreakRequest) {
+				assert.Equal(t, capsulev1beta2.RequestPhaseApproved, br.Status.Phase)
+				assert.Equal(t, uint(1), br.Status.Size)
+				require.Len(t, br.Status.ProcessedItems, 1)
+				assert.Equal(t, v1.ConditionFalse, br.Status.ProcessedItems[0].Status)
+				assert.Contains(t, br.Status.ProcessedItems[0].Message, "apply failed")
+				assert.True(t, br.Status.ProcessedItems[0].Created)
+			},
+			wantErr: true,
 		},
 	}
 
@@ -205,7 +283,6 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 
 			r := &BreakRequestReconciler{
 				Client:   cl,
-				scheme:   s,
 				recorder: &events.FakeRecorder{},
 				Log:      ctrl.Log,
 			}

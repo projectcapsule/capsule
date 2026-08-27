@@ -65,6 +65,15 @@ test-clean: ## Clean tests cache
 manager: generate golint
 	go build -o bin/manager
 
+# Build kubectl Capsule plugin binary
+.PHONY: kubectl-capsule
+kubectl-capsule:
+	@mkdir -p bin
+	go build -o bin/kubectl-capsule ./cmd/cli
+	@echo ""
+	@echo "Run the kubectl plugin with:"
+	@echo '  PATH="$(CURDIR)/bin:$$PATH" kubectl capsule --help'
+
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate manifests
 	go run .
@@ -205,6 +214,8 @@ dev-setup: dev-setup-flux-handoff
 		--set 'certManager.generateCertificates=false' \
 		--set 'tls.enableController=false' \
 		--set 'tls.create=false' \
+		--set rbac.breakrequests.create=true \
+		--set-string 'rbac.breakrequests.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set rbac.resources.create=true \
 		--set-string 'rbac.resources.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set rbac.resourcepoolclaims.create=true \
@@ -491,6 +502,8 @@ e2e-install: helm-controller-version ko-build-all dev-install-gw-api-crds
 		--set 'manager.options.leaderElection.leaseDuration=60s' \
 		--set 'manager.options.leaderElection.renewDeadline=40s' \
 		--set 'manager.rbac.minimal=true' \
+		--set rbac.breakrequests.create=true \
+		--set-string 'rbac.breakrequests.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set rbac.resources.create=true \
 		--set-string 'rbac.resources.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set rbac.resourcepoolclaims.create=true \

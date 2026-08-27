@@ -5,20 +5,33 @@ package v1beta2
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/projectcapsule/capsule/pkg/api/breaktheglass"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
+	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
+	tpl "github.com/projectcapsule/capsule/pkg/template"
 )
 
 // BreakRequestTemplateSpec defines the desired state of BreakRequestTemplate.
 type BreakRequestTemplateSpec struct {
-	// Actual Items being created by this template
+	// NamespaceSelectors limit the namespaces in which BreakRequests may reference this template.
+	// Selectors are ORed. When omitted, the template is available in every namespace.
+	// +optional
+	NamespaceSelectors []selectors.NamespaceSelector `json:"namespaceSelectors,omitempty"`
+
+	// Resources rendered and managed by this template.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
-	Templates []runtime.RawExtension `json:"templates"`
+	Resources []apiruntime.ResourceTemplate `json:"resources"`
 
 	// ParamSchema template parameter schema
-	ParamSchema *runtime.RawExtension `json:"paramSchema,omitempty"`
+	ParamSchema *k8sruntime.RawExtension `json:"paramSchema,omitempty"`
+
+	// Context loads additional Kubernetes resources for use by all resource targets and templates.
+	// Resource reference fields may use parameters declared by ParamSchema.
+	// +optional
+	Context *tpl.TemplateContext `json:"context,omitempty"`
 
 	// The default duration of the BreakRequest referencing this template should be valid for. If not set,
 	// the resource will be kept until the request is deleted.
@@ -39,12 +52,19 @@ type BreakRequestTemplateSpec struct {
 
 // BreakRequestTemplateStatus defines the observed state of BreakRequestTemplate.
 type BreakRequestTemplateStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// ObservedGeneration is the most recent generation resolved by the controller.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// Namespaces contains the namespaces allowed to reference this template.
+	// A single "*" entry means that the template is available in every namespace.
+	// +optional
+	Namespaces []string `json:"namespaces,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Cluster
+// +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="AutoApprove",type=boolean,JSONPath=`.spec.autoApprove`
 // +kubebuilder:printcolumn:name="Condition",type=string,JSONPath=`.spec.approvalCondition`,priority=10
 

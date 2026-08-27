@@ -10,19 +10,17 @@ import (
 	"text/template"
 
 	"github.com/santhosh-tekuri/jsonschema/v5"
-	"k8s.io/apimachinery/pkg/runtime"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
 	"k8s.io/kube-openapi/pkg/validation/validate"
+
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
+	"github.com/projectcapsule/capsule/pkg/template/functions"
 )
 
-func ValidateItems(schema *runtime.RawExtension, tis []runtime.RawExtension) error {
-	var schemaRaw []byte
-	if schema != nil {
-		schemaRaw = schema.Raw
-	}
-
-	if _, err := ValidateSchema(schemaRaw); err != nil {
+func ValidateItems(schema k8sruntime.RawExtension, tis []k8sruntime.RawExtension) error {
+	if _, err := ValidateSchema(schema.Raw); err != nil {
 		return fmt.Errorf("paramSchema is invalid: %w", err)
 	}
 
@@ -35,8 +33,58 @@ func ValidateItems(schema *runtime.RawExtension, tis []runtime.RawExtension) err
 	return nil
 }
 
+// ValidateResourceTemplates validates a parameter schema and the targets of
+// reusable resource templates.
+func ValidateResourceTemplates(schema *k8sruntime.RawExtension, resources []apiruntime.ResourceTemplate) error {
+	var schemaBytes []byte
+	if schema != nil {
+		schemaBytes = schema.Raw
+	}
+
+	if _, err := ValidateSchema(schemaBytes); err != nil {
+		return fmt.Errorf("paramSchema is invalid: %w", err)
+	}
+
+	for resourceIndex, resourceTemplate := range resources {
+		if len(resourceTemplate.Targets) == 0 && resourceTemplate.Template == "" {
+			return fmt.Errorf("resource %d must define at least one target or a template", resourceIndex)
+		}
+
+		for targetIndex, target := range resourceTemplate.Targets {
+			targetData := target.Raw
+			if len(targetData) == 0 && target.Object != nil {
+				marshaled, err := json.Marshal(target.Object)
+				if err != nil {
+					return fmt.Errorf("resource %d target %d is invalid: %w", resourceIndex, targetIndex, err)
+				}
+
+				targetData = marshaled
+			}
+
+			if len(targetData) == 0 {
+				return fmt.Errorf("resource %d target %d is empty", resourceIndex, targetIndex)
+			}
+
+			if _, err := validateTemplate(targetData); err != nil {
+				return fmt.Errorf("resource %d target %d is invalid: %w", resourceIndex, targetIndex, err)
+			}
+		}
+
+		if resourceTemplate.Template != "" {
+			if _, err := validateTemplate([]byte(resourceTemplate.Template)); err != nil {
+				return fmt.Errorf("resource %d template is invalid: %w", resourceIndex, err)
+			}
+		}
+	}
+
+	return nil
+}
+
 func validateTemplate(tpl []byte) (*template.Template, error) {
-	return template.New("item").Option("missingkey=error").Parse(string(tpl))
+	return template.New("item").
+		Option("missingkey=error").
+		Funcs(functions.ExtraFuncMap()).
+		Parse(string(tpl))
 }
 
 func Validate(schemaData []byte, params []byte) error {

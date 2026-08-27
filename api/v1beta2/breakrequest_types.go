@@ -5,19 +5,21 @@ package v1beta2
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/projectcapsule/capsule/pkg/api/breaktheglass"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
+	tpl "github.com/projectcapsule/capsule/pkg/template"
 )
 
 // BreakRequestSpec defines the desired state of BreakRequest.
 type BreakRequestSpec struct {
-	// TemplateName the name of the template to use for this request
+	// Template references the template to use for this request.
 	// +kubebuilder:validation:Required
-	TemplateName string `json:"templateName"`
+	Template BreakRequestTemplateReference `json:"template"`
 	// Params the parameters to use for the template.
-	Params *runtime.RawExtension `json:"params,omitempty"`
+	Params *k8sruntime.RawExtension `json:"params,omitempty"`
 	// Requesting actor for the access request.
 	Requestor breaktheglass.AccessEntity `json:"requestor,omitempty"`
 	// A reason on why the request is needed
@@ -35,8 +37,27 @@ type BreakRequestSpec struct {
 	StartTime *metav1.Time `json:"startTime,omitempty"`
 }
 
+const BreakRequestTemplateKind = "BreakRequestTemplate"
+
+// BreakRequestTemplateReference identifies the cluster-scoped template used
+// by a BreakRequest.
+type BreakRequestTemplateReference struct {
+	// Kind of template being referenced.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum=BreakRequestTemplate
+	Kind string `json:"kind"`
+	// Name of the template being referenced.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`
+	Name string `json:"name"`
+}
+
 // BreakRequestStatus defines the observed state of BreakRequest.
 type BreakRequestStatus struct {
+	meta.ManagedResourcesStatus `json:",inline"`
+
 	// Review refers to the subject that either approved or denied the request
 	Review *ReviewInfo `json:"review,omitempty"`
 	// Template properties copied from the assigned template
@@ -46,10 +67,12 @@ type BreakRequestStatus struct {
 	// Shows timestamps between approval and termination of the request.
 	Active *ActivePeriod `json:"active,omitempty"`
 	// The time until which the BreakRequest should be retained after it expires (e.g. for auditing).
-	// If zero, the BreakRequest can be deleted immediately after expiring.
+	// If unset, the BreakRequest can be deleted immediately after expiring.
 	KeepUntil *metav1.Time `json:"keepUntil,omitempty"`
 	// Conditions applied to the request.
-	Conditions meta.ConditionList `json:"conditions,omitempty"`
+	// Known conditions are "Requested", "Pending", "Denied", "Approved", "Active" and "Expired".
+	// The latest condition is reflected in the phase.
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 	// +kubebuilder:validation:Enum=Requested;Pending;Denied;Approved;Active;Expired
 	Phase RequestPhase `json:"phase,omitempty"`
 }
@@ -62,10 +85,12 @@ type ActivePeriod struct {
 
 // TemplateProperties contains properties copied from the assigned template.
 type TemplateProperties struct {
-	// The templates that are created by this request, provided by the template.
-	Templates []runtime.RawExtension `json:"templates,omitempty"`
+	// Resources rendered by this request, provided by the template.
+	Resources []apiruntime.ResourceTemplate `json:"resources,omitempty"`
 	// ParamSchema template parameter schema
-	ParamSchema *runtime.RawExtension `json:"paramSchema,omitempty"`
+	ParamSchema *k8sruntime.RawExtension `json:"paramSchema,omitempty"`
+	// Context loads additional Kubernetes resources for use by all resource targets and templates.
+	Context *tpl.TemplateContext `json:"context,omitempty"`
 	// The default duration of the BreakRequest referencing this template should be valid for.
 	DefaultDuration *metav1.Duration `json:"defaultDuration,omitempty"`
 	// The max allowed duration of the BreakRequest referencing this template should be valid for.
@@ -80,7 +105,7 @@ type ApprovedProperties struct {
 	KeepFor   *breaktheglass.ExtendedDuration `json:"keepFor,omitempty"`
 	Duration  *metav1.Duration                `json:"duration,omitempty"`
 	StartTime *metav1.Time                    `json:"startTime,omitempty"`
-	Templates []runtime.RawExtension          `json:"templates,omitempty"`
+	Resources []apiruntime.ResourceTemplate   `json:"resources,omitempty"`
 }
 
 // ReviewInfo contains information about the review of a request.
@@ -121,6 +146,7 @@ const (
 // +kubebuilder:printcolumn:name="ActiveUntil",type=string,JSONPath=`.status.active.until`,priority=10
 // +kubebuilder:printcolumn:name="Duration",type=string,JSONPath=`.status.approved.duration`,priority=10
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
+// +kubebuilder:printcolumn:name="Items",type="integer",JSONPath=".status.size",description="The number of managed resources"
 
 // BreakRequest is the Schema for the BreakRequests API.
 type BreakRequest struct {

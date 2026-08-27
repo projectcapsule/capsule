@@ -16,7 +16,7 @@ import (
 	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -25,6 +25,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/breaktheglass"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 )
 
 func printBreakRequestsApprovalTable(
@@ -44,7 +45,7 @@ func printBreakRequestsApprovalTable(
 	}
 
 	keepForStr := "Undefined"
-	if app.KeepFor != nil && *app.KeepFor > 0 {
+	if app.KeepFor != nil && *app.KeepFor != 0 {
 		keepForStr = app.KeepFor.String()
 	}
 
@@ -68,9 +69,9 @@ func printBreakRequestsApprovalTable(
 		{"KeepFor", colorizeValue(keepForStr, color)},
 	})
 
-	// Example: printing .status.items nicely as YAML
-	for i, item := range app.Templates {
-		content := prettyRawExtension(item)
+	// Print every effective resource group and its policy as YAML.
+	for i, item := range app.Resources {
+		content := prettyResourceTemplate(item)
 		if color {
 			content = colorizeYAML(content)
 		}
@@ -78,7 +79,7 @@ func printBreakRequestsApprovalTable(
 		t.AppendSeparator()
 		// Multi-line cells are supported; keep them as one cell.
 		t.AppendRow(table.Row{
-			fmt.Sprintf("Status Item %d", i),
+			fmt.Sprintf("Resource %d", i),
 			content,
 		})
 	}
@@ -86,33 +87,17 @@ func printBreakRequestsApprovalTable(
 	t.Render()
 }
 
-// PrettyRawExtension returns human-readable YAML for a RawExtension.
-// - If Object is non-nil, it marshals that.
-// - Else converts JSON -> YAML.
-func prettyRawExtension(re runtime.RawExtension) string {
-	// Prefer the decoded object when present.
-	if re.Object != nil {
-		j, err := json.Marshal(re.Object)
-		if err != nil {
-			return "-"
-		}
-
-		if y, errY := yaml.JSONToYAML(j); errY == nil {
-			return string(y)
-		}
-
-		return string(j)
-	}
-
-	if len(re.Raw) == 0 {
+func prettyResourceTemplate(resourceTemplate apiruntime.ResourceTemplate) string {
+	data, err := json.Marshal(resourceTemplate)
+	if err != nil {
 		return "-"
 	}
 
-	if y, err := yaml.JSONToYAML(re.Raw); err == nil {
-		return string(y)
+	if yamlData, yamlErr := yaml.JSONToYAML(data); yamlErr == nil {
+		return string(yamlData)
 	}
 
-	return string(re.Raw)
+	return string(data)
 }
 
 // colorizeValue applies ANSI colors for YAML using chroma and returns a string suitable for terminal output.
@@ -169,9 +154,54 @@ func newK8sClient() (*rest.Config, ctrlclient.Client, error) {
 		return nil, nil, err
 	}
 
+	if err := impersonation.applyTo(cfg); err != nil {
+		return nil, nil, err
+	}
+
 	cl, err := ctrlclient.New(cfg, ctrlclient.Options{Scheme: scheme})
 
 	return cfg, cl, err
+}
+
+type impersonationOptions struct {
+	User   string
+	Groups []string
+}
+
+func (o impersonationOptions) applyTo(cfg *rest.Config) error {
+	if o.User != "" {
+		cfg.Impersonate.UserName = o.User
+		cfg.Impersonate.Groups = append([]string(nil), o.Groups...)
+	} else if len(o.Groups) > 0 {
+		cfg.Impersonate.Groups = append([]string(nil), o.Groups...)
+	}
+
+	if len(cfg.Impersonate.Groups) > 0 && cfg.Impersonate.UserName == "" {
+		return fmt.Errorf("--as-group requires --as or an impersonated user in the kubeconfig")
+	}
+
+	return nil
+}
+
+func accessEntityForConfig(cfg *rest.Config) *breaktheglass.AccessEntity {
+	username := cfg.Username
+	if cfg.Impersonate.UserName != "" {
+		username = cfg.Impersonate.UserName
+	}
+
+	return &breaktheglass.AccessEntity{
+		Type:   accessEntityTypeForUsername(username),
+		Name:   username,
+		Groups: append([]string(nil), cfg.Impersonate.Groups...),
+	}
+}
+
+func accessEntityTypeForUsername(username string) breaktheglass.AccessEntityType {
+	if strings.HasPrefix(username, serviceaccount.ServiceAccountUsernamePrefix) {
+		return breaktheglass.AccessEntityTypeServiceAccount
+	}
+
+	return breaktheglass.AccessEntityTypeUser
 }
 
 func runBreakRequestAction(
@@ -184,10 +214,7 @@ func runBreakRequestAction(
 		return err
 	}
 
-	user := &breaktheglass.AccessEntity{
-		Type: breaktheglass.AccessEntityTypeUser,
-		Name: cfg.Username,
-	}
+	user := accessEntityForConfig(cfg)
 
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		br := &capsulev1beta2.BreakRequest{}
