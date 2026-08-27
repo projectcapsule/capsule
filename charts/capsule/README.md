@@ -227,6 +227,21 @@ The following Values have changed key or Value:
 |-----|------|---------|-------------|
 | webhooks.annotations | object | `{}` | Additional Annotations for all webhooks |
 | webhooks.exclusive | bool | `false` | When `crds.exclusive` is `true` the webhooks will be installed |
+| webhooks.hooks.breakrequests.enabled | bool | `true` | Enable the Hook |
+| webhooks.hooks.breakrequests.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
+| webhooks.hooks.breakrequests.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.breakrequests.matchPolicy | string | `"Exact"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.breakrequests.namespaceSelector | object | `{}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
+| webhooks.hooks.breakrequests.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
+| webhooks.hooks.breakrequests.opts | object | `{}` | Capsule Hook Options |
+| webhooks.hooks.breakrequests.reinvocationPolicy | string | `"Never"` | [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy) |
+| webhooks.hooks.breakrequesttemplates.enabled | bool | `true` | Enable the Hook |
+| webhooks.hooks.breakrequesttemplates.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
+| webhooks.hooks.breakrequesttemplates.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.breakrequesttemplates.matchPolicy | string | `"Exact"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.breakrequesttemplates.namespaceSelector | object | `{}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
+| webhooks.hooks.breakrequesttemplates.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
+| webhooks.hooks.breakrequesttemplates.opts | object | `{}` | Capsule Hook Options |
 | webhooks.hooks.calculations | object | `{"enabled":false,"failurePolicy":"Fail","matchConditions":[],"matchPolicy":"Equivalent","namespaceSelector":{},"objectSelector":{},"rules":[]}` | Webhook for Custom Quota Calculations ([Read More](https://projectcapsule.dev/docs/resource-management/customquotas/#admission)) |
 | webhooks.hooks.calculations.enabled | bool | `false` | Enable the Hook |
 | webhooks.hooks.calculations.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
