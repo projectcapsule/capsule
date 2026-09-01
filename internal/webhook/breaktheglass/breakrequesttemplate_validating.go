@@ -15,65 +15,59 @@ import (
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
-	"github.com/projectcapsule/capsule/pkg/template"
 )
 
 func BreakRequestTemplateValidationHandler(log logr.Logger) handlers.Handler {
-	return &breakRequestTemplateValidationHandler{
-		log: log,
-	}
+	return &breakRequestTemplateValidationHandler{log: log}
 }
 
 type breakRequestTemplateValidationHandler struct {
 	log logr.Logger
 }
 
-func (b *breakRequestTemplateValidationHandler) OnCreate(_ client.Client, _ client.Reader, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
-		b.log.Info("Validation for BreakRequestTemplate upon creation", "name", req.Name)
-
-		return validate(decoder, req)
-	}
-}
-
-func (b *breakRequestTemplateValidationHandler) OnDelete(_ client.Client, _ client.Reader, _ admission.Decoder, _ events.EventRecorder) handlers.Func {
-	return func(_ context.Context, _ admission.Request) *admission.Response {
-		return nil
-	}
-}
-
-func (b *breakRequestTemplateValidationHandler) OnUpdate(_ client.Client, _ client.Reader, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (b *breakRequestTemplateValidationHandler) OnCreate(
+	_ client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
-		b.log.Info("Validation for BreakRequestTemplate upon update", "name", req.Name)
+		b.log.Info("Validation for BreakRequestTemplate upon creation", "namespace", req.Namespace, "name", req.Name)
 
-		return validate(decoder, req)
+		return validateNamespacedBreakRequestTemplate(decoder, req)
 	}
 }
 
-func validate(decoder admission.Decoder, req admission.Request) *admission.Response {
+func (b *breakRequestTemplateValidationHandler) OnDelete(
+	_ client.Client,
+	_ client.Reader,
+	_ admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
+	return func(_ context.Context, _ admission.Request) *admission.Response { return nil }
+}
+
+func (b *breakRequestTemplateValidationHandler) OnUpdate(
+	_ client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
+	return func(_ context.Context, req admission.Request) *admission.Response {
+		b.log.Info("Validation for BreakRequestTemplate upon update", "namespace", req.Namespace, "name", req.Name)
+
+		return validateNamespacedBreakRequestTemplate(decoder, req)
+	}
+}
+
+func validateNamespacedBreakRequestTemplate(
+	decoder admission.Decoder,
+	req admission.Request,
+) *admission.Response {
 	brt := &capsulev1beta2.BreakRequestTemplate{}
 	if err := decoder.Decode(req, brt); err != nil {
 		return ad.ErroredResponse(fmt.Errorf("failed to decode new object: %w", err))
 	}
 
-	if brt.Spec.ApprovalCondition != "" {
-		if err := brt.ValidateApprovalCondition(); err != nil {
-			return ad.Denyf("approvalCondition is invalid: %v", err)
-		}
-	}
-	// Ensure the template's own defaults are consistent.
-	if brt.Spec.MaxDuration != nil && brt.Spec.MaxDuration.Duration > 0 && brt.Spec.DefaultDuration != nil &&
-		brt.Spec.DefaultDuration.Duration > brt.Spec.MaxDuration.Duration {
-		return ad.Denyf(
-			"defaultDuration %s exceeds maxDuration %s",
-			brt.Spec.DefaultDuration.Duration,
-			brt.Spec.MaxDuration.Duration,
-		)
-	}
-
-	if err := template.ValidateResourceTemplates(brt.Spec.ParamSchema, brt.Spec.Resources); err != nil {
-		return ad.Denyf("invalid resources: %v", err)
-	}
-
-	return nil
+	return validateBreakRequestTemplate(brt)
 }

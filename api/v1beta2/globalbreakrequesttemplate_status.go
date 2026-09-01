@@ -6,6 +6,6 @@ package v1beta2
 import "slices"
 
 // NamespacePresent reports whether the resolved template status includes namespace.
-func (s *BreakRequestTemplateStatus) NamespacePresent(namespace string) bool {
+func (s *GlobalBreakRequestTemplateStatus) NamespacePresent(namespace string) bool {
 	return slices.Contains(s.Namespaces, "*") || slices.Contains(s.Namespaces, namespace)
 }

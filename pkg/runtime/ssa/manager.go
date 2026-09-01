@@ -25,10 +25,13 @@ import (
 
 // Metadata configures the labels used to track resources managed by a Manager.
 type Metadata struct {
-	CreatedByValue     string
-	ManagedByValue     string
-	ProtectedByValue   string
-	LegacyCreatedLabel string
+	CreatedByValue                      string
+	ManagedByValue                      string
+	ProtectedByValue                    string
+	ProtectedByServiceAccount           string
+	ProtectedByServiceAccountAnnotation string
+	AppManagedByValue                   string
+	LegacyCreatedLabel                  string
 }
 
 // Manager applies and prunes resources with server-side apply.
@@ -82,6 +85,22 @@ func (m Manager) Apply(
 		meta.NewManagedByCapsuleLabel: {},
 		meta.ProtectedByCapsuleLabel:  {},
 	})
+
+	protectionAnnotation := m.Metadata.ProtectedByServiceAccountAnnotation
+	if protectionAnnotation != "" {
+		annotations := desired.GetAnnotations()
+		delete(annotations, protectionAnnotation)
+
+		if opts.Protect && m.Metadata.ProtectedByServiceAccount != "" {
+			if annotations == nil {
+				annotations = map[string]string{}
+			}
+
+			annotations[protectionAnnotation] = m.Metadata.ProtectedByServiceAccount
+		}
+
+		desired.SetAnnotations(annotations)
+	}
 
 	if opts.Protect && m.Metadata.ProtectedByValue != "" {
 		labels := desired.GetLabels()
@@ -228,6 +247,89 @@ func (m Manager) Disown(
 		patches = append(patches, clt.PatchRemoveLabels(actual.GetLabels(), []string{
 			meta.NewManagedByCapsuleLabel,
 		})...)
+	}
+
+	if err := clt.ApplyPatches(
+		ctx,
+		c,
+		actual,
+		patches,
+		meta.ResourceControllerFieldOwnerPrefix(),
+	); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+
+		return err
+	}
+
+	return nil
+}
+
+// Orphan stops lifecycle management without removing the resource or
+// relinquishing the fields applied by the previous manager. Capsule tracking
+// and protection metadata is removed so the retained object can be managed by
+// users or another controller.
+func (m Manager) Orphan(
+	ctx context.Context,
+	c client.Client,
+	obj *unstructured.Unstructured,
+	ownerReference *metav1.OwnerReference,
+) error {
+	actual, err := m.scopedObjectReference(obj)
+	if err != nil {
+		return err
+	}
+
+	if err := c.Get(ctx, client.ObjectKeyFromObject(actual), actual); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+
+		return err
+	}
+
+	patches := clt.RemoveOwnerReferencePatch(actual.GetOwnerReferences(), ownerReference)
+	labels := actual.GetLabels()
+	removeLabels := make([]string, 0, 5)
+
+	if m.Metadata.CreatedByValue != "" {
+		if value, ok := labels[meta.CreatedByCapsuleLabel]; ok && value == m.Metadata.CreatedByValue {
+			removeLabels = append(removeLabels, meta.CreatedByCapsuleLabel)
+		}
+	}
+
+	if m.Metadata.ManagedByValue != "" {
+		if value, ok := labels[meta.NewManagedByCapsuleLabel]; ok && value == m.Metadata.ManagedByValue {
+			removeLabels = append(removeLabels, meta.NewManagedByCapsuleLabel)
+		}
+	}
+
+	if m.Metadata.ProtectedByValue != "" {
+		if value, ok := labels[meta.ProtectedByCapsuleLabel]; ok && value == m.Metadata.ProtectedByValue {
+			removeLabels = append(removeLabels, meta.ProtectedByCapsuleLabel)
+		}
+	}
+
+	if m.Metadata.AppManagedByValue != "" {
+		if value, ok := labels[meta.AppManagedByLabel]; ok && value == m.Metadata.AppManagedByValue {
+			removeLabels = append(removeLabels, meta.AppManagedByLabel)
+		}
+	}
+
+	if m.Metadata.LegacyCreatedLabel != "" {
+		if _, ok := labels[m.Metadata.LegacyCreatedLabel]; ok {
+			removeLabels = append(removeLabels, m.Metadata.LegacyCreatedLabel)
+		}
+	}
+
+	patches = append(patches, clt.PatchRemoveLabels(labels, removeLabels)...)
+
+	if annotation := m.Metadata.ProtectedByServiceAccountAnnotation; annotation != "" {
+		annotations := actual.GetAnnotations()
+		if _, ok := annotations[annotation]; ok {
+			patches = append(patches, clt.PatchRemoveAnnotations(annotations, []string{annotation})...)
+		}
 	}
 
 	if err := clt.ApplyPatches(

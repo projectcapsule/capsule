@@ -21,6 +21,7 @@ import (
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	mc "github.com/projectcapsule/capsule/internal/mocks/client"
@@ -44,6 +45,17 @@ var (
     "test": "{{.testValue}}"
   }
 }`)}
+	mtConfigMapRendered = runtime.RawExtension{Raw: []byte(`
+{
+  "apiVersion": "v1",
+  "kind": "ConfigMap",
+  "metadata": {
+    "name": "test-configmap"
+  },
+  "data": {
+    "test": "test-value"
+  }
+}`)}
 
 	psString = runtime.RawExtension{
 		Raw: []byte(`{"type": "object", "required": ["testValue"], "properties": {"testValue": {"type": "string"}}}`),
@@ -55,7 +67,8 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 	_ = capsulev1beta2.AddToScheme(s)
 
 	matchBr := gm.AssignableToTypeOf(&capsulev1beta2.BreakRequest{})
-	matchBrt := gm.AssignableToTypeOf(&capsulev1beta2.BreakRequestTemplate{})
+	matchBrt := gm.AssignableToTypeOf(&capsulev1beta2.GlobalBreakRequestTemplate{})
+	matchLocalBrt := gm.AssignableToTypeOf(&capsulev1beta2.BreakRequestTemplate{})
 	matchUs := gm.AssignableToTypeOf(&unstructured.Unstructured{})
 
 	tests := []struct {
@@ -73,21 +86,107 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: capsulev1beta2.BreakRequestSpec{
-					Template: capsulev1beta2.BreakRequestTemplateReference{
-						Kind: capsulev1beta2.BreakRequestTemplateKind,
+					Template: capsulev1beta2.GlobalBreakRequestTemplateReference{
+						Kind: capsulev1beta2.GlobalBreakRequestTemplateKind,
 						Name: templateName,
 					},
 				},
 			},
 			mocks: func(cl *mc.MockClient, scl *mc.MockSubResourceWriter) {
 				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil)
-				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBrt).Return(nil)
+				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBrt).
+					Do(func(_ any, _ any, brt *capsulev1beta2.GlobalBreakRequestTemplate, _ ...any) {
+						brt.ResourceVersion = "1234"
+						brt.Spec.Resources = []apiruntime.ResourceTemplate{{
+							Targets: []runtime.RawExtension{mtConfigMapRendered},
+						}}
+					})
 				scl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
 			},
 			verify: func(t *testing.T, br *capsulev1beta2.BreakRequest) {
-				assert.Len(t, br.Status.Conditions, 1)
+				assert.Len(t, br.Status.Conditions, 2)
 				assert.Equal(t, capsulev1beta2.RequestPhaseRequested, br.Status.Phase)
+				require.NotNil(t, br.Status.Template)
+				assert.Equal(t, capsulev1beta2.GlobalBreakRequestTemplateKind, br.Status.Template.Kind)
+				assert.Equal(t, templateName, br.Status.Template.Name)
+				assert.Equal(t, "1234", br.Status.Template.ResourceVersion)
+				require.NotNil(t, br.Status.Approved)
+				require.Len(t, br.Status.Approved.Resources, 1)
+				require.Len(t, br.Status.Approved.Resources[0].Targets, 1)
+				ready := findCondition(br.Status.Conditions, meta.ReadyCondition)
+				require.NotNil(t, ready)
+				assert.Equal(t, v1.ConditionTrue, ready.Status)
 			},
+		},
+		{
+			name: "newly created with namespace-local template",
+			br: &capsulev1beta2.BreakRequest{
+				ObjectMeta: v1.ObjectMeta{Name: resourceName, Namespace: "team-a"},
+				Spec: capsulev1beta2.BreakRequestSpec{Template: capsulev1beta2.BreakRequestTemplateReference{
+					Kind: capsulev1beta2.BreakRequestTemplateKind,
+					Name: templateName,
+				}},
+			},
+			mocks: func(cl *mc.MockClient, scl *mc.MockSubResourceWriter) {
+				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil)
+				cl.EXPECT().
+					Get(
+						gm.Any(),
+						client.ObjectKey{Namespace: "team-a", Name: templateName},
+						matchLocalBrt,
+					).
+					Do(func(_ any, _ any, brt *capsulev1beta2.BreakRequestTemplate, _ ...any) {
+						brt.Namespace = "team-a"
+						brt.ResourceVersion = "local-1234"
+						brt.Spec.Resources = []apiruntime.ResourceTemplate{{
+							Targets: []runtime.RawExtension{mtConfigMapRendered},
+						}}
+					})
+				scl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
+			},
+			verify: func(t *testing.T, br *capsulev1beta2.BreakRequest) {
+				require.NotNil(t, br.Status.Template)
+				assert.Equal(t, capsulev1beta2.BreakRequestTemplateKind, br.Status.Template.Kind)
+				assert.Equal(t, templateName, br.Status.Template.Name)
+				assert.Equal(t, "local-1234", br.Status.Template.ResourceVersion)
+				require.NotNil(t, br.Status.Approved)
+				require.Len(t, br.Status.Approved.Resources, 1)
+				require.Len(t, br.Status.Approved.Resources[0].Targets, 1)
+			},
+		},
+		{
+			name: "rendering failure is reported as not ready",
+			br: &capsulev1beta2.BreakRequest{
+				ObjectMeta: v1.ObjectMeta{Name: resourceName, Namespace: "default"},
+				Spec: capsulev1beta2.BreakRequestSpec{
+					Template: capsulev1beta2.GlobalBreakRequestTemplateReference{
+						Kind: capsulev1beta2.GlobalBreakRequestTemplateKind,
+						Name: templateName,
+					},
+				},
+			},
+			mocks: func(cl *mc.MockClient, scl *mc.MockSubResourceWriter) {
+				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBrt).
+					Do(func(_ any, _ any, brt *capsulev1beta2.GlobalBreakRequestTemplate, _ ...any) {
+						brt.Spec.ParamSchema = &psString
+						brt.Spec.Resources = []apiruntime.ResourceTemplate{{
+							Targets: []runtime.RawExtension{mtConfigMapParameterized},
+						}}
+					})
+				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil)
+				scl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
+			},
+			verify: func(t *testing.T, br *capsulev1beta2.BreakRequest) {
+				assert.Empty(t, br.Status.Phase)
+				require.NotNil(t, br.Status.Approved)
+				assert.Empty(t, br.Status.Approved.Resources)
+				ready := findCondition(br.Status.Conditions, meta.ReadyCondition)
+				require.NotNil(t, ready)
+				assert.Equal(t, v1.ConditionFalse, ready.Status)
+				assert.Equal(t, templateRenderingFailedReason, ready.Reason)
+				assert.Contains(t, ready.Message, "invalid params")
+			},
+			wantErr: true,
 		},
 		{
 			name: "approved but not yet to start",
@@ -97,14 +196,21 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: capsulev1beta2.BreakRequestSpec{
-					Template: capsulev1beta2.BreakRequestTemplateReference{
-						Kind: capsulev1beta2.BreakRequestTemplateKind,
+					Template: capsulev1beta2.GlobalBreakRequestTemplateReference{
+						Kind: capsulev1beta2.GlobalBreakRequestTemplateKind,
 						Name: templateName,
 					},
 				},
 				Status: capsulev1beta2.BreakRequestStatus{
 					Phase: capsulev1beta2.RequestPhaseApproved,
 					Conditions: []v1.Condition{
+						{
+							LastTransitionTime: v1.Now(),
+							Message:            "rendered resources are ready",
+							Reason:             meta.SucceededReason,
+							Status:             v1.ConditionTrue,
+							Type:               meta.ReadyCondition,
+						},
 						{
 							LastTransitionTime: v1.Now(),
 							Message:            "Access request approved",
@@ -144,8 +250,8 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: capsulev1beta2.BreakRequestSpec{
-					Template: capsulev1beta2.BreakRequestTemplateReference{
-						Kind: capsulev1beta2.BreakRequestTemplateKind,
+					Template: capsulev1beta2.GlobalBreakRequestTemplateReference{
+						Kind: capsulev1beta2.GlobalBreakRequestTemplateKind,
 						Name: templateName,
 					},
 					Params: &runtime.RawExtension{Raw: []byte(`{"testValue": "test-value"}`)},
@@ -153,6 +259,13 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 				Status: capsulev1beta2.BreakRequestStatus{
 					Phase: capsulev1beta2.RequestPhaseApproved,
 					Conditions: []v1.Condition{
+						{
+							LastTransitionTime: v1.Now(),
+							Message:            "rendered resources are ready",
+							Reason:             meta.SucceededReason,
+							Status:             v1.ConditionTrue,
+							Type:               meta.ReadyCondition,
+						},
 						{
 							LastTransitionTime: v1.Now(),
 							Message:            "Access request approved",
@@ -163,12 +276,9 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 					},
 					Approved: &capsulev1beta2.ApprovedProperties{
 						StartTime: ptr.To(v1.Now()),
-					},
-					Template: &capsulev1beta2.TemplateProperties{
-						Resources: []apiruntime.ResourceTemplate{{
-							Targets: []runtime.RawExtension{mtConfigMapParameterized},
+						Resources: []apiruntime.RenderedResource{{
+							Targets: []runtime.RawExtension{mtConfigMapRendered},
 						}},
-						ParamSchema: &psString,
 					},
 				},
 			},
@@ -184,6 +294,7 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 			},
 			verify: func(t *testing.T, br *capsulev1beta2.BreakRequest) {
 				assert.Equal(t, capsulev1beta2.RequestPhaseActive, br.Status.Phase)
+				require.NotNil(t, br.Status.Approved)
 				assert.Len(t, br.Status.Approved.Resources, 1)
 				assert.Len(t, br.Status.Approved.Resources[0].Targets, 1)
 				assert.Equal(t, uint(1), br.Status.Size)
@@ -226,22 +337,26 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: capsulev1beta2.BreakRequestSpec{
-					Template: capsulev1beta2.BreakRequestTemplateReference{
-						Kind: capsulev1beta2.BreakRequestTemplateKind,
+					Template: capsulev1beta2.GlobalBreakRequestTemplateReference{
+						Kind: capsulev1beta2.GlobalBreakRequestTemplateKind,
 						Name: templateName,
 					},
 					Params: &runtime.RawExtension{Raw: []byte(`{"testValue": "test-value"}`)},
 				},
 				Status: capsulev1beta2.BreakRequestStatus{
 					Phase: capsulev1beta2.RequestPhaseApproved,
+					Conditions: []v1.Condition{{
+						LastTransitionTime: v1.Now(),
+						Message:            "rendered resources are ready",
+						Reason:             meta.SucceededReason,
+						Status:             v1.ConditionTrue,
+						Type:               meta.ReadyCondition,
+					}},
 					Approved: &capsulev1beta2.ApprovedProperties{
 						StartTime: ptr.To(v1.Now()),
-					},
-					Template: &capsulev1beta2.TemplateProperties{
-						Resources: []apiruntime.ResourceTemplate{{
-							Targets: []runtime.RawExtension{mtConfigMapParameterized},
+						Resources: []apiruntime.RenderedResource{{
+							Targets: []runtime.RawExtension{mtConfigMapRendered},
 						}},
-						ParamSchema: &psString,
 					},
 				},
 			},
@@ -261,6 +376,10 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 				assert.Equal(t, v1.ConditionFalse, br.Status.ProcessedItems[0].Status)
 				assert.Contains(t, br.Status.ProcessedItems[0].Message, "apply failed")
 				assert.True(t, br.Status.ProcessedItems[0].Created)
+				ready := findCondition(br.Status.Conditions, meta.ReadyCondition)
+				require.NotNil(t, ready)
+				assert.Equal(t, v1.ConditionFalse, ready.Status)
+				assert.Equal(t, resourceApplyFailedReason, ready.Reason)
 			},
 			wantErr: true,
 		},
@@ -299,4 +418,42 @@ func TestBreakRequestReconciler_reconcile(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBreakRequestReconcilerLoadsNamespacedTemplateLocally(t *testing.T) {
+	t.Parallel()
+
+	s := runtime.NewScheme()
+	require.NoError(t, capsulev1beta2.AddToScheme(s))
+
+	teamA := &capsulev1beta2.BreakRequestTemplate{
+		ObjectMeta: v1.ObjectMeta{Name: templateName, Namespace: "team-a"},
+	}
+	teamB := &capsulev1beta2.BreakRequestTemplate{
+		ObjectMeta: v1.ObjectMeta{Name: templateName, Namespace: "team-b"},
+	}
+	r := &BreakRequestReconciler{Client: fake.NewClientBuilder().WithScheme(s).WithObjects(teamA, teamB).Build()}
+	br := &capsulev1beta2.BreakRequest{
+		ObjectMeta: v1.ObjectMeta{Namespace: "team-a"},
+		Spec: capsulev1beta2.BreakRequestSpec{Template: capsulev1beta2.BreakRequestTemplateReference{
+			Kind: capsulev1beta2.BreakRequestTemplateKind,
+			Name: templateName,
+		}},
+	}
+
+	loaded, err := r.loadTemplate(context.Background(), br)
+	require.NoError(t, err)
+	local, ok := loaded.(*capsulev1beta2.BreakRequestTemplate)
+	require.True(t, ok)
+	assert.Equal(t, "team-a", local.Namespace)
+}
+
+func findCondition(conditions []v1.Condition, conditionType string) *v1.Condition {
+	for i := range conditions {
+		if conditions[i].Type == conditionType {
+			return &conditions[i]
+		}
+	}
+
+	return nil
 }

@@ -7,14 +7,21 @@
 # template can be used for another namespaced CRD by changing crdName. The
 # selected distributor ServiceAccount must be allowed to bind roleName.
 apiVersion: capsule.clastix.io/v1beta2
-kind: BreakRequestTemplate
+kind: GlobalBreakRequestTemplate
 metadata:
-  name: crd-clusterrole-distribution
+  name: clusterrole-distribution
+  labels:
+    company.com/consumer: "tenants"
+  annotations:  
+    info.projectcapsule.dev/icon: "fa-solid fa-chart-line"
+    info.projectcapsule.dev/description: "Request temporary elevated permissions for a namespaced CRD across all Tenant namespaces."
+    info.projectcapsule.dev/tags: "rbac,security"
 spec:
   namespaceSelectors:
     - matchLabels:
-        projectcapsule.dev/tenant: solar
-  autoApprove: true
+       capsule.clastix.io/tenant: solar
+  approvals:
+    auto: true
   defaultDuration: 1h
   maxDuration: 8h
   keepFor: 7d
@@ -32,17 +39,17 @@ spec:
     properties:
       roleName:
         type: string
-        description: Name of the temporary ClusterRole distributed across the Tenant.
+        description: Name of the temporary ClusterRole.
         pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
         maxLength: 63
       tenantResourceName:
         type: string
-        description: Name of the TenantResource which distributes the ClusterRole.
+        description: Name of the temporary TenantResource.
         pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
         maxLength: 63
       roleBindingName:
         type: string
-        description: Name of the RoleBinding created in each Tenant namespace.
+        description: Name of the RoleBinding distributed to Tenant namespaces.
         pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
         maxLength: 63
       crdName:
@@ -50,6 +57,14 @@ spec:
         description: Name of a namespaced CRD, for example httproutes.gateway.networking.k8s.io.
         minLength: 1
         maxLength: 253
+        x-capsule-form:
+          widget: kubernetes-resource
+          source:
+            apiVersion: apiextensions.k8s.io/v1
+            kind: CustomResourceDefinition
+          option:
+            labelTemplate: '{{ .metadata.name }}'
+            valueTemplate: '{{ .metadata.name }}'
       serviceAccountName:
         type: string
         description: Promoted ServiceAccount used by the TenantResource.
@@ -61,10 +76,18 @@ spec:
         enum:
           - User
           - Group
+          - ServiceAccount
       subjectName:
         type: string
-        description: Name of the user or group receiving the temporary CRD permissions.
+        description: User/group name, or namespace/name for a ServiceAccount.
         minLength: 1
+    x-kubernetes-validations:
+      - rule: >-
+          self.subjectKind != 'ServiceAccount' ||
+          self.subjectName.matches('^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?/[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$')
+        message: ServiceAccount subjects must use namespace/name
+        reason: FieldValueInvalid
+        fieldPath: .subjectName
   context:
     resources:
       - apiVersion: apiextensions.k8s.io/v1
@@ -101,27 +124,34 @@ spec:
         creation: Owner
         protect: true
         force: false
-      targets:
-        - apiVersion: capsule.clastix.io/v1beta2
-          kind: TenantResource
-          metadata:
-            name: '{{ .tenantResourceName }}'
-          spec:
-            serviceAccount:
-              name: '{{ .serviceAccountName }}'
-            resyncPeriod: 30s
-            pruningOnDelete: true
-            resources:
-              - rawItems:
-                  - apiVersion: rbac.authorization.k8s.io/v1
-                    kind: RoleBinding
-                    metadata:
-                      name: '{{ .roleBindingName }}'
-                    roleRef:
-                      apiGroup: rbac.authorization.k8s.io
-                      kind: ClusterRole
-                      name: '{{ .roleName }}'
-                    subjects:
-                      - apiGroup: rbac.authorization.k8s.io
-                        kind: '{{ .subjectKind }}'
-                        name: '{{ .subjectName }}'
+        deletion: Remove
+      template: |
+        apiVersion: capsule.clastix.io/v1beta2
+        kind: TenantResource
+        metadata:
+          name: '{{ $.params.tenantResourceName }}'
+        spec:
+          serviceAccount:
+            name: '{{ $.params.serviceAccountName }}'
+          resyncPeriod: 30s
+          pruningOnDelete: true
+          resources:
+            - rawItems:
+                - apiVersion: rbac.authorization.k8s.io/v1
+                  kind: RoleBinding
+                  metadata:
+                    name: '{{ $.params.roleBindingName }}'
+                  roleRef:
+                    apiGroup: rbac.authorization.k8s.io
+                    kind: ClusterRole
+                    name: '{{ $.params.roleName }}'
+                  subjects:
+                    {{ if eq $.params.subjectKind "ServiceAccount" }}
+                    - kind: ServiceAccount
+                      namespace: '{{ index (splitList "/" $.params.subjectName) 0 }}'
+                      name: '{{ index (splitList "/" $.params.subjectName) 1 }}'
+                    {{ else }}
+                    - apiGroup: rbac.authorization.k8s.io
+                      kind: '{{ $.params.subjectKind }}'
+                      name: '{{ $.params.subjectName }}'
+                    {{ end }}

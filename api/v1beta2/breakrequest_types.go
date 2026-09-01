@@ -10,7 +10,6 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/breaktheglass"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
-	tpl "github.com/projectcapsule/capsule/pkg/template"
 )
 
 // BreakRequestSpec defines the desired state of BreakRequest.
@@ -37,14 +36,17 @@ type BreakRequestSpec struct {
 	StartTime *metav1.Time `json:"startTime,omitempty"`
 }
 
-const BreakRequestTemplateKind = "BreakRequestTemplate"
+const (
+	BreakRequestTemplateKind       = "BreakRequestTemplate"
+	GlobalBreakRequestTemplateKind = "GlobalBreakRequestTemplate"
+)
 
-// BreakRequestTemplateReference identifies the cluster-scoped template used
-// by a BreakRequest.
+// BreakRequestTemplateReference identifies the namespaced or global template
+// used by a BreakRequest.
 type BreakRequestTemplateReference struct {
 	// Kind of template being referenced.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum=BreakRequestTemplate
+	// +kubebuilder:validation:Enum=BreakRequestTemplate;GlobalBreakRequestTemplate
 	Kind string `json:"kind"`
 	// Name of the template being referenced.
 	// +kubebuilder:validation:Required
@@ -54,15 +56,41 @@ type BreakRequestTemplateReference struct {
 	Name string `json:"name"`
 }
 
+// GlobalBreakRequestTemplateReference is retained as a compatibility alias.
+type GlobalBreakRequestTemplateReference = BreakRequestTemplateReference
+
+// ResolvedBreakRequestTemplateReference identifies the exact template version
+// used to render a BreakRequest.
+type ResolvedBreakRequestTemplateReference struct {
+	BreakRequestTemplateReference `json:",inline"`
+
+	// ResourceVersion of the template used to render the request resources.
+	// +kubebuilder:validation:Required
+	ResourceVersion string `json:"resourceVersion"`
+}
+
+// ResolvedGlobalBreakRequestTemplateReference is retained as a compatibility alias.
+type ResolvedGlobalBreakRequestTemplateReference = ResolvedBreakRequestTemplateReference
+
 // BreakRequestStatus defines the observed state of BreakRequest.
 type BreakRequestStatus struct {
 	meta.ManagedResourcesStatus `json:",inline"`
 
+	// Template identifies the exact template version used to render the approved
+	// resource snapshot.
+	// +optional
+	Template *ResolvedBreakRequestTemplateReference `json:"template,omitempty"`
+
+	// ServiceAccount is the resolved identity used for template context loading
+	// and managed-resource actions. Capsule records its controller ServiceAccount
+	// when no impersonation is configured.
+	// +optional
+	ServiceAccount *meta.NamespacedRFC1123ObjectReferenceWithNamespace `json:"serviceAccount,omitempty"`
+
 	// Review refers to the subject that either approved or denied the request
 	Review *ReviewInfo `json:"review,omitempty"`
-	// Template properties copied from the assigned template
-	Template *TemplateProperties `json:"template,omitempty"`
-	// The Approved properties are set when the request is approved.
+	// Approved contains the rendered resources and effective lifecycle properties
+	// presented for approval. Once approved, this snapshot is authoritative.
 	Approved *ApprovedProperties `json:"approved,omitempty"`
 	// Shows timestamps between approval and termination of the request.
 	Active *ActivePeriod `json:"active,omitempty"`
@@ -70,7 +98,7 @@ type BreakRequestStatus struct {
 	// If unset, the BreakRequest can be deleted immediately after expiring.
 	KeepUntil *metav1.Time `json:"keepUntil,omitempty"`
 	// Conditions applied to the request.
-	// Known conditions are "Requested", "Pending", "Denied", "Approved", "Active" and "Expired".
+	// Known conditions are "Ready", "Requested", "Pending", "Denied", "Approved", "Active" and "Expired".
 	// The latest condition is reflected in the phase.
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 	// +kubebuilder:validation:Enum=Requested;Pending;Denied;Approved;Active;Expired
@@ -83,29 +111,15 @@ type ActivePeriod struct {
 	ActiveUntil *metav1.Time `json:"until,omitempty"`
 }
 
-// TemplateProperties contains properties copied from the assigned template.
-type TemplateProperties struct {
-	// Resources rendered by this request, provided by the template.
-	Resources []apiruntime.ResourceTemplate `json:"resources,omitempty"`
-	// ParamSchema template parameter schema
-	ParamSchema *k8sruntime.RawExtension `json:"paramSchema,omitempty"`
-	// Context loads additional Kubernetes resources for use by all resource targets and templates.
-	Context *tpl.TemplateContext `json:"context,omitempty"`
-	// The default duration of the BreakRequest referencing this template should be valid for.
-	DefaultDuration *metav1.Duration `json:"defaultDuration,omitempty"`
-	// The max allowed duration of the BreakRequest referencing this template should be valid for.
-	MaxDuration *metav1.Duration `json:"maxDuration,omitempty"`
-	// The duration of this BreakRequest will be kept in the system after it has been expired (eg. auditing purposes)
-	// If not set, the BreakRequest will be deleted after expiring.
-	KeepFor *breaktheglass.ExtendedDuration `json:"keepFor,omitempty"`
-}
-
 // ApprovedProperties contains the properties set when a request is approved.
 type ApprovedProperties struct {
 	KeepFor   *breaktheglass.ExtendedDuration `json:"keepFor,omitempty"`
 	Duration  *metav1.Duration                `json:"duration,omitempty"`
 	StartTime *metav1.Time                    `json:"startTime,omitempty"`
-	Resources []apiruntime.ResourceTemplate   `json:"resources,omitempty"`
+	// Resources contains the fully rendered manifests approved for this request.
+	// These resources are the source of truth for server-side apply and pruning;
+	// source templates and rendering context are never copied into the request.
+	Resources []apiruntime.RenderedResource `json:"resources,omitempty"`
 }
 
 // ReviewInfo contains information about the review of a request.
@@ -146,6 +160,8 @@ const (
 // +kubebuilder:printcolumn:name="ActiveUntil",type=string,JSONPath=`.status.active.until`,priority=10
 // +kubebuilder:printcolumn:name="Duration",type=string,JSONPath=`.status.approved.duration`,priority=10
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
+// +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
+// +kubebuilder:printcolumn:name="Message",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].message`,priority=10
 // +kubebuilder:printcolumn:name="Items",type="integer",JSONPath=".status.size",description="The number of managed resources"
 
 // BreakRequest is the Schema for the BreakRequests API.

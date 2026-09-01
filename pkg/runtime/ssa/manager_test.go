@@ -35,9 +35,11 @@ func TestManagedMetadataPatches(t *testing.T) {
 	}
 
 	manager := Manager{Metadata: Metadata{
-		CreatedByValue:   testCreatedBy,
-		ManagedByValue:   testCreatedBy,
-		ProtectedByValue: testCreatedBy,
+		CreatedByValue:                      testCreatedBy,
+		ManagedByValue:                      testCreatedBy,
+		ProtectedByValue:                    testCreatedBy,
+		ProtectedByServiceAccount:           "system:serviceaccount:test:runner",
+		ProtectedByServiceAccountAnnotation: meta.BreakRequestServiceAccountAnnotation,
 	}}
 	owner := metav1.OwnerReference{
 		APIVersion: "capsule.clastix.io/v1beta2",
@@ -134,15 +136,20 @@ func TestApplyUsesServerSideApply(t *testing.T) {
 	base := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recording := &applyingClient{Client: base}
 	manager := Manager{Metadata: Metadata{
-		CreatedByValue:   testCreatedBy,
-		ManagedByValue:   testCreatedBy,
-		ProtectedByValue: testCreatedBy,
+		CreatedByValue:                      testCreatedBy,
+		ManagedByValue:                      testCreatedBy,
+		ProtectedByValue:                    testCreatedBy,
+		ProtectedByServiceAccount:           "system:serviceaccount:test:runner",
+		ProtectedByServiceAccountAnnotation: meta.BreakRequestServiceAccountAnnotation,
 	}}
 	desired := configMap("applied", map[string]any{"requested": "value"})
 	desired.SetLabels(map[string]string{
 		meta.CreatedByCapsuleLabel:    "template-value",
 		meta.NewManagedByCapsuleLabel: "template-value",
 		meta.ProtectedByCapsuleLabel:  "template-value",
+	})
+	desired.SetAnnotations(map[string]string{
+		meta.BreakRequestServiceAccountAnnotation: "system:serviceaccount:spoofed:runner",
 	})
 
 	result, err := manager.Apply(context.Background(), recording, desired, ApplyOptions{
@@ -179,6 +186,9 @@ func TestApplyUsesServerSideApply(t *testing.T) {
 	if value := apply.object.GetLabels()[meta.ProtectedByCapsuleLabel]; value != testCreatedBy {
 		t.Fatalf("Apply() protection label = %q, want %q", value, testCreatedBy)
 	}
+	if value := apply.object.GetAnnotations()[meta.BreakRequestServiceAccountAnnotation]; value != "system:serviceaccount:test:runner" {
+		t.Fatalf("Apply() protection ServiceAccount = %q, want resolved identity", value)
+	}
 }
 
 func TestApplyStripsProtectionWhenDisabled(t *testing.T) {
@@ -192,12 +202,17 @@ func TestApplyStripsProtectionWhenDisabled(t *testing.T) {
 	base := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recording := &applyingClient{Client: base}
 	manager := Manager{Metadata: Metadata{
-		CreatedByValue:   testCreatedBy,
-		ManagedByValue:   testCreatedBy,
-		ProtectedByValue: testCreatedBy,
+		CreatedByValue:                      testCreatedBy,
+		ManagedByValue:                      testCreatedBy,
+		ProtectedByValue:                    testCreatedBy,
+		ProtectedByServiceAccount:           "system:serviceaccount:test:runner",
+		ProtectedByServiceAccountAnnotation: meta.BreakRequestServiceAccountAnnotation,
 	}}
 	desired := configMap("unprotected", nil)
 	desired.SetLabels(map[string]string{meta.ProtectedByCapsuleLabel: "template-value"})
+	desired.SetAnnotations(map[string]string{
+		meta.BreakRequestServiceAccountAnnotation: "system:serviceaccount:spoofed:runner",
+	})
 
 	if _, err := manager.Apply(context.Background(), recording, desired, ApplyOptions{
 		FieldOwner: testFieldOwner,
@@ -206,6 +221,9 @@ func TestApplyStripsProtectionWhenDisabled(t *testing.T) {
 	}
 	if value := recording.patches[0].object.GetLabels()[meta.ProtectedByCapsuleLabel]; value != "" {
 		t.Fatalf("Apply() protection label = %q with protection disabled", value)
+	}
+	if value := recording.patches[0].object.GetAnnotations()[meta.BreakRequestServiceAccountAnnotation]; value != "" {
+		t.Fatalf("Apply() protection ServiceAccount = %q with protection disabled", value)
 	}
 }
 
@@ -415,6 +433,84 @@ func TestPrune(t *testing.T) {
 			t.Fatal("isDeletable() = true for a resource shared by another Capsule manager")
 		}
 	})
+}
+
+func TestOrphan(t *testing.T) {
+	t.Parallel()
+
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+
+	owner := metav1.OwnerReference{
+		APIVersion: "capsule.clastix.io/v1beta2",
+		Kind:       "BreakRequest",
+		Name:       "request",
+		UID:        types.UID("request-uid"),
+	}
+	existing := configMap("orphaned", map[string]any{"requested": "value"})
+	existing.SetOwnerReferences([]metav1.OwnerReference{owner})
+	existing.SetLabels(map[string]string{
+		meta.CreatedByCapsuleLabel:    testCreatedBy,
+		meta.NewManagedByCapsuleLabel: testCreatedBy,
+		meta.ProtectedByCapsuleLabel:  testCreatedBy,
+		meta.AppManagedByLabel:        "test-app-manager",
+		"example.com/keep":            "true",
+	})
+	existing.SetAnnotations(map[string]string{
+		meta.BreakRequestServiceAccountAnnotation: "system:serviceaccount:stale:runner",
+		"example.com/keep":                        "true",
+	})
+
+	c := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithRuntimeObjects(existing).
+		Build()
+	manager := Manager{Metadata: Metadata{
+		CreatedByValue:                      testCreatedBy,
+		ManagedByValue:                      testCreatedBy,
+		ProtectedByValue:                    testCreatedBy,
+		ProtectedByServiceAccount:           "system:serviceaccount:test:runner",
+		ProtectedByServiceAccountAnnotation: meta.BreakRequestServiceAccountAnnotation,
+		AppManagedByValue:                   "test-app-manager",
+	}}
+
+	if err := manager.Orphan(context.Background(), c, existing, &owner); err != nil {
+		t.Fatalf("Orphan() error = %v", err)
+	}
+
+	retained := configMap("orphaned", nil)
+	if err := c.Get(context.Background(), client.ObjectKeyFromObject(retained), retained); err != nil {
+		t.Fatalf("getting orphaned resource: %v", err)
+	}
+
+	data, found, err := unstructured.NestedStringMap(retained.Object, "data")
+	if err != nil || !found || data["requested"] != "value" {
+		t.Fatalf("orphaned data = %#v, found=%v, err=%v", data, found, err)
+	}
+	if len(retained.GetOwnerReferences()) != 0 {
+		t.Fatalf("orphaned owner references = %#v, want empty", retained.GetOwnerReferences())
+	}
+	if retained.GetLabels()["example.com/keep"] != "true" {
+		t.Fatalf("unrelated label was removed: %#v", retained.GetLabels())
+	}
+	for _, key := range []string{
+		meta.CreatedByCapsuleLabel,
+		meta.NewManagedByCapsuleLabel,
+		meta.ProtectedByCapsuleLabel,
+		meta.AppManagedByLabel,
+	} {
+		if _, found := retained.GetLabels()[key]; found {
+			t.Fatalf("orphaned resource retains lifecycle label %q", key)
+		}
+	}
+	if _, found := retained.GetAnnotations()[meta.BreakRequestServiceAccountAnnotation]; found {
+		t.Fatalf("orphaned resource retains protection ServiceAccount annotation")
+	}
+	if retained.GetAnnotations()["example.com/keep"] != "true" {
+		t.Fatalf("unrelated annotation was removed: %#v", retained.GetAnnotations())
+	}
 }
 
 type recordingClient struct {

@@ -10,12 +10,10 @@ import (
 
 	"github.com/projectcapsule/capsule/pkg/api/breaktheglass"
 	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
-	tpl "github.com/projectcapsule/capsule/pkg/template"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/ptr"
 )
 
 func TestOptionalBreakRequestFieldsAreOmitted(t *testing.T) {
@@ -27,19 +25,15 @@ func TestOptionalBreakRequestFieldsAreOmitted(t *testing.T) {
 	}{
 		"status": {
 			value:  BreakRequestStatus{},
-			fields: []string{"review", "template", "approved", "active", "keepUntil"},
+			fields: []string{"review", "resources", "approved", "active", "keepUntil"},
 		},
 		"active period": {
 			value:  ActivePeriod{},
 			fields: []string{"from", "until"},
 		},
-		"template properties": {
-			value:  TemplateProperties{},
-			fields: []string{"paramSchema", "context", "defaultDuration", "maxDuration", "keepFor"},
-		},
 		"approved properties": {
 			value:  ApprovedProperties{},
-			fields: []string{"keepFor", "duration", "startTime"},
+			fields: []string{"keepFor", "duration", "startTime", "resources"},
 		},
 	}
 
@@ -126,6 +120,12 @@ func TestTransitionRequestPhase(t *testing.T) {
 			initPhase:   RequestPhaseRequested,
 			expectError: true,
 		},
+		{
+			name:        "expire a requested request",
+			phase:       RequestPhaseExpired,
+			initPhase:   RequestPhaseRequested,
+			expectError: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -142,34 +142,6 @@ func TestTransitionRequestPhase(t *testing.T) {
 	}
 }
 
-func TestInitializeFromTemplate(t *testing.T) {
-	br := &BreakRequest{}
-	brt := &BreakRequestTemplate{
-		Spec: BreakRequestTemplateSpec{
-			Resources:       []apiruntime.ResourceTemplate{},
-			ParamSchema:     &runtime.RawExtension{Raw: []byte(`{"type":"object"}`)},
-			Context:         &tpl.TemplateContext{},
-			DefaultDuration: &metav1.Duration{Duration: time.Minute},
-			MaxDuration:     &metav1.Duration{Duration: time.Hour},
-			KeepFor:         ptr.To(breaktheglass.ExtendedDuration(5)),
-		},
-	}
-
-	br.InitializeFromTemplate(brt)
-	assert.NotNil(t, br.Status.Template)
-	assert.Equal(t, brt.Spec.Resources, br.Status.Template.Resources)
-	assert.Equal(t, brt.Spec.ParamSchema, br.Status.Template.ParamSchema)
-	assert.Equal(t, brt.Spec.Context, br.Status.Template.Context)
-	assert.Equal(t, brt.Spec.DefaultDuration, br.Status.Template.DefaultDuration)
-	assert.Equal(t, brt.Spec.MaxDuration, br.Status.Template.MaxDuration)
-	assert.Equal(t, brt.Spec.KeepFor, br.Status.Template.KeepFor)
-	assert.NotSame(t, brt.Spec.ParamSchema, br.Status.Template.ParamSchema)
-	assert.NotSame(t, brt.Spec.Context, br.Status.Template.Context)
-	assert.NotSame(t, brt.Spec.DefaultDuration, br.Status.Template.DefaultDuration)
-	assert.NotSame(t, brt.Spec.MaxDuration, br.Status.Template.MaxDuration)
-	assert.NotSame(t, brt.Spec.KeepFor, br.Status.Template.KeepFor)
-}
-
 func TestApproveRequest(t *testing.T) {
 	br := &BreakRequest{}
 	entity := &breaktheglass.AccessEntity{Name: "reviewer", Type: breaktheglass.AccessEntityTypeUser}
@@ -179,6 +151,35 @@ func TestApproveRequest(t *testing.T) {
 	assert.Equal(t, RequestPhaseApproved, br.Status.Phase)
 	assert.Equal(t, entity, br.Status.Review.Reviewer)
 	assert.Equal(t, props.Duration, br.Status.Approved.Duration)
+}
+
+func TestGenerateApprovedPropertiesResolvesLifecycleDefaults(t *testing.T) {
+	keepFor := breaktheglass.ExtendedDuration(5 * time.Minute)
+	resources := []apiruntime.RenderedResource{{
+		Targets: []runtime.RawExtension{{Raw: []byte(`{"apiVersion":"v1","kind":"ConfigMap"}`)}},
+	}}
+	brt := &GlobalBreakRequestTemplate{Spec: GlobalBreakRequestTemplateSpec{
+		DefaultDuration: &metav1.Duration{Duration: time.Minute},
+		MaxDuration:     &metav1.Duration{Duration: time.Hour},
+		KeepFor:         &keepFor,
+	}}
+	br := &BreakRequest{Status: BreakRequestStatus{Approved: &ApprovedProperties{
+		Resources: resources,
+	}}}
+
+	properties, err := br.GenerateApprovedProperties(brt)
+	require.NoError(t, err)
+	require.NotNil(t, properties.Duration)
+	assert.Equal(t, time.Minute, properties.Duration.Duration)
+	require.NotNil(t, properties.KeepFor)
+	assert.Equal(t, keepFor, *properties.KeepFor)
+	require.NotNil(t, properties.StartTime)
+	assert.Equal(t, resources, properties.Resources)
+	require.NotSame(t, &resources[0], &properties.Resources[0])
+
+	br.Spec.Duration = &metav1.Duration{Duration: 2 * time.Hour}
+	_, err = br.GenerateApprovedProperties(brt)
+	require.ErrorContains(t, err, "exceeds template maxDuration")
 }
 
 func TestDenyRequest(t *testing.T) {
@@ -220,29 +221,18 @@ func TestActiveRequest(t *testing.T) {
 		expectActiveUntil  bool
 	}{
 		{
-			name: "activate not approved",
-			br: &BreakRequest{
-				Status: BreakRequestStatus{
-					Template: &TemplateProperties{
-						MaxDuration:     &metav1.Duration{Duration: time.Hour},
-						DefaultDuration: &metav1.Duration{Duration: time.Minute},
-					},
-				},
-			},
+			name:               "activate not approved",
+			br:                 &BreakRequest{},
 			entity:             &breaktheglass.AccessEntity{Name: "user", Type: breaktheglass.AccessEntityTypeUser},
 			wantErr:            "can only activate an approved request",
 			expectedPhase:      RequestPhaseActive,
-			expectActiveNotNil: true,
-			expectActiveUntil:  true,
+			expectActiveNotNil: false,
+			expectActiveUntil:  false,
 		},
 		{
 			name: "activate with approved duration",
 			br: &BreakRequest{
 				Status: BreakRequestStatus{
-					Template: &TemplateProperties{
-						MaxDuration:     &metav1.Duration{Duration: time.Hour},
-						DefaultDuration: &metav1.Duration{Duration: time.Minute},
-					},
 					Approved: &ApprovedProperties{
 						Duration: &metav1.Duration{Duration: 30 * time.Minute},
 					},
@@ -256,13 +246,10 @@ func TestActiveRequest(t *testing.T) {
 			expectActiveUntil:  true,
 		},
 		{
-			name: "activate with default duration when approved duration is nil",
+			name: "activate with requested duration when approved duration is nil",
 			br: &BreakRequest{
+				Spec: BreakRequestSpec{Duration: &metav1.Duration{Duration: time.Minute}},
 				Status: BreakRequestStatus{
-					Template: &TemplateProperties{
-						MaxDuration:     &metav1.Duration{Duration: time.Hour},
-						DefaultDuration: &metav1.Duration{Duration: time.Minute},
-					},
 					Approved: &ApprovedProperties{
 						Duration: nil,
 					},
@@ -279,10 +266,6 @@ func TestActiveRequest(t *testing.T) {
 			name: "activate without approved properties",
 			br: &BreakRequest{
 				Status: BreakRequestStatus{
-					Template: &TemplateProperties{
-						MaxDuration:     &metav1.Duration{Duration: time.Hour},
-						DefaultDuration: &metav1.Duration{Duration: time.Minute},
-					},
 					Approved: nil,
 					Phase:    RequestPhaseApproved,
 				},
@@ -291,16 +274,12 @@ func TestActiveRequest(t *testing.T) {
 			wantErr:            "",
 			expectedPhase:      RequestPhaseActive,
 			expectActiveNotNil: true,
-			expectActiveUntil:  true,
+			expectActiveUntil:  false,
 		},
 		{
 			name: "activate with nil entity",
 			br: &BreakRequest{
 				Status: BreakRequestStatus{
-					Template: &TemplateProperties{
-						MaxDuration:     &metav1.Duration{Duration: time.Hour},
-						DefaultDuration: &metav1.Duration{Duration: time.Minute},
-					},
 					Approved: &ApprovedProperties{
 						Duration: &metav1.Duration{Duration: 30 * time.Minute},
 					},
@@ -312,23 +291,6 @@ func TestActiveRequest(t *testing.T) {
 			expectedPhase:      RequestPhaseActive,
 			expectActiveNotNil: true,
 			expectActiveUntil:  true,
-		},
-		{
-			name: "activate without template",
-			br: &BreakRequest{
-				Status: BreakRequestStatus{
-					Template: nil,
-					Approved: &ApprovedProperties{
-						Duration: &metav1.Duration{Duration: 30 * time.Minute},
-					},
-					Phase: RequestPhaseApproved,
-				},
-			},
-			entity:             &breaktheglass.AccessEntity{Name: "user", Type: breaktheglass.AccessEntityTypeUser},
-			wantErr:            "template not set",
-			expectedPhase:      RequestPhaseActive,
-			expectActiveNotNil: true,
-			expectActiveUntil:  false,
 		},
 	}
 

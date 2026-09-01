@@ -36,6 +36,13 @@ spec:
     - jsonPath: .status.phase
       name: Phase
       type: string
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Ready")].message
+      name: Message
+      priority: 10
+      type: string
     - description: The number of managed resources
       jsonPath: .status.size
       name: Items
@@ -112,6 +119,7 @@ spec:
                     description: Kind of template being referenced.
                     enum:
                     - BreakRequestTemplate
+                    - GlobalBreakRequestTemplate
                     type: string
                   name:
                     description: Name of the template being referenced.
@@ -141,7 +149,9 @@ spec:
                     type: string
                 type: object
               approved:
-                description: The Approved properties are set when the request is approved.
+                description: |-
+                  Approved contains the rendered resources and effective lifecycle properties
+                  presented for approval. Once approved, this snapshot is authoritative.
                 properties:
                   duration:
                     type: string
@@ -149,12 +159,19 @@ spec:
                     pattern: ^([0-9]+(\.[0-9]+)?(s|m|h|d|w))+$
                     type: string
                   resources:
+                    description: |-
+                      Resources contains the fully rendered manifests approved for this request.
+                      These resources are the source of truth for server-side apply and pruning;
+                      source templates and rendering context are never copied into the request.
                     items:
+                      description: |-
+                        RenderedResource is an execution-ready group of Kubernetes manifests
+                        produced from a ResourceTemplate. It intentionally cannot contain a source
+                        template so status consumers and reconcilers only observe concrete targets.
                       properties:
                         policy:
-                          default: {}
-                          description: Policy controls how every target in this resource
-                            group is created and managed.
+                          description: Policy controls how every rendered target is
+                            created and managed.
                           properties:
                             creation:
                               default: Owner
@@ -166,6 +183,17 @@ spec:
                               enum:
                               - Owner
                               - Merge
+                              type: string
+                            deletion:
+                              default: Remove
+                              description: |-
+                                Deletion controls what happens when the parent stops managing the target.
+                                Remove deletes resources created for the parent and relinquishes adopted
+                                resources. Orphan keeps the resource and removes Capsule's lifecycle
+                                metadata. Removal is the default.
+                              enum:
+                              - Remove
+                              - Orphan
                               type: string
                             force:
                               default: false
@@ -180,25 +208,15 @@ spec:
                               type: boolean
                           type: object
                         targets:
-                          description: Targets are Kubernetes resource objects to
-                            render and manage with Policy.
+                          description: Targets are the fully rendered Kubernetes manifests.
                           items:
                             type: object
                             x-kubernetes-preserve-unknown-fields: true
                           minItems: 1
                           type: array
-                        template:
-                          description: |-
-                            Template is an optional Go template which may render one or more YAML or
-                            JSON Kubernetes resources separated by YAML document markers. Request
-                            parameters are available under .params and loaded resources under
-                            .context.resources.
-                          minLength: 1
-                          type: string
+                      required:
+                      - targets
                       type: object
-                      x-kubernetes-validations:
-                      - message: at least one target or a template is required
-                        rule: (has(self.targets) && size(self.targets) > 0) || has(self.template)
                     type: array
                   startTime:
                     format: date-time
@@ -207,7 +225,7 @@ spec:
               conditions:
                 description: |-
                   Conditions applied to the request.
-                  Known conditions are "Requested", "Pending", "Denied", "Approved", "Active" and "Expired".
+                  Known conditions are "Ready", "Requested", "Pending", "Denied", "Approved", "Active" and "Expired".
                   The latest condition is reflected in the phase.
                 items:
                   description: Condition contains details for one aspect of the current
@@ -382,184 +400,54 @@ spec:
                     - Approved
                     type: string
                 type: object
+              serviceAccount:
+                description: |-
+                  ServiceAccount is the resolved identity used for template context loading
+                  and managed-resource actions. Capsule records its controller ServiceAccount
+                  when no impersonation is configured.
+                properties:
+                  name:
+                    description: Name of the referent.
+                    maxLength: 63
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                    type: string
+                  namespace:
+                    description: Namespace of the referent.
+                    maxLength: 253
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                    type: string
+                required:
+                - name
+                - namespace
+                type: object
               size:
                 description: Number of managed resources.
                 type: integer
               template:
-                description: Template properties copied from the assigned template
+                description: |-
+                  Template identifies the exact template version used to render the approved
+                  resource snapshot.
                 properties:
-                  context:
-                    description: Context loads additional Kubernetes resources for
-                      use by all resource targets and templates.
-                    properties:
-                      resources:
-                        items:
-                          properties:
-                            apiVersion:
-                              description: |-
-                                API version, API group, or API group/version selector of the referent.
-
-                                Empty APIVersion means the core Kubernetes API version "v1".
-                                Use "*" to explicitly match all API groups and versions.
-
-                                Examples:
-                                - "" means core "v1".
-                                - "v1" means core "v1".
-                                - "apps" means any version in the "apps" API group.
-                                - "apps/v1" means the "apps/v1" API group/version.
-                                - "apps/*" means any version in the "apps" API group.
-                              type: string
-                            index:
-                              description: Index to mount the resource in the template
-                                context
-                              type: string
-                            kind:
-                              description: |-
-                                Kind of the referent.
-
-                                Use "*" to match all kinds.
-                              minLength: 1
-                              type: string
-                            name:
-                              description: |-
-                                Name of the values referent. This is useful
-                                when you traying to get a specific resource
-                              maxLength: 253
-                              minLength: 1
-                              type: string
-                            namespace:
-                              description: Namespace of the values referent.
-                              type: string
-                            optional:
-                              default: true
-                              description: Only relevant if name is set. If an item
-                                is not optional, there will be an error thrown when
-                                it does not exist
-                              type: boolean
-                            selector:
-                              description: Selector which allows to get any amount
-                                of these resources based on labels
-                              properties:
-                                matchExpressions:
-                                  description: matchExpressions is a list of label
-                                    selector requirements. The requirements are ANDed.
-                                  items:
-                                    description: |-
-                                      A label selector requirement is a selector that contains values, a key, and an operator that
-                                      relates the key and values.
-                                    properties:
-                                      key:
-                                        description: key is the label key that the
-                                          selector applies to.
-                                        type: string
-                                      operator:
-                                        description: |-
-                                          operator represents a key's relationship to a set of values.
-                                          Valid operators are In, NotIn, Exists and DoesNotExist.
-                                        type: string
-                                      values:
-                                        description: |-
-                                          values is an array of string values. If the operator is In or NotIn,
-                                          the values array must be non-empty. If the operator is Exists or DoesNotExist,
-                                          the values array must be empty. This array is replaced during a strategic
-                                          merge patch.
-                                        items:
-                                          type: string
-                                        type: array
-                                        x-kubernetes-list-type: atomic
-                                    required:
-                                    - key
-                                    - operator
-                                    type: object
-                                  type: array
-                                  x-kubernetes-list-type: atomic
-                                matchLabels:
-                                  additionalProperties:
-                                    type: string
-                                  description: |-
-                                    matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
-                                    map is equivalent to an element of matchExpressions, whose key field is "key", the
-                                    operator is "In", and the values array contains only "value". The requirements are ANDed.
-                                  type: object
-                              type: object
-                              x-kubernetes-map-type: atomic
-                          required:
-                          - kind
-                          type: object
-                        type: array
-                    type: object
-                  defaultDuration:
-                    description: The default duration of the BreakRequest referencing
-                      this template should be valid for.
+                  kind:
+                    description: Kind of template being referenced.
+                    enum:
+                    - BreakRequestTemplate
+                    - GlobalBreakRequestTemplate
                     type: string
-                  keepFor:
-                    description: |-
-                      The duration of this BreakRequest will be kept in the system after it has been expired (eg. auditing purposes)
-                      If not set, the BreakRequest will be deleted after expiring.
-                    pattern: ^([0-9]+(\.[0-9]+)?(s|m|h|d|w))+$
+                  name:
+                    description: Name of the template being referenced.
+                    maxLength: 253
+                    minLength: 1
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                     type: string
-                  maxDuration:
-                    description: The max allowed duration of the BreakRequest referencing
-                      this template should be valid for.
+                  resourceVersion:
+                    description: ResourceVersion of the template used to render the
+                      request resources.
                     type: string
-                  paramSchema:
-                    description: ParamSchema template parameter schema
-                    type: object
-                    x-kubernetes-preserve-unknown-fields: true
-                  resources:
-                    description: Resources rendered by this request, provided by the
-                      template.
-                    items:
-                      properties:
-                        policy:
-                          default: {}
-                          description: Policy controls how every target in this resource
-                            group is created and managed.
-                          properties:
-                            creation:
-                              default: Owner
-                              description: |-
-                                Creation controls how an existing target is handled. Owner requires the
-                                resource to have been created by the applying controller and otherwise
-                                returns an error. Merge adopts an existing resource when possible and
-                                creates the resource when it does not exist.
-                              enum:
-                              - Owner
-                              - Merge
-                              type: string
-                            force:
-                              default: false
-                              description: Force allows server-side apply to acquire
-                                conflicting field ownership.
-                              type: boolean
-                            protect:
-                              default: true
-                              description: |-
-                                Protect prevents users from changing or deleting the target through
-                                admission while it is managed. Protection is enabled by default.
-                              type: boolean
-                          type: object
-                        targets:
-                          description: Targets are Kubernetes resource objects to
-                            render and manage with Policy.
-                          items:
-                            type: object
-                            x-kubernetes-preserve-unknown-fields: true
-                          minItems: 1
-                          type: array
-                        template:
-                          description: |-
-                            Template is an optional Go template which may render one or more YAML or
-                            JSON Kubernetes resources separated by YAML document markers. Request
-                            parameters are available under .params and loaded resources under
-                            .context.resources.
-                          minLength: 1
-                          type: string
-                      type: object
-                      x-kubernetes-validations:
-                      - message: at least one target or a template is required
-                        rule: (has(self.targets) && size(self.targets) > 0) || has(self.template)
-                    type: array
+                required:
+                - kind
+                - name
+                - resourceVersion
                 type: object
             required:
             - size

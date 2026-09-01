@@ -90,6 +90,35 @@ func TestCompileBooleanWithVariables(t *testing.T) {
 	}
 }
 
+func TestCompileStringWithVariables(t *testing.T) {
+	t.Parallel()
+
+	compiler, err := NewCompiler()
+	if err != nil {
+		t.Fatalf("NewCompiler() error = %v", err)
+	}
+
+	compiled, err := compiler.CompileStringWithVariables(
+		`"invalid subject " + self.subjectName`,
+		environment.NewExpressions,
+		"self",
+	)
+	if err != nil {
+		t.Fatalf("CompileStringWithVariables() error = %v", err)
+	}
+
+	got, err := compiled.EvaluateStringWithVariables(context.Background(), map[string]any{
+		"self": map[string]any{"subjectName": "runner"},
+	})
+	if err != nil {
+		t.Fatalf("EvaluateStringWithVariables() error = %v", err)
+	}
+
+	if got != "invalid subject runner" {
+		t.Fatalf("EvaluateStringWithVariables() = %q, want %q", got, "invalid subject runner")
+	}
+}
+
 func TestCompiledExpressionEvaluateSingleQuantity(t *testing.T) {
 	t.Parallel()
 

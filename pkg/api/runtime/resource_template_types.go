@@ -19,6 +19,20 @@ const (
 	ResourceCreationPolicyMerge ResourceCreationPolicy = "Merge"
 )
 
+// ResourceDeletionPolicy controls what happens to a rendered target when its
+// parent stops managing it.
+type ResourceDeletionPolicy string
+
+const (
+	// ResourceDeletionPolicyRemove removes resources created for the parent and
+	// relinquishes adopted resources. This is also the runtime default.
+	ResourceDeletionPolicyRemove ResourceDeletionPolicy = "Remove"
+
+	// ResourceDeletionPolicyOrphan keeps the resource and removes Capsule's
+	// lifecycle metadata when the parent stops managing it.
+	ResourceDeletionPolicyOrphan ResourceDeletionPolicy = "Orphan"
+)
+
 // +kubebuilder:object:generate=true
 type ResourceTemplatePolicy struct {
 	// Creation controls how an existing target is handled. Owner requires the
@@ -37,6 +51,14 @@ type ResourceTemplatePolicy struct {
 	// Force allows server-side apply to acquire conflicting field ownership.
 	// +kubebuilder:default=false
 	Force bool `json:"force,omitempty"`
+
+	// Deletion controls what happens when the parent stops managing the target.
+	// Remove deletes resources created for the parent and relinquishes adopted
+	// resources. Orphan keeps the resource and removes Capsule's lifecycle
+	// metadata. Removal is the default.
+	// +kubebuilder:default=Remove
+	// +kubebuilder:validation:Enum=Remove;Orphan
+	Deletion ResourceDeletionPolicy `json:"deletion,omitempty"`
 }
 
 // AllowsAdoption reports whether an existing resource may be adopted.
@@ -49,6 +71,12 @@ func (p ResourceTemplatePolicy) AllowsAdoption() bool {
 // behave consistently with persisted custom resources.
 func (p ResourceTemplatePolicy) IsProtected() bool {
 	return p.Protect == nil || *p.Protect
+}
+
+// ShouldOrphan reports whether the target should be retained when its parent
+// stops managing it. A missing value uses Remove semantics.
+func (p ResourceTemplatePolicy) ShouldOrphan() bool {
+	return p.Deletion == ResourceDeletionPolicyOrphan
 }
 
 // +kubebuilder:object:generate=true
@@ -70,4 +98,17 @@ type ResourceTemplate struct {
 	// +optional
 	// +kubebuilder:validation:MinLength=1
 	Template string `json:"template,omitempty"`
+}
+
+// RenderedResource is an execution-ready group of Kubernetes manifests
+// produced from a ResourceTemplate. It intentionally cannot contain a source
+// template so status consumers and reconcilers only observe concrete targets.
+// +kubebuilder:object:generate=true
+type RenderedResource struct {
+	// Policy controls how every rendered target is created and managed.
+	Policy ResourceTemplatePolicy `json:"policy,omitempty"`
+
+	// Targets are the fully rendered Kubernetes manifests.
+	// +kubebuilder:validation:MinItems=1
+	Targets []k8sruntime.RawExtension `json:"targets"`
 }

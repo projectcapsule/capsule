@@ -8,19 +8,33 @@
 #   subjectKind: User
 #   subjectName: alice@example.com
 apiVersion: capsule.clastix.io/v1beta2
-kind: BreakRequestTemplate
+kind: GlobalBreakRequestTemplate
 metadata:
   name: crd-resource-crud
+  labels:
+    company.com/consumer: "tenants"
+  annotations:
+    info.projectcapsule.dev/tags: "rbac,crd"
+
+
 spec:
   # Optional. Selectors are ORed; omit this field to allow BreakRequests from
   # every namespace. Matching namespace names are published in status.namespaces.
   # namespaceSelectors:
   #   - matchLabels:
   #       projectcapsule.dev/break-the-glass: enabled
-  autoApprove: true
   defaultDuration: 1h
   maxDuration: 8h
   keepFor: 7d
+
+  approvals:
+    #auto: true
+    approvers:
+      - kind: User
+        name: "kubernetes-admin"
+    #conditions: # CEL
+    #  - "requestor.name == 'Timmy' || requestor.name == 'Alice'"
+
   paramSchema:
     type: object
     additionalProperties: false
@@ -40,6 +54,14 @@ spec:
         description: Name of the CustomResourceDefinition, for example widgets.platform.example.io.
         minLength: 1
         maxLength: 253
+        x-capsule-form:
+          widget: kubernetes-resource
+          source:
+            apiVersion: apiextensions.k8s.io/v1
+            kind: CustomResourceDefinition
+          option:
+            labelTemplate: '{{ .metadata.name }}'
+            valueTemplate: '{{ .metadata.name }}'
       subjectKind:
         type: string
         description: Kind of RBAC subject receiving temporary access.

@@ -23,20 +23,6 @@ import (
 	"github.com/projectcapsule/capsule/pkg/template"
 )
 
-// InitializeFromTemplate Copies all relevant values from the Template.
-func (br *BreakRequest) InitializeFromTemplate(brt *BreakRequestTemplate) {
-	spec := brt.Spec.DeepCopy()
-
-	br.Status.Template = &TemplateProperties{
-		Resources:       spec.Resources,
-		ParamSchema:     spec.ParamSchema,
-		Context:         spec.Context,
-		DefaultDuration: spec.DefaultDuration,
-		MaxDuration:     spec.MaxDuration,
-		KeepFor:         spec.KeepFor,
-	}
-}
-
 // SetRequested sets the BreakRequest phase to Requested (pending review).
 func (br *BreakRequest) SetRequested() (err error) {
 	if err := br.transitionRequestPhase(
@@ -90,9 +76,6 @@ func (br *BreakRequest) ApproveRequest(
 	); err != nil {
 		return err
 	}
-
-	// items are set by the controller, remove them from the status
-	properties.Resources = nil
 
 	br.Status.Approved = properties
 
@@ -148,11 +131,6 @@ func (br *BreakRequest) ActiveRequest(entity *breaktheglass.AccessEntity) (err e
 		br.Status.Active = &ActivePeriod{}
 	}
 
-	tpl := br.Status.Template
-	if tpl == nil {
-		return fmt.Errorf("template not set")
-	}
-
 	var duration *metav1.Duration
 
 	switch {
@@ -161,14 +139,6 @@ func (br *BreakRequest) ActiveRequest(entity *breaktheglass.AccessEntity) (err e
 		duration = br.Status.Approved.Duration
 	case br.Spec.Duration != nil && br.Spec.Duration.Duration != 0:
 		duration = br.Spec.Duration
-	default:
-		duration = tpl.DefaultDuration
-	}
-
-	if tpl.MaxDuration != nil && tpl.MaxDuration.Duration > 0 && duration != nil &&
-		duration.Duration > tpl.MaxDuration.Duration {
-		return fmt.Errorf("requested duration %s exceeds template maxDuration %s",
-			duration.Duration, tpl.MaxDuration.Duration)
 	}
 
 	br.Status.Active.ActiveFrom = &now
@@ -194,8 +164,9 @@ func (br *BreakRequest) ActiveRequest(entity *breaktheglass.AccessEntity) (err e
 	return nil
 }
 
-// ExpireRequest When a request is active, it can be expired. This indicates that the granted access is revoked, however,
-// this Request itself may be present longer, for auditing purposes.
+// ExpireRequest terminates a request from any lifecycle phase. For active
+// requests this revokes granted access; the request itself may remain longer
+// for auditing purposes.
 func (br *BreakRequest) ExpireRequest(entity *breaktheglass.AccessEntity) (err error) {
 	now := metav1.Now()
 
@@ -230,42 +201,93 @@ func (br *BreakRequest) DeleteRequest() {
 	controllerutil.RemoveFinalizer(br, meta.ControllerFinalizer)
 }
 
-// GenerateApprovedProperties Get the Properties which are relevant for Review and approval.
-func (br *BreakRequest) GenerateApprovedProperties(contexts ...template.ReferenceContext) (*ApprovedProperties, error) {
-	tpl := br.Status.Template
-	if tpl == nil {
-		return nil, errors.New("template not set")
-	}
-
-	var resources []apiruntime.ResourceTemplate
-
-	// Loading external context requires a Kubernetes client. Callers such as
-	// the CLI can still approve a request without rendering a server-side
-	// context preview; the controller always renders it before activation.
-	if tpl.Context != nil && len(contexts) == 0 {
-		if _, err := br.templateParameters(tpl.ParamSchema); err != nil {
-			return nil, err
-		}
-	} else {
-		var err error
-
-		resources, err = br.RenderResources(tpl.ParamSchema, tpl.Resources, contexts...)
-		if err != nil {
-			return nil, err
-		}
-	}
-
+// GenerateApprovedProperties returns the effective lifecycle properties for a
+// review. Passing the referenced template resolves its lifecycle defaults for
+// display and approval. Already rendered resources are retained in the returned
+// approval snapshot.
+func (br *BreakRequest) GenerateApprovedProperties(
+	templates ...BreakRequestTemplateSource,
+) (*ApprovedProperties, error) {
 	startTime := metav1.Now()
 	if br.Spec.StartTime != nil && !br.Spec.StartTime.IsZero() {
 		startTime = *br.Spec.StartTime
 	}
 
-	return &ApprovedProperties{
+	properties := &ApprovedProperties{
 		Duration:  br.Spec.Duration,
 		StartTime: &startTime,
-		Resources: resources,
-		KeepFor:   tpl.KeepFor,
-	}, nil
+	}
+	if br.Status.Approved != nil {
+		properties.Resources = make([]apiruntime.RenderedResource, len(br.Status.Approved.Resources))
+		for i := range br.Status.Approved.Resources {
+			br.Status.Approved.Resources[i].DeepCopyInto(&properties.Resources[i])
+		}
+	}
+
+	if len(templates) > 0 && templates[0] != nil {
+		if err := br.resolveApprovedProperties(templates[0], properties); err != nil {
+			return nil, err
+		}
+	}
+
+	return properties, nil
+}
+
+// ResolveApprovedProperties fills template defaults omitted by a reviewer and
+// validates the effective duration before activation.
+func (br *BreakRequest) ResolveApprovedProperties(brt BreakRequestTemplateSource) error {
+	if br.Status.Approved == nil {
+		return errors.New("approved status is nil")
+	}
+
+	return br.resolveApprovedProperties(brt, br.Status.Approved)
+}
+
+func (br *BreakRequest) resolveApprovedProperties(
+	brt BreakRequestTemplateSource,
+	properties *ApprovedProperties,
+) error {
+	if brt == nil {
+		return errors.New("template is nil")
+	}
+
+	templateData := brt.TemplateData()
+
+	if properties.Duration == nil {
+		switch {
+		case br.Spec.Duration != nil:
+			duration := *br.Spec.Duration
+			properties.Duration = &duration
+		case templateData.DefaultDuration != nil:
+			duration := *templateData.DefaultDuration
+			properties.Duration = &duration
+		}
+	}
+
+	if templateData.MaxDuration != nil && templateData.MaxDuration.Duration > 0 && properties.Duration != nil &&
+		properties.Duration.Duration > templateData.MaxDuration.Duration {
+		return fmt.Errorf(
+			"requested duration %s exceeds template maxDuration %s",
+			properties.Duration.Duration,
+			templateData.MaxDuration.Duration,
+		)
+	}
+
+	if properties.KeepFor == nil && templateData.KeepFor != nil {
+		keepFor := *templateData.KeepFor
+		properties.KeepFor = &keepFor
+	}
+
+	if properties.StartTime == nil {
+		startTime := metav1.Now()
+		if br.Spec.StartTime != nil && !br.Spec.StartTime.IsZero() {
+			startTime = *br.Spec.StartTime
+		}
+
+		properties.StartTime = &startTime
+	}
+
+	return nil
 }
 
 // RenderResources renders direct targets with the flat parameter/context
@@ -275,7 +297,7 @@ func (br *BreakRequest) RenderResources(
 	schema *k8sruntime.RawExtension,
 	resources []apiruntime.ResourceTemplate,
 	contexts ...template.ReferenceContext,
-) ([]apiruntime.ResourceTemplate, error) {
+) ([]apiruntime.RenderedResource, error) {
 	params, err := br.templateParameters(schema)
 	if err != nil {
 		return nil, err
@@ -308,12 +330,12 @@ func (br *BreakRequest) RenderResources(
 		},
 	}
 
-	rendered := make([]apiruntime.ResourceTemplate, 0, len(resources))
+	rendered := make([]apiruntime.RenderedResource, 0, len(resources))
 
 	var renderErr error
 
 	for resourceIndex, resource := range resources {
-		renderedResource := apiruntime.ResourceTemplate{Policy: resource.Policy}
+		renderedResource := apiruntime.RenderedResource{Policy: resource.Policy}
 
 		for targetIndex, target := range resource.Targets {
 			targetBytes, targetErr := rawExtensionBytes(target)
@@ -389,20 +411,17 @@ func rawExtensionBytes(target k8sruntime.RawExtension) ([]byte, error) {
 	return nil, errors.New("target is empty")
 }
 
-// LoadTemplateContext loads the external resources declared by the copied
-// BreakRequestTemplate context. Request parameters are available while
-// resolving resource names, namespaces, and selectors.
+// LoadTemplateContext loads external resources declared by the referenced
+// GlobalBreakRequestTemplate. Request parameters are available while resolving
+// resource names, namespaces, and selectors.
 func (br *BreakRequest) LoadTemplateContext(
 	ctx context.Context,
 	c client.Client,
 	mapper k8smeta.RESTMapper,
+	schema *k8sruntime.RawExtension,
+	templateContext *template.TemplateContext,
 ) (template.ReferenceContext, error) {
-	tpl := br.Status.Template
-	if tpl == nil {
-		return nil, errors.New("template not set")
-	}
-
-	if tpl.Context == nil {
+	if templateContext == nil {
 		return template.ReferenceContext{}, nil
 	}
 
@@ -414,18 +433,18 @@ func (br *BreakRequest) LoadTemplateContext(
 		return nil, errors.New("REST mapper is required to load template context")
 	}
 
-	params, err := br.templateParameters(tpl.ParamSchema)
+	params, err := br.templateParameters(schema)
 	if err != nil {
 		return nil, err
 	}
 
 	fastContext := parameterFastContext(params)
 
-	if err := tpl.Context.ValidateVariables(fastContext); err != nil {
+	if err := templateContext.ValidateVariables(fastContext); err != nil {
 		return nil, fmt.Errorf("validating template context: %w", err)
 	}
 
-	loaded, err := tpl.Context.GatherContext(
+	loaded, err := templateContext.GatherContext(
 		ctx,
 		c,
 		mapper,
@@ -475,15 +494,25 @@ func (br *BreakRequest) templateParameters(schema *k8sruntime.RawExtension) (tem
 func (br *BreakRequest) effectiveKeepFor() breaktheglass.ExtendedDuration {
 	var keepFor breaktheglass.ExtendedDuration
 
-	if br.Status.Template != nil && br.Status.Template.KeepFor != nil {
-		keepFor = *br.Status.Template.KeepFor
-	}
-
 	if br.Status.Approved != nil && br.Status.Approved.KeepFor != nil {
 		keepFor = *br.Status.Approved.KeepFor
 	}
 
 	return keepFor
+}
+
+// SetReady records whether the rendered resources and their reconciliation are
+// ready. Phase conditions are kept alongside this condition for lifecycle
+// history.
+func (br *BreakRequest) SetReady(status metav1.ConditionStatus, reason, message string) {
+	k8smeta.SetStatusCondition(&br.Status.Conditions, metav1.Condition{
+		Type:               meta.ReadyCondition,
+		Status:             status,
+		ObservedGeneration: br.Generation,
+		Reason:             reason,
+		Message:            message,
+		LastTransitionTime: metav1.Now(),
+	})
 }
 
 func parameterFastContext(params template.ReferenceContext) map[string]string {
@@ -560,10 +589,7 @@ func (br *BreakRequest) transitionRequestPhase(
 			return fmt.Errorf("can only activate an approved request")
 		}
 
-	case RequestPhaseExpired:
-		if br.Status.Phase != RequestPhaseActive {
-			return fmt.Errorf("can only expire an active request")
-		}
+	case RequestPhaseExpired: // terminal transition from any phase
 	case RequestPhasePending, RequestPhaseRequested: // nothing to do here
 	}
 

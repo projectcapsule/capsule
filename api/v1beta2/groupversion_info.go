@@ -29,6 +29,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&BreakRequestList{},
 		&BreakRequestTemplate{},
 		&BreakRequestTemplateList{},
+		&GlobalBreakRequestTemplate{},
+		&GlobalBreakRequestTemplateList{},
 		&CapsuleConfiguration{},
 		&CapsuleConfigurationList{},
 		&CustomQuota{},

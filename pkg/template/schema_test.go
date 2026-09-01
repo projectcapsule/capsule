@@ -90,6 +90,83 @@ func TestValidate(t *testing.T) {
 	}
 }
 
+func TestValidateConditionalServiceAccountPath(t *testing.T) {
+	t.Parallel()
+
+	schema := y2j(`
+type: object
+additionalProperties: false
+required:
+  - subjectKind
+  - subjectName
+properties:
+  subjectKind:
+    type: string
+    enum:
+      - User
+      - Group
+      - ServiceAccount
+  subjectName:
+    type: string
+    minLength: 1
+allOf:
+  - if:
+      properties:
+        subjectKind:
+          const: ServiceAccount
+      required:
+        - subjectKind
+    then:
+      properties:
+        subjectName:
+          pattern: '^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?/[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$'
+`)
+
+	tests := []struct {
+		name      string
+		params    string
+		wantError bool
+	}{
+		{
+			name: "service account namespace and name",
+			params: `
+subjectKind: ServiceAccount
+subjectName: operations/break-glass-runner
+`,
+		},
+		{
+			name: "service account without namespace",
+			params: `
+subjectKind: ServiceAccount
+subjectName: break-glass-runner
+`,
+			wantError: true,
+		},
+		{
+			name: "user remains an arbitrary non-empty name",
+			params: `
+subjectKind: User
+subjectName: alice@example.com
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := Validate(schema, y2j(tt.params))
+			if tt.wantError {
+				assert.Error(t, err)
+
+				return
+			}
+
+			assert.NoError(t, err)
+		})
+	}
+}
+
 func y2j(in string) []byte {
 	m := make(map[string]any)
 	err := yaml.Unmarshal([]byte(in), &m)

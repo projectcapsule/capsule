@@ -43,33 +43,30 @@ func TestBreakRequestLoadsParameterTemplatedContextForAllItems(t *testing.T) {
 			"source":{"type":"object","required":["name"],"properties":{"name":{"type":"string"}}}
 		}
 	}`)}
+	templateContext := &tpl.TemplateContext{Resources: []*tpl.TemplateResourceReference{{
+		ResourceReference: tpl.ResourceReference{
+			VersionKind: apiruntime.VersionKind{APIVersion: "v1", Kind: "ConfigMap"},
+			Name:        "{{ .source.name }}",
+		},
+		Index: "settings",
+	}}}
+	resources := []apiruntime.ResourceTemplate{
+		{Targets: []runtime.RawExtension{{Raw: []byte(`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"{{ .name }}-one"},"data":{"environment":"{{ (index .settings 0).data.environment }}"}}`)}}},
+		{Targets: []runtime.RawExtension{{Raw: []byte(`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"{{ .name }}-two"},"data":{"environment":"{{ (index .settings 0).data.environment }}"}}`)}}},
+	}
 	br := &BreakRequest{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "team-a"},
 		Spec: BreakRequestSpec{Params: &runtime.RawExtension{Raw: []byte(`{
 			"name":"temporary-access",
 			"source":{"name":"platform-settings"}
 		}`)}},
-		Status: BreakRequestStatus{Template: &TemplateProperties{
-			ParamSchema: &paramSchema,
-			Context: &tpl.TemplateContext{Resources: []*tpl.TemplateResourceReference{{
-				ResourceReference: tpl.ResourceReference{
-					VersionKind: apiruntime.VersionKind{APIVersion: "v1", Kind: "ConfigMap"},
-					Name:        "{{ .source.name }}",
-				},
-				Index: "settings",
-			}}},
-			Resources: []apiruntime.ResourceTemplate{
-				{Targets: []runtime.RawExtension{{Raw: []byte(`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"{{ .name }}-one"},"data":{"environment":"{{ (index .settings 0).data.environment }}"}}`)}}},
-				{Targets: []runtime.RawExtension{{Raw: []byte(`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"{{ .name }}-two"},"data":{"environment":"{{ (index .settings 0).data.environment }}"}}`)}}},
-			},
-		}},
 	}
 
-	loaded, err := br.LoadTemplateContext(context.Background(), cl, mapper)
+	loaded, err := br.LoadTemplateContext(context.Background(), cl, mapper, &paramSchema, templateContext)
 	if err != nil {
 		t.Fatalf("LoadTemplateContext() error = %v", err)
 	}
-	items, err := br.RenderResources(&paramSchema, br.Status.Template.Resources, loaded)
+	items, err := br.RenderResources(&paramSchema, resources, loaded)
 	if err != nil {
 		t.Fatalf("RenderResources() error = %v", err)
 	}
@@ -120,10 +117,6 @@ metadata:
 	if !resources[0].Policy.Force {
 		t.Fatal("RenderResources() did not preserve resource policy")
 	}
-	if resources[0].Template != "" {
-		t.Fatal("RenderResources() retained the source template in effective resources")
-	}
-
 	direct := string(resources[0].Targets[0].Raw)
 	if !strings.Contains(direct, "temporary-access-direct") {
 		t.Fatalf("direct target did not use flat params: %s", direct)

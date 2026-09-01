@@ -29,6 +29,7 @@ type ResultType string
 const (
 	ResultTypeBoolean  ResultType = "boolean"
 	ResultTypeQuantity ResultType = "quantity"
+	ResultTypeString   ResultType = "string"
 )
 
 type Compiler struct {
@@ -66,6 +67,17 @@ func (c *Compiler) CompileBoolean(expression string, mode environment.Type) (*Co
 
 func (c *Compiler) CompileQuantity(expression string, mode environment.Type) (*CompiledExpression, error) {
 	return c.compile(expression, mode, ResultTypeQuantity, nil)
+}
+
+// CompileStringWithVariables compiles a string expression with additional
+// dynamically typed variables. This is primarily useful for Kubernetes-style
+// CEL message expressions.
+func (c *Compiler) CompileStringWithVariables(
+	expression string,
+	mode environment.Type,
+	variables ...string,
+) (*CompiledExpression, error) {
+	return c.compile(expression, mode, ResultTypeString, variables)
 }
 
 // CompileBooleanWithVariables compiles a boolean expression with additional
@@ -175,6 +187,11 @@ func validateOutputType(output *celgo.Type, resultType ResultType) error {
 			)
 		}
 
+	case ResultTypeString:
+		if !output.IsExactType(celgo.StringType) {
+			return fmt.Errorf("expression must evaluate to string, got %s", output)
+		}
+
 	default:
 		return fmt.Errorf("unsupported CEL result type %q", resultType)
 	}
@@ -224,6 +241,33 @@ func (c *CompiledExpression) EvaluateBooleanWithVariables(
 	}
 
 	return bool(result), nil
+}
+
+// EvaluateStringWithVariables evaluates a compiled string expression using
+// the supplied CEL activation.
+func (c *CompiledExpression) EvaluateStringWithVariables(
+	ctx context.Context,
+	variables map[string]any,
+) (string, error) {
+	if c == nil || c.program == nil {
+		return "", fmt.Errorf("compiled CEL expression is nil")
+	}
+
+	if c.resultType != ResultTypeString {
+		return "", fmt.Errorf("compiled CEL expression %q does not return string", c.expression)
+	}
+
+	value, _, err := c.program.ContextEval(ctx, variables)
+	if err != nil {
+		return "", fmt.Errorf("evaluate CEL expression %q: %w", c.expression, err)
+	}
+
+	result, ok := value.(types.String)
+	if !ok {
+		return "", fmt.Errorf("CEL expression %q returned %T, expected string", c.expression, value)
+	}
+
+	return string(result), nil
 }
 
 func (c *CompiledExpression) EvaluateQuantity(

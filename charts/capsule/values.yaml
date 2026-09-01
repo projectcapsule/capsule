@@ -1639,8 +1639,42 @@ webhooks:
             - breakrequests/status
           scope: Namespaced
 
-    # -- Validate cluster-scoped BreakRequestTemplates
+    # -- Validate namespaced BreakRequestTemplates
     breakrequesttemplates:
+      # -- Enable the Hook
+      enabled: true
+      # -- Capsule Hook Options
+      opts: {}
+      # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
+      failurePolicy: Fail
+      # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matchpolicy)
+      matchPolicy: Equivalent
+      # @schema type: object
+      # @schema additionalProperties: true
+      # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#objectselector)
+      objectSelector: {}
+      # @schema type: object
+      # @schema additionalProperties: true
+      # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#namespaceselector)
+      namespaceSelector: {}
+      # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matchconditions)
+      matchConditions: []
+      # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#rules)
+      rules:
+        - apiGroups:
+            - capsule.clastix.io
+          apiVersions:
+            - v1beta2
+          operations:
+            - CREATE
+            - UPDATE
+            - DELETE
+          resources:
+            - breakrequesttemplates
+          scope: Namespaced
+
+    # -- Validate cluster-scoped GlobalBreakRequestTemplates
+    globalbreakrequesttemplates:
       # -- Enable the Hook
       enabled: true
       # -- Capsule Hook Options
@@ -1670,7 +1704,7 @@ webhooks:
             - UPDATE
             - DELETE
           resources:
-            - breakrequesttemplates
+            - globalbreakrequesttemplates
           scope: Cluster
 
     # -- Protect resources managed by BreakRequests from changes outside the Capsule controller

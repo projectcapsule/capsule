@@ -16,7 +16,6 @@ import (
 	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
-	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -24,7 +23,6 @@ import (
 	"sigs.k8s.io/yaml"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api/breaktheglass"
 	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 )
 
@@ -56,8 +54,6 @@ func printBreakRequestsApprovalTable(
 		effectiveDurationStr = app.Duration.Duration.String()
 	case br.Spec.Duration != nil && br.Spec.Duration.Duration != 0:
 		effectiveDurationStr = br.Spec.Duration.Duration.String()
-	case br.Status.Template != nil && br.Status.Template.DefaultDuration != nil && br.Status.Template.DefaultDuration.Duration != 0:
-		effectiveDurationStr = br.Status.Template.DefaultDuration.Duration.String()
 	}
 
 	t.AppendHeader(table.Row{"Field", "Value"})
@@ -68,27 +64,56 @@ func printBreakRequestsApprovalTable(
 		{"ApprovedDuration", colorizeValue(approvedDurationStr, color)},
 		{"KeepFor", colorizeValue(keepForStr, color)},
 	})
+	t.Render()
 
-	// Print every effective resource group and its policy as YAML.
-	for i, item := range app.Resources {
-		content := prettyResourceTemplate(item)
-		if color {
-			content = colorizeYAML(content)
+	resources := table.NewWriter()
+	resources.SetOutputMirror(os.Stdout)
+	resources.SetStyle(table.StyleRounded)
+	resources.AppendHeader(table.Row{"Policy", "Resource"})
+
+	rows := 0
+
+	for _, item := range app.Resources {
+		itemRows := renderedResourceRows(item, color)
+		if len(itemRows) == 0 {
+			continue
 		}
 
-		t.AppendSeparator()
-		// Multi-line cells are supported; keep them as one cell.
-		t.AppendRow(table.Row{
-			fmt.Sprintf("Resource %d", i),
-			content,
-		})
+		if rows > 0 {
+			resources.AppendSeparator()
+		}
+
+		resources.AppendRows(itemRows)
+		rows += len(itemRows)
 	}
 
-	t.Render()
+	if rows > 0 {
+		resources.Render()
+	}
 }
 
-func prettyResourceTemplate(resourceTemplate apiruntime.ResourceTemplate) string {
-	data, err := json.Marshal(resourceTemplate)
+func renderedResourceRows(resource apiruntime.RenderedResource, color bool) []table.Row {
+	policy := prettyYAML(resource.Policy)
+	if color {
+		policy = colorizeYAML(policy)
+	}
+
+	rows := make([]table.Row, 0, len(resource.Targets))
+
+	for _, target := range resource.Targets {
+		manifest := prettyYAML(target)
+		if color {
+			manifest = colorizeYAML(manifest)
+		}
+
+		rows = append(rows, table.Row{policy, manifest})
+	}
+
+	return rows
+}
+
+func prettyYAML(value any) string {
+	data, err := json.Marshal(value)
 	if err != nil {
 		return "-"
 	}
@@ -183,38 +208,13 @@ func (o impersonationOptions) applyTo(cfg *rest.Config) error {
 	return nil
 }
 
-func accessEntityForConfig(cfg *rest.Config) *breaktheglass.AccessEntity {
-	username := cfg.Username
-	if cfg.Impersonate.UserName != "" {
-		username = cfg.Impersonate.UserName
-	}
-
-	return &breaktheglass.AccessEntity{
-		Type:   accessEntityTypeForUsername(username),
-		Name:   username,
-		Groups: append([]string(nil), cfg.Impersonate.Groups...),
-	}
-}
-
-func accessEntityTypeForUsername(username string) breaktheglass.AccessEntityType {
-	if strings.HasPrefix(username, serviceaccount.ServiceAccountUsernamePrefix) {
-		return breaktheglass.AccessEntityTypeServiceAccount
-	}
-
-	return breaktheglass.AccessEntityTypeUser
-}
-
-func runBreakRequestAction(
-	action func(br *capsulev1beta2.BreakRequest, user *breaktheglass.AccessEntity) error,
-) error {
+func runBreakRequestAction(phase capsulev1beta2.RequestPhase) error {
 	ctx := context.Background()
 
-	cfg, k8sClient, err := newK8sClient()
+	_, k8sClient, err := newK8sClient()
 	if err != nil {
 		return err
 	}
-
-	user := accessEntityForConfig(cfg)
 
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		br := &capsulev1beta2.BreakRequest{}
@@ -226,10 +226,29 @@ func runBreakRequestAction(
 			return err
 		}
 
-		if err := action(br, user); err != nil {
-			return err
-		}
+		return patchBreakRequestStatus(ctx, k8sClient, br, func() error {
+			br.Status.Phase = phase
 
-		return k8sClient.Status().Update(ctx, br)
+			return nil
+		})
 	})
+}
+
+func patchBreakRequestStatus(
+	ctx context.Context,
+	k8sClient ctrlclient.Client,
+	br *capsulev1beta2.BreakRequest,
+	action func() error,
+) error {
+	before := br.DeepCopy()
+
+	if err := action(); err != nil {
+		return err
+	}
+
+	return k8sClient.Status().Patch(
+		ctx,
+		br,
+		ctrlclient.MergeFromWithOptions(before, ctrlclient.MergeFromWithOptimisticLock{}),
+	)
 }
