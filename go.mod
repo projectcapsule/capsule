@@ -28,7 +28,7 @@ require (
 	go.yaml.in/yaml/v2 v2.4.4
 	golang.org/x/sync v0.22.0
 	gomodules.xyz/jsonpatch/v2 v2.5.0
-	google.golang.org/grpc v1.83.0
+	google.golang.org/grpc v1.83.1
 	gopkg.in/inf.v0 v0.9.1
 	k8s.io/api v0.36.3
 	k8s.io/apiextensions-apiserver v0.36.3
