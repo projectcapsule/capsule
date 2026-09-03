@@ -64,6 +64,24 @@ func TestRenderTemplateBytes(t *testing.T) {
 			want: "HARBOR/app:1",
 		},
 		{
+			name: "finds a context resource by name",
+			context: map[string]any{
+				"mgmt": []map[string]any{
+					{
+						"metadata": map[string]any{"name": "tenant-management"},
+						"data": map[string]any{
+							"team-a": "subjects:\n  - name: alice\n  - name: bob\n",
+						},
+					},
+				},
+			},
+			key: MissingKeyOption("error"),
+			tpl: `{{- $resource := .mgmt | mustGetResourceByName "tenant-management" -}}
+{{- $team := $resource.data | get "team-a" | fromYAML -}}
+{{- range $team.subjects }}{{ .name }} {{ end -}}`,
+			want: "alice bob ",
+		},
+		{
 			name: "missing key returns execute error when missingkey error is enabled",
 			context: map[string]any{
 				"namespace": map[string]any{

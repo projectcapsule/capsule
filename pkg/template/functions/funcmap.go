@@ -26,12 +26,15 @@ func ExtraFuncMap() template.FuncMap {
 // CustomFuncMap return our custom templates.
 func CustomFuncMap() template.FuncMap {
 	return template.FuncMap{
-		"toToml":            toTOML,
-		"fromToml":          fromTOML,
-		"fromYamlArray":     fromYAMLArray,
-		"fromJsonArray":     fromJSONArray,
-		"deterministicUUID": deterministicUUID,
-		"generateAgeKey":    generateAgeKey,
-		"generateAgePQKey":  generateAgePQKey,
+		"toToml":                      toTOML,
+		"fromToml":                    fromTOML,
+		"fromYamlArray":               fromYAMLArray,
+		"fromJsonArray":               fromJSONArray,
+		"deterministicUUID":           deterministicUUID,
+		"generateAgeKey":              generateAgeKey,
+		"generateAgePQKey":            generateAgePQKey,
+		"getResourceByName":           getResourceByName,
+		"mustGetResourceByName":       mustGetResourceByName,
+		"getResourceByNamespacedName": getResourceByNamespacedName,
 	}
 }

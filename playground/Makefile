@@ -196,11 +196,16 @@ apply-user:
 	@$(KUBECTL) label ns green-prod env=prod --overwrite
 	@$(KUBECTL) get ns solar-uat >/dev/null 2>&1 || $(KUBECTL) create ns solar-uat --as alice --as-group projectcapsule.dev
 	@$(KUBECTL) label ns solar-uat env=test --overwrite
+	@$(KUBECTL) label ns solar-uat team=team-a --overwrite
 	@$(KUBECTL) get ns solar-test >/dev/null 2>&1 || $(KUBECTL) create ns solar-test --as alice --as-group projectcapsule.dev
 	@$(KUBECTL) label ns solar-test env=test --overwrite
+	@$(KUBECTL) label ns solar-test team=team-a --overwrite
 	@$(KUBECTL) get ns solar-prod >/dev/null 2>&1 || $(KUBECTL) create ns solar-prod --as alice --as-group projectcapsule.dev
 	@$(KUBECTL) label ns solar-prod env=prod --overwrite
-	@kubectl kustomize user | envsubst $(SUBSTITUTION_VARIABLES) | $(KUBECTL) apply -f -
+	@$(KUBECTL) label ns solar-prod team=team-b --overwrite
+	@$(KUBECTL) kustomize user/solar | envsubst $(SUBSTITUTION_VARIABLES) | $(KUBECTL) apply --as alice --as-group projectcapsule.dev -f -
+
+
 
 
 wait-oidc: certificates ## Wait for ingress and Dex before enabling API-server OIDC.

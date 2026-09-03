@@ -349,9 +349,15 @@ func (r *NamespaceTrigger) gatherGlobalResources(
 	namespace *corev1.Namespace,
 	acc processor.Accumulator,
 ) error {
+	replicationContext, err := newReplicationContext(tntResource)
+	if err != nil {
+		return err
+	}
+
 	opts := CollectorOptions{
 		Accumulator:               acc,
 		AllowClusterScopedObjects: true,
+		ReplicationContext:        replicationContext,
 	}
 
 	for resourceIndex, resource := range tntResource.Spec.Resources {
@@ -423,6 +429,11 @@ func (r *NamespaceTrigger) gatherNamespacedResources(
 	namespace *corev1.Namespace,
 	acc processor.Accumulator,
 ) error {
+	replicationContext, err := newReplicationContext(tntResource)
+	if err != nil {
+		return err
+	}
+
 	// The Namespace has just been created, thus it may not have landed on the Tenant status
 	// yet: it is a legit replication target nonetheless, and the validator must know about it
 	// to not reject the items referring to it.
@@ -435,6 +446,7 @@ func (r *NamespaceTrigger) gatherNamespacedResources(
 		Accumulator:                  acc,
 		AllowCrossNamespaceSelection: false,
 		AllowClusterScopedObjects:    false,
+		ReplicationContext:           replicationContext,
 		ValidatorNamespaces:          tpl.NewNamespaceValidator(false, allowed),
 	}
 

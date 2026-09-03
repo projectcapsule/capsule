@@ -512,7 +512,7 @@ var _ = Describe("GlobalResourceQuota", Ordered, Label("globalresourcequota", "r
 		))
 	})
 
-	It("rejects direct hard-limit reductions and removals below allocated usage", func() {
+	It("rejects direct hard-limit reductions below allocated usage and allows removals", func() {
 		quotaKey := client.ObjectKey{Name: ephemeralQuotaName}
 		Eventually(func(g Gomega) {
 			current := &capsulev1beta2.GlobalResourceQuota{}
@@ -532,17 +532,6 @@ var _ = Describe("GlobalResourceQuota", Ordered, Label("globalresourcequota", "r
 			)))
 		})
 
-		By("rejecting removal of a resource with usage", func() {
-			current := &capsulev1beta2.GlobalResourceQuota{}
-			Expect(k8sClient.Get(ctx, quotaKey, current)).To(Succeed())
-			delete(current.Spec.Quota.Hard, corev1.ResourceRequestsEphemeralStorage)
-
-			err := k8sClient.Update(ctx, current)
-			Expect(err).To(MatchError(ContainSubstring(
-				`spec.quota.hard["requests.ephemeral-storage"] cannot be removed while 600Mi is allocated`,
-			)))
-		})
-
 		By("allowing a decrease exactly to allocated usage", func() {
 			current := &capsulev1beta2.GlobalResourceQuota{}
 			Expect(k8sClient.Get(ctx, quotaKey, current)).To(Succeed())
@@ -555,6 +544,21 @@ var _ = Describe("GlobalResourceQuota", Ordered, Label("globalresourcequota", "r
 				g.Expect(reconciled.Status.ObservedGeneration).To(Equal(reconciled.Generation))
 				hard := reconciled.Status.Total.Hard[corev1.ResourceRequestsEphemeralStorage]
 				g.Expect(hard.Cmp(resource.MustParse("600Mi"))).To(Equal(0))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		})
+
+		By("allowing removal of a resource with usage", func() {
+			current := &capsulev1beta2.GlobalResourceQuota{}
+			Expect(k8sClient.Get(ctx, quotaKey, current)).To(Succeed())
+			delete(current.Spec.Quota.Hard, corev1.ResourceRequestsEphemeralStorage)
+
+			Expect(k8sClient.Update(ctx, current)).To(Succeed())
+			Eventually(func(g Gomega) {
+				reconciled := &capsulev1beta2.GlobalResourceQuota{}
+				g.Expect(k8sClient.Get(ctx, quotaKey, reconciled)).To(Succeed())
+				g.Expect(reconciled.Status.ObservedGeneration).To(Equal(reconciled.Generation))
+				g.Expect(reconciled.Spec.Quota.Hard).NotTo(HaveKey(corev1.ResourceRequestsEphemeralStorage))
+				g.Expect(reconciled.Status.Total.Hard).NotTo(HaveKey(corev1.ResourceRequestsEphemeralStorage))
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 	})

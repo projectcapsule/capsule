@@ -1,0 +1,94 @@
+# Bootstrap resources for the temporary Gateway API access example.
+#
+# The ServiceAccount is promoted by the matching rule on the solar Tenant. The
+# promotion creates RoleBindings for gateway-api-role-distributor in every
+# solar namespace. This gives the TenantResource enough authority to distribute
+# only temporary-gateway-api-httproute-editor; it does not grant the
+# ServiceAccount any HTTPRoute permissions of its own.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tenant-management
+  namespace: solar-system
+data:
+  team-a: |
+    owners:
+      - kind: User
+        name: alice
+      - kind: User
+        name: bob
+  team-b: |
+    owners:
+      - kind: User
+        name: alice
+      - kind: User
+        name: bob
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gateway-api-role-distributor
+  namespace: solar-system
+  labels:
+    projectcapsule.dev/promote: "true"
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: TenantResource
+metadata:
+  name: tenant-distribution
+  namespace: solar-system
+spec:
+  resyncPeriod: 60s
+  serviceAccount:
+    name: gateway-api-role-distributor
+  resources:
+    - context:
+        resources:
+          - index: mgmt
+            apiVersion: v1
+            kind: ConfigMap
+            name: tenant-management
+            namespace: solar-system
+      generators:
+        - template: |
+            {{- range $team, $config := (index $.mgmt 0 "data") }}
+            {{- $team_config := fromYAML $config }}
+            ---
+            apiVersion: capsule.clastix.io/v1beta2
+            kind: TenantResource
+            metadata:
+              name: "{{ $team }}-tenant-distribution"
+              namespace: solar-system
+              ownerReferences:
+                - apiVersion: capsule.clastix.io/v1beta2
+                  kind: TenantResource
+                  name: {{ $.replications.metadata.name | quote }}
+                  uid: {{ $.replications.metadata.uid | quote }}
+                  controller: true
+                  blockOwnerDeletion: true
+            spec:
+              resyncPeriod: 60s
+              serviceAccount:
+                name: gateway-api-role-distributor
+              resources:
+                - namespaceSelector:
+                    matchLabels:
+                      team: {{ $team }}
+                  rawItems:
+                    - apiVersion: rbac.authorization.k8s.io/v1
+                      kind: RoleBinding
+                      metadata:
+                        name: "tenant:{{`{{namespace}}`}}:cr:gateway-api"
+                        namespace: "{{`{{namespace}}`}}"
+                      subjects:
+                      {{- range $team_config.owners }}
+                      - kind: {{ .kind }}
+                        name: {{ .name }}
+                        apiGroup: rbac.authorization.k8s.io
+                      {{- end }}
+                      roleRef:
+                        kind: ClusterRole
+                        name: gateway-api-role-distributor
+                        apiGroup: rbac.authorization.k8s.io
+            {{- end }}
