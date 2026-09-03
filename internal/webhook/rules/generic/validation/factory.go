@@ -45,9 +45,10 @@ func evaluateGenericRules[R any](
 }
 
 type genericRuleValidator func(
-	genericObject,
-	schema.GroupVersionKind,
-	[]*apirules.NamespaceRuleEnforceBody,
+	oldObj genericObject,
+	obj genericObject,
+	gvk schema.GroupVersionKind,
+	enforceBodies []*apirules.NamespaceRuleEnforceBody,
 ) (*ruleengine.Evaluation, error)
 
 type genericRules struct {
@@ -94,7 +95,7 @@ func (h *genericRules) OnCreate(
 
 		enforceBodies := ruleengine.EnforceBodiesFromNamespaceRules(bodies)
 
-		if err := h.validateGenericRules(ctx, req, obj, gvk, tnt, recorder, enforceBodies); err != nil {
+		if err := h.validateGenericRules(ctx, req, nil, obj, gvk, tnt, recorder, enforceBodies); err != nil {
 			return ad.Deny(err.Error())
 		}
 
@@ -105,7 +106,7 @@ func (h *genericRules) OnCreate(
 func (h *genericRules) OnUpdate(
 	_ client.Client,
 	_ client.Reader,
-	_ genericObject,
+	oldObj genericObject,
 	obj genericObject,
 	_ admission.Decoder,
 	recorder events.EventRecorder,
@@ -120,7 +121,7 @@ func (h *genericRules) OnUpdate(
 
 		enforceBodies := ruleengine.EnforceBodiesFromNamespaceRules(bodies)
 
-		if err := h.validateGenericRules(ctx, req, obj, gvk, tnt, recorder, enforceBodies); err != nil {
+		if err := h.validateGenericRules(ctx, req, oldObj, obj, gvk, tnt, recorder, enforceBodies); err != nil {
 			return ad.Deny(err.Error())
 		}
 
@@ -145,6 +146,7 @@ func (h *genericRules) OnDelete(
 func (h *genericRules) validateGenericRules(
 	ctx context.Context,
 	req admission.Request,
+	oldObj genericObject,
 	obj genericObject,
 	gvk schema.GroupVersionKind,
 	tnt *capsulev1beta2.Tenant,
@@ -162,7 +164,7 @@ func (h *genericRules) validateGenericRules(
 	}
 
 	for _, evaluate := range h.rules {
-		evaluation, err := evaluate(obj, gvk, enforceBodies)
+		evaluation, err := evaluate(oldObj, obj, gvk, enforceBodies)
 		if err != nil {
 			return err
 		}

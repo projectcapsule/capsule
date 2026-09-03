@@ -5,6 +5,7 @@ package e2e
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -29,7 +30,14 @@ import (
 )
 
 var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("tenant", "rules", "enforce", "metadata", "generic"), func() {
-	const ownerName = "e2e-rules-metadata"
+	const (
+		ownerName             = "e2e-rules-metadata"
+		secondOwnerName       = "e2e-rules-metadata-second"
+		ownerLabel            = "example.corp/label-a"
+		secondOwnerLabel      = "example.corp/label-b"
+		ownerAnnotation       = "example.corp/annotation-a"
+		secondOwnerAnnotation = "example.corp/annotation-b"
+	)
 
 	var (
 		tnt         *capsulev1beta2.Tenant
@@ -112,6 +120,65 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 		return rule
 	}
 
+	audienceRule := func(
+		audience rules.Audience,
+		rule *rules.NamespaceRuleBodyTenant,
+	) *rules.NamespaceRuleBodyTenant {
+		rule.Audience = []rules.Audience{audience}
+
+		return rule
+	}
+
+	isolatedMetadataRules := func() []*rules.NamespaceRuleBodyTenant {
+		return []*rules.NamespaceRuleBodyTenant{
+			audienceRule(
+				rules.Audience{
+					Kind: rules.AudienceKindCustom,
+					Name: string(rules.CustomAudienceCapsuleUser),
+				},
+				metadataRule(
+					rules.ActionTypeDeny,
+					"v1",
+					[]string{"ConfigMap"},
+					map[string]rules.MetadataValueRule{
+						".*": metadataValueRule(false, metadataByExpression(".*")),
+					},
+					map[string]rules.MetadataValueRule{
+						".*": metadataValueRule(false, metadataByExpression(".*")),
+					},
+				),
+			),
+			audienceRule(
+				rules.Audience{Kind: rules.AudienceKindUser, Name: ownerName},
+				metadataRule(
+					rules.ActionTypeAllow,
+					"v1",
+					[]string{"ConfigMap"},
+					map[string]rules.MetadataValueRule{
+						ownerLabel: metadataValueRule(false, metadataByExact("owner-a")),
+					},
+					map[string]rules.MetadataValueRule{
+						ownerAnnotation: metadataValueRule(false, metadataByExact("owner-a")),
+					},
+				),
+			),
+			audienceRule(
+				rules.Audience{Kind: rules.AudienceKindUser, Name: secondOwnerName},
+				metadataRule(
+					rules.ActionTypeAllow,
+					"v1",
+					[]string{"ConfigMap"},
+					map[string]rules.MetadataValueRule{
+						secondOwnerLabel: metadataValueRule(false, metadataByExact("owner-b")),
+					},
+					map[string]rules.MetadataValueRule{
+						secondOwnerAnnotation: metadataValueRule(false, metadataByExact("owner-b")),
+					},
+				),
+			),
+		}
+	}
+
 	baseTenantRules := func() []*rules.NamespaceRuleBodyTenant {
 		return []*rules.NamespaceRuleBodyTenant{
 			metadataRule(
@@ -186,6 +253,14 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 						CoreOwnerSpec: rbac.CoreOwnerSpec{
 							UserSpec: rbac.UserSpec{
 								Name: ownerName,
+								Kind: "User",
+							},
+						},
+					},
+					{
+						CoreOwnerSpec: rbac.CoreOwnerSpec{
+							UserSpec: rbac.UserSpec{
+								Name: secondOwnerName,
 								Kind: "User",
 							},
 						},
@@ -574,6 +649,62 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	}
 
+	patchConfigMapMetadata := func(
+		cs kubernetes.Interface,
+		nsName string,
+		cmName string,
+		labels map[string]string,
+		annotations map[string]string,
+	) error {
+		metadataPatch := map[string]any{}
+		if labels != nil {
+			metadataPatch["labels"] = labels
+		}
+		if annotations != nil {
+			metadataPatch["annotations"] = annotations
+		}
+
+		patch, err := json.Marshal(map[string]any{"metadata": metadataPatch})
+		if err != nil {
+			return err
+		}
+
+		_, err = cs.CoreV1().ConfigMaps(nsName).Patch(
+			context.Background(),
+			cmName,
+			k8stypes.MergePatchType,
+			patch,
+			metav1.PatchOptions{},
+		)
+
+		return err
+	}
+
+	patchConfigMapMetadataAndExpectDenied := func(
+		cs kubernetes.Interface,
+		nsName string,
+		cmName string,
+		labels map[string]string,
+		annotations map[string]string,
+		substrings ...string,
+	) {
+		Eventually(func() error {
+			err := patchConfigMapMetadata(cs, nsName, cmName, labels, annotations)
+			if err == nil {
+				return fmt.Errorf("expected configmap metadata patch to be denied, but it succeeded")
+			}
+
+			message := err.Error()
+			for _, substring := range substrings {
+				if !strings.Contains(message, substring) {
+					return fmt.Errorf("expected error to contain %q, got: %s", substring, message)
+				}
+			}
+
+			return nil
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	}
+
 	createServiceAndExpectAllowed := func(cs kubernetes.Interface, nsName string, svc *corev1.Service) {
 		EventuallyCreation(func() error {
 			_, err := cs.CoreV1().Services(nsName).Create(context.Background(), svc, metav1.CreateOptions{})
@@ -717,6 +848,25 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 				substrings,
 			)
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	}
+
+	prepareIsolatedMetadataTest := func(name string) (*corev1.Namespace, kubernetes.Interface, kubernetes.Interface, *corev1.ConfigMap) {
+		updateTenantRules(isolatedMetadataRules())
+
+		ns := createNamespace(nil)
+		waitForProjectedMetadata(ns.Name, secondOwnerLabel, nil, nil)
+
+		owner := ownerClient(tnt.Spec.Owners[0].UserSpec)
+		secondOwner := ownerClient(tnt.Spec.Owners[1].UserSpec)
+		cm := configMap(
+			name,
+			map[string]string{ownerLabel: "owner-a"},
+			map[string]string{ownerAnnotation: "owner-a"},
+		)
+
+		createConfigMapAndExpectAllowed(owner, ns.Name, cm)
+
+		return ns, owner, secondOwner, cm
 	}
 
 	BeforeEach(func() {
@@ -1356,6 +1506,142 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 				},
 			),
 		)
+	})
+
+	It("allows an audience to patch its metadata while another audience's metadata is unchanged", func() {
+		ns, _, secondOwner, cm := prepareIsolatedMetadataTest("metadata-update-isolated-allowed")
+
+		By("patching only the label and annotation assigned to the second owner")
+		Eventually(func() error {
+			return patchConfigMapMetadata(
+				secondOwner,
+				ns.Name,
+				cm.Name,
+				map[string]string{secondOwnerLabel: "owner-b"},
+				map[string]string{secondOwnerAnnotation: "owner-b"},
+			)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		By("preserving both audiences' metadata")
+		Eventually(func(g Gomega) {
+			current, err := secondOwner.CoreV1().ConfigMaps(ns.Name).Get(
+				context.Background(),
+				cm.Name,
+				metav1.GetOptions{},
+			)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(current.Labels).To(HaveKeyWithValue(ownerLabel, "owner-a"))
+			g.Expect(current.Labels).To(HaveKeyWithValue(secondOwnerLabel, "owner-b"))
+			g.Expect(current.Annotations).To(HaveKeyWithValue(ownerAnnotation, "owner-a"))
+			g.Expect(current.Annotations).To(HaveKeyWithValue(secondOwnerAnnotation, "owner-b"))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	})
+
+	It("denies patches to metadata assigned to another audience", func() {
+		ns, _, secondOwner, cm := prepareIsolatedMetadataTest("metadata-update-other-audience-denied")
+
+		By("denying a change to the first owner's label")
+		patchConfigMapMetadataAndExpectDenied(
+			secondOwner,
+			ns.Name,
+			cm.Name,
+			map[string]string{ownerLabel: "tampered"},
+			nil,
+			ownerLabel,
+			"tampered",
+			"denied",
+		)
+
+		By("denying a change to the first owner's annotation")
+		patchConfigMapMetadataAndExpectDenied(
+			secondOwner,
+			ns.Name,
+			cm.Name,
+			nil,
+			map[string]string{ownerAnnotation: "tampered"},
+			ownerAnnotation,
+			"tampered",
+			"denied",
+		)
+
+		By("preserving the first owner's metadata")
+		Eventually(func(g Gomega) {
+			current, err := secondOwner.CoreV1().ConfigMaps(ns.Name).Get(
+				context.Background(),
+				cm.Name,
+				metav1.GetOptions{},
+			)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(current.Labels).To(HaveKeyWithValue(ownerLabel, "owner-a"))
+			g.Expect(current.Annotations).To(HaveKeyWithValue(ownerAnnotation, "owner-a"))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	})
+
+	It("denies disallowed values for metadata assigned to the updating audience", func() {
+		ns, _, secondOwner, cm := prepareIsolatedMetadataTest("metadata-update-own-value-denied")
+
+		By("denying a disallowed value for the second owner's label")
+		patchConfigMapMetadataAndExpectDenied(
+			secondOwner,
+			ns.Name,
+			cm.Name,
+			map[string]string{secondOwnerLabel: "blocked"},
+			nil,
+			secondOwnerLabel,
+			"blocked",
+			"denied",
+		)
+
+		By("denying a disallowed value for the second owner's annotation")
+		patchConfigMapMetadataAndExpectDenied(
+			secondOwner,
+			ns.Name,
+			cm.Name,
+			nil,
+			map[string]string{secondOwnerAnnotation: "blocked"},
+			secondOwnerAnnotation,
+			"blocked",
+			"denied",
+		)
+	})
+
+	It("allows non-metadata updates when another audience's metadata is unchanged", func() {
+		ns, _, secondOwner, cm := prepareIsolatedMetadataTest("metadata-update-data-allowed")
+
+		By("updating ConfigMap data as the second owner")
+		Eventually(func() error {
+			current, err := secondOwner.CoreV1().ConfigMaps(ns.Name).Get(
+				context.Background(),
+				cm.Name,
+				metav1.GetOptions{},
+			)
+			if err != nil {
+				return err
+			}
+
+			current.Data["key"] = "updated"
+
+			_, err = secondOwner.CoreV1().ConfigMaps(ns.Name).Update(
+				context.Background(),
+				current,
+				metav1.UpdateOptions{},
+			)
+
+			return err
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		By("preserving the metadata and the data update")
+		Eventually(func(g Gomega) {
+			current, err := secondOwner.CoreV1().ConfigMaps(ns.Name).Get(
+				context.Background(),
+				cm.Name,
+				metav1.GetOptions{},
+			)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(current.Data).To(HaveKeyWithValue("key", "updated"))
+			g.Expect(current.Labels).To(HaveKeyWithValue(ownerLabel, "owner-a"))
+			g.Expect(current.Annotations).To(HaveKeyWithValue(ownerAnnotation, "owner-a"))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 
 	It("denies an update when a metadata value becomes invalid", func() {
