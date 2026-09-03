@@ -7,6 +7,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	serviceaccountindexer "github.com/projectcapsule/capsule/pkg/runtime/indexers/serviceaccount"
 )
 
 type GlobalServiceAccount struct{}
@@ -28,14 +29,11 @@ func (g GlobalServiceAccount) Func() client.IndexerFunc {
 			return nil
 		}
 
-		ns := imp.Namespace.String()
-
-		name := imp.Name.String()
-
-		if ns == "" || name == "" {
+		key := serviceaccountindexer.ReferenceKey(imp.Namespace.String(), imp.Name.String())
+		if key == "" {
 			return nil
 		}
 
-		return []string{ns + "/" + name}
+		return []string{key}
 	}
 }

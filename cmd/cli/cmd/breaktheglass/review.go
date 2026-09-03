@@ -12,10 +12,8 @@ import (
 	"github.com/xhit/go-str2duration/v2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	"github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/breaktheglass"
@@ -53,7 +51,7 @@ var reviewCmd = &cobra.Command{
 
 		ctx := context.Background()
 
-		cfg, k8sClient, err := newK8sClient()
+		_, k8sClient, err := newK8sClient()
 		if err != nil {
 			return err
 		}
@@ -83,32 +81,11 @@ var reviewCmd = &cobra.Command{
 			)
 		}
 
-		var props *v1beta2.ApprovedProperties
-
-		if br.Status.Template != nil && br.Status.Template.Context != nil {
-			httpClient, clientErr := rest.HTTPClientFor(cfg)
-			if clientErr != nil {
-				return clientErr
-			}
-
-			mapper, mapperErr := apiutil.NewDynamicRESTMapper(cfg, httpClient)
-			if mapperErr != nil {
-				return mapperErr
-			}
-
-			loadedContext, contextErr := br.LoadTemplateContext(ctx, k8sClient, mapper)
-			if contextErr != nil {
-				return contextErr
-			}
-
-			props, err = br.GenerateApprovedProperties(loadedContext)
-		} else {
-			props, err = br.GenerateApprovedProperties()
+		if br.Status.Request == nil {
+			return fmt.Errorf("BreakRequest %s has no prepared request properties", name)
 		}
 
-		if err != nil {
-			return err
-		}
+		props := br.Status.Request.DeepCopy()
 
 		// Parse Flags and Overwrite
 		if keepForStr != "" {
@@ -174,8 +151,6 @@ var reviewCmd = &cobra.Command{
 			}
 		}
 
-		user := accessEntityForConfig(cfg)
-
 		return retry.OnError(
 			retry.DefaultRetry,
 			apierrors.IsConflict,
@@ -188,18 +163,25 @@ var reviewCmd = &cobra.Command{
 					return err
 				}
 
-				switch action {
-				case approveValue:
-					if err := br.ApproveRequest(user, props, message); err != nil {
-						return err
+				return patchBreakRequestStatus(ctx, k8sClient, br, func() error {
+					switch action {
+					case approveValue:
+						br.Status.Phase = v1beta2.RequestPhaseApproved
+						br.Status.Request = props.DeepCopy()
+					case denyValue:
+						br.Status.Phase = v1beta2.RequestPhaseDenied
+					default:
+						return fmt.Errorf("unsupported review action %q", action)
 					}
-				case denyValue:
-					if err := br.DenyRequest(user, message); err != nil {
-						return err
-					}
-				}
 
-				return k8sClient.Status().Update(ctx, br)
+					if br.Status.Review == nil {
+						br.Status.Review = &v1beta2.ReviewInfo{}
+					}
+
+					br.Status.Review.Message = message
+
+					return nil
+				})
 			},
 		)
 	},

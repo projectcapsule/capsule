@@ -7,6 +7,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	serviceaccountindexer "github.com/projectcapsule/capsule/pkg/runtime/indexers/serviceaccount"
 )
 
 type NamespacedServiceAccount struct{}
@@ -28,14 +29,11 @@ func (g NamespacedServiceAccount) Func() client.IndexerFunc {
 			return nil
 		}
 
-		ns := tgr.GetNamespace()
-
-		name := imp.Name.String()
-
-		if ns == "" || name == "" {
+		key := serviceaccountindexer.ReferenceKey(tgr.GetNamespace(), imp.Name.String())
+		if key == "" {
 			return nil
 		}
 
-		return []string{ns + "/" + name}
+		return []string{key}
 	}
 }

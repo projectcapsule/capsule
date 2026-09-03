@@ -1595,6 +1595,17 @@ data:
 				g.Expect(current.Status.ServiceAccount.Name).To(Equal(apimeta.RFC1123Name(saNoDelete)))
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
+			By("protecting the ServiceAccount referenced by TenantResource status")
+			serviceAccount := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{
+				Name:      saNoDelete,
+				Namespace: baseNamespace,
+			}}
+			Eventually(func() bool {
+				err := k8sClient.Delete(ctx, serviceAccount, client.DryRunAll)
+
+				return apierrors.IsForbidden(err)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
+
 			Expect(k8sClient.Delete(ctx, tr)).To(Succeed())
 
 			// Objects should remain because prune cannot delete them.

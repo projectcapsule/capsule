@@ -19,6 +19,9 @@ func TestResourceTemplatePolicyDefaults(t *testing.T) {
 	if !policy.IsProtected() {
 		t.Fatal("zero-value policy is not protected, want protection enabled")
 	}
+	if policy.ShouldOrphan() {
+		t.Fatal("zero-value policy orphans resources, want Remove semantics")
+	}
 
 	policy.Creation = ResourceCreationPolicyMerge
 	policy.Protect = ptr.To(false)
@@ -27,5 +30,10 @@ func TestResourceTemplatePolicyDefaults(t *testing.T) {
 	}
 	if policy.IsProtected() {
 		t.Fatal("protect=false policy is protected")
+	}
+
+	policy.Deletion = ResourceDeletionPolicyOrphan
+	if !policy.ShouldOrphan() {
+		t.Fatal("Orphan policy does not retain resources")
 	}
 }

@@ -14,6 +14,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	serviceaccountindexer "github.com/projectcapsule/capsule/pkg/runtime/indexers/serviceaccount"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
 )
 
@@ -157,7 +158,20 @@ func (r *CacheInvalidator) checkServiceAccountReferences(
 	ctx context.Context,
 	sa client.Object,
 ) (ref bool, err error) {
-	key := sa.GetNamespace() + "/" + sa.GetName()
+	key := serviceaccountindexer.ReferenceKey(sa.GetNamespace(), sa.GetName())
+
+	var requests capsulev1beta2.BreakRequestList
+	if err := r.List(
+		ctx,
+		&requests,
+		client.MatchingFields{serviceaccountindexer.ReferenceFieldName: key},
+	); err != nil {
+		return false, err
+	}
+
+	if len(requests.Items) > 0 {
+		return true, nil
+	}
 
 	var gtr capsulev1beta2.GlobalTenantResourceList
 	if err := r.List(

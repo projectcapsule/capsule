@@ -11,22 +11,24 @@ spec:
     kind: BreakRequestTemplate
     listKind: BreakRequestTemplateList
     plural: breakrequesttemplates
+    shortNames:
+    - brt
     singular: breakrequesttemplate
-  scope: Cluster
+  scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.autoApprove
+    - jsonPath: .spec.approvals.auto
       name: AutoApprove
       type: boolean
-    - jsonPath: .spec.approvalCondition
-      name: Condition
-      priority: 10
-      type: string
+    - description: Age
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
     name: v1beta2
     schema:
       openAPIV3Schema:
-        description: BreakRequestTemplate is the Schema for the breakrequesttemplates
-          API.
+        description: BreakRequestTemplate is the Schema for namespaced BreakRequest
+          templates.
         properties:
           apiVersion:
             description: |-
@@ -46,16 +48,50 @@ spec:
           metadata:
             type: object
           spec:
-            description: BreakRequestTemplateSpec defines the desired state of BreakRequestTemplate.
+            description: BreakRequestTemplateSpec defines the desired state of a namespaced
+              BreakRequestTemplate.
             properties:
-              approvalCondition:
-                description: ApprovalCondition an optional CEL expression that must
-                  be successful for the request to be approved.
-                type: string
-              autoApprove:
-                description: AutoApprove requests created by this template will be
-                  automatically approved.
-                type: boolean
+              approvals:
+                description: Approvals configures automatic and manual approval of
+                  requests using this template.
+                properties:
+                  approvers:
+                    description: |-
+                      Approvers lists the subjects permitted to approve a request manually.
+                      When omitted, any subject with permission to update the request status may
+                      approve it.
+                    items:
+                      properties:
+                        kind:
+                          description: Kind of entity. Possible values are "User",
+                            "Group", and "ServiceAccount"
+                          enum:
+                          - User
+                          - Group
+                          - ServiceAccount
+                          type: string
+                        name:
+                          description: Name of the entity.
+                          type: string
+                      required:
+                      - kind
+                      - name
+                      type: object
+                    type: array
+                  auto:
+                    description: |-
+                      Auto automatically approves matching requests. Approvers are ignored for
+                      automatic approvals.
+                    type: boolean
+                  conditions:
+                    description: |-
+                      Conditions contains CEL expressions evaluated as an OR list. At least one
+                      expression must evaluate to true. When omitted, approval is unconditional.
+                    items:
+                      minLength: 1
+                      type: string
+                    type: array
+                type: object
               context:
                 description: |-
                   Context loads additional Kubernetes resources for use by all resource targets and templates.
@@ -158,74 +194,40 @@ spec:
                     type: array
                 type: object
               defaultDuration:
-                description: |-
-                  The default duration of the BreakRequest referencing this template should be valid for. If not set,
-                  the resource will be kept until the request is deleted.
+                description: The default duration of a BreakRequest referencing this
+                  template.
                 type: string
-              keepFor:
+              impersonation:
                 description: |-
-                  The duration of this BreakRequest will be kept in the system after it has been expired (eg. auditing purposes)
-                  If not set, the BreakRequest will be deleted after expiring.
+                  Impersonation identifies the namespace-local ServiceAccount used for
+                  context loading and every managed-resource action performed for requests
+                  using this template. When omitted, the tenant default ServiceAccount from
+                  CapsuleConfiguration is used. If neither is configured, Capsule uses its
+                  controller identity.
+                properties:
+                  name:
+                    description: Name of the referent.
+                    maxLength: 63
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                    type: string
+                required:
+                - name
+                type: object
+              keepFor:
+                description: The duration a BreakRequest is retained after it expires
+                  for auditing.
                 pattern: ^([0-9]+(\.[0-9]+)?(s|m|h|d|w))+$
                 type: string
               maxDuration:
-                description: The max allowed duration of the BreakRequest referencing
-                  this template should be valid for.
+                description: The maximum allowed duration of a BreakRequest referencing
+                  this template.
                 type: string
-              namespaceSelectors:
-                description: |-
-                  NamespaceSelectors limit the namespaces in which BreakRequests may reference this template.
-                  Selectors are ORed. When omitted, the template is available in every namespace.
-                items:
-                  description: Selector for resources and their labels or selecting
-                    origin namespaces
-                  properties:
-                    matchExpressions:
-                      description: matchExpressions is a list of label selector requirements.
-                        The requirements are ANDed.
-                      items:
-                        description: |-
-                          A label selector requirement is a selector that contains values, a key, and an operator that
-                          relates the key and values.
-                        properties:
-                          key:
-                            description: key is the label key that the selector applies
-                              to.
-                            type: string
-                          operator:
-                            description: |-
-                              operator represents a key's relationship to a set of values.
-                              Valid operators are In, NotIn, Exists and DoesNotExist.
-                            type: string
-                          values:
-                            description: |-
-                              values is an array of string values. If the operator is In or NotIn,
-                              the values array must be non-empty. If the operator is Exists or DoesNotExist,
-                              the values array must be empty. This array is replaced during a strategic
-                              merge patch.
-                            items:
-                              type: string
-                            type: array
-                            x-kubernetes-list-type: atomic
-                        required:
-                        - key
-                        - operator
-                        type: object
-                      type: array
-                      x-kubernetes-list-type: atomic
-                    matchLabels:
-                      additionalProperties:
-                        type: string
-                      description: |-
-                        matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
-                        map is equivalent to an element of matchExpressions, whose key field is "key", the
-                        operator is "In", and the values array contains only "value". The requirements are ANDed.
-                      type: object
-                  type: object
-                  x-kubernetes-map-type: atomic
-                type: array
               paramSchema:
-                description: ParamSchema template parameter schema
+                description: |-
+                  ParamSchema is the JSON Schema used to validate template parameters.
+                  Properties may use the x-capsule-form vendor extension to select values
+                  from arbitrary Kubernetes GVKs in compatible form clients. The schema may
+                  use x-kubernetes-validations for Kubernetes-compatible CEL rules.
                 type: object
                 x-kubernetes-preserve-unknown-fields: true
               resources:
@@ -248,6 +250,17 @@ spec:
                           - Owner
                           - Merge
                           type: string
+                        deletion:
+                          default: Remove
+                          description: |-
+                            Deletion controls what happens when the parent stops managing the target.
+                            Remove deletes resources created for the parent and relinquishes adopted
+                            resources. Orphan keeps the resource and removes Capsule's lifecycle
+                            metadata. Removal is the default.
+                          enum:
+                          - Remove
+                          - Orphan
+                          type: string
                         force:
                           default: false
                           description: Force allows server-side apply to acquire conflicting
@@ -261,8 +274,10 @@ spec:
                           type: boolean
                       type: object
                     targets:
-                      description: Targets are Kubernetes resource objects to render
-                        and manage with Policy.
+                      description: |-
+                        Targets are Kubernetes resource objects to render and manage with Policy.
+                        Parameters and loaded context use the flat template root; trusted request
+                        metadata is available under .request.
                       items:
                         type: object
                         x-kubernetes-preserve-unknown-fields: true
@@ -273,7 +288,8 @@ spec:
                         Template is an optional Go template which may render one or more YAML or
                         JSON Kubernetes resources separated by YAML document markers. Request
                         parameters are available under .params and loaded resources under
-                        .context.resources.
+                        .context.resources. Trusted request metadata is available under .request
+                        with name, username, groups, and timestamp fields.
                       minLength: 1
                       type: string
                   type: object
@@ -285,25 +301,7 @@ spec:
             required:
             - resources
             type: object
-          status:
-            description: BreakRequestTemplateStatus defines the observed state of
-              BreakRequestTemplate.
-            properties:
-              namespaces:
-                description: |-
-                  Namespaces contains the namespaces allowed to reference this template.
-                  A single "*" entry means that the template is available in every namespace.
-                items:
-                  type: string
-                type: array
-              observedGeneration:
-                description: ObservedGeneration is the most recent generation resolved
-                  by the controller.
-                format: int64
-                type: integer
-            type: object
         type: object
     served: true
     storage: true
-    subresources:
-      status: {}
+    subresources: {}

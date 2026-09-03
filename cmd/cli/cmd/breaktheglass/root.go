@@ -44,4 +44,5 @@ func init() {
 	RootCmd.AddCommand(reviewCmd)
 	RootCmd.AddCommand(activateCmd)
 	RootCmd.AddCommand(expireCmd)
+	RootCmd.AddCommand(retryCmd)
 }

@@ -41,6 +41,7 @@ rules:
   - quantityledgers.capsule.clastix.io
   - breakrequests.capsule.clastix.io
   - breakrequesttemplates.capsule.clastix.io
+  - globalbreakrequesttemplates.capsule.clastix.io
   verbs:
   - create
   - delete

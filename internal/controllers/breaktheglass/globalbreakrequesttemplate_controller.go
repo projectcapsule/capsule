@@ -25,21 +25,21 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
 
-const breakRequestTemplateControllerName = "breakrequesttemplate"
+const globalBreakRequestTemplateControllerName = "globalbreakrequesttemplate"
 
-// BreakRequestTemplateReconciler resolves namespace selectors for admission and discovery.
-type BreakRequestTemplateReconciler struct {
+// GlobalBreakRequestTemplateReconciler resolves namespace selectors for admission and discovery.
+type GlobalBreakRequestTemplateReconciler struct {
 	client.Client
 
 	Log logr.Logger
 }
 
-func (r *BreakRequestTemplateReconciler) SetupWithManager(mgr ctrl.Manager, options utils.ControllerOptions) error {
+func (r *GlobalBreakRequestTemplateReconciler) SetupWithManager(mgr ctrl.Manager, options utils.ControllerOptions) error {
 	r.Client = mgr.GetClient()
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(
-			&capsulev1beta2.BreakRequestTemplate{},
+			&capsulev1beta2.GlobalBreakRequestTemplate{},
 			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
 		).
 		Watches(
@@ -47,13 +47,13 @@ func (r *BreakRequestTemplateReconciler) SetupWithManager(mgr ctrl.Manager, opti
 			handler.EnqueueRequestsFromMapFunc(r.mapNamespaceToTemplates),
 			builder.WithPredicates(namespaceLabelsChangedPredicate()),
 		).
-		Named(breakRequestTemplateControllerName).
+		Named(globalBreakRequestTemplateControllerName).
 		WithOptions(options.Runtime.ToControllerOptions()).
 		Complete(r)
 }
 
-func (r *BreakRequestTemplateReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
-	instance := &capsulev1beta2.BreakRequestTemplate{}
+func (r *GlobalBreakRequestTemplateReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
+	instance := &capsulev1beta2.GlobalBreakRequestTemplate{}
 	if err := r.Get(ctx, request.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
 			return ctrl.Result{}, nil
@@ -80,14 +80,14 @@ func (r *BreakRequestTemplateReconciler) Reconcile(ctx context.Context, request 
 	return ctrl.Result{}, nil
 }
 
-func (r *BreakRequestTemplateReconciler) updateStatus(
+func (r *GlobalBreakRequestTemplateReconciler) updateStatus(
 	ctx context.Context,
 	name string,
 	generation int64,
 	namespaces []string,
 ) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		latest := &capsulev1beta2.BreakRequestTemplate{}
+		latest := &capsulev1beta2.GlobalBreakRequestTemplate{}
 		if err := r.Get(ctx, types.NamespacedName{Name: name}, latest); err != nil {
 			return err
 		}
@@ -107,13 +107,13 @@ func (r *BreakRequestTemplateReconciler) updateStatus(
 	})
 }
 
-func (r *BreakRequestTemplateReconciler) mapNamespaceToTemplates(
+func (r *GlobalBreakRequestTemplateReconciler) mapNamespaceToTemplates(
 	ctx context.Context,
 	_ client.Object,
 ) []reconcile.Request {
-	list := &capsulev1beta2.BreakRequestTemplateList{}
+	list := &capsulev1beta2.GlobalBreakRequestTemplateList{}
 	if err := r.List(ctx, list); err != nil {
-		r.Log.Error(err, "cannot list BreakRequestTemplates for namespace event")
+		r.Log.Error(err, "cannot list GlobalBreakRequestTemplates for namespace event")
 
 		return nil
 	}

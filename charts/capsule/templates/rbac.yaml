@@ -181,7 +181,8 @@ rules:
   - breakrequests
   - breakrequests/status
   - breakrequesttemplates
-  - breakrequesttemplates/status
+  - globalbreakrequesttemplates
+  - globalbreakrequesttemplates/status
   verbs:
   - create
   - delete
@@ -212,6 +213,7 @@ rules:
   - rulestatuses.capsule.clastix.io
   - breakrequests.capsule.clastix.io
   - breakrequesttemplates.capsule.clastix.io
+  - globalbreakrequesttemplates.capsule.clastix.io
   verbs:
   - get
   - patch

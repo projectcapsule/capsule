@@ -35,7 +35,7 @@ func TestAddToManagerRegistersIndexers(t *testing.T) {
 		t.Fatalf("AddToManager() unexpected error: %v", err)
 	}
 
-	if got, want := len(mgr.indexer.calls), 22; got != want {
+	if got, want := len(mgr.indexer.calls), 23; got != want {
 		t.Fatalf("registered indexers = %d, want %d", got, want)
 	}
 
@@ -56,7 +56,7 @@ func TestAddToManagerRegistersIndexers(t *testing.T) {
 	for _, field := range []string{
 		".spec.name",
 		".status.namespaces",
-		"spec.serviceaccount",
+		"status.request.impersonation",
 		"hostnamePathPair",
 		".spec.dependsOn.global",
 		".spec.dependsOn.namespaced",

@@ -12,6 +12,7 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -23,16 +24,82 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/api/breaktheglass"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/ssa"
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 const controllerName = "breakrequest"
+
+const (
+	templateResolutionFailedReason = "TemplateResolutionFailed"
+	templateContextFailedReason    = "TemplateContextFailed"
+	templateRenderingFailedReason  = "TemplateRenderingFailed"
+	impersonationFailedReason      = "ImpersonationFailed"
+	resourceDryRunFailedReason     = "ResourceDryRunFailed"
+	resourcesNotReadyReason        = "ResourcesNotReady"
+	resourceApplyFailedReason      = "ResourceApplyFailed"
+)
+
+type reconcileStatusError struct {
+	reason string
+	err    error
+}
+
+func (e *reconcileStatusError) Error() string {
+	return e.err.Error()
+}
+
+func (e *reconcileStatusError) Unwrap() error {
+	return e.err
+}
+
+func statusError(reason string, err error) error {
+	return &reconcileStatusError{reason: reason, err: err}
+}
+
+func statusReason(err error) string {
+	reason := meta.FailedReason
+
+	var statusErr *reconcileStatusError
+	if errors.As(err, &statusErr) {
+		reason = statusErr.reason
+	}
+
+	return reason
+}
+
+func markRequestFailed(
+	br *capsulev1beta2.BreakRequest,
+	stage capsulev1beta2.RequestFailureStage,
+	retryPhase capsulev1beta2.RequestPhase,
+	err error,
+) error {
+	if failureErr := br.FailRequest(stage, retryPhase, statusReason(err), err.Error()); failureErr != nil {
+		return errors.Join(err, failureErr)
+	}
+
+	return err
+}
+
+func setReconcileReady(br *capsulev1beta2.BreakRequest, err error) {
+	switch {
+	case err != nil:
+		br.SetReady(metav1.ConditionFalse, statusReason(err), err.Error())
+	case br.Status.Phase == capsulev1beta2.RequestPhaseFailed && br.Status.Failure != nil:
+		br.SetReady(metav1.ConditionFalse, br.Status.Failure.Reason, br.Status.Failure.Message)
+	case br.Status.Phase == capsulev1beta2.RequestPhaseFailed:
+		br.SetReady(metav1.ConditionFalse, meta.FailedReason, "request failed and may be retried or expired")
+	default:
+		br.SetReady(metav1.ConditionTrue, meta.SucceededReason, readyMessage(br))
+	}
+}
 
 type BreakRequestReconciler struct {
 	client.Client
@@ -41,19 +108,29 @@ type BreakRequestReconciler struct {
 	recorder  events.EventRecorder
 	Log       logr.Logger
 	resources ssa.Manager
+
+	Configuration      configuration.Configuration
+	ImpersonationCache *cache.ImpersonationCache
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *BreakRequestReconciler) SetupWithManager(mgr ctrl.Manager, _ utils.ControllerOptions) error {
 	r.Client = mgr.GetClient()
+
 	r.recorder = mgr.GetEventRecorder(controllerName)
+	if r.ImpersonationCache == nil {
+		r.ImpersonationCache = cache.NewImpersonationCache()
+	}
+
 	r.resources = ssa.Manager{
 		Reader: mgr.GetAPIReader(),
 		Mapper: mgr.GetRESTMapper(),
 		Metadata: ssa.Metadata{
-			CreatedByValue:   meta.ValueControllerBreakTheGlass,
-			ManagedByValue:   meta.ValueControllerBreakTheGlass,
-			ProtectedByValue: meta.ValueControllerBreakTheGlass,
+			CreatedByValue:                      meta.ValueControllerBreakTheGlass,
+			ManagedByValue:                      meta.ValueControllerBreakTheGlass,
+			ProtectedByValue:                    meta.ValueControllerBreakTheGlass,
+			ProtectedByServiceAccountAnnotation: meta.BreakRequestServiceAccountAnnotation,
+			AppManagedByValue:                   meta.ValueAppBreakTheGlassManager,
 		},
 	}
 
@@ -100,10 +177,14 @@ func (r *BreakRequestReconciler) reconcile(
 	log logr.Logger,
 	br *capsulev1beta2.BreakRequest,
 ) (res ctrl.Result, err error) {
-	defer r.updateStatus(ctx, log, br)()
+	defer func() {
+		setReconcileReady(br, err)
+
+		r.updateStatus(ctx, log, br)()
+	}()
 
 	if !br.DeletionTimestamp.IsZero() {
-		return r.reconcileDelete(ctx, br)
+		return r.reconcileDelete(ctx, log, br)
 	}
 
 	switch br.Status.Phase {
@@ -113,9 +194,41 @@ func (r *BreakRequestReconciler) reconcile(
 		return ctrl.Result{}, nil
 
 	case capsulev1beta2.RequestPhaseApproved:
-		return r.reconcileApproved(ctx, log, br)
+		r.recordTransitionEvent(
+			br,
+			capsulev1beta2.RequestPhaseApproved,
+			evt.ReasonBreakRequestApproved,
+			evt.ActionApproved,
+		)
+
+		result, activationErr := r.reconcileApproved(ctx, log, br)
+		if activationErr != nil {
+			return result, markRequestFailed(
+				br,
+				capsulev1beta2.RequestFailureStageActivation,
+				capsulev1beta2.RequestPhaseApproved,
+				activationErr,
+			)
+		}
+
+		return result, nil
+
+	case capsulev1beta2.RequestPhaseFailed:
+		log.V(5).Info("BreakRequest failed and is waiting for retry or expiry")
+
+		return ctrl.Result{}, nil
+
+	case capsulev1beta2.RequestPhaseRetrying:
+		return r.reconcileRetrying(ctx, log, br)
 
 	case capsulev1beta2.RequestPhaseDenied:
+		r.recordTransitionEvent(
+			br,
+			capsulev1beta2.RequestPhaseDenied,
+			evt.ReasonBreakRequestDenied,
+			evt.ActionDenied,
+		)
+
 		log.V(5).Info("BreakRequest is denied, handling denied state")
 
 		return ctrl.Result{}, nil
@@ -125,36 +238,49 @@ func (r *BreakRequestReconciler) reconcile(
 			return ctrl.Result{}, err
 		}
 
-		if br.Status.Active != nil {
-			if br.Status.Active.ActiveUntil != nil {
-				ts := metav1.Now()
-				if ts.After(br.Status.Active.ActiveUntil.Time) {
-					r.recorder.Eventf(
-						br,
-						nil,
-						corev1.EventTypeNormal,
-						evt.ReasonBreakRequestExpired,
-						evt.ActionExpired,
-						"Break request expired",
-					)
-
-					return ctrl.Result{}, br.ExpireRequest(nil)
-				}
-
-				log.V(5).Info("Re-queueing when expiration is due")
-
-				return ctrl.Result{
-					RequeueAfter: time.Until(br.Status.Active.ActiveUntil.Time),
-				}, nil
-			}
+		if br.Status.Active == nil || br.Status.Active.ActiveUntil == nil {
+			return ctrl.Result{}, nil
 		}
+
+		if !metav1.Now().After(br.Status.Active.ActiveUntil.Time) {
+			log.V(5).Info("Re-queueing when expiration is due")
+
+			return ctrl.Result{
+				RequeueAfter: time.Until(br.Status.Active.ActiveUntil.Time),
+			}, nil
+		}
+
+		if err := br.ExpireRequest(nil); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		r.recordTransitionEvent(
+			br,
+			capsulev1beta2.RequestPhaseExpired,
+			evt.ReasonBreakRequestExpired,
+			evt.ActionExpired,
+		)
 
 		return ctrl.Result{}, nil
 
 	// When the BreakRequest has expired
 	case capsulev1beta2.RequestPhaseExpired:
-		if err := r.pruneItems(ctx, br); err != nil {
-			return ctrl.Result{}, err
+		r.recordTransitionEvent(
+			br,
+			capsulev1beta2.RequestPhaseExpired,
+			evt.ReasonBreakRequestExpired,
+			evt.ActionExpired,
+		)
+
+		if len(br.Status.ProcessedItems) > 0 {
+			resourceClient, loadErr := r.resourceClient(ctx, log, br, nil)
+			if loadErr != nil {
+				return ctrl.Result{}, statusError(impersonationFailedReason, loadErr)
+			}
+
+			if err := r.pruneItems(ctx, br, resourceClient); err != nil {
+				return ctrl.Result{}, err
+			}
 		}
 
 		if br.Status.KeepUntil == nil ||
@@ -175,7 +301,7 @@ func (r *BreakRequestReconciler) reconcile(
 		return ctrl.Result{RequeueAfter: time.Until(br.Status.KeepUntil.Time)}, nil
 
 	// The case when the BreakRequest is newly created
-	case "":
+	case "", capsulev1beta2.RequestPhaseCreated:
 		return r.reconcileNew(ctx, log, br)
 
 	case capsulev1beta2.RequestPhaseRequested:
@@ -187,6 +313,32 @@ func (r *BreakRequestReconciler) reconcile(
 	}
 }
 
+// recordTransitionEvent emits a Kubernetes lifecycle event once and records
+// its emission time on the corresponding audit transition.
+func (r *BreakRequestReconciler) recordTransitionEvent(
+	br *capsulev1beta2.BreakRequest,
+	phase capsulev1beta2.RequestPhase,
+	reason,
+	action string,
+) {
+	transition := br.LatestTransition(phase)
+	if transition == nil || transition.EventTime != nil || r.recorder == nil {
+		return
+	}
+
+	r.recorder.Eventf(
+		br,
+		nil,
+		corev1.EventTypeNormal,
+		reason,
+		action,
+		transition.Message,
+	)
+
+	now := metav1.Now()
+	transition.EventTime = &now
+}
+
 func (r *BreakRequestReconciler) reconcileApproved(
 	ctx context.Context,
 	log logr.Logger,
@@ -194,38 +346,71 @@ func (r *BreakRequestReconciler) reconcileApproved(
 ) (ctrl.Result, error) {
 	log.V(5).Info("BreakRequest is approved, checking if duration can be started")
 
-	if br.Status.Approved == nil {
-		return ctrl.Result{}, fmt.Errorf("BreakRequest is in Approved phase but status.approved is nil")
+	if br.Status.Request == nil {
+		return ctrl.Result{}, fmt.Errorf("BreakRequest is in Approved phase but status.request is nil")
 	}
 
-	brt := &capsulev1beta2.BreakRequestTemplate{}
-	if err := r.Get(ctx, client.ObjectKey{Name: br.Spec.Template.Name}, brt); err != nil {
-		return ctrl.Result{}, fmt.Errorf(
-			"failed to get BreakRequest Template %s: %w",
-			br.Spec.Template.Name,
-			err,
+	if !k8smeta.IsStatusConditionTrue(br.Status.Conditions, meta.ReadyCondition) {
+		return ctrl.Result{}, statusError(
+			resourcesNotReadyReason,
+			errors.New("rendered resources are not ready for activation"),
 		)
 	}
 
-	if err := brt.CheckApprovalCondition(ctx, br); err != nil {
+	brt, err := r.loadTemplate(ctx, br)
+	if err != nil {
+		return ctrl.Result{}, statusError(templateResolutionFailedReason, fmt.Errorf(
+			"failed to get BreakRequest Template %s: %w",
+			br.Spec.Template.Name,
+			err,
+		))
+	}
+
+	if err := br.CheckApprovalConditions(ctx, brt); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to verify approval for BreakRequest %s: %w", br.Name, err)
+	}
+
+	approvals := br.ApprovalPolicy(brt)
+	if len(approvals.Approvers) > 0 {
+		if br.Status.Review == nil || br.Status.Review.Reviewer == nil {
+			return ctrl.Result{}, fmt.Errorf("BreakRequest %s has no reviewer", br.Name)
+		}
+
+		reviewer := br.Status.Review.Reviewer
+		if reviewer.Type != breaktheglass.AccessEntityTypeSystem &&
+			!approvals.IsApprover(reviewer.Name, reviewer.Groups) {
+			return ctrl.Result{}, fmt.Errorf("reviewer %q is not permitted to approve BreakRequest %s", reviewer.Name, br.Name)
+		}
 	}
 
 	if err := r.addFinalizer(ctx, log, br); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	if br.Status.Approved.StartTime != nil {
-		if wait := time.Until(br.Status.Approved.StartTime.Time); wait > 0 {
-			log.V(5).Info("BreakRequest is approved, waiting for startTime", "startTime", br.Status.Approved.StartTime.Time)
+	if err := br.ResolveRequestStatus(brt); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if br.Status.Request.StartTime != nil {
+		if wait := time.Until(br.Status.Request.StartTime.Time); wait > 0 {
+			log.V(5).Info("BreakRequest is approved, waiting for startTime", "startTime", br.Status.Request.StartTime.Time)
 
 			return ctrl.Result{RequeueAfter: wait}, nil
 		}
 	}
 
+	resourceClient, err := r.resourceClient(ctx, log, br, brt)
+	if err != nil {
+		return ctrl.Result{}, statusError(impersonationFailedReason, err)
+	}
+
+	if err := r.validateResolvedServiceAccount(ctx, br); err != nil {
+		return ctrl.Result{}, statusError(impersonationFailedReason, err)
+	}
+
 	log.V(5).Info("BreakRequest is approved, activating br")
 
-	if err := r.transitionRequestActivation(ctx, br); err != nil {
+	if err := r.transitionRequestActivation(ctx, br, resourceClient); err != nil {
 		return ctrl.Result{}, fmt.Errorf(
 			"failed to activate BreakRequest %s: %w",
 			br.Name,
@@ -252,67 +437,298 @@ func (r *BreakRequestReconciler) reconcileNew(
 	log logr.Logger,
 	br *capsulev1beta2.BreakRequest,
 ) (ctrl.Result, error) {
-	if br.Spec.Template.Kind != capsulev1beta2.BreakRequestTemplateKind {
-		return ctrl.Result{}, fmt.Errorf(
-			"unsupported BreakRequest template kind %q",
-			br.Spec.Template.Kind,
-		)
+	if err := br.SetCreated(&br.Spec.Requestor); err != nil {
+		return ctrl.Result{}, err
 	}
 
-	brt := &capsulev1beta2.BreakRequestTemplate{}
-	if err := r.Get(ctx, client.ObjectKey{Name: br.Spec.Template.Name}, brt); err != nil {
-		return ctrl.Result{}, fmt.Errorf(
+	brt, err := r.loadTemplate(ctx, br)
+	if err != nil {
+		return ctrl.Result{}, statusError(templateResolutionFailedReason, fmt.Errorf(
 			"failed to get BreakRequest Template %s: %w",
 			br.Spec.Template.Name,
 			err,
-		)
+		))
 	}
 
-	br.InitializeFromTemplate(brt)
-
-	if !brt.Spec.AutoApprove {
-		return r.requestReview(log, br)
-	}
-
-	approved, err := brt.EvaluateApprovalCondition(ctx, br)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf(
-			"auto approval could not be evaluated for BreakRequest %s: %w",
-			br.Name,
-			err,
-		)
-	}
-
-	if !approved {
-		return r.requestReview(log, br)
-	}
-
-	loadedContext, err := br.LoadTemplateContext(ctx, r.Client, r.managedResourceManager().Mapper)
+	properties, err := br.GenerateRequestStatus(brt)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	properties, err := br.GenerateApprovedProperties(loadedContext)
+	properties.Template = &capsulev1beta2.ResolvedBreakRequestTemplateReference{
+		BreakRequestTemplateReference: br.Spec.Template,
+		ResourceVersion:               brt.GetResourceVersion(),
+	}
+	br.Status.Request = properties
+
+	resourceClient, err := r.resourceClient(ctx, log, br, brt)
 	if err != nil {
+		return ctrl.Result{}, statusError(impersonationFailedReason, err)
+	}
+
+	if err := r.renderResources(ctx, br, brt, resourceClient); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	err = br.ApproveRequest(&breaktheglass.AccessEntity{
+	retryPhase := capsulev1beta2.RequestPhaseRequested
+	autoApprove := false
+
+	if br.ApprovalPolicy(brt).Auto {
+		approved, approvalErr := br.EvaluateApprovalConditions(ctx, brt)
+		if approvalErr != nil {
+			return ctrl.Result{}, fmt.Errorf(
+				"auto approval could not be evaluated for BreakRequest %s: %w",
+				br.Name,
+				approvalErr,
+			)
+		}
+
+		if approved {
+			retryPhase = capsulev1beta2.RequestPhaseApproved
+			autoApprove = true
+		}
+	}
+
+	if err := r.validateResolvedServiceAccount(ctx, br); err != nil {
+		return ctrl.Result{}, markRequestFailed(
+			br,
+			capsulev1beta2.RequestFailureStagePreflight,
+			retryPhase,
+			statusError(impersonationFailedReason, err),
+		)
+	}
+
+	if dryRunErr := r.dryRunItems(ctx, br, resourceClient); dryRunErr != nil {
+		return ctrl.Result{}, markRequestFailed(
+			br,
+			capsulev1beta2.RequestFailureStagePreflight,
+			retryPhase,
+			statusError(resourceDryRunFailedReason, fmt.Errorf("resource preflight failed: %w", dryRunErr)),
+		)
+	}
+
+	if err := br.SetRequestedBy(&br.Spec.Requestor); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if !autoApprove {
+		return r.requestReview(log, br)
+	}
+
+	return ctrl.Result{}, br.ApproveRequest(&breaktheglass.AccessEntity{
 		Type: breaktheglass.AccessEntityTypeSystem,
-	}, properties, "Auto Approved")
+	}, br.Status.Request, "Auto Approved")
+}
 
-	return ctrl.Result{}, err
+func (r *BreakRequestReconciler) reconcileRetrying(
+	ctx context.Context,
+	log logr.Logger,
+	br *capsulev1beta2.BreakRequest,
+) (ctrl.Result, error) {
+	if br.Status.Failure == nil {
+		return ctrl.Result{}, errors.New("BreakRequest is Retrying but status.failure is nil")
+	}
+
+	failure := *br.Status.Failure
+
+	switch failure.Stage {
+	case capsulev1beta2.RequestFailureStagePreflight:
+		resourceClient, err := r.resourceClient(ctx, log, br, nil)
+		if err != nil {
+			return ctrl.Result{}, markRequestFailed(
+				br,
+				failure.Stage,
+				failure.RetryPhase,
+				statusError(impersonationFailedReason, err),
+			)
+		}
+
+		if err := r.validateResolvedServiceAccount(ctx, br); err != nil {
+			return ctrl.Result{}, markRequestFailed(
+				br,
+				failure.Stage,
+				failure.RetryPhase,
+				statusError(impersonationFailedReason, err),
+			)
+		}
+
+		if dryRunErr := r.dryRunItems(ctx, br, resourceClient); dryRunErr != nil {
+			return ctrl.Result{}, markRequestFailed(
+				br,
+				failure.Stage,
+				failure.RetryPhase,
+				statusError(resourceDryRunFailedReason, fmt.Errorf("resource preflight failed: %w", dryRunErr)),
+			)
+		}
+
+		return ctrl.Result{}, br.CompleteRetry()
+
+	case capsulev1beta2.RequestFailureStageActivation:
+		if err := br.CompleteRetry(); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		// reconcileApproved requires the snapshot to be Ready. The deferred
+		// status update records the final result after this attempt.
+		br.SetReady(metav1.ConditionTrue, meta.ReconcilingReason, "retrying resource activation")
+
+		result, activationErr := r.reconcileApproved(ctx, log, br)
+		if activationErr != nil {
+			return result, markRequestFailed(
+				br,
+				capsulev1beta2.RequestFailureStageActivation,
+				capsulev1beta2.RequestPhaseApproved,
+				activationErr,
+			)
+		}
+
+		return result, nil
+	default:
+		return ctrl.Result{}, fmt.Errorf("unsupported retry failure stage %q", failure.Stage)
+	}
+}
+
+func (r *BreakRequestReconciler) loadTemplate(
+	ctx context.Context,
+	br *capsulev1beta2.BreakRequest,
+) (capsulev1beta2.BreakRequestTemplateSource, error) {
+	switch br.Spec.Template.Kind {
+	case capsulev1beta2.BreakRequestTemplateKind:
+		brt := &capsulev1beta2.BreakRequestTemplate{}
+		if err := r.Get(ctx, client.ObjectKey{Namespace: br.Namespace, Name: br.Spec.Template.Name}, brt); err != nil {
+			return nil, err
+		}
+
+		return brt, nil
+	case capsulev1beta2.GlobalBreakRequestTemplateKind:
+		brt := &capsulev1beta2.GlobalBreakRequestTemplate{}
+		if err := r.Get(ctx, client.ObjectKey{Name: br.Spec.Template.Name}, brt); err != nil {
+			return nil, err
+		}
+
+		return brt, nil
+	default:
+		return nil, fmt.Errorf("unsupported BreakRequest template kind %q", br.Spec.Template.Kind)
+	}
+}
+
+func (r *BreakRequestReconciler) renderResources(
+	ctx context.Context,
+	br *capsulev1beta2.BreakRequest,
+	brt capsulev1beta2.BreakRequestTemplateSource,
+	resourceClient client.Client,
+) error {
+	templateData := brt.TemplateData()
+
+	if br.Status.Request == nil {
+		properties, err := br.GenerateRequestStatus(brt)
+		if err != nil {
+			return err
+		}
+
+		br.Status.Request = properties
+	}
+
+	loadedContext, err := br.LoadTemplateContext(
+		ctx,
+		resourceClient,
+		r.managedResourceManager(resourceClient, br).Mapper,
+		templateData.ParamSchema,
+		templateData.Context,
+	)
+	if err != nil {
+		br.Status.Request.Resources = nil
+
+		return statusError(templateContextFailedReason, fmt.Errorf("loading template context: %w", err))
+	}
+
+	rendered, renderErr := br.RenderResources( //nolint:contextcheck // rendering has no context-aware public API
+		templateData.ParamSchema,
+		templateData.Resources,
+		loadedContext,
+	)
+	manager := r.managedResourceManager(resourceClient, br)
+
+	var preparationErr error
+
+	for resourceIndex := range rendered {
+		for targetIndex, raw := range rendered[resourceIndex].Targets {
+			obj, targetErr := object(raw)
+			if targetErr != nil {
+				preparationErr = errors.Join(preparationErr, fmt.Errorf(
+					"preparing resource %d target %d: %w",
+					resourceIndex,
+					targetIndex,
+					targetErr,
+				))
+
+				continue
+			}
+
+			defaultTargetNamespace(obj, br.Namespace)
+
+			labels := obj.GetLabels()
+			if labels == nil {
+				labels = map[string]string{}
+			}
+
+			labels[meta.AppManagedByLabel] = meta.ValueAppBreakTheGlassManager
+			obj.SetLabels(labels)
+			rendered[resourceIndex].Targets[targetIndex] = runtime.RawExtension{Object: obj}
+
+			if _, targetErr := managedResourceStatus(manager, obj); targetErr != nil {
+				preparationErr = errors.Join(preparationErr, fmt.Errorf(
+					"preparing resource %d target %d: %w",
+					resourceIndex,
+					targetIndex,
+					targetErr,
+				))
+			}
+		}
+	}
+
+	// Persist successful render results even when another target failed. This
+	// gives users a useful status preview while Ready=False prevents approval or
+	// application of a partial result.
+	br.Status.Request.Resources = rendered
+
+	if err := errors.Join(renderErr, preparationErr); err != nil {
+		return statusError(templateRenderingFailedReason, err)
+	}
+
+	return nil
+}
+
+func readyMessage(br *capsulev1beta2.BreakRequest) string {
+	switch br.Status.Phase {
+	case capsulev1beta2.RequestPhaseCreated:
+		return "request is being prepared"
+	case capsulev1beta2.RequestPhaseRequested:
+		return "rendered resources are ready for review"
+	case capsulev1beta2.RequestPhasePending:
+		return "request is ready for review"
+	case capsulev1beta2.RequestPhaseDenied:
+		return "request was denied"
+	case capsulev1beta2.RequestPhaseApproved:
+		return "rendered resources are ready for activation"
+	case capsulev1beta2.RequestPhaseActive:
+		return "managed resources are ready"
+	case capsulev1beta2.RequestPhaseFailed:
+		return "request failed and may be retried or expired"
+	case capsulev1beta2.RequestPhaseRetrying:
+		return "request retry is in progress"
+	case capsulev1beta2.RequestPhaseExpired:
+		return "managed resources were pruned"
+	default:
+		return "reconciled"
+	}
 }
 
 func (r *BreakRequestReconciler) requestReview(
 	log logr.Logger,
 	br *capsulev1beta2.BreakRequest,
 ) (ctrl.Result, error) {
-	log.V(5).Info("BreakRequest is newly created, moving to pending phase")
-
-	if err := br.SetRequested(); err != nil {
-		return ctrl.Result{}, err
-	}
+	log.V(5).Info("BreakRequest is ready for review")
 
 	r.recorder.Eventf(
 		br,
@@ -389,14 +805,22 @@ func (r *BreakRequestReconciler) addFinalizer(
 
 func (r *BreakRequestReconciler) reconcileDelete(
 	ctx context.Context,
+	log logr.Logger,
 	br *capsulev1beta2.BreakRequest,
 ) (ctrl.Result, error) {
 	if !controllerutil.ContainsFinalizer(br, meta.ControllerFinalizer) {
 		return ctrl.Result{}, nil
 	}
 
-	if err := r.pruneItems(ctx, br); err != nil {
-		return ctrl.Result{}, err
+	if len(br.Status.ProcessedItems) > 0 {
+		resourceClient, err := r.resourceClient(ctx, log, br, nil)
+		if err != nil {
+			return ctrl.Result{}, statusError(impersonationFailedReason, err)
+		}
+
+		if err := r.pruneItems(ctx, br, resourceClient); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	if br.Status.KeepUntil != nil {
@@ -414,6 +838,7 @@ func (r *BreakRequestReconciler) reconcileDelete(
 func (r *BreakRequestReconciler) transitionRequestActivation(
 	ctx context.Context,
 	br *capsulev1beta2.BreakRequest,
+	resourceClient client.Client,
 ) error {
 	// Avoid persisting the Active phase when item reconciliation fails.
 	brCopy := br.DeepCopy()
@@ -423,13 +848,17 @@ func (r *BreakRequestReconciler) transitionRequestActivation(
 	}
 
 	// Reflect Binding
-	if err := r.reconcileItems(ctx, brCopy); err != nil {
+	if err := r.reconcileItems(ctx, brCopy, resourceClient); err != nil {
 		// Persist the rendered identities so partially applied resources can be
 		// pruned if activation is cancelled or the request is deleted.
-		br.Status.Approved.Resources = brCopy.Status.Approved.Resources
+		br.Status.Request.Resources = brCopy.Status.Request.Resources
 		br.Status.ManagedResourcesStatus = brCopy.Status.ManagedResourcesStatus
 
-		return fmt.Errorf("failed to create BreakRequest items %s: %w", brCopy.Name, err)
+		return statusError(resourceApplyFailedReason, fmt.Errorf(
+			"failed to create BreakRequest items %s: %w",
+			brCopy.Name,
+			err,
+		))
 	}
 
 	br.Status = brCopy.Status
@@ -438,48 +867,90 @@ func (r *BreakRequestReconciler) transitionRequestActivation(
 	return nil
 }
 
+// dryRunItems exercises the exact server-side apply request for every rendered
+// target with the resolved execution identity. It does not persist resources,
+// tracking metadata, or processed-item status.
+func (r *BreakRequestReconciler) dryRunItems(
+	ctx context.Context,
+	br *capsulev1beta2.BreakRequest,
+	resourceClient client.Client,
+) error {
+	if br.Status.Request == nil {
+		return errors.New("request status is nil")
+	}
+
+	if err := r.validateResolvedServiceAccount(ctx, br); err != nil {
+		return err
+	}
+
+	var dryRunErr error
+
+	manager := r.managedResourceManager(resourceClient, br)
+	fieldOwner := meta.BreakRequestFieldOwner(br)
+
+	for resourceIndex, resource := range br.Status.Request.Resources {
+		for targetIndex, raw := range resource.Targets {
+			obj, err := object(raw)
+			if err != nil {
+				dryRunErr = errors.Join(dryRunErr, fmt.Errorf(
+					"resource %d target %d: %w",
+					resourceIndex,
+					targetIndex,
+					err,
+				))
+
+				continue
+			}
+
+			defaultTargetNamespace(obj, br.Namespace)
+
+			_, err = manager.Apply(ctx, resourceClient, obj, ssa.ApplyOptions{
+				FieldOwner: fieldOwner,
+				Force:      resource.Policy.Force,
+				Adopt:      resource.Policy.AllowsAdoption(),
+				Protect:    resource.Policy.IsProtected(),
+				DryRun:     true,
+			})
+			if err != nil {
+				dryRunErr = errors.Join(dryRunErr, fmt.Errorf(
+					"resource %d target %d: %w",
+					resourceIndex,
+					targetIndex,
+					err,
+				))
+			}
+		}
+	}
+
+	return dryRunErr
+}
+
 // Creates the necessary items resources for the BreakRequest.
 func (r *BreakRequestReconciler) reconcileItems(
 	ctx context.Context,
 	br *capsulev1beta2.BreakRequest,
+	resourceClient client.Client,
 ) (err error) {
 	var syncErr error
 
-	tpl := br.Status.Template
-	if tpl == nil {
-		return errors.New("template is nil")
-	}
-
-	if br.Status.Approved == nil {
-		return errors.New("approved status is nil")
+	if br.Status.Request == nil {
+		return errors.New("request status is nil")
 	}
 
 	if br.Status.Active == nil {
 		return errors.New("active status is nil")
 	}
 
-	// reset the approved items; only the effective items should be kept
-	br.Status.Approved.Resources = nil
 	currentItems := br.Status.ProcessedItems
 	processedItems := make(meta.ProcessedItems, 0)
 
-	loadedContext, err := br.LoadTemplateContext(ctx, r.Client, r.managedResourceManager().Mapper)
-	if err != nil {
-		return err
-	}
-
-	rendered, err := br.RenderResources(tpl.ParamSchema, tpl.Resources, loadedContext)
-	if err != nil {
-		return err
-	}
-
-	manager := r.managedResourceManager()
+	manager := r.managedResourceManager(resourceClient, br)
 	fieldOwner := meta.BreakRequestFieldOwner(br)
 
-	for _, resource := range rendered {
-		effective := apiruntime.ResourceTemplate{Policy: resource.Policy}
+	for resourceIndex := range br.Status.Request.Resources {
+		resource := &br.Status.Request.Resources[resourceIndex]
 
-		for _, raw := range resource.Targets {
+		for targetIndex, raw := range resource.Targets {
 			obj, decodeErr := object(raw)
 			if decodeErr != nil {
 				syncErr = errors.Join(syncErr, decodeErr)
@@ -487,7 +958,7 @@ func (r *BreakRequestReconciler) reconcileItems(
 				continue
 			}
 
-			obj.SetNamespace(br.Namespace)
+			defaultTargetNamespace(obj, br.Namespace)
 
 			if br.Status.Active.ActiveUntil != nil {
 				ann := obj.GetAnnotations()
@@ -507,8 +978,10 @@ func (r *BreakRequestReconciler) reconcileItems(
 			labels[meta.AppManagedByLabel] = meta.ValueAppBreakTheGlassManager
 			obj.SetLabels(labels)
 
-			// Keep the rendered identity even when apply fails so it can be pruned.
-			effective.Targets = append(effective.Targets, runtime.RawExtension{Object: obj.DeepCopy()})
+			// Persist the exact SSA input before applying it. This remains the
+			// source of truth for retries and pruning, including after a partial
+			// apply failure.
+			resource.Targets[targetIndex] = runtime.RawExtension{Object: obj.DeepCopy()}
 
 			// BreakRequests are namespaced but may manage cluster-scoped objects,
 			// so their lifecycle cannot rely on Kubernetes owner references. The
@@ -522,7 +995,7 @@ func (r *BreakRequestReconciler) reconcileItems(
 			}
 
 			current := currentItems.GetItem(item.ResourceID)
-			result, applyErr := manager.Apply(ctx, r.Client, obj, ssa.ApplyOptions{
+			result, applyErr := manager.Apply(ctx, resourceClient, obj, ssa.ApplyOptions{
 				FieldOwner:        fieldOwner,
 				Force:             resource.Policy.Force,
 				Adopt:             resource.Policy.AllowsAdoption(),
@@ -545,10 +1018,6 @@ func (r *BreakRequestReconciler) reconcileItems(
 
 			processedItems.UpdateItem(item)
 		}
-
-		if len(effective.Targets) > 0 {
-			br.Status.Approved.Resources = append(br.Status.Approved.Resources, effective)
-		}
 	}
 
 	processedItems.SortDeterministic()
@@ -562,17 +1031,18 @@ func (r *BreakRequestReconciler) reconcileItems(
 func (r *BreakRequestReconciler) pruneItems(
 	ctx context.Context,
 	br *capsulev1beta2.BreakRequest,
+	resourceClient client.Client,
 ) (err error) {
 	var syncErr error
 
-	if br.Status.Approved == nil {
-		return errors.New("approved status is nil")
+	if br.Status.Request == nil {
+		return errors.New("request status is nil")
 	}
 
-	manager := r.managedResourceManager()
+	manager := r.managedResourceManager(resourceClient, br)
 	fieldOwner := meta.BreakRequestFieldOwner(br)
 
-	for _, resource := range br.Status.Approved.Resources {
+	for _, resource := range br.Status.Request.Resources {
 		for _, target := range resource.Targets {
 			obj, err := object(target)
 			if err != nil {
@@ -590,7 +1060,23 @@ func (r *BreakRequestReconciler) pruneItems(
 
 			current := br.Status.ProcessedItems.GetItem(item.ResourceID)
 
-			deleted, pruneErr := manager.Prune(ctx, r.Client, obj, ssa.PruneOptions{
+			if resource.Policy.ShouldOrphan() {
+				if orphanErr := manager.Orphan(ctx, resourceClient, obj, nil); orphanErr != nil {
+					item.Status = metav1.ConditionFalse
+					item.Message = "orphan failed: " + orphanErr.Error()
+					br.Status.ProcessedItems.UpdateItem(item)
+
+					syncErr = errors.Join(syncErr, orphanErr)
+
+					continue
+				}
+
+				br.Status.ProcessedItems.RemoveItem(item)
+
+				continue
+			}
+
+			deleted, pruneErr := manager.Prune(ctx, resourceClient, obj, ssa.PruneOptions{
 				FieldOwner:        fieldOwner,
 				PreviouslyCreated: current != nil && current.Created,
 			})
@@ -605,7 +1091,7 @@ func (r *BreakRequestReconciler) pruneItems(
 			}
 
 			if !deleted {
-				if disownErr := manager.Disown(ctx, r.Client, obj, nil); disownErr != nil {
+				if disownErr := manager.Disown(ctx, resourceClient, obj, nil); disownErr != nil {
 					item.Status = metav1.ConditionFalse
 					item.Message = "disown failed: " + disownErr.Error()
 					br.Status.ProcessedItems.UpdateItem(item)
@@ -672,11 +1158,216 @@ func object(re runtime.RawExtension) (*unstructured.Unstructured, error) {
 	return obj, nil
 }
 
-func (r *BreakRequestReconciler) managedResourceManager() ssa.Manager {
-	manager := r.resources
-	if manager.Reader == nil {
-		manager.Reader = r.Client
+func defaultTargetNamespace(obj *unstructured.Unstructured, namespace string) {
+	if obj.GetNamespace() == "" {
+		obj.SetNamespace(namespace)
 	}
+}
+
+func (r *BreakRequestReconciler) validateResolvedServiceAccount(
+	ctx context.Context,
+	br *capsulev1beta2.BreakRequest,
+) error {
+	if br.Status.Request == nil || br.Status.Request.Impersonation == nil {
+		return errors.New("resolved ServiceAccount is nil")
+	}
+
+	controllerName, controllerNamespace := configuration.ControllerServiceAccount()
+	if br.Status.Request.Impersonation.Name.String() == controllerName &&
+		br.Status.Request.Impersonation.Namespace.String() == controllerNamespace {
+		return nil
+	}
+
+	reader := r.resources.Reader
+	if reader == nil {
+		reader = r.Client
+	}
+
+	key := client.ObjectKey{
+		Name:      br.Status.Request.Impersonation.Name.String(),
+		Namespace: br.Status.Request.Impersonation.Namespace.String(),
+	}
+	serviceAccount := &corev1.ServiceAccount{}
+
+	if err := reader.Get(ctx, key, serviceAccount); err != nil {
+		return fmt.Errorf(
+			"resolved ServiceAccount %s/%s is unavailable: %w",
+			key.Namespace,
+			key.Name,
+			err,
+		)
+	}
+
+	return nil
+}
+
+func (r *BreakRequestReconciler) resourceClient(
+	ctx context.Context,
+	log logr.Logger,
+	br *capsulev1beta2.BreakRequest,
+	brt capsulev1beta2.BreakRequestTemplateSource,
+) (client.Client, error) {
+	if br.Status.Request == nil {
+		br.Status.Request = &capsulev1beta2.BreakRequestStatusRequest{}
+	}
+
+	serviceAccount := br.Status.Request.Impersonation
+	if serviceAccount == nil {
+		if brt != nil {
+			serviceAccount = r.resolveTemplateServiceAccount(log, brt)
+		}
+
+		if serviceAccount == nil {
+			controllerName, controllerNamespace := configuration.ControllerServiceAccount()
+			serviceAccount = &meta.NamespacedRFC1123ObjectReferenceWithNamespace{
+				Name:      meta.RFC1123Name(controllerName),
+				Namespace: meta.RFC1123SubdomainName(controllerNamespace),
+			}
+		}
+
+		resolved := *serviceAccount
+		br.Status.Request.Impersonation = &resolved
+	}
+
+	controllerName, controllerNamespace := configuration.ControllerServiceAccount()
+	if serviceAccount.Name.String() == controllerName &&
+		serviceAccount.Namespace.String() == controllerNamespace {
+		return r.Client, nil
+	}
+
+	if r.ImpersonationCache == nil {
+		return nil, errors.New("impersonation client cache is not configured")
+	}
+
+	if cached, ok := r.ImpersonationCache.Get(
+		serviceAccount.Namespace.String(),
+		serviceAccount.Name.String(),
+	); ok {
+		return cached, nil
+	}
+
+	if r.Configuration == nil {
+		return nil, errors.New("capsule configuration is required for service account impersonation")
+	}
+
+	restConfig, err := r.Configuration.ServiceAccountClient(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("load impersonation REST configuration: %w", err)
+	}
+
+	log.V(5).Info(
+		"using impersonation client for BreakRequest resources",
+		"serviceaccount", serviceAccount.Name,
+		"namespace", serviceAccount.Namespace,
+	)
+
+	resourceClient, err := r.ImpersonationCache.LoadOrCreate(
+		ctx,
+		log,
+		restConfig,
+		r.Scheme(),
+		*serviceAccount,
+	)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"load client for ServiceAccount %s/%s: %w",
+			serviceAccount.Namespace,
+			serviceAccount.Name,
+			err,
+		)
+	}
+
+	return resourceClient, nil
+}
+
+func (r *BreakRequestReconciler) resolveTemplateServiceAccount(
+	log logr.Logger,
+	brt capsulev1beta2.BreakRequestTemplateSource,
+) *meta.NamespacedRFC1123ObjectReferenceWithNamespace {
+	switch template := brt.(type) {
+	case *capsulev1beta2.BreakRequestTemplate:
+		if template == nil {
+			return nil
+		}
+
+		if template.Spec.Impersonation != nil {
+			return &meta.NamespacedRFC1123ObjectReferenceWithNamespace{
+				Name:      template.Spec.Impersonation.Name,
+				Namespace: meta.RFC1123SubdomainName(template.Namespace),
+			}
+		}
+
+		if r.Configuration == nil {
+			return nil
+		}
+
+		name := r.Configuration.ServiceAccountClientProperties().TenantDefaultServiceAccount
+		if name == "" {
+			return nil
+		}
+
+		return &meta.NamespacedRFC1123ObjectReferenceWithNamespace{
+			Name:      name,
+			Namespace: meta.RFC1123SubdomainName(template.Namespace),
+		}
+	case *capsulev1beta2.GlobalBreakRequestTemplate:
+		if template == nil {
+			return nil
+		}
+
+		return r.resolveGlobalTemplateServiceAccount(log, template)
+	default:
+		return nil
+	}
+}
+
+func (r *BreakRequestReconciler) resolveGlobalTemplateServiceAccount(
+	log logr.Logger,
+	brt *capsulev1beta2.GlobalBreakRequestTemplate,
+) *meta.NamespacedRFC1123ObjectReferenceWithNamespace {
+	if brt.Spec.Impersonation != nil {
+		return brt.Spec.Impersonation.DeepCopy()
+	}
+
+	if r.Configuration == nil {
+		return nil
+	}
+
+	properties := r.Configuration.ServiceAccountClientProperties()
+	name := properties.GlobalDefaultServiceAccount.String()
+	namespace := properties.GlobalDefaultServiceAccountNamespace.String()
+
+	if (name == "") != (namespace == "") {
+		log.V(2).Info(
+			"global default impersonation ServiceAccount requires both name and namespace",
+			"name", name,
+			"namespace", namespace,
+		)
+
+		return nil
+	}
+
+	if name == "" {
+		return nil
+	}
+
+	return &meta.NamespacedRFC1123ObjectReferenceWithNamespace{
+		Name:      properties.GlobalDefaultServiceAccount,
+		Namespace: properties.GlobalDefaultServiceAccountNamespace,
+	}
+}
+
+func (r *BreakRequestReconciler) managedResourceManager(
+	resourceClient client.Client,
+	br *capsulev1beta2.BreakRequest,
+) ssa.Manager {
+	manager := r.resources
+
+	if resourceClient == nil {
+		resourceClient = r.Client
+	}
+
+	manager.Reader = resourceClient
 
 	if manager.Metadata.CreatedByValue == "" {
 		manager.Metadata.CreatedByValue = meta.ValueControllerBreakTheGlass
@@ -688,6 +1379,18 @@ func (r *BreakRequestReconciler) managedResourceManager() ssa.Manager {
 
 	if manager.Metadata.ProtectedByValue == "" {
 		manager.Metadata.ProtectedByValue = meta.ValueControllerBreakTheGlass
+	}
+
+	if manager.Metadata.ProtectedByServiceAccountAnnotation == "" {
+		manager.Metadata.ProtectedByServiceAccountAnnotation = meta.BreakRequestServiceAccountAnnotation
+	}
+
+	if br != nil && br.Status.Request != nil && br.Status.Request.Impersonation != nil {
+		manager.Metadata.ProtectedByServiceAccount = users.GetServiceAccountFullName(*br.Status.Request.Impersonation)
+	}
+
+	if manager.Metadata.AppManagedByValue == "" {
+		manager.Metadata.AppManagedByValue = meta.ValueAppBreakTheGlassManager
 	}
 
 	return manager

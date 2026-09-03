@@ -5,6 +5,7 @@ package template
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"text/template"
@@ -114,6 +115,29 @@ func Validate(schemaData []byte, params []byte) error {
 		return fmt.Errorf("validation failed: %v", errors)
 	}
 
+	// The kube-openapi validator above preserves the validation behavior used by
+	// existing templates, but it only understands the older OpenAPI schema
+	// dialect. Validate the same parameters with the JSON Schema 2020-12
+	// compiler as well so conditional and composition keywords such as if/then,
+	// dependentRequired, and unevaluatedProperties are enforced at runtime.
+	compiled, err := compileJSONSchema(schemaData)
+	if err != nil {
+		return fmt.Errorf("failed to compile JSON Schema: %w", err)
+	}
+
+	if err := compiled.Validate(p); err != nil {
+		return fmt.Errorf("validation failed: %w", err)
+	}
+
+	kubernetesValidator, err := newKubernetesCELValidator(schemaData)
+	if err != nil {
+		return fmt.Errorf("failed to prepare x-kubernetes-validations: %w", err)
+	}
+
+	if err := kubernetesValidator.Validate(context.Background(), p, nil); err != nil {
+		return fmt.Errorf("validation failed: %w", err)
+	}
+
 	return nil
 }
 
@@ -128,6 +152,18 @@ func ValidateSchema(schemaData []byte) (*spec.Schema, error) {
 		return nil, fmt.Errorf("failed to validate OpenAPI schemaData: %w", err)
 	}
 
+	if err := validateJSONSchemaFormExtensions(schemaData); err != nil {
+		return nil, fmt.Errorf("failed to validate Capsule form extensions: %w", err)
+	}
+
+	if err := validateKubernetesValidationExtensions(schemaData); err != nil {
+		return nil, fmt.Errorf("failed to validate x-kubernetes-validations: %w", err)
+	}
+
+	if _, err := newKubernetesCELValidator(schemaData); err != nil {
+		return nil, fmt.Errorf("failed to prepare x-kubernetes-validations: %w", err)
+	}
+
 	// Convert to OpenAPI spec schemaData
 	schema := &spec.Schema{}
 	if err := schema.UnmarshalJSON(schemaData); err != nil {
@@ -138,21 +174,31 @@ func ValidateSchema(schemaData []byte) (*spec.Schema, error) {
 }
 
 func metaValidateJSONSchema(schemaBytes []byte) error {
+	_, err := compileJSONSchema(schemaBytes)
+
+	return err
+}
+
+func compileJSONSchema(schemaBytes []byte) (*jsonschema.Schema, error) {
 	// For OAS 3.1: https://json-schema.org/draft/2020-12/schema
 	meta := "https://json-schema.org/draft/2020-12/schema"
 
 	c := jsonschema.NewCompiler()
+
+	c.Draft = jsonschema.Draft2020
+
 	if err := c.AddResource("meta.json", bytes.NewReader([]byte(`{"$ref":"`+meta+`"}`))); err != nil {
-		return err
+		return nil, err
 	}
 	// Compile the candidate schema using the chosen meta-schema
 	if err := c.AddResource("candidate.json", bytes.NewReader(schemaBytes)); err != nil {
-		return err
+		return nil, err
 	}
 
-	if _, err := c.Compile("candidate.json"); err != nil {
-		return fmt.Errorf("schema invalid: %w", err)
+	compiled, err := c.Compile("candidate.json")
+	if err != nil {
+		return nil, fmt.Errorf("schema invalid: %w", err)
 	}
 
-	return nil
+	return compiled, nil
 }

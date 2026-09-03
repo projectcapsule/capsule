@@ -18,7 +18,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
 
-func TestBreakRequestTemplateReconciler(t *testing.T) {
+func TestGlobalBreakRequestTemplateReconciler(t *testing.T) {
 	t.Parallel()
 
 	scheme := runtime.NewScheme()
@@ -51,15 +51,15 @@ func TestBreakRequestTemplateReconciler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			template := &capsulev1beta2.BreakRequestTemplate{
+			template := &capsulev1beta2.GlobalBreakRequestTemplate{
 				ObjectMeta: metav1.ObjectMeta{Name: "template", Generation: 4},
-				Spec: capsulev1beta2.BreakRequestTemplateSpec{
+				Spec: capsulev1beta2.GlobalBreakRequestTemplateSpec{
 					NamespaceSelectors: tt.selectors,
 				},
 			}
 			cl := fake.NewClientBuilder().
 				WithScheme(scheme).
-				WithStatusSubresource(&capsulev1beta2.BreakRequestTemplate{}).
+				WithStatusSubresource(&capsulev1beta2.GlobalBreakRequestTemplate{}).
 				WithObjects(
 					template,
 					&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "team-a", Labels: map[string]string{"break-glass": "enabled"}}},
@@ -68,14 +68,14 @@ func TestBreakRequestTemplateReconciler(t *testing.T) {
 				).
 				Build()
 
-			r := &BreakRequestTemplateReconciler{Client: cl}
+			r := &GlobalBreakRequestTemplateReconciler{Client: cl}
 			if _, err := r.Reconcile(context.Background(), reconcile.Request{
 				NamespacedName: client.ObjectKey{Name: template.Name},
 			}); err != nil {
 				t.Fatal(err)
 			}
 
-			got := &capsulev1beta2.BreakRequestTemplate{}
+			got := &capsulev1beta2.GlobalBreakRequestTemplate{}
 			if err := cl.Get(context.Background(), client.ObjectKey{Name: template.Name}, got); err != nil {
 				t.Fatal(err)
 			}
@@ -94,15 +94,15 @@ func TestBreakRequestTemplateReconciler(t *testing.T) {
 	}
 }
 
-func TestBreakRequestTemplateStatusNamespacePresent(t *testing.T) {
+func TestGlobalBreakRequestTemplateStatusNamespacePresent(t *testing.T) {
 	t.Parallel()
 
-	selected := capsulev1beta2.BreakRequestTemplateStatus{Namespaces: []string{"team-a"}}
+	selected := capsulev1beta2.GlobalBreakRequestTemplateStatus{Namespaces: []string{"team-a"}}
 	if !selected.NamespacePresent("team-a") || selected.NamespacePresent("team-b") {
 		t.Fatalf("selected namespace lookup returned unexpected result")
 	}
 
-	unrestricted := capsulev1beta2.BreakRequestTemplateStatus{Namespaces: []string{"*"}}
+	unrestricted := capsulev1beta2.GlobalBreakRequestTemplateStatus{Namespaces: []string{"*"}}
 	if !unrestricted.NamespacePresent("any-namespace") {
 		t.Fatalf("wildcard status should match every namespace")
 	}

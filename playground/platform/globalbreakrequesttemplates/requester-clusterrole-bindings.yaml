@@ -1,0 +1,106 @@
+---
+# Lets a requester select one or more existing ClusterRoles and one or more
+# namespaces. After approval, the generator creates one RoleBinding for every
+# namespace/ClusterRole combination and binds it to the authenticated requester.
+# The resolved execution ServiceAccount needs RoleBinding lifecycle permissions
+# in every selected namespace and permission to bind every selected ClusterRole.
+#
+# Example BreakRequest params:
+# params:
+#   clusterRoles:
+#     - view
+#     - edit
+#   namespaces:
+#     - solar-dev
+#     - solar-test
+apiVersion: capsule.clastix.io/v1beta2
+kind: GlobalBreakRequestTemplate
+metadata:
+  name: clusterrole-bindings
+  labels:
+    company.com/consumer: "tenants"
+  annotations:
+    info.projectcapsule.dev/description: "Temporarily bind selected ClusterRoles to the requesting user in selected namespaces."
+    info.projectcapsule.dev/tags: "rbac,security"
+spec:
+  defaultDuration: 30m
+  maxDuration: 4h
+  approvals:
+    auto: false
+    approvers:
+      - kind: User
+        name: kubernetes-admin
+      - kind: User
+        name: admin
+  paramSchema:
+    type: object
+    additionalProperties: false
+    required:
+      - clusterRoles
+      - namespaces
+    properties:
+      clusterRoles:
+        type: array
+        title: ClusterRoles
+        description: ClusterRoles temporarily granted to the requesting user.
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+          maxLength: 253
+          pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$'
+          x-capsule-form:
+            widget: kubernetes-resource
+            source:
+              apiVersion: rbac.authorization.k8s.io/v1
+              kind: ClusterRole
+            option:
+              labelTemplate: '{{ .metadata.name }}'
+              valueTemplate: '{{ .metadata.name }}'
+      namespaces:
+        type: array
+        title: Namespaces
+        description: Namespaces in which the selected ClusterRoles are bound.
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+          maxLength: 63
+          pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+          x-capsule-form:
+            widget: kubernetes-resource
+            source:
+              apiVersion: v1
+              kind: Namespace
+            option:
+              labelTemplate: '{{ .metadata.name }}'
+              valueTemplate: '{{ .metadata.name }}'
+  resources:
+    - policy:
+        creation: Owner
+        protect: true
+        force: false
+        deletion: Remove
+      template: |
+        {{ range $namespace := $.params.namespaces }}
+        {{ range $clusterRole := $.params.clusterRoles }}
+        ---
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: RoleBinding
+        metadata:
+          name: 'btg-{{ deterministicUUID $.request.username $.request.timestamp $namespace $clusterRole | toLower }}'
+          namespace: '{{ $namespace }}'
+          annotations:
+            tracking.company.com/request-timestamp: '{{ $.request.timestamp }}'
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+          name: '{{ $clusterRole }}'
+        subjects:
+          - apiGroup: rbac.authorization.k8s.io
+            kind: User
+            name: '{{ $.request.username }}'
+        {{ end }}
+        {{ end }}

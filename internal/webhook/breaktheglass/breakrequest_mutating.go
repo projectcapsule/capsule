@@ -19,6 +19,7 @@ import (
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 func BreakRequestMutationHandler(log logr.Logger) handlers.Handler {
@@ -70,38 +71,91 @@ func (h *breakRequestMutationHandler) OnUpdate(_ client.Client, _ client.Reader,
 			return ad.ErroredResponse(err)
 		}
 
-		if oldBr.Status.Phase == capsulev1beta2.RequestPhaseApproved ||
-			newBr.Status.Phase != capsulev1beta2.RequestPhaseApproved {
+		// The controller already uses the lifecycle API and must be able to write
+		// reconciliation status without admission reconstructing it.
+		if users.IsControllerServiceAccount(req.UserInfo.Username) ||
+			oldBr.Status.Phase == newBr.Status.Phase {
 			return nil
 		}
 
-		// Capture the authenticated reviewer on manual approval. Preserve the
-		// controller's explicit System identity for automatic approvals.
-		if newBr.Status.Review != nil &&
-			newBr.Status.Review.Reviewer != nil &&
-			newBr.Status.Review.Reviewer.Type == breaktheglass.AccessEntityTypeSystem {
-			return nil
-		}
-
-		reviewer := breaktheglass.AccessEntity{
+		transitioned := oldBr.DeepCopy()
+		entity := &breaktheglass.AccessEntity{
 			Name:   req.UserInfo.Username,
 			Type:   h.getAccessEntityType(req.UserInfo.Username),
 			Groups: req.UserInfo.Groups,
 		}
 
-		var patch jsonpatch.JsonPatchOperation
-		if newBr.Status.Review == nil {
-			patch = jsonpatch.NewOperation("add", "/status/review", capsulev1beta2.ReviewInfo{
-				Reviewer: &reviewer,
-			})
-		} else {
-			patch = jsonpatch.NewOperation("add", "/status/review/reviewer", reviewer)
+		message := ""
+		if newBr.Status.Review != nil {
+			message = newBr.Status.Review.Message
 		}
 
-		response := admission.Patched("set authenticated BreakRequest reviewer", patch)
+		var err error
+
+		switch newBr.Status.Phase {
+		case capsulev1beta2.RequestPhaseApproved:
+			properties := requestForTransition(oldBr, newBr)
+			if properties == nil {
+				return ad.Deny("cannot approve BreakRequest without request properties")
+			}
+
+			err = transitioned.ApproveRequest(entity, properties, message)
+		case capsulev1beta2.RequestPhaseDenied:
+			err = transitioned.DenyRequest(entity, message)
+		case capsulev1beta2.RequestPhaseActive:
+			err = transitioned.ActiveRequest(entity)
+		case capsulev1beta2.RequestPhaseExpired:
+			err = transitioned.ExpireRequest(entity)
+		case capsulev1beta2.RequestPhaseRetrying:
+			err = transitioned.RetryRequest(entity)
+		case capsulev1beta2.RequestPhaseRequested,
+			capsulev1beta2.RequestPhaseCreated,
+			capsulev1beta2.RequestPhasePending,
+			capsulev1beta2.RequestPhaseFailed:
+			return ad.Denyf(
+				"transitioning BreakRequest from %s to %s is not supported",
+				oldBr.Status.Phase,
+				newBr.Status.Phase,
+			)
+		default:
+			return ad.Denyf(
+				"transitioning BreakRequest from %s to %s is not supported",
+				oldBr.Status.Phase,
+				newBr.Status.Phase,
+			)
+		}
+
+		if err != nil {
+			return ad.Denyf("invalid BreakRequest transition: %v", err)
+		}
+
+		response := admission.Patched(
+			"apply authenticated BreakRequest status transition",
+			jsonpatch.NewOperation("add", "/status", transitioned.Status),
+		)
 
 		return &response
 	}
+}
+
+func requestForTransition(
+	oldBr,
+	newBr *capsulev1beta2.BreakRequest,
+) *capsulev1beta2.BreakRequestStatusRequest {
+	if oldBr.Status.Request == nil {
+		return nil
+	}
+
+	properties := oldBr.Status.Request.DeepCopy()
+	if newBr.Status.Request == nil {
+		return properties
+	}
+
+	properties.KeepFor = newBr.Status.Request.KeepFor
+	properties.Duration = newBr.Status.Request.Duration
+	properties.StartTime = newBr.Status.Request.StartTime
+
+	return properties
 }
 
 func (h *breakRequestMutationHandler) OnDelete(_ client.Client, _ client.Reader, _ admission.Decoder, _ events.EventRecorder) handlers.Func {

@@ -754,6 +754,7 @@ func main() {
 		),
 		route.Node(handlers.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
 		route.Cordoning(handlers.InCapsuleGroups(cfg, generic.CordoningHandler(cfg))),
+		route.ServiceAccountReferences(serviceaccounts.ReferenceProtection()),
 		route.ServiceAccounts(
 			serviceaccounts.Handler(
 				cfg,
@@ -850,9 +851,12 @@ func main() {
 		)),
 		route.BreakRequestValidation(breaktheglass.BreakRequestValidationHandler(
 			ctrl.Log.WithName("webhooks").WithName("breakrequests"),
-			manager.GetRESTMapper(),
+			cfg,
 		)),
-		route.BreakRequestTemplateValidation(breaktheglass.BreakRequestTemplateValidationHandler(ctrl.Log.WithName("webhooks").WithName("breakrequesttemplates"))),
+		route.BreakRequestTemplateValidation(breaktheglass.BreakRequestTemplateValidationHandler(
+			ctrl.Log.WithName("webhooks").WithName("breakrequesttemplates"),
+		)),
+		route.GlobalBreakRequestTemplateValidation(breaktheglass.GlobalBreakRequestTemplateValidationHandler(ctrl.Log.WithName("webhooks").WithName("globalbreakrequesttemplates"))),
 		route.GenericBreakTheGlassHandler(),
 	)
 
@@ -949,17 +953,19 @@ func main() {
 	}
 
 	if err = (&breaktheglasscontroller.BreakRequestReconciler{
-		Log:     ctrl.Log.WithName("capsule.ctrl").WithName("breakrequest"),
-		Metrics: *metrics.MustMakeBreakRequestsRecorder(),
+		Log:                ctrl.Log.WithName("capsule.ctrl").WithName("breakrequest"),
+		Metrics:            *metrics.MustMakeBreakRequestsRecorder(),
+		Configuration:      cfg,
+		ImpersonationCache: impersonationCache,
 	}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "BreakRequestReconciler")
 		os.Exit(1)
 	}
 
-	if err = (&breaktheglasscontroller.BreakRequestTemplateReconciler{
-		Log: ctrl.Log.WithName("capsule.ctrl").WithName("breakrequesttemplate"),
+	if err = (&breaktheglasscontroller.GlobalBreakRequestTemplateReconciler{
+		Log: ctrl.Log.WithName("capsule.ctrl").WithName("globalbreakrequesttemplate"),
 	}).SetupWithManager(manager, controllerConfig); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BreakRequestTemplateReconciler")
+		setupLog.Error(err, "unable to create controller", "controller", "GlobalBreakRequestTemplateReconciler")
 		os.Exit(1)
 	}
 

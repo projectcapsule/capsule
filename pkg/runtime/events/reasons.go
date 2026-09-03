@@ -80,4 +80,6 @@ const (
 	ReasonBreakRequestExpired      = "BreakRequestExpired"
 	ReasonBreakRequestActivated    = "BreakRequestActivated"
 	ReasonBreakRequestReviewNeeded = "BreakRequestReviewNeeded"
+	ReasonBreakRequestApproved     = "BreakRequestApproved"
+	ReasonBreakRequestDenied       = "BreakRequestDenied"
 )

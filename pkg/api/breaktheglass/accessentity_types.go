@@ -3,8 +3,6 @@
 
 package breaktheglass
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 type AccessEntityType string
 
 const (
@@ -27,12 +25,4 @@ type AccessEntity struct {
 	Type AccessEntityType `json:"type,omitempty"`
 	// The groups the entity belongs to
 	Groups []string `json:"groups,omitempty"`
-}
-
-// +kubebuilder:object:generate=true
-// BreakRequestStatus defines the observed state of BreakRequest.
-type BreakRequestStatusConditionItem struct {
-	metav1.Condition `json:",inline"`
-
-	Reviewer AccessEntity `json:"reviewer,omitempty"`
 }

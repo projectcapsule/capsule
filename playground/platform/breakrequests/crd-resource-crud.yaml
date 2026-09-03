@@ -1,5 +1,5 @@
 # BreakRequest examples for the cluster-scoped `crd-resource-crud`
-# BreakRequestTemplate. Both referenced CRDs are installed by Capsule and are
+# GlobalBreakRequestTemplate. Both referenced CRDs are installed by Capsule and are
 # namespaced resources. Change the namespace and identities for your cluster.
 apiVersion: capsule.clastix.io/v1beta2
 kind: BreakRequest
@@ -8,7 +8,7 @@ metadata:
   namespace: default
 spec:
   template:
-    kind: BreakRequestTemplate
+    kind: GlobalBreakRequestTemplate
     name: crd-resource-crud
   requestor:
     type: User
@@ -28,7 +28,7 @@ metadata:
   namespace: default
 spec:
   template:
-    kind: BreakRequestTemplate
+    kind: GlobalBreakRequestTemplate
     name: crd-resource-crud
   requestor:
     type: User
@@ -48,7 +48,7 @@ metadata:
   namespace: default
 spec:
   template:
-    kind: BreakRequestTemplate
+    kind: GlobalBreakRequestTemplate
     name: crd-resource-crud-2
   requestor:
     type: User

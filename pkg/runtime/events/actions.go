@@ -16,4 +16,6 @@ const (
 	ActionExpired       string = "Expired"
 	ActionActivated     string = "Activated"
 	ActionPendingReview string = "PendingReview"
+	ActionApproved      string = "Approved"
+	ActionDenied        string = "Denied"
 )

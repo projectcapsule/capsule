@@ -11,7 +11,7 @@ metadata:
   namespace: solar-gateway-access
 spec:
   template:
-    kind: BreakRequestTemplate
+    kind: GlobalBreakRequestTemplate
     name: crd-clusterrole-distribution
   requestor:
     type: User
