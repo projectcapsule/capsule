@@ -47,3 +47,21 @@ spec:
                   selector:
                     matchLabels:
                       projectcapsule.dev/tenant: {{ $.tenant.metadata.name }}
+                - apiGroups:
+                  - "capsule.clastix.io"
+                  resources:
+                  - "globalbreakrequesttemplates"
+                  operations:
+                  - List
+                  selector:
+                    matchLabels:
+                      company.com/consumer: "tenants"
+                - apiGroups:
+                  - "rbac.authorization.k8s.io"
+                  resources:
+                  - "clusterroles"
+                  operations:
+                  - List
+                  selector:
+                    matchLabels:
+                      company.com/consumer: "tenants"

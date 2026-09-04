@@ -21,6 +21,9 @@ rules:
 - apiGroups: ["capsule.clastix.io"]
   resources: ["globalproxysettings", "tenantowners"]
   verbs: ["get", "create", "patch", "watch", "list", "delete"]
+- apiGroups: ["admissionregistration.k8s.io"]
+  resources: ["mutatingadmissionpolicies", "mutatingadmissionpolicybindings"]
+  verbs: ["get", "create", "patch", "watch", "list", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -43,3 +46,14 @@ rules:
 - apiGroups: [""]
   resources: ["*"]
   verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tenants:btr:operator
+  labels:
+    company.com/consumer: "tenants"
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "create", "patch", "watch", "list", "delete"]

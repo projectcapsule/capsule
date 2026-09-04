@@ -31,11 +31,13 @@ const (
 
 	CordonedLabel = "projectcapsule.dev/cordoned"
 
-	CapsuleNameLabel = "projectcapsule.dev/name"
+	CapsuleNameLabel  = "projectcapsule.dev/name"
+	AppManagedByLabel = "app.kubernetes.io/managed-by"
 
-	CreatedByCapsuleLabel = "projectcapsule.dev/created-by"
-	CustomResourcesLabel  = "projectcapsule.dev/custom-resources"
-	ResourceOriginLabel   = "projectcapsule.dev/resource-origin"
+	CreatedByCapsuleLabel   = "projectcapsule.dev/created-by"
+	ProtectedByCapsuleLabel = "projectcapsule.dev/protected-by"
+	CustomResourcesLabel    = "projectcapsule.dev/custom-resources"
+	ResourceOriginLabel     = "projectcapsule.dev/resource-origin"
 
 	NewManagedByCapsuleLabel = "projectcapsule.dev/managed-by"
 	ManagedByCapsuleLabel    = "capsule.clastix.io/managed-by"

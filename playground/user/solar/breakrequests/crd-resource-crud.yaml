@@ -1,0 +1,14 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: BreakRequest
+metadata:
+  name: clustrrole-alice
+  namespace: solar-test
+spec:
+  template:
+    kind: GlobalBreakRequestTemplate
+    name: clusterrole-binding
+  reason: Temporarily investigate and repair CustomQuota configuration.
+  duration: 30m
+  params:
+    clusterRole: "admin"

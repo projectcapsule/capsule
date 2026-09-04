@@ -75,4 +75,11 @@ const (
 	// CustomQuotas.
 	ReasonUsageCalculationFailed = "UsageCalculationFailed"
 	ReasonQuotaExceeded          = "QuotaExceeded"
+
+	// BreakRequests.
+	ReasonBreakRequestExpired      = "BreakRequestExpired"
+	ReasonBreakRequestActivated    = "BreakRequestActivated"
+	ReasonBreakRequestReviewNeeded = "BreakRequestReviewNeeded"
+	ReasonBreakRequestApproved     = "BreakRequestApproved"
+	ReasonBreakRequestDenied       = "BreakRequestDenied"
 )

@@ -1111,7 +1111,7 @@ spec:
                     type: string
                   globalDefaultServiceAccount:
                     description: |-
-                      Default ServiceAccount for global resources (GlobalTenantResource)
+                      Default ServiceAccount for global resources (GlobalTenantResource and GlobalBreakRequestTemplate)
                       When defined, users are required to use this ServiceAccount anywhere in the cluster
                       unless they explicitly provide their own.
                     maxLength: 63
@@ -1119,7 +1119,7 @@ spec:
                     type: string
                   globalDefaultServiceAccountNamespace:
                     description: |-
-                      Default ServiceAccount for global resources (GlobalTenantResource)
+                      Namespace of the default ServiceAccount for global resources (GlobalTenantResource and GlobalBreakRequestTemplate)
                       When defined, users are required to use this ServiceAccount anywhere in the cluster
                       unless they explicitly provide their own.
                     maxLength: 253
@@ -1132,7 +1132,7 @@ spec:
                     type: boolean
                   tenantDefaultServiceAccount:
                     description: |-
-                      Default ServiceAccount for namespaced resources (TenantResource)
+                      Default ServiceAccount for namespaced resources (TenantResource and BreakRequestTemplate)
                       When defined, users are required to use this ServiceAccount within the namespace
                       where they deploy the resource, unless they explicitly provide their own.
                     maxLength: 63

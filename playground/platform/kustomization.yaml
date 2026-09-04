@@ -9,3 +9,4 @@ resources:
   - owners/
   - resourcepools/
   - tenants/
+  - globalbreakrequesttemplates/

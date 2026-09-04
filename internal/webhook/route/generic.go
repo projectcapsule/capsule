@@ -25,6 +25,22 @@ func (w *replicasResourcesHandler) GetPath() string {
 	return "/generic/replications"
 }
 
+type breakTheGlassResourcesHandler struct{}
+
+func GenericBreakTheGlassHandler() handlers.Webhook {
+	return &breakTheGlassResourcesHandler{}
+}
+
+func (w *breakTheGlassResourcesHandler) GetHandlers() []handlers.Handler {
+	return []handlers.Handler{
+		generic.BreakTheGlassResourceHandler(),
+	}
+}
+
+func (w *breakTheGlassResourcesHandler) GetPath() string {
+	return "/generic/breaktheglass"
+}
+
 type genericCustomResourcesHandler struct {
 	handlers []handlers.Handler
 }

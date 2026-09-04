@@ -1,0 +1,147 @@
+# This template grants temporary CRUD access to all instances of one custom
+# resource in the namespace of the BreakRequest.
+#
+# Example BreakRequest parameters:
+# params:
+#   name: widgets-editor-alice
+#   crdName: widgets.platform.example.io
+#   subjectKind: User
+#   subjectName: alice@example.com
+apiVersion: capsule.clastix.io/v1beta2
+kind: GlobalBreakRequestTemplate
+metadata:
+  name: crd-resource-crud
+  labels:
+    company.com/consumer: "tenants"
+  annotations:
+    info.projectcapsule.dev/tags: "rbac,crd"
+
+
+spec:
+  # Optional. Selectors are ORed; omit this field to allow BreakRequests from
+  # every namespace. Matching namespace names are published in status.namespaces.
+  # namespaceSelectors:
+  #   - matchLabels:
+  #       projectcapsule.dev/break-the-glass: enabled
+  defaultDuration: 1h
+  maxDuration: 8h
+  keepFor: 7d
+
+  approvals:
+    # auto: true
+    approvers:
+      - kind: User
+        name: "kubernetes-admin"
+    # conditions: # CEL
+    #  - "requestor.name == 'Timmy' || requestor.name == 'Alice'"
+
+  paramSchema:
+    type: object
+    additionalProperties: false
+    required:
+      - name
+      - crdName
+      - subjectKind
+      - subjectName
+    properties:
+      name:
+        type: string
+        description: Unique DNS-compatible name for the temporary Role and RoleBinding.
+        pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+        maxLength: 63
+      crdName:
+        type: string
+        description: Name of the CustomResourceDefinition, for example widgets.platform.example.io.
+        minLength: 1
+        maxLength: 253
+        x-capsule-form:
+          widget: kubernetes-resource
+          source:
+            apiVersion: apiextensions.k8s.io/v1
+            kind: CustomResourceDefinition
+          option:
+            labelTemplate: '{{ .metadata.name }}'
+            valueTemplate: '{{ .metadata.name }}'
+      subjectKind:
+        type: string
+        description: Kind of RBAC subject receiving temporary access.
+        enum:
+          - User
+          - Group
+      subjectName:
+        type: string
+        description: Name of the Kubernetes user or group receiving temporary access.
+        minLength: 1
+  context:
+    resources:
+      - apiVersion: apiextensions.k8s.io/v1
+        kind: CustomResourceDefinition
+        name: '{{ .crdName }}'
+        index: crd
+        optional: false
+  resources:
+    - policy:
+        # Owner requires Capsule to create the resource. Merge adopts an
+        # existing resource when possible and creates it otherwise.
+        creation: Owner
+        # Prevent changes through admission while the request is active.
+        protect: true
+        force: false
+      targets:
+        - apiVersion: rbac.authorization.k8s.io/v1
+          kind: Role
+          metadata:
+            name: '{{ .name }}'
+          rules:
+            - apiGroups:
+                - '{{ (index .crd 0).spec.group }}'
+              resources:
+                - '{{ (index .crd 0).spec.names.plural }}'
+              verbs:
+                - get
+                - list
+                - watch
+                - create
+                - update
+                - patch
+                - delete
+                - deletecollection
+      template: |
+        # Multi YAML
+        ---
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: Role
+        metadata:
+          name: {{ $.params.name }}
+        rules:
+          - apiGroups:
+              - {{ (index $.context.resources.crd 0).spec.group }}
+            resources:
+              - {{ (index $.context.resources.crd 0).spec.names.plural }}
+            verbs:
+              - get
+              - list
+              - watch
+              - create
+              - update
+              - patch
+              - delete
+              - deletecollection
+
+    - policy:
+        creation: Owner
+        protect: true
+        force: false
+      targets:
+        - apiVersion: rbac.authorization.k8s.io/v1
+          kind: RoleBinding
+          metadata:
+            name: '{{ .name }}'
+          roleRef:
+            apiGroup: rbac.authorization.k8s.io
+            kind: Role
+            name: '{{ .name }}'
+          subjects:
+            - apiGroup: rbac.authorization.k8s.io
+              kind: '{{ .subjectKind }}'
+              name: '{{ .subjectName }}'

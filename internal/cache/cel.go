@@ -118,6 +118,7 @@ func (c *CELCache) getOrCompile(
 
 	var err error
 
+	//nolint:exhaustive //cel.ResultTypeString not used yet
 	switch resultType {
 	case celruntime.ResultTypeBoolean:
 		compiled, err = c.compiler.CompileBoolean(expression, mode)

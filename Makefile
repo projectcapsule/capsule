@@ -49,7 +49,7 @@ all: manager
 
 # Run tests
 .PHONY: test
-test: gotestsum test-clean generate manifests test-clean
+test: gotestsum test-clean generate manifests mocks test-clean
 	@GO111MODULE=on $(GOTEST) \
 		--format pkgname-and-test-fails \
 		--packages="$(shell go list ./... | grep -v "e2e")" \
@@ -64,6 +64,15 @@ test-clean: ## Clean tests cache
 # Build manager binary
 manager: generate golint
 	go build -o bin/manager
+
+# Build kubectl Capsule plugin binary
+.PHONY: kubectl-capsule
+kubectl-capsule:
+	@mkdir -p bin
+	go build -o bin/kubectl-capsule ./cmd/cli
+	@echo ""
+	@echo "Run the kubectl plugin with:"
+	@echo '  PATH="$(CURDIR)/bin:$$PATH" kubectl capsule --help'
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate manifests
@@ -205,6 +214,8 @@ dev-setup: dev-setup-flux-handoff
 		--set 'certManager.generateCertificates=false' \
 		--set 'tls.enableController=false' \
 		--set 'tls.create=false' \
+		--set rbac.breakrequests.create=true \
+		--set-string 'rbac.breakrequests.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set rbac.resources.create=true \
 		--set-string 'rbac.resources.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set rbac.resourcepoolclaims.create=true \
@@ -435,6 +446,11 @@ golint: golangci-lint
 golint-fix: golangci-lint
 	$(GOLANGCI_LINT) run -c .golangci.yaml --verbose --fix
 
+# generate mocks
+.PHONY: mocks
+mocks: mockgen
+	$(MOCKGEN) -destination internal/mocks/client/mock.go sigs.k8s.io/controller-runtime/pkg/client Client,SubResourceWriter,Reader
+
 .PHONY: e2e-openshift
 e2e-openshift: ginkgo
 	$(MAKE) e2e-build-openshift && $(MAKE) e2e-exec FILTER='&& !skip && !skip-on-openshift' && $(MAKE) e2e-destroy-openshift
@@ -486,6 +502,8 @@ e2e-install: helm-controller-version ko-build-all dev-install-gw-api-crds
 		--set 'manager.options.leaderElection.leaseDuration=60s' \
 		--set 'manager.options.leaderElection.renewDeadline=40s' \
 		--set 'manager.rbac.minimal=true' \
+		--set rbac.breakrequests.create=true \
+		--set-string 'rbac.breakrequests.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set rbac.resources.create=true \
 		--set-string 'rbac.resources.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set rbac.resourcepoolclaims.create=true \
@@ -678,6 +696,13 @@ APIDOCS_GEN_LOOKUP  := fybrik/crdoc
 apidocs-gen: ## Download crdoc locally if necessary.
 	@test -s $(APIDOCS_GEN) && $(APIDOCS_GEN) --version | grep -q $(APIDOCS_GEN_VERSION) || \
 	$(call go-install-tool,$(APIDOCS_GEN),fybrik.io/crdoc@$(APIDOCS_GEN_VERSION))
+
+MOCKGEN         := $(LOCALBIN)/mockgen
+MOCKGEN_VERSION := v0.6.0
+MOCKGEN_LOOKUP  := go.uber.org/mock/mockgen
+mockgen:
+	@test -s $(MOCKGEN) && $(MOCKGEN) -version | grep -q $(MOCKGEN_VERSION) || \
+	$(call go-install-tool,$(MOCKGEN),$(MOCKGEN_LOOKUP)@$(MOCKGEN_VERSION))
 
 GORELEASER          := $(LOCALBIN)/goreleaser
 GORELEASER_VERSION  := 2.17.1

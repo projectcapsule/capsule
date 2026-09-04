@@ -1,0 +1,28 @@
+# Apply the namespace, distributor ClusterRole, and promoted ServiceAccount in
+# ../tenantresources/gateway-api-role-distributor.yaml first. Then apply the
+# crd-clusterrole-distribution template and wait until solar-gateway-access is
+# listed in its status.namespaces before applying this request. The Gateway API
+# standard CRDs must also be installed so the template can load the HTTPRoute
+# CRD declared in params.crdName.
+apiVersion: capsule.clastix.io/v1beta2
+kind: BreakRequest
+metadata:
+  name: gateway-api-httproute-access
+  namespace: solar-gateway-access
+spec:
+  template:
+    kind: GlobalBreakRequestTemplate
+    name: crd-clusterrole-distribution
+  requestor:
+    type: User
+    name: alice
+  reason: Temporarily let the Gateway API developers manage HTTPRoutes in the solar Tenant.
+  duration: 2h
+  params:
+    roleName: temporary-gateway-api-httproute-editor
+    tenantResourceName: distribute-gateway-api-httproute-editor
+    roleBindingName: gateway-api-httproute-editors
+    crdName: httproutes.gateway.networking.k8s.io
+    serviceAccountName: gateway-api-role-distributor
+    subjectKind: Group
+    subjectName: gateway-api-developers
