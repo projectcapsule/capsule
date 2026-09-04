@@ -144,6 +144,8 @@ github.com/go-sprout/sprout v1.0.3 h1:LLuz0D3aYazgbVTOwCVuMor3LOUVYinipXRIdjA/D+
 github.com/go-sprout/sprout v1.0.3/go.mod h1:cFFzpnyGGry3cmN0UNCAM1f7AGok6vPVabeYQzBMBZY=
 github.com/go-sprout/sprout v1.1.0 h1:v3FuPtWq4ycA67T9AleSg5L4aekCbfawUKtUwBFMMac=
 github.com/go-sprout/sprout v1.1.0/go.mod h1:3e0Lgn1vcMXxqNyfHgVN+lEAmRpusURDzXWco6YHjvc=
+github.com/go-sprout/sprout v1.1.1 h1:W1k8rnSGnKHDR5Z5M8pi22zjFvAx9mRsomsfFT9c85c=
+github.com/go-sprout/sprout v1.1.1/go.mod h1:/gb8yk3HCg6S5+X16PDh+mVjk+6KFtKb6j5xoix4sVk=
 github.com/go-task/slim-sprig/v3 v3.0.0 h1:sUs3vkvUymDpBKi3qH1YSqBQk9+9D/8M2mN1vB6EwHI=
 github.com/go-task/slim-sprig/v3 v3.0.0/go.mod h1:W848ghGpv3Qj3dhTPRyJypKRiqCdHZiAzKg9hl15HA8=
 github.com/gobuffalo/flect v1.0.3 h1:xeWBM2nui+qnVvNM4S3foBhCAL2XgPU+a7FdpelbTq4=
@@ -336,6 +338,8 @@ go.yaml.in/yaml/v2 v2.4.4 h1:tuyd0P+2Ont/d6e2rl3be67goVK4R6deVxCUX5vyPaQ=
 go.yaml.in/yaml/v2 v2.4.4/go.mod h1:gMZqIpDtDqOfM0uNfy0SkpRhvUryYH0Z6wdMYcacYXQ=
 go.yaml.in/yaml/v3 v3.0.4 h1:tfq32ie2Jv2UxXFdLJdh3jXuOzWiL1fo0bu/FbuKpbc=
 go.yaml.in/yaml/v3 v3.0.4/go.mod h1:DhzuOOF2ATzADvBadXxruRBLzYTpT36CKvDb3+aBEFg=
+go.yaml.in/yaml/v3 v3.0.5 h1:N6y/pJk8buWs9NY5ERU2HSMfm+IuD/OtfdAnq6kESPw=
+go.yaml.in/yaml/v3 v3.0.5/go.mod h1:HVTZu1O7/Vkt2N+BFy8Zza+lnLsABggaTM2ZpNIGuKg=
 golang.org/x/crypto v0.53.0 h1:QZ4Muo8THX6CizN2vPPd5fBGHyogrdK9fG4wLPFUsto=
 golang.org/x/crypto v0.53.0/go.mod h1:DNLU434OwVakk9PzuwV8w62mAJpRJL3vsgcfp4Qnsio=
 golang.org/x/crypto v0.54.0 h1:YLIA59K4fiNzHzjnZt2tUJQjQtUWfWbeHBqKtk3eScw=
