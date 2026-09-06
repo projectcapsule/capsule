@@ -147,8 +147,9 @@ func (h *handler) OnUpdate(
 			return ad.ErroredResponse(err)
 		}
 
-		if response, stop := validateTerminatingNamespaceUpdate(req, oldNs, ns); stop {
-			return response
+		terminating := isTerminatingNamespace(oldNs)
+		if terminating && namespaceTenantAssignmentChanged(oldNs, ns) {
+			return ad.Deny("namespace tenant ownership can not change during termination")
 		}
 
 		reader = webhookutils.NewTenantCachingReader(reader)
@@ -157,6 +158,13 @@ func (h *handler) OnUpdate(
 
 		if response, stop := validateNamespaceTenantReferenceTransition(user, oldNs, ns); stop {
 			return response
+		}
+
+		// Kubernetes control-plane actors must be able to complete namespace
+		// deletion even when the referenced Tenant no longer exists. Capsule
+		// users, however, still need to pass the ownership check below.
+		if terminating && !user.IsCapsule() {
+			return nil
 		}
 
 		oldTenant, err := tenant.ResolveNamespaceTenant(ctx, reader, oldNs)
@@ -204,6 +212,13 @@ func (h *handler) OnUpdate(
 			return nil
 		}
 
+		// Once ownership has been established, allow finalizer and status updates
+		// needed to complete deletion without applying tenant policies that may
+		// have become unsatisfiable during termination.
+		if terminating {
+			return nil
+		}
+
 		if terminating := h.rejectOnTermination(ns, newTenant); terminating != nil {
 			return terminating
 		}
@@ -230,30 +245,11 @@ func namespaceTenantChanged(oldTenant, newTenant *capsulev1beta2.Tenant) bool {
 	return oldTenant.GetName() != newTenant.GetName() || oldTenant.GetUID() != newTenant.GetUID()
 }
 
-func isTerminatingNamespaceUpdate(
-	req admission.Request,
-	oldNs, newNs *corev1.Namespace,
-) bool {
-	return req.SubResource == "finalize" ||
-		newNs.DeletionTimestamp != nil ||
-		oldNs.DeletionTimestamp != nil ||
-		newNs.Status.Phase == corev1.NamespaceTerminating ||
-		oldNs.Status.Phase == corev1.NamespaceTerminating
-}
-
-func validateTerminatingNamespaceUpdate(
-	req admission.Request,
-	oldNs, newNs *corev1.Namespace,
-) (*admission.Response, bool) {
-	if !isTerminatingNamespaceUpdate(req, oldNs, newNs) {
-		return nil, false
-	}
-
-	if namespaceTenantAssignmentChanged(oldNs, newNs) {
-		return ad.Deny("namespace tenant ownership can not change during termination"), true
-	}
-
-	return nil, true
+func isTerminatingNamespace(oldNs *corev1.Namespace) bool {
+	// DeletionTimestamp is set by the API server and cannot be supplied through
+	// a namespace status/finalize update. Status.Phase is intentionally not
+	// trusted because callers with namespaces/status access can write it.
+	return oldNs.DeletionTimestamp != nil
 }
 
 func validateNamespaceTenantReferenceTransition(
@@ -277,6 +273,10 @@ func validateNamespaceTenantReferenceTransition(
 	case oldHasTenantReference && !newHasTenantReference:
 		return ad.Deny("namespace can not remove tenant ownership"), true
 	case !oldHasTenantReference && !newHasTenantReference:
+		if user.IsCapsule() {
+			return ad.Deny("namespace is not owned by any tenant"), true
+		}
+
 		return nil, true
 	default:
 		return nil, false
