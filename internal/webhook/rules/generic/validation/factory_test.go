@@ -157,7 +157,7 @@ func TestValidateGenericRules(t *testing.T) {
 
 		h := &genericRules{
 			rules: []genericRuleValidator{
-				func(genericObject, schema.GroupVersionKind, []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
+				func(genericObject, genericObject, schema.GroupVersionKind, []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
 					t.Fatalf("validator must not be called")
 
 					return nil, nil
@@ -170,6 +170,7 @@ func TestValidateGenericRules(t *testing.T) {
 		err := h.validateGenericRules(
 			context.Background(),
 			admission.Request{},
+			nil,
 			nil,
 			baseGVK,
 			testTenant(),
@@ -188,7 +189,7 @@ func TestValidateGenericRules(t *testing.T) {
 
 		h := &genericRules{
 			rules: []genericRuleValidator{
-				func(obj genericObject, got schema.GroupVersionKind, _ []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
+				func(_ genericObject, obj genericObject, got schema.GroupVersionKind, _ []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
 					if got != baseGVK {
 						t.Fatalf("expected gvk %s, got %s", baseGVK.String(), got.String())
 					}
@@ -211,6 +212,7 @@ func TestValidateGenericRules(t *testing.T) {
 		err := h.validateGenericRules(
 			context.Background(),
 			admission.Request{},
+			nil,
 			obj,
 			baseGVK,
 			testTenant(),
@@ -245,6 +247,7 @@ func TestValidateGenericRules(t *testing.T) {
 			rules: []genericRuleValidator{
 				func(
 					genericObject,
+					genericObject,
 					schema.GroupVersionKind,
 					[]*apirules.NamespaceRuleEnforceBody,
 				) (*ruleengine.Evaluation, error) {
@@ -263,6 +266,7 @@ func TestValidateGenericRules(t *testing.T) {
 		err := h.validateGenericRules(
 			context.Background(),
 			admission.Request{},
+			nil,
 			obj,
 			coreGVK("ConfigMap"),
 			&capsulev1beta2.Tenant{
@@ -293,7 +297,7 @@ func TestValidateGenericRules(t *testing.T) {
 
 		h := &genericRules{
 			rules: []genericRuleValidator{
-				func(genericObject, schema.GroupVersionKind, []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
+				func(genericObject, genericObject, schema.GroupVersionKind, []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
 					called = true
 
 					return nil, nil
@@ -306,6 +310,7 @@ func TestValidateGenericRules(t *testing.T) {
 		err := h.validateGenericRules(
 			context.Background(),
 			admission.Request{},
+			nil,
 			genericMetadataObject(map[string]string{
 				"managed-by": "human",
 			}, nil),
@@ -329,12 +334,12 @@ func TestValidateGenericRules(t *testing.T) {
 
 		h := &genericRules{
 			rules: []genericRuleValidator{
-				func(genericObject, schema.GroupVersionKind, []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
+				func(genericObject, genericObject, schema.GroupVersionKind, []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
 					calls = append(calls, "first")
 
 					return nil, nil
 				},
-				func(genericObject, schema.GroupVersionKind, []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
+				func(genericObject, genericObject, schema.GroupVersionKind, []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
 					calls = append(calls, "second")
 
 					return &ruleengine.Evaluation{}, nil
@@ -347,6 +352,7 @@ func TestValidateGenericRules(t *testing.T) {
 		err := h.validateGenericRules(
 			context.Background(),
 			admission.Request{},
+			nil,
 			genericMetadataObject(nil, nil),
 			baseGVK,
 			testTenant(),
@@ -376,7 +382,7 @@ func TestValidateGenericRules(t *testing.T) {
 
 		h := &genericRules{
 			rules: []genericRuleValidator{
-				func(_ genericObject, _ schema.GroupVersionKind, got []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
+				func(_ genericObject, _ genericObject, _ schema.GroupVersionKind, got []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
 					if len(got) != len(enforceBodies) {
 						t.Fatalf("expected %d enforce bodies, got %d", len(enforceBodies), len(got))
 					}
@@ -391,6 +397,7 @@ func TestValidateGenericRules(t *testing.T) {
 		err := h.validateGenericRules(
 			context.Background(),
 			admission.Request{},
+			nil,
 			genericMetadataObject(nil, nil),
 			baseGVK,
 			testTenant(),
@@ -410,10 +417,10 @@ func TestValidateGenericRules(t *testing.T) {
 
 		h := &genericRules{
 			rules: []genericRuleValidator{
-				func(genericObject, schema.GroupVersionKind, []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
+				func(genericObject, genericObject, schema.GroupVersionKind, []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
 					return nil, expected
 				},
-				func(genericObject, schema.GroupVersionKind, []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
+				func(genericObject, genericObject, schema.GroupVersionKind, []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
 					secondCalled = true
 
 					return nil, nil
@@ -426,6 +433,7 @@ func TestValidateGenericRules(t *testing.T) {
 		err := h.validateGenericRules(
 			context.Background(),
 			admission.Request{},
+			nil,
 			genericMetadataObject(nil, nil),
 			baseGVK,
 			testTenant(),
@@ -447,7 +455,7 @@ func TestValidateGenericRules(t *testing.T) {
 
 		h := &genericRules{
 			rules: []genericRuleValidator{
-				func(genericObject, schema.GroupVersionKind, []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
+				func(genericObject, genericObject, schema.GroupVersionKind, []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
 					calls++
 
 					return &ruleengine.Evaluation{
@@ -465,7 +473,7 @@ func TestValidateGenericRules(t *testing.T) {
 						},
 					}, nil
 				},
-				func(genericObject, schema.GroupVersionKind, []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
+				func(genericObject, genericObject, schema.GroupVersionKind, []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
 					calls++
 
 					return nil, nil
@@ -478,6 +486,7 @@ func TestValidateGenericRules(t *testing.T) {
 		err := h.validateGenericRules(
 			context.Background(),
 			admission.Request{},
+			nil,
 			genericMetadataObject(nil, nil),
 			baseGVK,
 			testTenant(),
@@ -499,7 +508,7 @@ func TestValidateGenericRules(t *testing.T) {
 
 		h := &genericRules{
 			rules: []genericRuleValidator{
-				func(genericObject, schema.GroupVersionKind, []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
+				func(genericObject, genericObject, schema.GroupVersionKind, []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
 					return &ruleengine.Evaluation{
 						Blocking: &ruleengine.Decision{
 							SetName:     "metadata label",
@@ -513,7 +522,7 @@ func TestValidateGenericRules(t *testing.T) {
 						},
 					}, nil
 				},
-				func(genericObject, schema.GroupVersionKind, []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
+				func(genericObject, genericObject, schema.GroupVersionKind, []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
 					secondCalled = true
 
 					return nil, nil
@@ -526,6 +535,7 @@ func TestValidateGenericRules(t *testing.T) {
 		err := h.validateGenericRules(
 			context.Background(),
 			admission.Request{},
+			nil,
 			genericMetadataObject(nil, nil),
 			baseGVK,
 			testTenant(),
@@ -561,7 +571,7 @@ func TestGenericRulesOnCreate(t *testing.T) {
 
 		h := &genericRules{
 			rules: []genericRuleValidator{
-				func(genericObject, schema.GroupVersionKind, []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
+				func(genericObject, genericObject, schema.GroupVersionKind, []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
 					called = true
 
 					return nil, nil
@@ -638,7 +648,7 @@ func TestGenericRulesOnCreate(t *testing.T) {
 
 		h := &genericRules{
 			rules: []genericRuleValidator{
-				func(genericObject, schema.GroupVersionKind, []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
+				func(genericObject, genericObject, schema.GroupVersionKind, []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
 					return nil, errors.New("validator failed")
 				},
 			},
@@ -672,18 +682,18 @@ func TestGenericRulesOnCreate(t *testing.T) {
 func TestGenericRulesOnUpdate(t *testing.T) {
 	t.Parallel()
 
-	t.Run("uses new object and allows when validators return nil", func(t *testing.T) {
+	t.Run("uses old and new objects and allows when validators return nil", func(t *testing.T) {
 		t.Parallel()
 
-		calledWithNewObject := false
+		calledWithObjects := false
 
 		oldObj := genericMetadataObject(map[string]string{"old": "true"}, nil)
 		newObj := genericMetadataObject(map[string]string{"new": "true"}, nil)
 
 		h := &genericRules{
 			rules: []genericRuleValidator{
-				func(obj genericObject, _ schema.GroupVersionKind, _ []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
-					calledWithNewObject = obj.GetLabels()["new"] == "true"
+				func(old, obj genericObject, _ schema.GroupVersionKind, _ []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
+					calledWithObjects = old.GetLabels()["old"] == "true" && obj.GetLabels()["new"] == "true"
 
 					return nil, nil
 				},
@@ -707,8 +717,8 @@ func TestGenericRulesOnUpdate(t *testing.T) {
 		if resp != nil {
 			t.Fatalf("expected nil response, got %#v", resp)
 		}
-		if !calledWithNewObject {
-			t.Fatalf("expected validator to receive the new object")
+		if !calledWithObjects {
+			t.Fatalf("expected validator to receive the old and new objects")
 		}
 	})
 
@@ -1041,6 +1051,7 @@ func TestGenericRulesWithRealMetadataValidatorSmoke(t *testing.T) {
 	h := GenericRules(cache.NewRegexCache()).(*genericRules)
 
 	evaluation, err := h.validateMetadata(
+		nil,
 		genericMetadataObject(map[string]string{"env": "prod"}, nil),
 		schema.GroupVersionKind{
 			Group:   "",
