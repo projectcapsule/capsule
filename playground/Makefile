@@ -4,7 +4,7 @@ SHELL := /usr/bin/env bash
 
 CLUSTER_NAME ?= capsule
 PROXY_PORT ?= 9001
-CONTEXT = kind-$(CLUSTER_NAME)
+CONTEXT ?= $(shell kubectl config current-context 2>/dev/null)
 KUBECTL = kubectl --context $(CONTEXT)
 TIMEOUT ?= 10m
 ROOT_DIR := $(abspath $(CURDIR)/..)

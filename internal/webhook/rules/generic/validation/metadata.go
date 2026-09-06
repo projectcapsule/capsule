@@ -33,6 +33,7 @@ type metadataEntry struct {
 }
 
 func (h *genericRules) validateMetadata(
+	oldObj genericObject,
 	obj genericObject,
 	gvk schema.GroupVersionKind,
 	enforceBodies []*apirules.NamespaceRuleEnforceBody,
@@ -41,7 +42,7 @@ func (h *genericRules) validateMetadata(
 		return nil, nil
 	}
 
-	entries, err := h.controlledMetadataEntries(obj, gvk, enforceBodies)
+	entries, err := h.controlledMetadataEntries(oldObj, obj, gvk, enforceBodies)
 	if err != nil {
 		return nil, err
 	}
@@ -178,12 +179,22 @@ func (h *genericRules) metadataSet(
 
 //nolint:gocognit
 func (h *genericRules) controlledMetadataEntries(
+	oldObj genericObject,
 	obj genericObject,
 	gvk schema.GroupVersionKind,
 	enforceBodies []*apirules.NamespaceRuleEnforceBody,
 ) ([]metadataEntry, error) {
 	labels := obj.GetLabels()
 	annotations := obj.GetAnnotations()
+
+	// Creation has no old object, so all present metadata is evaluated. During
+	// updates, unchanged entries still satisfy Required but skip value matching.
+	var oldLabels, oldAnnotations map[string]string
+
+	if oldObj != nil {
+		oldLabels = oldObj.GetLabels()
+		oldAnnotations = oldObj.GetAnnotations()
+	}
 
 	seen := make(map[string]metadataEntry)
 
@@ -224,7 +235,14 @@ func (h *genericRules) controlledMetadataEntries(
 
 					matchedAny = true
 
-					h.addMetadataEntry(seen, metadataFieldLabel, key, value, true, required)
+					h.addMetadataEntryIfChanged(
+						seen,
+						oldLabels,
+						metadataFieldLabel,
+						key,
+						value,
+						required,
+					)
 				}
 
 				if !matchedAny && required {
@@ -256,7 +274,14 @@ func (h *genericRules) controlledMetadataEntries(
 
 					matchedAny = true
 
-					h.addMetadataEntry(seen, metadataFieldAnnotation, key, value, true, required)
+					h.addMetadataEntryIfChanged(
+						seen,
+						oldAnnotations,
+						metadataFieldAnnotation,
+						key,
+						value,
+						required,
+					)
 				}
 
 				if !matchedAny && required {
@@ -280,6 +305,31 @@ func (h *genericRules) controlledMetadataEntries(
 	})
 
 	return out, nil
+}
+
+func metadataValueUnchanged(
+	oldMetadata map[string]string,
+	key string,
+	value string,
+) bool {
+	oldValue, ok := oldMetadata[key]
+
+	return ok && oldValue == value
+}
+
+func (h *genericRules) addMetadataEntryIfChanged(
+	seen map[string]metadataEntry,
+	oldMetadata map[string]string,
+	field metadataField,
+	key string,
+	value string,
+	required bool,
+) {
+	if metadataValueUnchanged(oldMetadata, key, value) {
+		return
+	}
+
+	h.addMetadataEntry(seen, field, key, value, true, required)
 }
 
 func (h *genericRules) matchesMetadataKey(selector, key string) (bool, error) {
