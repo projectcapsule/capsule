@@ -18,6 +18,9 @@ func ExtraFuncMap() template.FuncMap {
 
 	// Remove unsafe methods
 	delete(funcMap, "env")
+	// expandenv is from sprig but still supported in sprout
+	// expandEnv is the official sprout successor
+	delete(funcMap, "expandenv")
 	delete(funcMap, "expandEnv")
 
 	return funcMap

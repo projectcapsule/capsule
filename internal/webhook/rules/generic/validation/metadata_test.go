@@ -356,7 +356,7 @@ func TestValidateMetadata(t *testing.T) {
 
 			h := newMetadataTestRules(nil, nil)
 
-			got, err := h.validateMetadata(tt.obj, tt.gvk, tt.enforceBodies)
+			got, err := h.validateMetadata(nil, tt.obj, tt.gvk, tt.enforceBodies)
 			if tt.wantMessage == "error" {
 				if err == nil {
 					t.Fatalf("expected error")
@@ -419,6 +419,137 @@ func TestValidateMetadata(t *testing.T) {
 	}
 }
 
+func TestValidateMetadataUpdate(t *testing.T) {
+	t.Parallel()
+
+	denyAll := enforceMetadata(
+		apirules.ActionTypeDeny,
+		[]string{"*"},
+		[]string{"ConfigMap"},
+		map[string]apirules.MetadataValueRule{
+			".*": metadataPolicy(false, expression(".*")),
+		},
+		map[string]apirules.MetadataValueRule{
+			".*": metadataPolicy(false, expression(".*")),
+		},
+	)
+	allowB := enforceMetadata(
+		apirules.ActionTypeAllow,
+		[]string{"*"},
+		[]string{"ConfigMap"},
+		map[string]apirules.MetadataValueRule{
+			"label-b": metadataPolicy(false, expression(".*")),
+		},
+		map[string]apirules.MetadataValueRule{
+			"annotation-b": metadataPolicy(false, expression(".*")),
+		},
+	)
+	requireEnvironment := enforceMetadata(
+		apirules.ActionTypeAllow,
+		[]string{"*"},
+		[]string{"ConfigMap"},
+		map[string]apirules.MetadataValueRule{
+			"env": metadataPolicy(true, exact("prod")),
+		},
+		nil,
+	)
+
+	tests := []struct {
+		name          string
+		oldObj        genericObject
+		obj           genericObject
+		enforceBodies []*apirules.NamespaceRuleEnforceBody
+		wantNil       bool
+		wantBlocking  bool
+		wantPath      string
+	}{
+		{
+			name: "allows changed metadata authorized for the caller while ignoring unchanged metadata",
+			oldObj: metadataObject(
+				map[string]string{"label-a": "old"},
+				map[string]string{"annotation-a": "old"},
+			),
+			obj: metadataObject(
+				map[string]string{"label-a": "old", "label-b": "new"},
+				map[string]string{"annotation-a": "old", "annotation-b": "new"},
+			),
+			enforceBodies: []*apirules.NamespaceRuleEnforceBody{denyAll, allowB},
+		},
+		{
+			name:          "denies a changed label not authorized for the caller",
+			oldObj:        metadataObject(map[string]string{"label-a": "old"}, nil),
+			obj:           metadataObject(map[string]string{"label-a": "new"}, nil),
+			enforceBodies: []*apirules.NamespaceRuleEnforceBody{denyAll, allowB},
+			wantBlocking:  true,
+			wantPath:      `metadata.labels["label-a"]`,
+		},
+		{
+			name:          "ignores an unchanged required value",
+			oldObj:        metadataObject(map[string]string{"env": "legacy"}, nil),
+			obj:           metadataObject(map[string]string{"env": "legacy", "other": "new"}, nil),
+			enforceBodies: []*apirules.NamespaceRuleEnforceBody{requireEnvironment},
+			wantNil:       true,
+		},
+		{
+			name:          "denies a changed required value that is invalid",
+			oldObj:        metadataObject(map[string]string{"env": "prod"}, nil),
+			obj:           metadataObject(map[string]string{"env": "stage"}, nil),
+			enforceBodies: []*apirules.NamespaceRuleEnforceBody{requireEnvironment},
+			wantBlocking:  true,
+			wantPath:      `metadata.labels["env"]`,
+		},
+		{
+			name:          "denies removal of required metadata",
+			oldObj:        metadataObject(map[string]string{"env": "prod"}, nil),
+			obj:           metadataObject(nil, nil),
+			enforceBodies: []*apirules.NamespaceRuleEnforceBody{requireEnvironment},
+			wantBlocking:  true,
+			wantPath:      `metadata.labels["env"]`,
+		},
+		{
+			name:          "ignores removal of optional denied metadata",
+			oldObj:        metadataObject(map[string]string{"label-a": "old"}, nil),
+			obj:           metadataObject(nil, nil),
+			enforceBodies: []*apirules.NamespaceRuleEnforceBody{denyAll},
+			wantNil:       true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := newMetadataTestRules(nil, nil)
+
+			got, err := h.validateMetadata(tt.oldObj, tt.obj, coreGVK("ConfigMap"), tt.enforceBodies)
+			if err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+			if tt.wantNil {
+				if got != nil {
+					t.Fatalf("expected nil evaluation, got %#v", got)
+				}
+
+				return
+			}
+			if got == nil {
+				t.Fatal("expected evaluation")
+			}
+
+			blockingErr := got.BlockingError()
+			if tt.wantBlocking && blockingErr == nil {
+				t.Fatal("expected blocking error")
+			}
+			if !tt.wantBlocking && blockingErr != nil {
+				t.Fatalf("expected no blocking error, got %v", blockingErr)
+			}
+			if tt.wantPath != "" && got.Blocking.Value.Path != tt.wantPath {
+				t.Fatalf("expected path %q, got %q", tt.wantPath, got.Blocking.Value.Path)
+			}
+		})
+	}
+}
+
 func TestControlledMetadataEntriesMatchesKeyPatternsWithRegexCache(t *testing.T) {
 	t.Parallel()
 
@@ -439,6 +570,7 @@ func TestControlledMetadataEntriesMatchesKeyPatternsWithRegexCache(t *testing.T)
 	}}
 
 	entries, err := h.controlledMetadataEntries(
+		nil,
 		obj,
 		schema.GroupVersionKind{Version: "v1", Kind: "Namespace"},
 		enforce,
@@ -966,7 +1098,7 @@ func TestControlledMetadataEntries(t *testing.T) {
 
 			h := newMetadataTestRules(tt.managedLabels, tt.managedAnnotations)
 
-			got, err := h.controlledMetadataEntries(tt.obj, tt.gvk, tt.enforceBodies)
+			got, err := h.controlledMetadataEntries(nil, tt.obj, tt.gvk, tt.enforceBodies)
 			if err != nil {
 				t.Fatalf("controlledMetadataEntries() error = %v", err)
 			}
