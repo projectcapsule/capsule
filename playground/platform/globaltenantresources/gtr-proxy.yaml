@@ -50,7 +50,7 @@ spec:
                 - apiGroups:
                   - "capsule.clastix.io"
                   resources:
-                  - "globalbreakrequesttemplates"
+                  - "globalresourceleasetemplates"
                   operations:
                   - List
                   selector:

@@ -40,11 +40,11 @@ func TestManagedMetadataPatches(t *testing.T) {
 		ManagedByValue:                      testCreatedBy,
 		ProtectedByValue:                    testCreatedBy,
 		ProtectedByServiceAccount:           "system:serviceaccount:test:runner",
-		ProtectedByServiceAccountAnnotation: meta.BreakRequestServiceAccountAnnotation,
+		ProtectedByServiceAccountAnnotation: meta.ResourceLeaseServiceAccountAnnotation,
 	}}
 	owner := metav1.OwnerReference{
 		APIVersion: "capsule.clastix.io/v1beta2",
-		Kind:       "BreakRequest",
+		Kind:       "ResourceLease",
 		Name:       "request",
 		UID:        types.UID("request-uid"),
 	}
@@ -141,7 +141,7 @@ func TestApplyUsesServerSideApply(t *testing.T) {
 		ManagedByValue:                      testCreatedBy,
 		ProtectedByValue:                    testCreatedBy,
 		ProtectedByServiceAccount:           "system:serviceaccount:test:runner",
-		ProtectedByServiceAccountAnnotation: meta.BreakRequestServiceAccountAnnotation,
+		ProtectedByServiceAccountAnnotation: meta.ResourceLeaseServiceAccountAnnotation,
 	}}
 	desired := configMap("applied", map[string]any{"requested": "value"})
 	desired.SetLabels(map[string]string{
@@ -150,7 +150,7 @@ func TestApplyUsesServerSideApply(t *testing.T) {
 		meta.ProtectedByCapsuleLabel:  "template-value",
 	})
 	desired.SetAnnotations(map[string]string{
-		meta.BreakRequestServiceAccountAnnotation: "system:serviceaccount:spoofed:runner",
+		meta.ResourceLeaseServiceAccountAnnotation: "system:serviceaccount:spoofed:runner",
 	})
 
 	result, err := manager.Apply(context.Background(), recording, desired, ApplyOptions{
@@ -187,7 +187,7 @@ func TestApplyUsesServerSideApply(t *testing.T) {
 	if value := apply.object.GetLabels()[meta.ProtectedByCapsuleLabel]; value != testCreatedBy {
 		t.Fatalf("Apply() protection label = %q, want %q", value, testCreatedBy)
 	}
-	if value := apply.object.GetAnnotations()[meta.BreakRequestServiceAccountAnnotation]; value != "system:serviceaccount:test:runner" {
+	if value := apply.object.GetAnnotations()[meta.ResourceLeaseServiceAccountAnnotation]; value != "system:serviceaccount:test:runner" {
 		t.Fatalf("Apply() protection ServiceAccount = %q, want resolved identity", value)
 	}
 }
@@ -253,12 +253,12 @@ func TestApplyStripsProtectionWhenDisabled(t *testing.T) {
 		ManagedByValue:                      testCreatedBy,
 		ProtectedByValue:                    testCreatedBy,
 		ProtectedByServiceAccount:           "system:serviceaccount:test:runner",
-		ProtectedByServiceAccountAnnotation: meta.BreakRequestServiceAccountAnnotation,
+		ProtectedByServiceAccountAnnotation: meta.ResourceLeaseServiceAccountAnnotation,
 	}}
 	desired := configMap("unprotected", nil)
 	desired.SetLabels(map[string]string{meta.ProtectedByCapsuleLabel: "template-value"})
 	desired.SetAnnotations(map[string]string{
-		meta.BreakRequestServiceAccountAnnotation: "system:serviceaccount:spoofed:runner",
+		meta.ResourceLeaseServiceAccountAnnotation: "system:serviceaccount:spoofed:runner",
 	})
 
 	if _, err := manager.Apply(context.Background(), recording, desired, ApplyOptions{
@@ -269,7 +269,7 @@ func TestApplyStripsProtectionWhenDisabled(t *testing.T) {
 	if value := recording.patches[0].object.GetLabels()[meta.ProtectedByCapsuleLabel]; value != "" {
 		t.Fatalf("Apply() protection label = %q with protection disabled", value)
 	}
-	if value := recording.patches[0].object.GetAnnotations()[meta.BreakRequestServiceAccountAnnotation]; value != "" {
+	if value := recording.patches[0].object.GetAnnotations()[meta.ResourceLeaseServiceAccountAnnotation]; value != "" {
 		t.Fatalf("Apply() protection ServiceAccount = %q with protection disabled", value)
 	}
 }
@@ -362,7 +362,7 @@ func TestPrune(t *testing.T) {
 
 	owner := metav1.OwnerReference{
 		APIVersion: "capsule.clastix.io/v1beta2",
-		Kind:       "BreakRequest",
+		Kind:       "ResourceLease",
 		Name:       "request",
 		UID:        types.UID("request-uid"),
 	}
@@ -492,7 +492,7 @@ func TestOrphan(t *testing.T) {
 
 	owner := metav1.OwnerReference{
 		APIVersion: "capsule.clastix.io/v1beta2",
-		Kind:       "BreakRequest",
+		Kind:       "ResourceLease",
 		Name:       "request",
 		UID:        types.UID("request-uid"),
 	}
@@ -506,7 +506,7 @@ func TestOrphan(t *testing.T) {
 		"example.com/keep":            "true",
 	})
 	existing.SetAnnotations(map[string]string{
-		meta.BreakRequestServiceAccountAnnotation: "system:serviceaccount:stale:runner",
+		meta.ResourceLeaseServiceAccountAnnotation: "system:serviceaccount:stale:runner",
 		"example.com/keep":                        "true",
 	})
 
@@ -519,7 +519,7 @@ func TestOrphan(t *testing.T) {
 		ManagedByValue:                      testCreatedBy,
 		ProtectedByValue:                    testCreatedBy,
 		ProtectedByServiceAccount:           "system:serviceaccount:test:runner",
-		ProtectedByServiceAccountAnnotation: meta.BreakRequestServiceAccountAnnotation,
+		ProtectedByServiceAccountAnnotation: meta.ResourceLeaseServiceAccountAnnotation,
 		AppManagedByValue:                   "test-app-manager",
 	}}
 
@@ -552,7 +552,7 @@ func TestOrphan(t *testing.T) {
 			t.Fatalf("orphaned resource retains lifecycle label %q", key)
 		}
 	}
-	if _, found := retained.GetAnnotations()[meta.BreakRequestServiceAccountAnnotation]; found {
+	if _, found := retained.GetAnnotations()[meta.ResourceLeaseServiceAccountAnnotation]; found {
 		t.Fatalf("orphaned resource retains protection ServiceAccount annotation")
 	}
 	if retained.GetAnnotations()["example.com/keep"] != "true" {

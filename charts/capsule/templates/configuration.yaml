@@ -682,17 +682,17 @@ spec:
         timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
         {{- end }}
       {{- end }}
-      {{- with .Values.webhooks.hooks.breakrequests }}
+      {{- with .Values.webhooks.hooks.resourceleases }}
         {{- if .enabled }}
           {{- $anyValidating = true }}
-      - name: breakrequests.validating.projectcapsule.dev
+      - name: resourceleases.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         admissionReviewVersions:
           - v1
-        path: "/breakrequests/validating"
+        path: "/resourceleases/validating"
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
         {{- with .namespaceSelector }}
@@ -718,17 +718,17 @@ spec:
         timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
         {{- end }}
       {{- end }}
-      {{- with .Values.webhooks.hooks.breakrequesttemplates }}
+      {{- with .Values.webhooks.hooks.resourceleasetemplates }}
         {{- if .enabled }}
           {{- $anyValidating = true }}
-      - name: breakrequesttemplates.validating.projectcapsule.dev
+      - name: resourceleasetemplates.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         admissionReviewVersions:
           - v1
-        path: "/breakrequesttemplates/validating"
+        path: "/resourceleasetemplates/validating"
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
         {{- with .namespaceSelector }}
@@ -754,17 +754,17 @@ spec:
         timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
         {{- end }}
       {{- end }}
-      {{- with .Values.webhooks.hooks.globalbreakrequesttemplates }}
+      {{- with .Values.webhooks.hooks.globalresourceleasetemplates }}
         {{- if .enabled }}
           {{- $anyValidating = true }}
-      - name: globalbreakrequesttemplates.validating.projectcapsule.dev
+      - name: globalresourceleasetemplates.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         admissionReviewVersions:
           - v1
-        path: "/globalbreakrequesttemplates/validating"
+        path: "/globalresourceleasetemplates/validating"
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
         {{- with .namespaceSelector }}
@@ -790,17 +790,17 @@ spec:
         timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
         {{- end }}
       {{- end }}
-      {{- with .Values.webhooks.hooks.breakTheGlass }}
+      {{- with .Values.webhooks.hooks.resourceLease }}
         {{- if .enabled }}
           {{- $anyValidating = true }}
-      - name: break-the-glass.validating.projectcapsule.dev
+      - name: resource-lease.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         admissionReviewVersions:
           - v1
-        path: "/generic/breaktheglass"
+        path: "/generic/resourcelease"
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
         {{- with .namespaceSelector }}
@@ -1059,7 +1059,7 @@ spec:
         timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
 
       # ServiceAccount references may point outside Tenant namespaces (for
-      # example, from a GlobalTenantResource or GlobalBreakRequestTemplate).
+      # example, from a GlobalTenantResource or GlobalResourceLeaseTemplate).
       # Keep deletion protection separate from promotion validation so it is
       # not limited by the promotion label or Tenant namespace selectors.
       - name: serviceaccount-references.validating.projectcapsule.dev
@@ -1810,10 +1810,10 @@ spec:
         timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
         {{- end }}
       {{- end }}
-      {{- with .Values.webhooks.hooks.breakrequests }}
+      {{- with .Values.webhooks.hooks.resourceleases }}
         {{- if .enabled }}
           {{- $anyMutating = true }}
-      - name: breakrequests.mutating.projectcapsule.dev
+      - name: resourceleases.mutating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -1821,7 +1821,7 @@ spec:
         admissionReviewVersions:
           - v1
           - v1beta1
-        path: "/breakrequests/mutating"
+        path: "/resourceleases/mutating"
         failurePolicy:  {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
         reinvocationPolicy: {{ .reinvocationPolicy }}

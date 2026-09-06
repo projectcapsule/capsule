@@ -43,7 +43,6 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/internal/controllers/admission"
-	breaktheglasscontroller "github.com/projectcapsule/capsule/internal/controllers/breaktheglass"
 	cacheinvalidator "github.com/projectcapsule/capsule/internal/controllers/cfg/invalidator"
 	configcontroller "github.com/projectcapsule/capsule/internal/controllers/cfg/status"
 	customquotacontroller "github.com/projectcapsule/capsule/internal/controllers/customquotas"
@@ -51,6 +50,7 @@ import (
 	podlabelscontroller "github.com/projectcapsule/capsule/internal/controllers/pod"
 	"github.com/projectcapsule/capsule/internal/controllers/pv"
 	rbaccontroller "github.com/projectcapsule/capsule/internal/controllers/rbac"
+	resourceleasecontroller "github.com/projectcapsule/capsule/internal/controllers/resourcelease"
 	"github.com/projectcapsule/capsule/internal/controllers/resourcepools"
 	"github.com/projectcapsule/capsule/internal/controllers/resources"
 	rulestatuscontroller "github.com/projectcapsule/capsule/internal/controllers/rulestatus"
@@ -62,7 +62,6 @@ import (
 	"github.com/projectcapsule/capsule/internal/metrics"
 	capsuleversion "github.com/projectcapsule/capsule/internal/version"
 	"github.com/projectcapsule/capsule/internal/webhook"
-	"github.com/projectcapsule/capsule/internal/webhook/breaktheglass"
 	cfgvalidation "github.com/projectcapsule/capsule/internal/webhook/cfg"
 	customquotavalidation "github.com/projectcapsule/capsule/internal/webhook/customquota"
 	"github.com/projectcapsule/capsule/internal/webhook/defaults"
@@ -77,6 +76,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/owners"
 	"github.com/projectcapsule/capsule/internal/webhook/pod"
 	"github.com/projectcapsule/capsule/internal/webhook/pvc"
+	"github.com/projectcapsule/capsule/internal/webhook/resourcelease"
 	"github.com/projectcapsule/capsule/internal/webhook/resourcepool"
 	"github.com/projectcapsule/capsule/internal/webhook/route"
 	rulesgenericmutation "github.com/projectcapsule/capsule/internal/webhook/rules/generic/mutation"
@@ -846,18 +846,18 @@ func main() {
 			),
 		),
 		route.RulesValidating(manager.GetRESTMapper(), cfg),
-		route.BreakRequestMutation(breaktheglass.BreakRequestMutationHandler(
-			ctrl.Log.WithName("webhooks").WithName("breakrequests"),
+		route.ResourceLeaseMutation(resourcelease.ResourceLeaseMutationHandler(
+			ctrl.Log.WithName("webhooks").WithName("resourceleases"),
 		)),
-		route.BreakRequestValidation(breaktheglass.BreakRequestValidationHandler(
-			ctrl.Log.WithName("webhooks").WithName("breakrequests"),
+		route.ResourceLeaseValidation(resourcelease.ResourceLeaseValidationHandler(
+			ctrl.Log.WithName("webhooks").WithName("resourceleases"),
 			cfg,
 		)),
-		route.BreakRequestTemplateValidation(breaktheglass.BreakRequestTemplateValidationHandler(
-			ctrl.Log.WithName("webhooks").WithName("breakrequesttemplates"),
+		route.ResourceLeaseTemplateValidation(resourcelease.ResourceLeaseTemplateValidationHandler(
+			ctrl.Log.WithName("webhooks").WithName("resourceleasetemplates"),
 		)),
-		route.GlobalBreakRequestTemplateValidation(breaktheglass.GlobalBreakRequestTemplateValidationHandler(ctrl.Log.WithName("webhooks").WithName("globalbreakrequesttemplates"))),
-		route.GenericBreakTheGlassHandler(),
+		route.GlobalResourceLeaseTemplateValidation(resourcelease.GlobalResourceLeaseTemplateValidationHandler(ctrl.Log.WithName("webhooks").WithName("globalresourceleasetemplates"))),
+		route.GenericResourceLeaseHandler(),
 	)
 
 	nodeWebhookSupported, _ := utils.NodeWebhookSupported(kubeVersion)
@@ -952,20 +952,20 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&breaktheglasscontroller.BreakRequestReconciler{
-		Log:                ctrl.Log.WithName("capsule.ctrl").WithName("breakrequest"),
-		Metrics:            *metrics.MustMakeBreakRequestsRecorder(),
+	if err = (&resourceleasecontroller.ResourceLeaseReconciler{
+		Log:                ctrl.Log.WithName("capsule.ctrl").WithName("resourcelease"),
+		Metrics:            *metrics.MustMakeResourceLeasesRecorder(),
 		Configuration:      cfg,
 		ImpersonationCache: impersonationCache,
 	}).SetupWithManager(manager, controllerConfig); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BreakRequestReconciler")
+		setupLog.Error(err, "unable to create controller", "controller", "ResourceLeaseReconciler")
 		os.Exit(1)
 	}
 
-	if err = (&breaktheglasscontroller.GlobalBreakRequestTemplateReconciler{
-		Log: ctrl.Log.WithName("capsule.ctrl").WithName("globalbreakrequesttemplate"),
+	if err = (&resourceleasecontroller.GlobalResourceLeaseTemplateReconciler{
+		Log: ctrl.Log.WithName("capsule.ctrl").WithName("globalresourceleasetemplate"),
 	}).SetupWithManager(manager, controllerConfig); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "GlobalBreakRequestTemplateReconciler")
+		setupLog.Error(err, "unable to create controller", "controller", "GlobalResourceLeaseTemplateReconciler")
 		os.Exit(1)
 	}
 

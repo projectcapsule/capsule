@@ -14,20 +14,20 @@ import (
 	serviceaccountindexer "github.com/projectcapsule/capsule/pkg/runtime/indexers/serviceaccount"
 )
 
-func TestBreakRequestReference(t *testing.T) {
+func TestResourceLeaseReference(t *testing.T) {
 	t.Parallel()
 
-	indexer := serviceaccountindexer.BreakRequestReference{}
-	if _, ok := indexer.Object().(*capsulev1beta2.BreakRequest); !ok {
-		t.Fatalf("Object() = %T, want *BreakRequest", indexer.Object())
+	indexer := serviceaccountindexer.ResourceLeaseReference{}
+	if _, ok := indexer.Object().(*capsulev1beta2.ResourceLease); !ok {
+		t.Fatalf("Object() = %T, want *ResourceLease", indexer.Object())
 	}
 	if indexer.Field() != serviceaccountindexer.ReferenceFieldName {
 		t.Fatalf("Field() = %q, want %q", indexer.Field(), serviceaccountindexer.ReferenceFieldName)
 	}
 
-	request := &capsulev1beta2.BreakRequest{
+	request := &capsulev1beta2.ResourceLease{
 		ObjectMeta: metav1.ObjectMeta{Name: "access", Namespace: "team-a"},
-		Status: capsulev1beta2.BreakRequestStatus{Request: &capsulev1beta2.BreakRequestStatusRequest{
+		Status: capsulev1beta2.ResourceLeaseStatus{Request: &capsulev1beta2.ResourceLeaseStatusRequest{
 			Impersonation: &meta.NamespacedRFC1123ObjectReferenceWithNamespace{
 				Name:      "runner",
 				Namespace: "capsule-system",

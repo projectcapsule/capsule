@@ -25,20 +25,20 @@ func (w *replicasResourcesHandler) GetPath() string {
 	return "/generic/replications"
 }
 
-type breakTheGlassResourcesHandler struct{}
+type resourceLeaseResourcesHandler struct{}
 
-func GenericBreakTheGlassHandler() handlers.Webhook {
-	return &breakTheGlassResourcesHandler{}
+func GenericResourceLeaseHandler() handlers.Webhook {
+	return &resourceLeaseResourcesHandler{}
 }
 
-func (w *breakTheGlassResourcesHandler) GetHandlers() []handlers.Handler {
+func (w *resourceLeaseResourcesHandler) GetHandlers() []handlers.Handler {
 	return []handlers.Handler{
-		generic.BreakTheGlassResourceHandler(),
+		generic.ResourceLeaseResourceHandler(),
 	}
 }
 
-func (w *breakTheGlassResourcesHandler) GetPath() string {
-	return "/generic/breaktheglass"
+func (w *resourceLeaseResourcesHandler) GetPath() string {
+	return "/generic/resourcelease"
 }
 
 type genericCustomResourcesHandler struct {

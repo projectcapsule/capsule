@@ -34,8 +34,8 @@ func ResourceFieldOwner(fieldowner string) string {
 	return FieldManagerCapsulePrefix + "/resource/" + fieldowner
 }
 
-// BreakRequestFieldOwner returns a stable field manager for a BreakRequest.
-func BreakRequestFieldOwner(obj metav1.Object) string {
+// ResourceLeaseFieldOwner returns a stable field manager for a ResourceLease.
+func ResourceLeaseFieldOwner(obj metav1.Object) string {
 	identity := string(obj.GetUID())
 	if identity == "" {
 		hash := fnv.New64a()
@@ -45,7 +45,7 @@ func BreakRequestFieldOwner(obj metav1.Object) string {
 		identity = strconv.FormatUint(hash.Sum64(), 36)
 	}
 
-	return ResourceFieldOwner("breakrequest/" + identity)
+	return ResourceFieldOwner("resourcelease/" + identity)
 }
 
 // CapsuleFieldOwners returns the set of managers that start with the Capsule prefix.

@@ -37,25 +37,25 @@ func TestReferenceProtectionOnDelete(t *testing.T) {
 	}{
 		{name: "allows an unreferenced ServiceAccount"},
 		{
-			name: "denies an unexpired BreakRequest reference",
-			objects: []client.Object{&capsulev1beta2.BreakRequest{
+			name: "denies an unexpired ResourceLease reference",
+			objects: []client.Object{&capsulev1beta2.ResourceLease{
 				ObjectMeta: metav1.ObjectMeta{Name: "temporary-access", Namespace: "team-a"},
-				Status: capsulev1beta2.BreakRequestStatus{
-					Phase: capsulev1beta2.RequestPhaseActive,
-					Request: &capsulev1beta2.BreakRequestStatusRequest{
+				Status: capsulev1beta2.ResourceLeaseStatus{
+					Phase: capsulev1beta2.ResourceLeasePhaseActive,
+					Request: &capsulev1beta2.ResourceLeaseStatusRequest{
 						Impersonation: reference.DeepCopy(),
 					},
 				},
 			}},
-			wantDenied: "unexpired BreakRequest team-a/temporary-access",
+			wantDenied: "unexpired ResourceLease team-a/temporary-access",
 		},
 		{
-			name: "allows an expired BreakRequest reference",
-			objects: []client.Object{&capsulev1beta2.BreakRequest{
+			name: "allows an expired ResourceLease reference",
+			objects: []client.Object{&capsulev1beta2.ResourceLease{
 				ObjectMeta: metav1.ObjectMeta{Name: "expired-access", Namespace: "team-a"},
-				Status: capsulev1beta2.BreakRequestStatus{
-					Phase: capsulev1beta2.RequestPhaseExpired,
-					Request: &capsulev1beta2.BreakRequestStatusRequest{
+				Status: capsulev1beta2.ResourceLeaseStatus{
+					Phase: capsulev1beta2.ResourceLeasePhaseExpired,
+					Request: &capsulev1beta2.ResourceLeaseStatusRequest{
 						Impersonation: reference.DeepCopy(),
 					},
 				},
@@ -130,14 +130,14 @@ func referenceProtectionFakeClient(t *testing.T, objects ...client.Object) clien
 		t.Fatal(err)
 	}
 
-	breakRequestIndexer := serviceaccountindexer.BreakRequestReference{}
+	resourceLeaseIndexer := serviceaccountindexer.ResourceLeaseReference{}
 	globalResourceIndexer := tenantresource.GlobalServiceAccount{}
 	tenantResourceIndexer := tenantresource.NamespacedServiceAccount{}
 
 	return fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(objects...).
-		WithIndex(breakRequestIndexer.Object(), breakRequestIndexer.Field(), breakRequestIndexer.Func()).
+		WithIndex(resourceLeaseIndexer.Object(), resourceLeaseIndexer.Field(), resourceLeaseIndexer.Func()).
 		WithIndex(globalResourceIndexer.Object(), globalResourceIndexer.Field(), globalResourceIndexer.Func()).
 		WithIndex(tenantResourceIndexer.Object(), tenantResourceIndexer.Field(), tenantResourceIndexer.Func()).
 		Build()

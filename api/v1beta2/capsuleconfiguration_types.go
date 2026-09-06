@@ -162,16 +162,16 @@ type ServiceAccountClient struct {
 	// If true, TLS certificate verification is skipped (not recommended for production)
 	// +kubebuilder:default=false
 	SkipTLSVerify bool `json:"skipTlsVerify,omitempty"`
-	// Default ServiceAccount for global resources (GlobalTenantResource and GlobalBreakRequestTemplate)
+	// Default ServiceAccount for global resources (GlobalTenantResource and GlobalResourceLeaseTemplate)
 	// When defined, users are required to use this ServiceAccount anywhere in the cluster
 	// unless they explicitly provide their own.
 	GlobalDefaultServiceAccount meta.RFC1123Name `json:"globalDefaultServiceAccount,omitempty"`
-	// Namespace of the default ServiceAccount for global resources (GlobalTenantResource and GlobalBreakRequestTemplate)
+	// Namespace of the default ServiceAccount for global resources (GlobalTenantResource and GlobalResourceLeaseTemplate)
 	// When defined, users are required to use this ServiceAccount anywhere in the cluster
 	// unless they explicitly provide their own.
 	// +optional
 	GlobalDefaultServiceAccountNamespace meta.RFC1123SubdomainName `json:"globalDefaultServiceAccountNamespace,omitempty"`
-	// Default ServiceAccount for namespaced resources (TenantResource and BreakRequestTemplate)
+	// Default ServiceAccount for namespaced resources (TenantResource and ResourceLeaseTemplate)
 	// When defined, users are required to use this ServiceAccount within the namespace
 	// where they deploy the resource, unless they explicitly provide their own.
 	TenantDefaultServiceAccount meta.RFC1123Name `json:"tenantDefaultServiceAccount,omitempty"`

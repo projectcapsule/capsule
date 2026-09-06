@@ -17,7 +17,7 @@ const (
 	JSONSchemaFormWidgetKubernetesResource JSONSchemaFormWidget = "kubernetes-resource"
 
 	// JSONSchemaFormRequestNamespace resolves to the namespace in which the
-	// BreakRequest is being created.
+	// ResourceLease is being created.
 	JSONSchemaFormRequestNamespace = "request"
 
 	// JSONSchemaFormAllNamespaces lists a namespaced GVK across all namespaces.
@@ -59,9 +59,9 @@ type KubernetesResourceFormSource struct {
 	Kind string `json:"kind"`
 
 	// Namespace controls the list scope for namespaced resources. "request"
-	// selects the BreakRequest namespace, "*" selects all namespaces, and any
+	// selects the ResourceLease namespace, "*" selects all namespaces, and any
 	// other value selects that literal namespace. When omitted, form consumers
-	// use the BreakRequest namespace for namespaced GVKs and cluster scope for
+	// use the ResourceLease namespace for namespaced GVKs and cluster scope for
 	// cluster-scoped GVKs.
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
@@ -88,7 +88,7 @@ type KubernetesResourceFormOption struct {
 	// +optional
 	LabelTemplate string `json:"labelTemplate,omitempty"`
 
-	// ValueTemplate renders the value stored in the BreakRequest parameters. It
+	// ValueTemplate renders the value stored in the ResourceLease parameters. It
 	// defaults to "{{ .metadata.name }}".
 	// +optional
 	ValueTemplate string `json:"valueTemplate,omitempty"`

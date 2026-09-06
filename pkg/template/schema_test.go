@@ -131,14 +131,14 @@ allOf:
 			name: "service account namespace and name",
 			params: `
 subjectKind: ServiceAccount
-subjectName: operations/break-glass-runner
+subjectName: operations/resource-lease-runner
 `,
 		},
 		{
 			name: "service account without namespace",
 			params: `
 subjectKind: ServiceAccount
-subjectName: break-glass-runner
+subjectName: resource-lease-runner
 `,
 			wantError: true,
 		},

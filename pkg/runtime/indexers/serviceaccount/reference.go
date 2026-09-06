@@ -21,19 +21,19 @@ func ReferenceKey(namespace, name string) string {
 	return namespace + "/" + name
 }
 
-type BreakRequestReference struct{}
+type ResourceLeaseReference struct{}
 
-func (BreakRequestReference) Object() client.Object {
-	return &capsulev1beta2.BreakRequest{}
+func (ResourceLeaseReference) Object() client.Object {
+	return &capsulev1beta2.ResourceLease{}
 }
 
-func (BreakRequestReference) Field() string {
+func (ResourceLeaseReference) Field() string {
 	return ReferenceFieldName
 }
 
-func (BreakRequestReference) Func() client.IndexerFunc {
+func (ResourceLeaseReference) Func() client.IndexerFunc {
 	return func(object client.Object) []string {
-		request := object.(*capsulev1beta2.BreakRequest) //nolint:forcetypeassert
+		request := object.(*capsulev1beta2.ResourceLease) //nolint:forcetypeassert
 		if request.Status.Request == nil || request.Status.Request.Impersonation == nil {
 			return nil
 		}

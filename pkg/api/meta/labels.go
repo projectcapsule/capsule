@@ -38,6 +38,8 @@ const (
 	ProtectedByCapsuleLabel = "projectcapsule.dev/protected-by"
 	CustomResourcesLabel    = "projectcapsule.dev/custom-resources"
 	ResourceOriginLabel     = "projectcapsule.dev/resource-origin"
+	EventActorLabel         = "event.projectcapsule.dev/actor"
+	EventActorKindLabel     = "event.projectcapsule.dev/actor-kind"
 
 	NewManagedByCapsuleLabel = "projectcapsule.dev/managed-by"
 	ManagedByCapsuleLabel    = "capsule.clastix.io/managed-by"

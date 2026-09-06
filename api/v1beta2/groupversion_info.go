@@ -25,12 +25,12 @@ var (
 
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(GroupVersion,
-		&BreakRequest{},
-		&BreakRequestList{},
-		&BreakRequestTemplate{},
-		&BreakRequestTemplateList{},
-		&GlobalBreakRequestTemplate{},
-		&GlobalBreakRequestTemplateList{},
+		&ResourceLease{},
+		&ResourceLeaseList{},
+		&ResourceLeaseTemplate{},
+		&ResourceLeaseTemplateList{},
+		&GlobalResourceLeaseTemplate{},
+		&GlobalResourceLeaseTemplateList{},
 		&CapsuleConfiguration{},
 		&CapsuleConfigurationList{},
 		&CustomQuota{},

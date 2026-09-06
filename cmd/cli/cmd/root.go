@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/projectcapsule/capsule/cmd/cli/cmd/breaktheglass"
+	"github.com/projectcapsule/capsule/cmd/cli/cmd/resourcelease"
 	capsuleversion "github.com/projectcapsule/capsule/internal/version"
 )
 
@@ -29,5 +29,5 @@ func Execute() {
 
 func init() {
 	// Add subcommands
-	rootCmd.AddCommand(breaktheglass.RootCmd)
+	rootCmd.AddCommand(resourcelease.RootCmd)
 }

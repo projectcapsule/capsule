@@ -132,22 +132,22 @@ func TestManagerAndNameHelpers(t *testing.T) {
 	if got := meta.ResourceControllerFieldOwnerPrefix(); got != "projectcapsule.dev/resource/controller" {
 		t.Fatalf("ResourceControllerFieldOwnerPrefix() = %q", got)
 	}
-	if got := meta.ResourceFieldOwner("breakrequest/id"); got != "projectcapsule.dev/resource/breakrequest/id" {
+	if got := meta.ResourceFieldOwner("resourcelease/id"); got != "projectcapsule.dev/resource/resourcelease/id" {
 		t.Fatalf("ResourceFieldOwner() = %q", got)
 	}
 	withUID := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
 		Name: "request", Namespace: "default", UID: types.UID("request-uid"),
 	}}
-	if got := meta.BreakRequestFieldOwner(withUID); got != "projectcapsule.dev/resource/breakrequest/request-uid" {
-		t.Fatalf("BreakRequestFieldOwner() = %q", got)
+	if got := meta.ResourceLeaseFieldOwner(withUID); got != "projectcapsule.dev/resource/resourcelease/request-uid" {
+		t.Fatalf("ResourceLeaseFieldOwner() = %q", got)
 	}
 	withoutUID := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "request", Namespace: "default"}}
-	got := meta.BreakRequestFieldOwner(withoutUID)
-	if got != meta.BreakRequestFieldOwner(withoutUID.DeepCopy()) {
-		t.Fatalf("BreakRequestFieldOwner() is not deterministic: %q", got)
+	got := meta.ResourceLeaseFieldOwner(withoutUID)
+	if got != meta.ResourceLeaseFieldOwner(withoutUID.DeepCopy()) {
+		t.Fatalf("ResourceLeaseFieldOwner() is not deterministic: %q", got)
 	}
 	if len(got) > 128 {
-		t.Fatalf("BreakRequestFieldOwner() length = %d, want <= 128", len(got))
+		t.Fatalf("ResourceLeaseFieldOwner() length = %d, want <= 128", len(got))
 	}
 	if got := meta.NameForManagedRuleStatus(); got != "capsule-managed-rules" {
 		t.Fatalf("NameForManagedRuleStatus() = %q", got)

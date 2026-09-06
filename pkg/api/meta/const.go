@@ -9,6 +9,6 @@ const (
 	ValueController              string = "controller"
 	ValueControllerResources     string = "resources"
 	ValueControllerReplications  string = "replications"
-	ValueControllerBreakTheGlass string = "break-the-glass"
-	ValueAppBreakTheGlassManager string = "break-the-glass-controller"
+	ValueControllerResourceLease string = "resource-lease"
+	ValueAppResourceLeaseManager string = "resource-lease-controller"
 )

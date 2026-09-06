@@ -160,7 +160,7 @@ func (r *CacheInvalidator) checkServiceAccountReferences(
 ) (ref bool, err error) {
 	key := serviceaccountindexer.ReferenceKey(sa.GetNamespace(), sa.GetName())
 
-	var requests capsulev1beta2.BreakRequestList
+	var requests capsulev1beta2.ResourceLeaseList
 	if err := r.List(
 		ctx,
 		&requests,

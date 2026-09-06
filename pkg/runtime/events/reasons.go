@@ -76,10 +76,10 @@ const (
 	ReasonUsageCalculationFailed = "UsageCalculationFailed"
 	ReasonQuotaExceeded          = "QuotaExceeded"
 
-	// BreakRequests.
-	ReasonBreakRequestExpired      = "BreakRequestExpired"
-	ReasonBreakRequestActivated    = "BreakRequestActivated"
-	ReasonBreakRequestReviewNeeded = "BreakRequestReviewNeeded"
-	ReasonBreakRequestApproved     = "BreakRequestApproved"
-	ReasonBreakRequestDenied       = "BreakRequestDenied"
+	// ResourceLeases.
+	ReasonResourceLeaseExpired      = "ResourceLeaseExpired"
+	ReasonResourceLeaseActivated    = "ResourceLeaseActivated"
+	ReasonResourceLeaseReviewNeeded = "ResourceLeaseReviewNeeded"
+	ReasonResourceLeaseApproved     = "ResourceLeaseApproved"
+	ReasonResourceLeaseDenied       = "ResourceLeaseDenied"
 )
