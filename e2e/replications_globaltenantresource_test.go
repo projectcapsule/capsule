@@ -940,6 +940,17 @@ data:
 				g.Expect(current.Status.ServiceAccount.Name).To(Equal(apimeta.RFC1123Name(saNoDelete)))
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
+			By("protecting the ServiceAccount referenced by GlobalTenantResource status")
+			serviceAccount := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{
+				Name:      saNoDelete,
+				Namespace: "capsule-system",
+			}}
+			Eventually(func() bool {
+				err := k8sClient.Delete(ctx, serviceAccount, client.DryRunAll)
+
+				return apierrors.IsForbidden(err)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
+
 			Expect(k8sClient.Delete(ctx, gtr)).To(Succeed())
 
 			for _, ns := range tenantANamespaces {

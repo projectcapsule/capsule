@@ -50,6 +50,7 @@ import (
 	podlabelscontroller "github.com/projectcapsule/capsule/internal/controllers/pod"
 	"github.com/projectcapsule/capsule/internal/controllers/pv"
 	rbaccontroller "github.com/projectcapsule/capsule/internal/controllers/rbac"
+	resourceleasecontroller "github.com/projectcapsule/capsule/internal/controllers/resourcelease"
 	"github.com/projectcapsule/capsule/internal/controllers/resourcepools"
 	"github.com/projectcapsule/capsule/internal/controllers/resources"
 	rulestatuscontroller "github.com/projectcapsule/capsule/internal/controllers/rulestatus"
@@ -75,6 +76,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/owners"
 	"github.com/projectcapsule/capsule/internal/webhook/pod"
 	"github.com/projectcapsule/capsule/internal/webhook/pvc"
+	"github.com/projectcapsule/capsule/internal/webhook/resourcelease"
 	"github.com/projectcapsule/capsule/internal/webhook/resourcepool"
 	"github.com/projectcapsule/capsule/internal/webhook/route"
 	rulesgenericmutation "github.com/projectcapsule/capsule/internal/webhook/rules/generic/mutation"
@@ -752,6 +754,7 @@ func main() {
 		),
 		route.Node(handlers.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
 		route.Cordoning(handlers.InCapsuleGroups(cfg, generic.CordoningHandler(cfg))),
+		route.ServiceAccountReferences(serviceaccounts.ReferenceProtection()),
 		route.ServiceAccounts(
 			serviceaccounts.Handler(
 				cfg,
@@ -843,6 +846,18 @@ func main() {
 			),
 		),
 		route.RulesValidating(manager.GetRESTMapper(), cfg),
+		route.ResourceLeaseMutation(resourcelease.ResourceLeaseMutationHandler(
+			ctrl.Log.WithName("webhooks").WithName("resourceleases"),
+		)),
+		route.ResourceLeaseValidation(resourcelease.ResourceLeaseValidationHandler(
+			ctrl.Log.WithName("webhooks").WithName("resourceleases"),
+			cfg,
+		)),
+		route.ResourceLeaseTemplateValidation(resourcelease.ResourceLeaseTemplateValidationHandler(
+			ctrl.Log.WithName("webhooks").WithName("resourceleasetemplates"),
+		)),
+		route.GlobalResourceLeaseTemplateValidation(resourcelease.GlobalResourceLeaseTemplateValidationHandler(ctrl.Log.WithName("webhooks").WithName("globalresourceleasetemplates"))),
+		route.GenericResourceLeaseHandler(),
 	)
 
 	nodeWebhookSupported, _ := utils.NodeWebhookSupported(kubeVersion)
@@ -934,6 +949,23 @@ func main() {
 		Metrics:    metrics.MustMakeRuleStatusRecorder(),
 	}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RuleSet")
+		os.Exit(1)
+	}
+
+	if err = (&resourceleasecontroller.ResourceLeaseReconciler{
+		Log:                ctrl.Log.WithName("capsule.ctrl").WithName("resourcelease"),
+		Metrics:            *metrics.MustMakeResourceLeasesRecorder(),
+		Configuration:      cfg,
+		ImpersonationCache: impersonationCache,
+	}).SetupWithManager(manager, controllerConfig); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ResourceLeaseReconciler")
+		os.Exit(1)
+	}
+
+	if err = (&resourceleasecontroller.GlobalResourceLeaseTemplateReconciler{
+		Log: ctrl.Log.WithName("capsule.ctrl").WithName("globalresourceleasetemplate"),
+	}).SetupWithManager(manager, controllerConfig); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "GlobalResourceLeaseTemplateReconciler")
 		os.Exit(1)
 	}
 

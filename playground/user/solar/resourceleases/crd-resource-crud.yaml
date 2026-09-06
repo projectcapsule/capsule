@@ -1,0 +1,28 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: ResourceLease
+metadata:
+  name: clustrrole-alice
+  namespace: solar-test
+spec:
+  template:
+    kind: GlobalResourceLeaseTemplate
+    name: clusterrole-binding
+  reason: Temporarily investigate and repair CustomQuota configuration.
+  duration: 30m
+  params:
+    clusterRole: "admin"
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: ResourceLease
+metadata:
+  name: edit-alice
+  namespace: solar-test
+spec:
+  template:
+    kind: GlobalResourceLeaseTemplate
+    name: clusterrole-binding
+  reason: Temporarily investigate and repair CustomQuota configuration.
+  duration: 30m
+  params:
+    clusterRole: "edit"

@@ -61,7 +61,7 @@ help: ## Show the available playground targets.
 	@awk 'BEGIN {FS = ":.*## "; print "Capsule local playground\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 check: ## Check required local tools and the Docker daemon.
-	@for tool in curl docker envsubst flux jq kind kubectl openssl; do \
+	@for tool in curl docker envsubst flux jq kind kubectl openssl yq; do \
 		command -v "$$tool" >/dev/null || { echo "Missing required tool: $$tool" >&2; exit 1; }; \
 	done
 	@[[ '$(DEX_HOST)' =~ ^[a-zA-Z0-9.-]+$$ ]] || { echo "DEX_HOST is not a valid DNS hostname" >&2; exit 1; }
@@ -194,6 +194,7 @@ apply-user:
 	@$(KUBECTL) label ns green-test env=test --overwrite
 	@$(KUBECTL) get ns green-prod >/dev/null 2>&1 || $(KUBECTL) create ns green-prod --as bob --as-group projectcapsule.dev
 	@$(KUBECTL) label ns green-prod env=prod --overwrite
+	@$(KUBECTL) get ns solar-system >/dev/null 2>&1 || $(KUBECTL) create ns solar-system --as alice --as-group projectcapsule.dev
 	@$(KUBECTL) get ns solar-uat >/dev/null 2>&1 || $(KUBECTL) create ns solar-uat --as alice --as-group projectcapsule.dev
 	@$(KUBECTL) label ns solar-uat env=test --overwrite
 	@$(KUBECTL) label ns solar-uat team=team-a --overwrite
@@ -203,9 +204,8 @@ apply-user:
 	@$(KUBECTL) get ns solar-prod >/dev/null 2>&1 || $(KUBECTL) create ns solar-prod --as alice --as-group projectcapsule.dev
 	@$(KUBECTL) label ns solar-prod env=prod --overwrite
 	@$(KUBECTL) label ns solar-prod team=team-b --overwrite
-	@$(KUBECTL) kustomize user/solar | envsubst $(SUBSTITUTION_VARIABLES) | $(KUBECTL) apply --as alice --as-group projectcapsule.dev -f -
-
-
+	@$(KUBECTL) kustomize user/solar | envsubst $(SUBSTITUTION_VARIABLES) | yq 'select(.kind != "GlobalTenantResource" or .metadata.name != "solar-namespace-pod-tolerations")' | $(KUBECTL) apply --as alice --as-group projectcapsule.dev -f -
+	@$(KUBECTL) kustomize user/solar | envsubst $(SUBSTITUTION_VARIABLES) | yq 'select(.kind == "GlobalTenantResource" and .metadata.name == "solar-namespace-pod-tolerations")' | $(KUBECTL) apply -f -
 
 
 wait-oidc: certificates ## Wait for ingress and Dex before enabling API-server OIDC.

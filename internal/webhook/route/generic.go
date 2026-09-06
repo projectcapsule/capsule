@@ -25,6 +25,22 @@ func (w *replicasResourcesHandler) GetPath() string {
 	return "/generic/replications"
 }
 
+type resourceLeaseResourcesHandler struct{}
+
+func GenericResourceLeaseHandler() handlers.Webhook {
+	return &resourceLeaseResourcesHandler{}
+}
+
+func (w *resourceLeaseResourcesHandler) GetHandlers() []handlers.Handler {
+	return []handlers.Handler{
+		generic.ResourceLeaseResourceHandler(),
+	}
+}
+
+func (w *resourceLeaseResourcesHandler) GetPath() string {
+	return "/generic/resourcelease"
+}
+
 type genericCustomResourcesHandler struct {
 	handlers []handlers.Handler
 }

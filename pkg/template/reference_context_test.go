@@ -76,6 +76,30 @@ func TestResourceReferenceLoadResources(t *testing.T) {
 		}
 	})
 
+	t.Run("cluster-scoped object ignores the default namespace", func(t *testing.T) {
+		t.Parallel()
+
+		clusterMapper := templateRESTMapper()
+		clusterMapper.Add(
+			corev1.SchemeGroupVersion.WithKind("Namespace"),
+			meta.RESTScopeRoot,
+		)
+		clusterClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(
+			&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "team-a"}},
+		).Build()
+
+		got, err := (tpl.ResourceReference{
+			VersionKind: tplVersionKind("v1", "Namespace"),
+			Name:        "team-a",
+		}).LoadResources(ctx, clusterClient, clusterMapper, "ignored-default", nil, nil, true, nil)
+		if err != nil {
+			t.Fatalf("LoadResources() unexpected error: %v", err)
+		}
+		if len(got) != 1 || got[0].GetName() != "team-a" || got[0].GetNamespace() != "" {
+			t.Fatalf("LoadResources() = %#v, want cluster-scoped Namespace/team-a", got)
+		}
+	})
+
 	t.Run("optional missing named object returns nil", func(t *testing.T) {
 		t.Parallel()
 
@@ -186,11 +210,37 @@ func TestTemplateContextGatherContext(t *testing.T) {
 	}
 }
 
+func TestTemplateContextValidateVariables(t *testing.T) {
+	t.Parallel()
+
+	context := &tpl.TemplateContext{Resources: []*tpl.TemplateResourceReference{{
+		ResourceReference: tpl.ResourceReference{
+			Name:      "{{ .name }}",
+			Namespace: "{{ namespace }}",
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{
+				"app": "{{ application }}",
+			}},
+		},
+	}}}
+
+	if err := context.ValidateVariables(map[string]string{
+		".name":       "settings",
+		"namespace":   "team-a",
+		"application": "api",
+	}); err != nil {
+		t.Fatalf("ValidateVariables() unexpected error: %v", err)
+	}
+	if err := context.ValidateVariables(map[string]string{".name": "settings"}); err == nil ||
+		!strings.Contains(err.Error(), "undefined variable") {
+		t.Fatalf("ValidateVariables() error = %v, want undefined variable", err)
+	}
+}
+
 func configMap(namespace, name string, lbls map[string]string) *corev1.ConfigMap {
 	return &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name, Labels: lbls}}
 }
 
-func templateRESTMapper() meta.RESTMapper {
+func templateRESTMapper() *meta.DefaultRESTMapper {
 	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{{Version: "v1"}})
 	mapper.Add(schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"}, meta.RESTScopeNamespace)
 

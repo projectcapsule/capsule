@@ -32,9 +32,11 @@ func TestNamespacedTenantResourceIndexers(t *testing.T) {
 		Status: capsulev1beta2.TenantResourceStatus{
 			TenantResourceCommonStatus: capsulev1beta2.TenantResourceCommonStatus{
 				ServiceAccount: &meta.NamespacedRFC1123ObjectReferenceWithNamespace{Name: "builder"},
-				ProcessedItems: meta.ProcessedItems{
-					item,
-					{ResourceID: gvk.ResourceID{Version: "v1", Kind: "Secret", Namespace: "tenant-a", Name: "token"}},
+				ManagedResourcesStatus: meta.ManagedResourcesStatus{
+					ProcessedItems: meta.ProcessedItems{
+						item,
+						{ResourceID: gvk.ResourceID{Version: "v1", Kind: "Secret", Namespace: "tenant-a", Name: "token"}},
+					},
 				},
 			},
 		},
@@ -75,7 +77,9 @@ func TestGlobalProcessedItemsIndexer(t *testing.T) {
 	gtr := &capsulev1beta2.GlobalTenantResource{
 		Status: capsulev1beta2.GlobalTenantResourceStatus{
 			TenantResourceCommonStatus: capsulev1beta2.TenantResourceCommonStatus{
-				ProcessedItems: meta.ProcessedItems{item},
+				ManagedResourcesStatus: meta.ManagedResourcesStatus{
+					ProcessedItems: meta.ProcessedItems{item},
+				},
 			},
 		},
 	}

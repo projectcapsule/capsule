@@ -551,7 +551,7 @@ spec:
                 format: int64
                 type: integer
               processedItems:
-                description: List of the replicated resources for the given TenantResource.
+                description: List of resources managed by the API object.
                 items:
                   description: Advanced Status Item for pin pointing items in tenants/namespaces.
                   properties:
@@ -641,7 +641,7 @@ spec:
                 - namespace
                 type: object
               size:
-                description: How many items are being replicated by the TenantResource.
+                description: Number of managed resources.
                 type: integer
             required:
             - size

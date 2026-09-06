@@ -64,7 +64,7 @@ So the TL;DR answer is:
 
 ```bash
 # Create a KinD cluster if not already created
-$ make dev-cluster
+$ make dev-build dev-install-deps
 
 # To retrieve your laptop's IP and execute `make dev-setup` to setup dev env
 # For example: LAPTOP_HOST_IP=192.168.10.101 make dev-setup

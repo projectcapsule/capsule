@@ -12,4 +12,10 @@ const (
 	ActionMutated          string = "Mutated"
 	ActionValidationDenied string = "ValidationDenied"
 	ActionRuleAudit        string = "RuleAudit"
+
+	ActionExpired       string = "Expired"
+	ActionActivated     string = "Activated"
+	ActionPendingReview string = "PendingReview"
+	ActionApproved      string = "Approved"
+	ActionDenied        string = "Denied"
 )

@@ -17,10 +17,15 @@ func PatchApply(
 	obj client.Object,
 	fieldOwner string,
 	overwrite bool,
+	dryRun bool,
 ) error {
 	opts := []client.PatchOption{client.FieldOwner(fieldOwner)}
 	if overwrite {
 		opts = append(opts, client.ForceOwnership)
+	}
+
+	if dryRun {
+		opts = append(opts, client.DryRunAll)
 	}
 
 	//nolint:staticcheck

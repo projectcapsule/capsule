@@ -75,4 +75,11 @@ const (
 	// CustomQuotas.
 	ReasonUsageCalculationFailed = "UsageCalculationFailed"
 	ReasonQuotaExceeded          = "QuotaExceeded"
+
+	// ResourceLeases.
+	ReasonResourceLeaseExpired      = "ResourceLeaseExpired"
+	ReasonResourceLeaseActivated    = "ResourceLeaseActivated"
+	ReasonResourceLeaseReviewNeeded = "ResourceLeaseReviewNeeded"
+	ReasonResourceLeaseApproved     = "ResourceLeaseApproved"
+	ReasonResourceLeaseDenied       = "ResourceLeaseDenied"
 )
