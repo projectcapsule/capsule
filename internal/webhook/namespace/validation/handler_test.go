@@ -16,6 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	authuser "k8s.io/apiserver/pkg/authentication/user"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -29,7 +30,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/users"
 )
 
-func TestNamespaceHandlerAllowsUnchangedFinalizeWithoutTenant(t *testing.T) {
+func TestNamespaceHandlerRestrictsTerminatingSubresourceBypassWithoutTenant(t *testing.T) {
 	t.Parallel()
 
 	scheme := namespaceValidationScheme(t)
@@ -37,17 +38,137 @@ func TestNamespaceHandlerAllowsUnchangedFinalizeWithoutTenant(t *testing.T) {
 	oldNs := namespaceWithTenantReference("workloads", "missing", "missing-uid")
 	oldNs.DeletionTimestamp = &now
 	oldNs.Status.Phase = corev1.NamespaceTerminating
+	cl, cfg := namespaceValidationFixture(t, nil)
+
+	actors := []struct {
+		name        string
+		userInfo    authenticationv1.UserInfo
+		wantAllowed bool
+	}{
+		{
+			name: "kube-system service account",
+			userInfo: authenticationv1.UserInfo{
+				Username: "system:serviceaccount:kube-system:namespace-controller",
+				Groups: []string{
+					"system:serviceaccounts",
+					"system:serviceaccounts:kube-system",
+					"system:authenticated",
+				},
+			},
+			wantAllowed: true,
+		},
+		{
+			name: "unknown user",
+			userInfo: authenticationv1.UserInfo{
+				Username: "mallory",
+				Groups:   []string{authuser.AllAuthenticated},
+			},
+		},
+	}
+
+	for _, actor := range actors {
+		for _, subresource := range []string{"status", "finalize"} {
+			t.Run(actor.name+" "+subresource, func(t *testing.T) {
+				newNs := oldNs.DeepCopy()
+				newNs.Status.Conditions = append(newNs.Status.Conditions, corev1.NamespaceCondition{
+					Type:   "ControlPlaneProbe",
+					Status: corev1.ConditionTrue,
+				})
+				newNs.Spec.Finalizers = nil
+				request := namespaceUpdateRequest(t, oldNs, newNs, subresource)
+				request.UserInfo = actor.userInfo
+
+				response := NamespaceHandler(cfg).OnUpdate(
+					cl,
+					cl,
+					admission.NewDecoder(scheme),
+					nil,
+				)(context.Background(), request)
+
+				if actor.wantAllowed && response != nil {
+					t.Fatalf("%s response = %#v, want trusted actor allowed", subresource, response)
+				}
+				if !actor.wantAllowed && (response == nil || response.Allowed) {
+					t.Fatalf("%s response = %#v, want stale Tenant resolution failure", subresource, response)
+				}
+			})
+		}
+	}
+}
+
+func TestNamespaceHandlerRequiresUnknownUsersToOwnTerminatingNamespace(t *testing.T) {
+	t.Parallel()
+
+	scheme := namespaceValidationScheme(t)
+	owner := rbac.CoreOwnerSpec{UserSpec: rbac.UserSpec{Name: "alice", Kind: rbac.UserOwner}}
+	tnt := namespaceValidationTenant("solar", "solar-uid", owner)
+	cl, cfg := namespaceValidationFixture(t, nil, tnt)
+	recorder := events.NewEventRecorder(nil, logr.Discard(), nil, nil)
+	now := metav1.Now()
+	oldNs := namespaceWithTenantReference("workloads", tnt.Name, string(tnt.UID))
+	oldNs.DeletionTimestamp = &now
+	oldNs.Status.Phase = corev1.NamespaceTerminating
+	oldNs.Spec.Finalizers = []corev1.FinalizerName{corev1.FinalizerKubernetes}
+
+	tests := []struct {
+		name        string
+		username    string
+		subresource string
+		wantAllowed bool
+	}{
+		{name: "owner status", username: owner.Name, subresource: "status", wantAllowed: true},
+		{name: "owner finalize", username: owner.Name, subresource: "finalize", wantAllowed: true},
+		{name: "non-owner status", username: "mallory", subresource: "status"},
+		{name: "non-owner finalize", username: "mallory", subresource: "finalize"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			newNs := oldNs.DeepCopy()
+			newNs.Status.Conditions = append(newNs.Status.Conditions, corev1.NamespaceCondition{
+				Type:   "UserProbe",
+				Status: corev1.ConditionTrue,
+			})
+			newNs.Spec.Finalizers = nil
+			request := namespaceUpdateRequest(t, oldNs, newNs, tt.subresource)
+			request.UserInfo = authenticationv1.UserInfo{
+				Username: tt.username,
+				Groups:   []string{authuser.AllAuthenticated},
+			}
+
+			response := NamespaceHandler(cfg).OnUpdate(
+				cl,
+				cl,
+				admission.NewDecoder(scheme),
+				recorder,
+			)(context.Background(), request)
+
+			if tt.wantAllowed && response != nil {
+				t.Fatalf("%s response = %#v, want owned update allowed", tt.subresource, response)
+			}
+			if !tt.wantAllowed && (response == nil || response.Allowed) {
+				t.Fatalf("%s response = %#v, want non-owner denial", tt.subresource, response)
+			}
+		})
+	}
+}
+
+func TestNamespaceHandlerRejectsUnknownUserForUnownedTerminatingNamespace(t *testing.T) {
+	t.Parallel()
+
+	scheme := namespaceValidationScheme(t)
+	cl, cfg := namespaceValidationFixture(t, nil)
+	now := metav1.Now()
+	oldNs := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+		Name:              "unowned",
+		DeletionTimestamp: &now,
+	}}
 	newNs := oldNs.DeepCopy()
 	newNs.Spec.Finalizers = nil
-	cl, cfg := namespaceValidationFixture(t, nil)
 	request := namespaceUpdateRequest(t, oldNs, newNs, "finalize")
 	request.UserInfo = authenticationv1.UserInfo{
-		Username: "system:serviceaccount:kube-system:namespace-controller",
-		Groups: []string{
-			"system:serviceaccounts",
-			"system:serviceaccounts:kube-system",
-			"system:authenticated",
-		},
+		Username: "mallory",
+		Groups:   []string{authuser.AllAuthenticated},
 	}
 
 	response := NamespaceHandler(cfg).OnUpdate(
@@ -56,9 +177,47 @@ func TestNamespaceHandlerAllowsUnchangedFinalizeWithoutTenant(t *testing.T) {
 		admission.NewDecoder(scheme),
 		nil,
 	)(context.Background(), request)
+	if response == nil || response.Allowed {
+		t.Fatalf("finalize response = %#v, want unowned namespace denial", response)
+	}
+}
 
-	if response != nil {
-		t.Fatalf("finalize response = %#v, want no interception", response)
+func TestCanBypassTerminatingNamespaceValidation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		user users.AdmissionUser
+		want bool
+	}{
+		{name: "configured administrator", user: users.AdmissionUser{Type: users.AdmissionUserAdmin}, want: true},
+		{name: "system masters", user: users.AdmissionUser{Groups: []string{authuser.SystemPrivilegedGroup}}, want: true},
+		{name: "kubeadm administrator", user: users.AdmissionUser{Groups: []string{kubeadmClusterAdministratorsGroup}}, want: true},
+		{name: "kube controller manager", user: users.AdmissionUser{Username: authuser.KubeControllerManager}, want: true},
+		{name: "api server", user: users.AdmissionUser{Username: authuser.APIServerUser}, want: true},
+		{
+			name: "kube-system service account",
+			user: users.NewAdmissionUser(users.AdmissionUserUnknown, authenticationv1.UserInfo{
+				Username: users.ServiceAccountUsername(metav1.NamespaceSystem, "namespace-controller"),
+			}),
+			want: true,
+		},
+		{
+			name: "tenant service account",
+			user: users.NewAdmissionUser(users.AdmissionUserUnknown, authenticationv1.UserInfo{
+				Username: users.ServiceAccountUsername("tenant", "controller"),
+			}),
+		},
+		{name: "capsule user", user: users.AdmissionUser{Type: users.AdmissionUserCapsule, Username: "alice"}},
+		{name: "unknown user", user: users.AdmissionUser{Username: "mallory"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := canBypassTerminatingNamespaceValidation(tt.user); got != tt.want {
+				t.Fatalf("canBypassTerminatingNamespaceValidation() = %t, want %t", got, tt.want)
+			}
+		})
 	}
 }
 
