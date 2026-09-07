@@ -194,6 +194,7 @@ apply-user:
 	@$(KUBECTL) label ns green-test env=test --overwrite
 	@$(KUBECTL) get ns green-prod >/dev/null 2>&1 || $(KUBECTL) create ns green-prod --as bob --as-group projectcapsule.dev
 	@$(KUBECTL) label ns green-prod env=prod --overwrite
+	@$(KUBECTL) get ns solar-system >/dev/null 2>&1 || $(KUBECTL) create ns solar-system --as alice --as-group projectcapsule.dev
 	@$(KUBECTL) get ns solar-uat >/dev/null 2>&1 || $(KUBECTL) create ns solar-uat --as alice --as-group projectcapsule.dev
 	@$(KUBECTL) label ns solar-uat env=test --overwrite
 	@$(KUBECTL) label ns solar-uat team=team-a --overwrite
@@ -204,9 +205,6 @@ apply-user:
 	@$(KUBECTL) label ns solar-prod env=prod --overwrite
 	@$(KUBECTL) label ns solar-prod team=team-b --overwrite
 	@$(KUBECTL) kustomize user/solar | envsubst $(SUBSTITUTION_VARIABLES) | $(KUBECTL) apply --as alice --as-group projectcapsule.dev -f -
-
-
-
 
 wait-oidc: certificates ## Wait for ingress and Dex before enabling API-server OIDC.
 	@$(KUBECTL) wait --namespace flux-system --for=condition=ready helmrelease/ingress-nginx helmrelease/dex --timeout=$(TIMEOUT)
