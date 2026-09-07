@@ -62,6 +62,40 @@ func TestNamespaceHandlerAllowsUnchangedFinalizeWithoutTenant(t *testing.T) {
 	}
 }
 
+func TestNamespaceHandlerRejectsMetadataChangeOnFinalizeWithoutTenant(t *testing.T) {
+	t.Parallel()
+
+	scheme := namespaceValidationScheme(t)
+	now := metav1.Now()
+	oldNs := namespaceWithTenantReference("workloads", "missing", "missing-uid")
+	oldNs.DeletionTimestamp = &now
+	oldNs.Status.Phase = corev1.NamespaceTerminating
+	newNs := oldNs.DeepCopy()
+	newNs.Labels["security.example.com/probe"] = "injected"
+	newNs.Spec.Finalizers = nil
+	cl, cfg := namespaceValidationFixture(t, nil)
+	request := namespaceUpdateRequest(t, oldNs, newNs, "finalize")
+	request.UserInfo = authenticationv1.UserInfo{
+		Username: "system:serviceaccount:kube-system:namespace-controller",
+		Groups: []string{
+			"system:serviceaccounts",
+			"system:serviceaccounts:kube-system",
+			"system:authenticated",
+		},
+	}
+
+	response := NamespaceHandler(cfg).OnUpdate(
+		cl,
+		cl,
+		admission.NewDecoder(scheme),
+		nil,
+	)(context.Background(), request)
+
+	if response == nil || response.Allowed {
+		t.Fatalf("finalize response = %#v, want stale Tenant resolution failure", response)
+	}
+}
+
 func TestNamespaceHandlerValidatesMetadataOnActiveSubresources(t *testing.T) {
 	t.Parallel()
 
@@ -171,6 +205,82 @@ func TestNamespaceHandlerAllowsOwnedTerminatingFinalize(t *testing.T) {
 	)(context.Background(), request)
 	if response != nil {
 		t.Fatalf("finalize response = %#v, want owned terminating namespace allowed", response)
+	}
+}
+
+func TestNamespaceHandlerValidatesMetadataOnOwnedTerminatingFinalize(t *testing.T) {
+	t.Parallel()
+
+	const forbiddenLabel = "pod-security.kubernetes.io/enforce"
+
+	scheme := namespaceValidationScheme(t)
+	owner := rbac.CoreOwnerSpec{UserSpec: rbac.UserSpec{Name: "alice", Kind: rbac.UserOwner}}
+	tnt := namespaceValidationTenant("solar", "solar-uid", owner)
+	tnt.Spec.NamespaceOptions = &capsulev1beta2.NamespaceOptions{
+		ForbiddenLabels: capsuleapi.ForbiddenListSpec{Exact: []string{forbiddenLabel}},
+	}
+	cl, cfg := namespaceValidationFixture(t, []rbac.UserSpec{owner.UserSpec}, tnt)
+	recorder := events.NewEventRecorder(nil, logr.Discard(), nil, nil)
+
+	now := metav1.Now()
+	oldNs := namespaceWithTenantReference("workloads", tnt.Name, string(tnt.UID))
+	oldNs.DeletionTimestamp = &now
+	oldNs.Status.Phase = corev1.NamespaceTerminating
+	newNs := oldNs.DeepCopy()
+	newNs.Labels[forbiddenLabel] = "privileged"
+	newNs.Spec.Finalizers = nil
+	request := namespaceUpdateRequest(t, oldNs, newNs, "finalize")
+	request.UserInfo = authenticationv1.UserInfo{Username: owner.Name}
+
+	response := NamespaceHandler(cfg, UserMetadataHandler()).OnUpdate(
+		cl,
+		cl,
+		admission.NewDecoder(scheme),
+		recorder,
+	)(context.Background(), request)
+	if response == nil || response.Allowed {
+		t.Fatalf("finalize response = %#v, want forbidden metadata denial", response)
+	}
+}
+
+func TestNamespaceMetadataChanged(t *testing.T) {
+	t.Parallel()
+
+	oldNs := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+		Labels:      map[string]string{"label": "old"},
+		Annotations: map[string]string{"annotation": "old"},
+		OwnerReferences: []metav1.OwnerReference{{
+			APIVersion: "example.com/v1",
+			Kind:       "Owner",
+			Name:       "old",
+		}},
+	}}
+
+	tests := []struct {
+		name   string
+		mutate func(*corev1.Namespace)
+		want   bool
+	}{
+		{name: "unchanged", mutate: func(*corev1.Namespace) {}, want: false},
+		{name: "label", mutate: func(ns *corev1.Namespace) { ns.Labels["label"] = "new" }, want: true},
+		{name: "annotation", mutate: func(ns *corev1.Namespace) { ns.Annotations["annotation"] = "new" }, want: true},
+		{name: "owner reference", mutate: func(ns *corev1.Namespace) { ns.OwnerReferences[0].Name = "new" }, want: true},
+		{name: "namespace finalizer", mutate: func(ns *corev1.Namespace) {
+			ns.Spec.Finalizers = []corev1.FinalizerName{corev1.FinalizerKubernetes}
+		}, want: false},
+		{name: "status", mutate: func(ns *corev1.Namespace) {
+			ns.Status.Phase = corev1.NamespaceTerminating
+		}, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			newNs := oldNs.DeepCopy()
+			tt.mutate(newNs)
+			if got := namespaceMetadataChanged(oldNs, newNs); got != tt.want {
+				t.Fatalf("namespaceMetadataChanged() = %t, want %t", got, tt.want)
+			}
+		})
 	}
 }
 

@@ -152,6 +152,8 @@ func (h *handler) OnUpdate(
 			return ad.Deny("namespace tenant ownership can not change during termination")
 		}
 
+		skipTerminatingValidation := canSkipTerminatingNamespaceValidation(terminating, oldNs, ns)
+
 		reader = webhookutils.NewTenantCachingReader(reader)
 
 		user := handlers.ResolveAdmissionUser(ctx, c, req, h.cfg)
@@ -163,7 +165,7 @@ func (h *handler) OnUpdate(
 		// Kubernetes control-plane actors must be able to complete namespace
 		// deletion even when the referenced Tenant no longer exists. Capsule
 		// users, however, still need to pass the ownership check below.
-		if terminating && !user.IsCapsule() {
+		if skipTerminatingValidation && !user.IsCapsule() {
 			return nil
 		}
 
@@ -215,7 +217,7 @@ func (h *handler) OnUpdate(
 		// Once ownership has been established, allow finalizer and status updates
 		// needed to complete deletion without applying tenant policies that may
 		// have become unsatisfiable during termination.
-		if terminating {
+		if skipTerminatingValidation {
 			return nil
 		}
 
@@ -250,6 +252,19 @@ func isTerminatingNamespace(oldNs *corev1.Namespace) bool {
 	// a namespace status/finalize update. Status.Phase is intentionally not
 	// trusted because callers with namespaces/status access can write it.
 	return oldNs.DeletionTimestamp != nil
+}
+
+func canSkipTerminatingNamespaceValidation(
+	terminating bool,
+	oldNs, newNs *corev1.Namespace,
+) bool {
+	return terminating && !namespaceMetadataChanged(oldNs, newNs)
+}
+
+func namespaceMetadataChanged(oldNs, newNs *corev1.Namespace) bool {
+	return !reflect.DeepEqual(oldNs.Labels, newNs.Labels) ||
+		!reflect.DeepEqual(oldNs.Annotations, newNs.Annotations) ||
+		!reflect.DeepEqual(oldNs.OwnerReferences, newNs.OwnerReferences)
 }
 
 func validateNamespaceTenantReferenceTransition(
