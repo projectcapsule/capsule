@@ -246,6 +246,17 @@ func TestNamespaceHandlerValidatesMetadataOnOwnedTerminatingFinalize(t *testing.
 func TestNamespaceMetadataChanged(t *testing.T) {
 	t.Parallel()
 
+	if namespaceMetadataChanged(
+		&corev1.Namespace{},
+		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+			Labels:          map[string]string{},
+			Annotations:     map[string]string{},
+			OwnerReferences: []metav1.OwnerReference{},
+		}},
+	) {
+		t.Fatal("namespaceMetadataChanged() = true for semantically empty metadata")
+	}
+
 	oldNs := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
 		Labels:      map[string]string{"label": "old"},
 		Annotations: map[string]string{"annotation": "old"},

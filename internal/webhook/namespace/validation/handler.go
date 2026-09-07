@@ -6,6 +6,7 @@ package validation
 import (
 	"context"
 	"fmt"
+	"maps"
 	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
@@ -262,9 +263,12 @@ func canSkipTerminatingNamespaceValidation(
 }
 
 func namespaceMetadataChanged(oldNs, newNs *corev1.Namespace) bool {
-	return !reflect.DeepEqual(oldNs.Labels, newNs.Labels) ||
-		!reflect.DeepEqual(oldNs.Annotations, newNs.Annotations) ||
-		!reflect.DeepEqual(oldNs.OwnerReferences, newNs.OwnerReferences)
+	ownerReferencesChanged := len(oldNs.OwnerReferences) != len(newNs.OwnerReferences) ||
+		(len(oldNs.OwnerReferences) > 0 && !reflect.DeepEqual(oldNs.OwnerReferences, newNs.OwnerReferences))
+
+	return !maps.Equal(oldNs.Labels, newNs.Labels) ||
+		!maps.Equal(oldNs.Annotations, newNs.Annotations) ||
+		ownerReferencesChanged
 }
 
 func validateNamespaceTenantReferenceTransition(
