@@ -205,7 +205,6 @@ apply-user:
 	@$(KUBECTL) label ns solar-prod env=prod --overwrite
 	@$(KUBECTL) label ns solar-prod team=team-b --overwrite
 	@$(KUBECTL) kustomize user/solar | envsubst $(SUBSTITUTION_VARIABLES) | $(KUBECTL) apply --as alice --as-group projectcapsule.dev -f -
-	@$(KUBECTL) kustomize user/solar | envsubst $(SUBSTITUTION_VARIABLES) | $(KUBECTL) apply -f -
 
 wait-oidc: certificates ## Wait for ingress and Dex before enabling API-server OIDC.
 	@$(KUBECTL) wait --namespace flux-system --for=condition=ready helmrelease/ingress-nginx helmrelease/dex --timeout=$(TIMEOUT)
