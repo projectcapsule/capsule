@@ -83,7 +83,7 @@ password; enter the email address in Dex's login form:
 | `bob@projectcapsule.dev` | `bob` | `bob` | Owns `green` |
 | `gatsby@projectcapsule.dev` | `gatsby` | `gatsby` | Owns `wind`; also sees the `solar` namespaces shared by the sample proxy rule |
 | `renewable@projectcapsule.dev` | `renewable` | `renewable` | Authenticates as the local `renewable` user |
-| `admin@example.com` | `admin` | `admin` | Authenticates successfully but has no elevated Kubernetes RBAC by default |
+| `admin@projectcapsule.dev` | `admin` | `admin` | Authenticates successfully but has no elevated Kubernetes RBAC by default |
 
 The setup generates one persistent local CA under `installation/.generated/`
 and reuses it for Dex, Headlamp, Capsule, Capsule Proxy, and kube-apiserver OIDC trust.
@@ -120,6 +120,7 @@ make apply           # reapply playground configuration after editing it
 make dev-capsule     # rebuild and redeploy only Capsule from the current checkout
 make capsule-stable  # return Capsule to the pinned Flux-managed release
 make down            # delete the kind cluster
+make select-laptop-host-ip   # select the laptop IP and save it to .env (root directory)
 ```
 
 ## Developing Capsule in the playground
@@ -147,7 +148,8 @@ to this playground target.
 
 The repository root's legacy `make dev-setup` target uses a different handoff:
 it runs the Capsule controller on the workstation and points admission webhooks
-at `LAPTOP_HOST_IP`. Before installing that development release, it waits for
+at `LAPTOP_HOST_IP`. Use `make select-laptop-host-ip` (in the root directory) to select and persist this IP in `.env`.
+Before installing that development release, it waits for
 `flux-system/capsule` to become ready and deletes only that HelmRelease. Waiting
 for deletion lets the Flux Helm controller finish uninstalling the pinned
 release before local Helm takes ownership. All other playground HelmReleases

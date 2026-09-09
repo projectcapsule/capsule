@@ -60,19 +60,21 @@ To achieve that, there are some necessary steps we need to walk through, which h
 
 So the TL;DR answer is:
 
-**Make sure a *KinD* cluster is running on your laptop, and then run `make dev-setup` to setup the dev environment.**. This is not done in the `make dev-setup` setup.
+**Make sure a *KinD* cluster is running on your laptop, and then run `make dev-setup` to setup the dev environment.**
 
 ```bash
 # Create a KinD cluster if not already created
 $ make dev-cluster
 
-# To retrieve your laptop's IP and execute `make dev-setup` to setup dev env
-# For example: LAPTOP_HOST_IP=192.168.10.101 make dev-setup
-$ LAPTOP_HOST_IP="<YOUR_LAPTOP_IP>" make dev-setup
+# Select your laptop's IP and save it to .env
+$ make select-laptop-host-ip
+
+# Execute `make dev-setup` to setup dev env (it will use the IP from .env)
+$ make dev-setup
 
 
 # Monitoring Setup (Grafana/Prometheus/Pyroscope)
-$ LAPTOP_HOST_IP="<YOUR_LAPTOP_IP>" make dev-setup-monitoring
+$ make dev-setup-monitoring
 ```
 
 ### Setup
@@ -92,7 +94,7 @@ Running webhooks requires TLS, we can prepare the TLS key pair in our developmen
 
 ```bash
 # Prepare a simple OpenSSL config file
-# Do remember to export LAPTOP_HOST_IP before running this command
+# Do remember to export LAPTOP_HOST_IP (or use `make select-laptop-host-ip`) before running this command
 $ cat > _tls.cnf <<EOF
 [ req ]
 default_bits       = 4096

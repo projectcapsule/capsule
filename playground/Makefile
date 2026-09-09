@@ -251,7 +251,7 @@ dev-image: check-dev ## Build Capsule from the current checkout and load it into
 
 dev-capsule: check-dev certificates ## Deploy the current Capsule source and chart into a running playground.
 	@$(KUBECTL) get helmrelease capsule --namespace flux-system >/dev/null 2>&1 || { echo "Capsule is not installed; run make up first" >&2; exit 1; }
-	@helm status capsule --kube-context '$(CONTEXT)' --namespace capsule-system >/dev/null 2>&1 || { echo "The Capsule Helm release is not ready; run make up first" >&2; exit 1; }
+	@helm status capsule --kube-context '$(CONTEXT)' --namespace flux-system >/dev/null 2>&1 || { echo "The Capsule Helm release is not ready; run make up first" >&2; exit 1; }
 	@$(MAKE) --no-print-directory dev-image
 	@flux suspend helmrelease capsule --context '$(CONTEXT)' --namespace flux-system
 	@set -e; values_file="$$(mktemp)"; \
