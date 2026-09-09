@@ -4,6 +4,8 @@ VERSION         ?= $(or $(shell git describe --abbrev=0 --tags --match "v*" 2>/d
 GOOS                 ?= $(shell go env GOOS)
 GOARCH               ?= $(shell go env GOARCH)
 
+-include .env
+
 # Defaults
 REGISTRY        ?= ghcr.io
 REPOSITORY      ?= projectcapsule/capsule
@@ -28,6 +30,7 @@ OS_SUPPORTED_VERSION ?= "4.22.0-okd-scos.ec.10"
 KUBECTL ?= kubectl
 HELM ?= helm
 DEV_SETUP_TIMEOUT ?= 10m
+export LAPTOP_HOST_IP
 
 # Options for 'bundle-build'
 ifneq ($(origin CHANNELS), undefined)
@@ -122,6 +125,8 @@ helm-test-exec: ct helm-controller-version ko-build-all
 	@$(CT) install --config $(SRC_ROOT)/.github/configs/ct.yaml --namespace=capsule-system --all --debug
 
 # Setup development env
+dev-cluster: dev-build dev-install-deps
+
 dev-build: kind
 	$(KIND) create cluster --wait=60s --name $(CLUSTER_NAME) --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION) --config ./hack/kind-cluster.yaml
 	$(KUBECTL) apply --force-conflicts --server-side=true -f ./e2e/rbac.yaml
@@ -158,6 +163,19 @@ PROMETHEUS_LOOKUP  := prometheus-operator/prometheus-operator
 dev-install-prometheus-crds:
 	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/prometheus-operator/prometheus-operator/releases/download/$(PROMETHEUS_VERSION)/bundle.yaml
 
+
+.PHONY: select-laptop-host-ip
+select-laptop-host-ip: gum ## Select the laptop IP from the available inet addresses.
+	@LAPTOP_HOST_IP=$$(ifconfig | awk '/inet / && $$2 != "127.0.0.1" {print $$2}' | $(LOCALBIN)/gum choose --header "Select the laptop IP" --selected="$(LAPTOP_HOST_IP)") && \
+	if [ -z "$$LAPTOP_HOST_IP" ]; then echo "No IP selected"; exit 1; fi && \
+	echo "Selected IP: $$LAPTOP_HOST_IP" && \
+	if [ -f .env ]; then \
+		grep -v '^LAPTOP_HOST_IP=' .env > .env.tmp || true; \
+		mv .env.tmp .env; \
+		echo "LAPTOP_HOST_IP=$$LAPTOP_HOST_IP" >> .env; \
+	else \
+		echo "LAPTOP_HOST_IP=$$LAPTOP_HOST_IP" > .env; \
+	fi
 
 # Usage:
 # 	LAPTOP_HOST_IP=<YOUR_LAPTOP_IP> make dev-setup
@@ -196,7 +214,7 @@ dev-setup: dev-setup-flux-handoff
 		--cert=/tmp/k8s-webhook-server/serving-certs/tls.crt\
 		--key=/tmp/k8s-webhook-server/serving-certs/tls.key || true
 	rm -f _tls.cnf
-	export WEBHOOK_URL="https://$${LAPTOP_HOST_IP}:9443"; \
+	export WEBHOOK_URL="https://$(LAPTOP_HOST_IP):9443"; \
 	export CA_BUNDLE=`openssl base64 -in /tmp/k8s-webhook-server/serving-certs/tls.crt | tr -d '\n'`; \
 	$(HELM) upgrade \
 		--dependency-update \
@@ -248,7 +266,7 @@ dev-setup: dev-setup-flux-handoff
 	mkdir -p ./hack/generated/ || true
 	$(KUBECTL) label clusterrole admin projectcapsule.dev/aggregate-to-controller=true
 	bash ./hack/kubeconfig-for-sa.sh $(CLUSTER_NAME) "capsule-system" "capsule" "./hack/generated/kubeconfig.yaml"
-	$(KUBECTL) -n capsule-system scale deployment capsule-controller-manager --replicas=0 || true
+	$(KUBECTL) -n capsule-system scale deployment capsule-controller-manager --replicas=0 2>/dev/null || true
 
 dev-setup-flux-handoff: dev-setup-cert-manager
 	@test -n '$(LAPTOP_HOST_IP)' || { echo "LAPTOP_HOST_IP must be set before handing the Capsule release over to local development" >&2; exit 1; }
@@ -455,6 +473,11 @@ ko-publish-all: ko-publish-capsule
 
 test-release: goreleaser syft
 	PATH=$(LOCALBIN):$${PATH} $(GORELEASER) --skip=publish,sign --snapshot --clean --parallelism 2
+
+# Fixing code
+.PHONY: gofix
+gofix:
+	go fix ./...
 
 # Sorting imports
 .PHONY: goimports
@@ -757,6 +780,13 @@ harpoon:
 	@curl -s https://raw.githubusercontent.com/alegrey91/harpoon/main/install | \
 		sudo bash -s -- --install-version $(HARPOON_VERSION) --install-dir $(LOCALBIN)
 
+GUM         := $(LOCALBIN)/gum
+GUM_VERSION := 2.0.1
+GUM_LOOKUP  := charm.land/gum
+gum: ## Download gum locally if necessary.
+		test -s $(GUM) && $(GUM) --version | grep -q $(GUM_VERSION) ||  \
+	$(call go-install-tool,$(GUM),$(GUM_LOOKUP)/v2@v$(GUM_VERSION))
+
 # go-install-tool will 'go install' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 define go-install-tool
@@ -765,3 +795,35 @@ define go-install-tool
     GOBIN=$(LOCALBIN) go install $(2) ;\
 }
 endef
+
+####################
+# -- Local Development
+####################
+
+APP_NAME     := controller
+MODULE_NAME  := capsule
+PACKAGE      := github.com/projectcapsule/capsule/cmd/controller
+RUN_ARGS     := --zap-log-level 4 --client-connection-burst=1000 --client-connection-qps=2000.0 --workers=8
+RUN_ENV      := NAMESPACE=capsule-system SERVICE_ACCOUNT=capsule
+
+.PHONY: controller-dev-start
+controller-dev-start: # start the controller from local env
+	$(RUN_ENV) go run ./cmd/controller/ $(RUN_ARGS)
+
+.PHONY: controller-dev-idea-run-config
+controller-dev-idea-run-config:
+	@mkdir -p .idea/runConfigurations
+	@{ \
+	envs=""; \
+	for kv in $(RUN_ENV); do \
+	  k=$${kv%%=*}; v=$${kv#*=}; \
+	  if [ -n "$$envs" ]; then \
+	    envs="$$envs\n      <env name=\"$$k\" value=\"$$v\" />"; \
+	  else \
+	    envs="      <env name=\"$$k\" value=\"$$v\" />"; \
+	  fi; \
+	done; \
+	export APP_NAME="$(APP_NAME)" MODULE_NAME="$(MODULE_NAME)" PACKAGE="$(PACKAGE)" RUN_ARGS="$(RUN_ARGS)"; \
+	export RUN_ENVS="$$(printf "%b" "$$envs")"; \
+	envsubst '$$APP_NAME $$MODULE_NAME $$PACKAGE $$RUN_ARGS $$RUN_ENVS' < hack/dev/idea-run-config.xml > .idea/runConfigurations/$(APP_NAME).xml; \
+	}
