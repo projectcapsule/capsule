@@ -18,7 +18,7 @@ import (
 )
 
 // ReferenceProtection prevents deletion of execution identities which are
-// still required by replication resources or an unexpired ResourceLease.
+// still required by replication resources or an unexpired ResourcePermit.
 func ReferenceProtection() handlers.Handler {
 	return &referenceProtection{}
 }
@@ -55,18 +55,18 @@ func (*referenceProtection) OnDelete(
 			return handlers.ErroredResponse(fmt.Errorf("ServiceAccount deletion request has an empty namespace or name"))
 		}
 
-		requests := &capsulev1beta2.ResourceLeaseList{}
+		requests := &capsulev1beta2.ResourcePermitList{}
 		if err := c.List(ctx, requests, client.MatchingFields{
 			serviceaccountindexer.ReferenceFieldName: key,
 		}); err != nil {
-			return handlers.ErroredResponse(fmt.Errorf("listing ResourceLeases for ServiceAccount %s: %w", key, err))
+			return handlers.ErroredResponse(fmt.Errorf("listing ResourcePermits for ServiceAccount %s: %w", key, err))
 		}
 
 		for index := range requests.Items {
 			request := &requests.Items[index]
-			if request.Status.Phase != capsulev1beta2.ResourceLeasePhaseExpired {
+			if request.Status.Phase != capsulev1beta2.ResourcePermitPhaseExpired {
 				return ad.Denyf(
-					"ServiceAccount %s cannot be deleted because it is used by unexpired ResourceLease %s/%s",
+					"ServiceAccount %s cannot be deleted because it is used by unexpired ResourcePermit %s/%s",
 					key,
 					request.Namespace,
 					request.Name,

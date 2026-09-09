@@ -178,11 +178,12 @@ rules:
   - globalresourcequotas/status
   - quantityledgers
   - quantityledgers/status
-  - resourceleases
-  - resourceleases/status
-  - resourceleasetemplates
-  - globalresourceleasetemplates
-  - globalresourceleasetemplates/status
+  - resourcepermits
+  - resourcepermits/status
+  - resourcepermittemplates
+  - resourcepermittemplates/status
+  - globalresourcepermittemplates
+  - globalresourcepermittemplates/status
   verbs:
   - create
   - delete
@@ -211,9 +212,9 @@ rules:
   - tenants.capsule.clastix.io
   - tenantowners.capsule.clastix.io
   - rulestatuses.capsule.clastix.io
-  - resourceleases.capsule.clastix.io
-  - resourceleasetemplates.capsule.clastix.io
-  - globalresourceleasetemplates.capsule.clastix.io
+  - resourcepermits.capsule.clastix.io
+  - resourcepermittemplates.capsule.clastix.io
+  - globalresourcepermittemplates.capsule.clastix.io
   verbs:
   - get
   - patch

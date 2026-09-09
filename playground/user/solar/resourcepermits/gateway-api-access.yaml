@@ -1,0 +1,11 @@
+apiVersion: capsule.clastix.io/v1beta2
+kind: ResourcePermit
+metadata:
+  name: gateway-api-access
+  namespace: solar-system
+spec:
+  template:
+    kind: GlobalResourcePermitTemplate
+    name: gateway-api
+  reason: Permanently enable Gateway API resources for the solar tenant's owners.
+  params: {}

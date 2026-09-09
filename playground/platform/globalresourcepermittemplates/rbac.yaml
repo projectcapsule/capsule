@@ -1,0 +1,71 @@
+# The permit controller already has namespace and GlobalTenantResource lifecycle
+# permissions. This identity executes only the generated distributors.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: permit-example-reconciler
+  namespace: capsule-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: playground-permit-example-reconciler
+rules:
+  - apiGroups: [""]
+    resources: ["serviceaccounts"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["rolebindings"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles"]
+    resourceNames: ["playground-gateway-api-editor", "playground-grafana-reconciler"]
+    verbs: ["get", "bind"]
+  - apiGroups: ["source.toolkit.fluxcd.io"]
+    resources: ["helmrepositories"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["helm.toolkit.fluxcd.io"]
+    resources: ["helmreleases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: playground-permit-example-reconciler
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: playground-permit-example-reconciler
+subjects:
+  - kind: ServiceAccount
+    name: permit-example-reconciler
+    namespace: capsule-system
+---
+# Bind only with tenant namespace RoleBindings: this grants namespaced Gateway
+# API CRs while GatewayClasses and CRD definitions stay under platform control.
+# The Gateway API CRDs/controller are installed separately.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: playground-gateway-api-editor
+rules:
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"]
+---
+# Flux receives this role only through a RoleBinding in each Grafana namespace.
+# The chart's optional Kubernetes RBAC and dashboard sidecars are disabled.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: playground-grafana-reconciler
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets", "services", "serviceaccounts", "persistentvolumeclaims", "pods"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
