@@ -76,10 +76,10 @@ const (
 	ReasonUsageCalculationFailed = "UsageCalculationFailed"
 	ReasonQuotaExceeded          = "QuotaExceeded"
 
-	// ResourceLeases.
-	ReasonResourceLeaseExpired      = "ResourceLeaseExpired"
-	ReasonResourceLeaseActivated    = "ResourceLeaseActivated"
-	ReasonResourceLeaseReviewNeeded = "ResourceLeaseReviewNeeded"
-	ReasonResourceLeaseApproved     = "ResourceLeaseApproved"
-	ReasonResourceLeaseDenied       = "ResourceLeaseDenied"
+	// ResourcePermits.
+	ReasonResourcePermitExpired      = "ResourcePermitExpired"
+	ReasonResourcePermitActivated    = "ResourcePermitActivated"
+	ReasonResourcePermitReviewNeeded = "ResourcePermitReviewNeeded"
+	ReasonResourcePermitApproved     = "ResourcePermitApproved"
+	ReasonResourcePermitDenied       = "ResourcePermitDenied"
 )

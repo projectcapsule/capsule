@@ -104,8 +104,8 @@ proxy:
 
 # These are ClusterRoles which grant permissions for Capsule CRDs to Tenant Owners
 rbac:
-  # -- Allow the creation and review of ResourceLeases
-  resourceleases:
+  # -- Allow the creation and review of ResourcePermits
+  resourcepermits:
     create: false
     labels: {}
     # rbac.authorization.k8s.io/aggregate-to-admin: "true"
@@ -1602,8 +1602,8 @@ webhooks:
             - '*'
           scope: "*"
 
-    # -- Validate namespaced ResourceLeases and their referenced templates
-    resourceleases:
+    # -- Validate namespaced ResourcePermits and their referenced templates
+    resourcepermits:
       # -- Enable the Hook
       enabled: true
       # -- Capsule Hook Options
@@ -1635,12 +1635,12 @@ webhooks:
             - UPDATE
             - DELETE
           resources:
-            - resourceleases
-            - resourceleases/status
+            - resourcepermits
+            - resourcepermits/status
           scope: Namespaced
 
-    # -- Validate namespaced ResourceLeaseTemplates
-    resourceleasetemplates:
+    # -- Validate namespaced ResourcePermitTemplates
+    resourcepermittemplates:
       # -- Enable the Hook
       enabled: true
       # -- Capsule Hook Options
@@ -1670,11 +1670,11 @@ webhooks:
             - UPDATE
             - DELETE
           resources:
-            - resourceleasetemplates
+            - resourcepermittemplates
           scope: Namespaced
 
-    # -- Validate cluster-scoped GlobalResourceLeaseTemplates
-    globalresourceleasetemplates:
+    # -- Validate cluster-scoped GlobalResourcePermitTemplates
+    globalresourcepermittemplates:
       # -- Enable the Hook
       enabled: true
       # -- Capsule Hook Options
@@ -1704,11 +1704,11 @@ webhooks:
             - UPDATE
             - DELETE
           resources:
-            - globalresourceleasetemplates
+            - globalresourcepermittemplates
           scope: Cluster
 
-    # -- Protect resources managed by ResourceLeases from changes outside the Capsule controller
-    resourceLease:
+    # -- Protect resources managed by ResourcePermits from changes outside the Capsule controller
+    resourcePermit:
       # -- Enable the Hook
       enabled: true
       # -- Capsule Hook Options
@@ -1725,7 +1725,7 @@ webhooks:
           - key: projectcapsule.dev/protected-by
             operator: In
             values:
-              - "resource-lease"
+              - "resource-permit"
       # @schema type: object
       # @schema additionalProperties: true
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)

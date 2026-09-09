@@ -25,20 +25,20 @@ func (w *replicasResourcesHandler) GetPath() string {
 	return "/generic/replications"
 }
 
-type resourceLeaseResourcesHandler struct{}
+type resourcePermitResourcesHandler struct{}
 
-func GenericResourceLeaseHandler() handlers.Webhook {
-	return &resourceLeaseResourcesHandler{}
+func GenericResourcePermitHandler() handlers.Webhook {
+	return &resourcePermitResourcesHandler{}
 }
 
-func (w *resourceLeaseResourcesHandler) GetHandlers() []handlers.Handler {
+func (w *resourcePermitResourcesHandler) GetHandlers() []handlers.Handler {
 	return []handlers.Handler{
-		generic.ResourceLeaseResourceHandler(),
+		generic.ResourcePermitResourceHandler(),
 	}
 }
 
-func (w *resourceLeaseResourcesHandler) GetPath() string {
-	return "/generic/resourcelease"
+func (w *resourcePermitResourcesHandler) GetPath() string {
+	return "/generic/resourcepermit"
 }
 
 type genericCustomResourcesHandler struct {

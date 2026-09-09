@@ -1,14 +1,14 @@
-{{- if $.Values.rbac.resourceleases.create }}
+{{- if $.Values.rbac.resourcepermits.create }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: capsule:{{ include "capsule.fullname" $ }}:resourceleases
+  name: capsule:{{ include "capsule.fullname" $ }}:resourcepermits
   labels:
-    {{- toYaml $.Values.rbac.resourceleases.labels | nindent 4 }}
+    {{- toYaml $.Values.rbac.resourcepermits.labels | nindent 4 }}
 rules:
 - apiGroups: ["capsule.clastix.io"]
-  resources: ["resourceleases", "resourceleases/status"]
+  resources: ["resourcepermits", "resourcepermits/status"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 {{- end }}
 {{- if $.Values.rbac.resourcepoolclaims.create }}

@@ -53,7 +53,7 @@ spec:
       create: false
       name: capsule-tls
     rbac:
-      resourceleases:
+      resourcepermits:
         create: true
         labels:
           rbac.authorization.k8s.io/aggregate-to-admin: "true"

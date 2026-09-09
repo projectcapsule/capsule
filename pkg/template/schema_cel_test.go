@@ -43,14 +43,14 @@ x-kubernetes-validations:
 			name: "service account namespace and name",
 			params: `
 subjectKind: ServiceAccount
-subjectName: operations/resource-lease-runner
+subjectName: operations/resource-permit-runner
 `,
 		},
 		{
 			name: "service account without namespace",
 			params: `
 subjectKind: ServiceAccount
-subjectName: resource-lease-runner
+subjectName: resource-permit-runner
 `,
 			wantError: "ServiceAccount subjects must use namespace/name",
 		},

@@ -20,11 +20,11 @@ const (
 	ReleaseAnnotation        = "projectcapsule.dev/release"
 	ReleaseAnnotationTrigger = "true"
 
-	ReconcileAnnotation                = "reconcile.projectcapsule.dev/requestedAt"
-	ResourceLeaseActiveUntilAnnotation = "projectcapsule.dev/active-until"
-	// ResourceLeaseServiceAccountAnnotation records the identity allowed to
-	// reconcile a resource protected by an active ResourceLease.
-	ResourceLeaseServiceAccountAnnotation = "projectcapsule.dev/resourcelease-service-account"
+	ReconcileAnnotation                 = "reconcile.projectcapsule.dev/requestedAt"
+	ResourcePermitActiveUntilAnnotation = "projectcapsule.dev/active-until"
+	// ResourcePermitServiceAccountAnnotation records the identity allowed to
+	// reconcile a resource protected by an active ResourcePermit.
+	ResourcePermitServiceAccountAnnotation = "projectcapsule.dev/resourcepermit-service-account"
 
 	AvailableIngressClassesAnnotation       = "capsule.clastix.io/ingress-classes"
 	AvailableIngressClassesRegexpAnnotation = "capsule.clastix.io/ingress-classes-regexp"

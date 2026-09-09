@@ -37,25 +37,25 @@ func TestReferenceProtectionOnDelete(t *testing.T) {
 	}{
 		{name: "allows an unreferenced ServiceAccount"},
 		{
-			name: "denies an unexpired ResourceLease reference",
-			objects: []client.Object{&capsulev1beta2.ResourceLease{
+			name: "denies an unexpired ResourcePermit reference",
+			objects: []client.Object{&capsulev1beta2.ResourcePermit{
 				ObjectMeta: metav1.ObjectMeta{Name: "temporary-access", Namespace: "team-a"},
-				Status: capsulev1beta2.ResourceLeaseStatus{
-					Phase: capsulev1beta2.ResourceLeasePhaseActive,
-					Request: &capsulev1beta2.ResourceLeaseStatusRequest{
+				Status: capsulev1beta2.ResourcePermitStatus{
+					Phase: capsulev1beta2.ResourcePermitPhaseActive,
+					Request: &capsulev1beta2.ResourcePermitStatusRequest{
 						Impersonation: reference.DeepCopy(),
 					},
 				},
 			}},
-			wantDenied: "unexpired ResourceLease team-a/temporary-access",
+			wantDenied: "unexpired ResourcePermit team-a/temporary-access",
 		},
 		{
-			name: "allows an expired ResourceLease reference",
-			objects: []client.Object{&capsulev1beta2.ResourceLease{
+			name: "allows an expired ResourcePermit reference",
+			objects: []client.Object{&capsulev1beta2.ResourcePermit{
 				ObjectMeta: metav1.ObjectMeta{Name: "expired-access", Namespace: "team-a"},
-				Status: capsulev1beta2.ResourceLeaseStatus{
-					Phase: capsulev1beta2.ResourceLeasePhaseExpired,
-					Request: &capsulev1beta2.ResourceLeaseStatusRequest{
+				Status: capsulev1beta2.ResourcePermitStatus{
+					Phase: capsulev1beta2.ResourcePermitPhaseExpired,
+					Request: &capsulev1beta2.ResourcePermitStatusRequest{
 						Impersonation: reference.DeepCopy(),
 					},
 				},
@@ -130,14 +130,14 @@ func referenceProtectionFakeClient(t *testing.T, objects ...client.Object) clien
 		t.Fatal(err)
 	}
 
-	resourceLeaseIndexer := serviceaccountindexer.ResourceLeaseReference{}
+	resourcePermitIndexer := serviceaccountindexer.ResourcePermitReference{}
 	globalResourceIndexer := tenantresource.GlobalServiceAccount{}
 	tenantResourceIndexer := tenantresource.NamespacedServiceAccount{}
 
 	return fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(objects...).
-		WithIndex(resourceLeaseIndexer.Object(), resourceLeaseIndexer.Field(), resourceLeaseIndexer.Func()).
+		WithIndex(resourcePermitIndexer.Object(), resourcePermitIndexer.Field(), resourcePermitIndexer.Func()).
 		WithIndex(globalResourceIndexer.Object(), globalResourceIndexer.Field(), globalResourceIndexer.Func()).
 		WithIndex(tenantResourceIndexer.Object(), tenantResourceIndexer.Field(), tenantResourceIndexer.Func()).
 		Build()

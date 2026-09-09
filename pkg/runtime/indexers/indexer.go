@@ -45,7 +45,7 @@ func AddToManager(ctx context.Context, log logr.Logger, mgr manager.Manager) err
 		tenantresource.NamespacedCreatedItems{},
 		tenantresource.GlobalDependencies{},
 		tenantresource.NamespacedDependencies{},
-		serviceaccount.ResourceLeaseReference{},
+		serviceaccount.ResourcePermitReference{},
 		customquota.NamespacedTargetReference{},
 		customquota.NamespacedObjectUIDReference{},
 		customquota.GlobalTargetReference{},

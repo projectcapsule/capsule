@@ -1019,8 +1019,8 @@
                         }
                     }
                 },
-                "resourceleases": {
-                    "description": "Allow the creation and review of ResourceLeases",
+                "resourcepermits": {
+                    "description": "Allow the creation and review of ResourcePermits",
                     "type": "object",
                     "properties": {
                         "create": {
@@ -1752,8 +1752,8 @@
                                 }
                             }
                         },
-                        "globalresourceleasetemplates": {
-                            "description": "Validate cluster-scoped GlobalResourceLeaseTemplates",
+                        "globalresourcepermittemplates": {
+                            "description": "Validate cluster-scoped GlobalResourcePermitTemplates",
                             "type": "object",
                             "properties": {
                                 "enabled": {
@@ -2483,8 +2483,8 @@
                                 }
                             }
                         },
-                        "resourceLease": {
-                            "description": "Protect resources managed by ResourceLeases from changes outside the Capsule controller",
+                        "resourcePermit": {
+                            "description": "Protect resources managed by ResourcePermits from changes outside the Capsule controller",
                             "type": "object",
                             "properties": {
                                 "enabled": {
@@ -2577,8 +2577,8 @@
                                 }
                             }
                         },
-                        "resourceleases": {
-                            "description": "Validate namespaced ResourceLeases and their referenced templates",
+                        "resourcepermits": {
+                            "description": "Validate namespaced ResourcePermits and their referenced templates",
                             "type": "object",
                             "properties": {
                                 "enabled": {
@@ -2653,8 +2653,8 @@
                                 }
                             }
                         },
-                        "resourceleasetemplates": {
-                            "description": "Validate namespaced ResourceLeaseTemplates",
+                        "resourcepermittemplates": {
+                            "description": "Validate namespaced ResourcePermitTemplates",
                             "type": "object",
                             "properties": {
                                 "enabled": {

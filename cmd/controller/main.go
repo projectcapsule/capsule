@@ -50,7 +50,7 @@ import (
 	podlabelscontroller "github.com/projectcapsule/capsule/internal/controllers/pod"
 	"github.com/projectcapsule/capsule/internal/controllers/pv"
 	rbaccontroller "github.com/projectcapsule/capsule/internal/controllers/rbac"
-	resourceleasecontroller "github.com/projectcapsule/capsule/internal/controllers/resourcelease"
+	resourcepermitcontroller "github.com/projectcapsule/capsule/internal/controllers/resourcepermit"
 	"github.com/projectcapsule/capsule/internal/controllers/resourcepools"
 	"github.com/projectcapsule/capsule/internal/controllers/resources"
 	rulestatuscontroller "github.com/projectcapsule/capsule/internal/controllers/rulestatus"
@@ -76,7 +76,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/owners"
 	"github.com/projectcapsule/capsule/internal/webhook/pod"
 	"github.com/projectcapsule/capsule/internal/webhook/pvc"
-	"github.com/projectcapsule/capsule/internal/webhook/resourcelease"
+	"github.com/projectcapsule/capsule/internal/webhook/resourcepermit"
 	"github.com/projectcapsule/capsule/internal/webhook/resourcepool"
 	"github.com/projectcapsule/capsule/internal/webhook/route"
 	rulesgenericmutation "github.com/projectcapsule/capsule/internal/webhook/rules/generic/mutation"
@@ -846,18 +846,18 @@ func main() {
 			),
 		),
 		route.RulesValidating(manager.GetRESTMapper(), cfg),
-		route.ResourceLeaseMutation(resourcelease.ResourceLeaseMutationHandler(
-			ctrl.Log.WithName("webhooks").WithName("resourceleases"),
+		route.ResourcePermitMutation(resourcepermit.ResourcePermitMutationHandler(
+			ctrl.Log.WithName("webhooks").WithName("resourcepermits"),
 		)),
-		route.ResourceLeaseValidation(resourcelease.ResourceLeaseValidationHandler(
-			ctrl.Log.WithName("webhooks").WithName("resourceleases"),
+		route.ResourcePermitValidation(resourcepermit.ResourcePermitValidationHandler(
+			ctrl.Log.WithName("webhooks").WithName("resourcepermits"),
 			cfg,
 		)),
-		route.ResourceLeaseTemplateValidation(resourcelease.ResourceLeaseTemplateValidationHandler(
-			ctrl.Log.WithName("webhooks").WithName("resourceleasetemplates"),
+		route.ResourcePermitTemplateValidation(resourcepermit.ResourcePermitTemplateValidationHandler(
+			ctrl.Log.WithName("webhooks").WithName("resourcepermittemplates"),
 		)),
-		route.GlobalResourceLeaseTemplateValidation(resourcelease.GlobalResourceLeaseTemplateValidationHandler(ctrl.Log.WithName("webhooks").WithName("globalresourceleasetemplates"))),
-		route.GenericResourceLeaseHandler(),
+		route.GlobalResourcePermitTemplateValidation(resourcepermit.GlobalResourcePermitTemplateValidationHandler(ctrl.Log.WithName("webhooks").WithName("globalresourcepermittemplates"))),
+		route.GenericResourcePermitHandler(),
 	)
 
 	nodeWebhookSupported, _ := utils.NodeWebhookSupported(kubeVersion)
@@ -952,20 +952,28 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&resourceleasecontroller.ResourceLeaseReconciler{
-		Log:                ctrl.Log.WithName("capsule.ctrl").WithName("resourcelease"),
-		Metrics:            *metrics.MustMakeResourceLeasesRecorder(),
+	if err = (&resourcepermitcontroller.ResourcePermitReconciler{
+		Log:                ctrl.Log.WithName("capsule.ctrl").WithName("resourcepermit"),
+		Metrics:            *metrics.MustMakeResourcePermitsRecorder(),
 		Configuration:      cfg,
 		ImpersonationCache: impersonationCache,
 	}).SetupWithManager(manager, controllerConfig); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ResourceLeaseReconciler")
+		setupLog.Error(err, "unable to create controller", "controller", "ResourcePermitReconciler")
 		os.Exit(1)
 	}
 
-	if err = (&resourceleasecontroller.GlobalResourceLeaseTemplateReconciler{
-		Log: ctrl.Log.WithName("capsule.ctrl").WithName("globalresourceleasetemplate"),
+	if err = (&resourcepermitcontroller.GlobalResourcePermitTemplateReconciler{
+		Log:     ctrl.Log.WithName("capsule.ctrl").WithName("globalresourcepermittemplate"),
+		Metrics: metrics.MustMakeGlobalResourcePermitTemplateRecorder(),
 	}).SetupWithManager(manager, controllerConfig); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "GlobalResourceLeaseTemplateReconciler")
+		setupLog.Error(err, "unable to create controller", "controller", "GlobalResourcePermitTemplateReconciler")
+		os.Exit(1)
+	}
+
+	if err = (&resourcepermitcontroller.ResourcePermitTemplateReconciler{
+		Metrics: metrics.MustMakeResourcePermitTemplateRecorder(),
+	}).SetupWithManager(manager, controllerConfig); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ResourcePermitTemplateReconciler")
 		os.Exit(1)
 	}
 
