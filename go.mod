@@ -11,7 +11,7 @@ require (
 	github.com/go-sprout/sprout v1.1.0
 	github.com/google/cel-go v0.31.0
 	github.com/onsi/ginkgo/v2 v2.28.1
-	github.com/onsi/gomega v1.42.1
+	github.com/onsi/gomega v1.43.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.24.1
 	github.com/prometheus/client_model v0.6.2
