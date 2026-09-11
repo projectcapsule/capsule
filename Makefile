@@ -4,6 +4,8 @@ VERSION         ?= $(or $(shell git describe --abbrev=0 --tags --match "v*" 2>/d
 GOOS                 ?= $(shell go env GOOS)
 GOARCH               ?= $(shell go env GOARCH)
 
+-include .env
+
 # Defaults
 REGISTRY        ?= ghcr.io
 REPOSITORY      ?= projectcapsule/capsule
@@ -28,6 +30,7 @@ OS_SUPPORTED_VERSION ?= "4.22.0-okd-scos.ec.10"
 KUBECTL ?= kubectl
 HELM ?= helm
 DEV_SETUP_TIMEOUT ?= 10m
+export LAPTOP_HOST_IP
 
 # Options for 'bundle-build'
 ifneq ($(origin CHANNELS), undefined)
@@ -144,6 +147,17 @@ dev-install-prometheus-crds:
 	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/prometheus-operator/prometheus-operator/releases/download/$(PROMETHEUS_VERSION)/bundle.yaml
 
 
+.PHONY: select-laptop-host-ip
+select-laptop-host-ip: ## Select the laptop IP from the available inet addresses.
+	@LAPTOP_HOST_IP=$$(hostname -I | tr ' ' '\n' | grep -v ':' | grep -v '^$$' | gum choose --header "Select the laptop IP" --selected="$(LAPTOP_HOST_IP)") && \
+	if [ -z "$$LAPTOP_HOST_IP" ]; then echo "No IP selected"; exit 1; fi && \
+	echo "Selected IP: $$LAPTOP_HOST_IP" && \
+	if [ -f .env ]; then \
+		sed -i '/^LAPTOP_HOST_IP=/d' .env; \
+		echo "LAPTOP_HOST_IP=$$LAPTOP_HOST_IP" >> .env; \
+	else \
+		echo "LAPTOP_HOST_IP=$$LAPTOP_HOST_IP" > .env; \
+	fi
 # Usage:
 # 	LAPTOP_HOST_IP=<YOUR_LAPTOP_IP> make dev-setup
 # For example:
@@ -181,7 +195,7 @@ dev-setup: dev-setup-flux-handoff
 		--cert=/tmp/k8s-webhook-server/serving-certs/tls.crt\
 		--key=/tmp/k8s-webhook-server/serving-certs/tls.key || true
 	rm -f _tls.cnf
-	export WEBHOOK_URL="https://$${LAPTOP_HOST_IP}:9443"; \
+	export WEBHOOK_URL="https://$(LAPTOP_HOST_IP):9443"; \
 	export CA_BUNDLE=`openssl base64 -in /tmp/k8s-webhook-server/serving-certs/tls.crt | tr -d '\n'`; \
 	$(HELM) upgrade \
 		--dependency-update \
@@ -280,12 +294,20 @@ dev-setup-openshift-specifics:
 dev-setup-capsule:
 	@$(MAKE) -C playground dev-capsule
 
-
 wait-for-helmreleases:
 	@ echo "Waiting for all HelmReleases to have observedGeneration >= 0..."
 	@while [ "$$($(KUBECTL) get helmrelease -A -o jsonpath='{range .items[?(@.status.observedGeneration<0)]}{.metadata.namespace}{" "}{.metadata.name}{"\n"}{end}' | wc -l)" -ne 0 ]; do \
 	  sleep 5; \
 	done
+
+.PHONY: start-controller-dev
+start-controller-dev: # start the controller from local env
+	NAMESPACE=capsule-system SERVICE_ACCOUNT=capsule \
+	  go run ./cmd/controller/ \
+	  --zap-log-level 4 \
+	  --client-connection-burst=1000 \
+	  --client-connection-qps=2000.0 \
+	  --workers=8
 
 ####################
 # -- Enterprise Release
