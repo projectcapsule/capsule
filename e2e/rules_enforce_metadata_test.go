@@ -2278,7 +2278,7 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 		)
 	})
 
-	It("skips empty metadata values during value evaluation", func() {
+	It("evaluates empty metadata values against allow rules", Label("metadata-empty-values"), func() {
 		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
 			metadataRule(
 				rules.ActionTypeAllow,
@@ -2287,7 +2287,7 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 				map[string]rules.MetadataValueRule{
 					"empty-ok": metadataValueRule(
 						true,
-						metadataByExact(""),
+						metadataByExpression("^$"),
 					),
 					"empty-not-ok": metadataValueRule(
 						false,
@@ -2305,7 +2305,7 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 			cs,
 			ns.Name,
 			configMap(
-				"empty-label-exact-allowed",
+				"empty-label-regex-allowed",
 				map[string]string{
 					"empty-ok": "",
 				},
@@ -2313,17 +2313,19 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 			),
 		)
 
-		createConfigMapAndExpectAllowed(
+		createConfigMapAndExpectDenied(
 			cs,
 			ns.Name,
 			configMap(
-				"empty-label-invalid-skipped",
+				"empty-label-invalid-denied",
 				map[string]string{
 					"empty-ok":     "",
 					"empty-not-ok": "",
 				},
 				nil,
 			),
+			`metadata label "" at metadata.labels["empty-not-ok"] is not allowed by namespace rule`,
+			"Allowed metadata values: exact: prod",
 		)
 	})
 
