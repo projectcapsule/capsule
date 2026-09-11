@@ -2877,9 +2877,23 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 
-	It("filters mutation and validation by audience across metadata, Service, and workload rules", func() {
+	It("filters mutation and validation by audience across metadata, Service, and workload rules", Label("metadata-empty-values"), func() {
 		defaultValue := "owner-default"
 		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
+			// A default-only policy belongs in an allow rule: a deny rule with
+			// no value matcher would reject the default it just applied.
+			audienceRule(
+				rules.Audience{Kind: rules.AudienceKindUser, Name: ownerName},
+				metadataRule(
+					rules.ActionTypeAllow,
+					"v1",
+					[]string{"ConfigMap"},
+					map[string]rules.MetadataValueRule{
+						"example.corp/audience-default": {Default: &defaultValue},
+					},
+					nil,
+				),
+			),
 			{
 				NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
 					Audience: []rules.Audience{{Kind: rules.AudienceKindUser, Name: ownerName}},
@@ -2888,7 +2902,6 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 						Metadata: []rules.MetadataRule{{
 							VersionKinds: runtime.VersionKinds{APIGroups: []string{"v1"}, Kinds: []string{"ConfigMap"}},
 							Labels: map[string]rules.MetadataValueRule{
-								"example.corp/audience-default": {Default: &defaultValue},
 								"example.corp/audience-blocked": metadataValueRule(false, metadataByExact("true")),
 							},
 						}},
