@@ -931,7 +931,7 @@ func TestEvaluation_Append(t *testing.T) {
 	})
 }
 
-func TestEvaluateEnforce_SkipsEmptyExtractedValues(t *testing.T) {
+func TestEvaluateEnforce_EmptyExtractedValues(t *testing.T) {
 	t.Parallel()
 
 	type testCase struct {
@@ -939,6 +939,7 @@ func TestEvaluateEnforce_SkipsEmptyExtractedValues(t *testing.T) {
 		action           api.ActionType
 		values           []Value
 		rules            []string
+		evaluateEmpty    bool
 		wantMatcherCalls int
 		wantBlocking     bool
 		wantFinal        bool
@@ -947,6 +948,45 @@ func TestEvaluateEnforce_SkipsEmptyExtractedValues(t *testing.T) {
 	}
 
 	tests := []testCase{
+		{
+			name:             "opt in evaluates an empty denied value",
+			action:           api.ActionTypeDeny,
+			values:           []Value{{Path: "metadata.value"}},
+			rules:            []string{""},
+			evaluateEmpty:    true,
+			wantMatcherCalls: 1,
+			wantBlocking:     true,
+			wantFinal:        true,
+			wantBlockingPath: "metadata.value",
+		},
+		{
+			name:             "opt in denies an empty value missing the allow list",
+			action:           api.ActionTypeAllow,
+			values:           []Value{{Path: "metadata.value"}},
+			rules:            []string{"allowed"},
+			evaluateEmpty:    true,
+			wantMatcherCalls: 1,
+			wantBlocking:     true,
+			wantBlockingPath: "metadata.value",
+		},
+		{
+			name:             "opt in allows an explicitly allowed empty value",
+			action:           api.ActionTypeAllow,
+			values:           []Value{{Path: "metadata.value"}},
+			rules:            []string{""},
+			evaluateEmpty:    true,
+			wantMatcherCalls: 1,
+			wantFinal:        true,
+		},
+		{
+			name:             "opt in audits an empty value",
+			action:           api.ActionTypeAudit,
+			values:           []Value{{Path: "metadata.value"}},
+			rules:            []string{""},
+			evaluateEmpty:    true,
+			wantMatcherCalls: 1,
+			wantAudits:       1,
+		},
 		{
 			name:   "empty value is skipped before deny evaluation",
 			action: api.ActionTypeDeny,
@@ -1097,8 +1137,9 @@ func TestEvaluateEnforce_SkipsEmptyExtractedValues(t *testing.T) {
 					},
 				},
 				Set[string, struct{}]{
-					Name:        "registry",
-					EventReason: "NamespaceRuleViolation",
+					Name:                "registry",
+					EventReason:         "NamespaceRuleViolation",
+					EvaluateEmptyValues: tt.evaluateEmpty,
 
 					Values: func(struct{}) []Value {
 						return tt.values

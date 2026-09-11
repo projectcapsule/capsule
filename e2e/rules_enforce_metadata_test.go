@@ -1689,6 +1689,127 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 		)
 	})
 
+	DescribeTable("denies metadata presence including empty values", Label("metadata-empty-values"), func(kind, field string, explicitValues bool) {
+		const policyKey = "openshift.io/run-level"
+
+		// Start without metadata constraints so an existing value can be tested
+		// after the deny rule is introduced.
+		updateTenantRules(nil)
+		ns := createNamespace(nil)
+		owner := impersonationClient(ownerName, withDefaultGroups(nil))
+
+		newResource := func() client.Object {
+			if kind == "Namespace" {
+				return NewNamespace("", map[string]string{meta.TenantLabel: tnt.Name})
+			}
+
+			cm := configMap("metadata-presence", nil, nil)
+			cm.Namespace = ns.Name
+			return cm
+		}
+		setMetadata := func(obj client.Object, value string) {
+			if field == "labels" {
+				labels := obj.GetLabels()
+				if labels == nil {
+					labels = map[string]string{}
+				}
+				labels[policyKey] = value
+				obj.SetLabels(labels)
+			} else {
+				annotations := obj.GetAnnotations()
+				if annotations == nil {
+					annotations = map[string]string{}
+				}
+				annotations[policyKey] = value
+				obj.SetAnnotations(annotations)
+			}
+		}
+
+		absent := newResource()
+		Eventually(func() error {
+			return owner.Create(context.Background(), absent)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		existing := newResource()
+		existing.SetName(existing.GetName() + "-existing")
+		setMetadata(existing, "baseline")
+		Eventually(func() error {
+			return owner.Create(context.Background(), existing)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		policy := metadataValueRule(false)
+		if explicitValues {
+			policy.Values = []runtime.ExpressionMatch{metadataByExpression(".*")}
+		}
+		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
+			metadataRule(rules.ActionTypeDeny, "", []string{"*", "Namespace"},
+				map[string]rules.MetadataValueRule{policyKey: policy},
+				map[string]rules.MetadataValueRule{policyKey: policy}),
+		})
+		waitForProjectedMetadata(ns.Name, policyKey, nil, nil)
+
+		By("allowing creation without the denied key")
+		candidate := newResource()
+		candidate.SetName(candidate.GetName() + "-missing")
+		Expect(owner.Create(context.Background(), candidate, client.DryRunAll)).To(Succeed())
+
+		expectDenied := func(operation func() error) {
+			Eventually(func(g Gomega) {
+				err := operation()
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(apierrors.IsForbidden(err)).To(BeTrue(), "expected an admission denial: %v", err)
+				g.Expect(err.Error()).To(ContainSubstring(" denied the request: metadata "))
+				g.Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("metadata.%s[%q]", field, policyKey)))
+				g.Expect(err.Error()).To(ContainSubstring("denied by namespace rule"))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		}
+
+		for _, value := range []string{"privileged", ""} {
+			By(fmt.Sprintf("rejecting %s creation with %s value %q", kind, field, value))
+			expectDenied(func() error {
+				candidate := newResource()
+				candidate.SetName(candidate.GetName() + "-denied")
+				setMetadata(candidate, value)
+				return owner.Create(context.Background(), candidate, client.DryRunAll)
+			})
+
+			By(fmt.Sprintf("rejecting a patch adding %s value %q", field, value))
+			patch, err := json.Marshal(map[string]any{"metadata": map[string]any{field: map[string]string{policyKey: value}}})
+			Expect(err).NotTo(HaveOccurred())
+			expectDenied(func() error {
+				return owner.Patch(context.Background(), absent, client.RawPatch(k8stypes.MergePatchType, patch), client.DryRunAll)
+			})
+
+			By(fmt.Sprintf("rejecting a patch changing existing %s to %q", field, value))
+			expectDenied(func() error {
+				return owner.Patch(context.Background(), existing, client.RawPatch(k8stypes.MergePatchType, patch), client.DryRunAll)
+			})
+		}
+
+		By("allowing unrelated metadata while the denied key is absent")
+		Expect(owner.Patch(context.Background(), absent, client.RawPatch(k8stypes.MergePatchType,
+			[]byte(`{"metadata":{"labels":{"example.corp/unrelated":""}}}`)))).To(Succeed())
+
+		By("allowing removal of a pre-existing denied key")
+		patch, err := json.Marshal(map[string]any{"metadata": map[string]any{field: map[string]any{policyKey: nil}}})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(owner.Patch(context.Background(), existing, client.RawPatch(k8stypes.MergePatchType, patch))).To(Succeed())
+		Expect(owner.Get(context.Background(), client.ObjectKeyFromObject(existing), existing)).To(Succeed())
+		if field == "labels" {
+			Expect(existing.GetLabels()).NotTo(HaveKey(policyKey))
+		} else {
+			Expect(existing.GetAnnotations()).NotTo(HaveKey(policyKey))
+		}
+	},
+		Entry("Namespace labels without values", "Namespace", "labels", false),
+		Entry("Namespace annotations without values", "Namespace", "annotations", false),
+		Entry("ConfigMap labels without values", "ConfigMap", "labels", false),
+		Entry("ConfigMap annotations without values", "ConfigMap", "annotations", false),
+		Entry("Namespace labels with a catch-all regexp", "Namespace", "labels", true),
+		Entry("Namespace annotations with a catch-all regexp", "Namespace", "annotations", true),
+		Entry("ConfigMap labels with a catch-all regexp", "ConfigMap", "labels", true),
+		Entry("ConfigMap annotations with a catch-all regexp", "ConfigMap", "annotations", true),
+	)
+
 	It("supports required metadata without value constraints", func() {
 		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
 			metadataRule(

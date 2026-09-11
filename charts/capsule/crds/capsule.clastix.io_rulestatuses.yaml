@@ -164,14 +164,16 @@ spec:
                                   description: |-
                                     Required enforces that the metadata key must be present.
 
-                                    This is mainly meaningful with action=allow. Deny and audit rules remain
-                                    value matchers and do not require missing metadata to exist.
+                                    This is only meaningful with action=allow. Deny and audit rules do not
+                                    require missing metadata to exist.
                                   type: boolean
                                 values:
                                   description: |-
                                     Values defines allowed, denied, or audited values for the metadata key.
 
-                                    If Required=true and Values is empty, only presence is enforced.
+                                    With action=allow and no values, only Required is enforced.
+                                    With action=deny or action=audit and no values, any present value matches,
+                                    including an empty string.
                                   items:
                                     description: |-
                                       At least one of Exact or Exp must be set.
@@ -247,14 +249,16 @@ spec:
                                   description: |-
                                     Required enforces that the metadata key must be present.
 
-                                    This is mainly meaningful with action=allow. Deny and audit rules remain
-                                    value matchers and do not require missing metadata to exist.
+                                    This is only meaningful with action=allow. Deny and audit rules do not
+                                    require missing metadata to exist.
                                   type: boolean
                                 values:
                                   description: |-
                                     Values defines allowed, denied, or audited values for the metadata key.
 
-                                    If Required=true and Values is empty, only presence is enforced.
+                                    With action=allow and no values, only Required is enforced.
+                                    With action=deny or action=audit and no values, any present value matches,
+                                    including an empty string.
                                   items:
                                     description: |-
                                       At least one of Exact or Exp must be set.
@@ -853,14 +857,16 @@ spec:
                                     description: |-
                                       Required enforces that the metadata key must be present.
 
-                                      This is mainly meaningful with action=allow. Deny and audit rules remain
-                                      value matchers and do not require missing metadata to exist.
+                                      This is only meaningful with action=allow. Deny and audit rules do not
+                                      require missing metadata to exist.
                                     type: boolean
                                   values:
                                     description: |-
                                       Values defines allowed, denied, or audited values for the metadata key.
 
-                                      If Required=true and Values is empty, only presence is enforced.
+                                      With action=allow and no values, only Required is enforced.
+                                      With action=deny or action=audit and no values, any present value matches,
+                                      including an empty string.
                                     items:
                                       description: |-
                                         At least one of Exact or Exp must be set.
@@ -936,14 +942,16 @@ spec:
                                     description: |-
                                       Required enforces that the metadata key must be present.
 
-                                      This is mainly meaningful with action=allow. Deny and audit rules remain
-                                      value matchers and do not require missing metadata to exist.
+                                      This is only meaningful with action=allow. Deny and audit rules do not
+                                      require missing metadata to exist.
                                     type: boolean
                                   values:
                                     description: |-
                                       Values defines allowed, denied, or audited values for the metadata key.
 
-                                      If Required=true and Values is empty, only presence is enforced.
+                                      With action=allow and no values, only Required is enforced.
+                                      With action=deny or action=audit and no values, any present value matches,
+                                      including an empty string.
                                     items:
                                       description: |-
                                         At least one of Exact or Exp must be set.
@@ -1482,14 +1490,16 @@ spec:
                                       description: |-
                                         Required enforces that the metadata key must be present.
 
-                                        This is mainly meaningful with action=allow. Deny and audit rules remain
-                                        value matchers and do not require missing metadata to exist.
+                                        This is only meaningful with action=allow. Deny and audit rules do not
+                                        require missing metadata to exist.
                                       type: boolean
                                     values:
                                       description: |-
                                         Values defines allowed, denied, or audited values for the metadata key.
 
-                                        If Required=true and Values is empty, only presence is enforced.
+                                        With action=allow and no values, only Required is enforced.
+                                        With action=deny or action=audit and no values, any present value matches,
+                                        including an empty string.
                                       items:
                                         description: |-
                                           At least one of Exact or Exp must be set.
@@ -1565,14 +1575,16 @@ spec:
                                       description: |-
                                         Required enforces that the metadata key must be present.
 
-                                        This is mainly meaningful with action=allow. Deny and audit rules remain
-                                        value matchers and do not require missing metadata to exist.
+                                        This is only meaningful with action=allow. Deny and audit rules do not
+                                        require missing metadata to exist.
                                       type: boolean
                                     values:
                                       description: |-
                                         Values defines allowed, denied, or audited values for the metadata key.
 
-                                        If Required=true and Values is empty, only presence is enforced.
+                                        With action=allow and no values, only Required is enforced.
+                                        With action=deny or action=audit and no values, any present value matches,
+                                        including an empty string.
                                       items:
                                         description: |-
                                           At least one of Exact or Exp must be set.
