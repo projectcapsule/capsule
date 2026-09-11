@@ -93,7 +93,7 @@ func TestNamespaceHandlerAllowsDeleteWithMissingTenant(t *testing.T) {
 	}
 }
 
-func namespaceValidationScheme(t *testing.T) *runtime.Scheme {
+func namespaceValidationScheme(t testing.TB) *runtime.Scheme {
 	t.Helper()
 
 	scheme := runtime.NewScheme()
@@ -121,7 +121,7 @@ func namespaceWithTenantReference(name, tenantName, tenantUID string) *corev1.Na
 }
 
 func namespaceUpdateRequest(
-	t *testing.T,
+	t testing.TB,
 	oldNs, newNs *corev1.Namespace,
 	subresource string,
 ) admission.Request {

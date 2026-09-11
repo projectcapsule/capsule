@@ -19,6 +19,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 	"github.com/projectcapsule/capsule/pkg/users"
+	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
 type userMetadataHandler struct{}
@@ -92,7 +93,10 @@ func (h *userMetadataHandler) OnUpdate(
 				return ad.Deny(msg)
 			}
 
-			if v != oldNs.GetAnnotations()["scheduler.alpha.kubernetes.io/node-selector"] {
+			// Permit restoring the Tenant's desired selector after drift without
+			// allowing a caller to replace it with an arbitrary selector.
+			if v != oldNs.GetAnnotations()[utils.NodeSelectorAnnotation] &&
+				v != utils.BuildNodeSelector(tnt, nil)[utils.NodeSelectorAnnotation] {
 				msg := "the annotation scheduler.alpha.kubernetes.io/node-selector is enforced via tenant, cannot be updated"
 
 				recorder.LabeledEvent(
