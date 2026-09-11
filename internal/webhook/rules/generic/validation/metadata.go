@@ -109,8 +109,9 @@ func (h *genericRules) metadataSet(
 	entry metadataEntry,
 ) genericRuleSet[runtime.ExpressionMatch] {
 	return genericRuleSet[runtime.ExpressionMatch]{
-		Name:        metadataSetName(entry.Field),
-		EventReason: events.ReasonForbiddenMetadata,
+		Name:                metadataSetName(entry.Field),
+		EventReason:         events.ReasonForbiddenMetadata,
+		EvaluateEmptyValues: true,
 
 		Values: func(_ genericObject) []ruleengine.Value {
 			return []ruleengine.Value{
@@ -143,7 +144,7 @@ func (h *genericRules) metadataSet(
 						}
 
 						if matched {
-							out = append(out, policy.Values...)
+							out = append(out, metadataValueMatchers(enforce.Action, policy)...)
 						}
 					}
 				case metadataFieldAnnotation:
@@ -154,7 +155,7 @@ func (h *genericRules) metadataSet(
 						}
 
 						if matched {
-							out = append(out, policy.Values...)
+							out = append(out, metadataValueMatchers(enforce.Action, policy)...)
 						}
 					}
 				}
@@ -175,6 +176,16 @@ func (h *genericRules) metadataSet(
 		RuleDescription:    runtime.DescribeExpressionMatch,
 		AllowedDescription: "Allowed metadata values",
 	}
+}
+
+func metadataValueMatchers(action apirules.ActionType, policy apirules.MetadataValueRule) []runtime.ExpressionMatch {
+	if len(policy.Values) == 0 && (action.OrDefault() == apirules.ActionTypeDeny || action.OrDefault() == apirules.ActionTypeAudit) {
+		// Without value constraints, deny and audit match the presence of the
+		// key, including an empty value. Missing keys are skipped by validation.
+		return []runtime.ExpressionMatch{{ExpressionRegex: runtime.ExpressionRegex{Expression: ".*"}}}
+	}
+
+	return policy.Values
 }
 
 //nolint:gocognit

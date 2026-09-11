@@ -19,6 +19,106 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
+func TestValidateMetadataValuePolicies(t *testing.T) {
+	t.Parallel()
+
+	const key = "openshift.io/run-level"
+
+	tests := []struct {
+		name         string
+		action       apirules.ActionType
+		policy       apirules.MetadataValueRule
+		value        string
+		absent       bool
+		wantBlocking bool
+		wantAudits   int
+	}{
+		{name: "deny presence with no values", action: apirules.ActionTypeDeny, value: "privileged", wantBlocking: true},
+		{name: "deny empty presence with no values", action: apirules.ActionTypeDeny, wantBlocking: true},
+		{name: "default action denies empty presence", wantBlocking: true},
+		{name: "deny empty values list", action: apirules.ActionTypeDeny, policy: metadataPolicy(false, []runtime.ExpressionMatch{}...), wantBlocking: true},
+		{name: "deny missing key is allowed", action: apirules.ActionTypeDeny, absent: true},
+		{name: "deny required missing key is allowed", action: apirules.ActionTypeDeny, policy: metadataPolicy(true), absent: true},
+		{name: "deny regexp matches empty", action: apirules.ActionTypeDeny, policy: metadataPolicy(false, expression(".*")), wantBlocking: true},
+		{name: "deny empty only regexp", action: apirules.ActionTypeDeny, policy: metadataPolicy(false, expression("^$")), wantBlocking: true},
+		{name: "deny nonmatching regexp allows empty", action: apirules.ActionTypeDeny, policy: metadataPolicy(false, expression(".+"))},
+		{name: "deny nonmatching exact allows empty", action: apirules.ActionTypeDeny, policy: metadataPolicy(false, exact("privileged"))},
+		{name: "allow list rejects empty", action: apirules.ActionTypeAllow, policy: metadataPolicy(false, exact("baseline")), wantBlocking: true},
+		{name: "required allow list rejects empty", action: apirules.ActionTypeAllow, policy: metadataPolicy(true, exact("baseline")), wantBlocking: true},
+		{name: "allow regexp accepts empty", action: apirules.ActionTypeAllow, policy: metadataPolicy(false, expression("^$"))},
+		{name: "required presence accepts empty", action: apirules.ActionTypeAllow, policy: metadataPolicy(true)},
+		{name: "optional presence accepts empty", action: apirules.ActionTypeAllow},
+		{name: "audit presence with no values", action: apirules.ActionTypeAudit, value: "privileged", wantAudits: 1},
+		{name: "audit empty presence with no values", action: apirules.ActionTypeAudit, wantAudits: 1},
+		{name: "audit regexp matches empty", action: apirules.ActionTypeAudit, policy: metadataPolicy(false, expression(".*")), wantAudits: 1},
+		{name: "audit missing key is ignored", action: apirules.ActionTypeAudit, absent: true},
+	}
+
+	for _, kind := range []string{"Namespace", "ConfigMap"} {
+		for _, field := range []metadataField{metadataFieldLabel, metadataFieldAnnotation} {
+			for _, operation := range []string{"create", "add", "change"} {
+				for _, tt := range tests {
+					t.Run(kind+"/"+string(field)+"/"+operation+"/"+tt.name, func(t *testing.T) {
+						t.Parallel()
+
+						policy := map[string]apirules.MetadataValueRule{key: tt.policy}
+						metadata := map[string]string{}
+						if !tt.absent {
+							metadata[key] = tt.value
+						}
+
+						obj := metadataObject(nil, nil)
+						body := enforceMetadata(tt.action, nil, []string{"*", "Namespace"}, nil, nil)
+						if field == metadataFieldLabel {
+							obj.SetLabels(metadata)
+							body.Metadata[0].Labels = policy
+						} else {
+							obj.SetAnnotations(metadata)
+							body.Metadata[0].Annotations = policy
+						}
+
+						var old genericObject
+						if operation != "create" {
+							old = metadataObject(nil, nil)
+							if operation == "change" {
+								if field == metadataFieldLabel {
+									old.SetLabels(map[string]string{key: "previous"})
+								} else {
+									old.SetAnnotations(map[string]string{key: "previous"})
+								}
+							}
+						}
+
+						got, err := newMetadataTestRules(nil, nil).validateMetadata(old, obj, coreGVK(kind), []*apirules.NamespaceRuleEnforceBody{body})
+						if err != nil {
+							t.Fatalf("validateMetadata() error = %v", err)
+						}
+						if blocked := got.BlockingError() != nil; blocked != tt.wantBlocking {
+							t.Fatalf("blocking = %v, want %v: %#v", blocked, tt.wantBlocking, got)
+						}
+						if tt.wantBlocking {
+							wantPath := metadataLabelPath(key)
+							if field == metadataFieldAnnotation {
+								wantPath = metadataAnnotationPath(key)
+							}
+							if got.Blocking.Value.Path != wantPath || got.Blocking.Value.Value != tt.value {
+								t.Fatalf("blocking value = %#v, want %q at %s", got.Blocking.Value, tt.value, wantPath)
+							}
+						}
+						audits := 0
+						if got != nil {
+							audits = len(got.Audits)
+						}
+						if audits != tt.wantAudits {
+							t.Fatalf("audit count = %d, want %d", audits, tt.wantAudits)
+						}
+					})
+				}
+			}
+		}
+	}
+}
+
 func TestValidateMetadata(t *testing.T) {
 	t.Parallel()
 

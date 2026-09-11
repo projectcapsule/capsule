@@ -95,6 +95,12 @@ type Set[R any, O any] struct {
 	EventReason string
 
 	Values func(O) []Value
+
+	// EvaluateEmptyValues includes empty strings in matching. By default they
+	// represent unset resource fields and are skipped. Metadata keys can be
+	// present with an empty value and must opt in to evaluation.
+	EvaluateEmptyValues bool
+
 	// Rules extracts rules when extraction cannot fail.
 	Rules func(*api.NamespaceRuleEnforceBody) []R
 	// RulesWithError extracts rules that require runtime parsing or matching.
@@ -139,12 +145,9 @@ func EvaluateEnforce[R any, T any](
 	evaluation := &Evaluation{}
 
 	values := set.Values(obj)
-	if len(values) == 0 {
-		return evaluation, nil
-	}
 
 	for _, value := range values {
-		if value.Value == "" {
+		if value.Value == "" && !set.EvaluateEmptyValues {
 			continue
 		}
 
