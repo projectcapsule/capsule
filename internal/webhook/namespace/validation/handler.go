@@ -6,10 +6,14 @@ package validation
 import (
 	"context"
 	"fmt"
+	"maps"
 	"reflect"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	authuser "k8s.io/apiserver/pkg/authentication/user"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -34,6 +38,8 @@ type handler struct {
 	cfg      configuration.Configuration
 	handlers []handlers.TypedHandlerWithTenantUser[*corev1.Namespace]
 }
+
+const kubeadmClusterAdministratorsGroup = "kubeadm:cluster-admins"
 
 func (h *handler) OnCreate(
 	c client.Client,
@@ -147,13 +153,20 @@ func (h *handler) OnUpdate(
 			return ad.ErroredResponse(err)
 		}
 
-		if response, stop := validateTerminatingNamespaceUpdate(req, oldNs, ns); stop {
-			return response
+		terminating := isTerminatingNamespace(oldNs)
+		if terminating && namespaceTenantAssignmentChanged(oldNs, ns) {
+			return ad.Deny("namespace tenant ownership can not change during termination")
 		}
+
+		skipTerminatingValidation := canSkipTerminatingNamespaceValidation(terminating, oldNs, ns)
 
 		reader = webhookutils.NewTenantCachingReader(reader)
 
 		user := handlers.ResolveAdmissionUser(ctx, c, req, h.cfg)
+
+		if response, stop := validateTerminatingNamespaceActor(skipTerminatingValidation, user, oldNs); stop {
+			return response
+		}
 
 		if response, stop := validateNamespaceTenantReferenceTransition(user, oldNs, ns); stop {
 			return response
@@ -178,7 +191,8 @@ func (h *handler) OnUpdate(
 				return ad.Deny("namespace can not be migrated between tenants")
 			}
 
-			if user.IsCapsule() && !tenant.NamespaceIsOwned(ctx, c, h.cfg, oldNs, oldTenant, user) {
+			if (user.IsCapsule() || skipTerminatingValidation) &&
+				!tenant.NamespaceIsOwned(ctx, c, h.cfg, oldNs, oldTenant, user) {
 				recorder.LabeledEvent(
 					ns,
 					corev1.EventTypeWarning,
@@ -201,6 +215,13 @@ func (h *handler) OnUpdate(
 		}
 
 		if tnt == nil {
+			return nil
+		}
+
+		// Once ownership has been established, allow finalizer and status updates
+		// needed to complete deletion without applying tenant policies that may
+		// have become unsatisfiable during termination.
+		if skipTerminatingValidation {
 			return nil
 		}
 
@@ -230,30 +251,65 @@ func namespaceTenantChanged(oldTenant, newTenant *capsulev1beta2.Tenant) bool {
 	return oldTenant.GetName() != newTenant.GetName() || oldTenant.GetUID() != newTenant.GetUID()
 }
 
-func isTerminatingNamespaceUpdate(
-	req admission.Request,
-	oldNs, newNs *corev1.Namespace,
-) bool {
-	return req.SubResource == "finalize" ||
-		newNs.DeletionTimestamp != nil ||
-		oldNs.DeletionTimestamp != nil ||
-		newNs.Status.Phase == corev1.NamespaceTerminating ||
-		oldNs.Status.Phase == corev1.NamespaceTerminating
+func isTerminatingNamespace(oldNs *corev1.Namespace) bool {
+	// DeletionTimestamp is set by the API server and cannot be supplied through
+	// a namespace status/finalize update. Status.Phase is intentionally not
+	// trusted because callers with namespaces/status access can write it.
+	return oldNs.DeletionTimestamp != nil
 }
 
-func validateTerminatingNamespaceUpdate(
-	req admission.Request,
+func canSkipTerminatingNamespaceValidation(
+	terminating bool,
 	oldNs, newNs *corev1.Namespace,
+) bool {
+	return terminating && !namespaceMetadataChanged(oldNs, newNs)
+}
+
+func validateTerminatingNamespaceActor(
+	skipTerminatingValidation bool,
+	user users.AdmissionUser,
+	oldNs *corev1.Namespace,
 ) (*admission.Response, bool) {
-	if !isTerminatingNamespaceUpdate(req, oldNs, newNs) {
+	if !skipTerminatingValidation {
 		return nil, false
 	}
 
-	if namespaceTenantAssignmentChanged(oldNs, newNs) {
-		return ad.Deny("namespace tenant ownership can not change during termination"), true
+	// Only positively identified control-plane actors may skip Tenant
+	// resolution while completing deletion. An Unknown user can still hold
+	// namespaces/status or namespaces/finalize RBAC and must not inherit the
+	// control-plane exception merely because it is not a Capsule user.
+	if canBypassTerminatingNamespaceValidation(user) {
+		return nil, true
 	}
 
-	return nil, true
+	if user.IsUnknown() && !tenant.HasTenantReference(oldNs) {
+		return ad.Deny("namespace is not owned by any tenant"), true
+	}
+
+	return nil, false
+}
+
+func canBypassTerminatingNamespaceValidation(user users.AdmissionUser) bool {
+	if user.IsAdmin() ||
+		slices.Contains(user.Groups, authuser.SystemPrivilegedGroup) ||
+		slices.Contains(user.Groups, kubeadmClusterAdministratorsGroup) {
+		return true
+	}
+
+	if user.Username == authuser.KubeControllerManager || user.Username == authuser.APIServerUser {
+		return true
+	}
+
+	return user.ServiceAccount != nil && user.ServiceAccount.Namespace == metav1.NamespaceSystem
+}
+
+func namespaceMetadataChanged(oldNs, newNs *corev1.Namespace) bool {
+	ownerReferencesChanged := len(oldNs.OwnerReferences) != len(newNs.OwnerReferences) ||
+		(len(oldNs.OwnerReferences) > 0 && !reflect.DeepEqual(oldNs.OwnerReferences, newNs.OwnerReferences))
+
+	return !maps.Equal(oldNs.Labels, newNs.Labels) ||
+		!maps.Equal(oldNs.Annotations, newNs.Annotations) ||
+		ownerReferencesChanged
 }
 
 func validateNamespaceTenantReferenceTransition(
@@ -277,6 +333,10 @@ func validateNamespaceTenantReferenceTransition(
 	case oldHasTenantReference && !newHasTenantReference:
 		return ad.Deny("namespace can not remove tenant ownership"), true
 	case !oldHasTenantReference && !newHasTenantReference:
+		if user.IsCapsule() {
+			return ad.Deny("namespace is not owned by any tenant"), true
+		}
+
 		return nil, true
 	default:
 		return nil, false

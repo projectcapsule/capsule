@@ -128,7 +128,7 @@ func TestNamespaceHandlerDoesNotInterceptFinalize(t *testing.T) {
 	}
 }
 
-func TestNamespaceHandlerRejectsTenantOwnerLabelMigrationWithEmptyOwnerReferences(t *testing.T) {
+func TestNamespaceHandlerRejectsTenantOwnerLabelMigrationAcrossSubresources(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -164,20 +164,34 @@ func TestNamespaceHandlerRejectsTenantOwnerLabelMigrationWithEmptyOwnerReference
 		t.Fatal(err)
 	}
 
-	response := NamespaceHandler(cfg, OwnerReferenceHandler(cfg)).OnUpdate(
-		cl,
-		cl,
-		admission.NewDecoder(scheme),
-		recorder,
-	)(ctx, admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
-		Object:    runtime.RawExtension{Raw: newRaw},
-		OldObject: runtime.RawExtension{Raw: oldRaw},
-		UserInfo: authenticationv1.UserInfo{
-			Username: owner.Name,
-		},
-	}})
+	tests := []struct {
+		name        string
+		subresource string
+	}{
+		{name: "namespace"},
+		{name: "status", subresource: "status"},
+		{name: "finalize", subresource: "finalize"},
+	}
 
-	if response == nil || response.Allowed {
-		t.Fatalf("expected label migration patch to be denied, got %#v", response)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			response := NamespaceHandler(cfg, OwnerReferenceHandler(cfg)).OnUpdate(
+				cl,
+				cl,
+				admission.NewDecoder(scheme),
+				recorder,
+			)(ctx, admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+				SubResource: tt.subresource,
+				Object:      runtime.RawExtension{Raw: newRaw},
+				OldObject:   runtime.RawExtension{Raw: oldRaw},
+				UserInfo: authenticationv1.UserInfo{
+					Username: owner.Name,
+				},
+			}})
+
+			if response == nil || response.Allowed {
+				t.Fatalf("expected label migration patch to be denied, got %#v", response)
+			}
+		})
 	}
 }
