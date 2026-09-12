@@ -159,12 +159,23 @@ func (r *ResourcePool) CalculateAvailableResources() {
 	available := corev1.ResourceList{}
 
 	for res, qt := range r.Status.Allocation.Hard {
+		// Deep-copy qt before subtracting: resource.Quantity contains internal pointers,
+		// so a shallow copy can alias the map entry and Sub() could mutate Hard.
+		// Using DeepCopy() ensures Hard remains unchanged.
+		remaining := qt.DeepCopy()
+
 		amount, exists := r.Status.Allocation.Claimed[res]
 		if exists {
-			qt.Sub(amount)
+			remaining.Sub(amount)
 		}
 
-		available[res] = qt
+		// A pool can never offer a negative amount of resources, so clamp
+		// at zero. This also keeps Hard intact for downstream math.
+		if remaining.Sign() < 0 {
+			remaining = resource.MustParse("0")
+		}
+
+		available[res] = remaining
 	}
 
 	r.Status.Allocation.Available = available
@@ -194,6 +205,13 @@ func (r *ResourcePool) GetAvailableClaimableResources() corev1.ResourceList {
 		}
 
 		qt.Sub(claimed)
+
+		// A pool can never offer a negative amount of resources, so clamp at
+		// zero here too, otherwise callers that build PoolExhausted messages
+		// from this value can surface negative available quantities.
+		if qt.Sign() < 0 {
+			qt = resource.MustParse("0")
+		}
 
 		hard[resourceName] = qt
 	}
