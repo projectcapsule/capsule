@@ -40,10 +40,10 @@ func NewExternalServiceIPForbidden(allowedIps []api.AllowedIP) error {
 
 func (e ExternalServiceIPForbiddenError) Error() string {
 	if len(e.cidr) == 0 {
-		return "The current Tenant does not allow the use of Service with external IPs"
+		return "external IPs are not allowed by the tenant"
 	}
 
-	return fmt.Sprintf("The selected external IPs for the current Service are violating the following enforced CIDRs: %s", strings.Join(e.cidr, ", "))
+	return fmt.Sprintf("external IPs must use an allowed CIDR. Allowed CIDRs: %s", strings.Join(e.cidr, ", "))
 }
 
 type NodePortDisabledError struct{}
@@ -53,7 +53,7 @@ func NewNodePortDisabledError() error {
 }
 
 func (NodePortDisabledError) Error() string {
-	return "NodePort service types are forbidden for the tenant: please, reach out to the system administrators"
+	return "NodePort service types are forbidden for the tenant"
 }
 
 type ExternalNameDisabledError struct{}
@@ -63,7 +63,7 @@ func NewExternalNameDisabledError() error {
 }
 
 func (ExternalNameDisabledError) Error() string {
-	return "ExternalName service types are forbidden for the tenant: please, reach out to the system administrators"
+	return "ExternalName service types are forbidden for the tenant"
 }
 
 type LoadBalancerDisabledError struct{}
@@ -73,5 +73,5 @@ func NewLoadBalancerDisabled() error {
 }
 
 func (LoadBalancerDisabledError) Error() string {
-	return "LoadBalancer service types are forbidden for the tenant: please, reach out to the system administrators"
+	return "LoadBalancer service types are forbidden for the tenant"
 }

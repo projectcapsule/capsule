@@ -47,7 +47,7 @@ type DecisionError struct {
 
 func (e *DecisionError) Error() string {
 	if e == nil || e.Decision == nil {
-		return "namespace rule decision denied request"
+		return "request denied by namespace rule"
 	}
 
 	return e.Decision.Message
@@ -333,7 +333,7 @@ func allowMissMessage[R any, T any](
 	}
 
 	return fmt.Sprintf(
-		"%s: value did not match any allowed rule. %s: %s",
+		"%s. %s: %s",
 		message,
 		allowedLabel(set),
 		descriptions,
@@ -366,14 +366,14 @@ func decisionMessage[R any, T any](
 		return appendMatchContext(message, matchedRule, matchDetail, "matched audit rule")
 
 	case api.ActionTypeDeny:
-		message := fmt.Sprintf(
+		// Keep matcher details on Decision for diagnostics. The rejected value,
+		// field and policy source are sufficient for an admission denial.
+		return fmt.Sprintf(
 			"%s %q at %s is denied by namespace rule",
 			set.Name,
 			value.Value,
 			value.Path,
 		)
-
-		return appendMatchContext(message, matchedRule, matchDetail, "matched denied rule")
 
 	case api.ActionTypeAllow:
 		message := fmt.Sprintf(

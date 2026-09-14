@@ -54,7 +54,7 @@ type IngressHostnameCollisionError struct {
 }
 
 func (i IngressHostnameCollisionError) Error() string {
-	return fmt.Sprintf("hostname %s is already used across the cluster: please, reach out to the system administrators", i.hostname)
+	return fmt.Sprintf("hostname %s is already used across the cluster", i.hostname)
 }
 
 func NewIngressHostnameCollision(hostname string) error {
@@ -95,7 +95,7 @@ func NewIngressClassUndefined(spec api.DefaultAllowedListSpec) error {
 }
 
 func (i IngressClassUndefinedError) Error() string {
-	return DefaultAllowedValuesErrorMessage(i.spec, "No Ingress Class is forbidden for the current Tenant. Specify a Ingress Class which is allowed within the Tenant: ")
+	return DefaultAllowedValuesErrorMessage(i.spec, "an ingress class is required by the tenant")
 }
 
 type IngressClassNotValidError struct {

@@ -30,15 +30,9 @@ func TestAllowedValuesErrorMessages(t *testing.T) {
 	}
 
 	got := apierrors.AllowedValuesErrorMessage(allowed, "prefix: ")
-	for _, want := range []string{
-		"prefix:",
-		"use one from the following list (fast, slow)",
-		"use one matching the following regex (premium-.*)",
-		"matching the label selector defined in the Tenant",
-	} {
-		if !strings.Contains(got, want) {
-			t.Fatalf("AllowedValuesErrorMessage() = %q, missing %q", got, want)
-		}
+	want := "prefix. Allowed values: fast, slow or matching pattern premium-.* or matching the tenant's label selector"
+	if got != want {
+		t.Fatalf("AllowedValuesErrorMessage() = %q, want %q", got, want)
 	}
 
 	defaultMsg := apierrors.DefaultAllowedValuesErrorMessage(api.DefaultAllowedListSpec{SelectorAllowedListSpec: allowed}, "default: ")
@@ -51,8 +45,22 @@ func TestAllowedValuesErrorMessages(t *testing.T) {
 			LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"class": "gold"}},
 		},
 	}, "selection: ")
-	if !strings.Contains(selectionMsg, "matching the label selector defined in the Tenant") {
+	if !strings.Contains(selectionMsg, "matching the tenant's label selector") {
 		t.Fatalf("SelectionListWithDefaultErrorMessage() = %q", selectionMsg)
+	}
+}
+
+func TestAllowedValuesErrorMessageWithoutChoices(t *testing.T) {
+	t.Parallel()
+
+	for _, message := range []string{"a storage class is required", "a storage class is required: "} {
+		if got := apierrors.AllowedValuesErrorMessage(api.SelectorAllowedListSpec{}, message); got != "a storage class is required" {
+			t.Fatalf("message without choices = %q", got)
+		}
+	}
+	allowed := api.SelectorAllowedListSpec{AllowedListSpec: api.AllowedListSpec{Exact: []string{"fast"}}}
+	if got := apierrors.AllowedValuesErrorMessage(allowed, ""); got != "Allowed values: fast" {
+		t.Fatalf("message without prefix = %q", got)
 	}
 }
 
@@ -71,17 +79,17 @@ func TestErrorConstructors(t *testing.T) {
 	}{
 		{name: "custom quota", err: apierrors.NewCustomResourceQuotaError("pods.v1", 3), want: "pods.v1"},
 		{name: "device forbidden", err: apierrors.NewDeviceClassForbidden("gpu", selectorAllowed), want: "Device Class gpu is forbidden"},
-		{name: "device undefined", err: apierrors.NewDeviceClassUndefined(selectorAllowed), want: "Selected DeviceClass is forbidden"},
+		{name: "device undefined", err: apierrors.NewDeviceClassUndefined(selectorAllowed), want: "the selected device class does not exist or is not allowed"},
 		{name: "gateway class", err: apierrors.NewGatewayClassError("public", stderrors.New("missing")), want: "Failed to resolve Gateway Class public"},
 		{name: "gateway", err: apierrors.NewGatewayError(gatewayv1.ObjectName("gw"), stderrors.New("missing")), want: "Failed to resolve Gateway gw"},
 		{name: "gateway forbidden", err: apierrors.NewGatewayClassForbidden("public", allowed), want: "Gateway Class public is forbidden"},
-		{name: "gateway undefined", err: apierrors.NewGatewayClassUndefined(allowed), want: "No gateway Class is forbidden"},
+		{name: "gateway undefined", err: apierrors.NewGatewayClassUndefined(allowed), want: "a gateway class is required"},
 		{name: "ingress class", err: apierrors.NewIngressClassError("nginx", stderrors.New("missing")), want: "Failed to resolve Ingress Class nginx"},
 		{name: "ingress forbidden", err: apierrors.NewIngressClassForbidden("nginx", allowed), want: "Ingress Class nginx is forbidden"},
 		{name: "ingress collision", err: apierrors.NewIngressHostnameCollision("example.com"), want: "example.com is already used"},
 		{name: "empty ingress hostname", err: apierrors.NewEmptyIngressHostname(api.AllowedListSpec{Exact: []string{"example.com"}, Regex: ".*\\.example\\.com"}), want: "empty hostname is not allowed"},
 		{name: "ingress hostnames invalid", err: apierrors.NewIngressHostnamesNotValid([]string{"bad_host"}, api.AllowedListSpec{Exact: []string{"example.com"}}), want: "Hostnames [bad_host] are not valid"},
-		{name: "ingress undefined", err: apierrors.NewIngressClassUndefined(allowed), want: "No Ingress Class is forbidden"},
+		{name: "ingress undefined", err: apierrors.NewIngressClassUndefined(allowed), want: "an ingress class is required"},
 		{name: "ingress not valid", err: apierrors.NewIngressClassNotValid("nginx", allowed), want: "Ingress Class nginx is forbidden"},
 		{name: "namespace quota", err: apierrors.NewNamespaceQuotaExceededError(), want: "Cannot exceed Namespace quota"},
 		{name: "node labels", err: apierrors.NewNodeLabelForbiddenError(&api.ForbiddenListSpec{Exact: []string{"node-role"}, Regex: "forbidden.*"}), want: "some labels are marked as forbidden"},
@@ -94,7 +102,7 @@ func TestErrorConstructors(t *testing.T) {
 		{name: "pod priority forbidden", err: apierrors.NewPodPriorityClassForbidden("high", allowed), want: "Pod Priority Class high is forbidden"},
 		{name: "pod runtime forbidden", err: apierrors.NewPodRuntimeClassForbidden("kata", allowed), want: "Pod Runtime Class kata is forbidden"},
 		{name: "services metadata", err: apierrors.NewNoServicesMetadata("service"), want: "Skipping labels sync for service"},
-		{name: "external service IP forbidden empty", err: apierrors.NewExternalServiceIPForbidden(nil), want: "does not allow the use of Service with external IPs"},
+		{name: "external service IP forbidden empty", err: apierrors.NewExternalServiceIPForbidden(nil), want: "external IPs are not allowed"},
 		{name: "external service IP forbidden cidr", err: apierrors.NewExternalServiceIPForbidden([]api.AllowedIP{"10.0.0.0/8"}), want: "10.0.0.0/8"},
 		{name: "nodeport disabled", err: apierrors.NewNodePortDisabledError(), want: "NodePort service types are forbidden"},
 		{name: "external name disabled", err: apierrors.NewExternalNameDisabledError(), want: "ExternalName service types are forbidden"},

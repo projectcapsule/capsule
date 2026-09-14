@@ -354,9 +354,7 @@ func evaluateWorkloadResourceField(
 				Path:  path,
 			},
 			Message: fmt.Sprintf(
-				"workload resource %s %q at %s does not satisfy any allowed resource policy",
-				field,
-				name,
+				"resource at %s does not satisfy an allowed resource policy",
 				path,
 			),
 		}
@@ -379,7 +377,7 @@ func workloadResourceCompliant(
 	case workloadResourceRequests:
 		_, present := resources.Requests[name]
 
-		return !present, fmt.Sprintf("request must be undefined for policy %s", constraint.policy), nil
+		return !present, "request must be omitted", nil
 	case workloadResourceLimits:
 		limit, limitPresent := resources.Limits[name]
 
@@ -388,15 +386,15 @@ func workloadResourceCompliant(
 			apirules.WorkloadResourceLimitPolicyDefault:
 			return false, "", fmt.Errorf("limit %q policy %q is not an enforcement constraint", name, constraint.policy)
 		case apirules.WorkloadResourceLimitPolicyRemove:
-			return !limitPresent, "limit must be undefined for policy Remove", nil
+			return !limitPresent, "limit must be omitted", nil
 		case apirules.WorkloadResourceLimitPolicyMatchRequest:
 			request, requestPresent := resources.Requests[name]
 			if !requestPresent {
-				return !limitPresent, "limit and request must both be undefined or equal for policy MatchRequest", nil
+				return !limitPresent, "limit must be omitted when no request is set", nil
 			}
 
 			if !limitPresent {
-				return false, fmt.Sprintf("limit is undefined while request is %s", request.String()), nil
+				return false, fmt.Sprintf("limit must equal request %s", request.String()), nil
 			}
 
 			return limit.Cmp(request) == 0,
@@ -409,11 +407,11 @@ func workloadResourceCompliant(
 
 			request, requestPresent := resources.Requests[name]
 			if !requestPresent || request.Sign() <= 0 {
-				return false, "Ratio requires a request greater than zero", nil
+				return false, "request must be greater than zero", nil
 			}
 
 			if !limitPresent {
-				return false, "limit is undefined", nil
+				return false, "limit is required", nil
 			}
 
 			maximum, err := workloads.LimitForRatio(name, request, *constraint.value)
@@ -455,9 +453,7 @@ func workloadResourceDecision(
 	}
 
 	message := fmt.Sprintf(
-		"workload resource %s %q at %s %s policy %s",
-		field,
-		name,
+		"resource at %s %s policy %s",
 		path,
 		verb,
 		constraint.policy,

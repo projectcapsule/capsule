@@ -38,5 +38,5 @@ func NewDeviceClassUndefined(spec api.SelectorAllowedListSpec) error {
 }
 
 func (i DeviceClassUndefinedError) Error() string {
-	return AllowedValuesErrorMessage(i.spec, "Selected DeviceClass is forbidden for the current Tenant or does not exist. Specify a device Class which is allowed by ")
+	return AllowedValuesErrorMessage(i.spec, "the selected device class does not exist or is not allowed by the tenant")
 }

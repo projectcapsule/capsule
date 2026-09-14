@@ -79,6 +79,11 @@ type MetadataValueRule struct {
 
 	// Managed is enforced by admission mutation and reconciled by the RuleStatus
 	// controller using server-side apply when the rule configuration changes.
+	// Present metadata matching the effective managed value is exempt from
+	// metadata value validation, including overlapping deny rules. The last
+	// applicable managed value for each concrete key wins.
+	// During admission, only rules matching the request's audience contribute
+	// to the effective managed value.
 	// +optional
 	Managed *string `json:"managed,omitempty"`
 }

@@ -7,13 +7,17 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"testing"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
+	"github.com/projectcapsule/capsule/pkg/api/rules"
+	"github.com/projectcapsule/capsule/pkg/ruleengine"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	"github.com/projectcapsule/capsule/pkg/users"
 	admissionv1 "k8s.io/api/admission/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -88,6 +92,75 @@ func TestResolveAdmissionUser(t *testing.T) {
 			t.Fatalf("ResolveAdmissionUser() = %#v, want capsule user", user)
 		}
 	})
+}
+
+func TestAdmissionUserAndCapsuleAudienceAgreeForTenantServiceAccounts(t *testing.T) {
+	t.Setenv(configuration.EnvironmentServiceaccountName, "controller")
+	t.Setenv(configuration.EnvironmentControllerNamespace, "capsule-system")
+
+	tnt := &capsulev1beta2.Tenant{
+		ObjectMeta: metav1.ObjectMeta{Name: "tenant-a"},
+		Status: capsulev1beta2.TenantStatus{
+			Namespaces: []string{"team-a"},
+			Owners: rbac.OwnerStatusListSpec{{UserSpec: rbac.UserSpec{
+				Kind: rbac.ServiceAccountOwner,
+				Name: users.ServiceAccountUsername("team-a", "promoted"),
+			}}},
+		},
+	}
+	cl := handlersFakeClient(t, tnt, &capsulev1beta2.CapsuleConfiguration{
+		ObjectMeta: metav1.ObjectMeta{Name: "capsule"},
+		Spec:       capsulev1beta2.CapsuleConfigurationSpec{IgnoreUserWithGroups: []string{"ignored"}},
+	})
+	cfg := configuration.NewCapsuleConfiguration(t.Context(), cl, cl, &rest.Config{}, "capsule")
+	body := &rules.NamespaceRuleBodyNamespace{
+		Audience: []rules.Audience{{Kind: rules.AudienceKindCustom, Name: string(rules.CustomAudienceCapsuleUser)}},
+		Enforce:  &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeDeny},
+	}
+
+	for _, tt := range []struct {
+		namespace string
+		name      string
+		ignored   bool
+		wantType  users.AdmissionUserType
+	}{
+		{namespace: "team-a", name: "promoted", wantType: users.AdmissionUserCapsule},
+		{namespace: "team-a", name: "unpromoted", wantType: users.AdmissionUserCapsule},
+		{namespace: "team-a", name: "promoted", ignored: true, wantType: users.AdmissionUserUnknown},
+		{namespace: "team-a", name: "unpromoted", ignored: true, wantType: users.AdmissionUserUnknown},
+		{namespace: "outside", name: "unrelated", wantType: users.AdmissionUserUnknown},
+		{namespace: "kube-system", name: "system-controller", wantType: users.AdmissionUserUnknown},
+		{namespace: "capsule-system", name: "controller", wantType: users.AdmissionUserAdmin},
+	} {
+		name := tt.namespace + "/" + tt.name
+		if tt.ignored {
+			name += "/ignored"
+		}
+		t.Run(name, func(t *testing.T) {
+			info := users.ServiceAccountUserInfo(tt.namespace, tt.name)
+			if tt.ignored {
+				info.Groups = append(info.Groups, "ignored")
+			}
+			req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{UserInfo: info}}
+			user := handlers.ResolveAdmissionUser(t.Context(), cl, req, cfg)
+			if user.Type != tt.wantType {
+				t.Fatalf("AdmissionUser.Type = %q, want %q", user.Type, tt.wantType)
+			}
+			if !reflect.DeepEqual(user.UserInfo(), info) {
+				t.Fatalf("AdmissionUser.UserInfo() = %#v, want %#v", user.UserInfo(), info)
+			}
+			if user.ServiceAccount == nil || user.ServiceAccount.Namespace != tt.namespace || user.ServiceAccount.Name != tt.name {
+				t.Fatalf("AdmissionUser.ServiceAccount = %#v, want %s/%s", user.ServiceAccount, tt.namespace, tt.name)
+			}
+			filtered, err := ruleengine.FilterNamespaceRulesByAudience(t.Context(), cl, cfg, tnt, req, []*rules.NamespaceRuleBodyNamespace{body})
+			if err != nil {
+				t.Fatalf("FilterNamespaceRulesByAudience() error = %v", err)
+			}
+			if matched := len(filtered) == 1; matched != user.IsCapsule() {
+				t.Fatalf("CapsuleUser audience match = %v, AdmissionUser.IsCapsule() = %v", matched, user.IsCapsule())
+			}
+		})
+	}
 }
 
 func TestInCapsuleGroupsWrapper(t *testing.T) {
@@ -304,6 +377,9 @@ func handlersFakeClientWithScheme(t *testing.T, scheme *runtime.Scheme, objects 
 	return fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(objects...).
+		WithIndex(&capsulev1beta2.Tenant{}, ".status.namespaces", func(obj client.Object) []string {
+			return obj.(*capsulev1beta2.Tenant).Status.Namespaces
+		}).
 		Build()
 }
 

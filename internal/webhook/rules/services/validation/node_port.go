@@ -31,7 +31,7 @@ func (h *serviceRules) validateNodePorts(
 					Value: string(svc.Spec.Type),
 					Path:  "spec.type",
 				},
-				Message: "service requires explicit spec.ports[*].nodePort because nodePort ranges are enforced by namespace rule",
+				Message: "spec.ports[*].nodePort is required by namespace rule",
 			},
 		}, nil
 	}

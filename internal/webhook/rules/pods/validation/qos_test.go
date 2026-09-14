@@ -134,7 +134,6 @@ func TestPodRulesValidateQoSClasses(t *testing.T) {
 			wantFinal:    true,
 			wantMessage: []string{
 				`QoS class "BestEffort" at status.qosClass is denied by namespace rule`,
-				`matched denied rule BestEffort`,
 			},
 		},
 		{
@@ -150,7 +149,6 @@ func TestPodRulesValidateQoSClasses(t *testing.T) {
 			wantFinal:    true,
 			wantMessage: []string{
 				`QoS class "Burstable" at status.qosClass is denied by namespace rule`,
-				`matched denied rule Burstable`,
 			},
 		},
 		{
@@ -170,7 +168,6 @@ func TestPodRulesValidateQoSClasses(t *testing.T) {
 			wantFinal:    true,
 			wantMessage: []string{
 				`QoS class "BestEffort" at status.qosClass is denied by namespace rule`,
-				`matched denied rule BestEffort`,
 			},
 		},
 		{
