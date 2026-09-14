@@ -19,6 +19,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 func TestMutateNamespaceRulesSkipsFinalize(t *testing.T) {
@@ -65,18 +66,32 @@ func TestMutateNamespaceRules(t *testing.T) {
 			}},
 		},
 	}
-	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
-		Name:   "solar-production",
-		Labels: map[string]string{meta.TenantLabel: tnt.Name},
-	}}
-
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(tnt).Build()
-	response := mutateNamespaceRules(client, client, nil, ns)(context.Background(), admission.Request{})
-	if response != nil {
-		t.Fatalf("mutateNamespaceRules() response = %#v", response)
-	}
+	for _, operation := range []admissionv1.Operation{admissionv1.Create, admissionv1.Update} {
+		t.Run(string(operation), func(t *testing.T) {
+			ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+				Name:   "solar-production",
+				Labels: map[string]string{meta.TenantLabel: tnt.Name},
+			}}
+			old := ns.DeepCopy()
+			handler := RulesMetadataHandler(nil)
+			req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{Operation: operation}}
+			var response *admission.Response
+			if operation == admissionv1.Create {
+				response = handler.OnCreate(client, client, users.AdmissionUser{}, ns, nil, nil)(t.Context(), req)
+			} else {
+				response = handler.OnUpdate(client, client, users.AdmissionUser{}, ns, old, nil, nil)(t.Context(), req)
+			}
+			if response != nil {
+				t.Fatalf("metadata mutation response = %#v", response)
+			}
 
-	if got := ns.Labels["rules.example.com/managed"]; got != "true" {
-		t.Fatalf("managed namespace label = %q, want true", got)
+			if got := ns.Labels["rules.example.com/managed"]; got != "true" {
+				t.Fatalf("managed namespace label = %q, want true", got)
+			}
+			if _, ok := old.Labels["rules.example.com/managed"]; ok {
+				t.Fatal("metadata mutation modified the old namespace")
+			}
+		})
 	}
 }

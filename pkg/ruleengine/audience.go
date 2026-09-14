@@ -4,9 +4,11 @@
 package ruleengine
 
 import (
+	"context"
 	"fmt"
 	"slices"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -17,6 +19,8 @@ import (
 )
 
 func FilterNamespaceRulesByAudience(
+	ctx context.Context,
+	c client.Client,
 	cfg configuration.Configuration,
 	tnt *capsulev1beta2.Tenant,
 	req admission.Request,
@@ -38,7 +42,7 @@ func FilterNamespaceRulesByAudience(
 			out = append(out, bodies[:i]...)
 		}
 
-		matched, err := matchesAudience(cfg, tnt, req, body.Audience)
+		matched, err := matchesAudience(ctx, c, cfg, tnt, req, body.Audience)
 		if err != nil {
 			return nil, err
 		}
@@ -55,7 +59,7 @@ func FilterNamespaceRulesByAudience(
 	return out, nil
 }
 
-func matchesAudience(cfg configuration.Configuration, tnt *capsulev1beta2.Tenant, req admission.Request, audience []rules.Audience) (bool, error) {
+func matchesAudience(ctx context.Context, c client.Client, cfg configuration.Configuration, tnt *capsulev1beta2.Tenant, req admission.Request, audience []rules.Audience) (bool, error) {
 	for _, subject := range audience {
 		switch subject.Kind {
 		case rules.AudienceKindUser:
@@ -75,7 +79,7 @@ func matchesAudience(cfg configuration.Configuration, tnt *capsulev1beta2.Tenant
 				return false, fmt.Errorf("configuration is required for custom audience %q", subject.Name)
 			}
 
-			matched, err := matchesCustomAudience(cfg, tnt, req, rules.CustomAudience(subject.Name))
+			matched, err := matchesCustomAudience(ctx, c, cfg, tnt, req, rules.CustomAudience(subject.Name))
 			if err != nil {
 				return false, err
 			}
@@ -91,10 +95,12 @@ func matchesAudience(cfg configuration.Configuration, tnt *capsulev1beta2.Tenant
 	return false, nil
 }
 
-func matchesCustomAudience(cfg configuration.Configuration, tnt *capsulev1beta2.Tenant, req admission.Request, custom rules.CustomAudience) (bool, error) {
+func matchesCustomAudience(ctx context.Context, c client.Client, cfg configuration.Configuration, tnt *capsulev1beta2.Tenant, req admission.Request, custom rules.CustomAudience) (bool, error) {
 	switch custom {
 	case rules.CustomAudienceCapsuleUser:
-		return cfg.Users().IsPresent(req.UserInfo.Username, req.UserInfo.Groups), nil
+		// Use the same membership check as admission, including aggregated users
+		// and all service accounts in tenant namespaces, promoted or otherwise.
+		return users.IsCapsuleUser(ctx, c, cfg, req.UserInfo.Username, req.UserInfo.Groups), nil
 	case rules.CustomAudienceAdministrator:
 		return cfg.Administrators().IsPresent(req.UserInfo.Username, req.UserInfo.Groups), nil
 	case rules.CustomAudienceTenantOwner:
