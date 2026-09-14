@@ -2810,6 +2810,185 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 		Expect(preserved.Annotations).To(HaveKeyWithValue("example.corp/managed", standaloneManaged))
 	})
 
+	DescribeTable("accepts managed metadata under overlapping deny rules", Label("metadata-managed-deny"), func(kind string, scopedAudience bool) {
+		const customerKey = "example.corp/customer"
+		const tenantKey = "example.corp/tenant"
+		const annotationKey = "example.corp/annotation"
+		const emptyKey = "example.corp/empty"
+		managedLabels := map[string]string{customerKey: "chainsaw", tenantKey: "tests", emptyKey: ""}
+		managedAnnotations := map[string]string{annotationKey: "controlled", emptyKey: ""}
+		labelPolicies := map[string]rules.MetadataValueRule{}
+		annotationPolicies := map[string]rules.MetadataValueRule{}
+		for key, value := range managedLabels {
+			labelPolicies[key] = rules.MetadataValueRule{Managed: ptr.To(value)}
+		}
+		for key, value := range managedAnnotations {
+			annotationPolicies[key] = rules.MetadataValueRule{Managed: ptr.To(value)}
+		}
+
+		managedRule := metadataRule(rules.ActionTypeAllow, "v1", []string{kind}, labelPolicies, annotationPolicies)
+		if scopedAudience {
+			managedRule = audienceRule(rules.Audience{Kind: rules.AudienceKindUser, Name: ownerName}, managedRule)
+		}
+		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
+			managedRule,
+			// A managed policy from a different namespace must not exempt a key
+			// from this namespace's deny rule.
+			selectedRule(map[string]string{"example.corp/managed-scope": "other"},
+				metadataRule(rules.ActionTypeAllow, "v1", []string{kind},
+					map[string]rules.MetadataValueRule{"example.corp/other-namespace": {Managed: ptr.To("other")}}, nil)),
+			audienceRule(rules.Audience{Kind: rules.AudienceKindCustom, Name: string(rules.CustomAudienceCapsuleUser)},
+				metadataRule(rules.ActionTypeDeny, "v1", []string{kind},
+					map[string]rules.MetadataValueRule{".*example.corp.*": {}},
+					map[string]rules.MetadataValueRule{".*example.corp.*": {}})),
+		})
+		ns := createNamespace(nil)
+		waitForProjectedMetadata(ns.Name, customerKey, nil, ptr.To("chainsaw"))
+		owner := impersonationClient(ownerName, withDefaultGroups(nil))
+		ctx := context.Background()
+		newResource := func() client.Object {
+			if kind == "Namespace" {
+				return NewNamespace("", map[string]string{meta.TenantLabel: tnt.Name})
+			}
+			return &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{GenerateName: "managed-deny-", Namespace: ns.Name}}
+		}
+		expectManaged := func(obj client.Object) {
+			for key, value := range managedLabels {
+				Expect(obj.GetLabels()).To(HaveKeyWithValue(key, value))
+			}
+			for key, value := range managedAnnotations {
+				Expect(obj.GetAnnotations()).To(HaveKeyWithValue(key, value))
+			}
+		}
+
+		if scopedAudience {
+			other := impersonationClient(secondOwnerName, withDefaultGroups(nil))
+			By("not injecting managed metadata for an owner outside the managed rule's audience")
+			candidate := newResource()
+			Expect(other.Create(ctx, candidate, client.DryRunAll)).To(Succeed())
+			for key := range managedLabels {
+				Expect(candidate.GetLabels()).NotTo(HaveKey(key))
+			}
+			for key := range managedAnnotations {
+				Expect(candidate.GetAnnotations()).NotTo(HaveKey(key))
+			}
+
+			if kind == "ConfigMap" {
+				// Namespace creation has a separate Capsule membership requirement.
+				By("allowing a requester outside the deny audience to supply unmanaged metadata")
+				candidate = newResource()
+				candidate.SetLabels(map[string]string{"example.corp/user-controlled": "admin"})
+				Expect(k8sClient.Create(ctx, candidate, client.DryRunAll)).To(Succeed())
+				Expect(candidate.GetLabels()).To(HaveKeyWithValue("example.corp/user-controlled", "admin"))
+				Expect(candidate.GetLabels()).NotTo(HaveKey(customerKey))
+			}
+
+			By("denying values managed only for the other audience, including empty values")
+			for _, field := range []string{"labels", "annotations"} {
+				for _, value := range []string{"controlled", ""} {
+					candidate := newResource()
+					key := annotationKey
+					if field == "labels" {
+						key = customerKey
+						labels := candidate.GetLabels()
+						if labels == nil {
+							labels = map[string]string{}
+						}
+						if value != "" {
+							value = managedLabels[key]
+						}
+						labels[key] = value
+						candidate.SetLabels(labels)
+					} else {
+						candidate.SetAnnotations(map[string]string{key: value})
+					}
+					err := other.Create(ctx, candidate, client.DryRunAll)
+					Expect(err).To(HaveOccurred())
+					Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("metadata.%s[%q]", field, key)))
+					Expect(err.Error()).To(ContainSubstring("denied by namespace rule"))
+				}
+			}
+		}
+
+		By("accepting creation with Capsule's managed values despite the later deny rule")
+		existing := newResource()
+		Expect(owner.Create(ctx, existing)).To(Succeed())
+		expectManaged(existing)
+
+		for _, value := range []string{"user-value", ""} {
+			By(fmt.Sprintf("overriding user-supplied managed metadata %q on creation", value))
+			candidate := newResource()
+			labels := candidate.GetLabels()
+			if labels == nil {
+				labels = map[string]string{}
+			}
+			labels[customerKey] = value
+			candidate.SetLabels(labels)
+			candidate.SetAnnotations(map[string]string{annotationKey: value})
+			Expect(owner.Create(ctx, candidate, client.DryRunAll)).To(Succeed())
+			expectManaged(candidate)
+		}
+
+		for _, value := range []any{"user-value", "", nil} {
+			By(fmt.Sprintf("restoring managed metadata after a patch sets it to %v", value))
+			labels := map[string]any{}
+			annotations := map[string]any{}
+			for key := range managedLabels {
+				labels[key] = value
+			}
+			for key := range managedAnnotations {
+				annotations[key] = value
+			}
+			patch, err := json.Marshal(map[string]any{"metadata": map[string]any{"labels": labels, "annotations": annotations}})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(owner.Patch(ctx, existing, client.RawPatch(k8stypes.MergePatchType, patch))).To(Succeed())
+			expectManaged(existing)
+		}
+
+		for _, target := range []struct{ field, key string }{
+			{"labels", "example.corp/user-controlled"},
+			{"annotations", "example.corp/user-controlled"},
+			{"labels", annotationKey},
+			{"annotations", customerKey},
+			{"labels", "example.corp/other-namespace"},
+		} {
+			for _, value := range []string{"chainsaw", ""} {
+				By(fmt.Sprintf("denying unmanaged %s key %s with value %q", target.field, target.key, value))
+				expectDenied := func(err error) {
+					Expect(err).To(HaveOccurred())
+					Expect(apierrors.IsForbidden(err)).To(BeTrue(), "expected an admission denial: %v", err)
+					Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("metadata.%s[%q]", target.field, target.key)))
+					Expect(err.Error()).To(ContainSubstring("denied by namespace rule"))
+				}
+				candidate := newResource()
+				if target.field == "labels" {
+					labels := candidate.GetLabels()
+					if labels == nil {
+						labels = map[string]string{}
+					}
+					labels[target.key] = value
+					candidate.SetLabels(labels)
+				} else {
+					candidate.SetAnnotations(map[string]string{target.key: value})
+				}
+				expectDenied(owner.Create(ctx, candidate, client.DryRunAll))
+				patch, err := json.Marshal(map[string]any{"metadata": map[string]any{target.field: map[string]string{target.key: value}}})
+				Expect(err).NotTo(HaveOccurred())
+				expectDenied(owner.Patch(ctx, existing, client.RawPatch(k8stypes.MergePatchType, patch), client.DryRunAll))
+			}
+		}
+
+		By("allowing unrelated metadata edits")
+		Expect(owner.Patch(ctx, existing, client.RawPatch(k8stypes.MergePatchType,
+			[]byte(`{"metadata":{"labels":{"example.net/unrelated":""}}}`)))).To(Succeed())
+		expectManaged(existing)
+	},
+		Entry("Namespace", "Namespace", false),
+		Entry("ConfigMap", "ConfigMap", false),
+		Entry("Namespace with a managed audience", Label("metadata-managed-audience"), "Namespace", true),
+		Entry("ConfigMap with a managed audience", Label("metadata-managed-audience"), "ConfigMap", true),
+	)
+
 	It("reconciles standalone managed metadata and removes it when the rule is removed", func() {
 		managedLabel := "managed-label"
 		managedAnnotation := "managed-annotation"

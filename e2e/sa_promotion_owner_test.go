@@ -5,6 +5,7 @@ package e2e
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	otypes "github.com/onsi/gomega/types"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -20,6 +22,9 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
+	"github.com/projectcapsule/capsule/pkg/api/rules"
+	"github.com/projectcapsule/capsule/pkg/api/runtime"
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 var _ = Describe("Promoting ServiceAccounts to Owners", Ordered, Label("config", "permissions", "owners", "promotion"), func() {
@@ -349,6 +354,148 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Ordered, Label("config",
 			}, defaultTimeoutInterval, defaultPollInterval).Should(tc.matcher, "persona=%s", name)
 		}
 	})
+
+	DescribeTable("applies CapsuleUser metadata rules to tenant service accounts", Label("serviceaccount-audience"), func(promoted bool) {
+		const policyKey = "openshift.io/run-level"
+		const defaultKey = "example.corp/capsule-user"
+		defaultValue := "true"
+		ctx := context.Background()
+
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec.AllowServiceAccountPromotion = true
+		})
+
+		ns := NewNamespace("", map[string]string{meta.TenantLabel: tnt.Name})
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+
+		sa := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "audience-sa", Namespace: ns.Name}}
+		Expect(k8sClient.Create(ctx, sa)).To(Succeed())
+		info := users.ServiceAccountUserInfo(ns.Name, sa.Name)
+		// Use only Kubernetes service account groups. Adding the test suite's
+		// Capsule group would hide a failure to recognize tenant service accounts.
+		saClient := impersonationClient(info.Username, info.Groups)
+
+		if promoted {
+			By("promoting the service account through its tenant owner")
+			owner := impersonationClient(tnt.Spec.Owners[0].Name, withDefaultGroups(nil))
+			patch, err := json.Marshal(map[string]any{"metadata": map[string]any{"labels": map[string]string{meta.OwnerPromotionLabel: meta.ValueTrue}}})
+			Expect(err).NotTo(HaveOccurred())
+			Eventually(func() error {
+				return owner.Patch(ctx, sa, client.RawPatch(types.MergePatchType, patch))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				current := &capsulev1beta2.Tenant{}
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(tnt), current)).To(Succeed())
+				g.Expect(current.Status.Owners.IsOwner(info.Username, info.Groups)).To(BeTrue())
+				crb := &rbacv1.ClusterRoleBinding{}
+				g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: originConfig.Spec.RBAC.ProvisionerClusterRole}, crb)).To(Succeed())
+				g.Expect(crb.Subjects).To(ContainElement(rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Name: sa.Name, Namespace: ns.Name}))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		} else {
+			current := &capsulev1beta2.Tenant{}
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(tnt), current)).To(Succeed())
+			Expect(current.Status.Owners.IsOwner(info.Username, info.Groups)).To(BeFalse())
+		}
+
+		// Grant resource access independently of promotion so the unpromoted
+		// account exercises admission, not an RBAC rejection.
+		Expect(k8sClient.Create(ctx, &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{Name: "audience-sa", Namespace: ns.Name},
+			RoleRef:    rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "ClusterRole", Name: "admin"},
+			Subjects:   []rbacv1.Subject{{Kind: rbacv1.ServiceAccountKind, Name: sa.Name, Namespace: ns.Name}},
+		})).To(Succeed())
+
+		audience := []rules.Audience{{Kind: rules.AudienceKindCustom, Name: string(rules.CustomAudienceCapsuleUser)}}
+		UpdateTenantEventually(tnt, func(current *capsulev1beta2.Tenant) {
+			current.Spec.Rules = []*rules.NamespaceRuleBodyTenant{
+				{NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
+					Audience: audience,
+					Enforce: &rules.NamespaceRuleEnforceBody{
+						Action: rules.ActionTypeDeny,
+						Metadata: []rules.MetadataRule{{
+							VersionKinds: runtime.VersionKinds{Kinds: []string{"*", "Namespace"}},
+							Labels:       map[string]rules.MetadataValueRule{policyKey: {}},
+							Annotations:  map[string]rules.MetadataValueRule{policyKey: {}},
+						}},
+					},
+				}},
+				{NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
+					Audience: audience,
+					Enforce: &rules.NamespaceRuleEnforceBody{
+						Action: rules.ActionTypeAllow,
+						Metadata: []rules.MetadataRule{{
+							VersionKinds: runtime.VersionKinds{Kinds: []string{"ConfigMap", "Namespace"}},
+							Labels:       map[string]rules.MetadataValueRule{defaultKey: {Default: &defaultValue}},
+						}},
+					},
+				}},
+			}
+		})
+		Eventually(func(g Gomega) {
+			status := &capsulev1beta2.RuleStatus{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: meta.NameForManagedRuleStatus(), Namespace: ns.Name}, status)).To(Succeed())
+			g.Expect(status.Status.Rules).To(HaveLen(2))
+			g.Expect(status.Status.Rules[0].Audience).To(Equal(audience))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		kinds := []string{"ConfigMap"}
+		if promoted {
+			kinds = append(kinds, "Namespace")
+		}
+		for _, kind := range kinds {
+			newResource := func() client.Object {
+				if kind == "Namespace" {
+					return NewNamespace("", map[string]string{meta.TenantLabel: tnt.Name})
+				}
+				return &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{GenerateName: "sa-audience-", Namespace: ns.Name}}
+			}
+
+			By(fmt.Sprintf("allowing %s creation without denied metadata and applying the CapsuleUser default", kind))
+			existing := newResource()
+			Eventually(func() error { return saClient.Create(ctx, existing) }, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			Expect(existing.GetLabels()).To(HaveKeyWithValue(defaultKey, defaultValue))
+
+			By("allowing unrelated metadata edits and restoring the default on update")
+			patch, err := json.Marshal(map[string]any{"metadata": map[string]any{"labels": map[string]any{defaultKey: nil, "example.corp/unrelated": ""}}})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(saClient.Patch(ctx, existing, client.RawPatch(types.MergePatchType, patch))).To(Succeed())
+			Expect(existing.GetLabels()).To(HaveKeyWithValue(defaultKey, defaultValue))
+
+			for _, field := range []string{"labels", "annotations"} {
+				for _, value := range []string{"privileged", ""} {
+					expectDenied := func(err error) {
+						Expect(err).To(HaveOccurred())
+						Expect(apierrors.IsForbidden(err)).To(BeTrue(), "expected an admission denial: %v", err)
+						Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("metadata.%s[%q]", field, policyKey)))
+						Expect(err.Error()).To(ContainSubstring("denied by namespace rule"))
+					}
+					By(fmt.Sprintf("denying %s creation with %s value %q", kind, field, value))
+					candidate := newResource()
+					if field == "labels" {
+						labels := candidate.GetLabels()
+						if labels == nil {
+							labels = map[string]string{}
+						}
+						labels[policyKey] = value
+						candidate.SetLabels(labels)
+					} else {
+						candidate.SetAnnotations(map[string]string{policyKey: value})
+					}
+					expectDenied(saClient.Create(ctx, candidate, client.DryRunAll))
+
+					By(fmt.Sprintf("denying %s edits with %s value %q", kind, field, value))
+					patch, err := json.Marshal(map[string]any{"metadata": map[string]any{field: map[string]string{policyKey: value}}})
+					Expect(err).NotTo(HaveOccurred())
+					expectDenied(saClient.Patch(ctx, existing, client.RawPatch(types.MergePatchType, patch), client.DryRunAll))
+				}
+			}
+		}
+	},
+		Entry("promoted service account", true),
+		Entry("unpromoted service account", false),
+	)
 
 	It("Allow Promoted ServiceAccount to interact with Tenant Namespaces", func() {
 		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {

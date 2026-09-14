@@ -70,3 +70,29 @@ func TestMutateMetadataReportsNoop(t *testing.T) {
 		t.Fatal("MutateMetadata() changed = true without matching rules")
 	}
 }
+
+func TestMutateMetadataAddsEmptyManagedValues(t *testing.T) {
+	t.Parallel()
+
+	obj := &unstructured.Unstructured{}
+	gvk := schema.GroupVersionKind{Version: "v1", Kind: "Namespace"}
+	bodies := []*rules.NamespaceRuleBodyNamespace{{Enforce: &rules.NamespaceRuleEnforceBody{
+		Action: rules.ActionTypeAllow,
+		Metadata: []rules.MetadataRule{{
+			VersionKinds: runtime.VersionKinds{Kinds: []string{"Namespace"}},
+			Labels:       map[string]rules.MetadataValueRule{"example.corp/empty": {Managed: ptr.To("")}},
+			Annotations:  map[string]rules.MetadataValueRule{"example.corp/empty": {Managed: ptr.To("")}},
+		}},
+	}}}
+	if !MutateMetadata(obj, gvk, bodies) {
+		t.Fatal("empty managed values were not added")
+	}
+	for _, metadata := range []map[string]string{obj.GetLabels(), obj.GetAnnotations()} {
+		if value, present := metadata["example.corp/empty"]; !present || value != "" {
+			t.Fatalf("managed metadata = %#v, want present empty value", metadata)
+		}
+	}
+	if MutateMetadata(obj, gvk, bodies) {
+		t.Fatal("unchanged empty managed values should be a no-op")
+	}
+}

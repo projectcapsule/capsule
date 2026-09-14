@@ -165,7 +165,7 @@ func applyMutation(current, defaults, managed map[string]string) (map[string]str
 	}
 
 	for key, value := range managed {
-		if current[key] == value {
+		if existing, present := current[key]; present && existing == value {
 			continue
 		}
 

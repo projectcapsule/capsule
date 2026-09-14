@@ -4,12 +4,14 @@
 package validation
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/utils/ptr"
 
 	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
@@ -111,6 +113,111 @@ func TestValidateMetadataValuePolicies(t *testing.T) {
 						}
 						if audits != tt.wantAudits {
 							t.Fatalf("audit count = %d, want %d", audits, tt.wantAudits)
+						}
+					})
+				}
+			}
+		}
+	}
+}
+
+func TestValidateManagedMetadata(t *testing.T) {
+	t.Parallel()
+
+	const key = "example.corp/customer"
+	for _, kind := range []string{"Namespace", "ConfigMap"} {
+		for _, field := range []metadataField{metadataFieldLabel, metadataFieldAnnotation} {
+			policyRule := func(policy apirules.MetadataValueRule) *apirules.NamespaceRuleEnforceBody {
+				body := enforceMetadata(apirules.ActionTypeAllow, []string{"v1"}, []string{kind}, nil, nil)
+				if field == metadataFieldLabel {
+					body.Metadata[0].Labels = map[string]apirules.MetadataValueRule{key: policy}
+				} else {
+					body.Metadata[0].Annotations = map[string]apirules.MetadataValueRule{key: policy}
+				}
+				return body
+			}
+			managed := policyRule(apirules.MetadataValueRule{Managed: ptr.To("chainsaw")})
+			deny := enforceMetadata(apirules.ActionTypeDeny, []string{"v1"}, []string{kind},
+				map[string]apirules.MetadataValueRule{".*example.corp.*": {}},
+				map[string]apirules.MetadataValueRule{".*example.corp.*": {}},
+			)
+			wrongKind := managed.DeepCopy()
+			wrongKind.Metadata[0].Kinds = []string{"Secret"}
+			wrongVersion := managed.DeepCopy()
+			wrongVersion.Metadata[0].APIGroups = []string{"apps/v1"}
+			wrongField := managed.DeepCopy()
+			wrongField.Metadata[0].Labels, wrongField.Metadata[0].Annotations = wrongField.Metadata[0].Annotations, wrongField.Metadata[0].Labels
+
+			tests := []struct {
+				name         string
+				bodies       []*apirules.NamespaceRuleEnforceBody
+				value        string
+				otherKey     bool
+				absent       bool
+				wantBlocking bool
+			}{
+				{name: "managed before deny", bodies: []*apirules.NamespaceRuleEnforceBody{managed, deny}, value: "chainsaw"},
+				{name: "managed after deny", bodies: []*apirules.NamespaceRuleEnforceBody{deny, managed}, value: "chainsaw"},
+				{name: "empty managed value", bodies: []*apirules.NamespaceRuleEnforceBody{policyRule(apirules.MetadataValueRule{Managed: ptr.To("")}), deny}},
+				{name: "incorrect managed value", bodies: []*apirules.NamespaceRuleEnforceBody{managed, deny}, value: "user-value", wantBlocking: true},
+				{name: "empty value is not the managed value", bodies: []*apirules.NamespaceRuleEnforceBody{managed, deny}, wantBlocking: true},
+				{name: "other key is not exempt", bodies: []*apirules.NamespaceRuleEnforceBody{managed, deny}, value: "chainsaw", otherKey: true, wantBlocking: true},
+				{name: "other field is not exempt", bodies: []*apirules.NamespaceRuleEnforceBody{wrongField, deny}, value: "chainsaw", wantBlocking: true},
+				{name: "other kind is not exempt", bodies: []*apirules.NamespaceRuleEnforceBody{wrongKind, deny}, value: "chainsaw", wantBlocking: true},
+				{name: "other apiVersion is not exempt", bodies: []*apirules.NamespaceRuleEnforceBody{wrongVersion, deny}, value: "chainsaw", wantBlocking: true},
+				{name: "default is not exempt", bodies: []*apirules.NamespaceRuleEnforceBody{policyRule(apirules.MetadataValueRule{Default: ptr.To("chainsaw")}), deny}, value: "chainsaw", wantBlocking: true},
+				{name: "ordinary allow keeps rule precedence", bodies: []*apirules.NamespaceRuleEnforceBody{policyRule(metadataPolicy(false, exact("chainsaw"))), deny}, value: "chainsaw", wantBlocking: true},
+				{name: "last managed value wins", bodies: []*apirules.NamespaceRuleEnforceBody{managed, policyRule(apirules.MetadataValueRule{Managed: ptr.To("tests")}), deny}, value: "tests"},
+				{name: "earlier managed value is not exempt", bodies: []*apirules.NamespaceRuleEnforceBody{managed, policyRule(apirules.MetadataValueRule{Managed: ptr.To("tests")}), deny}, value: "chainsaw", wantBlocking: true},
+				{name: "required managed value satisfies presence", bodies: []*apirules.NamespaceRuleEnforceBody{policyRule(apirules.MetadataValueRule{Managed: ptr.To("chainsaw"), Required: true}), deny}, value: "chainsaw"},
+				{name: "missing required managed value is denied", bodies: []*apirules.NamespaceRuleEnforceBody{policyRule(apirules.MetadataValueRule{Managed: ptr.To("chainsaw"), Required: true}), deny}, absent: true, wantBlocking: true},
+				{name: "managedFields does not grant exemption", bodies: []*apirules.NamespaceRuleEnforceBody{deny}, value: "chainsaw", wantBlocking: true},
+			}
+
+			for _, tt := range tests {
+				for _, update := range []bool{false, true} {
+					t.Run(fmt.Sprintf("%s/%s/%s/update=%t", kind, field, tt.name, update), func(t *testing.T) {
+						t.Parallel()
+
+						entryKey := key
+						if tt.otherKey {
+							entryKey = "example.corp/user-controlled"
+						}
+						obj := metadataObject(nil, nil)
+						obj.SetManagedFields([]metav1.ManagedFieldsEntry{{
+							Manager: "capsule", Operation: metav1.ManagedFieldsOperationApply, APIVersion: "v1",
+							FieldsType: "FieldsV1",
+							FieldsV1: &metav1.FieldsV1{Raw: []byte(fmt.Sprintf(
+								`{"f:metadata":{"f:%ss":{"f:%s":{}}}}`, field, entryKey,
+							))},
+						}})
+						if !tt.absent {
+							metadata := map[string]string{entryKey: tt.value}
+							if field == metadataFieldLabel {
+								obj.SetLabels(metadata)
+							} else {
+								obj.SetAnnotations(metadata)
+							}
+						}
+						var old genericObject
+						if update {
+							old = metadataObject(nil, nil)
+						}
+						got, err := newMetadataTestRules(nil, nil).validateMetadata(old, obj, coreGVK(kind), tt.bodies)
+						if err != nil {
+							t.Fatalf("validateMetadata() error = %v", err)
+						}
+						if blocked := got.BlockingError() != nil; blocked != tt.wantBlocking {
+							t.Fatalf("blocking = %v, want %v: %v", blocked, tt.wantBlocking, got.BlockingError())
+						}
+						if tt.wantBlocking {
+							wantPath := metadataLabelPath(entryKey)
+							if field == metadataFieldAnnotation {
+								wantPath = metadataAnnotationPath(entryKey)
+							}
+							if got.Blocking.Value.Path != wantPath {
+								t.Fatalf("blocking path = %s, want %s", got.Blocking.Value.Path, wantPath)
+							}
 						}
 					})
 				}

@@ -46,7 +46,7 @@ func (h *rulesMetadataHandler) OnCreate(
 			return handlers.ErroredResponse(err)
 		}
 
-		bodies, err = ruleengine.FilterNamespaceRulesByAudience(h.configuration, tnt, req, bodies)
+		bodies, err = ruleengine.FilterNamespaceRulesByAudience(ctx, c, h.configuration, tnt, req, bodies)
 		if err != nil {
 			return handlers.ErroredResponse(err)
 		}
@@ -75,7 +75,7 @@ func (h *rulesMetadataHandler) OnUpdate(
 			return handlers.ErroredResponse(err)
 		}
 
-		bodies, err = ruleengine.FilterNamespaceRulesByAudience(h.configuration, tnt, req, bodies)
+		bodies, err = ruleengine.FilterNamespaceRulesByAudience(ctx, c, h.configuration, tnt, req, bodies)
 		if err != nil {
 			return handlers.ErroredResponse(err)
 		}
