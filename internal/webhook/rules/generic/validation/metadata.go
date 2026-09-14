@@ -66,6 +66,12 @@ func (h *genericRules) validateMetadata(
 			continue
 		}
 
+		// Managed policies own concrete keys. Accept only the effective managed
+		// value, so broad user metadata rules cannot reject Capsule's mutation.
+		if value, managed := managedMetadataValue(gvk, entry, enforceBodies); managed && entry.Value == value {
+			continue
+		}
+
 		evaluation, err := evaluateGenericRules(
 			obj,
 			enforceBodies,
@@ -84,6 +90,38 @@ func (h *genericRules) validateMetadata(
 	}
 
 	return out, nil
+}
+
+// enforceBodies have already been filtered by namespace selection and the
+// request's audience. Never resolve exemptions from the unfiltered Tenant rules.
+func managedMetadataValue(
+	gvk schema.GroupVersionKind,
+	entry metadataEntry,
+	enforceBodies []*apirules.NamespaceRuleEnforceBody,
+) (value string, managed bool) {
+	for _, enforce := range enforceBodies {
+		if enforce == nil {
+			continue
+		}
+
+		for _, rule := range enforce.Metadata {
+			if !rule.MatchesGroupVersionKind(gvk) {
+				continue
+			}
+
+			policies := rule.Labels
+			if entry.Field == metadataFieldAnnotation {
+				policies = rule.Annotations
+			}
+
+			if policy := policies[entry.Key]; policy.Managed != nil {
+				// Mutation applies the last managed value for each key.
+				value, managed = *policy.Managed, true
+			}
+		}
+	}
+
+	return value, managed
 }
 
 func metadataRequiredDecision(entry metadataEntry) *ruleengine.Decision {
