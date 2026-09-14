@@ -271,14 +271,11 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 	expectMetadataPolicy := func(g Gomega, got rules.MetadataValueRule, expected expectedMetadataPolicy) {
 		g.Expect(got.Required).To(Equal(expected.required))
 
-		wantValues := max(len(expected.exact), len(expected.expressions))
-		if len(expected.negated) > wantValues {
-			wantValues = len(expected.negated)
-		}
+		wantValues := max(len(expected.negated), max(len(expected.exact), len(expected.expressions)))
 
 		g.Expect(got.Values).To(HaveLen(wantValues))
 
-		for i := 0; i < wantValues; i++ {
+		for i := range wantValues {
 			value := got.Values[i]
 
 			if len(expected.expressions) > i {
@@ -3198,6 +3195,105 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 			current := &corev1.Namespace{}
 			g.Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: ns.Name}, current)).To(Succeed())
 			g.Expect(current.Labels).To(HaveKeyWithValue(policyKey, "restricted"))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	})
+
+	It("validates metadata changes on the finalize subresource", func() {
+		const policyKey = "pod-security.kubernetes.io/enforce"
+
+		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
+			metadataRule(
+				rules.ActionTypeAllow,
+				"v1",
+				[]string{"Namespace"},
+				map[string]rules.MetadataValueRule{
+					policyKey: metadataValueRule(true, metadataByExact("baseline", "restricted")),
+				},
+				nil,
+			),
+		})
+
+		ns := createNamespace(map[string]string{policyKey: "baseline"})
+		waitForProjectedMetadata(ns.Name, policyKey, nil, nil)
+
+		createNamespaceFinalizeRBACForOwner(tnt)
+		DeferCleanup(deleteNamespaceFinalizeRBACForOwner, tnt)
+
+		owner := ownerClient(tnt.Spec.Owners[0].UserSpec)
+
+		const customFinalizer = "e2e.projectcapsule.dev/test-finalizer"
+		By("adding a finalizer to the namespace")
+		Eventually(func() error {
+			current, err := owner.CoreV1().Namespaces().Get(context.Background(), ns.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			current.Finalizers = append(current.Finalizers, customFinalizer)
+			_, err = owner.CoreV1().Namespaces().Update(context.Background(), current, metav1.UpdateOptions{})
+			return err
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		By("rejecting label modifications through namespaces/finalize")
+		Eventually(func() error {
+			current, err := owner.CoreV1().Namespaces().Get(context.Background(), ns.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			current.Labels[policyKey] = "restricted"
+			_, err = owner.CoreV1().Namespaces().Finalize(context.Background(), current, metav1.UpdateOptions{})
+			if err == nil {
+				return fmt.Errorf("expected finalize with label changes to be denied")
+			}
+			if !strings.Contains(err.Error(), "metadata other than finalizers cannot be modified on finalize") {
+				return err
+			}
+			return nil
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		By("rejecting annotation modifications through namespaces/finalize")
+		Eventually(func() error {
+			current, err := owner.CoreV1().Namespaces().Get(context.Background(), ns.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if current.Annotations == nil {
+				current.Annotations = map[string]string{}
+			}
+			current.Annotations["example.corp/annotation"] = "injected"
+			_, err = owner.CoreV1().Namespaces().Finalize(context.Background(), current, metav1.UpdateOptions{})
+			if err == nil {
+				return fmt.Errorf("expected finalize with annotation changes to be denied")
+			}
+			if !strings.Contains(err.Error(), "metadata other than finalizers cannot be modified on finalize") {
+				return err
+			}
+			return nil
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		By("allowing finalizer modifications when metadata is unchanged through namespaces/finalize")
+		Eventually(func() error {
+			current, err := owner.CoreV1().Namespaces().Get(context.Background(), ns.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			var updatedFinalizers []string
+			for _, f := range current.Finalizers {
+				if f != customFinalizer {
+					updatedFinalizers = append(updatedFinalizers, f)
+				}
+			}
+			current.Finalizers = updatedFinalizers
+			_, err = owner.CoreV1().Namespaces().Finalize(context.Background(), current, metav1.UpdateOptions{})
+			return err
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		By("verifying finalizer was removed and metadata remained intact")
+		Eventually(func(g Gomega) {
+			current := &corev1.Namespace{}
+			g.Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: ns.Name}, current)).To(Succeed())
+			g.Expect(current.Finalizers).NotTo(ContainElement(customFinalizer))
+			g.Expect(current.Labels).To(HaveKeyWithValue(policyKey, "baseline"))
+			g.Expect(current.Annotations).NotTo(HaveKey("example.corp/annotation"))
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 

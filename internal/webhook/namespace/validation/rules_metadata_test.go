@@ -17,36 +17,11 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
-	"github.com/projectcapsule/capsule/pkg/api/rules"
-	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/users"
 )
 
-func TestRulesMetadataHandlerSkipsFinalize(t *testing.T) {
-	t.Parallel()
-
-	handler := RulesMetadataHandler(nil, nil)
-	request := admission.Request{
-		Operation:   admissionv1.Update,
-		SubResource: "finalize"}
-
-	response := handler.OnUpdate(
-		nil,
-		nil,
-		users.AdmissionUser{},
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-	)(context.Background(), request)
-	if response != nil {
-		t.Fatalf("OnUpdate() response = %#v, want nil", response)
-	}
-}
-
-func TestRulesMetadataHandlerValidatesStatusMetadata(t *testing.T) {
+func TestRulesMetadataHandlerAllowsSubResourceMetadataModifications(t *testing.T) {
 	t.Parallel()
 
 	scheme := runtime.NewScheme()
@@ -58,48 +33,206 @@ func TestRulesMetadataHandlerValidatesStatusMetadata(t *testing.T) {
 	}
 
 	tnt := &capsulev1beta2.Tenant{Name: "solar"}
-	tnt.Spec.Rules = []*rules.NamespaceRuleBodyTenant{{
-		NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
-			Enforce: &rules.NamespaceRuleEnforceBody{
-				Action: rules.ActionTypeAllow,
-				Metadata: []rules.MetadataRule{{
-					APIGroups: []string{"v1"}, Kinds: []string{"Namespace"},
-					Labels: map[string]rules.MetadataValueRule{
-						"pod-security.kubernetes.io/enforce": {
-							Required: true,
-							Values:   []apiruntime.ExpressionMatch{{Exact: []string{"restricted", "baseline"}}},
-						},
-					},
-				}},
+
+	tests := []struct {
+		name   string
+		modify func(ns *corev1.Namespace)
+	}{
+		{
+			name: "finalizers modified",
+			modify: func(ns *corev1.Namespace) {
+				ns.Finalizers = []string{}
 			},
 		},
-	}}
+		{
+			name: "resourceVersion modified",
+			modify: func(ns *corev1.Namespace) {
+				ns.ResourceVersion = "2"
+			},
+		},
+		{
+			name: "generation modified",
+			modify: func(ns *corev1.Namespace) {
+				ns.Generation = 2
+			},
+		},
+		{
+			name: "managedFields modified",
+			modify: func(ns *corev1.Namespace) {
+				ns.ManagedFields = []metav1.ManagedFieldsEntry{
+					{
+						Manager:    "kube-controller-manager",
+						Operation:  metav1.ManagedFieldsOperationUpdate,
+						APIVersion: "v1",
+					},
+				}
+			},
+		},
+		{
+			name: "all allowed modifications combined",
+			modify: func(ns *corev1.Namespace) {
+				ns.Finalizers = []string{}
+				ns.ResourceVersion = "2"
+				ns.Generation = 2
+				ns.ManagedFields = []metav1.ManagedFieldsEntry{
+					{
+						Manager:    "kube-controller-manager",
+						Operation:  metav1.ManagedFieldsOperationUpdate,
+						APIVersion: "v1",
+					},
+				}
+			},
+		},
+	}
 
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			oldNs := &corev1.Namespace{
+				Name:            "solar-system",
+				Labels:          map[string]string{"env": "prod"},
+				Finalizers:      []string{"capsule.clastix.io/finalizer"},
+				ResourceVersion: "1",
+				Generation:      1,
+				ManagedFields: []metav1.ManagedFieldsEntry{
+					{
+						Manager:    "kubectl",
+						Operation:  metav1.ManagedFieldsOperationUpdate,
+						APIVersion: "v1",
+					},
+				},
+			}
+			newNs := oldNs.DeepCopy()
+			tt.modify(newNs)
+
+			client := fake.NewClientBuilder().WithScheme(scheme).Build()
+			recorder := events.NewEventRecorder(nil, logr.Discard(), nil, nil)
+			handler := RulesMetadataHandler(cache.NewRegexCache(), nil)
+			request := admission.Request{
+				Kind:        metav1.GroupVersionKind{Version: "v1", Kind: "Namespace"},
+				Operation:   admissionv1.Update,
+				SubResource: "finalize",
+			}
+
+			response := handler.OnUpdate(
+				client,
+				client,
+				users.AdmissionUser{},
+				newNs,
+				oldNs,
+				nil,
+				recorder,
+				tnt,
+			)(context.Background(), request)
+			if response != nil && !response.Allowed {
+				t.Fatalf("OnUpdate() response = %#v, want allowed", response)
+			}
+		})
+	}
+}
+
+func TestRulesMetadataHandlerRejectsSubresourceMetadataModifications(t *testing.T) {
+	t.Parallel()
+
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("add core API to scheme: %v", err)
+	}
+	if err := capsulev1beta2.AddToScheme(scheme); err != nil {
+		t.Fatalf("add Capsule API to scheme: %v", err)
+	}
+
+	tnt := &capsulev1beta2.Tenant{Name: "solar"}
+
+	tests := []struct {
+		name   string
+		modify func(ns *corev1.Namespace)
+	}{
+		{
+			name: "label modified",
+			modify: func(ns *corev1.Namespace) {
+				ns.Labels["new-label"] = "injected"
+			},
+		},
+		{
+			name: "annotation modified",
+			modify: func(ns *corev1.Namespace) {
+				if ns.Annotations == nil {
+					ns.Annotations = map[string]string{}
+				}
+				ns.Annotations["new-annotation"] = "injected"
+			},
+		},
+		{
+			name: "ownerReference modified",
+			modify: func(ns *corev1.Namespace) {
+				ns.OwnerReferences = append(ns.OwnerReferences, metav1.OwnerReference{
+					APIVersion: "capsule.clastix.io/v1beta2",
+					Kind:       "Tenant",
+					Name:       "attacker",
+					UID:        "12345",
+				})
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			oldNs := &corev1.Namespace{
+				Name:       "solar-system",
+				Labels:     map[string]string{"env": "prod"},
+				Finalizers: []string{"capsule.clastix.io/finalizer"},
+			}
+			newNs := oldNs.DeepCopy()
+			newNs.Finalizers = []string{}
+			tt.modify(newNs)
+
+			client := fake.NewClientBuilder().WithScheme(scheme).Build()
+			recorder := events.NewEventRecorder(nil, logr.Discard(), nil, nil)
+			handler := RulesMetadataHandler(cache.NewRegexCache(), nil)
+			request := admission.Request{
+				Kind:        metav1.GroupVersionKind{Version: "v1", Kind: "Namespace"},
+				Operation:   admissionv1.Update,
+				SubResource: "finalize",
+			}
+
+			response := handler.OnUpdate(
+				client,
+				client,
+				users.AdmissionUser{},
+				newNs,
+				oldNs,
+				nil,
+				recorder,
+				tnt,
+			)(context.Background(), request)
+			if response == nil || response.Allowed {
+				t.Fatalf("OnUpdate() response = %#v, want denied", response)
+			}
+		})
+	}
+}
+
+func BenchmarkNamespaceMetadataChanged(b *testing.B) {
 	oldNs := &corev1.Namespace{
-		Name:   "solar-system",
-		Labels: map[string]string{"pod-security.kubernetes.io/enforce": "baseline"}}
+		Name: "solar-system",
+		Labels: map[string]string{
+			"env":  "prod",
+			"tier": "frontend",
+		},
+		Annotations: map[string]string{
+			"capsule.clastix.io/ingress": "true",
+		},
+		Finalizers: []string{"capsule.clastix.io/finalizer"},
+	}
 	newNs := oldNs.DeepCopy()
-	newNs.Labels["pod-security.kubernetes.io/enforce"] = "privileged"
+	newNs.Finalizers = []string{}
 
-	client := fake.NewClientBuilder().WithScheme(scheme).Build()
-	recorder := events.NewEventRecorder(nil, logr.Discard(), nil, nil)
-	handler := RulesMetadataHandler(cache.NewRegexCache(), nil)
-	request := admission.Request{
-		Kind:        metav1.GroupVersionKind{Version: "v1", Kind: "Namespace"},
-		Operation:   admissionv1.Update,
-		SubResource: "status"}
-
-	response := handler.OnUpdate(
-		client,
-		client,
-		users.AdmissionUser{},
-		newNs,
-		oldNs,
-		nil,
-		recorder,
-		tnt,
-	)(context.Background(), request)
-	if response == nil || response.Allowed {
-		t.Fatalf("OnUpdate() response = %#v, want metadata injection denied", response)
+	b.ResetTimer()
+	for b.Loop() {
+		_ = namespaceMetadataChanged(oldNs, newNs)
 	}
 }

@@ -372,7 +372,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 
 				g.Expect(got.Enforce.Workloads.Registries).To(HaveLen(wantRegistries))
 
-				for j := 0; j < wantRegistries; j++ {
+				for j := range wantRegistries {
 					match := got.Enforce.Workloads.Registries[j].ExpressionMatch
 
 					if len(expected.expressions) > j {

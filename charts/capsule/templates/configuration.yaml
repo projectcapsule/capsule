@@ -1377,6 +1377,8 @@ spec:
               - UPDATE
             resources:
               - namespaces
+              - namespaces/status
+              - namespaces/finalize
             scope: '*'
         sideEffects: NoneOnDryRun
         timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}

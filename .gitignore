@@ -27,6 +27,7 @@ hack/generated/
 *.swo
 *~
 .vscode
+.env
 
 **/*.kubeconfig
 **/*.crt
