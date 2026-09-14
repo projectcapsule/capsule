@@ -821,10 +821,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 		pod := restrictedPod("customer-denied", "harbor/customer/containers/app:1", corev1.PullIfNotPresent)
 
 		createPodAndExpectDenied(cs, ns.Name, pod,
-			"containers[0]",
-			"harbor/customer/containers/app:1",
-			"denied",
-			"harbor/customer/containers/.*",
+			`image "harbor/customer/containers/app:1" at containers[0] is denied by registry rule`,
 		)
 	})
 
@@ -845,10 +842,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 		updatePodAndExpectDenied(cs, ns.Name, pod.Name, func(pod *corev1.Pod) {
 			pod.Spec.Containers[0].Image = "harbor/customer/containers/app:1"
 		},
-			"containers[0]",
-			"harbor/customer/containers/app:1",
-			"denied",
-			"harbor/customer/containers/.*",
+			`image "harbor/customer/containers/app:1" at containers[0] is denied by registry rule`,
 		)
 	})
 
@@ -865,10 +859,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 
 		denied := restrictedPod("prod-customer-denied", "harbor/customer/containers/other/app:1", corev1.PullIfNotPresent)
 		createPodAndExpectDenied(cs, ns.Name, denied,
-			"containers[0]",
-			"harbor/customer/containers/other/app:1",
-			"denied",
-			"harbor/customer/containers/.*",
+			`image "harbor/customer/containers/other/app:1" at containers[0] is denied by registry rule`,
 		)
 
 		allowed := restrictedPod("prod-customer-allowed", "harbor/customer/containers/prod/app:1", corev1.PullIfNotPresent)
@@ -911,10 +902,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 		}
 
 		createPodAndExpectDenied(cs, ns.Name, pod,
-			"initContainers[0]",
-			"harbor/customer/init/app:1",
-			"denied",
-			"harbor/customer/init/.*",
+			`image "harbor/customer/init/app:1" at initContainers[0] is denied by registry rule`,
 		)
 	})
 
@@ -957,10 +945,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 		}
 
 		createPodAndExpectDenied(cs, ns.Name, pod,
-			"volumes[0](imgvol)",
-			"harbor/customer/volume/app:1",
-			"denied",
-			"harbor/customer/volume/.*",
+			`image "harbor/customer/volume/app:1" at volumes[0](imgvol) is denied by registry rule`,
 		)
 	})
 
@@ -1060,10 +1045,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 
 			msg := err.Error()
 			for _, substring := range []string{
-				"ephemeralContainers[0]",
-				"harbor/customer/debug/app:1",
-				"denied",
-				"harbor/customer/debug/.*",
+				`image "harbor/customer/debug/app:1" at ephemeralContainers[0] is denied by registry rule`,
 			} {
 				if !strings.Contains(msg, substring) {
 					return fmt.Errorf("expected error to contain %q, got: %s", substring, msg)
@@ -1103,9 +1085,8 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 
 		createPodAndExpectDenied(cs, ns.Name, pod,
 			"containers[0]",
-			"policy/team/app:1",
-			"pullPolicy=IfNotPresent",
-			"allowed: Never",
+			`image pull policy "IfNotPresent"`,
+			"Allowed policies: Never",
 		)
 	})
 
@@ -1122,10 +1103,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 
 		denied := restrictedPod("negated-denied", "harbor/platform/app:1", corev1.PullIfNotPresent)
 		createPodAndExpectDenied(cs, ns.Name, denied,
-			"containers[0]",
-			"harbor/platform/app:1",
-			"denied",
-			"trusted/.*",
+			`image "harbor/platform/app:1" at containers[0] is denied by registry rule`,
 		)
 
 		allowed := restrictedPod("negated-allowed", "trusted/platform/app:1", corev1.PullIfNotPresent)

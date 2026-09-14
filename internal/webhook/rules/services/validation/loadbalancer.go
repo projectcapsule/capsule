@@ -37,7 +37,7 @@ func (h *serviceRules) validateLoadBalancers(
 					Value: string(corev1.ServiceTypeLoadBalancer),
 					Path:  "spec.type",
 				},
-				Message: "loadBalancer service requires spec.loadBalancerIP or spec.loadBalancerSourceRanges because loadBalancer CIDR constraints are enforced by namespace rule",
+				Message: "spec.loadBalancerIP or spec.loadBalancerSourceRanges is required by namespace rule",
 			},
 		}, nil
 	}

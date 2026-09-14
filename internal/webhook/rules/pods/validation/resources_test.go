@@ -72,7 +72,7 @@ func TestValidateResourcesAllowUsesPolicyAsAllowList(t *testing.T) {
 		t.Fatalf("validateResources(violating) error = %v", err)
 	}
 	if violating == nil || violating.Blocking == nil ||
-		!strings.Contains(violating.Blocking.Message, "does not satisfy any allowed resource policy") {
+		!strings.Contains(violating.Blocking.Message, "does not satisfy an allowed resource policy") {
 		t.Fatalf("validateResources(violating) = %#v, want allow-list miss", violating)
 	}
 }
@@ -155,7 +155,7 @@ func TestValidateResourcesRequiresRequestForRatio(t *testing.T) {
 		t.Fatalf("validateResources() error = %v", err)
 	}
 	if evaluation == nil || evaluation.Blocking == nil ||
-		!strings.Contains(evaluation.Blocking.Message, "requires a request greater than zero") {
+		!strings.Contains(evaluation.Blocking.Message, "request must be greater than zero") {
 		t.Fatalf("validateResources() = %#v, want missing-request violation", evaluation)
 	}
 }
