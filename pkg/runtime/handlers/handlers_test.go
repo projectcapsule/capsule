@@ -110,6 +110,7 @@ func TestAdmissionUserAndCapsuleAudienceAgreeForTenantServiceAccounts(t *testing
 	}
 	cl := handlersFakeClient(t, tnt, &capsulev1beta2.CapsuleConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "capsule"},
+		Spec:       capsulev1beta2.CapsuleConfigurationSpec{IgnoreUserWithGroups: []string{"ignored"}},
 	})
 	cfg := configuration.NewCapsuleConfiguration(t.Context(), cl, cl, &rest.Config{}, "capsule")
 	body := &rules.NamespaceRuleBodyNamespace{
@@ -120,16 +121,26 @@ func TestAdmissionUserAndCapsuleAudienceAgreeForTenantServiceAccounts(t *testing
 	for _, tt := range []struct {
 		namespace string
 		name      string
+		ignored   bool
 		wantType  users.AdmissionUserType
 	}{
 		{namespace: "team-a", name: "promoted", wantType: users.AdmissionUserCapsule},
 		{namespace: "team-a", name: "unpromoted", wantType: users.AdmissionUserCapsule},
+		{namespace: "team-a", name: "promoted", ignored: true, wantType: users.AdmissionUserUnknown},
+		{namespace: "team-a", name: "unpromoted", ignored: true, wantType: users.AdmissionUserUnknown},
 		{namespace: "outside", name: "unrelated", wantType: users.AdmissionUserUnknown},
 		{namespace: "kube-system", name: "system-controller", wantType: users.AdmissionUserUnknown},
 		{namespace: "capsule-system", name: "controller", wantType: users.AdmissionUserAdmin},
 	} {
-		t.Run(tt.namespace+"/"+tt.name, func(t *testing.T) {
+		name := tt.namespace + "/" + tt.name
+		if tt.ignored {
+			name += "/ignored"
+		}
+		t.Run(name, func(t *testing.T) {
 			info := users.ServiceAccountUserInfo(tt.namespace, tt.name)
+			if tt.ignored {
+				info.Groups = append(info.Groups, "ignored")
+			}
 			req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{UserInfo: info}}
 			user := handlers.ResolveAdmissionUser(t.Context(), cl, req, cfg)
 			if user.Type != tt.wantType {

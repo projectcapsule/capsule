@@ -98,6 +98,11 @@ func matchesAudience(ctx context.Context, c client.Client, cfg configuration.Con
 func matchesCustomAudience(ctx context.Context, c client.Client, cfg configuration.Configuration, tnt *capsulev1beta2.Tenant, req admission.Request, custom rules.CustomAudience) (bool, error) {
 	switch custom {
 	case rules.CustomAudienceCapsuleUser:
+		// Match admission's ignored-group guard before membership shortcuts.
+		if users.HasIgnoredGroup(req.UserInfo.Groups, cfg.IgnoreUserWithGroups()) {
+			return false, nil
+		}
+
 		// Use the same membership check as admission, including aggregated users
 		// and all service accounts in tenant namespaces, promoted or otherwise.
 		return users.IsCapsuleUser(ctx, c, cfg, req.UserInfo.Username, req.UserInfo.Groups), nil

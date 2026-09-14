@@ -12,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -19,6 +20,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/users"
 )
@@ -118,7 +120,14 @@ func TestCustomAudiencesIncludeTenantServiceAccounts(t *testing.T) {
 	cfg, cl := audienceConfiguration(t, config, tnt, otherTenant)
 	capsuleRule := &rules.NamespaceRuleBodyNamespace{
 		Audience: []rules.Audience{{Kind: rules.AudienceKindCustom, Name: string(rules.CustomAudienceCapsuleUser)}},
-		Enforce:  &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeDeny},
+		Enforce: &rules.NamespaceRuleEnforceBody{
+			Action: rules.ActionTypeAllow,
+			Metadata: []rules.MetadataRule{{
+				VersionKinds: apiruntime.VersionKinds{Kinds: []string{"Namespace", "ConfigMap"}},
+				Labels:       map[string]rules.MetadataValueRule{"example.corp/managed": {Managed: ptr.To("controlled")}},
+				Annotations:  map[string]rules.MetadataValueRule{"example.corp/managed": {Managed: ptr.To("controlled")}},
+			}},
+		},
 	}
 	ownerRule := &rules.NamespaceRuleBodyNamespace{
 		Audience: []rules.Audience{{Kind: rules.AudienceKindCustom, Name: string(rules.CustomAudienceTenantOwner)}},
@@ -129,6 +138,7 @@ func TestCustomAudiencesIncludeTenantServiceAccounts(t *testing.T) {
 	tests := []struct {
 		name        string
 		user        authenticationv1.UserInfo
+		ignored     bool
 		capsuleUser bool
 		tenantOwner bool
 	}{
@@ -144,6 +154,11 @@ func TestCustomAudiencesIncludeTenantServiceAccounts(t *testing.T) {
 		{name: "unrelated user", user: authenticationv1.UserInfo{Username: "unrelated"}},
 		{name: "administrator in status owners", user: authenticationv1.UserInfo{Username: "admin"}, tenantOwner: true},
 		{name: "ignored group", user: authenticationv1.UserInfo{Username: "bob", Groups: []string{"developers", "ignored"}}},
+		{name: "ignored configured user", user: authenticationv1.UserInfo{Username: "alice"}, ignored: true},
+		{name: "ignored aggregated user", user: authenticationv1.UserInfo{Username: "aggregated-user"}, ignored: true},
+		{name: "ignored promoted service account", user: promoted, ignored: true, tenantOwner: true},
+		{name: "ignored unpromoted service account", user: users.ServiceAccountUserInfo("team-a", "unpromoted"), ignored: true},
+		{name: "ignored configured external service account", user: users.ServiceAccountUserInfo("external", "configured"), ignored: true},
 		{name: "kube-system service account", user: users.ServiceAccountUserInfo("kube-system", "system-controller")},
 		{name: "capsule controller", user: users.ServiceAccountUserInfo("capsule-system", "capsule-controller")},
 	}
@@ -151,6 +166,9 @@ func TestCustomAudiencesIncludeTenantServiceAccounts(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{UserInfo: tt.user}}
+			if tt.ignored {
+				req.UserInfo.Groups = append(slices.Clone(tt.user.Groups), "ignored")
+			}
 			got, err := FilterNamespaceRulesByAudience(t.Context(), cl, cfg, tnt, req, []*rules.NamespaceRuleBodyNamespace{capsuleRule, ownerRule, unscoped})
 			if err != nil {
 				t.Fatalf("FilterNamespaceRulesByAudience() error = %v", err)
