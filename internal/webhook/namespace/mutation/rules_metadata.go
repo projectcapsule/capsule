@@ -58,12 +58,17 @@ func mutateNamespaceRules(c client.Client, reader client.Reader, cfg configurati
 			return handlers.ErroredResponse(err)
 		}
 
+		gvk := schema.GroupVersionKind{Version: "v1", Kind: "Namespace"}
+		if !rulesmutation.HasMetadataMutation(gvk, bodies) {
+			return nil
+		}
+
 		bodies, err = ruleengine.FilterNamespaceRulesByAudience(ctx, c, cfg, tnt, req, bodies)
 		if err != nil {
 			return handlers.ErroredResponse(err)
 		}
 
-		rulesmutation.MutateMetadata(ns, schema.GroupVersionKind{Version: "v1", Kind: "Namespace"}, bodies)
+		rulesmutation.MutateMetadata(ns, gvk, bodies)
 
 		return nil
 	}

@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/utils/lru"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -67,6 +68,7 @@ type Manager struct {
 
 	resourceQuotaSyncMu sync.Mutex
 	resourceQuotaSyncs  map[string]*tenantResourceQuotaSync
+	ruleStatusWrites    *lru.Cache
 }
 
 type supportedClasses struct {
@@ -77,6 +79,7 @@ type supportedClasses struct {
 func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
 	r.reader = mgr.GetAPIReader()
 	r.discoveryCache = cache.NewDiscoveryNamespacedResourceCache()
+	r.ruleStatusWrites = lru.New(8192)
 
 	ctrlBuilder := ctrl.NewControllerManagedBy(mgr).
 		Named("capsule/tenants").
@@ -111,7 +114,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 		Watches(
 			&capsulev1beta2.RuleStatus{},
 			handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &capsulev1beta2.Tenant{}),
-			builder.WithPredicates(predicates.ClassChanged()),
+			builder.WithPredicates(r.ruleStatusChangedPredicate()),
 		).
 		Watches(
 			&storagev1.StorageClass{},

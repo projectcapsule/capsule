@@ -5,11 +5,11 @@ package rulestatus
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 
 	"github.com/go-logr/logr"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,7 +17,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/retry"
-	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -85,40 +84,22 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 		return result, err
 	}
 
-	patchHelper, err := patch.NewHelper(instance, r.Client)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
+	originalStatus := instance.Status.DeepCopy()
 
 	defer func() {
-		if e := r.updateStatus(ctx, instance, err); e != nil {
-			if apierrors.IsNotFound(err) || apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
+		if e := r.updateStatus(ctx, instance, originalStatus, err); e != nil {
+			if caperrors.IgnoreGone(e) {
 				err = nil
 
 				return
 			}
 
-			err = fmt.Errorf("cannot update status: %w", e)
+			err = errors.Join(err, fmt.Errorf("cannot update status: %w", e))
 
 			return
 		}
 
 		r.Metrics.RecordConditions(instance)
-
-		if e := patchHelper.Patch(ctx, instance); e != nil {
-			if apierrors.IsNotFound(e) || apierrors.HasStatusCause(e, corev1.NamespaceTerminatingCause) {
-				err = nil
-
-				return
-			}
-
-			err = fmt.Errorf("cannot patch: %w", e)
-
-			return
-		}
-
-		// Controller-Runtime should never receive error
-		err = nil
 	}()
 
 	// Best-Effort for Updating the status
@@ -132,25 +113,23 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 
 	// Reconcile
 	if err = r.reconcile(ctx, instance); err != nil {
-		err = fmt.Errorf("cannot collect available resources: %w", err)
+		err = fmt.Errorf("cannot reconcile rules: %w", err)
 
 		return result, err
 	}
 
-	var reconcileError error
-	if err != nil {
-		reconcileError = fmt.Errorf("had errors reconciling")
-	}
-
 	log.V(4).Info("reconciling completed")
 
-	return ctrl.Result{}, reconcileError
+	return ctrl.Result{}, nil
 }
 
 func (r Manager) reconcile(ctx context.Context, instance *capsulev1beta2.RuleStatus) error {
 	previousRules := instance.Status.Rules
+	//nolint:staticcheck // Clear the legacy representation when publishing new rules.
+	hadLegacyRule := !reflect.DeepEqual(instance.Status.Rule, rules.NamespaceRuleBodyNamespace{})
 	hadManagedMetadata := hasManagedMetadata(previousRules)
-	ruleStatus := make([]*rules.NamespaceRuleBodyNamespace, 0, len(instance.Spec))
+
+	var ruleStatus []*rules.NamespaceRuleBodyNamespace
 
 	for _, rule := range instance.Spec {
 		if rule == nil || rule.Enforce == nil {
@@ -163,12 +142,10 @@ func (r Manager) reconcile(ctx context.Context, instance *capsulev1beta2.RuleSta
 		// which predate stable quota names.
 		statusRule.Quota = nil
 
-		enforce := rule.Enforce.DeepCopy()
-		for i := range enforce.Metadata {
-			enforce.Metadata[i].APIGroups = enforce.Metadata[i].StatusAPIGroups()
+		for i := range statusRule.Enforce.Metadata {
+			statusRule.Enforce.Metadata[i].APIGroups = statusRule.Enforce.Metadata[i].StatusAPIGroups()
 		}
 
-		statusRule.Enforce = enforce
 		ruleStatus = append(ruleStatus, statusRule)
 	}
 
@@ -177,8 +154,10 @@ func (r Manager) reconcile(ctx context.Context, instance *capsulev1beta2.RuleSta
 	instance.Status.Rule = rules.NamespaceRuleBodyNamespace{}
 
 	if hadManagedMetadata || hasManagedMetadata(ruleStatus) {
-		if err := r.publishRulesStatus(ctx, instance); err != nil {
-			return fmt.Errorf("publish rules before managed metadata reconciliation: %w", err)
+		if hadLegacyRule || !reflect.DeepEqual(previousRules, ruleStatus) {
+			if err := r.publishRulesStatus(ctx, instance); err != nil {
+				return fmt.Errorf("publish rules before managed metadata reconciliation: %w", err)
+			}
 		}
 
 		if err := r.reconcileManagedMetadata(ctx, instance, previousRules, ruleStatus); err != nil {
@@ -196,15 +175,35 @@ func (r *Manager) publishRulesStatus(ctx context.Context, instance *capsulev1bet
 			return err
 		}
 
+		originalStatus := latest.Status.DeepCopy()
 		latest.Status.Rules = instance.Status.Rules
 		//nolint:staticcheck
 		latest.Status.Rule = instance.Status.Rule
+
+		if reflect.DeepEqual(*originalStatus, latest.Status) {
+			return nil
+		}
 
 		return r.Client.Status().Update(ctx, latest)
 	})
 }
 
-func (r *Manager) updateStatus(ctx context.Context, instance *capsulev1beta2.RuleStatus, reconcileError error) error {
+func (r *Manager) updateStatus(ctx context.Context, instance *capsulev1beta2.RuleStatus, originalStatus *capsulev1beta2.RuleStatusStatus, reconcileError error) error {
+	instance.Status.ObservedGeneration = instance.GetGeneration()
+
+	readyCondition := meta.NewReadyCondition(instance)
+	if reconcileError != nil {
+		readyCondition.Message = reconcileError.Error()
+		readyCondition.Status = metav1.ConditionFalse
+		readyCondition.Reason = meta.FailedReason
+	}
+
+	instance.Status.Conditions.UpdateConditionByType(readyCondition)
+
+	if reflect.DeepEqual(*originalStatus, instance.Status) {
+		return nil
+	}
+
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.RuleStatus{}
 		if err = r.reader.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
@@ -218,17 +217,6 @@ func (r *Manager) updateStatus(ctx context.Context, instance *capsulev1beta2.Rul
 		originalStatus := latest.Status.DeepCopy()
 
 		latest.Status = instance.Status
-		latest.Status.ObservedGeneration = instance.GetGeneration()
-
-		// Set Ready Condition
-		readyCondition := meta.NewReadyCondition(instance)
-		if reconcileError != nil {
-			readyCondition.Message = reconcileError.Error()
-			readyCondition.Status = metav1.ConditionFalse
-			readyCondition.Reason = meta.FailedReason
-		}
-
-		latest.Status.Conditions.UpdateConditionByType(readyCondition)
 
 		if reflect.DeepEqual(*originalStatus, latest.Status) {
 			return nil
@@ -246,6 +234,11 @@ func (r *Manager) updateStatus(ctx context.Context, instance *capsulev1beta2.Rul
 }
 
 func (r *Manager) updateReconcilingStatus(ctx context.Context, instance *capsulev1beta2.RuleStatus) error {
+	status := instance.Status.DeepCopy()
+	if !removeQuotaDefinitions(status) && status.ObservedGeneration == instance.GetGeneration() {
+		return nil
+	}
+
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.RuleStatus{}
 		if err = r.reader.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
@@ -258,12 +251,24 @@ func (r *Manager) updateReconcilingStatus(ctx context.Context, instance *capsule
 				return nil
 			}
 
-			return r.Status().Update(ctx, latest)
+			if err := r.Status().Update(ctx, latest); err != nil {
+				return err
+			}
+
+			instance.Status = latest.Status
+
+			return nil
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(meta.NewReadyConditionReconcilingReason(instance))
 
-		return r.Status().Update(ctx, latest)
+		if err := r.Status().Update(ctx, latest); err != nil {
+			return err
+		}
+
+		instance.Status = latest.Status
+
+		return nil
 	})
 }
 
