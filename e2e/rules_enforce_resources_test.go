@@ -734,7 +734,7 @@ var _ = Describe("enforcing workload resource namespace rules", Ordered, Label("
 		expectResourceAuditEvent(
 			ns.Name,
 			pod.Name,
-			"workload resource limit",
+			`resource at spec.containers[0].resources.limits["memory"]`,
 			"violates policy Ratio",
 			"must not exceed 1536Mi",
 		)
