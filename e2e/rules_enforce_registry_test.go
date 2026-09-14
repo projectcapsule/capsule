@@ -1103,9 +1103,8 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 
 		createPodAndExpectDenied(cs, ns.Name, pod,
 			"containers[0]",
-			"policy/team/app:1",
-			"pullPolicy=IfNotPresent",
-			"allowed: Never",
+			`image pull policy "IfNotPresent"`,
+			"Allowed policies: Never",
 		)
 	})
 

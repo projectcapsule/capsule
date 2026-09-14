@@ -52,7 +52,7 @@ func (h *podRules) validateRegistries(
 					Value: ref.Reference,
 					Path:  ref.Path,
 				},
-				Message: fmt.Sprintf("%s has empty reference", ref.Path),
+				Message: fmt.Sprintf("image reference is required at %s", ref.Path),
 			}
 
 			return out, nil
@@ -267,10 +267,9 @@ func registryDecisionMessage(
 
 	case apirules.ActionTypeDeny:
 		return fmt.Sprintf(
-			"%s reference %q is denied by registry rule %q",
-			value.Path,
+			"image %q at %s is denied by registry rule",
 			value.Value,
-			rule,
+			value.Path,
 		)
 
 	case apirules.ActionTypeAllow:
@@ -342,9 +341,8 @@ func registryPullPolicyDecision(
 			},
 			MatchedValue: matched,
 			Message: fmt.Sprintf(
-				"%s reference %q must explicitly set pullPolicy (allowed: %s)",
+				"image pull policy is required at %s. Allowed policies: %s",
 				ref.Path,
-				ref.Reference,
 				allowed,
 			),
 		}
@@ -361,10 +359,9 @@ func registryPullPolicyDecision(
 			},
 			MatchedValue: matched,
 			Message: fmt.Sprintf(
-				"%s reference %q uses pullPolicy=%s which is not allowed (allowed: %s)",
-				ref.Path,
-				ref.Reference,
+				"image pull policy %q at %s is not allowed. Allowed policies: %s",
 				ref.PullPolicy,
+				ref.Path,
 				allowed,
 			),
 		}

@@ -17,30 +17,39 @@ func DefaultAllowedValuesErrorMessage(allowed api.DefaultAllowedListSpec, err st
 func AllowedValuesErrorMessage(allowed api.SelectorAllowedListSpec, err string) string {
 	var extra []string
 	if len(allowed.Exact) > 0 {
-		extra = append(extra, fmt.Sprintf("use one from the following list (%s)", strings.Join(allowed.Exact, ", ")))
+		extra = append(extra, strings.Join(allowed.Exact, ", "))
 	}
 
 	//nolint:staticcheck
 	if len(allowed.Regex) > 0 {
-		extra = append(extra, fmt.Sprintf("use one matching the following regex (%s)", allowed.Regex))
+		extra = append(extra, "matching pattern "+allowed.Regex)
 	}
 
 	if len(allowed.MatchLabels) > 0 || len(allowed.MatchExpressions) > 0 {
-		extra = append(extra, "matching the label selector defined in the Tenant")
+		extra = append(extra, "matching the tenant's label selector")
 	}
 
-	err += strings.Join(extra, " or ")
-
-	return err
+	return appendAllowedValues(err, extra)
 }
 
 func SelectionListWithDefaultErrorMessage(allowed api.SelectionListWithDefaultSpec, err string) string {
 	var extra []string
 	if len(allowed.MatchLabels) > 0 || len(allowed.MatchExpressions) > 0 {
-		extra = append(extra, "matching the label selector defined in the Tenant")
+		extra = append(extra, "matching the tenant's label selector")
 	}
 
-	err += strings.Join(extra, " or ")
+	return appendAllowedValues(err, extra)
+}
 
-	return err
+func appendAllowedValues(message string, choices []string) string {
+	message = strings.TrimRight(strings.TrimSpace(message), ":.")
+	if len(choices) == 0 {
+		return message
+	}
+
+	if message == "" {
+		return "Allowed values: " + strings.Join(choices, " or ")
+	}
+
+	return fmt.Sprintf("%s. Allowed values: %s", message, strings.Join(choices, " or "))
 }

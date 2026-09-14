@@ -184,7 +184,6 @@ func TestServiceRulesValidateServiceTypes(t *testing.T) {
 			wantFinal:    true,
 			wantMessage: []string{
 				`service type "LoadBalancer" at spec.type is denied by namespace rule`,
-				`service type "LoadBalancer" matched "LoadBalancer"`,
 			},
 		},
 		{
@@ -200,7 +199,6 @@ func TestServiceRulesValidateServiceTypes(t *testing.T) {
 			wantFinal:    true,
 			wantMessage: []string{
 				`service type "NodePort" at spec.type is denied by namespace rule`,
-				`service type "NodePort" matched "NodePort"`,
 			},
 		},
 		{
@@ -220,7 +218,6 @@ func TestServiceRulesValidateServiceTypes(t *testing.T) {
 			wantFinal:    true,
 			wantMessage: []string{
 				`service type "LoadBalancer" at spec.type is denied by namespace rule`,
-				`service type "LoadBalancer" matched "LoadBalancer"`,
 			},
 		},
 		{
@@ -357,6 +354,9 @@ func TestServiceRulesValidateServiceTypes(t *testing.T) {
 
 			if len(tt.wantMessage) > 0 {
 				msg := decisionMessageForServiceTypeTest(evaluation)
+				if tt.wantBlocking && tt.wantFinal && msg != tt.wantMessage[0] {
+					t.Fatalf("denial message = %q, want %q without matcher details", msg, tt.wantMessage[0])
+				}
 
 				for _, expected := range tt.wantMessage {
 					if !strings.Contains(msg, expected) {

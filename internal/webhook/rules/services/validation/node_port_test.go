@@ -74,8 +74,7 @@ func TestServiceRulesValidateNodePorts(t *testing.T) {
 			wantBlocking: true,
 			wantFinal:    false,
 			wantMessage: []string{
-				"service requires explicit spec.ports[*].nodePort",
-				"nodePort ranges are enforced by namespace rule",
+				"spec.ports[*].nodePort is required by namespace rule",
 			},
 		},
 		{
@@ -87,8 +86,7 @@ func TestServiceRulesValidateNodePorts(t *testing.T) {
 			wantBlocking: true,
 			wantFinal:    false,
 			wantMessage: []string{
-				"service requires explicit spec.ports[*].nodePort",
-				"nodePort ranges are enforced by namespace rule",
+				"spec.ports[*].nodePort is required by namespace rule",
 			},
 		},
 		{
@@ -100,8 +98,7 @@ func TestServiceRulesValidateNodePorts(t *testing.T) {
 			wantBlocking: true,
 			wantFinal:    false,
 			wantMessage: []string{
-				"service requires explicit spec.ports[*].nodePort",
-				"nodePort ranges are enforced by namespace rule",
+				"spec.ports[*].nodePort is required by namespace rule",
 			},
 		},
 		{
@@ -159,7 +156,6 @@ func TestServiceRulesValidateNodePorts(t *testing.T) {
 			wantFinal:    true,
 			wantMessage: []string{
 				`nodePort "30090" at spec.ports[0].nodePort is denied by namespace rule`,
-				"nodePort 30090 is within allowed range 30090",
 			},
 		},
 		{
@@ -173,7 +169,6 @@ func TestServiceRulesValidateNodePorts(t *testing.T) {
 			wantFinal:    true,
 			wantMessage: []string{
 				`nodePort "30090" at spec.ports[0].nodePort is denied by namespace rule`,
-				"nodePort 30090 is within allowed range 30090",
 			},
 		},
 		{

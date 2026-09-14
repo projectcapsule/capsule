@@ -165,7 +165,6 @@ func TestPodRulesValidateSchedulers(t *testing.T) {
 			wantFinal:    true,
 			wantMessage: []string{
 				`scheduler "unsafe-scheduler" at spec.schedulerName is denied by namespace rule`,
-				`matched denied rule exact: unsafe-scheduler`,
 			},
 		},
 		{
@@ -181,7 +180,6 @@ func TestPodRulesValidateSchedulers(t *testing.T) {
 			wantFinal:    true,
 			wantMessage: []string{
 				`scheduler "unsafe-scheduler" at spec.schedulerName is denied by namespace rule`,
-				`matched denied rule exact: unsafe-scheduler`,
 			},
 		},
 		{
@@ -201,7 +199,6 @@ func TestPodRulesValidateSchedulers(t *testing.T) {
 			wantFinal:    true,
 			wantMessage: []string{
 				`scheduler "unsafe-scheduler" at spec.schedulerName is denied by namespace rule`,
-				`matched denied rule exact: unsafe-scheduler`,
 			},
 		},
 		{
@@ -296,7 +293,6 @@ func TestPodRulesValidateSchedulers(t *testing.T) {
 			wantFinal:    true,
 			wantMessage: []string{
 				`scheduler "other-scheduler" at spec.schedulerName is denied by namespace rule`,
-				`matched denied rule not exact: tenant-scheduler`,
 			},
 		},
 		{

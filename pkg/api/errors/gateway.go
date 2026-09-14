@@ -73,5 +73,5 @@ func NewGatewayClassUndefined(spec api.DefaultAllowedListSpec) error {
 }
 
 func (i GatewayClassUndefinedError) Error() string {
-	return DefaultAllowedValuesErrorMessage(i.spec, "No gateway Class is forbidden for the current Tenant. Specify a gateway Class which is allowed within the Tenant: ")
+	return DefaultAllowedValuesErrorMessage(i.spec, "a gateway class is required by the tenant")
 }

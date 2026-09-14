@@ -147,7 +147,6 @@ func TestServiceRulesValidateExternalNames(t *testing.T) {
 			wantFinal:    true,
 			wantMessage: []string{
 				`externalName hostname "blocked.example.com" at spec.externalName is denied by namespace rule`,
-				`"blocked.example.com" matched hostname rule exact: blocked.example.com`,
 			},
 		},
 		{
@@ -167,7 +166,6 @@ func TestServiceRulesValidateExternalNames(t *testing.T) {
 			wantFinal:    true,
 			wantMessage: []string{
 				`externalName hostname "blocked.example.com" at spec.externalName is denied by namespace rule`,
-				`"blocked.example.com" matched hostname rule exact: blocked.example.com`,
 			},
 		},
 		{
@@ -242,7 +240,6 @@ func TestServiceRulesValidateExternalNames(t *testing.T) {
 			wantFinal:    true,
 			wantMessage: []string{
 				`externalName hostname "api.example.com" at spec.externalName is denied by namespace rule`,
-				`"api.example.com" matched hostname rule exp: trusted\..*`,
 			},
 		},
 		{
