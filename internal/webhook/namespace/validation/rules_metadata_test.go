@@ -23,31 +23,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/users"
 )
 
-func TestRulesMetadataHandlerSkipsFinalize(t *testing.T) {
-	t.Parallel()
-
-	handler := RulesMetadataHandler(nil, nil)
-	request := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
-		Operation:   admissionv1.Update,
-		SubResource: "finalize",
-	}}
-
-	response := handler.OnUpdate(
-		nil,
-		nil,
-		users.AdmissionUser{},
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-	)(context.Background(), request)
-	if response != nil {
-		t.Fatalf("OnUpdate() response = %#v, want nil", response)
-	}
-}
-
-func TestRulesMetadataHandlerValidatesStatusMetadata(t *testing.T) {
+func TestRulesMetadataHandlerValidatesSubresourceMetadata(t *testing.T) {
 	t.Parallel()
 
 	scheme := runtime.NewScheme()
@@ -86,23 +62,27 @@ func TestRulesMetadataHandlerValidatesStatusMetadata(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := events.NewEventRecorder(nil, logr.Discard(), nil, nil)
 	handler := RulesMetadataHandler(cache.NewRegexCache(), nil)
-	request := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
-		Kind:        metav1.GroupVersionKind{Version: "v1", Kind: "Namespace"},
-		Operation:   admissionv1.Update,
-		SubResource: "status",
-	}}
+	for _, subresource := range []string{"", "status", "finalize"} {
+		t.Run("resource="+subresource, func(t *testing.T) {
+			request := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+				Kind:        metav1.GroupVersionKind{Version: "v1", Kind: "Namespace"},
+				Operation:   admissionv1.Update,
+				SubResource: subresource,
+			}}
 
-	response := handler.OnUpdate(
-		client,
-		client,
-		users.AdmissionUser{},
-		newNs,
-		oldNs,
-		nil,
-		recorder,
-		tnt,
-	)(context.Background(), request)
-	if response == nil || response.Allowed {
-		t.Fatalf("OnUpdate() response = %#v, want metadata injection denied", response)
+			response := handler.OnUpdate(
+				client,
+				client,
+				users.AdmissionUser{},
+				newNs,
+				oldNs,
+				nil,
+				recorder,
+				tnt,
+			)(context.Background(), request)
+			if response == nil || response.Allowed {
+				t.Fatalf("OnUpdate() response = %#v, want metadata injection denied", response)
+			}
+		})
 	}
 }

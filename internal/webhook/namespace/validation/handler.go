@@ -6,6 +6,7 @@ package validation
 import (
 	"context"
 	"fmt"
+	"maps"
 	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
@@ -249,11 +250,21 @@ func validateTerminatingNamespaceUpdate(
 		return nil, false
 	}
 
+	// Status and finalizer maintenance must remain possible even when the
+	// Tenant is missing or its policies would block cleanup. RBAC authorizes
+	// those lifecycle operations, but their metadata writes still need the
+	// normal ownership and policy checks, including on terminating namespaces.
+	if maps.Equal(oldNs.Labels, newNs.Labels) &&
+		maps.Equal(oldNs.Annotations, newNs.Annotations) &&
+		reflect.DeepEqual(&oldNs.OwnerReferences, &newNs.OwnerReferences) {
+		return nil, true
+	}
+
 	if namespaceTenantAssignmentChanged(oldNs, newNs) {
 		return ad.Deny("namespace tenant ownership can not change during termination"), true
 	}
 
-	return nil, true
+	return nil, false
 }
 
 func validateNamespaceTenantReferenceTransition(
@@ -277,6 +288,10 @@ func validateNamespaceTenantReferenceTransition(
 	case oldHasTenantReference && !newHasTenantReference:
 		return ad.Deny("namespace can not remove tenant ownership"), true
 	case !oldHasTenantReference && !newHasTenantReference:
+		if user.IsCapsule() {
+			return ad.Deny("namespace is not owned by any tenant"), true
+		}
+
 		return nil, true
 	default:
 		return nil, false

@@ -105,9 +105,10 @@ func (h *handler) OnUpdate(
 			return ad.ErroredResponse(err)
 		}
 
-		// Namespace finalization and terminating updates must never depend on
-		// Tenant resolution. The standard mutating rule excludes subresources,
-		// but retain this guard for custom webhook configurations.
+		// Keep lifecycle maintenance independent of Tenant mutation. The namespace
+		// validator covers both subresources and checks ownership and policies
+		// whenever labels, annotations or ownerReferences change, including during
+		// termination. Retain this guard for custom mutating webhook configurations.
 		if req.SubResource != "" ||
 			ns.DeletionTimestamp != nil ||
 			oldNs.DeletionTimestamp != nil ||
