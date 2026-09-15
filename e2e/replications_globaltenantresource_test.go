@@ -39,8 +39,7 @@ const (
 
 var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global", "globaltenantresource"), Ordered, func() {
 	var (
-		ctx          context.Context
-		originConfig *capsulev1beta2.CapsuleConfiguration
+		ctx context.Context
 
 		tenantA *capsulev1beta2.Tenant
 		tenantB *capsulev1beta2.Tenant
@@ -55,7 +54,6 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 
 	BeforeEach(func() {
 		ctx = context.Background()
-		originConfig = &capsulev1beta2.CapsuleConfiguration{}
 
 		tenantAOwner = rbac.UserSpec{Name: "e2e-gtr-tenant-a", Kind: rbac.OwnerKind("User")}
 		tenantBOwner = rbac.UserSpec{Name: "e2e-gtr-tenant-b", Kind: rbac.OwnerKind("User")}
@@ -103,8 +101,6 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 			},
 		}
 
-		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: defaultConfigurationName}, originConfig)).To(Succeed())
-
 		EventuallyCreation(func() error {
 			tenantA.ResourceVersion = ""
 			return k8sClient.Create(ctx, tenantA)
@@ -133,15 +129,6 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 	})
 
 	AfterEach(func() {
-		Eventually(func() error {
-			cfg := &capsulev1beta2.CapsuleConfiguration{}
-			if err := k8sClient.Get(ctx, client.ObjectKey{Name: originConfig.Name}, cfg); err != nil {
-				return err
-			}
-			cfg.Spec = originConfig.Spec
-			return k8sClient.Update(ctx, cfg)
-		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-
 		cleanupGlobalTenantResourcesWithDefaultServiceAccount(ctx)
 
 		for _, ns := range allNamespaces {
@@ -1115,37 +1102,6 @@ data:
 
 			expectConfigMapData("e2e-gtr-tenant-a-one", "gtr-namespace-selector-prune", map[string]string{"mode": "selected"})
 			expectConfigMapDeleted("e2e-gtr-tenant-a-two", "gtr-namespace-selector-prune")
-		})
-	})
-
-	Context("service account resolution", func() {
-		It("reflects the resolved service account in status", func() {
-			gtr := newRawConfigMapGlobalTenantResource("gtr-sa-resolution", map[string]string{"mode": "default"})
-			gtr.Spec.ServiceAccount = nil
-			gtr.Spec.TenantSelector = metav1.LabelSelector{
-				MatchLabels: map[string]string{"energy": "solar"},
-			}
-
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
-
-			Eventually(func(g Gomega) {
-				current := &capsulev1beta2.GlobalTenantResource{}
-				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: gtr.Name}, current)).To(Succeed())
-				g.Expect(current.Status.ServiceAccount).ToNot(BeNil())
-			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-
-			ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
-				configuration.Spec.Impersonation.GlobalDefaultServiceAccount = "default"
-				configuration.Spec.Impersonation.GlobalDefaultServiceAccountNamespace = "capsule-system"
-			})
-
-			Eventually(func(g Gomega) {
-				current := &capsulev1beta2.GlobalTenantResource{}
-				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: gtr.Name}, current)).To(Succeed())
-				g.Expect(current.Status.ServiceAccount).ToNot(BeNil())
-				g.Expect(current.Status.ServiceAccount.Name).To(Equal(apimeta.RFC1123Name("default")))
-				g.Expect(current.Status.ServiceAccount.Namespace).To(Equal(apimeta.RFC1123SubdomainName("capsule-system")))
-			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 	})
 

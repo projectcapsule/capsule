@@ -45,16 +45,12 @@ var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace
 		contextSecretTwo      *corev1.Secret
 	)
 
-	originalConfig := &capsulev1beta2.CapsuleConfiguration{}
-
 	BeforeEach(func() {
 		ctx = context.Background()
 		baseNamespace = "e2e-tenantresource-ssa-system"
 		targetNamespaces = []string{"e2e-tenantresource-ssa-one", "e2e-tenantresource-ssa-two", "e2e-tenantresource-ssa-three"}
 		tenantOwner = rbac.UserSpec{Name: "e2e-tr-owner", Kind: rbac.OwnerKind("User")}
 		additionalBindingUser = rbac.UserSpec{Name: "e2e-tr-additional", Kind: rbac.OwnerKind("User")}
-
-		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: defaultConfigurationName}, originalConfig)).To(Succeed())
 
 		tnt = &capsulev1beta2.Tenant{
 			ObjectMeta: metav1.ObjectMeta{
@@ -106,8 +102,6 @@ var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace
 			StringData: map[string]string{".dockerconfigjson": "e30="},
 		}
 
-		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: defaultConfigurationName}, originalConfig)).To(Succeed())
-
 		EventuallyCreation(func() error {
 			tnt.ResourceVersion = ""
 			return k8sClient.Create(ctx, tnt)
@@ -132,10 +126,6 @@ var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace
 	})
 
 	AfterEach(func() {
-		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
-			configuration.Spec = originalConfig.Spec
-		})
-
 		cleanupTenantResourcesWithDefaultServiceAccount(
 			ctx,
 			append([]string{baseNamespace}, targetNamespaces...)...,
