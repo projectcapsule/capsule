@@ -18,6 +18,7 @@ const (
 	AssignedCondition  string = "Assigned"
 	BoundCondition     string = "Bound"
 	ExhaustedCondition string = "Exhausted"
+	ApprovedCondition  string = "Approved"
 
 	// FailedReason indicates a condition or event observed a failure (Claim Rejected).
 	SucceededReason               string = "Succeeded"
@@ -170,6 +171,17 @@ func NewTerminatingConditionReason(obj client.Object) Condition {
 		Reason:             SucceededReason,
 		Message:            "cleaning up",
 		LastTransitionTime: metav1.Now(),
+	}
+}
+
+func NewApprovedCondition(obj client.Object, reason string, message string) Condition {
+	return Condition{
+		Type:               ApprovedCondition,
+		Status:             metav1.ConditionTrue,
+		Reason:             reason,
+		Message:            message,
+		LastTransitionTime: metav1.Now(),
+		ObservedGeneration: obj.GetGeneration(),
 	}
 }
 
