@@ -59,8 +59,7 @@ func TestServiceRulesValidateLoadBalancers(t *testing.T) {
 			wantBlocking: true,
 			wantFinal:    false,
 			wantMessage: []string{
-				"loadBalancer service requires spec.loadBalancerIP or spec.loadBalancerSourceRanges",
-				"loadBalancer CIDR constraints are enforced by namespace rule",
+				"spec.loadBalancerIP or spec.loadBalancerSourceRanges is required by namespace rule",
 			},
 		},
 		{
@@ -72,7 +71,7 @@ func TestServiceRulesValidateLoadBalancers(t *testing.T) {
 			wantBlocking: true,
 			wantFinal:    false,
 			wantMessage: []string{
-				"loadBalancer service requires spec.loadBalancerIP or spec.loadBalancerSourceRanges",
+				"spec.loadBalancerIP or spec.loadBalancerSourceRanges is required by namespace rule",
 			},
 		},
 		{
@@ -204,7 +203,6 @@ func TestServiceRulesValidateLoadBalancers(t *testing.T) {
 			wantFinal:    true,
 			wantMessage: []string{
 				`loadBalancer CIDR "10.0.66.10" at spec.loadBalancerIP is denied by namespace rule`,
-				"10.0.66.10 is contained in 10.0.66.0/24",
 			},
 		},
 		{
@@ -218,7 +216,6 @@ func TestServiceRulesValidateLoadBalancers(t *testing.T) {
 			wantFinal:    true,
 			wantMessage: []string{
 				`loadBalancer CIDR "10.0.66.10" at spec.loadBalancerIP is denied by namespace rule`,
-				"10.0.66.10 is contained in 10.0.66.0/24",
 			},
 		},
 		{

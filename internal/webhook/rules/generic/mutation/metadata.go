@@ -81,6 +81,32 @@ func (*metadataRules) mutate(obj *unstructured.Unstructured, bodies []*apirules.
 	}
 }
 
+// HasMetadataMutation reports whether any rule can default or manage metadata
+// for gvk. Evaluate rendered rules, since templates can supply these fields.
+func HasMetadataMutation(gvk schema.GroupVersionKind, bodies []*apirules.NamespaceRuleBodyNamespace) bool {
+	for _, body := range bodies {
+		if body == nil || body.Enforce == nil {
+			continue
+		}
+
+		for _, rule := range body.Enforce.Metadata {
+			if !rule.MatchesGroupVersionKind(gvk) {
+				continue
+			}
+
+			for _, policies := range []map[string]apirules.MetadataValueRule{rule.Labels, rule.Annotations} {
+				for _, policy := range policies {
+					if policy.Default != nil || policy.Managed != nil {
+						return true
+					}
+				}
+			}
+		}
+	}
+
+	return false
+}
+
 func MutateMetadata(
 	obj metav1.Object,
 	gvk schema.GroupVersionKind,
@@ -165,7 +191,7 @@ func applyMutation(current, defaults, managed map[string]string) (map[string]str
 	}
 
 	for key, value := range managed {
-		if current[key] == value {
+		if existing, present := current[key]; present && existing == value {
 			continue
 		}
 

@@ -12,12 +12,14 @@ import (
 	"sort"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
@@ -49,7 +51,7 @@ func (r Manager) reconcileManagedMetadata(ctx context.Context, instance *capsule
 	labels, annotations := managedMetadataForGVK(namespaceGVK, current)
 
 	if hasMetadata(previousLabels, previousAnnotations) || hasMetadata(labels, annotations) {
-		if err := reconcileObjectManagedMetadata(ctx, dynamicClient, schema.GroupVersionResource{Version: "v1", Resource: "namespaces"}, namespaceGVK, "", instance.GetNamespace(), previousLabels, previousAnnotations, labels, annotations, manager); err != nil {
+		if err := r.reconcileNamespaceManagedMetadata(ctx, dynamicClient, instance.GetNamespace(), previousLabels, previousAnnotations, labels, annotations, manager); err != nil {
 			return err
 		}
 	}
@@ -81,6 +83,105 @@ func (r Manager) reconcileManagedMetadata(ctx context.Context, instance *capsule
 	return nil
 }
 
+func (r Manager) reconcileNamespaceManagedMetadata(ctx context.Context, dynamicClient dynamic.Interface, name string, previousLabels, previousAnnotations, labels, annotations map[string]string, manager string) error {
+	ns := &corev1.Namespace{}
+	if err := r.reader.Get(ctx, client.ObjectKey{Name: name}, ns); err != nil {
+		if isManagedMetadataObjectGone(err) {
+			return nil
+		}
+
+		return err
+	}
+
+	if managedMetadataIsCurrent(ns, previousLabels, previousAnnotations, labels, annotations, manager) {
+		return nil
+	}
+
+	return reconcileObjectManagedMetadata(ctx, dynamicClient,
+		schema.GroupVersionResource{Version: "v1", Resource: "namespaces"},
+		schema.GroupVersionKind{Version: "v1", Kind: "Namespace"},
+		"", name, previousLabels, previousAnnotations, labels, annotations, manager)
+}
+
+// Equal values alone are insufficient: SSA must also claim new fields and
+// release removed ones. Use the object already read from the API, keeping
+// retries and drift repair active without issuing an identical apply each time.
+func managedMetadataIsCurrent(obj metav1.Object, previousLabels, previousAnnotations, labels, annotations map[string]string, manager string) bool {
+	if !metadataValuesAreCurrent(obj.GetLabels(), previousLabels, labels) ||
+		!metadataValuesAreCurrent(obj.GetAnnotations(), previousAnnotations, annotations) {
+		return false
+	}
+
+	ownedLabels, ownedAnnotations := map[string]struct{}{}, map[string]struct{}{}
+
+	for _, fields := range obj.GetManagedFields() {
+		if fields.Manager != manager || fields.Subresource != "" {
+			continue
+		}
+
+		if fields.Operation != metav1.ManagedFieldsOperationApply || fields.FieldsType != "FieldsV1" || fields.FieldsV1 == nil {
+			return false
+		}
+
+		var ownership struct {
+			Metadata struct {
+				Labels      map[string]json.RawMessage `json:"f:labels"`
+				Annotations map[string]json.RawMessage `json:"f:annotations"`
+			} `json:"f:metadata"`
+		}
+
+		if err := json.Unmarshal(fields.FieldsV1.GetRawBytes(), &ownership); err != nil {
+			return false
+		}
+
+		for key := range ownership.Metadata.Labels {
+			if key != "." {
+				ownedLabels[strings.TrimPrefix(key, "f:")] = struct{}{}
+			}
+		}
+
+		for key := range ownership.Metadata.Annotations {
+			if key != "." {
+				ownedAnnotations[strings.TrimPrefix(key, "f:")] = struct{}{}
+			}
+		}
+	}
+
+	return metadataKeysAreOwned(labels, ownedLabels) && metadataKeysAreOwned(annotations, ownedAnnotations)
+}
+
+func metadataValuesAreCurrent(actual, previous, desired map[string]string) bool {
+	for key, value := range desired {
+		if got, exists := actual[key]; !exists || got != value {
+			return false
+		}
+	}
+
+	for key := range previous {
+		if _, kept := desired[key]; !kept {
+			if _, present := actual[key]; present {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+func metadataKeysAreOwned(desired map[string]string, owned map[string]struct{}) bool {
+	if len(desired) != len(owned) {
+		return false
+	}
+
+	for key := range desired {
+		if _, exists := owned[key]; !exists {
+			return false
+		}
+	}
+
+	return true
+}
+
 func reconcileManagedMetadataTarget(
 	ctx context.Context,
 	dynamicClient dynamic.Interface,
@@ -105,6 +206,10 @@ func reconcileManagedMetadataTarget(
 		}
 
 		for i := range items.Items {
+			if managedMetadataIsCurrent(&items.Items[i], previousLabels, previousAnnotations, labels, annotations, manager) {
+				continue
+			}
+
 			if err := reconcileObjectManagedMetadata(
 				ctx,
 				dynamicClient,

@@ -112,7 +112,7 @@ func TestPodRulesValidateRegistries(t *testing.T) {
 			},
 			wantBlocking: true,
 			wantMessage: []string{
-				"containers[0] has empty reference",
+				"image reference is required at containers[0]",
 			},
 		},
 		{
@@ -127,7 +127,7 @@ func TestPodRulesValidateRegistries(t *testing.T) {
 			},
 			wantBlocking: true,
 			wantMessage: []string{
-				"containers[0] has empty reference",
+				"image reference is required at containers[0]",
 			},
 		},
 		{
@@ -197,8 +197,7 @@ func TestPodRulesValidateRegistries(t *testing.T) {
 			wantBlocking: true,
 			wantFinal:    true,
 			wantMessage: []string{
-				`containers[0] reference "harbor/customer/app:1.0.0" is denied by registry rule`,
-				`exp=harbor/customer/.*`,
+				`image "harbor/customer/app:1.0.0" at containers[0] is denied by registry rule`,
 			},
 		},
 		{
@@ -214,8 +213,7 @@ func TestPodRulesValidateRegistries(t *testing.T) {
 			wantBlocking: true,
 			wantFinal:    true,
 			wantMessage: []string{
-				`containers[0] reference "harbor/customer/app:1.0.0" is denied by registry rule`,
-				`exp=harbor/customer/.*`,
+				`image "harbor/customer/app:1.0.0" at containers[0] is denied by registry rule`,
 			},
 		},
 		{
@@ -236,8 +234,7 @@ func TestPodRulesValidateRegistries(t *testing.T) {
 			wantBlocking: true,
 			wantFinal:    true,
 			wantMessage: []string{
-				`containers[0] reference "harbor/customer/app:1.0.0" is denied by registry rule`,
-				`exp=harbor/customer/.*`,
+				`image "harbor/customer/app:1.0.0" at containers[0] is denied by registry rule`,
 			},
 		},
 		{
@@ -329,8 +326,8 @@ func TestPodRulesValidateRegistries(t *testing.T) {
 			wantBlocking: true,
 			wantFinal:    true,
 			wantMessage: []string{
-				`containers[0] reference "harbor/platform/app:1.0.0" must explicitly set pullPolicy`,
-				`allowed: Always`,
+				`image pull policy is required at containers[0]`,
+				`Allowed policies: Always`,
 			},
 		},
 		{
@@ -346,8 +343,8 @@ func TestPodRulesValidateRegistries(t *testing.T) {
 			wantBlocking: true,
 			wantFinal:    true,
 			wantMessage: []string{
-				`containers[0] reference "harbor/platform/app:1.0.0" uses pullPolicy=Never which is not allowed`,
-				`allowed: Always, IfNotPresent`,
+				`image pull policy "Never" at containers[0] is not allowed`,
+				`Allowed policies: Always, IfNotPresent`,
 			},
 		},
 		{
@@ -379,7 +376,7 @@ func TestPodRulesValidateRegistries(t *testing.T) {
 			wantBlocking: true,
 			wantFinal:    true,
 			wantMessage: []string{
-				`containers[0] reference "harbor/platform/app:1.0.0" is denied by registry rule`,
+				`image "harbor/platform/app:1.0.0" at containers[0] is denied by registry rule`,
 			},
 		},
 	}
@@ -729,7 +726,7 @@ func TestRegistryDecisionMessage(t *testing.T) {
 				Path:  "containers[0]",
 			},
 			match: matched,
-			want:  `containers[0] reference "harbor/platform/app:1.0.0" is denied by registry rule "exp=harbor/platform/.*"`,
+			want:  `image "harbor/platform/app:1.0.0" at containers[0] is denied by registry rule`,
 		},
 		{
 			name:   "allow",
@@ -909,8 +906,8 @@ func TestRegistryPullPolicyDecision(t *testing.T) {
 			),
 			wantReason: events.ReasonForbiddenPullPolicy,
 			wantMessage: []string{
-				`containers[0] reference "harbor/platform/app:1.0.0" must explicitly set pullPolicy`,
-				`allowed: Always`,
+				`image pull policy is required at containers[0]`,
+				`Allowed policies: Always`,
 			},
 		},
 		{
@@ -930,8 +927,8 @@ func TestRegistryPullPolicyDecision(t *testing.T) {
 			),
 			wantReason: events.ReasonForbiddenPullPolicy,
 			wantMessage: []string{
-				`containers[0] reference "harbor/platform/app:1.0.0" uses pullPolicy=Never which is not allowed`,
-				`allowed: Always, IfNotPresent`,
+				`image pull policy "Never" at containers[0] is not allowed`,
+				`Allowed policies: Always, IfNotPresent`,
 			},
 		},
 		{
@@ -968,7 +965,7 @@ func TestRegistryPullPolicyDecision(t *testing.T) {
 			),
 			wantReason: events.ReasonForbiddenPullPolicy,
 			wantMessage: []string{
-				`allowed: Always, IfNotPresent`,
+				`Allowed policies: Always, IfNotPresent`,
 			},
 		},
 	}

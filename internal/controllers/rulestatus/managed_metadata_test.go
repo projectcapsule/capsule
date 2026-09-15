@@ -5,6 +5,7 @@ package rulestatus
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -22,6 +23,66 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 )
+
+func TestManagedMetadataSkipsOnlyAlreadyOwnedValues(t *testing.T) {
+	t.Parallel()
+	manager := "test-manager"
+	gvk := schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"}
+	gvr := schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}
+	labels := map[string]string{"example.com/managed": ""}
+	annotations := map[string]string{"example.com/owner": "team"}
+	base := &unstructured.Unstructured{}
+	base.SetGroupVersionKind(gvk)
+	base.SetName("settings")
+	base.SetNamespace("team")
+	base.SetLabels(labels)
+	base.SetAnnotations(annotations)
+	fields := &metav1.FieldsV1{}
+	fields.SetRawString(`{"f:metadata":{"f:labels":{".":{},"f:example.com/managed":{}},"f:annotations":{".":{},"f:example.com/owner":{}}}}`)
+	base.SetManagedFields([]metav1.ManagedFieldsEntry{{Manager: manager, Operation: metav1.ManagedFieldsOperationApply, FieldsType: "FieldsV1", FieldsV1: fields}})
+
+	for _, tc := range []struct {
+		name     string
+		mutate   func(*unstructured.Unstructured)
+		previous map[string]string
+		patches  int
+	}{
+		{name: "already applied", mutate: func(*unstructured.Unstructured) {}},
+		{name: "same value still needs ownership", mutate: func(o *unstructured.Unstructured) { o.SetManagedFields(nil) }, patches: 1},
+		{name: "missing empty value", mutate: func(o *unstructured.Unstructured) { o.SetLabels(nil) }, patches: 1},
+		{name: "changed value", mutate: func(o *unstructured.Unstructured) { o.SetLabels(map[string]string{"example.com/managed": "changed"}) }, patches: 1},
+		{name: "changed annotation", mutate: func(o *unstructured.Unstructured) { o.SetAnnotations(nil) }, patches: 1},
+		{name: "removed value needs cleanup", previous: map[string]string{"example.com/removed": "old"}, mutate: func(o *unstructured.Unstructured) {
+			o.SetLabels(map[string]string{"example.com/managed": "", "example.com/removed": "old"})
+		}, patches: 2},
+		{name: "removed field ownership needs release", mutate: func(o *unstructured.Unstructured) {
+			owned := o.GetManagedFields()
+			owned[0].FieldsV1.SetRawString(`{"f:metadata":{"f:labels":{"f:example.com/managed":{},"f:example.com/removed":{}},"f:annotations":{"f:example.com/owner":{}}}}`)
+			o.SetManagedFields(owned)
+		}, patches: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			obj := base.DeepCopy()
+			tc.mutate(obj)
+			d := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), obj)
+			patches := 0
+			d.PrependReactor("patch", "configmaps", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				patches++
+				var payload map[string]any
+				if err := json.Unmarshal(action.(k8stesting.PatchAction).GetPatch(), &payload); err != nil {
+					t.Fatal(err)
+				}
+				return true, obj, nil
+			})
+			if err := reconcileManagedMetadataTarget(context.Background(), d, managedMetadataTarget{gvr: gvr, gvk: gvk}, "team", tc.previous, nil, labels, annotations, manager); err != nil {
+				t.Fatal(err)
+			}
+			if patches != tc.patches {
+				t.Fatalf("patches = %d, want %d", patches, tc.patches)
+			}
+		})
+	}
+}
 
 func TestReconcileManagedMetadataRequiresRESTConfig(t *testing.T) {
 	t.Parallel()

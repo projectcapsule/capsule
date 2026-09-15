@@ -774,8 +774,7 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 			ns.Name,
 			loadBalancerService("lb-auto-node-port-denied", "10.0.0.2", nil, nil),
 			[]string{
-				"requires explicit spec.ports[*].nodePort",
-				"nodePort ranges are enforced by namespace rule",
+				"spec.ports[*].nodePort is required by namespace rule",
 			},
 			[]string{
 				"nodePort",
@@ -890,6 +889,25 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 		)
 	})
 
+	It("reports concise service type denials", Label("admission-messages"), func() {
+		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
+			serviceTypeRule(rules.ActionTypeDeny, rules.ServiceTypeNodePort),
+		})
+		ns := createNamespace(nil)
+		expectNamespaceStatusRules(ns.Name, []expectedServiceStatusRule{{
+			action: rules.ActionTypeDeny,
+			types:  []rules.ServiceType{rules.ServiceTypeNodePort},
+		}})
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+		_, err := cs.CoreV1().Services(ns.Name).Create(context.Background(),
+			nodePortServiceWithoutExplicitNodePort("concise-nodeport-denial"),
+			metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
+		)
+		Expect(err).To(HaveOccurred())
+		Expect(apierrors.IsForbidden(err)).To(BeTrue())
+		Expect(err.Error()).To(HaveSuffix(`service type "NodePort" at spec.type is denied by namespace rule`))
+	})
+
 	It("allows only Service external IPs contained in configured CIDRs", func() {
 		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
 			serviceTypeRule(
@@ -985,7 +1003,7 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 			"external IP",
 			"10.20.1.44",
 			"denied",
-			"all external IPs",
+			"is denied by namespace rule",
 		)
 	})
 
@@ -1076,10 +1094,7 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		createServiceAndExpectDenied(cs, ns.Name, externalNameService("external-selected-denied", "blocked.example.com"),
-			"externalName hostname",
-			"blocked.example.com",
-			"denied",
-			"exact: blocked.example.com",
+			`externalName hostname "blocked.example.com" at spec.externalName is denied by namespace rule`,
 		)
 	})
 
@@ -1090,10 +1105,7 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		createServiceAndExpectDenied(cs, ns.Name, externalNameService("external-negated-denied", "api.example.com"),
-			"externalName hostname",
-			"api.example.com",
-			"denied",
-			"exp: trusted\\..*",
+			`externalName hostname "api.example.com" at spec.externalName is denied by namespace rule`,
 		)
 
 		createServiceAndExpectAllowed(cs, ns.Name, externalNameService("external-negated-allowed", "trusted.api"))
@@ -1140,8 +1152,7 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		createServiceAndExpectDenied(cs, ns.Name, loadBalancerService("lb-required-value-denied", "", nil, ptr.To(false)),
-			"requires spec.loadBalancerIP or spec.loadBalancerSourceRanges",
-			"loadBalancer CIDR constraints are enforced by namespace rule",
+			"spec.loadBalancerIP or spec.loadBalancerSourceRanges is required by namespace rule",
 		)
 	})
 
@@ -1150,10 +1161,7 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		createServiceAndExpectDenied(cs, ns.Name, loadBalancerService("lb-later-deny", "10.0.66.10", nil, ptr.To(false)),
-			"loadBalancer CIDR",
-			"10.0.66.10",
-			"denied",
-			"10.0.66.0/24",
+			`loadBalancer CIDR "10.0.66.10" at spec.loadBalancerIP is denied by namespace rule`,
 		)
 	})
 
@@ -1197,8 +1205,7 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 			ns.Name,
 			nodePortServiceWithoutExplicitNodePort("node-port-required-denied"),
 			[]string{
-				"requires explicit spec.ports[*].nodePort",
-				"nodePort ranges are enforced by namespace rule",
+				"spec.ports[*].nodePort is required by namespace rule",
 			},
 			[]string{
 				"nodePort",
@@ -1217,10 +1224,7 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 			cs,
 			ns.Name,
 			nodePortService("node-port-later-deny", 30090),
-			"nodePort",
-			"30090",
-			"denied",
-			"30090",
+			`nodePort "30090" at spec.ports[0].nodePort is denied by namespace rule`,
 		)
 	})
 
@@ -1233,8 +1237,7 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 			ns.Name,
 			loadBalancerService("lb-auto-node-port-denied", "10.0.0.2", nil, nil),
 			[]string{
-				"requires explicit spec.ports[*].nodePort",
-				"nodePort ranges are enforced by namespace rule",
+				"spec.ports[*].nodePort is required by namespace rule",
 			},
 			[]string{
 				"nodePort",

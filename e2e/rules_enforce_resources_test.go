@@ -678,7 +678,7 @@ var _ = Describe("enforcing workload resource namespace rules", Ordered, Label("
 			ns.Name,
 			pod,
 			"violates policy Ratio",
-			"requires a request greater than zero",
+			"request must be greater than zero",
 		)
 	})
 
@@ -719,7 +719,7 @@ var _ = Describe("enforcing workload resource namespace rules", Ordered, Label("
 			cs,
 			ns.Name,
 			newPod("ratio-allow-denied", "2Gi"),
-			"does not satisfy any allowed resource policy",
+			"does not satisfy an allowed resource policy",
 			`limits["memory"]`,
 		)
 	})
@@ -734,7 +734,7 @@ var _ = Describe("enforcing workload resource namespace rules", Ordered, Label("
 		expectResourceAuditEvent(
 			ns.Name,
 			pod.Name,
-			"workload resource limit",
+			`resource at spec.containers[0].resources.limits["memory"]`,
 			"violates policy Ratio",
 			"must not exceed 1536Mi",
 		)

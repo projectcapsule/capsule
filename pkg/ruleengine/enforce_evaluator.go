@@ -47,7 +47,7 @@ type DecisionError struct {
 
 func (e *DecisionError) Error() string {
 	if e == nil || e.Decision == nil {
-		return "namespace rule decision denied request"
+		return "request denied by namespace rule"
 	}
 
 	return e.Decision.Message
@@ -95,6 +95,12 @@ type Set[R any, O any] struct {
 	EventReason string
 
 	Values func(O) []Value
+
+	// EvaluateEmptyValues includes empty strings in matching. By default they
+	// represent unset resource fields and are skipped. Metadata keys can be
+	// present with an empty value and must opt in to evaluation.
+	EvaluateEmptyValues bool
+
 	// Rules extracts rules when extraction cannot fail.
 	Rules func(*api.NamespaceRuleEnforceBody) []R
 	// RulesWithError extracts rules that require runtime parsing or matching.
@@ -139,12 +145,9 @@ func EvaluateEnforce[R any, T any](
 	evaluation := &Evaluation{}
 
 	values := set.Values(obj)
-	if len(values) == 0 {
-		return evaluation, nil
-	}
 
 	for _, value := range values {
-		if value.Value == "" {
+		if value.Value == "" && !set.EvaluateEmptyValues {
 			continue
 		}
 
@@ -330,7 +333,7 @@ func allowMissMessage[R any, T any](
 	}
 
 	return fmt.Sprintf(
-		"%s: value did not match any allowed rule. %s: %s",
+		"%s. %s: %s",
 		message,
 		allowedLabel(set),
 		descriptions,
@@ -363,14 +366,14 @@ func decisionMessage[R any, T any](
 		return appendMatchContext(message, matchedRule, matchDetail, "matched audit rule")
 
 	case api.ActionTypeDeny:
-		message := fmt.Sprintf(
+		// Keep matcher details on Decision for diagnostics. The rejected value,
+		// field and policy source are sufficient for an admission denial.
+		return fmt.Sprintf(
 			"%s %q at %s is denied by namespace rule",
 			set.Name,
 			value.Value,
 			value.Path,
 		)
-
-		return appendMatchContext(message, matchedRule, matchDetail, "matched denied rule")
 
 	case api.ActionTypeAllow:
 		message := fmt.Sprintf(

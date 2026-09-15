@@ -293,7 +293,7 @@ func TestEvaluateEnforce_LastMatchingAllowDenyWins(t *testing.T) {
 			},
 			wantFinalAction: api.ActionTypeDeny,
 			wantBlocking:    true,
-			wantMessage:     `registry "harbor/app:1" at spec.containers[0].image is denied by namespace rule: matched denied rule harbor/blocked/.*`,
+			wantMessage:     `registry "harbor/app:1" at spec.containers[0].image is denied by namespace rule`,
 		},
 		{
 			name: "deny then allow allows",
@@ -332,7 +332,7 @@ func TestEvaluateEnforce_LastMatchingAllowDenyWins(t *testing.T) {
 			},
 			wantFinalAction: api.ActionTypeDeny,
 			wantBlocking:    true,
-			wantMessage:     `registry "harbor/app:1" at spec.containers[0].image is denied by namespace rule: matched denied rule harbor/app:.*`,
+			wantMessage:     `registry "harbor/app:1" at spec.containers[0].image is denied by namespace rule`,
 		},
 		{
 			name: "last matching rule wins while non matching later rules are ignored",
@@ -423,7 +423,7 @@ func TestEvaluateEnforce_DefaultActionIsDeny(t *testing.T) {
 
 	assertBlockingAction(t, evaluation, api.ActionTypeDeny)
 
-	if evaluation.Blocking.Message != `registry "harbor/app:1" at spec.containers[0].image is denied by namespace rule: matched denied rule default-deny` {
+	if evaluation.Blocking.Message != `registry "harbor/app:1" at spec.containers[0].image is denied by namespace rule` {
 		t.Fatalf("blocking message = %q", evaluation.Blocking.Message)
 	}
 }
@@ -457,7 +457,7 @@ func TestEvaluateEnforce_AllowListMissDenies(t *testing.T) {
 	assertBlockingAction(t, evaluation, api.ActionTypeDeny)
 	assertNoFinal(t, evaluation)
 
-	want := `registry "docker.io/library/nginx:latest" at spec.containers[0].image is not allowed by namespace rule: value did not match any allowed rule. Allowed registries: harbor/.*, registry.local/.*`
+	want := `registry "docker.io/library/nginx:latest" at spec.containers[0].image is not allowed by namespace rule. Allowed registries: harbor/.*, registry.local/.*`
 	if evaluation.Blocking.Message != want {
 		t.Fatalf("blocking message = %q, want %q", evaluation.Blocking.Message, want)
 	}
@@ -654,7 +654,7 @@ func TestEvaluateEnforce_AuditDoesNotSatisfyAllowList(t *testing.T) {
 	}
 }
 
-func TestEvaluateEnforce_MatchDetailOverridesMatchedRuleInMessage(t *testing.T) {
+func TestEvaluateEnforce_DenialOmitsMatcherDetails(t *testing.T) {
 	t.Parallel()
 
 	fixture := newTestFixture()
@@ -696,9 +696,12 @@ func TestEvaluateEnforce_MatchDetailOverridesMatchedRuleInMessage(t *testing.T) 
 		t.Fatalf("match detail = %q", blocking.MatchDetail)
 	}
 
-	want := `loadBalancer CIDR "10.0.171.239" at spec.loadBalancerIP is denied by namespace rule: 10.0.171.239 is contained in 10.0.0.0/8`
+	want := `loadBalancer CIDR "10.0.171.239" at spec.loadBalancerIP is denied by namespace rule`
 	if blocking.Message != want {
 		t.Fatalf("blocking message = %q, want %q", blocking.Message, want)
+	}
+	if got := evaluation.BlockingError().Error(); got != want {
+		t.Fatalf("admission error = %q, want %q", got, want)
 	}
 }
 
@@ -860,7 +863,7 @@ func TestDecisionError_ErrorFallback(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			if tt.err.Error() != "namespace rule decision denied request" {
+			if tt.err.Error() != "request denied by namespace rule" {
 				t.Fatalf("Error() = %q", tt.err.Error())
 			}
 		})
@@ -931,7 +934,7 @@ func TestEvaluation_Append(t *testing.T) {
 	})
 }
 
-func TestEvaluateEnforce_SkipsEmptyExtractedValues(t *testing.T) {
+func TestEvaluateEnforce_EmptyExtractedValues(t *testing.T) {
 	t.Parallel()
 
 	type testCase struct {
@@ -939,6 +942,7 @@ func TestEvaluateEnforce_SkipsEmptyExtractedValues(t *testing.T) {
 		action           api.ActionType
 		values           []Value
 		rules            []string
+		evaluateEmpty    bool
 		wantMatcherCalls int
 		wantBlocking     bool
 		wantFinal        bool
@@ -947,6 +951,45 @@ func TestEvaluateEnforce_SkipsEmptyExtractedValues(t *testing.T) {
 	}
 
 	tests := []testCase{
+		{
+			name:             "opt in evaluates an empty denied value",
+			action:           api.ActionTypeDeny,
+			values:           []Value{{Path: "metadata.value"}},
+			rules:            []string{""},
+			evaluateEmpty:    true,
+			wantMatcherCalls: 1,
+			wantBlocking:     true,
+			wantFinal:        true,
+			wantBlockingPath: "metadata.value",
+		},
+		{
+			name:             "opt in denies an empty value missing the allow list",
+			action:           api.ActionTypeAllow,
+			values:           []Value{{Path: "metadata.value"}},
+			rules:            []string{"allowed"},
+			evaluateEmpty:    true,
+			wantMatcherCalls: 1,
+			wantBlocking:     true,
+			wantBlockingPath: "metadata.value",
+		},
+		{
+			name:             "opt in allows an explicitly allowed empty value",
+			action:           api.ActionTypeAllow,
+			values:           []Value{{Path: "metadata.value"}},
+			rules:            []string{""},
+			evaluateEmpty:    true,
+			wantMatcherCalls: 1,
+			wantFinal:        true,
+		},
+		{
+			name:             "opt in audits an empty value",
+			action:           api.ActionTypeAudit,
+			values:           []Value{{Path: "metadata.value"}},
+			rules:            []string{""},
+			evaluateEmpty:    true,
+			wantMatcherCalls: 1,
+			wantAudits:       1,
+		},
 		{
 			name:   "empty value is skipped before deny evaluation",
 			action: api.ActionTypeDeny,
@@ -1097,8 +1140,9 @@ func TestEvaluateEnforce_SkipsEmptyExtractedValues(t *testing.T) {
 					},
 				},
 				Set[string, struct{}]{
-					Name:        "registry",
-					EventReason: "NamespaceRuleViolation",
+					Name:                "registry",
+					EventReason:         "NamespaceRuleViolation",
+					EvaluateEmptyValues: tt.evaluateEmpty,
 
 					Values: func(struct{}) []Value {
 						return tt.values

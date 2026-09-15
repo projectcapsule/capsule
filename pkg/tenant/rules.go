@@ -54,14 +54,6 @@ func BuildNamespaceRuleBodyStatus(
 		nsLabels = labels.Set(ns.Labels)
 	}
 
-	templateOptions := sanitize.DefaultSanitizeOptions()
-	templateOptions.StripStatus = false
-
-	templateContext, err := NewTenantNamespaceContext(tnt, ns, scheme, templateOptions)
-	if err != nil {
-		return nil, fmt.Errorf("build namespace rule template context: %w", err)
-	}
-
 	selected := make([]*rules.NamespaceRuleBodyNamespace, 0, len(tnt.Spec.Rules))
 
 	for i, rule := range tnt.Spec.Rules {
@@ -93,11 +85,24 @@ func BuildNamespaceRuleBodyStatus(
 		selected = append(selected, statusBody)
 	}
 
-	rendered, err := template.RenderNamespaceRuleBodies(
-		templateContext,
-		template.MissingKeyError,
-		selected,
-	)
+	prepared, err := template.PrepareNamespaceRuleBodies(template.MissingKeyError, selected)
+	if err != nil {
+		return nil, fmt.Errorf("render namespace rule bodies: %w", err)
+	}
+
+	var templateContext map[string]any
+
+	if prepared.NeedsContext() {
+		templateOptions := sanitize.DefaultSanitizeOptions()
+		templateOptions.StripStatus = false
+
+		templateContext, err = NewTenantNamespaceContext(tnt, ns, scheme, templateOptions)
+		if err != nil {
+			return nil, fmt.Errorf("build namespace rule template context: %w", err)
+		}
+	}
+
+	rendered, err := prepared.Render(templateContext)
 	if err != nil {
 		return nil, fmt.Errorf("render namespace rule bodies: %w", err)
 	}

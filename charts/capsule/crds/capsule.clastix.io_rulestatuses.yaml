@@ -158,20 +158,27 @@ spec:
                                   description: |-
                                     Managed is enforced by admission mutation and reconciled by the RuleStatus
                                     controller using server-side apply when the rule configuration changes.
+                                    Present metadata matching the effective managed value is exempt from
+                                    metadata value validation, including overlapping deny rules. The last
+                                    applicable managed value for each concrete key wins.
+                                    During admission, only rules matching the request's audience contribute
+                                    to the effective managed value.
                                   type: string
                                 required:
                                   default: false
                                   description: |-
                                     Required enforces that the metadata key must be present.
 
-                                    This is mainly meaningful with action=allow. Deny and audit rules remain
-                                    value matchers and do not require missing metadata to exist.
+                                    This is only meaningful with action=allow. Deny and audit rules do not
+                                    require missing metadata to exist.
                                   type: boolean
                                 values:
                                   description: |-
                                     Values defines allowed, denied, or audited values for the metadata key.
 
-                                    If Required=true and Values is empty, only presence is enforced.
+                                    With action=allow and no values, only Required is enforced.
+                                    With action=deny or action=audit and no values, any present value matches,
+                                    including an empty string.
                                   items:
                                     description: |-
                                       At least one of Exact or Exp must be set.
@@ -241,20 +248,27 @@ spec:
                                   description: |-
                                     Managed is enforced by admission mutation and reconciled by the RuleStatus
                                     controller using server-side apply when the rule configuration changes.
+                                    Present metadata matching the effective managed value is exempt from
+                                    metadata value validation, including overlapping deny rules. The last
+                                    applicable managed value for each concrete key wins.
+                                    During admission, only rules matching the request's audience contribute
+                                    to the effective managed value.
                                   type: string
                                 required:
                                   default: false
                                   description: |-
                                     Required enforces that the metadata key must be present.
 
-                                    This is mainly meaningful with action=allow. Deny and audit rules remain
-                                    value matchers and do not require missing metadata to exist.
+                                    This is only meaningful with action=allow. Deny and audit rules do not
+                                    require missing metadata to exist.
                                   type: boolean
                                 values:
                                   description: |-
                                     Values defines allowed, denied, or audited values for the metadata key.
 
-                                    If Required=true and Values is empty, only presence is enforced.
+                                    With action=allow and no values, only Required is enforced.
+                                    With action=deny or action=audit and no values, any present value matches,
+                                    including an empty string.
                                   items:
                                     description: |-
                                       At least one of Exact or Exp must be set.
@@ -847,20 +861,27 @@ spec:
                                     description: |-
                                       Managed is enforced by admission mutation and reconciled by the RuleStatus
                                       controller using server-side apply when the rule configuration changes.
+                                      Present metadata matching the effective managed value is exempt from
+                                      metadata value validation, including overlapping deny rules. The last
+                                      applicable managed value for each concrete key wins.
+                                      During admission, only rules matching the request's audience contribute
+                                      to the effective managed value.
                                     type: string
                                   required:
                                     default: false
                                     description: |-
                                       Required enforces that the metadata key must be present.
 
-                                      This is mainly meaningful with action=allow. Deny and audit rules remain
-                                      value matchers and do not require missing metadata to exist.
+                                      This is only meaningful with action=allow. Deny and audit rules do not
+                                      require missing metadata to exist.
                                     type: boolean
                                   values:
                                     description: |-
                                       Values defines allowed, denied, or audited values for the metadata key.
 
-                                      If Required=true and Values is empty, only presence is enforced.
+                                      With action=allow and no values, only Required is enforced.
+                                      With action=deny or action=audit and no values, any present value matches,
+                                      including an empty string.
                                     items:
                                       description: |-
                                         At least one of Exact or Exp must be set.
@@ -930,20 +951,27 @@ spec:
                                     description: |-
                                       Managed is enforced by admission mutation and reconciled by the RuleStatus
                                       controller using server-side apply when the rule configuration changes.
+                                      Present metadata matching the effective managed value is exempt from
+                                      metadata value validation, including overlapping deny rules. The last
+                                      applicable managed value for each concrete key wins.
+                                      During admission, only rules matching the request's audience contribute
+                                      to the effective managed value.
                                     type: string
                                   required:
                                     default: false
                                     description: |-
                                       Required enforces that the metadata key must be present.
 
-                                      This is mainly meaningful with action=allow. Deny and audit rules remain
-                                      value matchers and do not require missing metadata to exist.
+                                      This is only meaningful with action=allow. Deny and audit rules do not
+                                      require missing metadata to exist.
                                     type: boolean
                                   values:
                                     description: |-
                                       Values defines allowed, denied, or audited values for the metadata key.
 
-                                      If Required=true and Values is empty, only presence is enforced.
+                                      With action=allow and no values, only Required is enforced.
+                                      With action=deny or action=audit and no values, any present value matches,
+                                      including an empty string.
                                     items:
                                       description: |-
                                         At least one of Exact or Exp must be set.
@@ -1476,20 +1504,27 @@ spec:
                                       description: |-
                                         Managed is enforced by admission mutation and reconciled by the RuleStatus
                                         controller using server-side apply when the rule configuration changes.
+                                        Present metadata matching the effective managed value is exempt from
+                                        metadata value validation, including overlapping deny rules. The last
+                                        applicable managed value for each concrete key wins.
+                                        During admission, only rules matching the request's audience contribute
+                                        to the effective managed value.
                                       type: string
                                     required:
                                       default: false
                                       description: |-
                                         Required enforces that the metadata key must be present.
 
-                                        This is mainly meaningful with action=allow. Deny and audit rules remain
-                                        value matchers and do not require missing metadata to exist.
+                                        This is only meaningful with action=allow. Deny and audit rules do not
+                                        require missing metadata to exist.
                                       type: boolean
                                     values:
                                       description: |-
                                         Values defines allowed, denied, or audited values for the metadata key.
 
-                                        If Required=true and Values is empty, only presence is enforced.
+                                        With action=allow and no values, only Required is enforced.
+                                        With action=deny or action=audit and no values, any present value matches,
+                                        including an empty string.
                                       items:
                                         description: |-
                                           At least one of Exact or Exp must be set.
@@ -1559,20 +1594,27 @@ spec:
                                       description: |-
                                         Managed is enforced by admission mutation and reconciled by the RuleStatus
                                         controller using server-side apply when the rule configuration changes.
+                                        Present metadata matching the effective managed value is exempt from
+                                        metadata value validation, including overlapping deny rules. The last
+                                        applicable managed value for each concrete key wins.
+                                        During admission, only rules matching the request's audience contribute
+                                        to the effective managed value.
                                       type: string
                                     required:
                                       default: false
                                       description: |-
                                         Required enforces that the metadata key must be present.
 
-                                        This is mainly meaningful with action=allow. Deny and audit rules remain
-                                        value matchers and do not require missing metadata to exist.
+                                        This is only meaningful with action=allow. Deny and audit rules do not
+                                        require missing metadata to exist.
                                       type: boolean
                                     values:
                                       description: |-
                                         Values defines allowed, denied, or audited values for the metadata key.
 
-                                        If Required=true and Values is empty, only presence is enforced.
+                                        With action=allow and no values, only Required is enforced.
+                                        With action=deny or action=audit and no values, any present value matches,
+                                        including an empty string.
                                       items:
                                         description: |-
                                           At least one of Exact or Exp must be set.

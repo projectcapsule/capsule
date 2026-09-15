@@ -30,7 +30,7 @@ func (h *rulesMetadataMutation) OnCreate(c client.Client, reader client.Reader, 
 	return mutateNamespaceRules(c, reader, h.configuration, ns)
 }
 
-func (h *rulesMetadataMutation) OnUpdate(c client.Client, reader client.Reader, _ users.AdmissionUser, _ *corev1.Namespace, ns *corev1.Namespace, _ admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (h *rulesMetadataMutation) OnUpdate(c client.Client, reader client.Reader, _ users.AdmissionUser, ns *corev1.Namespace, _ *corev1.Namespace, _ admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return mutateNamespaceRules(c, reader, h.configuration, ns)
 }
 
@@ -58,12 +58,17 @@ func mutateNamespaceRules(c client.Client, reader client.Reader, cfg configurati
 			return handlers.ErroredResponse(err)
 		}
 
-		bodies, err = ruleengine.FilterNamespaceRulesByAudience(cfg, tnt, req, bodies)
+		gvk := schema.GroupVersionKind{Version: "v1", Kind: "Namespace"}
+		if !rulesmutation.HasMetadataMutation(gvk, bodies) {
+			return nil
+		}
+
+		bodies, err = ruleengine.FilterNamespaceRulesByAudience(ctx, c, cfg, tnt, req, bodies)
 		if err != nil {
 			return handlers.ErroredResponse(err)
 		}
 
-		rulesmutation.MutateMetadata(ns, schema.GroupVersionKind{Version: "v1", Kind: "Namespace"}, bodies)
+		rulesmutation.MutateMetadata(ns, gvk, bodies)
 
 		return nil
 	}

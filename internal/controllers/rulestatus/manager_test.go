@@ -5,14 +5,118 @@ package rulestatus
 
 import (
 	"context"
+	"strings"
 	"testing"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/internal/metrics"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 )
+
+func TestRuleStatusReconcileAvoidsRedundantStatusRequests(t *testing.T) {
+	t.Parallel()
+	for _, empty := range []bool{false, true} {
+		t.Run(map[bool]string{false: "deny", true: "empty"}[empty], func(t *testing.T) {
+			ctx := context.Background()
+			scheme := runtime.NewScheme()
+			if err := capsulev1beta2.AddToScheme(scheme); err != nil {
+				t.Fatal(err)
+			}
+			instance := &capsulev1beta2.RuleStatus{ObjectMeta: metav1.ObjectMeta{Name: "rules", Namespace: "team", Generation: 1}}
+			if !empty {
+				instance.Spec = []*rules.NamespaceRuleBodyNamespace{{Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeDeny}}}
+			}
+			gets, updates, patches := 0, 0, 0
+			c := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(instance).WithObjects(instance).
+				WithInterceptorFuncs(interceptor.Funcs{
+					Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						gets++
+						return c.Get(ctx, key, obj, opts...)
+					},
+					SubResourceUpdate: func(ctx context.Context, c client.Client, sub string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+						updates++
+						return c.SubResource(sub).Update(ctx, obj, opts...)
+					},
+					SubResourcePatch: func(ctx context.Context, c client.Client, sub string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+						patches++
+						return c.SubResource(sub).Patch(ctx, obj, patch, opts...)
+					},
+				}).Build()
+			r := &Manager{Client: c, reader: c, Metrics: metrics.NewRuleStatusRecorder(), Log: logr.Discard()}
+			request := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(instance)}
+			if _, err := r.Reconcile(ctx, request); err != nil {
+				t.Fatal(err)
+			}
+			if updates != 2 || patches != 0 {
+				t.Fatalf("initial status writes: %d updates, %d patches; want Reconciling and Ready updates only", updates, patches)
+			}
+			gets, updates, patches = 0, 0, 0
+			for i := 0; i < 3; i++ {
+				if _, err := r.Reconcile(ctx, request); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if gets != 3 || updates != 0 || patches != 0 {
+				t.Fatalf("steady requests: gets=%d updates=%d patches=%d; want only one cached Get per reconcile", gets, updates, patches)
+			}
+			if err := c.Get(ctx, request.NamespacedName, instance); err != nil {
+				t.Fatal(err)
+			}
+			if !meta.IsStatusConditionTrue(instance.Status.Conditions, meta.ReadyCondition) || instance.Status.ObservedGeneration != 1 {
+				t.Fatalf("unexpected final status: %#v", instance.Status)
+			}
+			updates = 0
+			if err := r.publishRulesStatus(ctx, instance); err != nil {
+				t.Fatal(err)
+			}
+			if updates != 0 {
+				t.Fatal("unchanged published rules caused a status write")
+			}
+		})
+	}
+}
+
+func TestRuleStatusReconcileReturnsManagedMetadataFailuresForRetry(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	if err := capsulev1beta2.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	value := "managed"
+	instance := &capsulev1beta2.RuleStatus{
+		ObjectMeta: metav1.ObjectMeta{Name: "rules", Namespace: "team", Generation: 1},
+		Spec: []*rules.NamespaceRuleBodyNamespace{{Enforce: &rules.NamespaceRuleEnforceBody{
+			Metadata: []rules.MetadataRule{{Labels: map[string]rules.MetadataValueRule{"example.com/managed": {Managed: &value}}}},
+		}}},
+	}
+	c := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(instance).WithObjects(instance).Build()
+	r := &Manager{Client: c, reader: c, Metrics: metrics.NewRuleStatusRecorder(), Log: logr.Discard()}
+	for i := 0; i < 2; i++ {
+		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(instance)})
+		if err == nil || !strings.Contains(err.Error(), "REST config is required") {
+			t.Fatalf("reconcile error = %v, want retryable managed metadata error", err)
+		}
+		if err := c.Get(ctx, client.ObjectKeyFromObject(instance), instance); err != nil {
+			t.Fatal(err)
+		}
+		condition := instance.Status.Conditions.GetConditionByType(meta.ReadyCondition)
+		if condition == nil || condition.Status != metav1.ConditionFalse {
+			t.Fatalf("failed reconciliation marked ready: %#v", instance.Status)
+		}
+	}
+}
 
 func TestReconcileExcludesQuotaFromRuleStatus(t *testing.T) {
 	t.Parallel()

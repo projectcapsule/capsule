@@ -508,9 +508,7 @@ var _ = Describe("enforcing ingress hostname namespace rules", Ordered, Label("t
 
 		createIngressAndExpectAllowed(cs, ns.Name, ingress("negated-trusted", "api.trusted.example"))
 		createIngressAndExpectDenied(cs, ns.Name, ingress("negated-denied", "api.untrusted.example"),
-			"api.untrusted.example",
-			"denied",
-			"not exp:",
+			`ingress hostname "api.untrusted.example" at spec.rules[0].host is denied by namespace rule`,
 		)
 	})
 

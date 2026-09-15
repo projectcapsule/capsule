@@ -124,8 +124,6 @@ func TestServiceRulesValidateExternalIPs(t *testing.T) {
 			wantBlocking: true,
 			wantMessage: []string{
 				`external IP "10.20.1.44" at spec.externalIPs[0] is denied by namespace rule`,
-				"all external IPs",
-				"deny rule applies to all external IPs",
 			},
 		},
 		{

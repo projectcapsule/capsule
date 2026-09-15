@@ -105,6 +105,24 @@ func TestBuildNamespaceRuleBodyStatus(t *testing.T) {
 		t.Fatalf("BuildNamespaceRuleBodyStatus() returned shared rule body")
 	}
 
+	// Template-visible status can change in memory without a resourceVersion
+	// change during the Tenant reconcile. It must not reuse rendered output.
+	tnt.Status.State = capsulev1beta2.TenantStateCordoned
+	ns.Status.Phase = corev1.NamespaceTerminating
+	got, err = tenant.BuildNamespaceRuleBodyStatus(scheme, ns, tnt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{string(tnt.Status.State), string(ns.Status.Phase)}; !reflect.DeepEqual(got[0].Enforce.Workloads.Schedulers[0].Exact, want) {
+		t.Fatalf("cached template did not see updated status: %#v", got[0].Enforce.Workloads.Schedulers)
+	}
+
+	ns.Labels["env"] = "dev"
+	got, err = tenant.BuildNamespaceRuleBodyStatus(scheme, ns, tnt)
+	if err != nil || len(got) != 1 || got[0].Enforce.Action != rules.ActionTypeDeny {
+		t.Fatalf("changed selector inputs did not select the deny rule: %#v, %v", got, err)
+	}
+
 	got, err = tenant.BuildNamespaceRuleBodyStatus(scheme, nil, tnt)
 	if err != nil || got != nil {
 		t.Fatalf("BuildNamespaceRuleBodyStatus(nil namespace) = %#v, %v, want nil nil", got, err)
