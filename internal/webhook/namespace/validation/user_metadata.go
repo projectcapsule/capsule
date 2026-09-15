@@ -72,7 +72,9 @@ func (h *userMetadataHandler) OnUpdate(
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if len(tnt.Spec.NodeSelector) > 0 {
+		// The controller must propagate Tenant selector changes to existing
+		// namespaces. Other callers cannot override the enforced annotation.
+		if len(tnt.Spec.NodeSelector) > 0 && !user.IsControllerServiceAccount() {
 			v, ok := newNs.GetAnnotations()["scheduler.alpha.kubernetes.io/node-selector"]
 			if !ok {
 				msg := "the annotation scheduler.alpha.kubernetes.io/node-selector is enforced via tenant, cannot be removed"
