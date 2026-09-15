@@ -1071,7 +1071,7 @@ spec:
           - v1
           - v1beta1
         path: "/serviceaccounts/references/validating"
-        failurePolicy: {{ .failurePolicy }}
+        failurePolicy: {{ .references.failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
         {{- with $.Values.webhooks.matchConditions }}
         matchConditions:

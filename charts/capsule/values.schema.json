@@ -2855,7 +2855,7 @@
                                     "type": "boolean"
                                 },
                                 "failurePolicy": {
-                                    "description": "[FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)",
+                                    "description": "[FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) for ServiceAccount promotion validation",
                                     "type": "string"
                                 },
                                 "matchConditions": {
@@ -2895,6 +2895,15 @@
                                 "opts": {
                                     "description": "Capsule Hook Options",
                                     "type": "object"
+                                },
+                                "references": {
+                                    "type": "object",
+                                    "properties": {
+                                        "failurePolicy": {
+                                            "description": "[FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) for ServiceAccount deletion reference protection. Ignore allows deletion without reference checks when the webhook is unavailable or times out; explicit denials still block deletion. Set to Fail to require reference protection during outages.",
+                                            "type": "string"
+                                        }
+                                    }
                                 }
                             }
                         },
