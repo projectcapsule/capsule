@@ -110,56 +110,17 @@ func (co *Collector) Collect(
 
 	var syncErr error
 
-	tplContext := tpl.ReferenceContext{}
-
-	if spec.Context != nil {
-		namespace := ""
-		if ns != nil {
-			namespace = ns.GetName()
-		}
-
-		tplContext, err = spec.Context.GatherContext(
-			ctx,
-			c,
-			co.mapper,
-			opts.Iterator.FastContext,
-			namespace,
-			nil,
-			opts.ValidatorNamespaces,
-		)
-		if err != nil {
-			return err
-		}
-	}
-
-	if opts.ReplicationContext != nil {
-		tplContext[replicationContextKey] = opts.ReplicationContext
-	}
-
-	if tnt != nil {
-		tCtx, err := tenant.NewTenantContext(tnt, c.Scheme(), co.contextSanitizeOptions)
+	// Only generators consume the full context. Raw items use the fast context,
+	// and copied resources do not need a template context at all.
+	var tplContext tpl.ReferenceContext
+	if len(spec.Generators) > 0 {
+		tplContext, err = co.gatherTemplateContext(ctx, c, opts, tnt, spec, ns)
 		if err != nil {
 			return err
 		}
 
-		tplContext["tenant"] = tCtx
+		log.V(7).Info("available context", "context", tplContext)
 	}
-
-	if ns != nil {
-		err = sanitize.SanitizeObject(ns, c.Scheme(), co.contextSanitizeOptions)
-		if err != nil {
-			return err
-		}
-
-		nsMap, err := utils.ToUnstructuredMap(&ns)
-		if err != nil {
-			return err
-		}
-
-		tplContext["namespace"] = nsMap
-	}
-
-	log.V(7).Info("available context", "context", tplContext)
 
 	authoredOpts := opts
 	authoredOpts.preserveOwnerReferences = true
@@ -321,10 +282,6 @@ func (co *Collector) CollectForNamespace(
 		}
 
 		replica := obj.DeepCopy()
-		if err := sanitize.SanitizeObject(replica, c.Scheme(), co.objectSanitizeOptions); err != nil {
-			return err
-		}
-
 		replica.SetNamespace(target.GetName())
 
 		log.V(4).Info(
@@ -412,6 +369,8 @@ func (co *Collector) CollectNamespacedItems(
 				)
 
 				meta.SetFilteredLabels(o, filterKeys)
+				// Strip source-only fields once, before each target deep-copies the source.
+				sanitize.SanitizeUnstructured(o, co.objectSanitizeOptions)
 
 				seen[k] = o
 			} else {
@@ -430,23 +389,91 @@ func GatherAdditionalMetadata(
 	spec capsulev1beta2.ResourceSpec,
 	fastContext map[string]string,
 ) (labels map[string]string, annotations map[string]string) {
-	labels = make(map[string]string)
-	annotations = make(map[string]string)
-
 	md := spec.AdditionalMetadata
 	if md == nil {
 		return labels, annotations
 	}
 
-	if md.Labels != nil {
-		labels = tpl.FastTemplateMap(maps.Clone(md.Labels), fastContext)
+	if len(md.Labels) > 0 {
+		labels = tpl.FastTemplateMap(md.Labels, fastContext)
 	}
 
-	if md.Annotations != nil {
-		annotations = tpl.FastTemplateMap(maps.Clone(md.Annotations), fastContext)
+	if len(md.Annotations) > 0 {
+		annotations = tpl.FastTemplateMap(md.Annotations, fastContext)
 	}
 
 	return labels, annotations
+}
+
+func (co *Collector) gatherTemplateContext(
+	ctx context.Context,
+	c client.Client,
+	opts CollectorOptions,
+	tnt *capsulev1beta2.Tenant,
+	spec capsulev1beta2.ResourceSpec,
+	ns *corev1.Namespace,
+) (tpl.ReferenceContext, error) {
+	tplContext := tpl.ReferenceContext{}
+
+	if spec.Context != nil {
+		namespace := ""
+		if ns != nil {
+			namespace = ns.GetName()
+		}
+
+		var err error
+
+		tplContext, err = spec.Context.GatherContext(
+			ctx,
+			c,
+			co.mapper,
+			opts.Iterator.FastContext,
+			namespace,
+			nil,
+			opts.ValidatorNamespaces,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if opts.ReplicationContext != nil {
+		tplContext[replicationContextKey] = opts.ReplicationContext
+	}
+
+	if tnt != nil {
+		// Drop managed fields before conversion to avoid expanding their JSON into maps.
+		// A shallow copy is sufficient: conversion owns the maps that sanitization edits.
+		contextTenant := *tnt
+		if co.contextSanitizeOptions.StripManagedFields {
+			contextTenant.ManagedFields = nil
+		}
+
+		tCtx, err := tenant.NewTenantContext(&contextTenant, c.Scheme(), co.contextSanitizeOptions)
+		if err != nil {
+			return nil, err
+		}
+
+		tplContext["tenant"] = tCtx
+	}
+
+	if ns != nil {
+		contextNamespace := *ns
+		if co.contextSanitizeOptions.StripManagedFields {
+			contextNamespace.ManagedFields = nil
+		}
+
+		nsMap, err := utils.ToUnstructuredMap(&contextNamespace)
+		if err != nil {
+			return nil, err
+		}
+
+		sanitize.SanitizeUnstructured(&unstructured.Unstructured{Object: nsMap}, co.contextSanitizeOptions)
+
+		tplContext["namespace"] = nsMap
+	}
+
+	return tplContext, nil
 }
 
 // Ensures the given object can take part to the accumulation:
@@ -493,11 +520,9 @@ func (co *Collector) handleGeneratorItem(
 		if ns != nil {
 			obj.SetNamespace(ns.Name)
 		}
-
-		processed = append(processed, obj)
 	}
 
-	return
+	return objs, nil
 }
 
 func (co *Collector) handleRawItem(
@@ -572,8 +597,9 @@ func (co *Collector) selectedTenantNamespaces(
 
 	log.V(5).Info("retrieved namespaces", "size", len(namespaces.Items))
 
-	for _, names := range namespaces.Items {
-		ns = append(ns, &names)
+	ns = make([]*corev1.Namespace, len(namespaces.Items))
+	for i := range namespaces.Items {
+		ns[i] = &namespaces.Items[i]
 	}
 
 	return ns, nil
