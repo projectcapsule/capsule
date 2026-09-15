@@ -60,6 +60,7 @@ The following Values have changed key or Value:
 | global.jobs.kubectl.tolerations | list | `[]` | Set list of tolerations |
 | global.jobs.kubectl.topologySpreadConstraints | list | `[]` | Set Topology Spread Constraints |
 | global.jobs.kubectl.ttlSecondsAfterFinished | int | `60` | Sets the ttl in seconds after a finished certgen job is deleted. Set to -1 to never delete. |
+| global.jobs.postDelete.enabled | bool | `true` | Enable Post Delete Job to remove Capsule's mutating and validating webhook configurations |
 | global.jobs.postInstall.enabled | bool | `true` | Enable Post Install Job |
 | global.jobs.preDelete.enabled | bool | `true` | Enable Pre Delete Job |
 

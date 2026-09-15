@@ -243,6 +243,15 @@
                                 }
                             }
                         },
+                        "postDelete": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "description": "Enable Post Delete Job to remove Capsule's mutating and validating webhook configurations",
+                                    "type": "boolean"
+                                }
+                            }
+                        },
                         "postInstall": {
                             "type": "object",
                             "properties": {

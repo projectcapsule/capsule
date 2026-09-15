@@ -10,6 +10,9 @@ global:
     preDelete:
       # -- Enable Pre Delete Job
       enabled: true
+    postDelete:
+      # -- Enable Post Delete Job to remove Capsule's mutating and validating webhook configurations
+      enabled: true
     kubectl:
       image:
         # -- Set the image repository of the helm chart job
