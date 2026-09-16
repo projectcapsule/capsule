@@ -303,7 +303,18 @@ func (b *resourcePermitValidationHandler) validateApproval(
 	oldBr *capsulev1beta2.ResourcePermit,
 	newBr *capsulev1beta2.ResourcePermit,
 ) *admission.Response {
-	ready := k8smeta.FindStatusCondition(oldBr.Status.Conditions, meta.ReadyCondition)
+	automaticApproval := users.IsControllerServiceAccount(req.UserInfo.Username) &&
+		newBr.Status.Review != nil &&
+		newBr.Status.Review.Reviewer != nil &&
+		newBr.Status.Review.Reviewer.Type == resourcepermit.AccessEntityTypeSystem
+
+	// The controller publishes rendering, preflight readiness, and automatic
+	// approval in one status update. Other reviewers must use persisted readiness.
+	readyStatus := oldBr.Status.Conditions
+	if automaticApproval {
+		readyStatus = newBr.Status.Conditions
+	}
+	ready := k8smeta.FindStatusCondition(readyStatus, meta.ReadyCondition)
 	if ready == nil || ready.Status != metav1.ConditionTrue {
 		message := "rendered resources are not ready"
 		if ready != nil && ready.Message != "" {
@@ -312,11 +323,6 @@ func (b *resourcePermitValidationHandler) validateApproval(
 
 		return ad.Denyf("cannot approve ResourcePermit: %s", message)
 	}
-
-	automaticApproval := users.IsControllerServiceAccount(req.UserInfo.Username) &&
-		newBr.Status.Review != nil &&
-		newBr.Status.Review.Reviewer != nil &&
-		newBr.Status.Review.Reviewer.Type == resourcepermit.AccessEntityTypeSystem
 
 	brt, err := loadResourcePermitTemplate(ctx, reader, newBr)
 	if err != nil {

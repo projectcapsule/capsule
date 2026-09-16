@@ -5,6 +5,7 @@ package serviceaccounts
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -28,6 +29,53 @@ func TestReferenceProtectionOnDelete(t *testing.T) {
 	reference := &meta.NamespacedRFC1123ObjectReferenceWithNamespace{
 		Name:      "runner",
 		Namespace: "capsule-system",
+	}
+	oldServiceAccount, err := json.Marshal(&corev1.ServiceAccount{
+		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "ServiceAccount"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "runner",
+			Namespace: "capsule-system",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	deletions := []struct {
+		name    string
+		request admissionv1.AdmissionRequest
+	}{
+		{
+			name: "individual deletion",
+			request: admissionv1.AdmissionRequest{
+				Operation: admissionv1.Delete,
+				Namespace: "capsule-system",
+				Name:      "runner",
+			},
+		},
+		{
+			name: "namespace cleanup collection deletion",
+			request: admissionv1.AdmissionRequest{
+				Operation: admissionv1.Delete,
+				Namespace: "capsule-system",
+				OldObject: runtime.RawExtension{Raw: oldServiceAccount},
+			},
+		},
+		{
+			name: "namespace from old object",
+			request: admissionv1.AdmissionRequest{
+				Operation: admissionv1.Delete,
+				Name:      "runner",
+				OldObject: runtime.RawExtension{Raw: oldServiceAccount},
+			},
+		},
+		{
+			name: "identity from old object",
+			request: admissionv1.AdmissionRequest{
+				Operation: admissionv1.Delete,
+				OldObject: runtime.RawExtension{Raw: oldServiceAccount},
+			},
+		},
 	}
 
 	tests := []struct {
@@ -91,24 +139,74 @@ func TestReferenceProtectionOnDelete(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			cl := referenceProtectionFakeClient(t, testCase.objects...)
-			handler := ReferenceProtection()
-			response := handler.OnDelete(cl, cl, nil, nil)(context.Background(), admission.Request{
+			for _, deletion := range deletions {
+				t.Run(deletion.name, func(t *testing.T) {
+					cl := referenceProtectionFakeClient(t, testCase.objects...)
+					handler := ReferenceProtection()
+					response := handler.OnDelete(cl, cl, admission.NewDecoder(cl.Scheme()), nil)(context.Background(), admission.Request{
+						AdmissionRequest: deletion.request,
+					})
+
+					if testCase.wantDenied == "" {
+						if response != nil {
+							t.Fatalf("OnDelete() = %#v, want allowed", response)
+						}
+
+						return
+					}
+
+					if response == nil || response.Allowed {
+						t.Fatalf("OnDelete() = %#v, want denial", response)
+					}
+					if response.Result == nil || !strings.Contains(response.Result.Message, testCase.wantDenied) {
+						t.Fatalf("OnDelete() message = %#v, want containing %q", response.Result, testCase.wantDenied)
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestReferenceProtectionOnDeleteInvalidIdentity(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		oldObject  []byte
+		wantDenied string
+	}{
+		{
+			name:       "missing old object",
+			wantDenied: "decoding ServiceAccount for deletion",
+		},
+		{
+			name:       "malformed old object",
+			oldObject:  []byte(`{`),
+			wantDenied: "decoding ServiceAccount for deletion",
+		},
+		{
+			name:       "missing name",
+			oldObject:  []byte(`{"apiVersion":"v1","kind":"ServiceAccount","metadata":{"namespace":"capsule-system"}}`),
+			wantDenied: "empty namespace or name",
+		},
+		{
+			name:       "missing namespace",
+			oldObject:  []byte(`{"apiVersion":"v1","kind":"ServiceAccount","metadata":{"name":"runner"}}`),
+			wantDenied: "empty namespace or name",
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			cl := referenceProtectionFakeClient(t)
+			response := ReferenceProtection().OnDelete(cl, cl, admission.NewDecoder(cl.Scheme()), nil)(context.Background(), admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
 					Operation: admissionv1.Delete,
-					Namespace: "capsule-system",
-					Name:      "runner",
+					OldObject: runtime.RawExtension{Raw: testCase.oldObject},
 				},
 			})
-
-			if testCase.wantDenied == "" {
-				if response != nil {
-					t.Fatalf("OnDelete() = %#v, want allowed", response)
-				}
-
-				return
-			}
-
 			if response == nil || response.Allowed {
 				t.Fatalf("OnDelete() = %#v, want denial", response)
 			}

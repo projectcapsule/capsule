@@ -39,18 +39,23 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 
 	var (
 		ctx             context.Context
+		namespace       *corev1.Namespace
 		brt             *capsulev1beta2.GlobalResourcePermitTemplate
 		defaultDuration = 5 * time.Second
 	)
 
 	BeforeEach(func() {
 		ctx = context.TODO()
+		namespace = createResourcePermitTestNamespace(ctx)
 		brt = &capsulev1beta2.GlobalResourcePermitTemplate{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "e2e-resourcepermit",
 			},
 			Spec: capsulev1beta2.GlobalResourcePermitTemplateSpec{
-				Approvals: resourcepermit.ApprovalSpec{Auto: true},
+				// Lifecycle tests use the controller identity explicitly; default
+				// ServiceAccount selection is covered by the configuration specs.
+				Impersonation: resourcePermitServiceAccountReference(ControllerNamespace, ControllerServiceAccount),
+				Approvals:     resourcepermit.ApprovalSpec{Auto: true},
 				DefaultDuration: &metav1.Duration{
 					Duration: defaultDuration,
 				},
@@ -95,29 +100,35 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 			br := &capsulev1beta2.ResourcePermit{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "e2e-resourcepermit-br",
-					Namespace: "default",
+					Namespace: namespace.Name,
 				},
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.GetName()),
 				},
 			}
-			defer EventuallyDeletion(br)
 
 			EventuallyCreation(func() error {
 				return k8sClient.Create(ctx, br)
 			}).Should(Succeed())
 
 			current := &capsulev1beta2.ResourcePermit{}
+			cm := &corev1.ConfigMap{}
 			Eventually(func(g Gomega) {
 				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: br.Name, Namespace: br.Namespace}, current)).To(Succeed())
+				g.Expect(current.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseActive),
+					"ResourcePermit did not activate; status: %+v; failure: %+v", current.Status, current.Status.Failure)
+				g.Expect(current.Status.Request).NotTo(BeNil())
 				g.Expect(current.Status.Request.Template).NotTo(BeNil())
 				g.Expect(current.Status.Request.Template.Kind).To(Equal(capsulev1beta2.GlobalResourcePermitTemplateKind))
 				g.Expect(current.Status.Request.Template.Name).To(Equal(brt.Name))
 				g.Expect(current.Status.Request.Template.ResourceVersion).NotTo(BeEmpty())
-			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+				g.Expect(current.Status.Request.Duration).NotTo(BeNil())
+				g.Expect(current.Status.Request.Duration.Duration).To(Equal(defaultDuration))
+				g.Expect(current.Status.Active).NotTo(BeNil())
+				g.Expect(current.Status.Active.ActiveFrom).NotTo(BeNil())
+				g.Expect(current.Status.Active.ActiveUntil).NotTo(BeNil())
+				g.Expect(current.Status.Active.ActiveUntil.Sub(current.Status.Active.ActiveFrom.Time)).To(Equal(defaultDuration))
 
-			cm := &corev1.ConfigMap{}
-			Eventually(func(g Gomega) {
 				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "e2e-resourcepermit-cm", Namespace: br.Namespace}, cm)).To(Succeed())
 				g.Expect(cm.Labels).To(HaveKeyWithValue(apimeta.CreatedByCapsuleLabel, apimeta.ValueControllerResourcePermit))
 				g.Expect(cm.Labels).To(HaveKeyWithValue(apimeta.ProtectedByCapsuleLabel, apimeta.ValueControllerResourcePermit))
@@ -128,10 +139,8 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 			Expect(apierrors.IsForbidden(err)).To(BeTrue())
 			Expect(err).To(MatchError(ContainSubstring("can only be changed by the Capsule controller")))
 
-			// should be deleted after duration
-			Eventually(func() (err error) {
-				return k8sClient.Get(ctx, types.NamespacedName{Name: "e2e-resourcepermit-cm", Namespace: br.Namespace}, cm)
-			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
+			By("waiting for natural expiry to delete both the ConfigMap and its ResourcePermit")
+			expectResourcePermitAndConfigMapDeleted(ctx, br, cm)
 		})
 	})
 
@@ -144,12 +153,12 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 
 		It("rejects deletion while active and archived, then deletes after retention expires", func() {
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-deletion-lifecycle", Namespace: "default"},
+				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-deletion-lifecycle", Namespace: namespace.Name},
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.Name),
 				},
 			}
-			defer EventuallyDeletion(br)
+
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, br) }).Should(Succeed())
 
 			current := &capsulev1beta2.ResourcePermit{}
@@ -187,10 +196,10 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 
 		It("allows the managed resource to be changed", func() {
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-unprotected", Namespace: "default"},
+				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-unprotected", Namespace: namespace.Name},
 				Spec:       capsulev1beta2.ResourcePermitSpec{Template: globalResourcePermitTemplateReference(brt.GetName())},
 			}
-			defer EventuallyDeletion(br)
+
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, br) }).Should(Succeed())
 
 			cm := &corev1.ConfigMap{}
@@ -212,7 +221,7 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 
 		It("retains the resource and removes Capsule lifecycle metadata", func() {
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-orphan", Namespace: "default"},
+				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-orphan", Namespace: namespace.Name},
 				Spec:       capsulev1beta2.ResourcePermitSpec{Template: globalResourcePermitTemplateReference(brt.GetName())},
 			}
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, br) }).Should(Succeed())
@@ -223,12 +232,12 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 				g.Expect(cm.Labels).To(HaveKeyWithValue(apimeta.CreatedByCapsuleLabel, apimeta.ValueControllerResourcePermit))
 				g.Expect(cm.Labels).To(HaveKeyWithValue(apimeta.ProtectedByCapsuleLabel, apimeta.ValueControllerResourcePermit))
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-			defer EventuallyDeletion(cm)
 
 			expireActiveResourcePermit(ctx, br)
-			Eventually(func() error {
-				return k8sClient.Get(ctx, types.NamespacedName{Name: br.Name, Namespace: br.Namespace}, br)
-			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: br.Name, Namespace: br.Namespace}, br)
+				return apierrors.IsNotFound(err)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
 
 			Eventually(func(g Gomega) {
 				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: cm.Name, Namespace: cm.Namespace}, cm)).To(Succeed())
@@ -263,10 +272,10 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 
 		It("cascades deletion through the ResourcePermit finalizer without an owner reference", func() {
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-cluster-scope", Namespace: "default"},
+				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-cluster-scope", Namespace: namespace.Name},
 				Spec:       capsulev1beta2.ResourcePermitSpec{Template: globalResourcePermitTemplateReference(brt.GetName())},
 			}
-			defer EventuallyDeletion(br)
+
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, br) }).Should(Succeed())
 
 			role := &rbacv1.ClusterRole{}
@@ -276,9 +285,10 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 			expireActiveResourcePermit(ctx, br)
-			Eventually(func() error {
-				return k8sClient.Get(ctx, types.NamespacedName{Name: role.Name}, role)
-			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: role.Name}, role)
+				return apierrors.IsNotFound(err)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
 		})
 	})
 
@@ -290,13 +300,12 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 			br := &capsulev1beta2.ResourcePermit{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "e2e-resourcepermit-br",
-					Namespace: "default",
+					Namespace: namespace.Name,
 				},
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.GetName()),
 				},
 			}
-			defer EventuallyDeletion(br)
 
 			EventuallyCreation(func() error {
 				return k8sClient.Create(ctx, br)
@@ -322,13 +331,12 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 			br := &capsulev1beta2.ResourcePermit{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "e2e-resourcepermit-br",
-					Namespace: "default",
+					Namespace: namespace.Name,
 				},
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.GetName()),
 				},
 			}
-			defer EventuallyDeletion(br)
 
 			EventuallyCreation(func() error {
 				return k8sClient.Create(ctx, br)
@@ -341,10 +349,7 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 				return k8sClient.Get(ctx, types.NamespacedName{Name: "e2e-resourcepermit-cm", Namespace: br.Namespace}, cm)
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
-			// should be deleted after duration
-			Eventually(func() (err error) {
-				return k8sClient.Get(ctx, types.NamespacedName{Name: "e2e-resourcepermit-cm", Namespace: br.Namespace}, cm)
-			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
+			expectResourcePermitAndConfigMapDeleted(ctx, br, cm)
 		})
 	})
 
@@ -366,14 +371,13 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 			br := &capsulev1beta2.ResourcePermit{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "e2e-resourcepermit-br",
-					Namespace: "default",
+					Namespace: namespace.Name,
 				},
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.GetName()),
 					Reason:   "open sesame",
 				},
 			}
-			defer EventuallyDeletion(br)
 
 			EventuallyCreation(func() error {
 				return k8sClient.Create(ctx, br)
@@ -384,17 +388,14 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 				return k8sClient.Get(ctx, types.NamespacedName{Name: "e2e-resourcepermit-cm", Namespace: br.Namespace}, cm)
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
-			// should be deleted after duration
-			Eventually(func() (err error) {
-				return k8sClient.Get(ctx, types.NamespacedName{Name: "e2e-resourcepermit-cm", Namespace: br.Namespace}, cm)
-			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
+			expectResourcePermitAndConfigMapDeleted(ctx, br, cm)
 		})
 
 		It("rejects a resource permit when none of the automatic approval conditions match", func() {
 			br := &capsulev1beta2.ResourcePermit{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "e2e-resourcepermit-br",
-					Namespace: "default",
+					Namespace: namespace.Name,
 				},
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.GetName()),
@@ -417,16 +418,15 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 		})
 
 		It("auto-approves a matching authenticated requestor", func() {
-			grantResourcePermitNamespaceAdmin(ctx, "default", "alice")
+			grantResourcePermitNamespaceAdmin(ctx, namespace.Name, "alice")
 
 			aliceClient := impersonationClient("alice", []string{"developers"})
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-requestor-alice", Namespace: "default"},
+				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-requestor-alice", Namespace: namespace.Name},
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.GetName()),
 				},
 			}
-			defer EventuallyDeletion(br)
 
 			EventuallyCreation(func() error { return aliceClient.Create(ctx, br) }).Should(Succeed())
 
@@ -437,11 +437,11 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 		})
 
 		It("rejects a non-matching authenticated requestor", func() {
-			grantResourcePermitNamespaceAdmin(ctx, "default", "bob")
+			grantResourcePermitNamespaceAdmin(ctx, namespace.Name, "bob")
 
 			bobClient := impersonationClient("bob", []string{"developers"})
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-requestor-bob", Namespace: "default"},
+				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-requestor-bob", Namespace: namespace.Name},
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.GetName()),
 				},
@@ -467,16 +467,16 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 		})
 
 		It("requires an explicit approver and any one CEL condition", func() {
-			grantResourcePermitNamespaceAdmin(ctx, "default", "bob")
-			grantResourcePermitNamespaceAdmin(ctx, "default", "charlie")
+			grantResourcePermitNamespaceAdmin(ctx, namespace.Name, "bob")
+			grantResourcePermitNamespaceAdmin(ctx, namespace.Name, "charlie")
 
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-reviewer", Namespace: "default"},
+				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-reviewer", Namespace: namespace.Name},
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.GetName()),
 				},
 			}
-			defer EventuallyDeletion(br)
+
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, br) }).Should(Succeed())
 
 			bobClient := impersonationClient("bob", []string{"users", "admin"})
@@ -515,16 +515,16 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 			})
 
 			It("only permits authenticated members of the group", func() {
-				grantResourcePermitNamespaceAdmin(ctx, "default", "alice")
-				grantResourcePermitNamespaceAdmin(ctx, "default", "bob")
+				grantResourcePermitNamespaceAdmin(ctx, namespace.Name, "alice")
+				grantResourcePermitNamespaceAdmin(ctx, namespace.Name, "bob")
 
 				br := &capsulev1beta2.ResourcePermit{
-					ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-group-approver", Namespace: "default"},
+					ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-group-approver", Namespace: namespace.Name},
 					Spec: capsulev1beta2.ResourcePermitSpec{
 						Template: globalResourcePermitTemplateReference(brt.GetName()),
 					},
 				}
-				defer EventuallyDeletion(br)
+
 				EventuallyCreation(func() error { return k8sClient.Create(ctx, br) }).Should(Succeed())
 
 				requested := &capsulev1beta2.ResourcePermit{}
@@ -556,16 +556,10 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 		)
 
 		BeforeEach(func() {
-			allowedNamespace = NewNamespace("")
+			allowedNamespace = namespace
 			allowedNamespace.Labels[globalResourcePermitTemplateSelectorLabel] = allowedNamespace.Name
-			deniedNamespace = NewNamespace("")
-
-			NamespaceCreationAdmin(allowedNamespace, defaultTimeoutInterval).Should(Succeed())
-			NamespaceCreationAdmin(deniedNamespace, defaultTimeoutInterval).Should(Succeed())
-			DeferCleanup(func() {
-				EventuallyDeletion(allowedNamespace)
-				EventuallyDeletion(deniedNamespace)
-			})
+			Expect(k8sClient.Update(ctx, allowedNamespace)).To(Succeed())
+			deniedNamespace = createResourcePermitTestNamespace(ctx)
 
 			brt.Spec.Approvals.Auto = false
 			brt.Spec.NamespaceSelectors = []selectors.NamespaceSelector{{
@@ -599,10 +593,6 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 					Template: globalResourcePermitTemplateReference(brt.Name),
 				},
 			}
-			DeferCleanup(func() {
-				expireResourcePermitForCleanup(ctx, request)
-				EventuallyDeletion(request)
-			})
 
 			EventuallyCreation(func() error {
 				return k8sClient.Create(ctx, request)
@@ -670,17 +660,13 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 			br := &capsulev1beta2.ResourcePermit{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "e2e-resourcepermit-br",
-					Namespace: "default",
+					Namespace: namespace.Name,
 				},
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.GetName()),
 					Params:   &runtime.RawExtension{Raw: []byte(`{"value": "test-value"}`)},
 				},
 			}
-			defer func() {
-				expireResourcePermitForCleanup(ctx, br)
-				EventuallyDeletion(br)
-			}()
 
 			EventuallyCreation(func() error {
 				err := k8sClient.Create(ctx, br)
@@ -698,7 +684,7 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 			br := &capsulev1beta2.ResourcePermit{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "e2e-resourcepermit-invalid-params",
-					Namespace: "default",
+					Namespace: namespace.Name,
 				},
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.GetName()),
@@ -720,11 +706,11 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 			cm := &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "e2e-resourcepermit-cm",
-					Namespace: "default",
+					Namespace: namespace.Name,
 				},
 				Data: map[string]string{"existing": "preserved"},
 			}
-			defer EventuallyDeletion(cm)
+
 			EventuallyCreation(func() error {
 				cm.ResourceVersion = ""
 
@@ -734,11 +720,11 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 			br := &capsulev1beta2.ResourcePermit{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "e2e-resourcepermit-adopt",
-					Namespace: "default",
+					Namespace: namespace.Name,
 				},
 				Spec: capsulev1beta2.ResourcePermitSpec{Template: globalResourcePermitTemplateReference(brt.GetName())},
 			}
-			defer EventuallyDeletion(br)
+
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, br) }).Should(Succeed())
 
 			Eventually(func(g Gomega) {
@@ -787,14 +773,14 @@ data:
 
 		It("makes parameter-selected context available to every rendered template", func() {
 			source := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-context", Namespace: "default"},
+				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-context", Namespace: namespace.Name},
 				Data:       map[string]string{"value": "from-context"},
 			}
-			defer EventuallyDeletion(source)
+
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, source) }).Should(Succeed())
 
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-context", Namespace: "default"},
+				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-context", Namespace: namespace.Name},
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.Name),
 					Params: &runtime.RawExtension{Raw: []byte(`{
@@ -802,13 +788,13 @@ data:
 					}`)},
 				},
 			}
-			defer EventuallyDeletion(br)
+
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, br) }).Should(Succeed())
 
 			Eventually(func(g Gomega) {
 				actual := &corev1.ConfigMap{}
 				g.Expect(k8sClient.Get(ctx, types.NamespacedName{
-					Name: "e2e-resourcepermit-cm", Namespace: "default",
+					Name: "e2e-resourcepermit-cm", Namespace: namespace.Name,
 				}, actual)).To(Succeed())
 				g.Expect(actual.Data).To(HaveKeyWithValue("loaded", "from-context"))
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())

@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -46,11 +47,29 @@ func (*referenceProtection) OnUpdate(
 func (*referenceProtection) OnDelete(
 	c client.Client,
 	_ client.Reader,
-	_ admission.Decoder,
+	decoder admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		key := serviceaccountindexer.ReferenceKey(req.Namespace, req.Name)
+		namespace, name := req.Namespace, req.Name
+		if namespace == "" || name == "" {
+			// DeleteCollection leaves the request name empty, but admission is
+			// called for each ServiceAccount with its identity in OldObject.
+			serviceAccount := &corev1.ServiceAccount{}
+			if err := decoder.DecodeRaw(req.OldObject, serviceAccount); err != nil {
+				return handlers.ErroredResponse(fmt.Errorf("decoding ServiceAccount for deletion: %w", err))
+			}
+
+			if namespace == "" {
+				namespace = serviceAccount.Namespace
+			}
+
+			if name == "" {
+				name = serviceAccount.Name
+			}
+		}
+
+		key := serviceaccountindexer.ReferenceKey(namespace, name)
 		if key == "" {
 			return handlers.ErroredResponse(fmt.Errorf("ServiceAccount deletion request has an empty namespace or name"))
 		}

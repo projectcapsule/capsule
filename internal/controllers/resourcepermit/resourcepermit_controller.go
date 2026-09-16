@@ -187,7 +187,9 @@ func (r *ResourcePermitReconciler) reconcile(
 	defer func() {
 		setReconcileReady(br, err)
 
-		r.updateStatus(ctx, log, br)()
+		// A failed status write must requeue reconciliation; otherwise a new
+		// permit can remain uninitialized with no further watch event.
+		err = errors.Join(err, r.updateStatus(ctx, log, br))
 	}()
 
 	if !br.DeletionTimestamp.IsZero() {
@@ -798,35 +800,31 @@ func (r *ResourcePermitReconciler) updateStatus(
 	ctx context.Context,
 	log logr.Logger,
 	br *capsulev1beta2.ResourcePermit,
-) func() {
-	return func() {
-		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			current := &capsulev1beta2.ResourcePermit{}
-			if err := r.Get(ctx, client.ObjectKeyFromObject(br), current); err != nil {
-				return fmt.Errorf("failed to refetch instance before update: %w", err)
-			}
-
-			current.Status = br.Status
-
-			log.V(7).Info("updating status", "status", current.Status)
-
-			if err := r.Client.Status().Update(ctx, current); err != nil {
-				return fmt.Errorf("failed to update status: %w", err)
-			}
-
-			return nil
-		})
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				// if the br is deleted, we cannot find it anymore
-				return
-			}
-
-			log.Error(err, "failed updating status")
-		} else {
-			log.V(7).Info("successful update", "status", br.Status)
+) error {
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		current := &capsulev1beta2.ResourcePermit{}
+		if err := r.Get(ctx, client.ObjectKeyFromObject(br), current); err != nil {
+			return fmt.Errorf("failed to refetch instance before update: %w", err)
 		}
+
+		current.Status = br.Status
+
+		log.V(7).Info("updating status", "status", current.Status)
+
+		if err := r.Client.Status().Update(ctx, current); err != nil {
+			return fmt.Errorf("failed to update status: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		// An expired or terminating permit may have been deleted during reconcile.
+		return client.IgnoreNotFound(err)
 	}
+
+	log.V(7).Info("successful update", "status", br.Status)
+
+	return nil
 }
 
 // Add a finalizer so managed resources are pruned before deletion and the

@@ -952,3 +952,108 @@ func TestResourcePermitValidationRejectsInvalidParametersBeforeRendering(t *test
 	resp := validator.OnCreate(cl, cl, decoder, nil)(context.Background(), admission.Request{})
 	test.VerifyResponse(t, resp, http.StatusForbidden, "source in body is required")
 }
+
+func TestResourcePermitApprovalReadiness(t *testing.T) {
+	t.Setenv(runtimeconfiguration.EnvironmentServiceaccountName, "capsule")
+	t.Setenv(runtimeconfiguration.EnvironmentControllerNamespace, "capsule-system")
+	const defaultTemplateName = "automatic-approval"
+	templateRef := capsulev1beta2.ResourcePermitTemplateReference{
+		Kind: capsulev1beta2.GlobalResourcePermitTemplateKind, Name: defaultTemplateName,
+	}
+
+	controllerName, controllerNamespace := runtimeconfiguration.ControllerServiceAccount()
+	controllerUsername := "system:serviceaccount:" + controllerNamespace + ":" + controllerName
+
+	for _, tt := range []struct {
+		name       string
+		username   string
+		reviewer   resourcepermit.AccessEntityType
+		oldReady   metav1.ConditionStatus
+		newReady   metav1.ConditionStatus
+		conditions []string
+		denied     string
+	}{
+		{
+			name:     "controller publishes readiness and automatic approval together",
+			username: controllerUsername, reviewer: resourcepermit.AccessEntityTypeSystem,
+			newReady: metav1.ConditionTrue,
+		},
+		{
+			name:     "controller retries after failed preflight",
+			username: controllerUsername, reviewer: resourcepermit.AccessEntityTypeSystem,
+			oldReady: metav1.ConditionFalse, newReady: metav1.ConditionTrue,
+		},
+		{
+			name:     "automatic approval requires current readiness",
+			username: controllerUsername, reviewer: resourcepermit.AccessEntityTypeSystem,
+			oldReady: metav1.ConditionTrue, newReady: metav1.ConditionFalse,
+			denied: "rendered resources are not ready",
+		},
+		{
+			name:     "automatic approval still evaluates approval conditions",
+			username: controllerUsername, reviewer: resourcepermit.AccessEntityTypeSystem,
+			newReady: metav1.ConditionTrue, conditions: []string{"false"},
+			denied: "approval conditions not satisfied",
+		},
+		{
+			name:     "reviewer cannot forge readiness",
+			username: "alice", reviewer: resourcepermit.AccessEntityTypeUser,
+			oldReady: metav1.ConditionFalse, newReady: metav1.ConditionTrue,
+			denied: "rendered resources are not ready",
+		},
+		{
+			name:     "reviewer cannot impersonate an automatic approval",
+			username: "alice", reviewer: resourcepermit.AccessEntityTypeSystem,
+			newReady: metav1.ConditionTrue,
+			denied:   "rendered resources are not ready",
+		},
+		{
+			name:     "reviewer approves previously ready resources",
+			username: "alice", reviewer: resourcepermit.AccessEntityTypeUser,
+			oldReady: metav1.ConditionTrue, newReady: metav1.ConditionTrue,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			scheme := runtime.NewScheme()
+			assert.NoError(t, capsulev1beta2.AddToScheme(scheme))
+			template := &capsulev1beta2.GlobalResourcePermitTemplate{
+				ObjectMeta: metav1.ObjectMeta{Name: defaultTemplateName},
+				Spec: capsulev1beta2.GlobalResourcePermitTemplateSpec{
+					Approvals: resourcepermit.ApprovalSpec{
+						Auto: true, Conditions: tt.conditions,
+						Approvers: rbac.UserListSpec{{Kind: rbac.UserOwner, Name: "alice"}},
+					},
+				},
+			}
+			reader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(template).Build()
+			oldBr := &capsulev1beta2.ResourcePermit{
+				Spec: capsulev1beta2.ResourcePermitSpec{Template: templateRef},
+			}
+			if tt.oldReady != "" {
+				oldBr.Status.Phase = capsulev1beta2.ResourcePermitPhaseRequested
+				oldBr.Status.Conditions = []metav1.Condition{{Type: capsulemeta.ReadyCondition, Status: tt.oldReady}}
+			}
+			newBr := oldBr.DeepCopy()
+			newBr.Status.Phase = capsulev1beta2.ResourcePermitPhaseApproved
+			newBr.Status.Request = &capsulev1beta2.ResourcePermitStatusRequest{}
+			newBr.Status.Conditions = []metav1.Condition{{Type: capsulemeta.ReadyCondition, Status: tt.newReady}}
+			newBr.Status.Review = &capsulev1beta2.ReviewInfo{Reviewer: &resourcepermit.AccessEntity{
+				Name: tt.username, Type: tt.reviewer,
+			}}
+			decoder := &test.Decoder[*capsulev1beta2.ResourcePermit]{Object: newBr, OldObject: oldBr}
+			req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+				SubResource: "status", UserInfo: authenticationv1.UserInfo{Username: tt.username},
+			}}
+			resp := ResourcePermitValidationHandler(ctrl.Log, nil).OnUpdate(nil, reader, decoder, nil)(context.Background(), req)
+			if tt.denied == "" {
+				if resp != nil {
+					t.Fatalf("unexpected admission response: %+v", resp.Result)
+				}
+			} else {
+				test.VerifyResponse(t, resp, http.StatusForbidden, tt.denied)
+			}
+		})
+	}
+}

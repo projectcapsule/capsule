@@ -40,6 +40,7 @@ var _ = Describe(
 	func() {
 		var (
 			ctx               context.Context
+			namespace         *corev1.Namespace
 			lifecycleTemplate *capsulev1beta2.GlobalResourcePermitTemplate
 			renderingTemplate *capsulev1beta2.GlobalResourcePermitTemplate
 			reviewerClient    client.Client
@@ -57,8 +58,12 @@ var _ = Describe(
 				return k8sClient.Create(ctx, renderingTemplate)
 			}).Should(Succeed())
 
-			grantResourcePermitNamespaceAdmin(ctx, "default", resourcePermitLifecycleReviewer)
 			reviewerClient = impersonationClient(resourcePermitLifecycleReviewer, []string{"reviewers"})
+		})
+
+		BeforeEach(func() {
+			namespace = createResourcePermitTestNamespace(ctx)
+			grantResourcePermitNamespaceAdmin(ctx, namespace.Name, resourcePermitLifecycleReviewer)
 		})
 
 		AfterAll(func() {
@@ -68,6 +73,7 @@ var _ = Describe(
 
 		It("prevents controller-owned status from being hijacked during approval", func() {
 			request := newLifecycleResourcePermit(
+				namespace.Name,
 				"e2e-resourcepermit-transition-hijack",
 				lifecycleTemplate.Name,
 				"e2e-resourcepermit-transition-original",
@@ -127,7 +133,7 @@ var _ = Describe(
 			hijacked.Status.Request.Resources = injectedResources
 			hijacked.Status.Request.Impersonation = &apimeta.NamespacedRFC1123ObjectReferenceWithNamespace{
 				Name:      "injected-runner",
-				Namespace: "kube-system",
+				Namespace: apimeta.RFC1123SubdomainName(namespace.Name),
 			}
 			hijacked.Status.Request.Template = &capsulev1beta2.ResolvedResourcePermitTemplateReference{
 				ResourcePermitTemplateReference: globalResourcePermitTemplateReference("injected-template"),
@@ -211,6 +217,7 @@ var _ = Describe(
 		Describe("deletion protection", func() {
 			It("allows a requested request awaiting review to be cancelled", func() {
 				request := newLifecycleResourcePermit(
+					namespace.Name,
 					"e2e-resourcepermit-delete-requested",
 					lifecycleTemplate.Name,
 					"e2e-resourcepermit-delete-requested-target",
@@ -230,6 +237,7 @@ var _ = Describe(
 
 			It("allows a pending request to be cancelled", func() {
 				request := newLifecycleResourcePermit(
+					namespace.Name,
 					"e2e-resourcepermit-delete-pending",
 					lifecycleTemplate.Name,
 					"e2e-resourcepermit-delete-pending-target",
@@ -265,6 +273,7 @@ var _ = Describe(
 
 			It("protects a denied request", func() {
 				request := newLifecycleResourcePermit(
+					namespace.Name,
 					"e2e-resourcepermit-delete-denied",
 					lifecycleTemplate.Name,
 					"e2e-resourcepermit-delete-denied-target",
@@ -286,6 +295,7 @@ var _ = Describe(
 
 			It("protects an approved request before its start time", func() {
 				request := newLifecycleResourcePermit(
+					namespace.Name,
 					"e2e-resourcepermit-delete-approved",
 					lifecycleTemplate.Name,
 					"e2e-resourcepermit-delete-approved-target",
@@ -302,6 +312,7 @@ var _ = Describe(
 
 			It("protects an active request", func() {
 				request := newLifecycleResourcePermit(
+					namespace.Name,
 					"e2e-resourcepermit-delete-active",
 					lifecycleTemplate.Name,
 					"e2e-resourcepermit-delete-active-target",
@@ -315,18 +326,12 @@ var _ = Describe(
 			})
 
 			It("does not block deletion of its namespace", func() {
-				namespace := NewNamespace("")
-				NamespaceCreationAdmin(namespace, defaultTimeoutInterval).Should(Succeed())
-				DeferCleanup(func() { ForceDeleteNamespace(ctx, namespace.Name) })
-
-				grantResourcePermitNamespaceAdmin(ctx, namespace.Name, resourcePermitLifecycleReviewer)
-
 				request := newLifecycleResourcePermit(
+					namespace.Name,
 					"e2e-resourcepermit-delete-with-namespace",
 					lifecycleTemplate.Name,
 					"e2e-resourcepermit-delete-with-namespace-target",
 				)
-				request.Namespace = namespace.Name
 				EventuallyCreation(func() error { return k8sClient.Create(ctx, request) }).Should(Succeed())
 				DeferCleanup(func() { cleanupLifecycleResourcePermit(ctx, request) })
 
@@ -369,6 +374,7 @@ var _ = Describe(
 				})
 
 				request := newLifecycleResourcePermit(
+					namespace.Name,
 					"e2e-resourcepermit-delete-active-admin",
 					lifecycleTemplate.Name,
 					"e2e-resourcepermit-delete-active-admin-target",
@@ -397,6 +403,7 @@ var _ = Describe(
 
 			It("protects an expired request until archive retention ends", func() {
 				request := newLifecycleResourcePermit(
+					namespace.Name,
 					"e2e-resourcepermit-delete-archived",
 					lifecycleTemplate.Name,
 					"e2e-resourcepermit-delete-archived-target",
@@ -436,7 +443,7 @@ var _ = Describe(
 			request := &capsulev1beta2.ResourcePermit{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "e2e-resourcepermit-rendering-failure",
-					Namespace: "default",
+					Namespace: namespace.Name,
 				},
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(renderingTemplate.Name),
@@ -499,6 +506,7 @@ func lifecycleResourcePermitTemplate() *capsulev1beta2.GlobalResourcePermitTempl
 	return &capsulev1beta2.GlobalResourcePermitTemplate{
 		ObjectMeta: metav1.ObjectMeta{Name: resourcePermitLifecycleTemplateName},
 		Spec: capsulev1beta2.GlobalResourcePermitTemplateSpec{
+			Impersonation: resourcePermitServiceAccountReference(ControllerNamespace, ControllerServiceAccount),
 			Approvals: resourcepermitapi.ApprovalSpec{
 				Approvers: capsulerbac.UserListSpec{{
 					Kind: capsulerbac.UserOwner,
@@ -526,6 +534,7 @@ func renderingFailureResourcePermitTemplate() *capsulev1beta2.GlobalResourcePerm
 	return &capsulev1beta2.GlobalResourcePermitTemplate{
 		ObjectMeta: metav1.ObjectMeta{Name: resourcePermitRenderingTemplateName},
 		Spec: capsulev1beta2.GlobalResourcePermitTemplateSpec{
+			Impersonation: resourcePermitServiceAccountReference(ControllerNamespace, ControllerServiceAccount),
 			Approvals: resourcepermitapi.ApprovalSpec{
 				Approvers: capsulerbac.UserListSpec{{
 					Kind: capsulerbac.UserOwner,
@@ -557,9 +566,9 @@ data:
 	}
 }
 
-func newLifecycleResourcePermit(name, templateName, targetName string) *capsulev1beta2.ResourcePermit {
+func newLifecycleResourcePermit(namespace, name, templateName, targetName string) *capsulev1beta2.ResourcePermit {
 	return &capsulev1beta2.ResourcePermit{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 		Spec: capsulev1beta2.ResourcePermitSpec{
 			Template: globalResourcePermitTemplateReference(templateName),
 			Params: &runtime.RawExtension{Raw: []byte(fmt.Sprintf(
@@ -585,7 +594,9 @@ func waitForResourcePermitPhase(
 	current := &capsulev1beta2.ResourcePermit{}
 	Eventually(func(g Gomega) {
 		g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(request), current)).To(Succeed())
-		g.Expect(current.Status.Phase).To(Equal(phase))
+		g.Expect(current.Status.Phase).To(Equal(phase),
+			"ResourcePermit %s did not reach %s; status: %+v; failure: %+v",
+			client.ObjectKeyFromObject(current), phase, current.Status, current.Status.Failure)
 	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 	return current.DeepCopy()

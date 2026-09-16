@@ -5,6 +5,8 @@ package resourcepermit
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -657,6 +659,42 @@ func TestRecordTransitionEventOnce(t *testing.T) {
 			eventList.Items = nil
 			require.NoError(t, eventClient.List(ctx, &eventList, client.InNamespace(br.Namespace)))
 			assert.Len(t, eventList.Items, 1)
+		})
+	}
+}
+
+func TestResourcePermitReconcileReturnsStatusWriteError(t *testing.T) {
+	t.Parallel()
+
+	for _, reconcileFails := range []bool{false, true} {
+		t.Run(fmt.Sprintf("reconcile fails=%t", reconcileFails), func(t *testing.T) {
+			t.Parallel()
+			mockCtrl := gm.NewController(t)
+			cl := mc.NewMockClient(mockCtrl)
+			scl := mc.NewMockSubResourceWriter(mockCtrl)
+			statusErr := errors.New("status update failed")
+			templateErr := errors.New("template read failed")
+			br := &capsulev1beta2.ResourcePermit{
+				ObjectMeta: v1.ObjectMeta{Name: resourceName, Namespace: "test-namespace"},
+				Status:     capsulev1beta2.ResourcePermitStatus{Phase: capsulev1beta2.ResourcePermitPhaseRequested},
+			}
+			if reconcileFails {
+				br.Status.Phase = ""
+				br.Spec.Template = capsulev1beta2.ResourcePermitTemplateReference{
+					Kind: capsulev1beta2.GlobalResourcePermitTemplateKind, Name: templateName,
+				}
+				cl.EXPECT().Get(gm.Any(), client.ObjectKey{Name: templateName}, gm.Any()).Return(templateErr)
+			}
+			cl.EXPECT().Get(gm.Any(), client.ObjectKeyFromObject(br), gm.Any()).Return(nil)
+			cl.EXPECT().Status().Return(scl)
+			scl.EXPECT().Update(gm.Any(), gm.Any()).Return(statusErr)
+			r := &ResourcePermitReconciler{Client: cl}
+
+			_, err := r.reconcile(context.Background(), ctrl.Log, br)
+			require.ErrorIs(t, err, statusErr)
+			if reconcileFails {
+				require.ErrorIs(t, err, templateErr)
+			}
 		})
 	}
 }

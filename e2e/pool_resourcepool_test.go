@@ -1217,6 +1217,7 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 					Namespace: "ns-1-pool-ordered",
 				},
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
+					Pool: pool.Name,
 					ResourceClaims: corev1.ResourceList{
 						corev1.ResourceLimitsMemory: resource.MustParse("512Mi"),
 					},
@@ -1236,6 +1237,7 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 					Namespace: "ns-2-pool-ordered",
 				},
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
+					Pool: pool.Name,
 					ResourceClaims: corev1.ResourceList{
 						corev1.ResourceRequestsMemory: resource.MustParse("750Mi"),
 					},
@@ -1281,6 +1283,7 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 					Namespace: "ns-2-pool-ordered",
 				},
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
+					Pool: pool.Name,
 					ResourceClaims: corev1.ResourceList{
 						corev1.ResourceRequestsCPU: resource.MustParse("4"),
 					},
@@ -1305,6 +1308,7 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 					Namespace: "ns-1-pool-ordered",
 				},
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
+					Pool: pool.Name,
 					ResourceClaims: corev1.ResourceList{
 						corev1.ResourceLimitsCPU: resource.MustParse("4"),
 					},
@@ -1329,6 +1333,7 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 					Namespace: "ns-2-pool-ordered",
 				},
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
+					Pool: pool.Name,
 					ResourceClaims: corev1.ResourceList{
 						corev1.ResourceLimitsCPU:   resource.MustParse("2"),
 						corev1.ResourceRequestsCPU: resource.MustParse("2"),
@@ -2268,10 +2273,11 @@ func isSuccessfullyBoundAndUnsedToPool(pool *capsulev1beta2.ResourcePool, claim 
 		}, fetchedClaim)
 		g.Expect(err).Should(Succeed())
 
-		isBoundToPool(fetchedPool, fetchedClaim)
-
-		g.Expect(fetchedClaim.Status.Pool.Name.String()).To(Equal(fetchedPool.Name))
+		g.Expect(fetchedClaim.Status.Pool.Name.String()).To(Equal(fetchedPool.Name),
+			"claim spec.pool=%q; claim conditions: %+v; pool conditions: %+v; pool namespaces: %v",
+			fetchedClaim.Spec.Pool, fetchedClaim.Status.Conditions, fetchedPool.Status.Conditions, fetchedPool.Status.Namespaces)
 		g.Expect(fetchedClaim.Status.Pool.UID).To(Equal(fetchedPool.GetUID()))
+		g.Expect(isBoundToPool(fetchedPool, fetchedClaim)).To(Succeed())
 
 		bound := fetchedClaim.Status.Conditions.GetConditionByType(meta.BoundCondition)
 		g.Expect(bound).NotTo(BeNil(), "Bound condition should be present")

@@ -26,7 +26,6 @@ const (
 	resourcePermitImpersonationTemplateName  = "e2e-resourcepermit-impersonation"
 	resourcePermitImpersonationTargetName    = "e2e-resourcepermit-impersonation-target"
 	resourcePermitImpersonationContextName   = "e2e-resourcepermit-impersonation-context"
-	resourcePermitServiceAccountNamespace    = "capsule-system"
 	resourcePermitTemplateServiceAccount     = "e2e-resourcepermit-template-runner"
 	resourcePermitDefaultServiceAccount      = "e2e-resourcepermit-default-runner"
 	resourcePermitLocalDefaultServiceAccount = "e2e-resourcepermit-local-default-runner"
@@ -41,12 +40,17 @@ var _ = Describe(
 	Label("resource-permit", "config", "impersonation"),
 	func() {
 		var (
-			ctx context.Context
-			brt *capsulev1beta2.GlobalResourcePermitTemplate
+			ctx                     context.Context
+			brt                     *capsulev1beta2.GlobalResourcePermitTemplate
+			namespace               *corev1.Namespace
+			serviceAccountNamespace string
 		)
 
 		BeforeEach(func() {
 			ctx = context.Background()
+			// Delete target resources before the execution identities they reference.
+			serviceAccountNamespace = createResourcePermitTestNamespace(ctx).Name
+			namespace = createResourcePermitTestNamespace(ctx)
 			brt = &capsulev1beta2.GlobalResourcePermitTemplate{
 				ObjectMeta: metav1.ObjectMeta{Name: resourcePermitImpersonationTemplateName},
 				Spec: capsulev1beta2.GlobalResourcePermitTemplateSpec{
@@ -79,7 +83,7 @@ data:
 		Context("with an explicit template ServiceAccount", func() {
 			BeforeEach(func() {
 				brt.Spec.Impersonation = resourcePermitServiceAccountReference(
-					resourcePermitServiceAccountNamespace,
+					serviceAccountNamespace,
 					resourcePermitTemplateServiceAccount,
 				)
 				brt.Spec.Context = &tpl.TemplateContext{Resources: []*tpl.TemplateResourceReference{{
@@ -100,13 +104,14 @@ data:
 `}}
 
 				grantResourcePermitServiceAccount(
-					resourcePermitServiceAccountNamespace,
+					serviceAccountNamespace,
 					resourcePermitTemplateServiceAccount,
+					namespace.Name,
 					[]string{"get", "list", "watch", "create", "update", "patch", "delete"},
 				)
 
 				source := &corev1.ConfigMap{
-					ObjectMeta: metav1.ObjectMeta{Name: resourcePermitImpersonationContextName, Namespace: "default"},
+					ObjectMeta: metav1.ObjectMeta{Name: resourcePermitImpersonationContextName, Namespace: namespace.Name},
 					Data:       map[string]string{"value": "loaded-by-template-service-account"},
 				}
 				EventuallyCreation(func() error { return k8sClient.Create(ctx, source) }).Should(Succeed())
@@ -114,7 +119,7 @@ data:
 			})
 
 			It("uses the identity for context, apply, protected updates, and deletion", func() {
-				br := newImpersonatedResourcePermit("e2e-resourcepermit-impersonated", brt.Name)
+				br := newImpersonatedResourcePermit(namespace.Name, "e2e-resourcepermit-impersonated", brt.Name)
 				DeferCleanup(func() {
 					expireResourcePermitForCleanup(ctx, br)
 					EventuallyDeletion(br)
@@ -122,7 +127,7 @@ data:
 				EventuallyCreation(func() error { return k8sClient.Create(ctx, br) }).Should(Succeed())
 
 				expectedUsername := serviceAccountUsername(
-					resourcePermitServiceAccountNamespace,
+					serviceAccountNamespace,
 					resourcePermitTemplateServiceAccount,
 				)
 				cm := resourcePermitManagedConfigMap(br.Namespace)
@@ -132,7 +137,7 @@ data:
 					expectResourcePermitServiceAccount(
 						g,
 						current,
-						resourcePermitServiceAccountNamespace,
+						serviceAccountNamespace,
 						resourcePermitTemplateServiceAccount,
 					)
 
@@ -146,7 +151,7 @@ data:
 
 				templateClient := impersonationClient(
 					expectedUsername,
-					serviceAccountGroups(resourcePermitServiceAccountNamespace),
+					serviceAccountGroups(serviceAccountNamespace),
 				)
 				cm.Data["updated"] = "by-template-service-account"
 				Expect(templateClient.Update(ctx, cm)).To(Succeed())
@@ -154,7 +159,7 @@ data:
 				By("protecting the template ServiceAccount copied to ResourcePermit status")
 				executionServiceAccount := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{
 					Name:      resourcePermitTemplateServiceAccount,
-					Namespace: resourcePermitServiceAccountNamespace,
+					Namespace: serviceAccountNamespace,
 				}}
 				Eventually(func() bool {
 					err := k8sClient.Delete(ctx, executionServiceAccount, client.DryRunAll)
@@ -193,7 +198,7 @@ data:
 					configuration.Spec.Impersonation.GlobalDefaultServiceAccountNamespace = ""
 				})
 
-				br := newImpersonatedResourcePermit("e2e-resourcepermit-controller-identity", brt.Name)
+				br := newImpersonatedResourcePermit(namespace.Name, "e2e-resourcepermit-controller-identity", brt.Name)
 				DeferCleanup(func() {
 					expireResourcePermitForCleanup(ctx, br)
 					EventuallyDeletion(br)
@@ -228,8 +233,9 @@ data:
 
 			It("uses the global default ServiceAccount from CapsuleConfiguration", func() {
 				grantResourcePermitServiceAccount(
-					resourcePermitServiceAccountNamespace,
+					serviceAccountNamespace,
 					resourcePermitDefaultServiceAccount,
+					namespace.Name,
 					[]string{"get", "list", "watch", "create", "update", "patch", "delete"},
 				)
 
@@ -246,10 +252,10 @@ data:
 					configuration.Spec.Impersonation.GlobalDefaultServiceAccount =
 						apimeta.RFC1123Name(resourcePermitDefaultServiceAccount)
 					configuration.Spec.Impersonation.GlobalDefaultServiceAccountNamespace =
-						apimeta.RFC1123SubdomainName(resourcePermitServiceAccountNamespace)
+						apimeta.RFC1123SubdomainName(serviceAccountNamespace)
 				})
 
-				br := newImpersonatedResourcePermit("e2e-resourcepermit-default-impersonation", brt.Name)
+				br := newImpersonatedResourcePermit(namespace.Name, "e2e-resourcepermit-default-impersonation", brt.Name)
 				DeferCleanup(func() {
 					expireResourcePermitForCleanup(ctx, br)
 					EventuallyDeletion(br)
@@ -257,7 +263,7 @@ data:
 				EventuallyCreation(func() error { return k8sClient.Create(ctx, br) }).Should(Succeed())
 
 				expectedUsername := serviceAccountUsername(
-					resourcePermitServiceAccountNamespace,
+					serviceAccountNamespace,
 					resourcePermitDefaultServiceAccount,
 				)
 				cm := resourcePermitManagedConfigMap(br.Namespace)
@@ -267,7 +273,7 @@ data:
 					expectResourcePermitServiceAccount(
 						g,
 						current,
-						resourcePermitServiceAccountNamespace,
+						serviceAccountNamespace,
 						resourcePermitDefaultServiceAccount,
 					)
 					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cm), cm)).To(Succeed())
@@ -287,15 +293,16 @@ data:
 
 			BeforeEach(func() {
 				brt.Spec.Impersonation = resourcePermitServiceAccountReference(
-					resourcePermitServiceAccountNamespace,
+					serviceAccountNamespace,
 					resourcePermitReadOnlyServiceAccount,
 				)
 				grantResourcePermitServiceAccount(
-					resourcePermitServiceAccountNamespace,
+					serviceAccountNamespace,
 					resourcePermitReadOnlyServiceAccount,
+					namespace.Name,
 					[]string{"get", "list", "watch"},
 				)
-				grantResourcePermitNamespaceAdmin(ctx, "default", resourcePermitRetryRequester)
+				grantResourcePermitNamespaceAdmin(ctx, namespace.Name, resourcePermitRetryRequester)
 				requesterClient = impersonationClient(
 					resourcePermitRetryRequester,
 					[]string{"system:authenticated"},
@@ -303,7 +310,7 @@ data:
 			})
 
 			It("fails preflight and lets the requester retry after permissions are fixed", func() {
-				br := newImpersonatedResourcePermit("e2e-resourcepermit-impersonation-forbidden", brt.Name)
+				br := newImpersonatedResourcePermit(namespace.Name, "e2e-resourcepermit-impersonation-forbidden", brt.Name)
 				DeferCleanup(func() {
 					expireResourcePermitForCleanup(ctx, br)
 					EventuallyDeletion(br)
@@ -316,7 +323,7 @@ data:
 					expectResourcePermitServiceAccount(
 						g,
 						current,
-						resourcePermitServiceAccountNamespace,
+						serviceAccountNamespace,
 						resourcePermitReadOnlyServiceAccount,
 					)
 
@@ -338,8 +345,9 @@ data:
 
 				By("granting the missing permissions and retrying as the requester")
 				grantResourcePermitServiceAccount(
-					resourcePermitServiceAccountNamespace,
+					serviceAccountNamespace,
 					resourcePermitReadOnlyServiceAccount,
+					namespace.Name,
 					[]string{"get", "list", "watch", "create", "update", "patch", "delete"},
 				)
 				patchResourcePermitPhaseAs(
@@ -369,12 +377,13 @@ data:
 
 			It("enters Failed when the ServiceAccount disappears after preflight and recovers on retry", func() {
 				grantResourcePermitServiceAccount(
-					resourcePermitServiceAccountNamespace,
+					serviceAccountNamespace,
 					resourcePermitReadOnlyServiceAccount,
+					namespace.Name,
 					[]string{"get", "list", "watch", "create", "update", "patch", "delete"},
 				)
 
-				br := newImpersonatedResourcePermit("e2e-resourcepermit-activation-retry", brt.Name)
+				br := newImpersonatedResourcePermit(namespace.Name, "e2e-resourcepermit-activation-retry", brt.Name)
 				startTime := metav1.NewTime(time.Now().Add(20 * time.Second))
 				br.Spec.StartTime = &startTime
 				DeferCleanup(func() {
@@ -395,7 +404,7 @@ data:
 				By("deleting the resolved ServiceAccount after the successful preflight")
 				serviceAccount := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{
 					Name:      resourcePermitReadOnlyServiceAccount,
-					Namespace: resourcePermitServiceAccountNamespace,
+					Namespace: serviceAccountNamespace,
 				}}
 				EventuallyDeletion(serviceAccount)
 
@@ -415,8 +424,9 @@ data:
 
 				By("recreating the ServiceAccount and retrying the stored approved snapshot")
 				grantResourcePermitServiceAccount(
-					resourcePermitServiceAccountNamespace,
+					serviceAccountNamespace,
 					resourcePermitReadOnlyServiceAccount,
+					namespace.Name,
 					[]string{"get", "list", "watch", "create", "update", "patch", "delete"},
 				)
 				patchResourcePermitPhaseAs(
@@ -454,12 +464,14 @@ var _ = Describe(
 	Label("resource-permit", "config", "impersonation"),
 	func() {
 		var (
-			ctx context.Context
-			brt *capsulev1beta2.ResourcePermitTemplate
+			ctx       context.Context
+			brt       *capsulev1beta2.ResourcePermitTemplate
+			namespace *corev1.Namespace
 		)
 
 		BeforeEach(func() {
 			ctx = context.Background()
+			namespace = createResourcePermitTestNamespace(ctx)
 
 			original := &capsulev1beta2.CapsuleConfiguration{}
 			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: defaultConfigurationName}, original)).To(Succeed())
@@ -471,8 +483,9 @@ var _ = Describe(
 			})
 
 			grantResourcePermitServiceAccount(
-				"default",
+				namespace.Name,
 				resourcePermitLocalDefaultServiceAccount,
+				namespace.Name,
 				[]string{"get", "list", "watch", "create", "update", "patch", "delete"},
 			)
 			ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
@@ -481,7 +494,7 @@ var _ = Describe(
 			})
 
 			brt = &capsulev1beta2.ResourcePermitTemplate{
-				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-local-template", Namespace: "default"},
+				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-local-template", Namespace: namespace.Name},
 				Spec: capsulev1beta2.ResourcePermitTemplateSpec{
 					Approvals: resourcepermit.ApprovalSpec{Auto: true},
 					Resources: []apiruntime.ResourceTemplate{{Template: `
@@ -501,7 +514,7 @@ data:
 
 		It("uses the namespace-local configured default and records template provenance", func() {
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-local-default", Namespace: "default"},
+				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-local-default", Namespace: namespace.Name},
 				Spec: capsulev1beta2.ResourcePermitSpec{Template: capsulev1beta2.ResourcePermitTemplateReference{
 					Kind: capsulev1beta2.ResourcePermitTemplateKind,
 					Name: brt.Name,
@@ -520,7 +533,7 @@ data:
 				expectResourcePermitServiceAccount(
 					g,
 					current,
-					"default",
+					namespace.Name,
 					resourcePermitLocalDefaultServiceAccount,
 				)
 				g.Expect(current.Status.Request.Template).NotTo(BeNil())
@@ -532,7 +545,7 @@ data:
 				g.Expect(cm.Data).To(HaveKeyWithValue("source", "namespaced-template"))
 				g.Expect(cm.Annotations).To(HaveKeyWithValue(
 					apimeta.ResourcePermitServiceAccountAnnotation,
-					serviceAccountUsername("default", resourcePermitLocalDefaultServiceAccount),
+					serviceAccountUsername(namespace.Name, resourcePermitLocalDefaultServiceAccount),
 				))
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
@@ -541,12 +554,10 @@ data:
 		})
 
 		It("does not resolve a namespaced template from another namespace", func() {
-			namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-local-other"}}
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, namespace) }).Should(Succeed())
-			DeferCleanup(func() { EventuallyDeletion(namespace) })
+			otherNamespace := createResourcePermitTestNamespace(ctx)
 
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-cross-namespace", Namespace: namespace.Name},
+				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-cross-namespace", Namespace: otherNamespace.Name},
 				Spec: capsulev1beta2.ResourcePermitSpec{Template: capsulev1beta2.ResourcePermitTemplateReference{
 					Kind: capsulev1beta2.ResourcePermitTemplateKind,
 					Name: brt.Name,
@@ -570,9 +581,9 @@ func resourcePermitServiceAccountReference(
 	}
 }
 
-func newImpersonatedResourcePermit(name, template string) *capsulev1beta2.ResourcePermit {
+func newImpersonatedResourcePermit(namespace, name, template string) *capsulev1beta2.ResourcePermit {
 	return &capsulev1beta2.ResourcePermit{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 		Spec: capsulev1beta2.ResourcePermitSpec{
 			Template: globalResourcePermitTemplateReference(template),
 		},
@@ -588,12 +599,12 @@ func resourcePermitManagedConfigMap(namespace string) *corev1.ConfigMap {
 	}
 }
 
-func grantResourcePermitServiceAccount(namespace, name string, configMapVerbs []string) {
+func grantResourcePermitServiceAccount(namespace, name, targetNamespace string, configMapVerbs []string) {
 	ensureServiceAccount(namespace, name)
 	bindServiceAccountToNamespacedResource(
 		namespace,
 		name,
-		"default",
+		targetNamespace,
 		[]string{"configmaps"},
 		configMapVerbs,
 	)
