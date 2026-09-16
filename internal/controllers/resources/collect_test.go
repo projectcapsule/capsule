@@ -5,6 +5,7 @@ package resources
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -14,10 +15,265 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/processor"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
+	"github.com/projectcapsule/capsule/pkg/runtime/sanitize"
+	tpl "github.com/projectcapsule/capsule/pkg/template"
+	"github.com/projectcapsule/capsule/pkg/tenant"
+	"github.com/projectcapsule/capsule/pkg/utils"
 )
+
+func TestCollectorOnlyLoadsContextForGenerators(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		name      string
+		raw       bool
+		generator bool
+	}{
+		{name: "copied resources only"},
+		{name: "raw items", raw: true},
+		{name: "generators", generator: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			mapper := k8smeta.NewDefaultRESTMapper([]schema.GroupVersion{{Version: "v1"}})
+			mapper.Add(schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"}, k8smeta.RESTScopeNamespace)
+			c := fake.NewClientBuilder().Build()
+			collector := NewCollector(c, mapper)
+			tnt := &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: "tenant"}}
+			ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "target"}}
+			spec := capsulev1beta2.ResourceSpec{
+				Context: &tpl.TemplateContext{Resources: []*tpl.TemplateResourceReference{{
+					ResourceReference: tpl.ResourceReference{
+						VersionKind: apiruntime.VersionKind{APIVersion: "v1", Kind: "ConfigMap"},
+						Name:        "missing-context",
+					},
+				}}},
+			}
+			if test.raw {
+				spec.RawItems = []capsulev1beta2.RawExtension{{RawExtension: runtime.RawExtension{
+					Raw: []byte(`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"{{tenant.name}}-{{namespace}}"}}`),
+				}}}
+			}
+			if test.generator {
+				spec.Generators = []capsulev1beta2.TemplateItemSpec{{
+					Template: `{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"generated"}}`,
+				}}
+			}
+
+			acc := processor.Accumulator{}
+			err := collector.Collect(t.Context(), c, CollectorOptions{
+				Accumulator: acc,
+				Iterator:    NewCollectorIteratorOptions(tnt, ns, spec),
+			}, tnt, "0", spec, ns)
+			if test.generator {
+				if err == nil || !strings.Contains(err.Error(), "missing-context") {
+					t.Fatalf("expected missing generator context error, got %v", err)
+				}
+			} else if err != nil {
+				t.Fatalf("unused context prevented collection: %v", err)
+			}
+			if test.raw {
+				if len(acc) != 1 {
+					t.Fatalf("accumulated %d objects, want 1", len(acc))
+				}
+				for _, item := range acc {
+					obj := (*item.Objects)[0].Object
+					if obj.GetName() != "tenant-target" || obj.GetNamespace() != "target" {
+						t.Fatalf("raw item fast context was not applied: %v", obj)
+					}
+				}
+			} else if len(acc) != 0 {
+				t.Fatalf("accumulated %d objects, want none", len(acc))
+			}
+		})
+	}
+}
+
+func TestCollectorTemplateContextPreservesInputs(t *testing.T) {
+	t.Parallel()
+
+	tnt := &capsulev1beta2.Tenant{ObjectMeta: replicationObjectMeta("tenant", "")}
+	tnt.Status.Namespaces = []string{"target"}
+	ns := &corev1.Namespace{
+		ObjectMeta: replicationObjectMeta("target", ""),
+		Status:     corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
+	}
+	originalTenant, originalNamespace := tnt.DeepCopy(), ns.DeepCopy()
+	c := fake.NewClientBuilder().Build()
+	collector := NewCollector(c, nil)
+
+	// Preserve the previous context's complete shape, including status, UID and RBAC.
+	wantTenant, err := tenant.NewTenantContext(tnt, c.Scheme(), collector.contextSanitizeOptions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cleanNamespace := ns.DeepCopy()
+	if err := sanitize.SanitizeObject(cleanNamespace, c.Scheme(), collector.contextSanitizeOptions); err != nil {
+		t.Fatal(err)
+	}
+	wantNamespace, err := utils.ToUnstructuredMap(cleanNamespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for range 2 {
+		context, err := collector.gatherTemplateContext(t.Context(), c, CollectorOptions{}, tnt, capsuleResourceSpec(), ns)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(context["tenant"], wantTenant) || !reflect.DeepEqual(context["namespace"], wantNamespace) {
+			t.Fatalf("context changed: %#v", context)
+		}
+		// Template functions can mutate maps. Neither input objects nor the next target's
+		// context should observe those changes.
+		for _, key := range []string{"tenant", "namespace"} {
+			metadata := context[key].(map[string]any)["metadata"].(map[string]any)
+			metadata["labels"].(map[string]any)["company.example/team"] = "changed"
+			metadata["annotations"].(map[string]any)["company.example/source"] = "changed"
+		}
+		if !reflect.DeepEqual(tnt, originalTenant) || !reflect.DeepEqual(ns, originalNamespace) {
+			t.Fatal("context construction or mutation modified input objects")
+		}
+	}
+}
+
+func TestCollectorReplicasAreSanitizedAndIndependent(t *testing.T) {
+	t.Parallel()
+
+	mapper := k8smeta.NewDefaultRESTMapper([]schema.GroupVersion{{Version: "v1"}})
+	mapper.Add(schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"}, k8smeta.RESTScopeNamespace)
+	source := newUnstructured("v1", "ConfigMap", "source", "example")
+	source.SetUID("source-uid")
+	source.SetResourceVersion("7")
+	source.SetGeneration(3)
+	source.SetLabels(map[string]string{"selected": "true", "keep": "original"})
+	source.SetAnnotations(map[string]string{
+		"keep": "original",
+		"kubectl.kubernetes.io/last-applied-configuration": "source-config",
+	})
+	source.SetOwnerReferences([]metav1.OwnerReference{{APIVersion: "v1", Kind: "Secret", Name: "owner", UID: "owner-uid"}})
+	source.SetManagedFields([]metav1.ManagedFieldsEntry{{
+		Manager: "kubectl", Operation: metav1.ManagedFieldsOperationUpdate, APIVersion: "v1",
+		FieldsType: "FieldsV1", FieldsV1: &metav1.FieldsV1{Raw: []byte(`{"f:data":{"f:config":{}}}`)},
+	}})
+	source.Object["data"] = map[string]any{"config": "original"}
+	source.Object["status"] = map[string]any{"ready": true}
+	original := source.DeepCopy()
+	c := fake.NewClientBuilder().WithObjects(source).WithReturnManagedFields().Build()
+	storedBefore := newUnstructured("v1", "ConfigMap", "source", "example")
+	if err := c.Get(t.Context(), client.ObjectKeyFromObject(source), storedBefore); err != nil {
+		t.Fatal(err)
+	}
+	collector := NewCollector(c, mapper)
+	tnt := capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: "tenant"}}
+	ref := tpl.ResourceReference{
+		VersionKind: apiruntime.VersionKind{APIVersion: "v1", Kind: "ConfigMap"},
+		Name:        source.GetName(),
+		Namespace:   source.GetNamespace(),
+		Selector:    &metav1.LabelSelector{MatchLabels: map[string]string{"selected": "true"}},
+	}
+	spec := capsulev1beta2.ResourceSpec{
+		NamespacedItems: []tpl.ResourceReference{ref, ref},
+		AdditionalMetadata: &api.AdditionalMetadataSpec{
+			Labels: map[string]string{"target": "{{namespace}}"},
+		},
+	}
+	opts := CollectorOptions{Accumulator: processor.Accumulator{}, AllowCrossNamespaceSelection: true}
+	sources, err := collector.CollectNamespacedItems(t.Context(), c, opts, spec, nil, tnt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sources) != 1 {
+		t.Fatalf("collected %d sources, want 1", len(sources))
+	}
+	for _, obj := range sources {
+		assertSanitizedReplica(t, obj)
+		if obj.GetNamespace() != "source" || obj.GetLabels()["selected"] != "" {
+			t.Fatalf("unexpected source identity or selection labels: %v", obj)
+		}
+	}
+
+	opts.AllowCrossNamespaceSelection = false
+	for _, name := range []string{"source", "target-a", "target-b"} {
+		if err := collector.CollectForNamespace(t.Context(), c, opts, tnt, "0", spec, sources,
+			&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(opts.Accumulator) != 2 {
+		t.Fatalf("accumulated %d replicas, want 2 (skip source namespace)", len(opts.Accumulator))
+	}
+	for _, item := range opts.Accumulator {
+		obj := (*item.Objects)[0].Object
+		assertSanitizedReplica(t, obj)
+		if obj.GetLabels()["target"] != obj.GetNamespace() || obj.GetLabels()["keep"] != "original" ||
+			obj.Object["data"].(map[string]any)["config"] != "original" {
+			t.Fatalf("replica has incorrect or shared data: %v", obj)
+		}
+		obj.Object["data"].(map[string]any)["config"] = "changed"
+		obj.Object["metadata"].(map[string]any)["labels"].(map[string]any)["keep"] = "changed"
+	}
+	for _, obj := range sources {
+		if obj.Object["data"].(map[string]any)["config"] != "original" || obj.GetLabels()["keep"] != "original" {
+			t.Fatal("replica mutation modified the collected source")
+		}
+	}
+	stored := newUnstructured("v1", "ConfigMap", "source", "example")
+	if err := c.Get(t.Context(), client.ObjectKeyFromObject(source), stored); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(stored, storedBefore) || !reflect.DeepEqual(source, original) {
+		t.Fatal("collection modified the original source")
+	}
+}
+
+func assertSanitizedReplica(t *testing.T, obj *unstructured.Unstructured) {
+	t.Helper()
+	for _, key := range []string{"uid", "resourceVersion", "generation", "ownerReferences", "managedFields"} {
+		if _, exists := obj.Object["metadata"].(map[string]any)[key]; exists {
+			t.Errorf("replica still contains metadata.%s", key)
+		}
+	}
+	if _, exists := obj.Object["status"]; exists {
+		t.Error("replica still contains status")
+	}
+	annotations := obj.GetAnnotations()
+	if _, exists := annotations["kubectl.kubernetes.io/last-applied-configuration"]; exists {
+		t.Error("replica still contains last-applied annotation")
+	}
+	if annotations["keep"] != "original" {
+		t.Errorf("replica lost user annotation: %v", annotations)
+	}
+}
+
+func TestGatherAdditionalMetadataDoesNotMutateSpec(t *testing.T) {
+	t.Parallel()
+
+	spec := capsulev1beta2.ResourceSpec{AdditionalMetadata: &api.AdditionalMetadataSpec{
+		Labels:      map[string]string{"target-{{namespace}}": "{{tenant.name}}"},
+		Annotations: map[string]string{"target": "{{namespace}}"},
+	}}
+	original := spec.DeepCopy()
+	for _, ns := range []string{"a", "b"} {
+		labels, annotations := GatherAdditionalMetadata(spec, map[string]string{"namespace": ns, "tenant.name": "tenant"})
+		if labels["target-"+ns] != "tenant" || annotations["target"] != ns {
+			t.Fatalf("unexpected metadata: %v, %v", labels, annotations)
+		}
+		labels["mutated"] = "true"
+		annotations["mutated"] = "true"
+		if !reflect.DeepEqual(spec, *original) {
+			t.Fatal("metadata templating or mutation modified the spec")
+		}
+	}
+}
 
 func TestCollectorAddToAccumulationClusterScopedObjects(t *testing.T) {
 	t.Parallel()

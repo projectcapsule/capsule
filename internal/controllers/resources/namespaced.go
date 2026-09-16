@@ -37,7 +37,6 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	tenantresourceindexer "github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
-	"github.com/projectcapsule/capsule/pkg/runtime/sanitize"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
@@ -499,45 +498,20 @@ func (r *namespacedResourceController) gatherResources(
 			return err
 		}
 
-		i := 0
-
 		for _, innerNs := range namespaces {
-			opts.Iterator = NewCollectorIteratorOptions(&tnt, innerNs, resource)
-
-			for _, obj := range objs {
-				if obj.GetNamespace() == innerNs.GetName() {
-					continue
-				}
-
-				target := obj.DeepCopy()
-				if err := sanitize.SanitizeObject(target, c.Scheme(), r.collector.objectSanitizeOptions); err != nil {
-					return err
-				}
-
-				target.SetNamespace(innerNs.GetName())
-
-				log.V(4).Info("adding replication for namespaced item", "name", target.GetName(), "namespace", target.GetNamespace(), "kind", target.GetKind())
-
-				err = r.collector.AddToAccumulation(&tnt, innerNs, opts, resource, target, "replica", false)
-				if err != nil {
-					return err
-				}
-			}
-
-			err = r.collector.Collect(
+			err = r.collector.CollectForNamespace(
 				ctx,
 				c,
 				opts,
-				&tnt,
-				strconv.Itoa((resourceIndex)),
+				tnt,
+				strconv.Itoa(resourceIndex),
 				resource,
+				objs,
 				innerNs,
 			)
 			if err != nil {
 				return err
 			}
-
-			i++
 		}
 	}
 
