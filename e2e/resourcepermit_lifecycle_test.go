@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 const (
@@ -325,7 +326,7 @@ var _ = Describe(
 				expectResourcePermitDeletionDenied(ctx, request, capsulev1beta2.ResourcePermitPhaseActive)
 			})
 
-			It("does not block deletion of its namespace", func() {
+			It("keeps its finalizer until managed resources are deleted during namespace termination", func() {
 				request := newLifecycleResourcePermit(
 					namespace.Name,
 					"e2e-resourcepermit-delete-with-namespace",
@@ -339,8 +340,52 @@ var _ = Describe(
 				waitForResourcePermitPhase(ctx, request, capsulev1beta2.ResourcePermitPhaseActive)
 				expectResourcePermitDeletionDenied(ctx, request, capsulev1beta2.ResourcePermitPhaseActive)
 
+				const holdFinalizer = "e2e.projectcapsule.dev/hold-resourcepermit-target"
+				controllerClient := impersonationClient(ControllerServiceAccountFull, serviceAccountGroups(ControllerNamespace))
+				targetKey := client.ObjectKey{Namespace: request.Namespace, Name: "e2e-resourcepermit-delete-with-namespace-target"}
+				releaseTarget := func() {
+					Eventually(func(g Gomega) {
+						target := &corev1.ConfigMap{}
+						err := k8sClient.Get(ctx, targetKey, target)
+						if apierrors.IsNotFound(err) {
+							return
+						}
+						g.Expect(err).NotTo(HaveOccurred())
+						before := target.DeepCopy()
+						controllerutil.RemoveFinalizer(target, holdFinalizer)
+						g.Expect(controllerClient.Patch(ctx, target, client.MergeFrom(before))).To(Succeed())
+					}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+				}
+				DeferCleanup(releaseTarget)
+				Eventually(func(g Gomega) {
+					target := &corev1.ConfigMap{}
+					g.Expect(k8sClient.Get(ctx, targetKey, target)).To(Succeed())
+					before := target.DeepCopy()
+					controllerutil.AddFinalizer(target, holdFinalizer)
+					g.Expect(controllerClient.Patch(ctx, target, client.MergeFrom(before))).To(Succeed())
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
 				By("allowing namespace termination to override lifecycle and archive retention")
 				Expect(k8sClient.Delete(ctx, namespace)).To(Succeed())
+
+				By("retaining the permit while its protected ConfigMap is still terminating")
+				Eventually(func(g Gomega) {
+					target := &corev1.ConfigMap{}
+					g.Expect(k8sClient.Get(ctx, targetKey, target)).To(Succeed())
+					g.Expect(target.DeletionTimestamp.IsZero()).To(BeFalse())
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+				Consistently(func(g Gomega) {
+					current := &capsulev1beta2.ResourcePermit{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(request), current)).To(Succeed())
+					g.Expect(current.Finalizers).To(ContainElement(apimeta.ControllerFinalizer))
+					g.Expect(current.Status.ProcessedItems).NotTo(BeEmpty())
+				}, 4*time.Second, 500*time.Millisecond).Should(Succeed())
+
+				By("finishing permit and namespace deletion after the ConfigMap finalizer completes")
+				releaseTarget()
+				Eventually(func() bool {
+					return apierrors.IsNotFound(k8sClient.Get(ctx, targetKey, &corev1.ConfigMap{}))
+				}, defaultTerminationTimeoutInterval, defaultPollInterval).Should(BeTrue())
 
 				Eventually(func() bool {
 					current := &capsulev1beta2.ResourcePermit{}
@@ -462,10 +507,10 @@ var _ = Describe(
 				g.Expect(ready.Message).To(ContainSubstring("rendering resource 1 template"))
 				g.Expect(ready.Message).To(ContainSubstring("map has no entry for key"))
 				g.Expect(current.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseCreated))
+				g.Expect(current.Status.Request).NotTo(BeNil())
 				g.Expect(current.Status.Request.Template).NotTo(BeNil())
 				g.Expect(current.Status.Request.Template.Name).To(Equal(renderingTemplate.Name))
 				g.Expect(current.Status.Request.Template.ResourceVersion).NotTo(BeEmpty())
-				g.Expect(current.Status.Request).NotTo(BeNil())
 				g.Expect(current.Status.Request.Resources).To(HaveLen(1))
 				g.Expect(current.Status.Size).To(BeZero())
 				g.Expect(current.Status.ProcessedItems).To(BeEmpty())
@@ -482,17 +527,22 @@ var _ = Describe(
 			}, 4*time.Second, 500*time.Millisecond).Should(BeTrue())
 
 			By("rejecting approval while the rendered snapshot is not ready")
-			before := current.DeepCopy()
-			current.Status.Phase = capsulev1beta2.ResourcePermitPhaseApproved
-			err := reviewerClient.Status().Patch(
-				ctx,
-				current,
-				client.MergeFromWithOptions(before, client.MergeFromWithOptimisticLock{}),
-			)
-			Expect(apierrors.IsForbidden(err)).To(BeTrue())
-			Expect(err).To(MatchError(ContainSubstring(
-				"cannot approve ResourcePermit: rendered resources are not ready",
-			)))
+			Eventually(func(g Gomega) {
+				// Rendering retries update status during the preview assertion above.
+				// Use a fresh version so a conflict cannot stand in for admission denial.
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(request), current)).To(Succeed())
+				before := current.DeepCopy()
+				current.Status.Phase = capsulev1beta2.ResourcePermitPhaseApproved
+				err := reviewerClient.Status().Patch(
+					ctx,
+					current,
+					client.MergeFromWithOptions(before, client.MergeFromWithOptimisticLock{}),
+				)
+				g.Expect(apierrors.IsForbidden(err)).To(BeTrue(), "expected admission denial, got: %v", err)
+				g.Expect(err).To(MatchError(ContainSubstring(
+					"cannot approve ResourcePermit: rendered resources are not ready",
+				)))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 			current = &capsulev1beta2.ResourcePermit{}
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(request), current)).To(Succeed())

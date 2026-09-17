@@ -285,7 +285,8 @@ func (r *ResourcePermitReconciler) reconcile(
 			evt.ActionExpired,
 		)
 
-		if len(br.Status.ProcessedItems) > 0 {
+		if len(br.Status.ProcessedItems) > 0 || (controllerutil.ContainsFinalizer(br, meta.ControllerFinalizer) &&
+			br.Status.Request != nil && len(br.Status.Request.Resources) > 0) {
 			resourceClient, loadErr := r.resourceClient(ctx, log, br, nil)
 			if loadErr != nil {
 				return ctrl.Result{}, statusError(impersonationFailedReason, loadErr)
@@ -293,6 +294,9 @@ func (r *ResourcePermitReconciler) reconcile(
 
 			if err := r.pruneItems(ctx, br, resourceClient); err != nil {
 				return ctrl.Result{}, err
+			}
+			if len(br.Status.ProcessedItems) > 0 {
+				return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
 			}
 		}
 
@@ -862,7 +866,7 @@ func (r *ResourcePermitReconciler) reconcileDelete(
 		return ctrl.Result{}, nil
 	}
 
-	if len(br.Status.ProcessedItems) > 0 {
+	if len(br.Status.ProcessedItems) > 0 || (br.Status.Request != nil && len(br.Status.Request.Resources) > 0) {
 		resourceClient, err := r.resourceClient(ctx, log, br, nil)
 		if err != nil {
 			return ctrl.Result{}, statusError(impersonationFailedReason, err)
@@ -870,6 +874,9 @@ func (r *ResourcePermitReconciler) reconcileDelete(
 
 		if err := r.pruneItems(ctx, br, resourceClient); err != nil {
 			return ctrl.Result{}, err
+		}
+		if len(br.Status.ProcessedItems) > 0 {
+			return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
 		}
 	}
 
@@ -1134,6 +1141,27 @@ func (r *ResourcePermitReconciler) pruneItems(
 			}
 
 			current := br.Status.ProcessedItems.GetItem(item.ResourceID)
+			obj.SetNamespace(item.Namespace)
+			if current != nil {
+				item = *current
+			} else {
+				// Applying a resource and persisting its status are separate writes.
+				// Recover successful applies from the immutable rendered snapshot,
+				// but never prune a preview that this permit did not actually apply.
+				actual := obj.DeepCopy()
+				if getErr := resourceClient.Get(ctx, client.ObjectKeyFromObject(actual), actual); getErr != nil {
+					if !apierrors.IsNotFound(getErr) {
+						syncErr = errors.Join(syncErr, getErr)
+					}
+
+					continue
+				}
+				if _, owned := meta.CapsuleFieldOwners(actual, fieldOwner)[fieldOwner]; !owned {
+					continue
+				}
+				item.Created = actual.GetLabels()[meta.CreatedByCapsuleLabel] == meta.ValueControllerResourcePermit ||
+					!resource.Policy.AllowsAdoption()
+			}
 
 			if resource.Policy.ShouldOrphan() {
 				if orphanErr := manager.Orphan(ctx, resourceClient, obj, nil); orphanErr != nil {
@@ -1153,7 +1181,7 @@ func (r *ResourcePermitReconciler) pruneItems(
 
 			deleted, pruneErr := manager.Prune(ctx, resourceClient, obj, ssa.PruneOptions{
 				FieldOwner:        fieldOwner,
-				PreviouslyCreated: current != nil && current.Created,
+				PreviouslyCreated: item.Created,
 			})
 			if pruneErr != nil {
 				item.Status = metav1.ConditionFalse
@@ -1163,6 +1191,21 @@ func (r *ResourcePermitReconciler) pruneItems(
 				syncErr = errors.Join(syncErr, pruneErr)
 
 				continue
+			}
+
+			if deleted {
+				// DELETE only starts termination. Keep tracking the resource and
+				// retain the permit finalizer until its own finalizers have finished.
+				actual := obj.DeepCopy()
+				getErr := resourceClient.Get(ctx, client.ObjectKeyFromObject(actual), actual)
+				if !apierrors.IsNotFound(getErr) {
+					item.Status = metav1.ConditionFalse
+					item.Message = "waiting for resource deletion"
+					br.Status.ProcessedItems.UpdateItem(item)
+					syncErr = errors.Join(syncErr, getErr)
+
+					continue
+				}
 			}
 
 			if !deleted {

@@ -5,15 +5,16 @@ package e2e
 
 import (
 	"context"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	apimeta "github.com/projectcapsule/capsule/pkg/api/meta"
+	capsulerbac "github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/api/resourcepermit"
 	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
+	authorizationv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -375,83 +376,135 @@ data:
 				expectResourcePermitAndConfigMapDeleted(ctx, br, cm)
 			})
 
-			It("enters Failed when the ServiceAccount disappears after preflight and recovers on retry", func() {
-				grantResourcePermitServiceAccount(
-					serviceAccountNamespace,
-					resourcePermitReadOnlyServiceAccount,
-					namespace.Name,
-					[]string{"get", "list", "watch", "create", "update", "patch", "delete"},
-				)
-
-				br := newImpersonatedResourcePermit(namespace.Name, "e2e-resourcepermit-activation-retry", brt.Name)
-				startTime := metav1.NewTime(time.Now().Add(20 * time.Second))
-				br.Spec.StartTime = &startTime
-				DeferCleanup(func() {
-					expireResourcePermitForCleanup(ctx, br)
-					EventuallyDeletion(br)
+			Context("when target permissions change after preflight", func() {
+				BeforeEach(func() {
+					// Hold activation until write permissions have been revoked.
+					brt.Spec.Approvals = resourcepermit.ApprovalSpec{
+						Approvers: capsulerbac.UserListSpec{{
+							Kind: capsulerbac.UserOwner,
+							Name: resourcePermitRetryRequester,
+						}},
+					}
+					grantResourcePermitServiceAccount(
+						serviceAccountNamespace,
+						resourcePermitReadOnlyServiceAccount,
+						namespace.Name,
+						[]string{"get", "list", "watch", "create", "update", "patch", "delete"},
+					)
 				})
-				EventuallyCreation(func() error { return requesterClient.Create(ctx, br) }).Should(Succeed())
 
-				Eventually(func(g Gomega) {
-					current := &capsulev1beta2.ResourcePermit{}
-					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(br), current)).To(Succeed())
-					g.Expect(current.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseApproved))
-					ready := k8smeta.FindStatusCondition(current.Status.Conditions, apimeta.ReadyCondition)
-					g.Expect(ready).NotTo(BeNil())
-					g.Expect(ready.Status).To(Equal(metav1.ConditionTrue))
-				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+				It("enters Failed when write permissions are revoked and recovers on retry", func() {
+					br := newImpersonatedResourcePermit(namespace.Name, "e2e-resourcepermit-activation-retry", brt.Name)
+					DeferCleanup(func() {
+						expireResourcePermitForCleanup(ctx, br)
+						EventuallyDeletion(br)
+					})
+					EventuallyCreation(func() error { return requesterClient.Create(ctx, br) }).Should(Succeed())
 
-				By("deleting the resolved ServiceAccount after the successful preflight")
-				serviceAccount := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{
-					Name:      resourcePermitReadOnlyServiceAccount,
-					Namespace: serviceAccountNamespace,
-				}}
-				EventuallyDeletion(serviceAccount)
+					Eventually(func(g Gomega) {
+						current := &capsulev1beta2.ResourcePermit{}
+						g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(br), current)).To(Succeed())
+						g.Expect(current.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseRequested))
+						ready := k8smeta.FindStatusCondition(current.Status.Conditions, apimeta.ReadyCondition)
+						g.Expect(ready).NotTo(BeNil())
+						g.Expect(ready.Status).To(Equal(metav1.ConditionTrue))
+					}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
-				Eventually(func(g Gomega) {
-					current := &capsulev1beta2.ResourcePermit{}
-					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(br), current)).To(Succeed())
-					g.Expect(current.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseFailed))
-					g.Expect(current.Status.Failure).NotTo(BeNil())
-					g.Expect(current.Status.Failure.Stage).To(Equal(capsulev1beta2.ResourcePermitFailureStageActivation))
-					g.Expect(current.Status.Failure.RetryPhase).To(Equal(capsulev1beta2.ResourcePermitPhaseApproved))
-					ready := k8smeta.FindStatusCondition(current.Status.Conditions, apimeta.ReadyCondition)
-					g.Expect(ready).NotTo(BeNil())
-					g.Expect(ready.Status).To(Equal(metav1.ConditionFalse))
-					g.Expect(ready.Reason).To(Equal("ImpersonationFailed"))
-					g.Expect(ready.Message).To(ContainSubstring("not found"))
-				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+					By("protecting the resolved ServiceAccount after successful preflight")
+					serviceAccount := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{
+						Name:      resourcePermitReadOnlyServiceAccount,
+						Namespace: serviceAccountNamespace,
+					}}
+					Eventually(func(g Gomega) {
+						err := k8sClient.Delete(ctx, serviceAccount, client.DryRunAll)
+						g.Expect(apierrors.IsForbidden(err)).To(BeTrue(), "expected admission denial, got: %v", err)
+						g.Expect(err).To(MatchError(ContainSubstring(
+							"used by unexpired ResourcePermit " + br.Namespace + "/" + br.Name,
+						)))
+					}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
-				By("recreating the ServiceAccount and retrying the stored approved snapshot")
-				grantResourcePermitServiceAccount(
-					serviceAccountNamespace,
-					resourcePermitReadOnlyServiceAccount,
-					namespace.Name,
-					[]string{"get", "list", "watch", "create", "update", "patch", "delete"},
-				)
-				patchResourcePermitPhaseAs(
-					ctx,
-					requesterClient,
-					br,
-					capsulev1beta2.ResourcePermitPhaseRetrying,
-				)
+					setConfigMapWriteAccess := func(allowed bool) {
+						verbs := []string{"get", "list", "watch"}
+						if allowed {
+							verbs = append(verbs, "create", "update", "patch", "delete")
+						}
+						bindServiceAccountToNamespacedResource(
+							serviceAccountNamespace,
+							resourcePermitReadOnlyServiceAccount,
+							namespace.Name,
+							[]string{"configmaps"},
+							verbs,
+						)
+						// Wait for RBAC propagation before approval or retry.
+						Eventually(func(g Gomega) {
+							for _, verb := range []string{"create", "patch"} {
+								review := &authorizationv1.SubjectAccessReview{
+									Spec: authorizationv1.SubjectAccessReviewSpec{
+										User:   serviceAccountUsername(serviceAccountNamespace, resourcePermitReadOnlyServiceAccount),
+										Groups: serviceAccountGroups(serviceAccountNamespace),
+										ResourceAttributes: &authorizationv1.ResourceAttributes{
+											Namespace: namespace.Name,
+											Verb:      verb,
+											Resource:  "configmaps",
+											Name:      resourcePermitImpersonationTargetName,
+										},
+									},
+								}
+								g.Expect(k8sClient.Create(ctx, review)).To(Succeed())
+								g.Expect(review.Status.EvaluationError).To(BeEmpty())
+								g.Expect(review.Status.Allowed).To(Equal(allowed), "%s ConfigMap permission: %+v", verb, review.Status)
+							}
+						}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+					}
+					// Restore access before permit cleanup, including when an assertion fails.
+					DeferCleanup(setConfigMapWriteAccess, true)
+					By("revoking write permissions and approving the stored snapshot")
+					setConfigMapWriteAccess(false)
+					patchResourcePermitPhaseAs(ctx, requesterClient, br, capsulev1beta2.ResourcePermitPhaseApproved)
 
-				cm := resourcePermitManagedConfigMap(br.Namespace)
-				Eventually(func(g Gomega) {
-					current := &capsulev1beta2.ResourcePermit{}
-					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(br), current)).To(Succeed())
-					g.Expect(current.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseActive))
-					g.Expect(current.Status.Failure).To(BeNil())
-					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cm), cm)).To(Succeed())
-				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+					Eventually(func(g Gomega) {
+						current := &capsulev1beta2.ResourcePermit{}
+						g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(br), current)).To(Succeed())
+						g.Expect(current.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseFailed))
+						g.Expect(current.Status.Failure).NotTo(BeNil())
+						g.Expect(current.Status.Failure.Stage).To(Equal(capsulev1beta2.ResourcePermitFailureStageActivation))
+						g.Expect(current.Status.Failure.RetryPhase).To(Equal(capsulev1beta2.ResourcePermitPhaseApproved))
+						ready := k8smeta.FindStatusCondition(current.Status.Conditions, apimeta.ReadyCondition)
+						g.Expect(ready).NotTo(BeNil())
+						g.Expect(ready.Status).To(Equal(metav1.ConditionFalse))
+						g.Expect(ready.Reason).To(Equal("ResourceApplyFailed"))
+						g.Expect(ready.Message).To(ContainSubstring("forbidden"))
+					}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
-				patchResourcePermitPhaseAs(
-					ctx,
-					requesterClient,
-					br,
-					capsulev1beta2.ResourcePermitPhaseExpired,
-				)
-				expectResourcePermitAndConfigMapDeleted(ctx, br, cm)
+					cm := resourcePermitManagedConfigMap(br.Namespace)
+					err := k8sClient.Get(ctx, client.ObjectKeyFromObject(cm), cm)
+					Expect(apierrors.IsNotFound(err)).To(BeTrue(), "failed activation must not create the target: %v", err)
+
+					By("restoring write permissions and retrying the stored approved snapshot")
+					setConfigMapWriteAccess(true)
+					patchResourcePermitPhaseAs(
+						ctx,
+						requesterClient,
+						br,
+						capsulev1beta2.ResourcePermitPhaseRetrying,
+					)
+
+					Eventually(func(g Gomega) {
+						current := &capsulev1beta2.ResourcePermit{}
+						g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(br), current)).To(Succeed())
+						g.Expect(current.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseActive))
+						g.Expect(current.Status.Failure).To(BeNil())
+						g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cm), cm)).To(Succeed())
+					}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+					patchResourcePermitPhaseAs(
+						ctx,
+						requesterClient,
+						br,
+						capsulev1beta2.ResourcePermitPhaseExpired,
+					)
+					expectResourcePermitAndConfigMapDeleted(ctx, br, cm)
+				})
 			})
 		})
 	},
@@ -627,6 +680,7 @@ func expectResourcePermitServiceAccount(
 	namespace,
 	name string,
 ) {
+	g.Expect(request.Status.Request).NotTo(BeNil(), "ResourcePermit status is not initialized: %+v", request.Status)
 	g.Expect(request.Status.Request.Impersonation).ToNot(BeNil())
 	g.Expect(request.Status.Request.Impersonation.Name.String()).To(Equal(name))
 	g.Expect(request.Status.Request.Impersonation.Namespace.String()).To(Equal(namespace))

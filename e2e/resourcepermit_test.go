@@ -192,6 +192,7 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 		BeforeEach(func() {
 			protect := false
 			brt.Spec.Resources[0].Policy.Protect = &protect
+			brt.Spec.DefaultDuration = nil
 		})
 
 		It("allows the managed resource to be changed", func() {
@@ -202,14 +203,26 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, br) }).Should(Succeed())
 
+			// The ConfigMap can appear before activation finishes. Editing it
+			// before the Active status is persisted can race an activation retry.
+			waitForResourcePermitPhase(ctx, br, capsulev1beta2.ResourcePermitPhaseActive)
+
 			cm := &corev1.ConfigMap{}
 			Eventually(func(g Gomega) {
 				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "e2e-resourcepermit-cm", Namespace: br.Namespace}, cm)).To(Succeed())
 				g.Expect(cm.Labels).NotTo(HaveKey(apimeta.ProtectedByCapsuleLabel))
+				cm.Data["key"] = "changed"
+				g.Expect(k8sClient.Update(ctx, cm)).To(Succeed())
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
-			cm.Data["key"] = "changed"
-			Expect(k8sClient.Update(ctx, cm)).To(Succeed())
+			Consistently(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cm), cm)).To(Succeed())
+				g.Expect(cm.Data).To(HaveKeyWithValue("key", "changed"))
+				current := &capsulev1beta2.ResourcePermit{}
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(br), current)).To(Succeed())
+				g.Expect(current.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseActive),
+					"ResourcePermit failed after editing an unprotected target: %+v", current.Status.Failure)
+			}, 4*time.Second, 500*time.Millisecond).Should(Succeed())
 		})
 	})
 
