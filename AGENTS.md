@@ -22,8 +22,8 @@ design and follow the conventions of the package you are changing.
 - Every e2e change must cover positive and negative cases with one or more real
   Tenant objects present. Add multiple tenants whenever isolation or shared state
   is involved.
-- All new code requires benchmark coverage of its execution paths. Extend existing
-  benchmarks where appropriate; benchmarks are required beyond admission code too.
+- New or materially changed performance-sensitive execution paths require benchmark
+  coverage; extend existing benchmarks where appropriate.
 - **All admission changes are performance critical**, including changes to shared
   helpers, configuration, rules, lookups, caches, or registration used by admission.
 - **Reuse existing local mutex-protected caches and indexed lookups wherever their
@@ -85,8 +85,9 @@ Before implementing a change:
 3. Search the shared packages for reusable behavior, local caches, and field
    indexers; inspect their callers, lifetime, and consistency requirements.
 4. Identify tenant boundaries, compatibility requirements, and admission impact.
-5. Define the unit tests, positive/negative tenant e2e scenarios, and benchmarks
-   needed to prove the change.
+5. Define the unit tests and positive/negative tenant e2e scenarios needed to prove
+   the change. Identify new or materially changed performance-sensitive execution
+   paths and plan benchmark coverage for them.
 
 ## Repository map and extension points
 
@@ -248,8 +249,9 @@ Kubernetes write.
   set or an explicit retention policy. Process-local caches are independent across
   controller replicas and cannot coordinate quota reservations or authorization.
 - Add tests for reuse, concurrent misses, invalidation, mutation isolation, and
-  distinct namespace profiles/tenants. Benchmark cold misses, warm hits, and
-  concurrent access; report allocations and contention along with saved work.
+  distinct namespace profiles/tenants. For new or materially changed cache paths,
+  benchmark cold misses, warm hits, and concurrent access; report allocations and
+  contention along with saved work.
 
 ### Use indexers for admission lookups
 
@@ -278,15 +280,18 @@ Kubernetes write.
 - Test extraction and lookup behavior, including no matches, multiple matches,
   changed relationships, deletion, and tenant/namespace separation. Register the
   same indexes with fake clients using `WithIndex`, and exercise real cache updates
-  in e2e tests. Benchmark increasing unrelated tenant/resource counts and verify
-  that the lookup avoids full-list work and redundant API calls.
+  in e2e tests. For new or materially changed lookup paths, benchmark increasing
+  unrelated tenant/resource counts and verify that the lookup avoids full-list work
+  and redundant API calls.
 
 ### Require performance evidence
 
-Every admission change needs before/after benchmarks of the affected request path,
-including applicable allow, deny, and skip cases. Exercise single-tenant and
-multiple-tenant workloads, representative rule/object sizes, and cache/concurrency
-states. Include counting-reader/client tests when lookup behavior changes.
+Assess performance impact for every admission change. New or materially changed
+admission execution paths require benchmarks, including applicable allow, deny,
+and skip cases. Compare before/after measurements for changed paths; report absolute
+measurements and scaling for new paths. Exercise single-tenant and multiple-tenant
+workloads, representative rule/object sizes, and cache/concurrency states. Include
+counting-reader/client tests when lookup behavior changes.
 
 Report timing, allocations, API-call changes, and scaling behavior. Fix regressions
 or explicitly document their measured cost and the required correctness tradeoff
@@ -356,16 +361,26 @@ Test implementation requirements:
 - Do not weaken assertions, increase timeouts without diagnosis, mark new coverage
   skipped, or commit focused specs to make a failing run appear successful.
 
-## Benchmarks: required for all new code
+## Benchmarks: performance-sensitive execution paths
+
+New or materially changed performance-sensitive execution paths require benchmark
+coverage; extend existing benchmarks where appropriate. These include admission,
+cache/index lookups, rule evaluation, template rendering, and reconciliation work
+whose cost grows with tenant, namespace, or resource counts. Material changes
+include changes to API calls, allocations, algorithms, locking, concurrency, or
+scaling behavior.
+
+Documentation-only changes and changes that do not introduce or materially alter
+performance-sensitive execution paths do not require benchmarks.
 
 Add Go `Benchmark...` functions in adjacent `*_test.go` or `*_bench_test.go` files.
 Extend existing benchmarks rather than introducing a separate framework. Examples:
 [pkg/tenant/rules_bench_test.go](pkg/tenant/rules_bench_test.go) and
 [internal/controllers/resources/collect_bench_test.go](internal/controllers/resources/collect_bench_test.go).
 
-- Benchmark the new behavior at a meaningful operation boundary, including new
-  helpers through their callers. Trivial wrapper-only measurements are insufficient
-  if the new work happens elsewhere.
+- Benchmark the affected performance-sensitive behavior at a meaningful operation
+  boundary, including helpers through their callers. Trivial wrapper-only
+  measurements are insufficient if the affected work happens elsewhere.
 - Use deterministic fixtures, `b.ReportAllocs()`, and sub-benchmarks for relevant
   input sizes. Include one and multiple tenants for tenant-dependent work, and
   vary namespaces/rules/resources where cost depends on their count. For rules
@@ -432,16 +447,17 @@ usage, request latency/throughput, and errors for any reported comparison.
 - Keep credentials, kubeconfigs, certificates/private keys, test artifacts, and
   benchmark output out of commits. Preserve unrelated local files.
 - Describe the resulting namespace profile behavior, rules API integration, reused
-  extension points, tenant scenarios, commands/results, and benchmark evidence in
-  the handoff or PR. Identify any
-  unrun checks and their concrete blockers; never claim success from compilation
-  alone or omit missing e2e/performance evidence.
+  extension points, tenant scenarios, commands/results, and benchmark evidence when
+  required in the handoff or PR. Identify unrun checks and their concrete blockers;
+  never claim success from compilation alone or omit required e2e/performance
+  evidence.
 - If preparing commits or a PR, follow the repository's Conventional Commit and
   DCO requirements in `CONTRIBUTING.md`.
 
 Before declaring completion, verify that the change advances namespace profiling,
 uses the rules API as its primary feature extension point, follows the existing
 structure, reuses available code, includes unit and tenant-aware positive/negative
-e2e coverage, includes benchmarks for new code, preserves isolation/API contracts,
-and supplies performance evidence for every affected admission path. Explain any
-necessary departure from the rules API approach.
+e2e coverage, includes benchmarks for new or materially changed performance-sensitive
+execution paths, and preserves isolation/API contracts. Assess performance impact
+for every admission change and supply the required evidence. Explain any necessary
+departure from the rules API approach.
