@@ -8,7 +8,7 @@ require (
 	github.com/fluxcd/pkg/apis/kustomize v1.15.0
 	github.com/fluxcd/pkg/ssa v0.77.0
 	github.com/go-logr/logr v1.4.4
-	github.com/go-sprout/sprout v1.1.0
+	github.com/go-sprout/sprout v1.1.1
 	github.com/google/cel-go v0.31.0
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.42.1
@@ -37,7 +37,7 @@ require (
 	k8s.io/client-go v0.36.3
 	k8s.io/component-helpers v0.36.3
 	k8s.io/klog/v2 v2.140.0
-	k8s.io/utils v0.0.0-20260507154919-ff6756f316d2
+	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
 	sigs.k8s.io/cluster-api v1.13.4
 	sigs.k8s.io/controller-runtime v0.24.1
 	sigs.k8s.io/gateway-api v1.6.1
@@ -114,7 +114,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.45.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/crypto v0.55.0 // indirect
 	golang.org/x/exp v0.0.0-20251219203646-944ab1f22d93 // indirect
 	golang.org/x/mod v0.39.0 // indirect
