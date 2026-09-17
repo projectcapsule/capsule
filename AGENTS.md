@@ -26,6 +26,9 @@ design and follow the conventions of the package you are changing.
   benchmarks where appropriate; benchmarks are required beyond admission code too.
 - **All admission changes are performance critical**, including changes to shared
   helpers, configuration, rules, lookups, caches, or registration used by admission.
+- **Reuse existing local mutex-protected caches and indexed lookups wherever their
+  consistency guarantees fit the operation.** Admission must avoid repeated
+  compilation, redundant reads, and full-list filtering when these facilities apply.
 - A change is not fully validated until its required checks pass. Report missing
   coverage, unavailable environments, and unrun checks explicitly.
 
@@ -79,7 +82,8 @@ Before implementing a change:
 2. Identify the namespace profile behavior and its rules API extension point, then
    trace the closest existing feature through rule selection, reconciliation or
    admission, registration, and its unit/e2e tests.
-3. Search the shared packages for reusable behavior and inspect their callers.
+3. Search the shared packages for reusable behavior, local caches, and field
+   indexers; inspect their callers, lifetime, and consistency requirements.
 4. Identify tenant boundaries, compatibility requirements, and admission impact.
 5. Define the unit tests, positive/negative tenant e2e scenarios, and benchmarks
    needed to prove the change.
@@ -215,6 +219,67 @@ Kubernetes write.
   per-request client construction. Keep concurrency bounded and lock scope small.
 - Measure added allocations, copies, lock contention, and API round trips. Avoid
   adding high-volume logs or expensive formatting to common allow/skip paths.
+
+### Reuse local mutex-protected caches
+
+- Prefer the existing process-local caches in `internal/cache/` for reusable
+  compiled regexes, CEL expressions, JSONPaths, registry rules, and compiled targets.
+  Use their `GetOrCompile`/`GetOrBuild` APIs and inject shared instances from the
+  controller setup. Do not create a new cache per admission request or duplicate an
+  existing cache with a handler-local map.
+- Match the cache lifetime to the data. Shared immutable compiled artifacts can
+  outlive requests; request-specific reads belong in the existing request caching
+  reader. Preserve that reader's per-request lifetime and copy semantics. Do not
+  promote request snapshots, lookup errors, or authorization decisions into a
+  process-wide cache without an explicit freshness and invalidation design.
+- Follow the existing `sync.Mutex`/`sync.RWMutex` patterns when extending a cache.
+  Protect map access and publication, recheck after acquiring the write lock on a
+  miss, and keep the hit path short. Never hold a shared cache lock across API I/O.
+  For expensive builds, use the appropriate existing build/publication pattern and
+  measure contention before introducing another concurrency mechanism.
+- A mutex protects access, not data freshness or the contents of a returned
+  pointer. Keep published values immutable or copy the mutable portions before
+  returning/changing them; a shallow slice copy does not isolate nested maps or
+  pointers. Namespace profile results must retain their tenant, namespace, rule,
+  and identity distinctions in cache keys wherever those inputs affect the result.
+- Reuse the applicable invalidation/reset/pruning hooks, including
+  `internal/controllers/cfg/invalidator/`. Define how updates, deletion, and rule
+  changes retire entries, and keep memory growth bounded by the intended working
+  set or an explicit retention policy. Process-local caches are independent across
+  controller replicas and cannot coordinate quota reservations or authorization.
+- Add tests for reuse, concurrent misses, invalidation, mutation isolation, and
+  distinct namespace profiles/tenants. Benchmark cold misses, warm hits, and
+  concurrent access; report allocations and contention along with saved work.
+
+### Use indexers for admission lookups
+
+- Prefer an existing keyed `Get` when the object name is known. For reverse or
+  relational lookups, use the registered field indexes in `pkg/runtime/indexers/`
+  with `client.MatchingFields` on the manager's cached client. Avoid listing all
+  tenants/resources and filtering them in Go when an index can select candidates.
+- Reuse index field constants and existing lookup helpers. Examples include
+  `tenant.NamespaceIndexerFieldName` for namespace-to-tenant lookup and
+  `tenant.OwnerKindIndexerFieldName` for owner-to-tenant lookup in
+  `pkg/runtime/indexers/tenant/`. Apply namespace scoping to namespaced resources
+  and retain all required ownership, identity, and rule checks on the results.
+- If a necessary index is missing, extend the relevant domain under
+  `pkg/runtime/indexers/` and register it through `AddToManager`. Keep extraction
+  deterministic, cheap, and free of API calls. Account for multi-valued relationships
+  and update/delete behavior; do not build a second hand-maintained reverse map.
+- Custom indexes exist in the controller-runtime cache. Do not pass their synthetic
+  fields to `GetAPIReader()` or another direct API client. Check which reader a
+  handler actually receives and that the queried resource uses the registered cache.
+  Do not silently replace an index registration failure with a full-cluster scan.
+- Indexed reads are eventually consistent. Preserve required authoritative reads
+  for security and quota decisions; use indexed candidate selection only where its
+  freshness is sufficient. Re-reading returned candidates cannot repair a stale
+  index that omitted a match. An empty indexed result must not become an unsafe
+  allow decision or proof that a conflict does not exist.
+- Test extraction and lookup behavior, including no matches, multiple matches,
+  changed relationships, deletion, and tenant/namespace separation. Register the
+  same indexes with fake clients using `WithIndex`, and exercise real cache updates
+  in e2e tests. Benchmark increasing unrelated tenant/resource counts and verify
+  that the lookup avoids full-list work and redundant API calls.
 
 ### Require performance evidence
 
