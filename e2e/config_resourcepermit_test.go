@@ -492,7 +492,9 @@ data:
 					Eventually(func(g Gomega) {
 						current := &capsulev1beta2.ResourcePermit{}
 						g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(br), current)).To(Succeed())
-						g.Expect(current.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseActive))
+						g.Expect(current.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseActive),
+							"ResourcePermit retry did not activate: failure=%+v, conditions=%+v, resources=%+v",
+							current.Status.Failure, current.Status.Conditions, current.Status.ProcessedItems)
 						g.Expect(current.Status.Failure).To(BeNil())
 						g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cm), cm)).To(Succeed())
 					}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())

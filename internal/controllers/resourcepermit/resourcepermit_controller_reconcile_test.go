@@ -352,7 +352,7 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 			},
 			mocks: func(cl *mc.MockClient, scl *mc.MockSubResourceWriter) {
 				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBrt).Return(nil)
-				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil).Times(3)
+				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil).Times(2)
 				cl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
 				scl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
 			},
@@ -403,7 +403,7 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 			},
 			mocks: func(cl *mc.MockClient, scl *mc.MockSubResourceWriter) {
 				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBrt).Return(nil)
-				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil).Times(3)
+				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil).Times(2)
 				cl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
 				cl.EXPECT().Get(gm.Any(), gm.Any(), matchUs).
 					Return(apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, "test-configmap"))
@@ -472,7 +472,7 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 			},
 			mocks: func(cl *mc.MockClient, scl *mc.MockSubResourceWriter) {
 				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBrt).Return(nil)
-				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil).Times(3)
+				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil).Times(2)
 				cl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
 				cl.EXPECT().Get(gm.Any(), gm.Any(), matchUs).
 					Return(apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, "test-configmap"))

@@ -838,23 +838,29 @@ func (r *ResourcePermitReconciler) addFinalizer(
 	log logr.Logger,
 	br *capsulev1beta2.ResourcePermit,
 ) error {
-	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, br, func() error {
+	// Metadata reads and writes refresh the object from the API. Keep those
+	// responses separate from status transitions made during this reconcile,
+	// such as restoring Approved before retrying activation.
+	current := br.DeepCopy()
+	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, current, func() error {
 		finalizerName := meta.ControllerFinalizer
-		if controllerutil.ContainsFinalizer(br, finalizerName) {
+		if controllerutil.ContainsFinalizer(current, finalizerName) {
 			log.V(5).Info("Finalizer already exists", "name", br.Name)
 
 			return nil
 		}
 
 		log.V(5).Info("Adding finalizer to ResourcePermit", "name", br.Name)
-		controllerutil.AddFinalizer(br, finalizerName)
+		controllerutil.AddFinalizer(current, finalizerName)
 
 		return nil
 	}); err != nil {
 		return fmt.Errorf("failed to add finalizer to ResourcePermit %s: %w", br.Name, err)
 	}
 
-	return r.Get(ctx, client.ObjectKeyFromObject(br), br)
+	br.ObjectMeta = current.ObjectMeta
+
+	return nil
 }
 
 func (r *ResourcePermitReconciler) reconcileDelete(
