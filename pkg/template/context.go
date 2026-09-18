@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
@@ -21,6 +22,81 @@ import (
 // +kubebuilder:object:generate=true
 type TemplateContext struct {
 	Resources []*TemplateResourceReference `json:"resources,omitempty"`
+}
+
+// ValidateVariables ensures every template expression in a resource reference
+// can be resolved before the reference is loaded.
+func (t *TemplateContext) ValidateVariables(values map[string]string) error {
+	if t == nil {
+		return nil
+	}
+
+	var errs []error
+
+	for index, resource := range t.Resources {
+		if resource == nil {
+			continue
+		}
+
+		prefix := fmt.Sprintf("resources[%d]", index)
+		errs = append(errs, validateReferenceVariables(prefix+".name", resource.Name, values)...)
+		errs = append(errs, validateReferenceVariables(prefix+".namespace", resource.Namespace, values)...)
+
+		if resource.Selector == nil {
+			continue
+		}
+
+		for key, value := range resource.Selector.MatchLabels {
+			errs = append(errs, validateReferenceVariables(prefix+".selector.matchLabels key", key, values)...)
+			errs = append(errs, validateReferenceVariables(prefix+".selector.matchLabels."+key, value, values)...)
+		}
+
+		for expressionIndex, expression := range resource.Selector.MatchExpressions {
+			field := fmt.Sprintf("%s.selector.matchExpressions[%d]", prefix, expressionIndex)
+
+			errs = append(errs, validateReferenceVariables(field+".key", expression.Key, values)...)
+
+			for valueIndex, value := range expression.Values {
+				errs = append(errs, validateReferenceVariables(
+					fmt.Sprintf("%s.values[%d]", field, valueIndex),
+					value,
+					values,
+				)...)
+			}
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
+func validateReferenceVariables(field, value string, variables map[string]string) []error {
+	if !ContainsFastTemplateSyntax(value) {
+		return nil
+	}
+
+	matches := FastTemplateExpression.FindAllStringSubmatch(value, -1)
+	if len(matches) == 0 {
+		return []error{fmt.Errorf("%s contains a malformed template %q", field, value)}
+	}
+
+	remaining := value
+
+	var errs []error
+
+	for _, match := range matches {
+		key := FastTemplateNormalize(match[1])
+		if _, found := variables[key]; !found {
+			errs = append(errs, fmt.Errorf("%s references undefined variable %q", field, key))
+		}
+
+		remaining = strings.ReplaceAll(remaining, match[0], "")
+	}
+
+	if ContainsFastTemplateSyntax(remaining) {
+		errs = append(errs, fmt.Errorf("%s contains a malformed template %q", field, value))
+	}
+
+	return errs
 }
 
 func (t *TemplateContext) GatherContext(

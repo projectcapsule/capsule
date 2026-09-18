@@ -36,3 +36,4 @@ hack/generated/
 *.tgz
 kind.yaml
 capsule-seccomp.json
+kubeconfig.yaml

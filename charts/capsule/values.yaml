@@ -10,6 +10,9 @@ global:
     preDelete:
       # -- Enable Pre Delete Job
       enabled: true
+    postDelete:
+      # -- Enable Post Delete Job to remove Capsule's mutating and validating webhook configurations
+      enabled: true
     kubectl:
       image:
         # -- Set the image repository of the helm chart job
@@ -104,6 +107,11 @@ proxy:
 
 # These are ClusterRoles which grant permissions for Capsule CRDs to Tenant Owners
 rbac:
+  # -- Allow the creation and review of ResourcePermits
+  resourcepermits:
+    create: false
+    labels: {}
+    # rbac.authorization.k8s.io/aggregate-to-admin: "true"
   # -- Allow the creation of TenantResources
   resources:
     create: false
@@ -1597,6 +1605,149 @@ webhooks:
             - '*'
           scope: "*"
 
+    # -- Validate namespaced ResourcePermits and their referenced templates
+    resourcepermits:
+      # -- Enable the Hook
+      enabled: true
+      # -- Capsule Hook Options
+      opts: {}
+      # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
+      failurePolicy: Fail
+      # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
+      matchPolicy: Equivalent
+      # @schema type: object
+      # @schema additionalProperties: true
+      # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
+      objectSelector: {}
+      # @schema type: object
+      # @schema additionalProperties: true
+      # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
+      namespaceSelector: {}
+      # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
+      matchConditions: []
+      # -- [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy)
+      reinvocationPolicy: Never
+      # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
+      rules:
+        - apiGroups:
+            - capsule.clastix.io
+          apiVersions:
+            - v1beta2
+          operations:
+            - CREATE
+            - UPDATE
+            - DELETE
+          resources:
+            - resourcepermits
+            - resourcepermits/status
+          scope: Namespaced
+
+    # -- Validate namespaced ResourcePermitTemplates
+    resourcepermittemplates:
+      # -- Enable the Hook
+      enabled: true
+      # -- Capsule Hook Options
+      opts: {}
+      # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
+      failurePolicy: Fail
+      # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matchpolicy)
+      matchPolicy: Equivalent
+      # @schema type: object
+      # @schema additionalProperties: true
+      # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#objectselector)
+      objectSelector: {}
+      # @schema type: object
+      # @schema additionalProperties: true
+      # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#namespaceselector)
+      namespaceSelector: {}
+      # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matchconditions)
+      matchConditions: []
+      # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#rules)
+      rules:
+        - apiGroups:
+            - capsule.clastix.io
+          apiVersions:
+            - v1beta2
+          operations:
+            - CREATE
+            - UPDATE
+            - DELETE
+          resources:
+            - resourcepermittemplates
+          scope: Namespaced
+
+    # -- Validate cluster-scoped GlobalResourcePermitTemplates
+    globalresourcepermittemplates:
+      # -- Enable the Hook
+      enabled: true
+      # -- Capsule Hook Options
+      opts: {}
+      # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
+      failurePolicy: Fail
+      # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
+      matchPolicy: Equivalent
+      # @schema type: object
+      # @schema additionalProperties: true
+      # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
+      objectSelector: {}
+      # @schema type: object
+      # @schema additionalProperties: true
+      # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
+      namespaceSelector: {}
+      # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
+      matchConditions: []
+      # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
+      rules:
+        - apiGroups:
+            - capsule.clastix.io
+          apiVersions:
+            - v1beta2
+          operations:
+            - CREATE
+            - UPDATE
+            - DELETE
+          resources:
+            - globalresourcepermittemplates
+          scope: Cluster
+
+    # -- Protect resources managed by ResourcePermits from changes outside the Capsule controller
+    resourcePermit:
+      # -- Enable the Hook
+      enabled: true
+      # -- Capsule Hook Options
+      opts: {}
+      # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
+      failurePolicy: Fail
+      # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
+      matchPolicy: Equivalent
+      # @schema type: object
+      # @schema additionalProperties: true
+      # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
+      objectSelector:
+        matchExpressions:
+          - key: projectcapsule.dev/protected-by
+            operator: In
+            values:
+              - "resource-permit"
+      # @schema type: object
+      # @schema additionalProperties: true
+      # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
+      namespaceSelector: {}
+      # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
+      matchConditions: []
+      # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
+      rules:
+        - apiGroups:
+            - '*'
+          apiVersions:
+            - '*'
+          operations:
+            - UPDATE
+            - DELETE
+          resources:
+            - '*'
+          scope: "*"
+
     services:
       # -- Enable the Hook
       enabled: true
@@ -1645,8 +1796,11 @@ webhooks:
       enabled: true
       # -- Capsule Hook Options
       opts: {}
-      # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
+      # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) for ServiceAccount promotion validation
       failurePolicy: Fail
+      references:
+        # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) for ServiceAccount deletion reference protection. Ignore allows deletion without reference checks when the webhook is unavailable or times out; explicit denials still block deletion. Set to Fail to require reference protection during outages.
+        failurePolicy: Ignore
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Exact
       # @schema type: object

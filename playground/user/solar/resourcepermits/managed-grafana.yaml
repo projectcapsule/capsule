@@ -1,0 +1,12 @@
+apiVersion: capsule.clastix.io/v1beta2
+kind: ResourcePermit
+metadata:
+  name: managed-grafana
+  namespace: solar-system
+spec:
+  template:
+    kind: GlobalResourcePermitTemplate
+    name: grafana
+  reason: Provision a managed Grafana instance for the solar tenant.
+  params:
+    instance: main

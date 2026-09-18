@@ -60,6 +60,65 @@ func TestCompileBooleanRejectsNonBooleanResult(t *testing.T) {
 	}
 }
 
+func TestCompileBooleanWithVariables(t *testing.T) {
+	t.Parallel()
+
+	compiler, err := NewCompiler()
+	if err != nil {
+		t.Fatalf("NewCompiler() error = %v", err)
+	}
+
+	compiled, err := compiler.CompileBooleanWithVariables(
+		`requestor.name == "alice" && "admin" in reviewer.groups`,
+		environment.StoredExpressions,
+		"requestor",
+		"reviewer",
+	)
+	if err != nil {
+		t.Fatalf("CompileBooleanWithVariables() error = %v", err)
+	}
+
+	got, err := compiled.EvaluateBooleanWithVariables(context.Background(), map[string]any{
+		"requestor": map[string]any{"name": "alice"},
+		"reviewer":  map[string]any{"groups": []string{"users", "admin"}},
+	})
+	if err != nil {
+		t.Fatalf("EvaluateBooleanWithVariables() error = %v", err)
+	}
+	if !got {
+		t.Fatal("EvaluateBooleanWithVariables() = false, want true")
+	}
+}
+
+func TestCompileStringWithVariables(t *testing.T) {
+	t.Parallel()
+
+	compiler, err := NewCompiler()
+	if err != nil {
+		t.Fatalf("NewCompiler() error = %v", err)
+	}
+
+	compiled, err := compiler.CompileStringWithVariables(
+		`"invalid subject " + self.subjectName`,
+		environment.NewExpressions,
+		"self",
+	)
+	if err != nil {
+		t.Fatalf("CompileStringWithVariables() error = %v", err)
+	}
+
+	got, err := compiled.EvaluateStringWithVariables(context.Background(), map[string]any{
+		"self": map[string]any{"subjectName": "runner"},
+	})
+	if err != nil {
+		t.Fatalf("EvaluateStringWithVariables() error = %v", err)
+	}
+
+	if got != "invalid subject runner" {
+		t.Fatalf("EvaluateStringWithVariables() = %q, want %q", got, "invalid subject runner")
+	}
+}
+
 func TestCompiledExpressionEvaluateSingleQuantity(t *testing.T) {
 	t.Parallel()
 

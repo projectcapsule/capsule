@@ -29,6 +29,7 @@ type ResultType string
 const (
 	ResultTypeBoolean  ResultType = "boolean"
 	ResultTypeQuantity ResultType = "quantity"
+	ResultTypeString   ResultType = "string"
 )
 
 type Compiler struct {
@@ -61,17 +62,39 @@ func NewCompiler() (*Compiler, error) {
 }
 
 func (c *Compiler) CompileBoolean(expression string, mode environment.Type) (*CompiledExpression, error) {
-	return c.compile(expression, mode, ResultTypeBoolean)
+	return c.compile(expression, mode, ResultTypeBoolean, nil)
 }
 
 func (c *Compiler) CompileQuantity(expression string, mode environment.Type) (*CompiledExpression, error) {
-	return c.compile(expression, mode, ResultTypeQuantity)
+	return c.compile(expression, mode, ResultTypeQuantity, nil)
+}
+
+// CompileStringWithVariables compiles a string expression with additional
+// dynamically typed variables. This is primarily useful for Kubernetes-style
+// CEL message expressions.
+func (c *Compiler) CompileStringWithVariables(
+	expression string,
+	mode environment.Type,
+	variables ...string,
+) (*CompiledExpression, error) {
+	return c.compile(expression, mode, ResultTypeString, variables)
+}
+
+// CompileBooleanWithVariables compiles a boolean expression with additional
+// dynamically typed variables. The standard object variable remains available.
+func (c *Compiler) CompileBooleanWithVariables(
+	expression string,
+	mode environment.Type,
+	variables ...string,
+) (*CompiledExpression, error) {
+	return c.compile(expression, mode, ResultTypeBoolean, variables)
 }
 
 func (c *Compiler) compile(
 	expression string,
 	mode environment.Type,
 	resultType ResultType,
+	variables []string,
 ) (*CompiledExpression, error) {
 	if c == nil || c.envSet == nil {
 		return nil, fmt.Errorf("CEL compiler is nil")
@@ -86,7 +109,40 @@ func (c *Compiler) compile(
 		return nil, fmt.Errorf("CEL expression exceeds max length of %d", MaxExpressionLength)
 	}
 
-	env, err := c.envSet.Env(mode)
+	envSet := c.envSet
+
+	if len(variables) > 0 {
+		envOptions := make([]celgo.EnvOption, 0, len(variables))
+		seen := map[string]struct{}{ObjectVariable: {}}
+
+		for _, variable := range variables {
+			variable = strings.TrimSpace(variable)
+
+			if variable == "" {
+				return nil, fmt.Errorf("CEL variable must not be empty")
+			}
+
+			if _, exists := seen[variable]; exists {
+				continue
+			}
+
+			seen[variable] = struct{}{}
+
+			envOptions = append(envOptions, celgo.Variable(variable, celgo.DynType))
+		}
+
+		extendedEnvSet, err := envSet.Extend(environment.VersionedOptions{
+			IntroducedVersion: version.MajorMinor(1, 0),
+			EnvOptions:        envOptions,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("extend Kubernetes CEL environment: %w", err)
+		}
+
+		envSet = extendedEnvSet
+	}
+
+	env, err := envSet.Env(mode)
 	if err != nil {
 		return nil, fmt.Errorf("load Kubernetes CEL %s environment: %w", mode, err)
 	}
@@ -131,6 +187,11 @@ func validateOutputType(output *celgo.Type, resultType ResultType) error {
 			)
 		}
 
+	case ResultTypeString:
+		if !output.IsExactType(celgo.StringType) {
+			return fmt.Errorf("expression must evaluate to string, got %s", output)
+		}
+
 	default:
 		return fmt.Errorf("unsupported CEL result type %q", resultType)
 	}
@@ -150,6 +211,17 @@ func (c *CompiledExpression) EvaluateBoolean(
 	ctx context.Context,
 	object unstructured.Unstructured,
 ) (bool, error) {
+	return c.EvaluateBooleanWithVariables(ctx, map[string]any{
+		ObjectVariable: object.Object,
+	})
+}
+
+// EvaluateBooleanWithVariables evaluates a compiled boolean expression using
+// the supplied CEL activation.
+func (c *CompiledExpression) EvaluateBooleanWithVariables(
+	ctx context.Context,
+	variables map[string]any,
+) (bool, error) {
 	if c == nil || c.program == nil {
 		return false, fmt.Errorf("compiled CEL expression is nil")
 	}
@@ -158,9 +230,7 @@ func (c *CompiledExpression) EvaluateBoolean(
 		return false, fmt.Errorf("compiled CEL expression %q does not return bool", c.expression)
 	}
 
-	value, _, err := c.program.ContextEval(ctx, map[string]any{
-		ObjectVariable: object.Object,
-	})
+	value, _, err := c.program.ContextEval(ctx, variables)
 	if err != nil {
 		return false, fmt.Errorf("evaluate CEL expression %q: %w", c.expression, err)
 	}
@@ -171,6 +241,33 @@ func (c *CompiledExpression) EvaluateBoolean(
 	}
 
 	return bool(result), nil
+}
+
+// EvaluateStringWithVariables evaluates a compiled string expression using
+// the supplied CEL activation.
+func (c *CompiledExpression) EvaluateStringWithVariables(
+	ctx context.Context,
+	variables map[string]any,
+) (string, error) {
+	if c == nil || c.program == nil {
+		return "", fmt.Errorf("compiled CEL expression is nil")
+	}
+
+	if c.resultType != ResultTypeString {
+		return "", fmt.Errorf("compiled CEL expression %q does not return string", c.expression)
+	}
+
+	value, _, err := c.program.ContextEval(ctx, variables)
+	if err != nil {
+		return "", fmt.Errorf("evaluate CEL expression %q: %w", c.expression, err)
+	}
+
+	result, ok := value.(types.String)
+	if !ok {
+		return "", fmt.Errorf("CEL expression %q returned %T, expected string", c.expression, value)
+	}
+
+	return string(result), nil
 }
 
 func (c *CompiledExpression) EvaluateQuantity(
