@@ -243,6 +243,15 @@
                                 }
                             }
                         },
+                        "postDelete": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "description": "Enable Post Delete Job to remove Capsule's mutating and validating webhook configurations",
+                                    "type": "boolean"
+                                }
+                            }
+                        },
                         "postInstall": {
                             "type": "object",
                             "properties": {
@@ -1019,6 +1028,18 @@
                         }
                     }
                 },
+                "resourcepermits": {
+                    "description": "Allow the creation and review of ResourcePermits",
+                    "type": "object",
+                    "properties": {
+                        "create": {
+                            "type": "boolean"
+                        },
+                        "labels": {
+                            "type": "object"
+                        }
+                    }
+                },
                 "resourcepoolclaims": {
                     "description": "Allow the creation of ResourcePoolClaims",
                     "type": "object",
@@ -1740,6 +1761,78 @@
                                 }
                             }
                         },
+                        "globalresourcepermittemplates": {
+                            "description": "Validate cluster-scoped GlobalResourcePermitTemplates",
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "description": "Enable the Hook",
+                                    "type": "boolean"
+                                },
+                                "failurePolicy": {
+                                    "description": "[FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)",
+                                    "type": "string"
+                                },
+                                "matchConditions": {
+                                    "description": "[MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
+                                    "type": "array"
+                                },
+                                "matchPolicy": {
+                                    "description": "[MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
+                                    "type": "string"
+                                },
+                                "namespaceSelector": {
+                                    "description": "[NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)",
+                                    "type": "object",
+                                    "additionalProperties": true
+                                },
+                                "objectSelector": {
+                                    "description": "[ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)",
+                                    "type": "object",
+                                    "additionalProperties": true
+                                },
+                                "opts": {
+                                    "description": "Capsule Hook Options",
+                                    "type": "object"
+                                },
+                                "rules": {
+                                    "description": "[Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)",
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "apiGroups": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "apiVersions": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "operations": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "resources": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "scope": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
                         "globalresourcequotas": {
                             "description": "Webhook for admission-time GlobalResourceQuota calculations",
                             "type": "object",
@@ -2399,6 +2492,248 @@
                                 }
                             }
                         },
+                        "resourcePermit": {
+                            "description": "Protect resources managed by ResourcePermits from changes outside the Capsule controller",
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "description": "Enable the Hook",
+                                    "type": "boolean"
+                                },
+                                "failurePolicy": {
+                                    "description": "[FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)",
+                                    "type": "string"
+                                },
+                                "matchConditions": {
+                                    "description": "[MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
+                                    "type": "array"
+                                },
+                                "matchPolicy": {
+                                    "description": "[MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
+                                    "type": "string"
+                                },
+                                "namespaceSelector": {
+                                    "description": "[NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)",
+                                    "type": "object",
+                                    "additionalProperties": true
+                                },
+                                "objectSelector": {
+                                    "description": "[ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)",
+                                    "type": "object",
+                                    "properties": {
+                                        "matchExpressions": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "key": {
+                                                        "type": "string"
+                                                    },
+                                                    "operator": {
+                                                        "type": "string"
+                                                    },
+                                                    "values": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "string"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "additionalProperties": true
+                                },
+                                "opts": {
+                                    "description": "Capsule Hook Options",
+                                    "type": "object"
+                                },
+                                "rules": {
+                                    "description": "[Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)",
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "apiGroups": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "apiVersions": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "operations": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "resources": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "scope": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "resourcepermits": {
+                            "description": "Validate namespaced ResourcePermits and their referenced templates",
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "description": "Enable the Hook",
+                                    "type": "boolean"
+                                },
+                                "failurePolicy": {
+                                    "description": "[FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)",
+                                    "type": "string"
+                                },
+                                "matchConditions": {
+                                    "description": "[MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
+                                    "type": "array"
+                                },
+                                "matchPolicy": {
+                                    "description": "[MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
+                                    "type": "string"
+                                },
+                                "namespaceSelector": {
+                                    "description": "[NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)",
+                                    "type": "object",
+                                    "additionalProperties": true
+                                },
+                                "objectSelector": {
+                                    "description": "[ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)",
+                                    "type": "object",
+                                    "additionalProperties": true
+                                },
+                                "opts": {
+                                    "description": "Capsule Hook Options",
+                                    "type": "object"
+                                },
+                                "reinvocationPolicy": {
+                                    "description": "[ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy)",
+                                    "type": "string"
+                                },
+                                "rules": {
+                                    "description": "[Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)",
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "apiGroups": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "apiVersions": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "operations": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "resources": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "scope": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "resourcepermittemplates": {
+                            "description": "Validate namespaced ResourcePermitTemplates",
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "description": "Enable the Hook",
+                                    "type": "boolean"
+                                },
+                                "failurePolicy": {
+                                    "description": "[FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)",
+                                    "type": "string"
+                                },
+                                "matchConditions": {
+                                    "description": "[MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matchconditions)",
+                                    "type": "array"
+                                },
+                                "matchPolicy": {
+                                    "description": "[MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matchpolicy)",
+                                    "type": "string"
+                                },
+                                "namespaceSelector": {
+                                    "description": "[NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#namespaceselector)",
+                                    "type": "object",
+                                    "additionalProperties": true
+                                },
+                                "objectSelector": {
+                                    "description": "[ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#objectselector)",
+                                    "type": "object",
+                                    "additionalProperties": true
+                                },
+                                "opts": {
+                                    "description": "Capsule Hook Options",
+                                    "type": "object"
+                                },
+                                "rules": {
+                                    "description": "[Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#rules)",
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "apiGroups": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "apiVersions": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "operations": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "resources": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "scope": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
                         "resourcepools": {
                             "type": "object",
                             "properties": {
@@ -2520,7 +2855,7 @@
                                     "type": "boolean"
                                 },
                                 "failurePolicy": {
-                                    "description": "[FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)",
+                                    "description": "[FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) for ServiceAccount promotion validation",
                                     "type": "string"
                                 },
                                 "matchConditions": {
@@ -2560,6 +2895,15 @@
                                 "opts": {
                                     "description": "Capsule Hook Options",
                                     "type": "object"
+                                },
+                                "references": {
+                                    "type": "object",
+                                    "properties": {
+                                        "failurePolicy": {
+                                            "description": "[FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) for ServiceAccount deletion reference protection. Ignore allows deletion without reference checks when the webhook is unavailable or times out; explicit denials still block deletion. Set to Fail to require reference protection during outages.",
+                                            "type": "string"
+                                        }
+                                    }
                                 }
                             }
                         },
