@@ -292,10 +292,28 @@ dev-setup-capsule:
 	@$(MAKE) -C playground dev-capsule
 
 
+HELM_RELEASES_WAIT_TIMEOUT_SECONDS ?= 900
+
 wait-for-helmreleases:
 	@ echo "Waiting for all HelmReleases to have observedGeneration >= 0..."
-	@while [ "$$($(KUBECTL) get helmrelease -A -o jsonpath='{range .items[?(@.status.observedGeneration<0)]}{.metadata.namespace}{" "}{.metadata.name}{"\n"}{end}' | wc -l)" -ne 0 ]; do \
-	  sleep 5; \
+	@timeout=$(HELM_RELEASES_WAIT_TIMEOUT_SECONDS); \
+	interval=5; \
+	elapsed=0; \
+	while [ "$$($(KUBECTL) get helmrelease -A -o jsonpath='{range .items[?(@.status.observedGeneration<0)]}{.metadata.namespace}{" "}{.metadata.name}{"\n"}{end}' | wc -l)" -ne 0 ]; do \
+	  if [ $$elapsed -ge $$timeout ]; then \
+	    echo "Timeout of $${timeout}s reached waiting for HelmReleases to have observedGeneration >= 0" >&2; \
+	    echo "=== HelmReleases overview ===" >&2; \
+	    $(KUBECTL) get helmrelease -A >&2 || true; \
+	    echo "=== HelmReleases details ===" >&2; \
+	    $(KUBECTL) describe helmrelease -A >&2 || true; \
+	    echo "=== pods overview ===" >&2; \
+	    $(KUBECTL) get pods -A>&2 || true; \
+	    echo "=== pods details ===" >&2; \
+	    $(KUBECTL) describe pods -A >&2 || true; \
+	    exit 1; \
+	  fi; \
+	  sleep $$interval; \
+	  elapsed=$$((elapsed + interval)); \
 	done
 
 ####################
