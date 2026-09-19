@@ -17,9 +17,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	clt "github.com/projectcapsule/capsule/pkg/runtime/client"
@@ -182,6 +184,25 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("con
 				},
 			})
 		}).Should(SatisfyAny(Succeed(), WithTransform(apierrors.IsNotFound, BeTrue())))
+	}
+
+	updateNamespaceSubresource := func(
+		cs kubernetes.Interface,
+		ns *corev1.Namespace,
+		subresource string,
+	) error {
+		switch subresource {
+		case "status":
+			_, err := cs.CoreV1().Namespaces().UpdateStatus(context.TODO(), ns, metav1.UpdateOptions{})
+
+			return err
+		case "finalize":
+			_, err := cs.CoreV1().Namespaces().Finalize(context.TODO(), ns, metav1.UpdateOptions{})
+
+			return err
+		default:
+			return fmt.Errorf("unsupported namespace subresource %q", subresource)
+		}
 	}
 
 	expectNoTenantHijackPersisted := func(nsName string, originalTenant, attackerTenant *capsulev1beta2.Tenant) {
@@ -520,6 +541,144 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("con
 		}
 
 		expectNoTenantHijackPersisted(ns.Name, tenantA, tenantB)
+	})
+
+	It("Owners can not write metadata to unmanaged namespaces through subresources", func() {
+		owner := t1.Spec.Owners[0].UserSpec
+		cs := ownerClient(owner)
+		grantName := "e2e-ns-unmanaged-subresource-metadata"
+		grantNamespaceSubresourceUpdate(grantName, rbacv1.Subject{
+			APIGroup: rbacv1.GroupName,
+			Kind:     rbacv1.UserKind,
+			Name:     owner.Name,
+		})
+		DeferCleanup(func() { cleanupNamespaceSubresourceGrant(grantName) })
+
+		for _, subresource := range []string{"status", "finalize"} {
+			By(fmt.Sprintf("rejecting metadata injection through namespaces/%s", subresource))
+			ns := createUnmanagedNamespace()
+			current, err := cs.CoreV1().Namespaces().Get(context.TODO(), ns.Name, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			if current.Labels == nil {
+				current.Labels = map[string]string{}
+			}
+
+			const probe = "security.projectcapsule.dev/unmanaged-probe"
+			current.Labels[probe] = subresource
+			Expect(updateNamespaceSubresource(cs, current, subresource)).NotTo(Succeed())
+
+			persisted := getNamespace(ns.Name)
+			Expect(persisted.Labels).NotTo(HaveKey(probe))
+		}
+	})
+
+	It("Owners can not write metadata to another Tenant through subresources", func() {
+		attacker := t1.Spec.Owners[0].UserSpec
+		victim := t3.Spec.Owners[0].UserSpec
+		cs := ownerClient(attacker)
+		grantName := "e2e-ns-cross-tenant-subresource-metadata"
+		grantNamespaceSubresourceUpdate(grantName, rbacv1.Subject{
+			APIGroup: rbacv1.GroupName,
+			Kind:     rbacv1.UserKind,
+			Name:     attacker.Name,
+		})
+		DeferCleanup(func() { cleanupNamespaceSubresourceGrant(grantName) })
+
+		ns := NewNamespace("", map[string]string{meta.TenantLabel: t3.Name})
+		NamespaceCreation(ns, victim, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(t3, ns).Should(Succeed())
+
+		for _, subresource := range []string{"status", "finalize"} {
+			By(fmt.Sprintf("rejecting cross-tenant metadata injection through namespaces/%s", subresource))
+			current, err := cs.CoreV1().Namespaces().Get(context.TODO(), ns.Name, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			if current.Labels == nil {
+				current.Labels = map[string]string{}
+			}
+
+			const probe = "security.projectcapsule.dev/cross-tenant-probe"
+			current.Labels[probe] = subresource
+			Expect(updateNamespaceSubresource(cs, current, subresource)).NotTo(Succeed())
+
+			persisted := getNamespace(ns.Name)
+			Expect(persisted.Labels).NotTo(HaveKey(probe))
+		}
+	})
+
+	It("Unknown users can not bypass ownership on terminating namespace subresources", func() {
+		owner := t1.Spec.Owners[0].UserSpec
+		const unknownUser = "e2e-unknown-namespace-finalizer"
+		cs := impersonationClientSet(unknownUser, []string{"system:authenticated"})
+		grantName := "e2e-ns-unknown-terminating-subresources"
+		grantNamespaceSubresourceUpdate(grantName, rbacv1.Subject{
+			APIGroup: rbacv1.GroupName,
+			Kind:     rbacv1.UserKind,
+			Name:     unknownUser,
+		})
+		DeferCleanup(func() { cleanupNamespaceSubresourceGrant(grantName) })
+
+		for _, subresource := range []string{"status", "finalize"} {
+			By(fmt.Sprintf("rejecting an unknown user through namespaces/%s", subresource))
+			ns := NewNamespace("", map[string]string{meta.TenantLabel: t1.Name})
+			NamespaceCreation(ns, owner, defaultTimeoutInterval).Should(Succeed())
+			NamespaceIsPartOfTenant(t1, ns).Should(Succeed())
+			holdNamespaceTerminating(context.TODO(), ns.Name)
+			DeferCleanup(func() { ForceDeleteNamespace(context.TODO(), ns.Name) })
+
+			current, err := cs.CoreV1().Namespaces().Get(context.TODO(), ns.Name, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			switch subresource {
+			case "status":
+				current.Status.Conditions = append(current.Status.Conditions, corev1.NamespaceCondition{
+					Type:   "UnknownUserProbe",
+					Status: corev1.ConditionTrue,
+				})
+			case "finalize":
+				current.Spec.Finalizers = nil
+			}
+
+			err = updateNamespaceSubresource(cs, current, subresource)
+			Expect(err).To(MatchError(ContainSubstring("denied patch request for this namespace")))
+
+			ForceDeleteNamespace(context.TODO(), ns.Name)
+		}
+	})
+
+	It("Owners can not bypass forbidden metadata through namespaces/finalize", func() {
+		const forbiddenLabel = "pod-security.kubernetes.io/enforce"
+
+		UpdateTenantEventually(t1, func(current *capsulev1beta2.Tenant) {
+			if current.Spec.NamespaceOptions == nil {
+				current.Spec.NamespaceOptions = &capsulev1beta2.NamespaceOptions{}
+			}
+			current.Spec.NamespaceOptions.ForbiddenLabels = api.ForbiddenListSpec{
+				Exact: []string{forbiddenLabel},
+			}
+		})
+		TenantReady(t1, metav1.ConditionTrue, defaultTimeoutInterval)
+
+		owner := t1.Spec.Owners[0].UserSpec
+		cs := ownerClient(owner)
+		grantName := "e2e-ns-finalize-forbidden-metadata"
+		grantNamespaceSubresourceUpdate(grantName, rbacv1.Subject{
+			APIGroup: rbacv1.GroupName,
+			Kind:     rbacv1.UserKind,
+			Name:     owner.Name,
+		})
+		DeferCleanup(func() { cleanupNamespaceSubresourceGrant(grantName) })
+
+		ns := NewNamespace("", map[string]string{meta.TenantLabel: t1.Name})
+		NamespaceCreation(ns, owner, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(t1, ns).Should(Succeed())
+
+		current, err := cs.CoreV1().Namespaces().Get(context.TODO(), ns.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		current.Labels[forbiddenLabel] = "privileged"
+		Expect(updateNamespaceSubresource(cs, current, "finalize")).NotTo(Succeed())
+
+		persisted := getNamespace(ns.Name)
+		Expect(persisted.Labels).NotTo(HaveKey(forbiddenLabel))
 	})
 
 	It("Owners can not add a second Tenant ownerReference to a managed namespace", func() {
