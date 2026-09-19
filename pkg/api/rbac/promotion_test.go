@@ -29,54 +29,46 @@ func TestPromotionSpec_ToAdditionalRolebindings(t *testing.T) {
 			},
 			expected: []AdditionalRoleBindingsWithNamespaceSpec{
 				{
-					Namespace: meta.RFC1123SubdomainName("target-a"),
-					AdditionalRoleBindingsSpec: AdditionalRoleBindingsSpec{
-						ClusterRoleName: "configmap-replicator",
-						Subjects: []rbacv1.Subject{
-							{
-								Kind:      rbacv1.ServiceAccountKind,
-								Name:      "gitops",
-								Namespace: "source-ns",
-							},
+					Namespace:       meta.RFC1123SubdomainName("target-a"),
+					ClusterRoleName: "configmap-replicator",
+					Subjects: []rbacv1.Subject{
+						{
+							Kind:      rbacv1.ServiceAccountKind,
+							Name:      "gitops",
+							Namespace: "source-ns",
 						},
 					},
 				},
 				{
-					Namespace: meta.RFC1123SubdomainName("target-a"),
-					AdditionalRoleBindingsSpec: AdditionalRoleBindingsSpec{
-						ClusterRoleName: "secret-replicator",
-						Subjects: []rbacv1.Subject{
-							{
-								Kind:      rbacv1.ServiceAccountKind,
-								Name:      "gitops",
-								Namespace: "source-ns",
-							},
+					Namespace:       meta.RFC1123SubdomainName("target-a"),
+					ClusterRoleName: "secret-replicator",
+					Subjects: []rbacv1.Subject{
+						{
+							Kind:      rbacv1.ServiceAccountKind,
+							Name:      "gitops",
+							Namespace: "source-ns",
 						},
 					},
 				},
 				{
-					Namespace: meta.RFC1123SubdomainName("target-b"),
-					AdditionalRoleBindingsSpec: AdditionalRoleBindingsSpec{
-						ClusterRoleName: "configmap-replicator",
-						Subjects: []rbacv1.Subject{
-							{
-								Kind:      rbacv1.ServiceAccountKind,
-								Name:      "gitops",
-								Namespace: "source-ns",
-							},
+					Namespace:       meta.RFC1123SubdomainName("target-b"),
+					ClusterRoleName: "configmap-replicator",
+					Subjects: []rbacv1.Subject{
+						{
+							Kind:      rbacv1.ServiceAccountKind,
+							Name:      "gitops",
+							Namespace: "source-ns",
 						},
 					},
 				},
 				{
-					Namespace: meta.RFC1123SubdomainName("target-b"),
-					AdditionalRoleBindingsSpec: AdditionalRoleBindingsSpec{
-						ClusterRoleName: "secret-replicator",
-						Subjects: []rbacv1.Subject{
-							{
-								Kind:      rbacv1.ServiceAccountKind,
-								Name:      "gitops",
-								Namespace: "source-ns",
-							},
+					Namespace:       meta.RFC1123SubdomainName("target-b"),
+					ClusterRoleName: "secret-replicator",
+					Subjects: []rbacv1.Subject{
+						{
+							Kind:      rbacv1.ServiceAccountKind,
+							Name:      "gitops",
+							Namespace: "source-ns",
 						},
 					},
 				},
@@ -116,15 +108,13 @@ func TestPromotionSpec_ToAdditionalRolebindings(t *testing.T) {
 			},
 			expected: []AdditionalRoleBindingsWithNamespaceSpec{
 				{
-					Namespace: meta.RFC1123SubdomainName("target-a"),
-					AdditionalRoleBindingsSpec: AdditionalRoleBindingsSpec{
-						ClusterRoleName: "view",
-						Subjects: []rbacv1.Subject{
-							{
-								Kind:     rbacv1.UserKind,
-								Name:     "alice",
-								APIGroup: rbacv1.GroupName,
-							},
+					Namespace:       meta.RFC1123SubdomainName("target-a"),
+					ClusterRoleName: "view",
+					Subjects: []rbacv1.Subject{
+						{
+							Kind:     rbacv1.UserKind,
+							Name:     "alice",
+							APIGroup: rbacv1.GroupName,
 						},
 					},
 				},
@@ -142,15 +132,13 @@ func TestPromotionSpec_ToAdditionalRolebindings(t *testing.T) {
 			},
 			expected: []AdditionalRoleBindingsWithNamespaceSpec{
 				{
-					Namespace: meta.RFC1123SubdomainName("target-a"),
-					AdditionalRoleBindingsSpec: AdditionalRoleBindingsSpec{
-						ClusterRoleName: "edit",
-						Subjects: []rbacv1.Subject{
-							{
-								Kind:     rbacv1.GroupKind,
-								Name:     "developers",
-								APIGroup: rbacv1.GroupName,
-							},
+					Namespace:       meta.RFC1123SubdomainName("target-a"),
+					ClusterRoleName: "edit",
+					Subjects: []rbacv1.Subject{
+						{
+							Kind:     rbacv1.GroupKind,
+							Name:     "developers",
+							APIGroup: rbacv1.GroupName,
 						},
 					},
 				},

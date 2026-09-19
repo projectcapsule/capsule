@@ -105,7 +105,6 @@ func TestRegistryRuleSetCacheGetOrBuild(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -187,11 +186,9 @@ func TestRegistryRuleSetCacheGetOrBuildConcurrent(t *testing.T) {
 	errs := make(chan error, workers)
 	results := make(chan *RuleSet, workers)
 
-	for i := 0; i < workers; i++ {
-		wg.Add(1)
+	for range workers {
 
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 
 			rs, _, err := c.GetOrBuild(specRules)
 			if err != nil {
@@ -201,7 +198,7 @@ func TestRegistryRuleSetCacheGetOrBuildConcurrent(t *testing.T) {
 			}
 
 			results <- rs
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -427,7 +424,6 @@ func TestRegistryRuleSetCacheMatchReference(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -555,7 +551,6 @@ func TestRegistryRuleSetCacheMatchRuleSetWithPullPolicy(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -924,32 +919,22 @@ func TestRegistryRuleSetCacheInsertForTest(t *testing.T) {
 
 func registry(expression string) rules.OCIRegistry {
 	return rules.OCIRegistry{
-		ExpressionMatch: runtime.ExpressionMatch{
-			ExpressionRegex: runtime.ExpressionRegex{
-				Expression: expression,
-				Negate:     false,
-			},
-		},
+		Expression: expression,
+		Negate:     false,
 	}
 }
 
 func registryWithPolicy(expression string, policies ...corev1.PullPolicy) rules.OCIRegistry {
 	return rules.OCIRegistry{
-		ExpressionMatch: runtime.ExpressionMatch{
-			ExpressionRegex: runtime.ExpressionRegex{
-				Expression: expression,
-				Negate:     false,
-			},
-		},
-		Policy: policies,
+		Expression: expression,
+		Negate:     false,
+		Policy:     policies,
 	}
 }
 
 func registryWithExpression(expression runtime.ExpressionRegex) rules.OCIRegistry {
 	return rules.OCIRegistry{
-		ExpressionMatch: runtime.ExpressionMatch{
-			ExpressionRegex: expression,
-		},
+		ExpressionRegex: expression,
 	}
 }
 
@@ -958,9 +943,7 @@ func registryWithExpressionAndPolicy(
 	policies ...corev1.PullPolicy,
 ) rules.OCIRegistry {
 	return rules.OCIRegistry{
-		ExpressionMatch: runtime.ExpressionMatch{
-			ExpressionRegex: expression,
-		},
-		Policy: policies,
+		ExpressionRegex: expression,
+		Policy:          policies,
 	}
 }

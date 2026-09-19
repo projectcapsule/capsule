@@ -20,11 +20,9 @@ import (
 
 var _ = Describe("creating a Service with user-specified labels and annotations", Ordered, Label("tenant", "networking", "service", "skip-on-openshift"), func() {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-service-user-metadata-forbidden",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-service-user-metadata-forbidden",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			ServiceOptions: &api.ServiceOptions{
@@ -39,12 +37,8 @@ var _ = Describe("creating a Service with user-specified labels and annotations"
 			},
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-service-user-metadata-forbidden",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-service-user-metadata-forbidden",
+					Kind: "User",
 				},
 			},
 		},

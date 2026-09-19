@@ -340,11 +340,11 @@ func fakeClient(objects ...client.Object) client.Client {
 }
 
 func namespace(name string, lbls map[string]string) *corev1.Namespace {
-	return &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: lbls}}
+	return &corev1.Namespace{Name: name, Labels: lbls}
 }
 
 func configMap(namespace, name string, lbls map[string]string) *corev1.ConfigMap {
-	return &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name, Labels: lbls}}
+	return &corev1.ConfigMap{Namespace: namespace, Name: name, Labels: lbls}
 }
 
 func namespaceNames(namespaces []corev1.Namespace) []string {

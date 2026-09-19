@@ -13,8 +13,6 @@ import (
 	"github.com/go-logr/logr"
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -53,10 +51,8 @@ func (r *validatingReconciler) SetupWithManager(mgr ctrl.Manager, ctrlConfig uti
 			&capsulev1beta2.CapsuleConfiguration{},
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 				return []reconcile.Request{{
-					NamespacedName: types.NamespacedName{
-						Name:      string(r.configuration.Admission().Validating.Name),
-						Namespace: admissionConfigurationEventMarker,
-					},
+					Name:      string(r.configuration.Admission().Validating.Name),
+					Namespace: admissionConfigurationEventMarker,
 				}}
 			}),
 			builder.WithPredicates(
@@ -111,13 +107,9 @@ func (r *validatingReconciler) reconcileValidatingConfiguration(
 	sort.Slice(desiredHooks, func(i, j int) bool { return desiredHooks[i].Name < desiredHooks[j].Name })
 
 	obj := &admissionv1.ValidatingWebhookConfiguration{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: admissionv1.SchemeGroupVersion.String(),
-			Kind:       "ValidatingWebhookConfiguration",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: string(cfg.Name),
-		},
+		APIVersion: admissionv1.SchemeGroupVersion.String(),
+		Kind:       "ValidatingWebhookConfiguration",
+		Name:       string(cfg.Name),
 	}
 
 	updateStarted := time.Now()
@@ -230,7 +222,7 @@ func (r *validatingReconciler) deleteValidatingWebhookConfig(ctx context.Context
 	}
 
 	obj := &admissionv1.ValidatingWebhookConfiguration{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Name: name,
 	}
 
 	err := r.client.Delete(ctx, obj)

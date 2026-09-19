@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"reflect"
 	"sort"
 	"strings"
@@ -57,12 +58,8 @@ func tuneE2ERestConfig(c *rest.Config) *rest.Config {
 
 func mergeMaps(base map[string]string, extra map[string]string) map[string]string {
 	out := map[string]string{}
-	for k, v := range base {
-		out[k] = v
-	}
-	for k, v := range extra {
-		out[k] = v
-	}
+	maps.Copy(out, base)
+	maps.Copy(out, extra)
 	return out
 }
 
@@ -75,10 +72,8 @@ func ignoreNotFound(err error) error {
 
 func NewService(svc types.NamespacedName) *corev1.Service {
 	return &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      svc.Name,
-			Namespace: svc.Namespace,
-		},
+		Name:      svc.Name,
+		Namespace: svc.Namespace,
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
 				{Port: int32(80)},
@@ -104,19 +99,15 @@ func NewNamespace(name string, labels ...map[string]string) *corev1.Namespace {
 
 	if len(labels) > 0 {
 		for _, lab := range labels {
-			for k, v := range lab {
-				namespaceLabels[k] = v
-			}
+			maps.Copy(namespaceLabels, lab)
 		}
 	}
 
 	namespaceLabels["env"] = "e2e"
 
 	return &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   name,
-			Labels: namespaceLabels,
-		},
+		Name:   name,
+		Labels: namespaceLabels,
 	}
 }
 
@@ -355,13 +346,13 @@ func GetTenantOwnerReference(
 
 func GetTenantOwnerReferenceAsPatch(
 	tnt *capsulev1beta2.Tenant,
-) (map[string]interface{}, error) {
+) (map[string]any, error) {
 	ownerRef, err := GetTenantOwnerReference(tnt)
 	if err != nil {
 		return nil, err
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"apiVersion": ownerRef.APIVersion,
 		"kind":       ownerRef.Kind,
 		"name":       ownerRef.Name,
@@ -380,17 +371,17 @@ func PatchTenantAssignmentForNamespace(
 		return err
 	}
 
-	return PatchNamespace(ns, cs, map[string]interface{}{
-		"metadata": map[string]interface{}{
-			"labels": map[string]interface{}{
+	return PatchNamespace(ns, cs, map[string]any{
+		"metadata": map[string]any{
+			"labels": map[string]any{
 				meta.TenantLabel: tnt.GetName(),
 			},
-			"ownerReferences": []map[string]interface{}{ref},
+			"ownerReferences": []map[string]any{ref},
 		},
 	})
 }
 
-func PatchNamespace(ns *corev1.Namespace, cs kubernetes.Interface, patch map[string]interface{}) error {
+func PatchNamespace(ns *corev1.Namespace, cs kubernetes.Interface, patch map[string]any) error {
 	patchBytes, err := json.Marshal(patch)
 	if err != nil {
 		return err
@@ -422,9 +413,9 @@ func PatchTenantOwnerReferenceForNamespace(
 			UID:        tnt.GetUID(),
 		}
 
-		patch := map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"ownerReferences": []map[string]interface{}{
+		patch := map[string]any{
+			"metadata": map[string]any{
+				"ownerReferences": []map[string]any{
 					{
 						"apiVersion": ownerRef.APIVersion,
 						"kind":       ownerRef.Kind,
@@ -537,7 +528,7 @@ func ModifyNode(fn func(node *corev1.Node) error) error {
 	return fn(&nodeList.Items[0])
 }
 
-func EventuallyCreation(f interface{}) AsyncAssertion {
+func EventuallyCreation(f any) AsyncAssertion {
 	return Eventually(f, defaultTimeoutInterval, defaultPollInterval)
 }
 
@@ -825,10 +816,8 @@ func normalizeOwners(in rbac.OwnerStatusListSpec) rbac.OwnerStatusListSpec {
 
 func EnsureServiceAccount(ctx context.Context, c client.Client, name string, namespace string) {
 	sa := &corev1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
+		Name:      name,
+		Namespace: namespace,
 	}
 
 	err := c.Create(ctx, sa)
@@ -840,10 +829,8 @@ func EnsureServiceAccount(ctx context.Context, c client.Client, name string, nam
 func EnsureRoleAndBindingForNamespaces(ctx context.Context, c client.Client, saName string, saNamespace string, namespaces []string) {
 	for _, ns := range namespaces {
 		role := &rbacv1.Role{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      saName + "-" + saNamespace,
-				Namespace: ns,
-			},
+			Name:      saName + "-" + saNamespace,
+			Namespace: ns,
 			Rules: []rbacv1.PolicyRule{
 				{
 					APIGroups: []string{""},
@@ -859,10 +846,8 @@ func EnsureRoleAndBindingForNamespaces(ctx context.Context, c client.Client, saN
 		}
 
 		rb := &rbacv1.RoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      saName + "-" + saNamespace,
-				Namespace: ns,
-			},
+			Name:      saName + "-" + saNamespace,
+			Namespace: ns,
 			Subjects: []rbacv1.Subject{
 				{
 					Kind:      "ServiceAccount",
@@ -904,10 +889,8 @@ func GetKubernetesVersion() *versionUtil.Version {
 
 func GrantEphemeralContainersUpdate(ns string, username string) (cleanup func()) {
 	role := &rbacv1.Role{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "e2e-ephemeralcontainers",
-			Namespace: ns,
-		},
+		Name:      "e2e-ephemeralcontainers",
+		Namespace: ns,
 		Rules: []rbacv1.PolicyRule{
 			{
 				APIGroups: []string{""},
@@ -924,10 +907,8 @@ func GrantEphemeralContainersUpdate(ns string, username string) (cleanup func())
 	}
 
 	rb := &rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "e2e-ephemeralcontainers",
-			Namespace: ns,
-		},
+		Name:      "e2e-ephemeralcontainers",
+		Namespace: ns,
 		Subjects: []rbacv1.Subject{
 			{
 				Kind:     rbacv1.UserKind,
@@ -970,7 +951,7 @@ func GrantEphemeralContainersUpdate(ns string, username string) (cleanup func())
 	}
 }
 
-func DeepCompare(expected, actual interface{}) (bool, string) {
+func DeepCompare(expected, actual any) (bool, string) {
 	expVal := reflect.ValueOf(expected)
 	actVal := reflect.ValueOf(actual)
 
@@ -982,8 +963,8 @@ func DeepCompare(expected, actual interface{}) (bool, string) {
 	switch expVal.Kind() {
 	case reflect.Slice, reflect.Array:
 		// Convert slices to []interface{} for ElementsMatch.
-		expSlice := make([]interface{}, expVal.Len())
-		actSlice := make([]interface{}, actVal.Len())
+		expSlice := make([]any, expVal.Len())
+		actSlice := make([]any, actVal.Len())
 		for i := 0; i < expVal.Len(); i++ {
 			expSlice[i] = expVal.Index(i).Interface()
 		}
@@ -1020,18 +1001,16 @@ type dummyT struct {
 	errors []string
 }
 
-func (d *dummyT) Errorf(format string, args ...interface{}) {
+func (d *dummyT) Errorf(format string, args ...any) {
 	d.errors = append(d.errors, fmt.Sprintf(format, args...))
 }
 
 func MakePod(namespace, name string, labels map[string]string, annotations map[string]string, image string, cpuRequest string, emptyDirSize string) *corev1.Pod {
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        name,
-			Namespace:   namespace,
-			Labels:      labels,
-			Annotations: annotations,
-		},
+		Name:        name,
+		Namespace:   namespace,
+		Labels:      labels,
+		Annotations: annotations,
 		Spec: corev1.PodSpec{
 			SecurityContext: nobodyPodSecurityContext(),
 			Containers: []corev1.Container{
@@ -1055,10 +1034,8 @@ func MakePod(namespace, name string, labels map[string]string, annotations map[s
 		pod.Spec.Volumes = []corev1.Volume{
 			{
 				Name: "cache",
-				VolumeSource: corev1.VolumeSource{
-					EmptyDir: &corev1.EmptyDirVolumeSource{
-						SizeLimit: ptr.To(resource.MustParse(emptyDirSize)),
-					},
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					SizeLimit: new(resource.MustParse(emptyDirSize)),
 				},
 			},
 		}
@@ -1075,12 +1052,10 @@ func MakePod(namespace, name string, labels map[string]string, annotations map[s
 
 func MakeDeployment(namespace, name string, replicas int32, labels map[string]string, cpuRequest string) *appsv1.Deployment {
 	dep := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
+		Name:      name,
+		Namespace: namespace,
 		Spec: appsv1.DeploymentSpec{
-			Replicas: ptr.To(replicas),
+			Replicas: new(replicas),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": name,
@@ -1134,7 +1109,7 @@ func ExpectPodsForDeployment(ctx context.Context, namespace, app string, expecte
 
 func nobodyPodSecurityContext() *corev1.PodSecurityContext {
 	return &corev1.PodSecurityContext{
-		RunAsNonRoot: ptr.To(true),
+		RunAsNonRoot: new(true),
 		RunAsUser:    ptr.To[int64](65534),
 		RunAsGroup:   ptr.To[int64](65534),
 		SeccompProfile: &corev1.SeccompProfile{
@@ -1145,7 +1120,7 @@ func nobodyPodSecurityContext() *corev1.PodSecurityContext {
 
 func restrictedContainerSecurityContext() *corev1.SecurityContext {
 	return &corev1.SecurityContext{
-		AllowPrivilegeEscalation: ptr.To(false),
+		AllowPrivilegeEscalation: new(false),
 		Capabilities: &corev1.Capabilities{
 			Drop: []corev1.Capability{
 				"ALL",
@@ -1156,10 +1131,8 @@ func restrictedContainerSecurityContext() *corev1.SecurityContext {
 
 func MakePVC(namespace, name, size string) *corev1.PersistentVolumeClaim {
 	return &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
+		Name:      name,
+		Namespace: namespace,
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 			Resources: corev1.VolumeResourceRequirements{
@@ -1177,7 +1150,7 @@ func ScaleDeployment(ctx context.Context, namespace, name string, replicas int32
 		if err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, dep); err != nil {
 			return err
 		}
-		dep.Spec.Replicas = ptr.To(replicas)
+		dep.Spec.Replicas = new(replicas)
 		return k8sClient.Update(ctx, dep)
 	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 }
@@ -1269,9 +1242,7 @@ func EnsureRuntimeClass(ctx context.Context, rtc *nodev1.RuntimeClass) {
 			if labels == nil {
 				labels = map[string]string{}
 			}
-			for key, value := range rtc.GetLabels() {
-				labels[key] = value
-			}
+			maps.Copy(labels, rtc.GetLabels())
 			labels["env"] = "e2e"
 			desired.SetLabels(labels)
 
@@ -1279,9 +1250,7 @@ func EnsureRuntimeClass(ctx context.Context, rtc *nodev1.RuntimeClass) {
 			if annotations == nil {
 				annotations = map[string]string{}
 			}
-			for key, value := range rtc.GetAnnotations() {
-				annotations[key] = value
-			}
+			maps.Copy(annotations, rtc.GetAnnotations())
 			desired.SetAnnotations(annotations)
 
 			return nil

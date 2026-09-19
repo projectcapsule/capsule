@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -130,7 +129,7 @@ func TestWebhookCertificateReadinessCheckRequiresManagedConfiguration(t *testing
 
 func testValidatingWebhookConfiguration(caBundle []byte) *admissionregistrationv1.ValidatingWebhookConfiguration {
 	return &admissionregistrationv1.ValidatingWebhookConfiguration{
-		ObjectMeta: metav1.ObjectMeta{Name: testValidatingConfiguration},
+		Name: testValidatingConfiguration,
 		Webhooks: []admissionregistrationv1.ValidatingWebhook{{
 			Name: "owners.validating.projectcapsule.dev",
 			ClientConfig: admissionregistrationv1.WebhookClientConfig{

@@ -21,14 +21,14 @@ func TestRuleGlobalResourceQuota(t *testing.T) {
 	t.Parallel()
 
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{Name: "tenant-a", UID: types.UID("tenant-uid")},
+		Name: "tenant-a", UID: types.UID("tenant-uid"),
 		Spec: capsulev1beta2.TenantSpec{Rules: []*rules.NamespaceRuleBodyTenant{{
 			NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
 				Quota: []rules.ResourceQuotaRule{{
 					Name: "shared-compute",
-					ResourceQuotaSpec: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{
+					Hard: corev1.ResourceList{
 						corev1.ResourceRequestsMemory: resource.MustParse("16Gi"),
-					}},
+					},
 				}},
 			},
 			NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"tier": "paid"}},
@@ -55,7 +55,7 @@ func TestRuleGlobalResourceQuotaNameIsStableAcrossRuleChanges(t *testing.T) {
 	t.Parallel()
 
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{Name: "tenant-a", UID: types.UID("tenant-uid")},
+		Name: "tenant-a", UID: types.UID("tenant-uid"),
 	}
 
 	want := RuleGlobalResourceQuotaName(tnt, "shared-compute")

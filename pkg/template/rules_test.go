@@ -11,7 +11,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/projectcapsule/capsule/pkg/api/rules"
-	"github.com/projectcapsule/capsule/pkg/api/runtime"
 )
 
 func TestRenderNamespaceRuleBodies(t *testing.T) {
@@ -58,10 +57,8 @@ func TestRenderNamespaceRuleBodies(t *testing.T) {
 						Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
 							Registries: []rules.OCIRegistry{
 								{
-									ExpressionMatch: runtime.ExpressionMatch{
-										Exact: []string{
-											"{{ .tenant.metadata.name }}/{{ .namespace.metadata.name }}/app:1",
-										},
+									Exact: []string{
+										"{{ .tenant.metadata.name }}/{{ .namespace.metadata.name }}/app:1",
 									},
 								},
 							},
@@ -115,10 +112,8 @@ func TestRenderNamespaceRuleBodies(t *testing.T) {
 						Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
 							Registries: []rules.OCIRegistry{
 								{
-									ExpressionMatch: runtime.ExpressionMatch{
-										Exact: []string{
-											`{{ index .namespace.metadata.labels "registry-prefix" }}/app:1`,
-										},
+									Exact: []string{
+										`{{ index .namespace.metadata.labels "registry-prefix" }}/app:1`,
 									},
 								},
 							},
@@ -152,11 +147,7 @@ func TestRenderNamespaceRuleBodies(t *testing.T) {
 						Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
 							Registries: []rules.OCIRegistry{
 								{
-									ExpressionMatch: runtime.ExpressionMatch{
-										ExpressionRegex: runtime.ExpressionRegex{
-											Expression: "{{ .tenant.metadata.name }}/allow/.*",
-										},
-									},
+									Expression: "{{ .tenant.metadata.name }}/allow/.*",
 								},
 							},
 						},
@@ -171,11 +162,7 @@ func TestRenderNamespaceRuleBodies(t *testing.T) {
 							},
 							Registries: []rules.OCIRegistry{
 								{
-									ExpressionMatch: runtime.ExpressionMatch{
-										ExpressionRegex: runtime.ExpressionRegex{
-											Expression: "{{ .tenant.metadata.name }}/deny/.*",
-										},
-									},
+									Expression: "{{ .tenant.metadata.name }}/deny/.*",
 								},
 							},
 						},
@@ -230,10 +217,8 @@ func TestRenderNamespaceRuleBodies(t *testing.T) {
 						Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
 							Registries: []rules.OCIRegistry{
 								{
-									ExpressionMatch: runtime.ExpressionMatch{
-										Exact: []string{
-											"{{ .namespace.metadata.labels.registry }}/app:1",
-										},
+									Exact: []string{
+										"{{ .namespace.metadata.labels.registry }}/app:1",
 									},
 								},
 							},
@@ -246,7 +231,6 @@ func TestRenderNamespaceRuleBodies(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -336,10 +320,8 @@ func TestRenderNamespaceRuleBodies_DoesNotMutateInput(t *testing.T) {
 				Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
 					Registries: []rules.OCIRegistry{
 						{
-							ExpressionMatch: runtime.ExpressionMatch{
-								Exact: []string{
-									"{{ .tenant.metadata.name }}/app:1",
-								},
+							Exact: []string{
+								"{{ .tenant.metadata.name }}/app:1",
 							},
 						},
 					},

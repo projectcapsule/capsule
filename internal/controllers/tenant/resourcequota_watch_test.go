@@ -15,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/workqueue"
@@ -43,11 +42,9 @@ func TestResourceQuotaReconcileSyncsTenantQuotas(t *testing.T) {
 
 	controller := true
 	tenant := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenant-a",
-			Annotations: map[string]string{
-				capsulev1beta2.LimitAnnotationForResource("widgets.example.com_v1"): "10",
-			},
+		Name: "tenant-a",
+		Annotations: map[string]string{
+			capsulev1beta2.LimitAnnotationForResource("widgets.example.com_v1"): "10",
 		},
 		Spec: capsulev1beta2.TenantSpec{ResourceQuota: api.ResourceQuotaSpec{
 			Scope: api.ResourceQuotaScopeNamespace,
@@ -57,7 +54,7 @@ func TestResourceQuotaReconcileSyncsTenantQuotas(t *testing.T) {
 		}},
 		Status: capsulev1beta2.TenantStatus{Spaces: []*capsulev1beta2.TenantStatusNamespaceItem{{Name: "team-a"}}},
 	}
-	trigger := &corev1.ResourceQuota{ObjectMeta: metav1.ObjectMeta{
+	trigger := &corev1.ResourceQuota{
 		Name:      "capsule-tenant-a-0",
 		Namespace: "team-a",
 		OwnerReferences: []metav1.OwnerReference{{
@@ -65,8 +62,7 @@ func TestResourceQuotaReconcileSyncsTenantQuotas(t *testing.T) {
 			Kind:       "Tenant",
 			Name:       tenant.Name,
 			Controller: &controller,
-		}},
-	}}
+		}}}
 	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(tenant, trigger).Build()
 	gvr := schema.GroupVersionResource{Group: "example.com", Version: "v1", Resource: "widgets"}
 	dynamicClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
@@ -80,7 +76,7 @@ func TestResourceQuotaReconcileSyncsTenantQuotas(t *testing.T) {
 	manager := &Manager{Client: cl, reader: cl, DynamicClient: dynamicClient, Metrics: metrics.NewTenantRecorder()}
 
 	if _, err := manager.reconcileResourceQuotas(context.Background(), reconcile.Request{
-		NamespacedName: types.NamespacedName{Name: tenant.Name},
+		Name: tenant.Name,
 	}); err != nil {
 		t.Fatalf("reconcile ResourceQuotas: %v", err)
 	}
@@ -121,8 +117,8 @@ func TestResourceQuotaInitialEventsCoalesceByOwnerTenant(t *testing.T) {
 	defer queue.ShutDown()
 
 	controller := true
-	for i := 0; i < 100; i++ {
-		quota := &corev1.ResourceQuota{ObjectMeta: metav1.ObjectMeta{
+	for range 100 {
+		quota := &corev1.ResourceQuota{
 			Name:      "quota",
 			Namespace: "team-a",
 			OwnerReferences: []metav1.OwnerReference{{
@@ -130,8 +126,7 @@ func TestResourceQuotaInitialEventsCoalesceByOwnerTenant(t *testing.T) {
 				Kind:       "Tenant",
 				Name:       "tenant-a",
 				Controller: &controller,
-			}},
-		}}
+			}}}
 
 		h.Create(context.Background(), event.CreateEvent{Object: quota, IsInInitialList: true}, queue)
 	}
@@ -169,7 +164,7 @@ func TestResourceQuotaReconcileSkipsMissingStatusNamespace(t *testing.T) {
 	}
 
 	tenant := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{Name: "tenant-a", UID: "tenant-a"},
+		Name: "tenant-a", UID: "tenant-a",
 		Spec: capsulev1beta2.TenantSpec{ResourceQuota: api.ResourceQuotaSpec{
 			Scope: api.ResourceQuotaScopeNamespace,
 			Items: []corev1.ResourceQuotaSpec{{Hard: corev1.ResourceList{
@@ -189,7 +184,7 @@ func TestResourceQuotaReconcileSkipsMissingStatusNamespace(t *testing.T) {
 	manager := &Manager{Client: cl, reader: cl, Metrics: metrics.NewTenantRecorder()}
 
 	if _, err := manager.reconcileResourceQuotas(context.Background(), reconcile.Request{
-		NamespacedName: types.NamespacedName{Name: tenant.Name},
+		Name: tenant.Name,
 	}); err != nil {
 		t.Fatalf("reconcile ResourceQuotas with missing namespace: %v", err)
 	}

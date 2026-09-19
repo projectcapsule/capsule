@@ -15,24 +15,18 @@ import (
 
 func mkItem(tenant, namespace, name, kind string, status metav1.ConditionStatus, condType, msg string, created bool, lastApply metav1.Time) meta.ObjectReferenceStatus {
 	return meta.ObjectReferenceStatus{
-		ResourceID: gvk.ResourceID{
-			TenantResourceIDWithOrigin: gvk.TenantResourceIDWithOrigin{
-				TenantResourceID: gvk.TenantResourceID{Tenant: tenant},
-				Origin:           "",
-			},
-			Group:     "",
-			Version:   "",
-			Kind:      kind,
-			Name:      name,
-			Namespace: namespace,
-		},
-		ObjectReferenceStatusCondition: meta.ObjectReferenceStatusCondition{
-			Status:    status,
-			Type:      condType,
-			Message:   msg,
-			LastApply: lastApply,
-			Created:   created,
-		},
+		Tenant:    tenant,
+		Origin:    "",
+		Group:     "",
+		Version:   "",
+		Kind:      kind,
+		Name:      name,
+		Namespace: namespace,
+		Status:    status,
+		Type:      condType,
+		Message:   msg,
+		LastApply: lastApply,
+		Created:   created,
 	}
 }
 

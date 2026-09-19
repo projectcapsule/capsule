@@ -10,7 +10,6 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -91,7 +90,7 @@ func TestResolveNamespacedTemplateServiceAccount(t *testing.T) {
 	configured := capsulev1beta2.ServiceAccountClient{TenantDefaultServiceAccount: "tenant-default"}
 	r := &ResourcePermitReconciler{Configuration: impersonationTestConfiguration{properties: configured}}
 	brt := &capsulev1beta2.ResourcePermitTemplate{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "team-a"},
+		Namespace: "team-a",
 		Spec: capsulev1beta2.ResourcePermitTemplateSpec{
 			Impersonation: &meta.LocalRFC1123ObjectReference{Name: "template-runner"},
 		},
@@ -207,8 +206,8 @@ func TestTemplateContextUsesImpersonatedClient(t *testing.T) {
 
 	base := fake.NewClientBuilder().WithScheme(scheme).Build()
 	impersonated := fake.NewClientBuilder().WithScheme(scheme).WithObjects(&corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{Name: "source", Namespace: "team-a"},
-		Data:       map[string]string{"value": "loaded-with-template-client"},
+		Name: "source", Namespace: "team-a",
+		Data: map[string]string{"value": "loaded-with-template-client"},
 	}).Build()
 	clients := cache.NewImpersonationCache()
 	clients.Set("operations", "template-runner", impersonated)
@@ -222,7 +221,7 @@ func TestTemplateContextUsesImpersonatedClient(t *testing.T) {
 		resources:          ssa.Manager{Mapper: mapper},
 	}
 	br := &capsulev1beta2.ResourcePermit{
-		ObjectMeta: metav1.ObjectMeta{Name: "request", Namespace: "team-a"},
+		Name: "request", Namespace: "team-a",
 	}
 	brt := &capsulev1beta2.GlobalResourcePermitTemplate{
 		Spec: capsulev1beta2.GlobalResourcePermitTemplateSpec{
@@ -231,10 +230,8 @@ func TestTemplateContextUsesImpersonatedClient(t *testing.T) {
 				Namespace: "operations",
 			},
 			Context: &tpl.TemplateContext{Resources: []*tpl.TemplateResourceReference{{
-				ResourceReference: tpl.ResourceReference{
-					VersionKind: apiruntime.VersionKind{APIVersion: "v1", Kind: "ConfigMap"},
-					Name:        "source",
-				},
+				APIVersion: "v1", Kind: "ConfigMap",
+				Name:  "source",
 				Index: "settings",
 			}}},
 			Resources: []apiruntime.ResourceTemplate{{

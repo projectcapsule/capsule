@@ -542,14 +542,10 @@ func TestDescribeRegistryRuleSet(t *testing.T) {
 			rule: registryRuleSet{
 				Registries: []apirules.OCIRegistry{
 					{
-						ExpressionMatch: runtime.ExpressionMatch{
-							Exact: []string{
-								"harbor/platform/app:1.0.0",
-							},
-							ExpressionRegex: runtime.ExpressionRegex{
-								Expression: "harbor/shared/.*",
-							},
+						Exact: []string{
+							"harbor/platform/app:1.0.0",
 						},
+						Expression: "harbor/shared/.*",
 					},
 				},
 			},
@@ -580,12 +576,8 @@ func TestDescribeRegistryRuleSet(t *testing.T) {
 			rule: registryRuleSet{
 				Registries: []apirules.OCIRegistry{
 					{
-						ExpressionMatch: runtime.ExpressionMatch{
-							ExpressionRegex: runtime.ExpressionRegex{
-								Expression: "trusted/.*",
-								Negate:     true,
-							},
-						},
+						Expression: "trusted/.*",
+						Negate:     true,
 					},
 				},
 			},
@@ -622,27 +614,21 @@ func TestRegistryReferencesFromPod(t *testing.T) {
 			},
 			EphemeralContainers: []corev1.EphemeralContainer{
 				{
-					EphemeralContainerCommon: corev1.EphemeralContainerCommon{
-						Name:            "debug",
-						Image:           "harbor/debug/app:1.0.0",
-						ImagePullPolicy: corev1.PullNever,
-					},
+					Name:            "debug",
+					Image:           "harbor/debug/app:1.0.0",
+					ImagePullPolicy: corev1.PullNever,
 				},
 			},
 			Volumes: []corev1.Volume{
 				{
-					Name: "config",
-					VolumeSource: corev1.VolumeSource{
-						ConfigMap: &corev1.ConfigMapVolumeSource{},
-					},
+					Name:      "config",
+					ConfigMap: &corev1.ConfigMapVolumeSource{},
 				},
 				{
 					Name: "artifact",
-					VolumeSource: corev1.VolumeSource{
-						Image: &corev1.ImageVolumeSource{
-							Reference:  "harbor/volume/artifact:1.0.0",
-							PullPolicy: corev1.PullAlways,
-						},
+					Image: &corev1.ImageVolumeSource{
+						Reference:  "harbor/volume/artifact:1.0.0",
+						PullPolicy: corev1.PullAlways,
 					},
 				},
 			},
@@ -818,12 +804,8 @@ func TestRegistryRuleDescription(t *testing.T) {
 			name: "negated expression",
 			matched: compiledRegistryRuleForTest(
 				apirules.OCIRegistry{
-					ExpressionMatch: runtime.ExpressionMatch{
-						ExpressionRegex: runtime.ExpressionRegex{
-							Expression: "trusted/.*",
-							Negate:     true,
-						},
-					},
+					Expression: "trusted/.*",
+					Negate:     true,
 				},
 				nil,
 			),
@@ -833,14 +815,10 @@ func TestRegistryRuleDescription(t *testing.T) {
 			name: "exact and expression",
 			matched: compiledRegistryRuleForTest(
 				apirules.OCIRegistry{
-					ExpressionMatch: runtime.ExpressionMatch{
-						Exact: []string{
-							"harbor/platform/app:1.0.0",
-						},
-						ExpressionRegex: runtime.ExpressionRegex{
-							Expression: "harbor/shared/.*",
-						},
+					Exact: []string{
+						"harbor/platform/app:1.0.0",
 					},
+					Expression: "harbor/shared/.*",
 				},
 				nil,
 			),
@@ -1084,19 +1062,13 @@ func registryEnforceForTest(
 
 func registryExactForTest(values ...string) apirules.OCIRegistry {
 	return apirules.OCIRegistry{
-		ExpressionMatch: runtime.ExpressionMatch{
-			Exact: values,
-		},
+		Exact: values,
 	}
 }
 
 func registryExpressionForTest(expression string) apirules.OCIRegistry {
 	return apirules.OCIRegistry{
-		ExpressionMatch: runtime.ExpressionMatch{
-			ExpressionRegex: runtime.ExpressionRegex{
-				Expression: expression,
-			},
-		},
+		Expression: expression,
 	}
 }
 
@@ -1134,8 +1106,7 @@ func compiledRegistryRuleForTest(
 	return out
 }
 
-func decisionMessageForRegistryTest(evaluation interface {
-}) string {
+func decisionMessageForRegistryTest(evaluation any) string {
 	e, ok := evaluation.(*ruleengine.Evaluation)
 	if !ok || e == nil {
 		return ""

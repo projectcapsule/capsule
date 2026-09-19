@@ -63,7 +63,7 @@ func TestTransitionAuditTrail(t *testing.T) {
 		Groups: []string{"developers"},
 	}
 	createdAt := metav1.NewTime(time.Date(2026, time.September, 2, 8, 0, 0, 0, time.UTC))
-	br := &ResourcePermit{ObjectMeta: metav1.ObjectMeta{CreationTimestamp: createdAt}}
+	br := &ResourcePermit{CreationTimestamp: createdAt}
 
 	require.NoError(t, br.SetCreated(requestor))
 	require.NoError(t, br.SetRequestedBy(requestor))
@@ -99,10 +99,8 @@ func TestResourcePermitResolvedDataIsNestedUnderRequest(t *testing.T) {
 
 	status := ResourcePermitStatus{Request: &ResourcePermitStatusRequest{
 		Template: &ResolvedResourcePermitTemplateReference{
-			ResourcePermitTemplateReference: ResourcePermitTemplateReference{
-				Kind: GlobalResourcePermitTemplateKind,
-				Name: "emergency-access",
-			},
+			Kind:            GlobalResourcePermitTemplateKind,
+			Name:            "emergency-access",
 			ResourceVersion: "42",
 		},
 		Impersonation: &apimeta.NamespacedRFC1123ObjectReferenceWithNamespace{

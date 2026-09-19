@@ -23,7 +23,7 @@ func TestObjectMetadataChangedPredicate(t *testing.T) {
 	t.Parallel()
 
 	p := predicates.ObjectMetadataChangedPredicate{}
-	oldPod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod", Labels: map[string]string{"a": "b"}}}
+	oldPod := &corev1.Pod{Name: "pod", Labels: map[string]string{"a": "b"}}
 	statusOnly := oldPod.DeepCopy()
 	statusOnly.Status.Phase = corev1.PodRunning
 
@@ -100,9 +100,9 @@ func TestTenantManagedResourceChangedPredicate(t *testing.T) {
 		},
 		{
 			name: "managed owner reference drift",
-			old: &corev1.LimitRange{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{
+			old: &corev1.LimitRange{OwnerReferences: []metav1.OwnerReference{{
 				Kind: "Tenant", Name: "tenant",
-			}}}},
+			}}},
 			new:  &corev1.LimitRange{},
 			want: true,
 		},
@@ -122,8 +122,8 @@ func TestValidatingAdmissionConfigurationChangedPredicate(t *testing.T) {
 
 	p := predicates.ValidatingAdmissionConfigurationChangedPredicate{}
 	withoutHash := &admissionv1.ValidatingWebhookConfiguration{
-		ObjectMeta: metav1.ObjectMeta{Name: "capsule"},
-		Webhooks:   []admissionv1.ValidatingWebhook{{Name: "namespaces.projectcapsule.dev"}},
+		Name:     "capsule",
+		Webhooks: []admissionv1.ValidatingWebhook{{Name: "namespaces.projectcapsule.dev"}},
 	}
 	obj := withoutHash.DeepCopy()
 	obj.Annotations = map[string]string{
@@ -164,8 +164,8 @@ func TestMutatingAdmissionConfigurationChangedPredicate(t *testing.T) {
 
 	p := predicates.MutatingAdmissionConfigurationChangedPredicate{}
 	withoutHash := &admissionv1.MutatingWebhookConfiguration{
-		ObjectMeta: metav1.ObjectMeta{Name: "capsule"},
-		Webhooks:   []admissionv1.MutatingWebhook{{Name: "pods.projectcapsule.dev"}},
+		Name:     "capsule",
+		Webhooks: []admissionv1.MutatingWebhook{{Name: "pods.projectcapsule.dev"}},
 	}
 	obj := withoutHash.DeepCopy()
 	obj.Annotations = map[string]string{

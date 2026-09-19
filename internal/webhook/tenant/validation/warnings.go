@@ -7,7 +7,6 @@ import (
 	"context"
 	"strings"
 
-	admissionv1 "k8s.io/api/admission/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -67,10 +66,8 @@ func (h *warningHandler) OnUpdate(
 
 func (h *warningHandler) handle(tnt *capsulev1beta2.Tenant, req admission.Request) *admission.Response {
 	response := &admission.Response{
-		AdmissionResponse: admissionv1.AdmissionResponse{
-			UID:     req.UID,
-			Allowed: true,
-		},
+		UID:     req.UID,
+		Allowed: true,
 	}
 
 	//nolint:staticcheck

@@ -364,11 +364,9 @@ func TestRemoveLooseOwnerReferenceForKindExceptGiven(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			obj := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "cm",
-					Namespace:       "ns",
-					OwnerReferences: append([]metav1.OwnerReference(nil), tt.initial...),
-				},
+				Name:            "cm",
+				Namespace:       "ns",
+				OwnerReferences: append([]metav1.OwnerReference(nil), tt.initial...),
 			}
 
 			meta.RemoveLooseOwnerReferenceForKindExceptGiven(obj, tt.keep)

@@ -7,7 +7,6 @@ import (
 	"context"
 	"testing"
 
-	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -158,11 +157,10 @@ func (h *requestSpyHandler) OnDelete(
 }
 
 func requestWithKind(group, kind string) admission.Request {
-	return admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+	return admission.Request{
 		Kind: metav1.GroupVersionKind{
 			Group:   group,
 			Version: "v1",
 			Kind:    kind,
-		},
-	}}
+		}}
 }

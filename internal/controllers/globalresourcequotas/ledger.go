@@ -25,10 +25,8 @@ func (r *Controller) ensureLedger(
 	quota *capsulev1beta2.GlobalResourceQuota,
 ) (*capsulev1beta2.QuantityLedger, error) {
 	ledger := &capsulev1beta2.QuantityLedger{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      quota.GetLedgerName(),
-			Namespace: configuration.ControllerNamespace(),
-		},
+		Name:      quota.GetLedgerName(),
+		Namespace: configuration.ControllerNamespace(),
 	}
 
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, ledger, func() error {

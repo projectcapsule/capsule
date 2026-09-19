@@ -842,9 +842,7 @@ func objectWithMetadata(
 	annotations map[string]string,
 ) *metav1.PartialObjectMetadata {
 	return &metav1.PartialObjectMetadata{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels:      labels,
-			Annotations: annotations,
-		},
+		Labels:      labels,
+		Annotations: annotations,
 	}
 }

@@ -18,28 +18,21 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
 var _ = Describe("exceeding a Tenant resource quota", Ordered, Label("resourcequota"), func() {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-quota-changes",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-quota-changes",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-quota-changes",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-quota-changes",
+					Kind: "User",
 				},
 			},
 			LimitRanges: api.LimitRangesSpec{Items: []corev1.LimitRangeSpec{
@@ -143,11 +136,9 @@ var _ = Describe("exceeding a Tenant resource quota", Ordered, Label("resourcequ
 		for _, namespace := range nsl {
 			Eventually(func() (err error) {
 				d := &appsv1.Deployment{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "my-pause",
-					},
+					Name: "my-pause",
 					Spec: appsv1.DeploymentSpec{
-						Replicas: ptr.To(int32(5)),
+						Replicas: new(int32(5)),
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
 								"app": "pause",
@@ -194,9 +185,7 @@ var _ = Describe("exceeding a Tenant resource quota", Ordered, Label("resourcequ
 
 			By("creating an exceeded Pod", func() {
 				pod := &corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "container",
-					},
+					Name: "container",
 					Spec: corev1.PodSpec{
 						SecurityContext: nobodyPodSecurityContext(),
 						Containers: []corev1.Container{

@@ -184,7 +184,7 @@ func newKubernetesCELValidator(schemaData []byte) (*kubernetesCELValidator, erro
 	// structural validation reserves a few rules for the root of a CRD, while a
 	// parameter object is not itself a Kubernetes API resource.
 	wrapper := &structuralschema.Structural{
-		Generic: structuralschema.Generic{Type: "object"},
+		Type: "object",
 		Properties: map[string]structuralschema.Structural{
 			"params": *structural,
 		},

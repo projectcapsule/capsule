@@ -20,10 +20,9 @@ func TestTypedTenantWithRulesetHandlerSkipsDelete(t *testing.T) {
 	handler := &handlers.TypedTenantWithRulesetHandler[*corev1.ConfigMap]{
 		Factory: func() *corev1.ConfigMap { return &corev1.ConfigMap{} },
 	}
-	request := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+	request := admission.Request{
 		Operation: admissionv1.Delete,
-		Namespace: "solar-system",
-	}}
+		Namespace: "solar-system"}
 
 	if response := handler.OnDelete(nil, nil, nil, nil)(context.Background(), request); response != nil {
 		t.Fatalf("OnDelete() response = %#v, want nil", response)

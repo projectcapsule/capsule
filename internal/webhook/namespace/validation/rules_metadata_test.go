@@ -27,10 +27,9 @@ func TestRulesMetadataHandlerSkipsFinalize(t *testing.T) {
 	t.Parallel()
 
 	handler := RulesMetadataHandler(nil, nil)
-	request := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+	request := admission.Request{
 		Operation:   admissionv1.Update,
-		SubResource: "finalize",
-	}}
+		SubResource: "finalize"}
 
 	response := handler.OnUpdate(
 		nil,
@@ -58,13 +57,13 @@ func TestRulesMetadataHandlerValidatesStatusMetadata(t *testing.T) {
 		t.Fatalf("add Capsule API to scheme: %v", err)
 	}
 
-	tnt := &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: "solar"}}
+	tnt := &capsulev1beta2.Tenant{Name: "solar"}
 	tnt.Spec.Rules = []*rules.NamespaceRuleBodyTenant{{
 		NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
 			Enforce: &rules.NamespaceRuleEnforceBody{
 				Action: rules.ActionTypeAllow,
 				Metadata: []rules.MetadataRule{{
-					VersionKinds: apiruntime.VersionKinds{APIGroups: []string{"v1"}, Kinds: []string{"Namespace"}},
+					APIGroups: []string{"v1"}, Kinds: []string{"Namespace"},
 					Labels: map[string]rules.MetadataValueRule{
 						"pod-security.kubernetes.io/enforce": {
 							Required: true,
@@ -76,21 +75,19 @@ func TestRulesMetadataHandlerValidatesStatusMetadata(t *testing.T) {
 		},
 	}}
 
-	oldNs := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+	oldNs := &corev1.Namespace{
 		Name:   "solar-system",
-		Labels: map[string]string{"pod-security.kubernetes.io/enforce": "baseline"},
-	}}
+		Labels: map[string]string{"pod-security.kubernetes.io/enforce": "baseline"}}
 	newNs := oldNs.DeepCopy()
 	newNs.Labels["pod-security.kubernetes.io/enforce"] = "privileged"
 
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := events.NewEventRecorder(nil, logr.Discard(), nil, nil)
 	handler := RulesMetadataHandler(cache.NewRegexCache(), nil)
-	request := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+	request := admission.Request{
 		Kind:        metav1.GroupVersionKind{Version: "v1", Kind: "Namespace"},
 		Operation:   admissionv1.Update,
-		SubResource: "status",
-	}}
+		SubResource: "status"}
 
 	response := handler.OnUpdate(
 		client,

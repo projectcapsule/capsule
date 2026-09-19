@@ -366,7 +366,7 @@ func TestPrune(t *testing.T) {
 		Name:       "request",
 		UID:        types.UID("request-uid"),
 	}
-	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+	ns := &corev1.Namespace{Name: "default"}
 	manager := Manager{
 		Mapper: mapper,
 		Metadata: Metadata{

@@ -314,6 +314,7 @@ func (b *resourcePermitValidationHandler) validateApproval(
 	if automaticApproval {
 		readyStatus = newBr.Status.Conditions
 	}
+
 	ready := k8smeta.FindStatusCondition(readyStatus, meta.ReadyCondition)
 	if ready == nil || ready.Status != metav1.ConditionTrue {
 		message := "rendered resources are not ready"

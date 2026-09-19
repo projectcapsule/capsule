@@ -120,9 +120,7 @@ func TestPodRulesValidateSchedulers(t *testing.T) {
 						Exact: []string{
 							"default-scheduler",
 						},
-						ExpressionRegex: runtime.ExpressionRegex{
-							Expression: "tenant-[a-z0-9-]+",
-						},
+						Expression: "tenant-[a-z0-9-]+",
 					},
 				),
 			},
@@ -473,32 +471,25 @@ func schedulerExactForTest(values ...string) runtime.ExpressionMatch {
 
 func schedulerExpressionForTest(expression string) runtime.ExpressionMatch {
 	return runtime.ExpressionMatch{
-		ExpressionRegex: runtime.ExpressionRegex{
-			Expression: expression,
-		},
+		Expression: expression,
 	}
 }
 
 func schedulerNegatedExactForTest(values ...string) runtime.ExpressionMatch {
 	return runtime.ExpressionMatch{
-		Exact: values,
-		ExpressionRegex: runtime.ExpressionRegex{
-			Negate: true,
-		},
+		Exact:  values,
+		Negate: true,
 	}
 }
 
 func schedulerNegatedExpressionForTest(expression string) runtime.ExpressionMatch {
 	return runtime.ExpressionMatch{
-		ExpressionRegex: runtime.ExpressionRegex{
-			Expression: expression,
-			Negate:     true,
-		},
+		Expression: expression,
+		Negate:     true,
 	}
 }
 
-func decisionMessageForSchedulerTest(evaluation interface {
-}) string {
+func decisionMessageForSchedulerTest(evaluation any) string {
 	e, ok := evaluation.(*ruleengine.Evaluation)
 	if !ok || e == nil {
 		return ""

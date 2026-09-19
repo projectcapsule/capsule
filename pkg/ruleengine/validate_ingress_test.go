@@ -26,10 +26,8 @@ func TestValidateIngressRules(t *testing.T) {
 					rules.IngressTypeGRPCRoute,
 				},
 				Hostnames: []runtime.ExpressionMatch{{
-					Exact: []string{"prod", "test"},
-					ExpressionRegex: runtime.ExpressionRegex{
-						Expression: ".*\\.example\\.com",
-					},
+					Exact:      []string{"prod", "test"},
+					Expression: ".*\\.example\\.com",
 				}},
 			},
 		},
@@ -46,7 +44,7 @@ func TestValidateIngressRules(t *testing.T) {
 
 	invalidRegex := valid[0].DeepCopy()
 	invalidRegex.Enforce.Ingress.Hostnames = []runtime.ExpressionMatch{{
-		ExpressionRegex: runtime.ExpressionRegex{Expression: "("},
+		Expression: "(",
 	}}
 	if err := ValidateRuleStatusBody(nil, []*rules.NamespaceRuleBodyNamespace{invalidRegex}); err == nil || !strings.Contains(err.Error(), "ingress.hostnames[0].exp") {
 		t.Fatalf("ValidateRuleStatusBody(invalid regex) error = %v", err)

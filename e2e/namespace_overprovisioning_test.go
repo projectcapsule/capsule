@@ -9,7 +9,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
@@ -18,25 +17,19 @@ import (
 
 var _ = Describe("creating a Namespace in over-quota of three", Ordered, Label("namespace"), func() {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-ns-overprovision",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-ns-overprovision",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-ns-overprovision",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-ns-overprovision",
+					Kind: "User",
 				},
 			},
 			NamespaceOptions: &capsulev1beta2.NamespaceOptions{
-				Quota: ptr.To(int32(3)),
+				Quota: new(int32(3)),
 			},
 		},
 	}

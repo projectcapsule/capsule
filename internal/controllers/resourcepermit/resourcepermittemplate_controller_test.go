@@ -108,7 +108,7 @@ func TestGlobalPermitTemplateNamespaceFailure(t *testing.T) {
 	object.Spec.NamespaceSelectors = []selectors.NamespaceSelector{{
 		LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"resource-permit": "enabled"}},
 	}}
-	namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "team-a", Labels: map[string]string{"resource-permit": "enabled"}}}
+	namespace := &corev1.Namespace{Name: "team-a", Labels: map[string]string{"resource-permit": "enabled"}}
 	base := permitTemplateTestClient(t, object, namespace)
 	listErr := errors.New("namespace listing unavailable")
 	failList := false

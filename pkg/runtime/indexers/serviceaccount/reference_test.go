@@ -7,8 +7,6 @@ import (
 	"reflect"
 	"testing"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	serviceaccountindexer "github.com/projectcapsule/capsule/pkg/runtime/indexers/serviceaccount"
@@ -26,7 +24,7 @@ func TestResourcePermitReference(t *testing.T) {
 	}
 
 	request := &capsulev1beta2.ResourcePermit{
-		ObjectMeta: metav1.ObjectMeta{Name: "access", Namespace: "team-a"},
+		Name: "access", Namespace: "team-a",
 		Status: capsulev1beta2.ResourcePermitStatus{Request: &capsulev1beta2.ResourcePermitStatusRequest{
 			Impersonation: &meta.NamespacedRFC1123ObjectReferenceWithNamespace{
 				Name:      "runner",

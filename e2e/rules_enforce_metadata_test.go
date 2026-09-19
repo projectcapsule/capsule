@@ -46,18 +46,14 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 
 	metadataByExpression := func(expression string) runtime.ExpressionMatch {
 		return runtime.ExpressionMatch{
-			ExpressionRegex: runtime.ExpressionRegex{
-				Expression: expression,
-			},
+			Expression: expression,
 		}
 	}
 
 	metadataByNegatedExpression := func(expression string) runtime.ExpressionMatch {
 		return runtime.ExpressionMatch{
-			ExpressionRegex: runtime.ExpressionRegex{
-				Expression: expression,
-				Negate:     true,
-			},
+			Expression: expression,
+			Negate:     true,
 		}
 	}
 
@@ -69,10 +65,8 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 
 	metadataByMatch := func(exact []string, expression string) runtime.ExpressionMatch {
 		return runtime.ExpressionMatch{
-			ExpressionRegex: runtime.ExpressionRegex{
-				Expression: expression,
-			},
-			Exact: exact,
+			Expression: expression,
+			Exact:      exact,
 		}
 	}
 
@@ -96,10 +90,8 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 					Action: action,
 					Metadata: []rules.MetadataRule{
 						{
-							VersionKinds: runtime.VersionKinds{
-								APIGroups: []string{apiVersion},
-								Kinds:     kinds,
-							},
+							APIGroups:   []string{apiVersion},
+							Kinds:       kinds,
 							Labels:      labels,
 							Annotations: annotations,
 						},
@@ -241,29 +233,19 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 
 	newTenant := func() *capsulev1beta2.Tenant {
 		return &capsulev1beta2.Tenant{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "e2e-rule-metadata",
-				Labels: map[string]string{
-					"env": "e2e",
-				},
+			Name: "e2e-rule-metadata",
+			Labels: map[string]string{
+				"env": "e2e",
 			},
 			Spec: capsulev1beta2.TenantSpec{
 				Owners: rbac.OwnerListSpec{
 					{
-						CoreOwnerSpec: rbac.CoreOwnerSpec{
-							UserSpec: rbac.UserSpec{
-								Name: ownerName,
-								Kind: "User",
-							},
-						},
+						Name: ownerName,
+						Kind: "User",
 					},
 					{
-						CoreOwnerSpec: rbac.CoreOwnerSpec{
-							UserSpec: rbac.UserSpec{
-								Name: secondOwnerName,
-								Kind: "User",
-							},
-						},
+						Name: secondOwnerName,
+						Kind: "User",
 					},
 				},
 				Rules: tenantRules,
@@ -289,10 +271,7 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 	expectMetadataPolicy := func(g Gomega, got rules.MetadataValueRule, expected expectedMetadataPolicy) {
 		g.Expect(got.Required).To(Equal(expected.required))
 
-		wantValues := len(expected.expressions)
-		if len(expected.exact) > wantValues {
-			wantValues = len(expected.exact)
-		}
+		wantValues := max(len(expected.exact), len(expected.expressions))
 		if len(expected.negated) > wantValues {
 			wantValues = len(expected.negated)
 		}
@@ -514,11 +493,9 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 
 	configMap := func(name string, labels map[string]string, annotations map[string]string) *corev1.ConfigMap {
 		return &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:        name,
-				Labels:      labels,
-				Annotations: annotations,
-			},
+			Name:        name,
+			Labels:      labels,
+			Annotations: annotations,
 			Data: map[string]string{
 				"key": "value",
 			},
@@ -527,11 +504,9 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 
 	service := func(name string, labels map[string]string, annotations map[string]string) *corev1.Service {
 		return &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:        name,
-				Labels:      labels,
-				Annotations: annotations,
-			},
+			Name:        name,
+			Labels:      labels,
+			Annotations: annotations,
 			Spec: corev1.ServiceSpec{
 				Type: corev1.ServiceTypeClusterIP,
 				Ports: []corev1.ServicePort{
@@ -546,11 +521,9 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 
 	deployment := func(name string, labels map[string]string, annotations map[string]string) *appsv1.Deployment {
 		return &appsv1.Deployment{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:        name,
-				Labels:      labels,
-				Annotations: annotations,
-			},
+			Name:        name,
+			Labels:      labels,
+			Annotations: annotations,
 			Spec: appsv1.DeploymentSpec{
 				Replicas: ptr.To[int32](1),
 				Selector: &metav1.LabelSelector{
@@ -2820,10 +2793,10 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 		labelPolicies := map[string]rules.MetadataValueRule{}
 		annotationPolicies := map[string]rules.MetadataValueRule{}
 		for key, value := range managedLabels {
-			labelPolicies[key] = rules.MetadataValueRule{Managed: ptr.To(value)}
+			labelPolicies[key] = rules.MetadataValueRule{Managed: new(value)}
 		}
 		for key, value := range managedAnnotations {
-			annotationPolicies[key] = rules.MetadataValueRule{Managed: ptr.To(value)}
+			annotationPolicies[key] = rules.MetadataValueRule{Managed: new(value)}
 		}
 
 		managedRule := metadataRule(rules.ActionTypeAllow, "v1", []string{kind}, labelPolicies, annotationPolicies)
@@ -2836,21 +2809,21 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 			// from this namespace's deny rule.
 			selectedRule(map[string]string{"example.corp/managed-scope": "other"},
 				metadataRule(rules.ActionTypeAllow, "v1", []string{kind},
-					map[string]rules.MetadataValueRule{"example.corp/other-namespace": {Managed: ptr.To("other")}}, nil)),
+					map[string]rules.MetadataValueRule{"example.corp/other-namespace": {Managed: new("other")}}, nil)),
 			audienceRule(rules.Audience{Kind: rules.AudienceKindCustom, Name: string(rules.CustomAudienceCapsuleUser)},
 				metadataRule(rules.ActionTypeDeny, "v1", []string{kind},
 					map[string]rules.MetadataValueRule{".*example.corp.*": {}},
 					map[string]rules.MetadataValueRule{".*example.corp.*": {}})),
 		})
 		ns := createNamespace(nil)
-		waitForProjectedMetadata(ns.Name, customerKey, nil, ptr.To("chainsaw"))
+		waitForProjectedMetadata(ns.Name, customerKey, nil, new("chainsaw"))
 		owner := impersonationClient(ownerName, withDefaultGroups(nil))
 		ctx := context.Background()
 		newResource := func() client.Object {
 			if kind == "Namespace" {
 				return NewNamespace("", map[string]string{meta.TenantLabel: tnt.Name})
 			}
-			return &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{GenerateName: "managed-deny-", Namespace: ns.Name}}
+			return &corev1.ConfigMap{GenerateName: "managed-deny-", Namespace: ns.Name}
 		}
 		expectManaged := func(obj client.Object) {
 			for key, value := range managedLabels {
@@ -3079,7 +3052,7 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 					Enforce: &rules.NamespaceRuleEnforceBody{
 						Action: rules.ActionTypeDeny,
 						Metadata: []rules.MetadataRule{{
-							VersionKinds: runtime.VersionKinds{APIGroups: []string{"v1"}, Kinds: []string{"ConfigMap"}},
+							APIGroups: []string{"v1"}, Kinds: []string{"ConfigMap"},
 							Labels: map[string]rules.MetadataValueRule{
 								"example.corp/audience-blocked": metadataValueRule(false, metadataByExact("true")),
 							},

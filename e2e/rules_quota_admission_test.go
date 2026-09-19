@@ -34,20 +34,18 @@ var _ = Describe("rule-generated GlobalResourceQuota admission", Ordered,
 		ctx := context.Background()
 		owner := rbac.UserSpec{Name: tenantName, Kind: rbac.UserOwner}
 		tnt := &capsulev1beta2.Tenant{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   tenantName,
-				Labels: map[string]string{"env": "e2e"},
-			},
+			Name:   tenantName,
+			Labels: map[string]string{"env": "e2e"},
 			Spec: capsulev1beta2.TenantSpec{
-				Owners: rbac.OwnerListSpec{{CoreOwnerSpec: rbac.CoreOwnerSpec{UserSpec: owner}}},
+				Owners: rbac.OwnerListSpec{{UserSpec: owner}},
 				Rules: []*rules.NamespaceRuleBodyTenant{{
 					NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
 						Quota: []rules.ResourceQuotaRule{{
 							Name: quotaName,
-							ResourceQuotaSpec: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{
+							Hard: corev1.ResourceList{
 								corev1.ResourceLimitsCPU: resource.MustParse("8"),
 								corev1.ResourcePods:      resource.MustParse("100"),
-							}},
+							},
 						}},
 					},
 					NamespaceSelector: &metav1.LabelSelector{
@@ -58,7 +56,7 @@ var _ = Describe("rule-generated GlobalResourceQuota admission", Ordered,
 		}
 		quotaKey := client.ObjectKey{Name: tenantutils.RuleGlobalResourceQuotaName(tnt, quotaName)}
 		tamperRole := &rbacv1.ClusterRole{
-			ObjectMeta: metav1.ObjectMeta{Name: rbacName},
+			Name: rbacName,
 			Rules: []rbacv1.PolicyRule{{
 				APIGroups: []string{capsulev1beta2.GroupVersion.Group},
 				Resources: []string{"globalresourcequotas"},
@@ -99,7 +97,7 @@ var _ = Describe("rule-generated GlobalResourceQuota admission", Ordered,
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		}
 		tamperBinding := &rbacv1.ClusterRoleBinding{
-			ObjectMeta: metav1.ObjectMeta{Name: rbacName},
+			Name: rbacName,
 			RoleRef: rbacv1.RoleRef{
 				APIGroup: rbacv1.GroupName,
 				Kind:     "ClusterRole",
@@ -152,7 +150,7 @@ var _ = Describe("rule-generated GlobalResourceQuota admission", Ordered,
 
 		AfterAll(func() {
 			controllerClient := impersonationClient(ControllerServiceAccountFull, nil)
-			forged := &capsulev1beta2.GlobalResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: rbacName}}
+			forged := &capsulev1beta2.GlobalResourceQuota{Name: rbacName}
 			Expect(ignoreNotFound(controllerClient.Delete(ctx, forged))).To(Succeed())
 
 			EventuallyDeletion(tnt)
@@ -318,10 +316,8 @@ var _ = Describe("rule-generated GlobalResourceQuota admission", Ordered,
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 			forged := &capsulev1beta2.GlobalResourceQuota{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   rbacName,
-					Labels: map[string]string{meta.NewManagedByCapsuleLabel: meta.ValueController},
-				},
+				Name:   rbacName,
+				Labels: map[string]string{meta.NewManagedByCapsuleLabel: meta.ValueController},
 				Spec: capsulev1beta2.GlobalResourceQuotaSpec{
 					Quota: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{
 						corev1.ResourceLimitsCPU: resource.MustParse("1"),
@@ -361,7 +357,7 @@ var _ = Describe("rule-generated GlobalResourceQuota admission", Ordered,
 		It("does not apply managed protection to an unlabeled GlobalResourceQuota", func() {
 			tamperClient := impersonationClient(owner.Name, withDefaultGroups(nil))
 			unmanaged := &capsulev1beta2.GlobalResourceQuota{
-				ObjectMeta: metav1.ObjectMeta{Name: rbacName},
+				Name: rbacName,
 				Spec: capsulev1beta2.GlobalResourceQuotaSpec{
 					Quota: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{
 						corev1.ResourcePods: resource.MustParse("10"),
@@ -444,7 +440,7 @@ var _ = Describe("managed GlobalResourceQuota administrator admission", Ordered,
 		administrator := rbac.UserSpec{Name: adminName, Kind: rbac.UserOwner}
 		originConfig := &capsulev1beta2.CapsuleConfiguration{}
 		adminRole := &rbacv1.ClusterRole{
-			ObjectMeta: metav1.ObjectMeta{Name: adminName},
+			Name: adminName,
 			Rules: []rbacv1.PolicyRule{{
 				APIGroups: []string{capsulev1beta2.GroupVersion.Group},
 				Resources: []string{"globalresourcequotas"},
@@ -452,7 +448,7 @@ var _ = Describe("managed GlobalResourceQuota administrator admission", Ordered,
 			}},
 		}
 		adminBinding := &rbacv1.ClusterRoleBinding{
-			ObjectMeta: metav1.ObjectMeta{Name: adminName},
+			Name: adminName,
 			RoleRef: rbacv1.RoleRef{
 				APIGroup: rbacv1.GroupName,
 				Kind:     "ClusterRole",
@@ -486,7 +482,7 @@ var _ = Describe("managed GlobalResourceQuota administrator admission", Ordered,
 
 		AfterAll(func() {
 			controllerClient := impersonationClient(ControllerServiceAccountFull, nil)
-			quota := &capsulev1beta2.GlobalResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: quotaName}}
+			quota := &capsulev1beta2.GlobalResourceQuota{Name: quotaName}
 			Expect(ignoreNotFound(controllerClient.Delete(ctx, quota))).To(Succeed())
 
 			Eventually(func() error {
@@ -507,10 +503,8 @@ var _ = Describe("managed GlobalResourceQuota administrator admission", Ordered,
 		It("allows a configured administrator to create, update, and delete a managed quota", func() {
 			adminClient := impersonationClient(administrator.Name, nil)
 			quota := &capsulev1beta2.GlobalResourceQuota{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   quotaName,
-					Labels: map[string]string{meta.NewManagedByCapsuleLabel: meta.ValueController},
-				},
+				Name:   quotaName,
+				Labels: map[string]string{meta.NewManagedByCapsuleLabel: meta.ValueController},
 				Spec: capsulev1beta2.GlobalResourceQuotaSpec{
 					Quota: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{
 						corev1.ResourcePods: resource.MustParse("10"),

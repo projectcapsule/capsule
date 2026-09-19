@@ -27,7 +27,7 @@ func TestUpdateReconcilingStatusSynchronizesCurrentStatus(t *testing.T) {
 	}
 
 	latest := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{Name: "tenant", Generation: 2},
+		Name: "tenant", Generation: 2,
 		Status: capsulev1beta2.TenantStatus{
 			ObservedGeneration: 2,
 			State:              capsulev1beta2.TenantStateActive,
@@ -41,7 +41,7 @@ func TestUpdateReconcilingStatusSynchronizesCurrentStatus(t *testing.T) {
 	manager := &Manager{Client: reader, reader: reader}
 
 	stale := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{Name: latest.Name, Generation: latest.Generation},
+		Name: latest.Name, Generation: latest.Generation,
 	}
 	if err := manager.updateReconcilingStatus(context.Background(), stale); err != nil {
 		t.Fatalf("update reconciling status: %v", err)
@@ -92,14 +92,14 @@ func TestUpdateReconcilingStatusRepairsSpecOwnersAtCurrentGeneration(t *testing.
 	}
 
 	promoted := rbac.CoreOwnerSpec{
-		UserSpec: rbac.UserSpec{Kind: rbac.ServiceAccountOwner, Name: "system:serviceaccount:tenant:promoted"},
+		Kind: rbac.ServiceAccountOwner, Name: "system:serviceaccount:tenant:promoted",
 	}
 	specOwner := rbac.CoreOwnerSpec{
-		UserSpec:     rbac.UserSpec{Kind: rbac.UserOwner, Name: "alice"},
+		Kind: rbac.UserOwner, Name: "alice",
 		ClusterRoles: []string{"admin", "capsule-namespace-deleter"},
 	}
 	latest := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{Name: "tenant", Generation: 2},
+		Name: "tenant", Generation: 2,
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{{CoreOwnerSpec: specOwner}},
 		},
@@ -147,13 +147,13 @@ func TestUpdateTenantOwnersStatusPersistsEvaluatedOwners(t *testing.T) {
 	}
 
 	stored := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{Name: "tenant"},
+		Name: "tenant",
 		Status: capsulev1beta2.TenantStatus{
 			State: capsulev1beta2.TenantStateActive,
 		},
 	}
 	owners := rbac.OwnerStatusListSpec{{
-		UserSpec: rbac.UserSpec{Kind: rbac.UserOwner, Name: "alice"},
+		Kind: rbac.UserOwner, Name: "alice",
 		ClusterRoles: []string{
 			"admin",
 			"capsule-namespace-deleter",
@@ -193,7 +193,7 @@ func TestUpdateTenantOwnersStatusInitializesRequiredStatus(t *testing.T) {
 		t.Fatalf("add Capsule scheme: %v", err)
 	}
 
-	stored := &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: "tenant"}}
+	stored := &capsulev1beta2.Tenant{Name: "tenant"}
 	cl := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithStatusSubresource(&capsulev1beta2.Tenant{}).
@@ -202,7 +202,7 @@ func TestUpdateTenantOwnersStatusInitializesRequiredStatus(t *testing.T) {
 	manager := &Manager{Client: cl, reader: cl}
 	instance := stored.DeepCopy()
 	instance.Status.Owners = rbac.OwnerStatusListSpec{{
-		UserSpec: rbac.UserSpec{Kind: rbac.UserOwner, Name: "alice"},
+		Kind: rbac.UserOwner, Name: "alice",
 	}}
 
 	if err := manager.updateTenantOwnersStatus(context.Background(), instance); err != nil {
@@ -229,11 +229,11 @@ func TestUpdateTenantClassStatusPreservesOwnersAndConditions(t *testing.T) {
 		t.Fatalf("add Capsule scheme: %v", err)
 	}
 
-	owner := rbac.CoreOwnerSpec{UserSpec: rbac.UserSpec{Kind: rbac.UserOwner, Name: "alice"}}
+	owner := rbac.CoreOwnerSpec{Kind: rbac.UserOwner, Name: "alice"}
 	ready := capmeta.NewReadyCondition(&capsulev1beta2.Tenant{})
 	cordoned := capmeta.NewCordonedCondition(&capsulev1beta2.Tenant{})
 	stored := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{Name: "tenant"},
+		Name: "tenant",
 		Status: capsulev1beta2.TenantStatus{
 			Owners:     rbac.OwnerStatusListSpec{owner},
 			State:      capsulev1beta2.TenantStateActive,

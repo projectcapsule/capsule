@@ -5,8 +5,6 @@ package runtime
 
 import (
 	"testing"
-
-	"k8s.io/utils/ptr"
 )
 
 func TestResourceTemplatePolicyDefaults(t *testing.T) {
@@ -24,7 +22,7 @@ func TestResourceTemplatePolicyDefaults(t *testing.T) {
 	}
 
 	policy.Creation = ResourceCreationPolicyMerge
-	policy.Protect = ptr.To(false)
+	policy.Protect = new(false)
 	if !policy.AllowsAdoption() {
 		t.Fatal("Merge policy does not allow adoption")
 	}
