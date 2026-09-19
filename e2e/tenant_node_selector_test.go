@@ -26,9 +26,9 @@ var _ = Describe("updating Tenant node selectors", Label("tenant", "namespace", 
 		func(initialSelector map[string]string) {
 			ctx := context.Background()
 			tnt := &capsulev1beta2.Tenant{
-				ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-node-selector-", Labels: map[string]string{"env": "e2e"}},
+				GenerateName: "e2e-node-selector-", Labels: map[string]string{"env": "e2e"},
 				Spec: capsulev1beta2.TenantSpec{
-					Owners:       rbac.OwnerListSpec{{CoreOwnerSpec: rbac.CoreOwnerSpec{UserSpec: rbac.UserSpec{Name: "node-selector-owner", Kind: "User"}}}},
+					Owners:       rbac.OwnerListSpec{{Name: "node-selector-owner", Kind: "User"}},
 					NodeSelector: initialSelector,
 				},
 			}

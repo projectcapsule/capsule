@@ -16,7 +16,6 @@ import (
 	"github.com/projectcapsule/capsule/pkg/utils"
 	resources "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
@@ -26,12 +25,10 @@ import (
 var _ = Describe("when Tenant handles Device classes", Ordered, Label("tenant", "classes", "deviceclass"), func() {
 	erm := "nvidia.com/gpu"
 	authorized := &resources.DeviceClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "gpu.example.com",
-			Labels: map[string]string{
-				"environment": "authorized",
-				"env":         "e2e",
-			},
+		Name: "gpu.example.com",
+		Labels: map[string]string{
+			"environment": "authorized",
+			"env":         "e2e",
 		},
 		Spec: resources.DeviceClassSpec{
 			Selectors: []resources.DeviceSelector{
@@ -45,12 +42,10 @@ var _ = Describe("when Tenant handles Device classes", Ordered, Label("tenant", 
 		},
 	}
 	authorized2 := &resources.DeviceClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "gpu2.example.com",
-			Labels: map[string]string{
-				"environment": "authorized",
-				"env":         "e2e",
-			},
+		Name: "gpu2.example.com",
+		Labels: map[string]string{
+			"environment": "authorized",
+			"env":         "e2e",
 		},
 		Spec: resources.DeviceClassSpec{
 			Selectors: []resources.DeviceSelector{
@@ -64,12 +59,10 @@ var _ = Describe("when Tenant handles Device classes", Ordered, Label("tenant", 
 		},
 	}
 	unauthorized := &resources.DeviceClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "gpu3.example.com",
-			Labels: map[string]string{
-				"environment": "unauthorized",
-				"env":         "e2e",
-			},
+		Name: "gpu3.example.com",
+		Labels: map[string]string{
+			"environment": "unauthorized",
+			"env":         "e2e",
 		},
 		Spec: resources.DeviceClassSpec{
 			Selectors: []resources.DeviceSelector{
@@ -84,55 +77,39 @@ var _ = Describe("when Tenant handles Device classes", Ordered, Label("tenant", 
 	}
 
 	tntWithAuthorized := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-authorized-deviceclass",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-authorized-deviceclass",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: []rbac.OwnerSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "authorized-deviceclass",
-							Kind: "User",
-						},
-					},
+					Name: "authorized-deviceclass",
+					Kind: "User",
 				},
 			},
 			DeviceClasses: &api.SelectorAllowedListSpec{
-				LabelSelector: v1.LabelSelector{
-					MatchLabels: map[string]string{
-						"environment": "authorized",
-					},
+				MatchLabels: map[string]string{
+					"environment": "authorized",
 				},
 			},
 		},
 	}
 	tntWithUnauthorized := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-unauthorized-deviceclass",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-unauthorized-deviceclass",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: []rbac.OwnerSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "unauthorized-deviceclass",
-							Kind: "User",
-						},
-					},
+					Name: "unauthorized-deviceclass",
+					Kind: "User",
 				},
 			},
 			DeviceClasses: &api.SelectorAllowedListSpec{
-				LabelSelector: v1.LabelSelector{
-					MatchLabels: map[string]string{
-						"environment": "production",
-					},
+				MatchLabels: map[string]string{
+					"environment": "production",
 				},
 			},
 		},
@@ -222,10 +199,8 @@ var _ = Describe("when Tenant handles Device classes", Ordered, Label("tenant", 
 			for _, class := range []*resources.DeviceClass{authorized} {
 				Eventually(func() (err error) {
 					g := &resources.ResourceClaim{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      class.GetName() + "-resource-claim",
-							Namespace: ns.GetName(),
-						},
+						Name:      class.GetName() + "-resource-claim",
+						Namespace: ns.GetName(),
 						Spec: resources.ResourceClaimSpec{
 							Devices: resources.DeviceClaim{
 								Requests: []resources.DeviceRequest{
@@ -257,10 +232,8 @@ var _ = Describe("when Tenant handles Device classes", Ordered, Label("tenant", 
 			for _, class := range []*resources.DeviceClass{unauthorized} {
 				Eventually(func() (err error) {
 					g := &resources.ResourceClaim{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      class.GetName() + "-resource-claim",
-							Namespace: ns.GetName(),
-						},
+						Name:      class.GetName() + "-resource-claim",
+						Namespace: ns.GetName(),
 						Spec: resources.ResourceClaimSpec{
 							Devices: resources.DeviceClaim{
 								Requests: []resources.DeviceRequest{
@@ -292,10 +265,8 @@ var _ = Describe("when Tenant handles Device classes", Ordered, Label("tenant", 
 			for _, class := range []*resources.DeviceClass{unauthorized} {
 				Eventually(func() (err error) {
 					g := &resources.ResourceClaim{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      class.GetName() + "-resource-claim",
-							Namespace: ns.GetName(),
-						},
+						Name:      class.GetName() + "-resource-claim",
+						Namespace: ns.GetName(),
 						Spec: resources.ResourceClaimSpec{
 							Devices: resources.DeviceClaim{
 								Requests: []resources.DeviceRequest{
@@ -360,10 +331,8 @@ var _ = Describe("when Tenant handles Device classes", Ordered, Label("tenant", 
 			for _, class := range []*resources.DeviceClass{authorized} {
 				Eventually(func() (err error) {
 					g := &resources.ResourceClaimTemplate{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      class.GetName() + "-resource-claim",
-							Namespace: ns.GetName(),
-						},
+						Name:      class.GetName() + "-resource-claim",
+						Namespace: ns.GetName(),
 						Spec: resources.ResourceClaimTemplateSpec{
 							Spec: resources.ResourceClaimSpec{
 								Devices: resources.DeviceClaim{
@@ -397,10 +366,8 @@ var _ = Describe("when Tenant handles Device classes", Ordered, Label("tenant", 
 			for _, class := range []*resources.DeviceClass{unauthorized} {
 				Eventually(func() (err error) {
 					g := &resources.ResourceClaimTemplate{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      class.GetName() + "-resource-claim",
-							Namespace: ns.GetName(),
-						},
+						Name:      class.GetName() + "-resource-claim",
+						Namespace: ns.GetName(),
 						Spec: resources.ResourceClaimTemplateSpec{
 							Spec: resources.ResourceClaimSpec{
 								Devices: resources.DeviceClaim{
@@ -434,10 +401,8 @@ var _ = Describe("when Tenant handles Device classes", Ordered, Label("tenant", 
 			for _, class := range []*resources.DeviceClass{unauthorized} {
 				Eventually(func() (err error) {
 					g := &resources.ResourceClaimTemplate{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      class.GetName() + "-resource-claim",
-							Namespace: ns.GetName(),
-						},
+						Name:      class.GetName() + "-resource-claim",
+						Namespace: ns.GetName(),
 						Spec: resources.ResourceClaimTemplateSpec{
 							Spec: resources.ResourceClaimSpec{
 								Devices: resources.DeviceClaim{
@@ -484,10 +449,8 @@ var _ = Describe("when Tenant handles Device classes", Ordered, Label("tenant", 
 			for _, class := range []*resources.DeviceClass{unauthorized} {
 				Eventually(func() (err error) {
 					g := &resources.ResourceClaimTemplate{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      class.GetName() + "-resource-claim",
-							Namespace: ns.GetName(),
-						},
+						Name:      class.GetName() + "-resource-claim",
+						Namespace: ns.GetName(),
 						Spec: resources.ResourceClaimTemplateSpec{
 							Spec: resources.ResourceClaimSpec{
 								Devices: resources.DeviceClaim{
@@ -534,10 +497,8 @@ var _ = Describe("when Tenant handles Device classes", Ordered, Label("tenant", 
 			for _, class := range []*resources.DeviceClass{unauthorized} {
 				Eventually(func() (err error) {
 					g := &resources.ResourceClaimTemplate{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      class.GetName() + "-resource-claim",
-							Namespace: ns.GetName(),
-						},
+						Name:      class.GetName() + "-resource-claim",
+						Namespace: ns.GetName(),
 						Spec: resources.ResourceClaimTemplateSpec{
 							Spec: resources.ResourceClaimSpec{
 								Devices: resources.DeviceClaim{

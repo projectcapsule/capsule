@@ -23,31 +23,21 @@ import (
 
 var _ = Describe("when Tenant owner interacts with the webhooks", Ordered, Label("tenant", "permissions", "owners"), func() {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-owner-admission",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-owner-admission",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-owner-admission",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-owner-admission",
+					Kind: "User",
 				},
 			},
 			StorageClasses: &api.DefaultAllowedListSpec{
-				SelectorAllowedListSpec: api.SelectorAllowedListSpec{
-					AllowedListSpec: api.AllowedListSpec{
-						Exact: []string{
-							"cephfs",
-							"glusterfs",
-						},
-					},
+				Exact: []string{
+					"cephfs",
+					"glusterfs",
 				},
 			},
 			LimitRanges: api.LimitRangesSpec{Items: []corev1.LimitRangeSpec{
@@ -213,9 +203,7 @@ var _ = Describe("when Tenant owner interacts with the webhooks", Ordered, Label
 
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 		np := &networkingv1.NetworkPolicy{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "custom-network-policy",
-			},
+			Name: "custom-network-policy",
 			Spec: tnt.Spec.NetworkPolicies.Items[0],
 		}
 		By("creating", func() {

@@ -20,29 +20,19 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 	originConfig := &capsulev1beta2.CapsuleConfiguration{}
 
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-assigned-custom-group",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-assigned-custom-group",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-assigned-custom-group-1",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-assigned-custom-group-1",
+					Kind: "User",
 				},
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-assigned-custom-group-2",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-assigned-custom-group-2",
+					Kind: "User",
 				},
 			},
 		},

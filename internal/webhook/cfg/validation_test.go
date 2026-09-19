@@ -9,7 +9,6 @@ import (
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	runtimeadmission "github.com/projectcapsule/capsule/pkg/runtime/admission"
 )
 
 func TestValidateAdmissionClients(t *testing.T) {
@@ -81,7 +80,7 @@ func dynamicValidatingConfig(
 	client *admissionregistrationv1.WebhookClientConfig,
 ) *capsulev1beta2.DynamicValidatingAdmissionConfig {
 	return &capsulev1beta2.DynamicValidatingAdmissionConfig{
-		DynamicAdmissionConfig: runtimeadmission.DynamicAdmissionConfig{Client: client},
+		Client: client,
 	}
 }
 
@@ -89,6 +88,6 @@ func dynamicMutatingConfig(
 	client *admissionregistrationv1.WebhookClientConfig,
 ) *capsulev1beta2.DynamicMutatingAdmissionConfig {
 	return &capsulev1beta2.DynamicMutatingAdmissionConfig{
-		DynamicAdmissionConfig: runtimeadmission.DynamicAdmissionConfig{Client: client},
+		Client: client,
 	}
 }

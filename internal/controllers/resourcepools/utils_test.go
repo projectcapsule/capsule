@@ -33,12 +33,10 @@ func claim(t *testing.T, uid, ns, name string, ts time.Time, req corev1.Resource
 	t.Helper()
 
 	return capsulev1beta2.ResourcePoolClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:               types.UID(uid),
-			Namespace:         ns,
-			Name:              name,
-			CreationTimestamp: metav1.NewTime(ts),
-		},
+		UID:               types.UID(uid),
+		Namespace:         ns,
+		Name:              name,
+		CreationTimestamp: metav1.NewTime(ts),
 		Spec: capsulev1beta2.ResourcePoolClaimSpec{
 			ResourceClaims: req,
 		},

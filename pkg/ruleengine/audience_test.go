@@ -7,12 +7,9 @@ import (
 	"slices"
 	"testing"
 
-	admissionv1 "k8s.io/api/admission/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -20,7 +17,6 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
-	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/users"
 )
@@ -29,7 +25,7 @@ func TestMatchesAudience(t *testing.T) {
 	t.Parallel()
 
 	cfg, cl := audienceConfiguration(t, nil)
-	req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{UserInfo: authenticationv1.UserInfo{Username: "alice", Groups: []string{"developers"}}}}
+	req := admission.Request{UserInfo: authenticationv1.UserInfo{Username: "alice", Groups: []string{"developers"}}}
 
 	tests := []struct {
 		name     string
@@ -40,7 +36,7 @@ func TestMatchesAudience(t *testing.T) {
 		{name: "user", audience: []rules.Audience{{Kind: rules.AudienceKindUser, Name: "alice"}}, want: true},
 		{name: "group", audience: []rules.Audience{{Kind: rules.AudienceKindGroup, Name: "developers"}}, want: true},
 		{name: "no match", audience: []rules.Audience{{Kind: rules.AudienceKindUser, Name: "bob"}}},
-		{name: "tenant owner", tnt: &capsulev1beta2.Tenant{Spec: capsulev1beta2.TenantSpec{Owners: rbac.OwnerListSpec{{CoreOwnerSpec: rbac.CoreOwnerSpec{UserSpec: rbac.UserSpec{Kind: rbac.UserOwner, Name: "alice"}}}}}}, audience: []rules.Audience{{Kind: rules.AudienceKindCustom, Name: string(rules.CustomAudienceTenantOwner)}}, want: true},
+		{name: "tenant owner", tnt: &capsulev1beta2.Tenant{Spec: capsulev1beta2.TenantSpec{Owners: rbac.OwnerListSpec{{Kind: rbac.UserOwner, Name: "alice"}}}}, audience: []rules.Audience{{Kind: rules.AudienceKindCustom, Name: string(rules.CustomAudienceTenantOwner)}}, want: true},
 	}
 
 	for _, tt := range tests {
@@ -60,9 +56,8 @@ func TestFilterNamespaceRulesUsesRootAudience(t *testing.T) {
 	t.Parallel()
 
 	cfg, cl := audienceConfiguration(t, nil)
-	req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
-		UserInfo: authenticationv1.UserInfo{Username: "alice", Groups: []string{"developers"}},
-	}}
+	req := admission.Request{
+		UserInfo: authenticationv1.UserInfo{Username: "alice", Groups: []string{"developers"}}}
 	matching := &rules.NamespaceRuleBodyNamespace{
 		Audience: []rules.Audience{{Kind: rules.AudienceKindGroup, Name: "developers"}},
 		Enforce:  &rules.NamespaceRuleEnforceBody{},
@@ -88,7 +83,7 @@ func TestCustomAudiencesIncludeTenantServiceAccounts(t *testing.T) {
 
 	promoted := users.ServiceAccountUserInfo("team-a", "promoted")
 	config := &capsulev1beta2.CapsuleConfiguration{
-		ObjectMeta: metav1.ObjectMeta{Name: "capsule"},
+		Name: "capsule",
 		Spec: capsulev1beta2.CapsuleConfigurationSpec{
 			Users: rbac.UserListSpec{
 				{Kind: rbac.UserOwner, Name: "alice"},
@@ -104,18 +99,18 @@ func TestCustomAudiencesIncludeTenantServiceAccounts(t *testing.T) {
 		rbac.UserSpec{Kind: rbac.GroupOwner, Name: "aggregated-group"},
 	)
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{Name: "tenant-a"},
+		Name: "tenant-a",
 		Status: capsulev1beta2.TenantStatus{
 			Namespaces: []string{"team-a", "capsule-system", "kube-system"},
 			Owners: rbac.OwnerStatusListSpec{
-				{UserSpec: rbac.UserSpec{Kind: rbac.ServiceAccountOwner, Name: promoted.Username}},
-				{UserSpec: rbac.UserSpec{Kind: rbac.UserOwner, Name: "admin"}},
+				{Kind: rbac.ServiceAccountOwner, Name: promoted.Username},
+				{Kind: rbac.UserOwner, Name: "admin"},
 			},
 		},
 	}
 	otherTenant := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{Name: "tenant-b"},
-		Status:     capsulev1beta2.TenantStatus{Namespaces: []string{"team-b"}},
+		Name:   "tenant-b",
+		Status: capsulev1beta2.TenantStatus{Namespaces: []string{"team-b"}},
 	}
 	cfg, cl := audienceConfiguration(t, config, tnt, otherTenant)
 	capsuleRule := &rules.NamespaceRuleBodyNamespace{
@@ -123,9 +118,9 @@ func TestCustomAudiencesIncludeTenantServiceAccounts(t *testing.T) {
 		Enforce: &rules.NamespaceRuleEnforceBody{
 			Action: rules.ActionTypeAllow,
 			Metadata: []rules.MetadataRule{{
-				VersionKinds: apiruntime.VersionKinds{Kinds: []string{"Namespace", "ConfigMap"}},
-				Labels:       map[string]rules.MetadataValueRule{"example.corp/managed": {Managed: ptr.To("controlled")}},
-				Annotations:  map[string]rules.MetadataValueRule{"example.corp/managed": {Managed: ptr.To("controlled")}},
+				Kinds:       []string{"Namespace", "ConfigMap"},
+				Labels:      map[string]rules.MetadataValueRule{"example.corp/managed": {Managed: new("controlled")}},
+				Annotations: map[string]rules.MetadataValueRule{"example.corp/managed": {Managed: new("controlled")}},
 			}},
 		},
 	}
@@ -165,7 +160,7 @@ func TestCustomAudiencesIncludeTenantServiceAccounts(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{UserInfo: tt.user}}
+			req := admission.Request{UserInfo: tt.user}
 			if tt.ignored {
 				req.UserInfo.Groups = append(slices.Clone(tt.user.Groups), "ignored")
 			}
@@ -198,8 +193,8 @@ func audienceConfiguration(t *testing.T, config *capsulev1beta2.CapsuleConfigura
 
 	if config == nil {
 		config = &capsulev1beta2.CapsuleConfiguration{
-			ObjectMeta: metav1.ObjectMeta{Name: "capsule"},
-			Spec:       configuration.DefaultCapsuleConfiguration(),
+			Name: "capsule",
+			Spec: configuration.DefaultCapsuleConfiguration(),
 		}
 		config.Status.Users = config.Spec.Users
 	}

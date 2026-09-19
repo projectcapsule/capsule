@@ -31,21 +31,15 @@ var _ = Describe("enforcing pod QoS namespace rules", Ordered, Label("tenant", "
 
 	newTenant := func() *capsulev1beta2.Tenant {
 		return &capsulev1beta2.Tenant{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "e2e-rule-qos",
-				Labels: map[string]string{
-					"env": "e2e",
-				},
+			Name: "e2e-rule-qos",
+			Labels: map[string]string{
+				"env": "e2e",
 			},
 			Spec: capsulev1beta2.TenantSpec{
 				Owners: rbac.OwnerListSpec{
 					{
-						CoreOwnerSpec: rbac.CoreOwnerSpec{
-							UserSpec: rbac.UserSpec{
-								Name: ownerName,
-								Kind: "User",
-							},
-						},
+						Name: ownerName,
+						Kind: "User",
 					},
 				},
 				Rules: []*rules.NamespaceRuleBodyTenant{
@@ -238,9 +232,7 @@ var _ = Describe("enforcing pod QoS namespace rules", Ordered, Label("tenant", "
 
 	bestEffortPod := func(name string) *corev1.Pod {
 		return &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: name,
-			},
+			Name: name,
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
@@ -257,9 +249,7 @@ var _ = Describe("enforcing pod QoS namespace rules", Ordered, Label("tenant", "
 
 	burstablePod := func(name string) *corev1.Pod {
 		return &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: name,
-			},
+			Name: name,
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
@@ -282,9 +272,7 @@ var _ = Describe("enforcing pod QoS namespace rules", Ordered, Label("tenant", "
 
 	guaranteedPod := func(name string) *corev1.Pod {
 		return &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: name,
-			},
+			Name: name,
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
@@ -311,9 +299,7 @@ var _ = Describe("enforcing pod QoS namespace rules", Ordered, Label("tenant", "
 
 	podWithInitContainerQoS := func(name string, initResources corev1.ResourceRequirements, containerResources corev1.ResourceRequirements) *corev1.Pod {
 		return &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: name,
-			},
+			Name: name,
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				InitContainers: []corev1.Container{

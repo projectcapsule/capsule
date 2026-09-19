@@ -24,21 +24,15 @@ import (
 
 var _ = Describe("when Tenant handles Ingress hostnames", Ordered, Label("tenant", "networking", "ingress"), func() {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-ingress-hostnames",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-ingress-hostnames",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-ingress-hostnames",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-ingress-hostnames",
+					Kind: "User",
 				},
 			},
 			IngressOptions: capsulev1beta2.IngressOptions{
@@ -53,9 +47,7 @@ var _ = Describe("when Tenant handles Ingress hostnames", Ordered, Label("tenant
 	// scaffold a basic networking.k8s.io Ingress with name and host
 	networkingIngress := func(name string, hostnames ...string) *networkingv1.Ingress {
 		ing := &networkingv1.Ingress{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: name,
-			},
+			Name: name,
 			Spec: networkingv1.IngressSpec{
 				Rules: []networkingv1.IngressRule{},
 			},
@@ -64,19 +56,17 @@ var _ = Describe("when Tenant handles Ingress hostnames", Ordered, Label("tenant
 		for _, hostname := range hostnames {
 			ing.Spec.Rules = append(ing.Spec.Rules, networkingv1.IngressRule{
 				Host: hostname,
-				IngressRuleValue: networkingv1.IngressRuleValue{
-					HTTP: &networkingv1.HTTPIngressRuleValue{
-						Paths: []networkingv1.HTTPIngressPath{
-							{
-								Path: "/",
-								PathType: func(v networkingv1.PathType) *networkingv1.PathType {
-									return &v
-								}(networkingv1.PathTypeExact),
-								Backend: networkingv1.IngressBackend{
-									Service: &networkingv1.IngressServiceBackend{
-										Name: "foo",
-										Port: networkingv1.ServiceBackendPort{Name: "http"},
-									},
+				HTTP: &networkingv1.HTTPIngressRuleValue{
+					Paths: []networkingv1.HTTPIngressPath{
+						{
+							Path: "/",
+							PathType: func(v networkingv1.PathType) *networkingv1.PathType {
+								return &v
+							}(networkingv1.PathTypeExact),
+							Backend: networkingv1.IngressBackend{
+								Service: &networkingv1.IngressServiceBackend{
+									Name: "foo",
+									Port: networkingv1.ServiceBackendPort{Name: "http"},
 								},
 							},
 						},
@@ -89,25 +79,21 @@ var _ = Describe("when Tenant handles Ingress hostnames", Ordered, Label("tenant
 	// scaffold a basic extensions Ingress with name and host
 	extensionsIngress := func(name, hostname string) *extensionsv1beta1.Ingress {
 		return &extensionsv1beta1.Ingress{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: name,
-			},
+			Name: name,
 			Spec: extensionsv1beta1.IngressSpec{
 				Rules: []extensionsv1beta1.IngressRule{
 					{
 						Host: hostname,
-						IngressRuleValue: extensionsv1beta1.IngressRuleValue{
-							HTTP: &extensionsv1beta1.HTTPIngressRuleValue{
-								Paths: []extensionsv1beta1.HTTPIngressPath{
-									{
-										Path: "/",
-										PathType: func(v extensionsv1beta1.PathType) *extensionsv1beta1.PathType {
-											return &v
-										}(extensionsv1beta1.PathTypeExact),
-										Backend: extensionsv1beta1.IngressBackend{
-											ServiceName: "foo",
-											ServicePort: intstr.FromInt(8080),
-										},
+						HTTP: &extensionsv1beta1.HTTPIngressRuleValue{
+							Paths: []extensionsv1beta1.HTTPIngressPath{
+								{
+									Path: "/",
+									PathType: func(v extensionsv1beta1.PathType) *extensionsv1beta1.PathType {
+										return &v
+									}(extensionsv1beta1.PathTypeExact),
+									Backend: extensionsv1beta1.IngressBackend{
+										ServiceName: "foo",
+										ServicePort: intstr.FromInt(8080),
 									},
 								},
 							},

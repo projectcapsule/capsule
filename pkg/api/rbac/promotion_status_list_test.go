@@ -12,20 +12,16 @@ func TestPromotionStatusListSpec_Upsert(t *testing.T) {
 		promotions := PromotionStatusListSpec{}
 
 		promotions.Upsert(PromotionSpec{
-			UserSpec: UserSpec{
-				Kind: ServiceAccountOwner,
-				Name: "system:serviceaccount:source:gitops",
-			},
+			Kind:         ServiceAccountOwner,
+			Name:         "system:serviceaccount:source:gitops",
 			ClusterRoles: []string{"view"},
 			Targets:      []string{"target-a"},
 		})
 
 		expected := PromotionStatusListSpec{
 			{
-				UserSpec: UserSpec{
-					Kind: ServiceAccountOwner,
-					Name: "system:serviceaccount:source:gitops",
-				},
+				Kind:         ServiceAccountOwner,
+				Name:         "system:serviceaccount:source:gitops",
 				ClusterRoles: []string{"view"},
 				Targets:      []string{"target-a"},
 			},
@@ -40,29 +36,23 @@ func TestPromotionStatusListSpec_Upsert(t *testing.T) {
 		promotions := PromotionStatusListSpec{}
 
 		promotions.Upsert(PromotionSpec{
-			UserSpec: UserSpec{
-				Kind: ServiceAccountOwner,
-				Name: "system:serviceaccount:source:gitops",
-			},
+			Kind:         ServiceAccountOwner,
+			Name:         "system:serviceaccount:source:gitops",
 			ClusterRoles: []string{"secret-replicator"},
 			Targets:      []string{"target-b", "target-a"},
 		})
 
 		promotions.Upsert(PromotionSpec{
-			UserSpec: UserSpec{
-				Kind: ServiceAccountOwner,
-				Name: "system:serviceaccount:source:gitops",
-			},
+			Kind:         ServiceAccountOwner,
+			Name:         "system:serviceaccount:source:gitops",
 			ClusterRoles: []string{"configmap-replicator"},
 			Targets:      []string{"target-a", "target-b"},
 		})
 
 		expected := PromotionStatusListSpec{
 			{
-				UserSpec: UserSpec{
-					Kind: ServiceAccountOwner,
-					Name: "system:serviceaccount:source:gitops",
-				},
+				Kind:         ServiceAccountOwner,
+				Name:         "system:serviceaccount:source:gitops",
 				ClusterRoles: []string{"configmap-replicator", "secret-replicator"},
 				Targets:      []string{"target-a", "target-b"},
 			},
@@ -77,37 +67,29 @@ func TestPromotionStatusListSpec_Upsert(t *testing.T) {
 		promotions := PromotionStatusListSpec{}
 
 		promotions.Upsert(PromotionSpec{
-			UserSpec: UserSpec{
-				Kind: ServiceAccountOwner,
-				Name: "system:serviceaccount:source:gitops",
-			},
+			Kind:         ServiceAccountOwner,
+			Name:         "system:serviceaccount:source:gitops",
 			ClusterRoles: []string{"view"},
 			Targets:      []string{"target-a", "target-b"},
 		})
 
 		promotions.Upsert(PromotionSpec{
-			UserSpec: UserSpec{
-				Kind: ServiceAccountOwner,
-				Name: "system:serviceaccount:source:gitops",
-			},
+			Kind:         ServiceAccountOwner,
+			Name:         "system:serviceaccount:source:gitops",
 			ClusterRoles: []string{"secret-replicator"},
 			Targets:      []string{"target-b"},
 		})
 
 		expected := PromotionStatusListSpec{
 			{
-				UserSpec: UserSpec{
-					Kind: ServiceAccountOwner,
-					Name: "system:serviceaccount:source:gitops",
-				},
+				Kind:         ServiceAccountOwner,
+				Name:         "system:serviceaccount:source:gitops",
 				ClusterRoles: []string{"view"},
 				Targets:      []string{"target-a", "target-b"},
 			},
 			{
-				UserSpec: UserSpec{
-					Kind: ServiceAccountOwner,
-					Name: "system:serviceaccount:source:gitops",
-				},
+				Kind:         ServiceAccountOwner,
+				Name:         "system:serviceaccount:source:gitops",
 				ClusterRoles: []string{"secret-replicator"},
 				Targets:      []string{"target-b"},
 			},
@@ -122,20 +104,16 @@ func TestPromotionStatusListSpec_Upsert(t *testing.T) {
 		promotions := PromotionStatusListSpec{}
 
 		promotions.Upsert(PromotionSpec{
-			UserSpec: UserSpec{
-				Kind: UserOwner,
-				Name: "alice",
-			},
+			Kind:         UserOwner,
+			Name:         "alice",
 			ClusterRoles: []string{"view", "view", "edit"},
 			Targets:      []string{"target-b", "target-a", "target-a"},
 		})
 
 		expected := PromotionStatusListSpec{
 			{
-				UserSpec: UserSpec{
-					Kind: UserOwner,
-					Name: "alice",
-				},
+				Kind:         UserOwner,
+				Name:         "alice",
 				ClusterRoles: []string{"edit", "view"},
 				Targets:      []string{"target-a", "target-b"},
 			},
@@ -150,54 +128,42 @@ func TestPromotionStatusListSpec_Upsert(t *testing.T) {
 		promotions := PromotionStatusListSpec{}
 
 		promotions.Upsert(PromotionSpec{
-			UserSpec: UserSpec{
-				Kind: UserOwner,
-				Name: "bob",
-			},
+			Kind:         UserOwner,
+			Name:         "bob",
 			ClusterRoles: []string{"view"},
 			Targets:      []string{"target-b"},
 		})
 
 		promotions.Upsert(PromotionSpec{
-			UserSpec: UserSpec{
-				Kind: ServiceAccountOwner,
-				Name: "system:serviceaccount:source:gitops",
-			},
+			Kind:         ServiceAccountOwner,
+			Name:         "system:serviceaccount:source:gitops",
 			ClusterRoles: []string{"view"},
 			Targets:      []string{"target-a"},
 		})
 
 		promotions.Upsert(PromotionSpec{
-			UserSpec: UserSpec{
-				Kind: UserOwner,
-				Name: "alice",
-			},
+			Kind:         UserOwner,
+			Name:         "alice",
 			ClusterRoles: []string{"view"},
 			Targets:      []string{"target-a"},
 		})
 
 		expected := PromotionStatusListSpec{
 			{
-				UserSpec: UserSpec{
-					Kind: ServiceAccountOwner,
-					Name: "system:serviceaccount:source:gitops",
-				},
+				Kind:         ServiceAccountOwner,
+				Name:         "system:serviceaccount:source:gitops",
 				ClusterRoles: []string{"view"},
 				Targets:      []string{"target-a"},
 			},
 			{
-				UserSpec: UserSpec{
-					Kind: UserOwner,
-					Name: "alice",
-				},
+				Kind:         UserOwner,
+				Name:         "alice",
 				ClusterRoles: []string{"view"},
 				Targets:      []string{"target-a"},
 			},
 			{
-				UserSpec: UserSpec{
-					Kind: UserOwner,
-					Name: "bob",
-				},
+				Kind:         UserOwner,
+				Name:         "bob",
 				ClusterRoles: []string{"view"},
 				Targets:      []string{"target-b"},
 			},
@@ -213,26 +179,20 @@ func TestPromotionStatusListSpec_FindUser(t *testing.T) {
 	t.Run("finds and aggregates promotions for user", func(t *testing.T) {
 		promotions := PromotionStatusListSpec{
 			{
-				UserSpec: UserSpec{
-					Kind: UserOwner,
-					Name: "alice",
-				},
+				Kind:         UserOwner,
+				Name:         "alice",
 				ClusterRoles: []string{"view"},
 				Targets:      []string{"target-a", "target-b"},
 			},
 			{
-				UserSpec: UserSpec{
-					Kind: UserOwner,
-					Name: "alice",
-				},
+				Kind:         UserOwner,
+				Name:         "alice",
 				ClusterRoles: []string{"edit"},
 				Targets:      []string{"target-b", "target-c"},
 			},
 			{
-				UserSpec: UserSpec{
-					Kind: UserOwner,
-					Name: "bob",
-				},
+				Kind:         UserOwner,
+				Name:         "bob",
 				ClusterRoles: []string{"admin"},
 				Targets:      []string{"target-d"},
 			},
@@ -244,10 +204,8 @@ func TestPromotionStatusListSpec_FindUser(t *testing.T) {
 		}
 
 		expected := PromotionSpec{
-			UserSpec: UserSpec{
-				Kind: UserOwner,
-				Name: "alice",
-			},
+			Kind:         UserOwner,
+			Name:         "alice",
 			ClusterRoles: []string{"edit", "view"},
 			Targets:      []string{"target-a", "target-b", "target-c"},
 		}
@@ -260,10 +218,8 @@ func TestPromotionStatusListSpec_FindUser(t *testing.T) {
 	t.Run("does not find user with different kind", func(t *testing.T) {
 		promotions := PromotionStatusListSpec{
 			{
-				UserSpec: UserSpec{
-					Kind: ServiceAccountOwner,
-					Name: "alice",
-				},
+				Kind:         ServiceAccountOwner,
+				Name:         "alice",
 				ClusterRoles: []string{"view"},
 				Targets:      []string{"target-a"},
 			},
@@ -278,10 +234,8 @@ func TestPromotionStatusListSpec_FindUser(t *testing.T) {
 	t.Run("returns false when user does not exist", func(t *testing.T) {
 		promotions := PromotionStatusListSpec{
 			{
-				UserSpec: UserSpec{
-					Kind: UserOwner,
-					Name: "alice",
-				},
+				Kind:         UserOwner,
+				Name:         "alice",
 				ClusterRoles: []string{"view"},
 				Targets:      []string{"target-a"},
 			},

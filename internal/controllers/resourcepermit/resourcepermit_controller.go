@@ -69,8 +69,7 @@ func statusError(reason string, err error) error {
 func statusReason(err error) string {
 	reason := meta.FailedReason
 
-	var statusErr *reconcileStatusError
-	if errors.As(err, &statusErr) {
+	if statusErr, ok := errors.AsType[*reconcileStatusError](err); ok {
 		reason = statusErr.reason
 	}
 
@@ -158,7 +157,7 @@ func (r *ResourcePermitReconciler) Reconcile(
 	if err := r.Get(ctx, req.NamespacedName, br); err != nil {
 		if apierrors.IsNotFound(err) {
 			// ensure metrics for this object are removed
-			r.Metrics.DeleteResourcePermitMetrics(&capsulev1beta2.ResourcePermit{ObjectMeta: metav1.ObjectMeta{Name: req.Name, Namespace: req.Namespace}})
+			r.Metrics.DeleteResourcePermitMetrics(&capsulev1beta2.ResourcePermit{Name: req.Name, Namespace: req.Namespace})
 			log.V(5).
 				Info("Request object not found, could have been deleted after reconcile request")
 
@@ -179,6 +178,8 @@ func (r *ResourcePermitReconciler) Reconcile(
 
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.4/pkg/reconcile
+//
+//nolint:cyclop
 func (r *ResourcePermitReconciler) reconcile(
 	ctx context.Context,
 	log logr.Logger,
@@ -295,6 +296,7 @@ func (r *ResourcePermitReconciler) reconcile(
 			if err := r.pruneItems(ctx, br, resourceClient); err != nil {
 				return ctrl.Result{}, err
 			}
+
 			if len(br.Status.ProcessedItems) > 0 {
 				return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
 			}
@@ -881,6 +883,7 @@ func (r *ResourcePermitReconciler) reconcileDelete(
 		if err := r.pruneItems(ctx, br, resourceClient); err != nil {
 			return ctrl.Result{}, err
 		}
+
 		if len(br.Status.ProcessedItems) > 0 {
 			return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
 		}
@@ -1148,6 +1151,8 @@ func (r *ResourcePermitReconciler) pruneItems(
 
 			current := br.Status.ProcessedItems.GetItem(item.ResourceID)
 			obj.SetNamespace(item.Namespace)
+
+			//nolint:nestif
 			if current != nil {
 				item = *current
 			} else {
@@ -1162,9 +1167,11 @@ func (r *ResourcePermitReconciler) pruneItems(
 
 					continue
 				}
+
 				if _, owned := meta.CapsuleFieldOwners(actual, fieldOwner)[fieldOwner]; !owned {
 					continue
 				}
+
 				item.Created = actual.GetLabels()[meta.CreatedByCapsuleLabel] == meta.ValueControllerResourcePermit ||
 					!resource.Policy.AllowsAdoption()
 			}
@@ -1203,11 +1210,13 @@ func (r *ResourcePermitReconciler) pruneItems(
 				// DELETE only starts termination. Keep tracking the resource and
 				// retain the permit finalizer until its own finalizers have finished.
 				actual := obj.DeepCopy()
+
 				getErr := resourceClient.Get(ctx, client.ObjectKeyFromObject(actual), actual)
 				if !apierrors.IsNotFound(getErr) {
 					item.Status = metav1.ConditionFalse
 					item.Message = "waiting for resource deletion"
 					br.Status.ProcessedItems.UpdateItem(item)
+
 					syncErr = errors.Join(syncErr, getErr)
 
 					continue
@@ -1246,11 +1255,9 @@ func managedResourceStatus(
 	}
 
 	return meta.ObjectReferenceStatus{
-		ResourceID: id,
-		ObjectReferenceStatusCondition: meta.ObjectReferenceStatusCondition{
-			Type:          meta.ReadyCondition,
-			ClusterScoped: clusterScoped,
-		},
+		ResourceID:    id,
+		Type:          meta.ReadyCondition,
+		ClusterScoped: clusterScoped,
 	}, nil
 }
 

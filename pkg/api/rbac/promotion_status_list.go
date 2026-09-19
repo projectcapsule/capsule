@@ -40,10 +40,8 @@ func (o *PromotionStatusListSpec) Upsert(newPromotion PromotionSpec) {
 
 func (o PromotionStatusListSpec) FindUser(name string, kind OwnerKind) (PromotionSpec, bool) {
 	result := PromotionSpec{
-		UserSpec: UserSpec{
-			Name: name,
-			Kind: kind,
-		},
+		Name: name,
+		Kind: kind,
 	}
 
 	found := false

@@ -9,10 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
-	"k8s.io/utils/ptr"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -28,7 +26,7 @@ func TestRenderedResourceRows(t *testing.T) {
 	resource := apiruntime.RenderedResource{
 		Policy: apiruntime.ResourceTemplatePolicy{
 			Creation: apiruntime.ResourceCreationPolicyOwner,
-			Protect:  ptr.To(true),
+			Protect:  new(true),
 			Deletion: apiruntime.ResourceDeletionPolicyOrphan,
 		},
 		Targets: []runtime.RawExtension{
@@ -141,7 +139,7 @@ func TestPatchResourcePermitStatusPreservesControllerManagedFields(t *testing.T)
 	}
 	approvals := &resourcepermitapi.ApprovalSpec{Conditions: []string{`requestor.name == "alice"`}}
 	stored := &capsulev1beta2.ResourcePermit{
-		ObjectMeta: metav1.ObjectMeta{Name: "request", Namespace: "tenant"},
+		Name: "request", Namespace: "tenant",
 		Status: capsulev1beta2.ResourcePermitStatus{
 			Phase: capsulev1beta2.ResourcePermitPhaseActive,
 			Request: &capsulev1beta2.ResourcePermitStatusRequest{

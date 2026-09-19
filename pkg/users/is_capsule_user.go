@@ -5,6 +5,7 @@ package users
 
 import (
 	"context"
+	"slices"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -56,14 +57,11 @@ func IsCapsuleUser(
 		}
 	}
 
-	//nolint:modernize
 	for _, group := range capsuleUsers.GetByKinds([]rbac.OwnerKind{rbac.GroupOwner}) {
 		if groupList.Find(group) {
 			if len(cfg.IgnoreUserWithGroups()) > 0 {
-				for _, ignoreGroup := range cfg.IgnoreUserWithGroups() {
-					if groupList.Find(ignoreGroup) {
-						return false
-					}
+				if slices.ContainsFunc(cfg.IgnoreUserWithGroups(), groupList.Find) {
+					return false
 				}
 			}
 

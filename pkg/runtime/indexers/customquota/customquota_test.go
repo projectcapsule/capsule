@@ -8,9 +8,7 @@ import (
 	"testing"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers/customquota"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -18,10 +16,10 @@ func TestCustomQuotaIndexers(t *testing.T) {
 	t.Parallel()
 
 	target := capsulev1beta2.CustomQuotaStatusTarget{
-		GroupVersionKind: metav1.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
+		Group: "apps", Version: "v1", Kind: "Deployment",
 	}
 	claim := capsulev1beta2.CustomQuotaClaimItem{
-		NamespacedObjectWithUIDReference: meta.NamespacedObjectWithUIDReference{UID: types.UID("claim-uid")},
+		UID: types.UID("claim-uid"),
 	}
 
 	tests := []struct {

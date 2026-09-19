@@ -25,13 +25,11 @@ func TestValidateCELExpressions(t *testing.T) {
 
 		err := validateCELExpressions(celCache, []capsulev1beta2.CustomQuotaSpecSource{
 			{
-				CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-					CEL: `quantity(object.spec.resources.requests["cpu"])`,
-					Selectors: []selectors.SelectorWithFields{
-						{
-							CELExpressions: []string{
-								`object.spec.restartPolicy == "Always"`,
-							},
+				CEL: `quantity(object.spec.resources.requests["cpu"])`,
+				Selectors: []selectors.SelectorWithFields{
+					{
+						CELExpressions: []string{
+							`object.spec.restartPolicy == "Always"`,
 						},
 					},
 				},
@@ -47,9 +45,7 @@ func TestValidateCELExpressions(t *testing.T) {
 
 		err := validateCELExpressions(celCache, []capsulev1beta2.CustomQuotaSpecSource{
 			{
-				CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-					CEL: `object.spec.enabled == true`,
-				},
+				CEL: `object.spec.enabled == true`,
 			},
 		})
 		if err == nil || !strings.Contains(err.Error(), "kubernetes.Quantity") {
@@ -62,12 +58,10 @@ func TestValidateCELExpressions(t *testing.T) {
 
 		err := validateCELExpressions(celCache, []capsulev1beta2.CustomQuotaSpecSource{
 			{
-				CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-					Selectors: []selectors.SelectorWithFields{
-						{
-							CELExpressions: []string{
-								`quantity("1")`,
-							},
+				Selectors: []selectors.SelectorWithFields{
+					{
+						CELExpressions: []string{
+							`quantity("1")`,
 						},
 					},
 				},

@@ -14,14 +14,12 @@ import (
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	apiMeta "github.com/projectcapsule/capsule/pkg/api/meta"
-	runtimeadmission "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/cert"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 )
@@ -152,14 +150,14 @@ func TestReconcileCertificatesPatchesEveryAdmissionCABundle(t *testing.T) {
 	oldCA, _, _ := generateTestTLSMaterial(t, testWebhookSANs())
 	secret := testTLSSecret(nil, nil, nil)
 	mutating := &admissionregistrationv1.MutatingWebhookConfiguration{
-		ObjectMeta: metav1.ObjectMeta{Name: testMutatingConfiguration},
+		Name: testMutatingConfiguration,
 		Webhooks: []admissionregistrationv1.MutatingWebhook{
 			{Name: "first.mutating.projectcapsule.dev", ClientConfig: admissionregistrationv1.WebhookClientConfig{CABundle: oldCA}},
 			{Name: "second.mutating.projectcapsule.dev"},
 		},
 	}
 	validating := &admissionregistrationv1.ValidatingWebhookConfiguration{
-		ObjectMeta: metav1.ObjectMeta{Name: testValidatingConfiguration},
+		Name: testValidatingConfiguration,
 		Webhooks: []admissionregistrationv1.ValidatingWebhook{
 			{Name: "first.validating.projectcapsule.dev", ClientConfig: admissionregistrationv1.WebhookClientConfig{CABundle: oldCA}},
 			{Name: "second.validating.projectcapsule.dev"},
@@ -205,7 +203,7 @@ func newTestTLSReconciler(t *testing.T, objects ...client.Object) (*Reconciler, 
 	t.Helper()
 
 	configurationObject := &capsulev1beta2.CapsuleConfiguration{
-		ObjectMeta: metav1.ObjectMeta{Name: "capsule"},
+		Name: "capsule",
 		Spec: capsulev1beta2.CapsuleConfigurationSpec{
 			EnableTLSReconciler: true,
 			CapsuleResources: capsulev1beta2.CapsuleResources{
@@ -214,14 +212,10 @@ func newTestTLSReconciler(t *testing.T, objects ...client.Object) (*Reconciler, 
 			Admission: capsulev1beta2.DynamicAdmission{
 				ServiceName: testServiceName,
 				Mutating: &capsulev1beta2.DynamicMutatingAdmissionConfig{
-					DynamicAdmissionConfig: runtimeadmission.DynamicAdmissionConfig{
-						Name: apiMeta.RFC1123Name(testMutatingConfiguration),
-					},
+					Name: apiMeta.RFC1123Name(testMutatingConfiguration),
 				},
 				Validating: &capsulev1beta2.DynamicValidatingAdmissionConfig{
-					DynamicAdmissionConfig: runtimeadmission.DynamicAdmissionConfig{
-						Name: apiMeta.RFC1123Name(testValidatingConfiguration),
-					},
+					Name: apiMeta.RFC1123Name(testValidatingConfiguration),
 				},
 			},
 		},
@@ -270,9 +264,9 @@ func testTLSSecret(caBundle, certificate, key []byte) *corev1.Secret {
 	}
 
 	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: testSecretName, Namespace: testNamespace},
-		Type:       corev1.SecretTypeTLS,
-		Data:       data,
+		Name: testSecretName, Namespace: testNamespace,
+		Type: corev1.SecretTypeTLS,
+		Data: data,
 	}
 }
 

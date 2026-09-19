@@ -33,7 +33,7 @@ func TestRuleStatusReconcileAvoidsRedundantStatusRequests(t *testing.T) {
 			if err := capsulev1beta2.AddToScheme(scheme); err != nil {
 				t.Fatal(err)
 			}
-			instance := &capsulev1beta2.RuleStatus{ObjectMeta: metav1.ObjectMeta{Name: "rules", Namespace: "team", Generation: 1}}
+			instance := &capsulev1beta2.RuleStatus{Name: "rules", Namespace: "team", Generation: 1}
 			if !empty {
 				instance.Spec = []*rules.NamespaceRuleBodyNamespace{{Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeDeny}}}
 			}
@@ -62,7 +62,7 @@ func TestRuleStatusReconcileAvoidsRedundantStatusRequests(t *testing.T) {
 				t.Fatalf("initial status writes: %d updates, %d patches; want Reconciling and Ready updates only", updates, patches)
 			}
 			gets, updates, patches = 0, 0, 0
-			for i := 0; i < 3; i++ {
+			for range 3 {
 				if _, err := r.Reconcile(ctx, request); err != nil {
 					t.Fatal(err)
 				}
@@ -96,14 +96,14 @@ func TestRuleStatusReconcileReturnsManagedMetadataFailuresForRetry(t *testing.T)
 	}
 	value := "managed"
 	instance := &capsulev1beta2.RuleStatus{
-		ObjectMeta: metav1.ObjectMeta{Name: "rules", Namespace: "team", Generation: 1},
+		Name: "rules", Namespace: "team", Generation: 1,
 		Spec: []*rules.NamespaceRuleBodyNamespace{{Enforce: &rules.NamespaceRuleEnforceBody{
 			Metadata: []rules.MetadataRule{{Labels: map[string]rules.MetadataValueRule{"example.com/managed": {Managed: &value}}}},
 		}}},
 	}
 	c := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(instance).WithObjects(instance).Build()
 	r := &Manager{Client: c, reader: c, Metrics: metrics.NewRuleStatusRecorder(), Log: logr.Discard()}
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(instance)})
 		if err == nil || !strings.Contains(err.Error(), "REST config is required") {
 			t.Fatalf("reconcile error = %v, want retryable managed metadata error", err)
@@ -122,9 +122,9 @@ func TestReconcileExcludesQuotaFromRuleStatus(t *testing.T) {
 	t.Parallel()
 
 	unnamedQuota := rules.ResourceQuotaRule{
-		ResourceQuotaSpec: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{
+		Hard: corev1.ResourceList{
 			corev1.ResourceRequestsCPU: resource.MustParse("1"),
-		}},
+		},
 	}
 	instance := &capsulev1beta2.RuleStatus{
 		Spec: []*rules.NamespaceRuleBodyNamespace{

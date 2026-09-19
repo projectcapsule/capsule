@@ -7,7 +7,6 @@ import (
 	"context"
 	"testing"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -43,7 +42,7 @@ func TestTenantCachingReaderDeduplicatesTenantGets(t *testing.T) {
 	base := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(&capsulev1beta2.Tenant{
-			ObjectMeta: metav1.ObjectMeta{Name: "solar"},
+			Name: "solar",
 		}).
 		Build()
 	counting := &countingReader{Reader: base}

@@ -7,7 +7,6 @@ import (
 	"context"
 	"testing"
 
-	admissionv1 "k8s.io/api/admission/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -26,9 +25,7 @@ func TestResourcePermitResourceHandler(t *testing.T) {
 
 	t.Run("controller may update", func(t *testing.T) {
 		resp := handler.OnUpdate(nil, nil, nil, nil)(context.Background(), admission.Request{
-			AdmissionRequest: admissionv1.AdmissionRequest{
-				UserInfo: users.ServiceAccountUserInfo("capsule-system", "capsule-controller"),
-			},
+			UserInfo: users.ServiceAccountUserInfo("capsule-system", "capsule-controller"),
 		})
 		if resp != nil {
 			t.Fatalf("expected controller request to be allowed, got %#v", resp)
@@ -37,18 +34,14 @@ func TestResourcePermitResourceHandler(t *testing.T) {
 
 	t.Run("user may not update", func(t *testing.T) {
 		resp := handler.OnUpdate(nil, nil, nil, nil)(context.Background(), admission.Request{
-			AdmissionRequest: admissionv1.AdmissionRequest{
-				UserInfo: authenticationv1.UserInfo{Username: "alice"},
-			},
+			UserInfo: authenticationv1.UserInfo{Username: "alice"},
 		})
 		webhooktest.VerifyResponse(t, resp, 403, "can only be changed by the Capsule controller")
 	})
 
 	t.Run("user may not delete", func(t *testing.T) {
 		resp := handler.OnDelete(nil, nil, nil, nil)(context.Background(), admission.Request{
-			AdmissionRequest: admissionv1.AdmissionRequest{
-				UserInfo: authenticationv1.UserInfo{Username: "alice"},
-			},
+			UserInfo: authenticationv1.UserInfo{Username: "alice"},
 		})
 		webhooktest.VerifyResponse(t, resp, 403, "can only be changed by the Capsule controller")
 	})
@@ -62,9 +55,7 @@ func TestResourcePermitResourceHandler(t *testing.T) {
 		decoder := &webhooktest.Decoder[*unstructured.Unstructured]{Object: newObj, OldObject: oldObj}
 
 		resp := handler.OnUpdate(nil, nil, decoder, nil)(context.Background(), admission.Request{
-			AdmissionRequest: admissionv1.AdmissionRequest{
-				UserInfo: users.ServiceAccountUserInfo("operations", "runner"),
-			},
+			UserInfo: users.ServiceAccountUserInfo("operations", "runner"),
 		})
 		if resp != nil {
 			t.Fatalf("expected configured ServiceAccount request to be allowed, got %#v", resp)
@@ -80,9 +71,7 @@ func TestResourcePermitResourceHandler(t *testing.T) {
 		decoder := &webhooktest.Decoder[*unstructured.Unstructured]{Object: newObj, OldObject: oldObj}
 
 		resp := handler.OnUpdate(nil, nil, decoder, nil)(context.Background(), admission.Request{
-			AdmissionRequest: admissionv1.AdmissionRequest{
-				UserInfo: users.ServiceAccountUserInfo("attacker", "runner"),
-			},
+			UserInfo: users.ServiceAccountUserInfo("attacker", "runner"),
 		})
 		webhooktest.VerifyResponse(t, resp, 403, "can only be changed by the Capsule controller")
 	})
@@ -93,9 +82,7 @@ func TestResourcePermitResourceHandler(t *testing.T) {
 		decoder := &webhooktest.Decoder[*unstructured.Unstructured]{Object: newObj, OldObject: oldObj}
 
 		resp := handler.OnUpdate(nil, nil, decoder, nil)(context.Background(), admission.Request{
-			AdmissionRequest: admissionv1.AdmissionRequest{
-				UserInfo: users.ServiceAccountUserInfo("operations", "runner"),
-			},
+			UserInfo: users.ServiceAccountUserInfo("operations", "runner"),
 		})
 		if resp != nil {
 			t.Fatalf("expected configured ServiceAccount adoption to be allowed, got %#v", resp)
@@ -107,9 +94,7 @@ func TestResourcePermitResourceHandler(t *testing.T) {
 		decoder := &webhooktest.Decoder[*unstructured.Unstructured]{OldObject: oldObj}
 
 		resp := handler.OnDelete(nil, nil, decoder, nil)(context.Background(), admission.Request{
-			AdmissionRequest: admissionv1.AdmissionRequest{
-				UserInfo: users.ServiceAccountUserInfo("operations", "runner"),
-			},
+			UserInfo: users.ServiceAccountUserInfo("operations", "runner"),
 		})
 		if resp != nil {
 			t.Fatalf("expected configured ServiceAccount deletion to be allowed, got %#v", resp)

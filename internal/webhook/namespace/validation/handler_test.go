@@ -83,10 +83,9 @@ func TestNamespaceHandlerAllowsDeleteWithMissingTenant(t *testing.T) {
 		reader,
 		admission.NewDecoder(scheme),
 		nil,
-	)(context.Background(), admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+	)(context.Background(), admission.Request{
 		Operation: admissionv1.Delete,
-		OldObject: runtime.RawExtension{Raw: raw},
-	}})
+		OldObject: runtime.RawExtension{Raw: raw}})
 
 	if response != nil {
 		t.Fatalf("delete response = %#v, want missing Tenant to be ignored", response)
@@ -108,7 +107,7 @@ func namespaceValidationScheme(t *testing.T) *runtime.Scheme {
 }
 
 func namespaceWithTenantReference(name, tenantName, tenantUID string) *corev1.Namespace {
-	return &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+	return &corev1.Namespace{
 		Name:   name,
 		Labels: map[string]string{meta.TenantLabel: tenantName},
 		OwnerReferences: []metav1.OwnerReference{{
@@ -116,8 +115,7 @@ func namespaceWithTenantReference(name, tenantName, tenantUID string) *corev1.Na
 			Kind:       "Tenant",
 			Name:       tenantName,
 			UID:        types.UID(tenantUID),
-		}},
-	}}
+		}}}
 }
 
 func namespaceUpdateRequest(
@@ -136,10 +134,9 @@ func namespaceUpdateRequest(
 		t.Fatal(err)
 	}
 
-	return admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+	return admission.Request{
 		Operation:   admissionv1.Update,
 		SubResource: subresource,
 		Object:      runtime.RawExtension{Raw: newRaw},
-		OldObject:   runtime.RawExtension{Raw: oldRaw},
-	}}
+		OldObject:   runtime.RawExtension{Raw: oldRaw}}
 }

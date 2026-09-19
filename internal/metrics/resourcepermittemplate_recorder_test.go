@@ -25,16 +25,16 @@ func TestResourcePermitTemplateConditionMetrics(t *testing.T) {
 	ready := meta.ConditionList{{Type: meta.ReadyCondition, Status: metav1.ConditionTrue}}
 	failed := meta.ConditionList{{Type: meta.ReadyCondition, Status: metav1.ConditionFalse}}
 	a := &capsulev1beta2.ResourcePermitTemplate{
-		ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "team-a"},
-		Status:     capsulev1beta2.ResourcePermitTemplateStatus{Conditions: ready},
+		Name: "example", Namespace: "team-a",
+		Status: capsulev1beta2.ResourcePermitTemplateStatus{Conditions: ready},
 	}
 	b := &capsulev1beta2.ResourcePermitTemplate{
-		ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "team-b"},
-		Status:     capsulev1beta2.ResourcePermitTemplateStatus{Conditions: failed},
+		Name: "example", Namespace: "team-b",
+		Status: capsulev1beta2.ResourcePermitTemplateStatus{Conditions: failed},
 	}
 	g := &capsulev1beta2.GlobalResourcePermitTemplate{
-		ObjectMeta: metav1.ObjectMeta{Name: "example"},
-		Status:     capsulev1beta2.GlobalResourcePermitTemplateStatus{Conditions: ready},
+		Name:   "example",
+		Status: capsulev1beta2.GlobalResourcePermitTemplateStatus{Conditions: ready},
 	}
 	local.RecordConditions(a)
 	local.RecordConditions(b)

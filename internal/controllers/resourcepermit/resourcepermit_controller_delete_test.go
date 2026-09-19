@@ -40,13 +40,11 @@ func TestResourcePermitWaitsForManagedResourceDeletion(t *testing.T) {
 					require.NoError(t, corev1.AddToScheme(scheme))
 					require.NoError(t, rbacv1.AddToScheme(scheme))
 					require.NoError(t, capsulev1beta2.AddToScheme(scheme))
-					namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "permit-test"}}
+					namespace := &corev1.Namespace{Name: "permit-test"}
 					permit := &capsulev1beta2.ResourcePermit{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "permit", Namespace: namespace.Name, UID: "permit-uid",
-							Finalizers: []string{meta.ControllerFinalizer},
-						},
-						Status: capsulev1beta2.ResourcePermitStatus{Phase: capsulev1beta2.ResourcePermitPhaseExpired},
+						Name: "permit", Namespace: namespace.Name, UID: "permit-uid",
+						Finalizers: []string{meta.ControllerFinalizer},
+						Status:     capsulev1beta2.ResourcePermitStatus{Phase: capsulev1beta2.ResourcePermitPhaseExpired},
 					}
 					if deleting {
 						now := metav1.Now()
@@ -128,20 +126,18 @@ func TestResourcePermitDeletionDoesNotPruneUnappliedPreview(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, capsulev1beta2.AddToScheme(scheme))
-	namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "permit-test"}}
+	namespace := &corev1.Namespace{Name: "permit-test"}
 	target := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{Name: "existing", Namespace: namespace.Name},
-		Data:       map[string]string{"existing": "preserve"},
+		Name: "existing", Namespace: namespace.Name,
+		Data: map[string]string{"existing": "preserve"},
 	}
 	permit := &capsulev1beta2.ResourcePermit{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "permit", Namespace: namespace.Name, Finalizers: []string{meta.ControllerFinalizer},
-		},
+		Name: "permit", Namespace: namespace.Name, Finalizers: []string{meta.ControllerFinalizer},
 		Status: capsulev1beta2.ResourcePermitStatus{
 			Phase: capsulev1beta2.ResourcePermitPhaseExpired,
 			Request: &capsulev1beta2.ResourcePermitStatusRequest{
 				Resources: []apiruntime.RenderedResource{{Targets: []runtime.RawExtension{{Object: &corev1.ConfigMap{
-					TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"},
+					APIVersion: "v1", Kind: "ConfigMap",
 					ObjectMeta: target.ObjectMeta,
 					Data:       map[string]string{"requested": "never-applied"},
 				}}}}},
@@ -170,7 +166,7 @@ func TestResourcePermitExpiryBeforeActivationDoesNotNeedExecutionIdentity(t *tes
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, capsulev1beta2.AddToScheme(scheme))
 	permit := &capsulev1beta2.ResourcePermit{
-		ObjectMeta: metav1.ObjectMeta{Name: "failed-preflight", Namespace: "permit-test"},
+		Name: "failed-preflight", Namespace: "permit-test",
 		Status: capsulev1beta2.ResourcePermitStatus{
 			Phase: capsulev1beta2.ResourcePermitPhaseExpired,
 			Request: &capsulev1beta2.ResourcePermitStatusRequest{
@@ -178,8 +174,8 @@ func TestResourcePermitExpiryBeforeActivationDoesNotNeedExecutionIdentity(t *tes
 					Name: "unavailable", Namespace: "permit-test",
 				},
 				Resources: []apiruntime.RenderedResource{{Targets: []runtime.RawExtension{{Object: &corev1.ConfigMap{
-					TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"},
-					ObjectMeta: metav1.ObjectMeta{Name: "never-applied", Namespace: "permit-test"},
+					APIVersion: "v1", Kind: "ConfigMap",
+					Name: "never-applied", Namespace: "permit-test",
 				}}}}},
 			},
 		},

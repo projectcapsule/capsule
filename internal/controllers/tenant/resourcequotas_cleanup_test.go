@@ -160,7 +160,7 @@ func TestSyncResourceQuotasPrunesRemovedHardResources(t *testing.T) {
 
 func quotaCleanupTenant(items []corev1.ResourceQuotaSpec) *capsulev1beta2.Tenant {
 	return &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{Name: "tenant-a"},
+		Name: "tenant-a",
 		Spec: capsulev1beta2.TenantSpec{ResourceQuota: api.ResourceQuotaSpec{
 			Scope: api.ResourceQuotaScopeTenant,
 			Items: items,
@@ -181,14 +181,12 @@ func managedResourceQuota(
 	hard corev1.ResourceList,
 ) *corev1.ResourceQuota {
 	return &corev1.ResourceQuota{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "capsule-" + tenant + "-" + index,
-			Namespace: namespace,
-			Labels: map[string]string{
-				capsulemeta.NewTenantLabel:           tenant,
-				capsulemeta.NewManagedByCapsuleLabel: capsulemeta.ValueController,
-				capsulemeta.ResourceQuotaLabel:       index,
-			},
+		Name:      "capsule-" + tenant + "-" + index,
+		Namespace: namespace,
+		Labels: map[string]string{
+			capsulemeta.NewTenantLabel:           tenant,
+			capsulemeta.NewManagedByCapsuleLabel: capsulemeta.ValueController,
+			capsulemeta.ResourceQuotaLabel:       index,
 		},
 		Spec: corev1.ResourceQuotaSpec{Hard: hard},
 	}

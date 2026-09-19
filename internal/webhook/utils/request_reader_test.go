@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -26,10 +25,8 @@ func TestRequestCachingReaderDeduplicatesAndIsolatesGets(t *testing.T) {
 	base := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(&corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   "solar",
-				Labels: map[string]string{"original": "true"},
-			},
+			Name:   "solar",
+			Labels: map[string]string{"original": "true"},
 		}).
 		Build()
 	counting := &countingReader{Reader: base}
@@ -88,7 +85,7 @@ func TestRequestCachingReaderDeduplicatesConcurrentGets(t *testing.T) {
 	base := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(&corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{Name: "solar"},
+			Name: "solar",
 		}).
 		Build()
 	counting := &countingReader{Reader: base}
@@ -99,10 +96,8 @@ func TestRequestCachingReaderDeduplicatesConcurrentGets(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for range 2 {
-		wg.Add(1)
 
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			<-start
 
 			errors <- reader.Get(
@@ -110,7 +105,7 @@ func TestRequestCachingReaderDeduplicatesConcurrentGets(t *testing.T) {
 				client.ObjectKey{Name: "solar"},
 				&corev1.Namespace{},
 			)
-		}()
+		})
 	}
 
 	close(start)

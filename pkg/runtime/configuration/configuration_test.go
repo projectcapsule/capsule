@@ -146,7 +146,7 @@ func TestCapsuleConfigurationUsesInformerClientBeforeDirectReader(t *testing.T) 
 
 	ctx := context.Background()
 	stored := &capsulev1beta2.CapsuleConfiguration{
-		ObjectMeta: metav1.ObjectMeta{Name: "capsule"},
+		Name: "capsule",
 		Spec: capsulev1beta2.CapsuleConfigurationSpec{
 			ForceTenantPrefix: true,
 		},
@@ -168,7 +168,7 @@ func TestCapsuleConfigurationGetters(t *testing.T) {
 
 	ctx := context.Background()
 	stored := &capsulev1beta2.CapsuleConfiguration{
-		ObjectMeta: metav1.ObjectMeta{Name: "capsule"},
+		Name: "capsule",
 		Spec: capsulev1beta2.CapsuleConfigurationSpec{
 			ProtectedNamespaceRegexpString: "^(kube|openshift)-",
 			ForceTenantPrefix:              true,
@@ -206,11 +206,9 @@ func TestCapsuleConfigurationGetters(t *testing.T) {
 	}
 	cl := configurationFakeClient(t, stored)
 	cfg := configuration.NewCapsuleConfiguration(ctx, cl, cl, &rest.Config{
-		Host: "https://kubernetes.default",
-		TLSClientConfig: rest.TLSClientConfig{
-			CAData: []byte("ca"),
-			CAFile: "ca-file",
-		},
+		Host:   "https://kubernetes.default",
+		CAData: []byte("ca"),
+		CAFile: "ca-file",
 	}, "capsule")
 
 	regex, err := cfg.ProtectedNamespaceRegexp()
@@ -283,7 +281,7 @@ func TestProtectedNamespaceRegexpErrors(t *testing.T) {
 
 	ctx := context.Background()
 	cl := configurationFakeClient(t, &capsulev1beta2.CapsuleConfiguration{
-		ObjectMeta: metav1.ObjectMeta{Name: "capsule"},
+		Name: "capsule",
 		Spec: capsulev1beta2.CapsuleConfigurationSpec{
 			ProtectedNamespaceRegexpString: "[",
 		},
@@ -301,7 +299,7 @@ func TestServiceAccountClientLoadsCASecret(t *testing.T) {
 	ctx := context.Background()
 	cl := configurationFakeClient(t,
 		&capsulev1beta2.CapsuleConfiguration{
-			ObjectMeta: metav1.ObjectMeta{Name: "capsule"},
+			Name: "capsule",
 			Spec: capsulev1beta2.CapsuleConfigurationSpec{
 				Impersonation: capsulev1beta2.ServiceAccountClient{
 					Endpoint:          "https://impersonation.example",
@@ -311,11 +309,11 @@ func TestServiceAccountClientLoadsCASecret(t *testing.T) {
 				},
 			},
 		},
-		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "capsule-system", Name: "ca"}, Data: map[string][]byte{"ca.crt": []byte("secret-ca")}},
+		&corev1.Secret{Namespace: "capsule-system", Name: "ca", Data: map[string][]byte{"ca.crt": []byte("secret-ca")}},
 	)
 	cfg := configuration.NewCapsuleConfiguration(ctx, cl, cl, &rest.Config{
-		Host:            "https://kubernetes.default",
-		TLSClientConfig: rest.TLSClientConfig{CAFile: "old"},
+		Host:   "https://kubernetes.default",
+		CAFile: "old",
 	}, "capsule")
 
 	got, err := cfg.ServiceAccountClient(ctx)
@@ -333,7 +331,7 @@ func TestServiceAccountClientMissingCASecretKey(t *testing.T) {
 	ctx := context.Background()
 	cl := configurationFakeClient(t,
 		&capsulev1beta2.CapsuleConfiguration{
-			ObjectMeta: metav1.ObjectMeta{Name: "capsule"},
+			Name: "capsule",
 			Spec: capsulev1beta2.CapsuleConfigurationSpec{
 				Impersonation: capsulev1beta2.ServiceAccountClient{
 					CASecretNamespace: capsulemeta.RFC1123SubdomainName("capsule-system"),
@@ -342,7 +340,7 @@ func TestServiceAccountClientMissingCASecretKey(t *testing.T) {
 				},
 			},
 		},
-		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "capsule-system", Name: "ca"}, Data: map[string][]byte{"ca.crt": []byte("secret-ca")}},
+		&corev1.Secret{Namespace: "capsule-system", Name: "ca", Data: map[string][]byte{"ca.crt": []byte("secret-ca")}},
 	)
 	cfg := configuration.NewCapsuleConfiguration(ctx, cl, cl, &rest.Config{}, "capsule")
 

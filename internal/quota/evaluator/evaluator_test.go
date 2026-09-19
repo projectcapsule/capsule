@@ -294,12 +294,11 @@ func TestEvaluateObjectCountNames(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
 			object := &metav1.PartialObjectMetadata{
-				ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "tenant-a"},
+				Name: "example", Namespace: "tenant-a",
 			}
 			req := requestFor(t, admissionv1.Create, test.resource, test.kind, object, nil)
 			req.Resource = metav1.GroupVersionResource{
@@ -329,7 +328,7 @@ func TestEvaluateCountsHorizontalPodAutoscalers(t *testing.T) {
 	t.Parallel()
 
 	hpa := &autoscalingv2.HorizontalPodAutoscaler{
-		ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "tenant-a"},
+		Name: "example", Namespace: "tenant-a",
 		Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
 			ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
 				APIVersion: "apps/v1",
@@ -443,7 +442,7 @@ func requestFor(
 		}
 	}
 
-	return admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+	return admission.Request{
 		Operation: operation,
 		Resource:  metav1.GroupVersionResource{Group: "", Version: "v1", Resource: resourceName},
 		Kind:      metav1.GroupVersionKind{Group: "", Version: "v1", Kind: kind},
@@ -454,8 +453,7 @@ func requestFor(
 		},
 		RequestResource: &metav1.GroupVersionResource{
 			Group: "", Version: "v1", Resource: resourceName,
-		},
-	}}
+		}}
 }
 
 func assertQuantity(t *testing.T, list corev1.ResourceList, name corev1.ResourceName, want string) {

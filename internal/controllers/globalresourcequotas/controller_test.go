@@ -35,18 +35,18 @@ func TestObserveUsageTracksTotalAndNamespaces(t *testing.T) {
 		corev1.ResourceRequestsMemory: resource.MustParse("16Gi"),
 	}
 	quota := &capsulev1beta2.GlobalResourceQuota{
-		ObjectMeta: metav1.ObjectMeta{Name: "shared", UID: types.UID("quota-uid")},
+		Name: "shared", UID: types.UID("quota-uid"),
 		Spec: capsulev1beta2.GlobalResourceQuotaSpec{
 			Quota: corev1.ResourceQuotaSpec{Hard: hard},
 		},
 	}
 	namespaceA := corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{Name: "a"},
-		Status:     corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
+		Name:   "a",
+		Status: corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
 	}
 	namespaceB := corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{Name: "b"},
-		Status:     corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
+		Name:   "b",
+		Status: corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
 	}
 	resourceQuotaA := observedResourceQuota(quota, namespaceA.Name, corev1.ResourceList{
 		corev1.ResourceRequestsCPU:    resource.MustParse("2"),
@@ -131,9 +131,8 @@ func TestMatchingNamespaceSelectorsUseOR(t *testing.T) {
 			},
 		},
 	}
-	namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
-		Name: "b", Labels: map[string]string{"team": "b"},
-	}}
+	namespace := &corev1.Namespace{
+		Name: "b", Labels: map[string]string{"team": "b"}}
 
 	cl := fake.NewClientBuilder().WithObjects(namespace).Build()
 	matched, err := selectors.GetNamespacesMatchingSelectors(
@@ -196,10 +195,8 @@ func observedResourceQuota(
 	used corev1.ResourceList,
 ) *corev1.ResourceQuota {
 	return &corev1.ResourceQuota{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      quota.GetResourceQuotaName(),
-			Namespace: namespace,
-		},
+		Name:      quota.GetResourceQuotaName(),
+		Namespace: namespace,
 		Status: corev1.ResourceQuotaStatus{
 			Hard: quota.Spec.Quota.Hard.DeepCopy(),
 			Used: used.DeepCopy(),

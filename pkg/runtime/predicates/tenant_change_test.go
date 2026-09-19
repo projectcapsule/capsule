@@ -18,7 +18,7 @@ func TestTenantStatusOwnersChangedPredicate(t *testing.T) {
 
 	p := predicates.TenantStatusOwnersChangedPredicate{}
 	withOwner := &capsulev1beta2.Tenant{Status: capsulev1beta2.TenantStatus{
-		Owners: rbac.OwnerStatusListSpec{{UserSpec: rbac.UserSpec{Kind: rbac.UserOwner, Name: "alice"}}},
+		Owners: rbac.OwnerStatusListSpec{{Kind: rbac.UserOwner, Name: "alice"}},
 	}}
 	withoutOwner := &capsulev1beta2.Tenant{}
 

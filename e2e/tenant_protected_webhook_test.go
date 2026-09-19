@@ -17,19 +17,13 @@ import (
 
 var _ = Describe("Deleting a tenant with protected annotation", Ordered, Label("tenant"), func() {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-protected-tenant",
-		},
+		Name: "e2e-protected-tenant",
 		Spec: capsulev1beta2.TenantSpec{
 			PreventDeletion: true,
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-protected-tenant",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-protected-tenant",
+					Kind: "User",
 				},
 			},
 		},

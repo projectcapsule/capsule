@@ -10,7 +10,6 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/yaml"
 
@@ -40,7 +39,7 @@ rules:
 
 func benchmarkRuleTenant(b *testing.B, namespaces int, withRules bool) *capsulev1beta2.Tenant {
 	b.Helper()
-	tnt := &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: "benchmark"}}
+	tnt := &capsulev1beta2.Tenant{Name: "benchmark"}
 	var spec struct {
 		Rules []*rules.NamespaceRuleBodyTenant `json:"rules"`
 	}
@@ -52,7 +51,7 @@ func benchmarkRuleTenant(b *testing.B, namespaces int, withRules bool) *capsulev
 	}
 	tnt.Status.State = capsulev1beta2.TenantStateActive
 	tnt.Status.Conditions = meta.ConditionList{meta.NewReadyCondition(tnt)}
-	for i := 0; i < namespaces; i++ {
+	for i := range namespaces {
 		name := fmt.Sprintf("benchmark-%04d", i)
 		tnt.Status.Namespaces = append(tnt.Status.Namespaces, name)
 		tnt.Status.Spaces = append(tnt.Status.Spaces, &capsulev1beta2.TenantStatusNamespaceItem{
@@ -73,7 +72,7 @@ func BenchmarkNamespaceMetadataRuleProjection(b *testing.B) {
 		for _, withRules := range []bool{false, true} {
 			b.Run(fmt.Sprintf("namespaces=%d/rules=%t", n, withRules), func(b *testing.B) {
 				tnt := benchmarkRuleTenant(b, n, withRules)
-				ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "benchmark-0000"}}
+				ns := &corev1.Namespace{Name: "benchmark-0000"}
 				b.ReportAllocs()
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
@@ -98,7 +97,7 @@ func BenchmarkNamespaceMetadataRuleNamespaceBatch(b *testing.B) {
 				group.SetLimit(8)
 				for _, name := range tnt.Status.Namespaces {
 					group.Go(func() error {
-						ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}
+						ns := &corev1.Namespace{Name: name}
 						_, err := tenant.BuildNamespaceRuleBodyStatus(scheme, ns, tnt)
 						return err
 					})

@@ -33,34 +33,24 @@ var _ = Describe("Capsule administrators changing existing Namespace tenant assi
 			Name: "admin",
 			Kind: rbac.UserOwner,
 		}
-		ownerA := rbac.OwnerSpec{CoreOwnerSpec: rbac.CoreOwnerSpec{
-			UserSpec: rbac.UserSpec{
-				Name: "e2e-namespace-assignment-owner-a",
-				Kind: rbac.UserOwner,
-			},
-			ClusterRoles: []string{"admin"},
-		}}
-		ownerB := rbac.OwnerSpec{CoreOwnerSpec: rbac.CoreOwnerSpec{
-			UserSpec: rbac.UserSpec{
-				Name: "e2e-namespace-assignment-owner-b",
-				Kind: rbac.UserOwner,
-			},
-			ClusterRoles: []string{"view"},
-		}}
+		ownerA := rbac.OwnerSpec{
+			Name:         "e2e-namespace-assignment-owner-a",
+			Kind:         rbac.UserOwner,
+			ClusterRoles: []string{"admin"}}
+		ownerB := rbac.OwnerSpec{
+			Name:         "e2e-namespace-assignment-owner-b",
+			Kind:         rbac.UserOwner,
+			ClusterRoles: []string{"view"}}
 
 		tenantA := &capsulev1beta2.Tenant{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   "e2e-namespace-assignment-a",
-				Labels: map[string]string{"env": "e2e"},
-			},
-			Spec: capsulev1beta2.TenantSpec{Owners: rbac.OwnerListSpec{ownerA}},
+			Name:   "e2e-namespace-assignment-a",
+			Labels: map[string]string{"env": "e2e"},
+			Spec:   capsulev1beta2.TenantSpec{Owners: rbac.OwnerListSpec{ownerA}},
 		}
 		tenantB := &capsulev1beta2.Tenant{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   "e2e-namespace-assignment-b",
-				Labels: map[string]string{"env": "e2e"},
-			},
-			Spec: capsulev1beta2.TenantSpec{Owners: rbac.OwnerListSpec{ownerB}},
+			Name:   "e2e-namespace-assignment-b",
+			Labels: map[string]string{"env": "e2e"},
+			Spec:   capsulev1beta2.TenantSpec{Owners: rbac.OwnerListSpec{ownerB}},
 		}
 
 		bindingA := ownerA.CoreOwnerSpec.ToAdditionalRolebindings()[0]
@@ -123,12 +113,12 @@ var _ = Describe("Capsule administrators changing existing Namespace tenant assi
 		}
 
 		patchDetachment := func(ns *corev1.Namespace, cs kubernetes.Interface) error {
-			return PatchNamespace(ns, cs, map[string]interface{}{
-				"metadata": map[string]interface{}{
-					"labels": map[string]interface{}{
+			return PatchNamespace(ns, cs, map[string]any{
+				"metadata": map[string]any{
+					"labels": map[string]any{
 						meta.TenantLabel: nil,
 					},
-					"ownerReferences": []interface{}{},
+					"ownerReferences": []any{},
 				},
 			})
 		}

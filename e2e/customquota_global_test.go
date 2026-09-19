@@ -19,12 +19,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/utils/ptr"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	capmeta "github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/quota"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
@@ -281,12 +279,10 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	BeforeEach(func() {
 		ns = &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: testNamespace,
-				Labels: map[string]string{
-					tenantLabel: tenantValue,
-					"env":       "e2e",
-				},
+			Name: testNamespace,
+			Labels: map[string]string{
+				tenantLabel: tenantValue,
+				"env":       "e2e",
 			},
 		}
 
@@ -331,30 +327,24 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("aggregates a custom pod quantity path and settles the corresponding ledger", Label("skip-on-openshift"), func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-pod-cpu-requests",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-pod-cpu-requests",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("500m"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpAdd,
-								Path:      ".spec.containers[*].resources.requests.cpu",
-								Selectors: []selectors.SelectorWithFields{
-									{
-										LabelSelector: &metav1.LabelSelector{
-											MatchLabels: map[string]string{
-												"track": "yes",
-											},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpAdd,
+							Path:       ".spec.containers[*].resources.requests.cpu",
+							Selectors: []selectors.SelectorWithFields{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"track": "yes",
 										},
 									},
 								},
@@ -397,25 +387,19 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("marks the quota not ready when an existing matching object has no value at the configured quantity path", func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-missing-path-not-ready",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-missing-path-not-ready",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("10Gi"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpAdd,
-								Path:      ".spec.volumes[*].emptyDir.sizeLimit",
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpAdd,
+							Path:       ".spec.volumes[*].emptyDir.sizeLimit",
 						},
 					},
 				},
@@ -455,25 +439,19 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("denies creating a matching object when the configured quantity path resolves to no value", Label("skip-on-openshift"), func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-missing-path-deny-create",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-missing-path-deny-create",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("10Gi"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpAdd,
-								Path:      ".spec.volumes[*].emptyDir.sizeLimit",
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpAdd,
+							Path:       ".spec.volumes[*].emptyDir.sizeLimit",
 						},
 					},
 				},
@@ -507,29 +485,23 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("remains consistent under concurrent pod creations for a GlobalCustomQuota", Label("skip-on-openshift"), func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-concurrent-pod-count",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-concurrent-pod-count",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpCount,
-								Selectors: []selectors.SelectorWithFields{
-									{
-										LabelSelector: &metav1.LabelSelector{
-											MatchLabels: map[string]string{
-												"track": "yes",
-											},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpCount,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"track": "yes",
 										},
 									},
 								},
@@ -571,7 +543,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			successSeen = map[string]struct{}{}
 		)
 
-		for i := 0; i < totalAttempts; i++ {
+		for i := range totalAttempts {
 			i := i
 
 			go func() {
@@ -628,7 +600,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 		var failed int
 		var failedMsgs []string
 
-		for i := 0; i < totalAttempts; i++ {
+		for range totalAttempts {
 			res := <-results
 			if res.err != nil {
 				failed++
@@ -669,24 +641,18 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("uses the smallest matching quota as authoritative while accounting successful pod count in both global and namespaced quotas", func() {
 		gq := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-mixed-pod-count",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-mixed-pod-count",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("5"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpCount,
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpCount,
 						},
 					},
 				},
@@ -703,24 +669,18 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 		}
 
 		cq := &capsulev1beta2.CustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "cq-mixed-pod-count",
-				Namespace: testNamespace,
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name:      "cq-mixed-pod-count",
+			Namespace: testNamespace,
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.CustomQuotaSpec{
 				Limit: resource.MustParse("2"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: runtime.VersionKind{
-							APIVersion: "v1",
-							Kind:       "Pod",
-						},
-						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-							Operation: quota.OpCount,
-						},
+						APIVersion: "v1",
+						Kind:       "Pod",
+						Operation:  quota.OpCount,
 					},
 				},
 			},
@@ -762,25 +722,19 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("uses the smallest matching quota as authoritative while accounting successful cpu usage in both global and namespaced quotas", func() {
 		gq := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-mixed-pod-cpu",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-mixed-pod-cpu",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("500m"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpAdd,
-								Path:      ".spec.containers[*].resources.requests.cpu",
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpAdd,
+							Path:       ".spec.containers[*].resources.requests.cpu",
 						},
 					},
 				},
@@ -797,25 +751,19 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 		}
 
 		cq := &capsulev1beta2.CustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "cq-mixed-pod-cpu",
-				Namespace: testNamespace,
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name:      "cq-mixed-pod-cpu",
+			Namespace: testNamespace,
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.CustomQuotaSpec{
 				Limit: resource.MustParse("200m"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: runtime.VersionKind{
-							APIVersion: "v1",
-							Kind:       "Pod",
-						},
-						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-							Operation: quota.OpAdd,
-							Path:      ".spec.containers[*].resources.requests.cpu",
-						},
+						APIVersion: "v1",
+						Kind:       "Pod",
+						Operation:  quota.OpAdd,
+						Path:       ".spec.containers[*].resources.requests.cpu",
 					},
 				},
 			},
@@ -854,29 +802,23 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("accounts only the matching subset for overlapping global and namespaced quota selectors", func() {
 		gq := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-mixed-overlap",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-mixed-overlap",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpCount,
-								Selectors: []selectors.SelectorWithFields{
-									{
-										LabelSelector: &metav1.LabelSelector{
-											MatchLabels: map[string]string{
-												"track": "yes",
-											},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpCount,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"track": "yes",
 										},
 									},
 								},
@@ -897,30 +839,24 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 		}
 
 		cq := &capsulev1beta2.CustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "cq-mixed-overlap",
-				Namespace: testNamespace,
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name:      "cq-mixed-overlap",
+			Namespace: testNamespace,
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.CustomQuotaSpec{
 				Limit: resource.MustParse("2"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: runtime.VersionKind{
-							APIVersion: "v1",
-							Kind:       "Pod",
-						},
-						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-							Operation: quota.OpCount,
-							Selectors: []selectors.SelectorWithFields{
-								{
-									LabelSelector: &metav1.LabelSelector{
-										MatchLabels: map[string]string{
-											"track": "yes",
-											"tier":  "frontend",
-										},
+						APIVersion: "v1",
+						Kind:       "Pod",
+						Operation:  quota.OpCount,
+						Selectors: []selectors.SelectorWithFields{
+							{
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"track": "yes",
+										"tier":  "frontend",
 									},
 								},
 							},
@@ -959,25 +895,19 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("tracks different paths independently when global and namespaced quotas match the same pod gvk", func() {
 		gq := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-mixed-path-cpu",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-mixed-path-cpu",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("500m"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpAdd,
-								Path:      ".spec.containers[*].resources.requests.cpu",
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpAdd,
+							Path:       ".spec.containers[*].resources.requests.cpu",
 						},
 					},
 				},
@@ -994,25 +924,19 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 		}
 
 		cq := &capsulev1beta2.CustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "cq-mixed-path-emptydir",
-				Namespace: testNamespace,
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name:      "cq-mixed-path-emptydir",
+			Namespace: testNamespace,
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.CustomQuotaSpec{
 				Limit: resource.MustParse("2Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: runtime.VersionKind{
-							APIVersion: "v1",
-							Kind:       "Pod",
-						},
-						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-							Operation: quota.OpAdd,
-							Path:      ".spec.volumes[*].emptyDir.sizeLimit",
-						},
+						APIVersion: "v1",
+						Kind:       "Pod",
+						Operation:  quota.OpAdd,
+						Path:       ".spec.volumes[*].emptyDir.sizeLimit",
 					},
 				},
 			},
@@ -1045,24 +969,18 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("accounts deployment scaling in both global and namespaced quotas and denies when the smaller namespaced quota is exceeded", func() {
 		gq := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-mixed-scale",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-mixed-scale",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpCount,
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpCount,
 						},
 					},
 				},
@@ -1079,24 +997,18 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 		}
 
 		cq := &capsulev1beta2.CustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "cq-mixed-scale",
-				Namespace: testNamespace,
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name:      "cq-mixed-scale",
+			Namespace: testNamespace,
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.CustomQuotaSpec{
 				Limit: resource.MustParse("3"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						VersionKind: runtime.VersionKind{
-							APIVersion: "v1",
-							Kind:       "Pod",
-						},
-						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-							Operation: quota.OpCount,
-						},
+						APIVersion: "v1",
+						Kind:       "Pod",
+						Operation:  quota.OpCount,
 					},
 				},
 			},
@@ -1135,25 +1047,19 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("clamps usage to zero for a pure subtraction source", func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-sub-only-clamps-zero",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-sub-only-clamps-zero",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("10Gi"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "PersistentVolumeClaim",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpSub,
-								Path:      ".spec.resources.requests.storage",
-							},
+							APIVersion: "v1",
+							Kind:       "PersistentVolumeClaim",
+							Operation:  quota.OpSub,
+							Path:       ".spec.resources.requests.storage",
 						},
 					},
 				},
@@ -1186,35 +1092,25 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("subtracts matching pvc storage from added pod emptyDir storage", func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-add-sub-storage",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-add-sub-storage",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("10Gi"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpAdd,
-								Path:      ".spec.volumes[*].emptyDir.sizeLimit",
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpAdd,
+							Path:       ".spec.volumes[*].emptyDir.sizeLimit",
 						},
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "PersistentVolumeClaim",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpSub,
-								Path:      ".spec.resources.requests.storage",
-							},
+							APIVersion: "v1",
+							Kind:       "PersistentVolumeClaim",
+							Operation:  quota.OpSub,
+							Path:       ".spec.resources.requests.storage",
 						},
 					},
 				},
@@ -1253,35 +1149,25 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("clamps mixed add and subtraction result to zero when subtraction exceeds additions", func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-add-sub-clamp-zero",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-add-sub-clamp-zero",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("10Gi"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpAdd,
-								Path:      ".spec.volumes[*].emptyDir.sizeLimit",
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpAdd,
+							Path:       ".spec.volumes[*].emptyDir.sizeLimit",
 						},
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "PersistentVolumeClaim",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpSub,
-								Path:      ".spec.resources.requests.storage",
-							},
+							APIVersion: "v1",
+							Kind:       "PersistentVolumeClaim",
+							Operation:  quota.OpSub,
+							Path:       ".spec.resources.requests.storage",
 						},
 					},
 				},
@@ -1320,40 +1206,30 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("supports subtraction with label selectors and removes the subtraction when the object no longer matches", func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-sub-label-selector",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-sub-label-selector",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("10Gi"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpAdd,
-								Path:      ".spec.volumes[*].emptyDir.sizeLimit",
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpAdd,
+							Path:       ".spec.volumes[*].emptyDir.sizeLimit",
 						},
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "PersistentVolumeClaim",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpSub,
-								Path:      ".spec.resources.requests.storage",
-								Selectors: []selectors.SelectorWithFields{
-									{
-										LabelSelector: &metav1.LabelSelector{
-											MatchLabels: map[string]string{
-												"discount": "yes",
-											},
+							APIVersion: "v1",
+							Kind:       "PersistentVolumeClaim",
+							Operation:  quota.OpSub,
+							Path:       ".spec.resources.requests.storage",
+							Selectors: []selectors.SelectorWithFields{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"discount": "yes",
 										},
 									},
 								},
@@ -1409,35 +1285,25 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("reconciles subtraction correctly when the subtracting resource is deleted", func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-sub-delete-reconcile",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-sub-delete-reconcile",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("10Gi"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpAdd,
-								Path:      ".spec.volumes[*].emptyDir.sizeLimit",
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpAdd,
+							Path:       ".spec.volumes[*].emptyDir.sizeLimit",
 						},
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "PersistentVolumeClaim",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpSub,
-								Path:      ".spec.resources.requests.storage",
-							},
+							APIVersion: "v1",
+							Kind:       "PersistentVolumeClaim",
+							Operation:  quota.OpSub,
+							Path:       ".spec.resources.requests.storage",
 						},
 					},
 				},
@@ -1480,34 +1346,24 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("subtracts cpu requests from counted pod usage across multiple matching pods and clamps at zero", func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-sub-cpu-clamp",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-sub-cpu-clamp",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpCount,
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpCount,
 						},
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpSub,
-								Path:      ".spec.containers[*].resources.requests.cpu",
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpSub,
+							Path:       ".spec.containers[*].resources.requests.cpu",
 						},
 					},
 				},
@@ -1547,34 +1403,24 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("applies subtraction while scaling a deployment", func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-sub-deployment-scale",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-sub-deployment-scale",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpCount,
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpCount,
 						},
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpSub,
-								Path:      ".spec.containers[*].resources.requests.cpu",
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpSub,
+							Path:       ".spec.containers[*].resources.requests.cpu",
 						},
 					},
 				},
@@ -1616,34 +1462,24 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("uses the smallest matching quota as authoritative even when both quotas use subtraction", func() {
 		small := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-sub-small",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-sub-small",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("2"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpCount,
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpCount,
 						},
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpSub,
-								Path:      ".spec.containers[*].resources.requests.cpu",
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpSub,
+							Path:       ".spec.containers[*].resources.requests.cpu",
 						},
 					},
 				},
@@ -1660,34 +1496,24 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 		}
 
 		large := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-sub-large",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-sub-large",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("5"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpCount,
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpCount,
 						},
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpSub,
-								Path:      ".spec.containers[*].resources.requests.cpu",
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpSub,
+							Path:       ".spec.containers[*].resources.requests.cpu",
 						},
 					},
 				},
@@ -1744,24 +1570,18 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("posts wildcard namespace status when no namespaceSelectors are configured and keeps it stable as namespaces change", func() {
 		quota := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-nsstatus-all",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-nsstatus-all",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("1000"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpCount,
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpCount,
 						},
 					},
 				},
@@ -1800,24 +1620,18 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 		NamespaceCreationAdmin(nsOther, defaultTimeoutInterval).Should(Succeed())
 
 		quota := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-nsstatus-multi-selectors",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-nsstatus-multi-selectors",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpCount,
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpCount,
 						},
 					},
 				},
@@ -1864,24 +1678,18 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("posts an empty namespace status when namespaceSelectors match no namespaces and updates when matches appear or disappear", func() {
 		quota := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-nsstatus-empty",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-nsstatus-empty",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpCount,
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpCount,
 						},
 					},
 				},
@@ -1913,29 +1721,23 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("does not produce negative usage when a matching pod is relabeled to no longer match", func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-no-negative-on-relabel",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-no-negative-on-relabel",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpCount,
-								Selectors: []selectors.SelectorWithFields{
-									{
-										LabelSelector: &metav1.LabelSelector{
-											MatchLabels: map[string]string{
-												"track": "yes",
-											},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpCount,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"track": "yes",
 										},
 									},
 								},
@@ -1982,24 +1784,18 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("counts pods correctly while scaling a deployment", func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-pod-count",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-pod-count",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("5"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpCount,
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpCount,
 						},
 					},
 				},
@@ -2042,29 +1838,23 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("tracks count with a single MatchLabels selector and updates when the pod no longer matches", func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-count-single-matchlabel",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-count-single-matchlabel",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpCount,
-								Selectors: []selectors.SelectorWithFields{
-									{
-										LabelSelector: &metav1.LabelSelector{
-											MatchLabels: map[string]string{
-												"track": "yes",
-											},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpCount,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"track": "yes",
 										},
 									},
 								},
@@ -2103,30 +1893,24 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("tracks count with multiple MatchLabels and updates when the pod no longer matches", func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-count-multi-matchlabel",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-count-multi-matchlabel",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpCount,
-								Selectors: []selectors.SelectorWithFields{
-									{
-										LabelSelector: &metav1.LabelSelector{
-											MatchLabels: map[string]string{
-												"track": "yes",
-												"tier":  "frontend",
-											},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpCount,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"track": "yes",
+											"tier":  "frontend",
 										},
 									},
 								},
@@ -2171,28 +1955,22 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("tracks count with a single field selector and updates when the pod no longer matches", func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-count-single-fieldselector",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-count-single-fieldselector",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpCount,
-								Selectors: []selectors.SelectorWithFields{
-									{
-										FieldSelectors: []string{
-											`.spec.containers[?(@.image=="nginx:1.27.0")]`,
-										},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpCount,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									FieldSelectors: []string{
+										`.spec.containers[?(@.image=="nginx:1.27.0")]`,
 									},
 								},
 							},
@@ -2230,29 +2008,23 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("tracks count with multiple field selectors and updates when the pod no longer matches", func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-count-multi-fieldselector",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-count-multi-fieldselector",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpCount,
-								Selectors: []selectors.SelectorWithFields{
-									{
-										FieldSelectors: []string{
-											`.spec.containers[?(@.image=="nginx:1.27.0")]`,
-											`.spec.containers[?(@.name=="main")]`,
-										},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpCount,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									FieldSelectors: []string{
+										`.spec.containers[?(@.image=="nginx:1.27.0")]`,
+										`.spec.containers[?(@.name=="main")]`,
 									},
 								},
 							},
@@ -2290,35 +2062,25 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("aggregates multiple sources across pod emptyDir size and pvc storage size", func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-multi-source-storage",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-multi-source-storage",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("3Gi"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Path:      ".spec.volumes[*].emptyDir.sizeLimit",
-								Operation: quota.OpAdd,
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Path:       ".spec.volumes[*].emptyDir.sizeLimit",
+							Operation:  quota.OpAdd,
 						},
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "PersistentVolumeClaim",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Path:      ".spec.resources.requests.storage",
-								Operation: quota.OpAdd,
-							},
+							APIVersion: "v1",
+							Kind:       "PersistentVolumeClaim",
+							Path:       ".spec.resources.requests.storage",
+							Operation:  quota.OpAdd,
 						},
 					},
 				},
@@ -2357,29 +2119,23 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("tracks count with multiple field selectors and updates when the pod no longer matches", func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-count-multi-fieldselector",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-count-multi-fieldselector",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpCount,
-								Selectors: []selectors.SelectorWithFields{
-									{
-										FieldSelectors: []string{
-											`.spec.containers[?(@.image=="nginx:1.27.0")]`,
-											`.spec.containers[?(@.name=="main")]`,
-										},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpCount,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									FieldSelectors: []string{
+										`.spec.containers[?(@.image=="nginx:1.27.0")]`,
+										`.spec.containers[?(@.name=="main")]`,
 									},
 								},
 							},
@@ -2417,48 +2173,38 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("aggregates multiple sources with selectors across pod emptyDir and pvc storage", func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-multi-source-selectors-storage",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-multi-source-selectors-storage",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("10Gi"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Path:      ".spec.volumes[*].emptyDir.sizeLimit",
-								Operation: quota.OpAdd,
-								Selectors: []selectors.SelectorWithFields{
-									{
-										LabelSelector: &metav1.LabelSelector{
-											MatchLabels: map[string]string{
-												"track": "yes",
-											},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Path:       ".spec.volumes[*].emptyDir.sizeLimit",
+							Operation:  quota.OpAdd,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"track": "yes",
 										},
 									},
 								},
 							},
 						},
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "PersistentVolumeClaim",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Path:      ".spec.resources.requests.storage",
-								Operation: quota.OpAdd,
-								Selectors: []selectors.SelectorWithFields{
-									{
-										FieldSelectors: []string{
-											`.spec.accessModes[?(@=="ReadWriteOnce")]`,
-										},
+							APIVersion: "v1",
+							Kind:       "PersistentVolumeClaim",
+							Path:       ".spec.resources.requests.storage",
+							Operation:  quota.OpAdd,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									FieldSelectors: []string{
+										`.spec.accessModes[?(@=="ReadWriteOnce")]`,
 									},
 								},
 							},
@@ -2514,44 +2260,34 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("reconciles multiple sources when objects stop matching or are deleted", func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-multi-source-reconcile",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-multi-source-reconcile",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("10Gi"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Path:      ".spec.volumes[*].emptyDir.sizeLimit",
-								Operation: quota.OpAdd,
-								Selectors: []selectors.SelectorWithFields{
-									{
-										LabelSelector: &metav1.LabelSelector{
-											MatchLabels: map[string]string{
-												"track": "yes",
-											},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Path:       ".spec.volumes[*].emptyDir.sizeLimit",
+							Operation:  quota.OpAdd,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"track": "yes",
 										},
 									},
 								},
 							},
 						},
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "PersistentVolumeClaim",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Path:      ".spec.resources.requests.storage",
-								Operation: quota.OpAdd,
-							},
+							APIVersion: "v1",
+							Kind:       "PersistentVolumeClaim",
+							Path:       ".spec.resources.requests.storage",
+							Operation:  quota.OpAdd,
 						},
 					},
 				},
@@ -2596,28 +2332,22 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("rejects admission when a field selector uses an invalid jsonpath filter on a scalar", func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-invalid-fieldselector",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-invalid-fieldselector",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpCount,
-								Selectors: []selectors.SelectorWithFields{
-									{
-										FieldSelectors: []string{
-											`.spec.restartPolicy[?(@=="Always")]`,
-										},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpCount,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									FieldSelectors: []string{
+										`.spec.restartPolicy[?(@=="Always")]`,
 									},
 								},
 							},
@@ -2652,24 +2382,18 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("uses the smallest matching global quota as authoritative while accounting usage in all matching quotas for pod count", func() {
 		small := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-pod-count-small",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-pod-count-small",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("2"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpCount,
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpCount,
 						},
 					},
 				},
@@ -2686,24 +2410,18 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 		}
 
 		large := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-pod-count-large",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-pod-count-large",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("5"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpCount,
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpCount,
 						},
 					},
 				},
@@ -2751,25 +2469,19 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("uses the smallest matching global quota as authoritative while accounting usage in all matching quotas for pod cpu requests", func() {
 		small := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-pod-cpu-small",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-pod-cpu-small",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("200m"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpAdd,
-								Path:      ".spec.containers[*].resources.requests.cpu",
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpAdd,
+							Path:       ".spec.containers[*].resources.requests.cpu",
 						},
 					},
 				},
@@ -2786,25 +2498,19 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 		}
 
 		large := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-pod-cpu-large",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-pod-cpu-large",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("500m"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpAdd,
-								Path:      ".spec.containers[*].resources.requests.cpu",
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpAdd,
+							Path:       ".spec.containers[*].resources.requests.cpu",
 						},
 					},
 				},
@@ -2853,29 +2559,23 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 	It("accounts only the matching subset for overlapping selectors on the same pod gvk", func() {
 
 		broad := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-pod-track-broad",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-pod-track-broad",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("5"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpCount,
-								Selectors: []selectors.SelectorWithFields{
-									{
-										LabelSelector: &metav1.LabelSelector{
-											MatchLabels: map[string]string{
-												"track": "yes",
-											},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpCount,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"track": "yes",
 										},
 									},
 								},
@@ -2896,30 +2596,24 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 		}
 
 		narrow := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-pod-track-frontend",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-pod-track-frontend",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("2"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpCount,
-								Selectors: []selectors.SelectorWithFields{
-									{
-										LabelSelector: &metav1.LabelSelector{
-											MatchLabels: map[string]string{
-												"track": "yes",
-												"tier":  "frontend",
-											},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpCount,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"track": "yes",
+											"tier":  "frontend",
 										},
 									},
 								},
@@ -2980,25 +2674,19 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("tracks different paths independently when multiple global quotas match the same pod gvk", func() {
 		cpuQuota := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-pod-path-cpu",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-pod-path-cpu",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("400m"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpAdd,
-								Path:      ".spec.containers[*].resources.requests.cpu",
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpAdd,
+							Path:       ".spec.containers[*].resources.requests.cpu",
 						},
 					},
 				},
@@ -3015,25 +2703,19 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 		}
 
 		emptyDirQuota := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-pod-path-emptydir",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-pod-path-emptydir",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("2Gi"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpAdd,
-								Path:      ".spec.volumes[*].emptyDir.sizeLimit",
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpAdd,
+							Path:       ".spec.volumes[*].emptyDir.sizeLimit",
 						},
 					},
 				},
@@ -3075,29 +2757,23 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("accounts only the quotas that actually match when multiple global quotas share the same gvk", func() {
 		labelQuota := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-pod-track-only",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-pod-track-only",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpCount,
-								Selectors: []selectors.SelectorWithFields{
-									{
-										LabelSelector: &metav1.LabelSelector{
-											MatchLabels: map[string]string{
-												"track": "yes",
-											},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpCount,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"track": "yes",
 										},
 									},
 								},
@@ -3118,28 +2794,22 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 		}
 
 		fieldQuota := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-pod-nginx-only",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-pod-nginx-only",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("10"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpCount,
-								Selectors: []selectors.SelectorWithFields{
-									{
-										FieldSelectors: []string{
-											`.spec.containers[?(@.image=="nginx:1.27.0")]`,
-										},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpCount,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									FieldSelectors: []string{
+										`.spec.containers[?(@.image=="nginx:1.27.0")]`,
 									},
 								},
 							},
@@ -3179,24 +2849,18 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("uses deterministic tie-breaking when multiple global quotas have the same remaining availability", func() {
 		quotaA := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-tie-a",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-tie-a",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("3"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpCount,
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpCount,
 						},
 					},
 				},
@@ -3213,24 +2877,18 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 		}
 
 		quotaB := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-tie-b",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-tie-b",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("4"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpCount,
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpCount,
 						},
 					},
 				},
@@ -3285,25 +2943,19 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("aggregates the same successful pod into multiple quotas with different paths on the same gvk", func() {
 		cpuQuota := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-multi-path-cpu",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-multi-path-cpu",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("300m"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpAdd,
-								Path:      ".spec.containers[*].resources.requests.cpu",
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpAdd,
+							Path:       ".spec.containers[*].resources.requests.cpu",
 						},
 					},
 				},
@@ -3320,25 +2972,19 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 		}
 
 		emptyDirQuota := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-multi-path-emptydir",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-multi-path-emptydir",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("3Gi"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpAdd,
-								Path:      ".spec.volumes[*].emptyDir.sizeLimit",
-							},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpAdd,
+							Path:       ".spec.volumes[*].emptyDir.sizeLimit",
 						},
 					},
 				},
@@ -3382,31 +3028,25 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("excludes succeeded pods from cpu limit quota using not-equals field selector", func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-not-equals-succeeded",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-not-equals-succeeded",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("2"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpAdd,
-								Path:      ".spec.containers[*].resources.limits.cpu",
-								Selectors: []selectors.SelectorWithFields{
-									{
-										FieldSelectors: []string{
-											".status.phase!=Succeeded",
-											".status.phase!=Failed",
-											".status.phase!=Unknown",
-										},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpAdd,
+							Path:       ".spec.containers[*].resources.limits.cpu",
+							Selectors: []selectors.SelectorWithFields{
+								{
+									FieldSelectors: []string{
+										".status.phase!=Succeeded",
+										".status.phase!=Failed",
+										".status.phase!=Unknown",
 									},
 								},
 							},
@@ -3432,10 +3072,8 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 		// Running pod with 1 CPU limit — should be counted.
 		runningPod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "ne-running",
-				Namespace: testNamespace,
-			},
+			Name:      "ne-running",
+			Namespace: testNamespace,
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
@@ -3462,10 +3100,8 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 		// Succeeded pod with 1 CPU limit — must be excluded after completion.
 		succeededPod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "ne-succeeded",
-				Namespace: testNamespace,
-			},
+			Name:      "ne-succeeded",
+			Namespace: testNamespace,
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
@@ -3483,7 +3119,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					},
 				},
 				RestartPolicy:                 corev1.RestartPolicyNever,
-				TerminationGracePeriodSeconds: ptr.To(int64(0)),
+				TerminationGracePeriodSeconds: new(int64(0)),
 			},
 		}
 		EventuallyCreation(func() error {
@@ -3508,7 +3144,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 		// Admission: 1 existing CPU + 2 requested > limit 2 — must be denied.
 		expectPodCreationDeniedContaining(func(name string) *corev1.Pod {
 			return &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: testNamespace},
+				Name: name, Namespace: testNamespace,
 				Spec: corev1.PodSpec{
 					SecurityContext: nobodyPodSecurityContext(),
 					Containers: []corev1.Container{
@@ -3532,31 +3168,25 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 	It("excludes failed pods from cpu limit quota using not-equals field selector", func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-not-equals-failed",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
+			Name: "gq-not-equals-failed",
+			Labels: map[string]string{
+				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
 					Limit: resource.MustParse("2"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							VersionKind: runtime.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpAdd,
-								Path:      ".spec.containers[*].resources.limits.cpu",
-								Selectors: []selectors.SelectorWithFields{
-									{
-										FieldSelectors: []string{
-											".status.phase!=Succeeded",
-											".status.phase!=Failed",
-											".status.phase!=Unknown",
-										},
+							APIVersion: "v1",
+							Kind:       "Pod",
+							Operation:  quota.OpAdd,
+							Path:       ".spec.containers[*].resources.limits.cpu",
+							Selectors: []selectors.SelectorWithFields{
+								{
+									FieldSelectors: []string{
+										".status.phase!=Succeeded",
+										".status.phase!=Failed",
+										".status.phase!=Unknown",
 									},
 								},
 							},
@@ -3582,10 +3212,8 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 		// Running pod with 1 CPU limit — should be counted.
 		runningPod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "ne-failed-running",
-				Namespace: testNamespace,
-			},
+			Name:      "ne-failed-running",
+			Namespace: testNamespace,
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
@@ -3612,10 +3240,8 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 		// Failed pod with 1 CPU limit — must be excluded after failure.
 		failedPod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "ne-failed-terminal",
-				Namespace: testNamespace,
-			},
+			Name:      "ne-failed-terminal",
+			Namespace: testNamespace,
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
@@ -3633,7 +3259,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					},
 				},
 				RestartPolicy:                 corev1.RestartPolicyNever,
-				TerminationGracePeriodSeconds: ptr.To(int64(0)),
+				TerminationGracePeriodSeconds: new(int64(0)),
 			},
 		}
 		EventuallyCreation(func() error {

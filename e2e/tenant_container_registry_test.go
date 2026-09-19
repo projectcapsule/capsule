@@ -31,21 +31,15 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 	originConfig := &capsulev1beta2.CapsuleConfiguration{}
 
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-container-registry",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-container-registry",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-container-registry",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-container-registry",
+					Kind: "User",
 				},
 			},
 			ContainerRegistries: &api.AllowedListSpec{
@@ -95,9 +89,7 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 		})
 
 		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "container",
-			},
+			Name: "container",
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
@@ -128,9 +120,7 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 		})
 
 		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "container",
-			},
+			Name: "container",
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
@@ -172,9 +162,7 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 		})
 
 		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "container",
-			},
+			Name: "container",
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
@@ -230,9 +218,7 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 		})
 
 		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "container",
-			},
+			Name: "container",
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
@@ -251,10 +237,8 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		role := &rbacv1.Role{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "ephemeralcontainers-editor",
-				Namespace: ns.GetName(),
-			},
+			Name:      "ephemeralcontainers-editor",
+			Namespace: ns.GetName(),
 			Rules: []rbacv1.PolicyRule{
 				{
 					APIGroups: []string{""}, // core API group
@@ -265,10 +249,8 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 		}
 
 		rb := &rbacv1.RoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "ephemeralcontainers-editor-binding",
-				Namespace: ns.GetName(),
-			},
+			Name:      "ephemeralcontainers-editor-binding",
+			Namespace: ns.GetName(),
 			Subjects: []rbacv1.Subject{
 				{
 					Kind: rbacv1.UserKind,
@@ -295,11 +277,9 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 		Eventually(func() error {
 			pod.Spec.EphemeralContainers = []corev1.EphemeralContainer{
 				{
-					EphemeralContainerCommon: corev1.EphemeralContainerCommon{
-						Name:            "dbg",
-						Image:           "attacker/pause:3.10",
-						ImagePullPolicy: corev1.PullIfNotPresent,
-					},
+					Name:            "dbg",
+					Image:           "attacker/pause:3.10",
+					ImagePullPolicy: corev1.PullIfNotPresent,
 				},
 			}
 
@@ -317,9 +297,7 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 		})
 
 		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "container",
-			},
+			Name: "container",
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				InitContainers: []corev1.Container{
@@ -371,9 +349,7 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 		})
 
 		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "container",
-			},
+			Name: "container",
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
@@ -418,9 +394,7 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 		})
 
 		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "container",
-			},
+			Name: "container",
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
@@ -439,10 +413,8 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		role := &rbacv1.Role{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "ephemeralcontainers-editor",
-				Namespace: ns.GetName(),
-			},
+			Name:      "ephemeralcontainers-editor",
+			Namespace: ns.GetName(),
 			Rules: []rbacv1.PolicyRule{
 				{
 					APIGroups: []string{""}, // core API group
@@ -453,10 +425,8 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 		}
 
 		rb := &rbacv1.RoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "ephemeralcontainers-editor-binding",
-				Namespace: ns.GetName(),
-			},
+			Name:      "ephemeralcontainers-editor-binding",
+			Namespace: ns.GetName(),
 			Subjects: []rbacv1.Subject{
 				{
 					Kind: rbacv1.UserKind,
@@ -483,11 +453,9 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 		Eventually(func() error {
 			pod.Spec.EphemeralContainers = []corev1.EphemeralContainer{
 				{
-					EphemeralContainerCommon: corev1.EphemeralContainerCommon{
-						Name:            "dbg",
-						Image:           "myregistry.azurecr.io/pause:3.10",
-						ImagePullPolicy: corev1.PullIfNotPresent,
-					},
+					Name:            "dbg",
+					Image:           "myregistry.azurecr.io/pause:3.10",
+					ImagePullPolicy: corev1.PullIfNotPresent,
 				},
 			}
 
@@ -505,9 +473,7 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 		})
 
 		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "container",
-			},
+			Name: "container",
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				InitContainers: []corev1.Container{
@@ -561,9 +527,7 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
 		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "container",
-			},
+			Name: "container",
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{
 					{
@@ -588,9 +552,7 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "ima
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
 		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "container",
-			},
+			Name: "container",
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{

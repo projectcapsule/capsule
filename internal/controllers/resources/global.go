@@ -292,9 +292,7 @@ func (r *globalResourceController) enqueueRequestFromTenant(ctx context.Context,
 	// No need of ordered value here
 	for res := range set {
 		reqs = append(reqs, reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name: res,
-			},
+			Name: res,
 		})
 	}
 
@@ -313,10 +311,8 @@ func (r *globalResourceController) enqueueAllResources(ctx context.Context, _ cl
 	reqs := make([]reconcile.Request, 0, len(list.Items))
 	for i := range list.Items {
 		reqs = append(reqs, reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name:      list.Items[i].Name,
-				Namespace: list.Items[i].Namespace,
-			},
+			Name:      list.Items[i].Name,
+			Namespace: list.Items[i].Namespace,
 		})
 	}
 
@@ -426,9 +422,7 @@ func (r *globalResourceController) gatherResources(
 			ilog.V(5).Info("replicating once for cluster scope")
 
 			clusterTenant := &capsulev1beta2.Tenant{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "None",
-				},
+				Name: "None",
 			}
 
 			opts.Iterator = NewCollectorIteratorOptions(clusterTenant, nil, resource)

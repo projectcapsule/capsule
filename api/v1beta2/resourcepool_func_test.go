@@ -22,11 +22,9 @@ func TestGetClaimFromStatus(t *testing.T) {
 	otherUID := types.UID("wrong-uid")
 
 	claim := &capsulev1beta2.ResourcePoolClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "claim-a",
-			Namespace: ns,
-			UID:       testUID,
-		},
+		Name:      "claim-a",
+		Namespace: ns,
+		UID:       testUID,
 	}
 
 	pool := &capsulev1beta2.ResourcePool{
@@ -34,9 +32,7 @@ func TestGetClaimFromStatus(t *testing.T) {
 			Claims: capsulev1beta2.ResourcePoolNamespaceClaimsStatus{
 				ns: {
 					&capsulev1beta2.ResourcePoolClaimsItem{
-						NamespacedRFC1123ObjectReferenceWithNamespaceWithUID: meta.NamespacedRFC1123ObjectReferenceWithNamespaceWithUID{
-							UID: testUID,
-						},
+						UID: testUID,
 						Claims: corev1.ResourceList{
 							corev1.ResourceCPU:    resource.MustParse("500m"),
 							corev1.ResourceMemory: resource.MustParse("256Mi"),
@@ -79,11 +75,9 @@ func makeResourceList(cpu, memory string) corev1.ResourceList {
 
 func makeClaim(name, ns string, uid types.UID, res corev1.ResourceList) *capsulev1beta2.ResourcePoolClaim {
 	return &capsulev1beta2.ResourcePoolClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: ns,
-			UID:       uid,
-		},
+		Name:      name,
+		Namespace: ns,
+		UID:       uid,
 		Spec: capsulev1beta2.ResourcePoolClaimSpec{
 			ResourceClaims: res,
 		},
@@ -94,8 +88,8 @@ func TestAssignNamespaces(t *testing.T) {
 	pool := &capsulev1beta2.ResourcePool{}
 
 	namespaces := []corev1.Namespace{
-		{ObjectMeta: metav1.ObjectMeta{Name: "active-ns"}, Status: corev1.NamespaceStatus{Phase: corev1.NamespaceActive}},
-		{ObjectMeta: metav1.ObjectMeta{Name: "terminating-ns", DeletionTimestamp: &metav1.Time{}}, Status: corev1.NamespaceStatus{Phase: corev1.NamespaceTerminating}},
+		{Name: "active-ns", Status: corev1.NamespaceStatus{Phase: corev1.NamespaceActive}},
+		{Name: "terminating-ns", DeletionTimestamp: &metav1.Time{}, Status: corev1.NamespaceStatus{Phase: corev1.NamespaceTerminating}},
 	}
 
 	pool.AssignNamespaces(namespaces)
@@ -220,7 +214,7 @@ func TestGetNamespaceClaims(t *testing.T) {
 			Claims: capsulev1beta2.ResourcePoolNamespaceClaimsStatus{
 				"ns": {
 					&capsulev1beta2.ResourcePoolClaimsItem{
-						NamespacedRFC1123ObjectReferenceWithNamespaceWithUID: meta.NamespacedRFC1123ObjectReferenceWithNamespaceWithUID{UID: "uid1"},
+						UID: "uid1",
 						Claims: corev1.ResourceList{
 							corev1.ResourceLimitsCPU: resource.MustParse("1"),
 						},

@@ -240,9 +240,7 @@ func (p *Processor) applyAccumulatedItem(
 ) bool {
 	or := meta.ObjectReferenceStatus{
 		ResourceID: item.Resource,
-		ObjectReferenceStatusCondition: meta.ObjectReferenceStatusCondition{
-			Type: meta.ReadyCondition,
-		},
+		Type:       meta.ReadyCondition,
 	}
 
 	clusterScoped, err := p.isClusterScoped(item.Resource.GetGVK())

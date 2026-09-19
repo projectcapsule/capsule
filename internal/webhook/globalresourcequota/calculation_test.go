@@ -142,7 +142,7 @@ func TestConcurrentReservationsCannotOversubscribe(t *testing.T) {
 	errs := make(chan error, 20)
 	var wg sync.WaitGroup
 
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		wg.Add(1)
 
 		go func(index int) {
@@ -188,12 +188,11 @@ func TestManagedResourceQuotaIsExcludedFromAccounting(t *testing.T) {
 	t.Parallel()
 
 	req := admissionRequest("resourcequotas")
-	object := &metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{
+	object := &metav1.PartialObjectMetadata{
 		Labels: map[string]string{
 			meta.NewManagedByCapsuleLabel: meta.ValueController,
 			meta.GlobalResourceQuotaLabel: "shared",
-		},
-	}}
+		}}
 
 	if !isManagedResourceQuota(req, object) {
 		t.Fatal("managed GlobalResourceQuota child was not excluded")
@@ -241,7 +240,6 @@ func TestValidateGlobalResourceQuota(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -413,9 +411,8 @@ func TestFormatExceededResourcesSortsAndFormatsEveryExceededLimit(t *testing.T) 
 }
 
 func admissionRequest(resourceName string) admission.Request {
-	return admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
-		Resource: metav1.GroupVersionResource{Group: "", Version: "v1", Resource: resourceName},
-	}}
+	return admission.Request{
+		Resource: metav1.GroupVersionResource{Group: "", Version: "v1", Resource: resourceName}}
 }
 
 func initializedLedger(
@@ -426,7 +423,7 @@ func initializedLedger(
 	hard := quota.Spec.Quota.Hard
 
 	return &capsulev1beta2.QuantityLedger{
-		ObjectMeta: metav1.ObjectMeta{Name: key.Name, Namespace: key.Namespace},
+		Name: key.Name, Namespace: key.Namespace,
 		Spec: capsulev1beta2.QuantityLedgerSpec{
 			TargetRef: capsulev1beta2.QuantityLedgerTargetRef{
 				Kind: "GlobalResourceQuota",
@@ -449,7 +446,7 @@ func initializedLedger(
 
 func globalQuotaForTest(name string, hard corev1.ResourceList) *capsulev1beta2.GlobalResourceQuota {
 	return &capsulev1beta2.GlobalResourceQuota{
-		ObjectMeta: metav1.ObjectMeta{Name: name, UID: types.UID(name + "-uid"), Generation: 1},
+		Name: name, UID: types.UID(name + "-uid"), Generation: 1,
 		Spec: capsulev1beta2.GlobalResourceQuotaSpec{
 			Quota: corev1.ResourceQuotaSpec{Hard: hard.DeepCopy()},
 		},
@@ -472,11 +469,10 @@ func globalResourceQuotaUpdateRequest(
 		t.Fatal(err)
 	}
 
-	return admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+	return admission.Request{
 		Operation: admissionv1.Update,
 		Object:    runtime.RawExtension{Raw: newRaw},
-		OldObject: runtime.RawExtension{Raw: oldRaw},
-	}}
+		OldObject: runtime.RawExtension{Raw: oldRaw}}
 }
 
 func reservationForTest(

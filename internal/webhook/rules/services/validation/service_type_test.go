@@ -416,8 +416,7 @@ func serviceTypeServiceForTest(
 	}
 }
 
-func decisionMessageForServiceTypeTest(evaluation interface {
-}) string {
+func decisionMessageForServiceTypeTest(evaluation any) string {
 	e, ok := evaluation.(*ruleengine.Evaluation)
 	if !ok || e == nil {
 		return ""

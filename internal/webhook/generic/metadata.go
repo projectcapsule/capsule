@@ -6,7 +6,6 @@ package generic
 import (
 	"context"
 
-	admissionv1 "k8s.io/api/admission/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -104,9 +103,7 @@ func (r *tenantAssignmentHandler) handle(
 	}
 
 	return &admission.Response{
-		AdmissionResponse: admissionv1.AdmissionResponse{
-			Allowed: true,
-		},
+		Allowed: true,
 		Patches: clt.JSONPatchesToJSONPatchOperation(patches),
 	}
 }

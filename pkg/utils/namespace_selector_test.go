@@ -14,10 +14,8 @@ import (
 
 func TestIsNamespaceSelectedBySelector_NilSelectorMatchesAll(t *testing.T) {
 	ns := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "ns1",
-			Labels: map[string]string{"env": "prod"},
-		},
+		Name:   "ns1",
+		Labels: map[string]string{"env": "prod"},
 	}
 
 	ok, err := utils.IsNamespaceSelectedBySelector(ns, nil)
@@ -31,10 +29,8 @@ func TestIsNamespaceSelectedBySelector_NilSelectorMatchesAll(t *testing.T) {
 
 func TestIsNamespaceSelectedBySelector_MatchLabels(t *testing.T) {
 	ns := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "ns1",
-			Labels: map[string]string{"env": "prod", "team": "a"},
-		},
+		Name:   "ns1",
+		Labels: map[string]string{"env": "prod", "team": "a"},
 	}
 
 	selector := &metav1.LabelSelector{
@@ -52,10 +48,8 @@ func TestIsNamespaceSelectedBySelector_MatchLabels(t *testing.T) {
 
 func TestIsNamespaceSelectedBySelector_NoMatchLabels(t *testing.T) {
 	ns := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "ns1",
-			Labels: map[string]string{"env": "dev"},
-		},
+		Name:   "ns1",
+		Labels: map[string]string{"env": "dev"},
 	}
 
 	selector := &metav1.LabelSelector{
@@ -73,10 +67,8 @@ func TestIsNamespaceSelectedBySelector_NoMatchLabels(t *testing.T) {
 
 func TestIsNamespaceSelectedBySelector_MatchExpressions_In(t *testing.T) {
 	ns := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "ns1",
-			Labels: map[string]string{"tier": "backend"},
-		},
+		Name:   "ns1",
+		Labels: map[string]string{"tier": "backend"},
 	}
 
 	selector := &metav1.LabelSelector{
@@ -100,10 +92,8 @@ func TestIsNamespaceSelectedBySelector_MatchExpressions_In(t *testing.T) {
 
 func TestIsNamespaceSelectedBySelector_MatchExpressions_NotIn(t *testing.T) {
 	ns := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "ns1",
-			Labels: map[string]string{"tier": "frontend"},
-		},
+		Name:   "ns1",
+		Labels: map[string]string{"tier": "frontend"},
 	}
 
 	selector := &metav1.LabelSelector{
@@ -127,10 +117,8 @@ func TestIsNamespaceSelectedBySelector_MatchExpressions_NotIn(t *testing.T) {
 
 func TestIsNamespaceSelectedBySelector_EmptyLabels_NoMatch(t *testing.T) {
 	ns := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "ns1",
-			Labels: nil,
-		},
+		Name:   "ns1",
+		Labels: nil,
 	}
 
 	selector := &metav1.LabelSelector{
@@ -148,10 +136,8 @@ func TestIsNamespaceSelectedBySelector_EmptyLabels_NoMatch(t *testing.T) {
 
 func TestIsNamespaceSelectedBySelector_InvalidSelectorReturnsError(t *testing.T) {
 	ns := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "ns1",
-			Labels: map[string]string{"env": "prod"},
-		},
+		Name:   "ns1",
+		Labels: map[string]string{"env": "prod"},
 	}
 
 	// Invalid: In operator requires non-empty Values

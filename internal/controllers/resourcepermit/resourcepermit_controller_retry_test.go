@@ -40,7 +40,7 @@ func TestResourcePermitActivationRetry(t *testing.T) {
 			require.NoError(t, capsulev1beta2.AddToScheme(scheme))
 			reviewer := &resourcepermit.AccessEntity{Name: "alice", Type: resourcepermit.AccessEntityTypeUser}
 			template := &capsulev1beta2.GlobalResourcePermitTemplate{
-				ObjectMeta: metav1.ObjectMeta{Name: "retry-template"},
+				Name: "retry-template",
 				Spec: capsulev1beta2.GlobalResourcePermitTemplateSpec{
 					Approvals: resourcepermit.ApprovalSpec{Approvers: capsulerbac.UserListSpec{{
 						Kind: capsulerbac.UserOwner, Name: reviewer.Name,
@@ -48,15 +48,13 @@ func TestResourcePermitActivationRetry(t *testing.T) {
 				},
 			}
 			target := &corev1.ConfigMap{
-				TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"},
-				ObjectMeta: metav1.ObjectMeta{Name: "retry-target", Namespace: "permit-test"},
-				Data:       map[string]string{"key": "value"},
+				APIVersion: "v1", Kind: "ConfigMap",
+				Name: "retry-target", Namespace: "permit-test",
+				Data: map[string]string{"key": "value"},
 			}
 			permit := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "retry-permit", Namespace: target.Namespace, UID: "retry-permit-uid",
-					Finalizers: []string{"tests.projectcapsule.dev/retain"},
-				},
+				Name: "retry-permit", Namespace: target.Namespace, UID: "retry-permit-uid",
+				Finalizers: []string{"tests.projectcapsule.dev/retain"},
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: capsulev1beta2.GlobalResourcePermitTemplateReference{
 						Kind: capsulev1beta2.GlobalResourcePermitTemplateKind, Name: template.Name,

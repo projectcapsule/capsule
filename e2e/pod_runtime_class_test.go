@@ -27,126 +27,96 @@ import (
 
 var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "runtimeclass"), func() {
 	tntWithDefault := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-runtime-selection",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-runtime-selection",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-runtimeclass-1",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-runtimeclass-1",
+					Kind: "User",
 				},
 			},
 			RuntimeClasses: &api.DefaultAllowedListSpec{
 				Default: "default-runtime",
-				SelectorAllowedListSpec: api.SelectorAllowedListSpec{
-					AllowedListSpec: api.AllowedListSpec{
-						Exact: []string{"legacy"},
-						Regex: "^hardened-.*$",
-					},
-					LabelSelector: metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"environment": "customers",
-						},
-					},
+				Exact:   []string{"legacy"},
+				Regex:   "^hardened-.*$",
+				MatchLabels: map[string]string{
+					"environment": "customers",
 				},
 			},
 		},
 	}
 
 	tntNoRestrictions := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-runtime-no-restrictions",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-runtime-no-restrictions",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: []rbac.OwnerSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-runtimeclass-2",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-runtimeclass-2",
+					Kind: "User",
 				},
 			},
 		},
 	}
 
 	defaultRuntime := &nodev1.RuntimeClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "default-runtime",
-			Labels: map[string]string{
-				"name":        "default-runtime",
-				"environment": "customers",
-				"env":         "e2e",
-			},
+		Name: "default-runtime",
+		Labels: map[string]string{
+			"name":        "default-runtime",
+			"environment": "customers",
+			"env":         "e2e",
 		},
 		Handler: "custom-handler",
 	}
 
 	legacy := &nodev1.RuntimeClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "legacy",
-			Labels: map[string]string{
-				"environment": "disallowed",
-				"env":         "e2e",
-			},
+		Name: "legacy",
+		Labels: map[string]string{
+			"environment": "disallowed",
+			"env":         "e2e",
 		},
 		Handler: "custom-handler",
 	}
 
 	disallowed := &nodev1.RuntimeClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "disallowed",
-			Labels: map[string]string{
-				"environment": "disallowed",
-				"env":         "e2e",
-			},
+		Name: "disallowed",
+		Labels: map[string]string{
+			"environment": "disallowed",
+			"env":         "e2e",
 		},
 		Handler: "custom-handler",
 	}
 
 	customerContainerd := &nodev1.RuntimeClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "customer-containerd",
-			Labels: map[string]string{
-				"name":        "customer-containerd",
-				"environment": "customers",
-				"env":         "e2e",
-			},
+		Name: "customer-containerd",
+		Labels: map[string]string{
+			"name":        "customer-containerd",
+			"environment": "customers",
+			"env":         "e2e",
 		},
 		Handler: "custom-handler",
 	}
 
 	customerKubevirt := &nodev1.RuntimeClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "customer-virt",
-			Labels: map[string]string{
-				"name":        "customer-virt",
-				"environment": "customers",
-				"env":         "e2e",
-			},
+		Name: "customer-virt",
+		Labels: map[string]string{
+			"name":        "customer-virt",
+			"environment": "customers",
+			"env":         "e2e",
 		},
 		Handler: "custom-handler",
 	}
 
 	customerUni := &nodev1.RuntimeClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "customer-runu",
-			Labels: map[string]string{
-				"name": "customer-runu",
-				"env":  "e2e",
-			},
+		Name: "customer-runu",
+		Labels: map[string]string{
+			"name": "customer-runu",
+			"env":  "e2e",
 		},
 		Handler: "custom-handler",
 	}
@@ -221,10 +191,8 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 				Eventually(func() (err error) {
 
 					g := &corev1.Pod{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      class + "-container",
-							Namespace: ns.GetName(),
-						},
+						Name:      class + "-container",
+						Namespace: ns.GetName(),
 						Spec: corev1.PodSpec{
 							SecurityContext:  nobodyPodSecurityContext(),
 							RuntimeClassName: &class,
@@ -290,9 +258,7 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 			})
 
 			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "container",
-				},
+				Name: "container",
 				Spec: corev1.PodSpec{
 					SecurityContext:  nobodyPodSecurityContext(),
 					RuntimeClassName: &disallowed.Name,
@@ -339,9 +305,7 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 		})
 
 		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "container",
-			},
+			Name: "container",
 			Spec: corev1.PodSpec{
 				SecurityContext:  nobodyPodSecurityContext(),
 				RuntimeClassName: &legacy.Name,
@@ -389,11 +353,9 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 		for i, rt := range []string{"hardened-crio", "hardened-containerd", "hardened-dockerd"} {
 			runtimeName := strings.Join([]string{rt, "-", strconv.Itoa(i)}, "")
 			runtime := &nodev1.RuntimeClass{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: runtimeName,
-					Labels: map[string]string{
-						"env": "e2e",
-					},
+				Name: runtimeName,
+				Labels: map[string]string{
+					"env": "e2e",
 				},
 				Handler: "custom-handler",
 			}
@@ -417,9 +379,7 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 			})
 
 			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: rt,
-				},
+				Name: rt,
 				Spec: corev1.PodSpec{
 					SecurityContext:  nobodyPodSecurityContext(),
 					RuntimeClassName: &runtimeName,
@@ -455,13 +415,11 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 		for i, rt := range []string{"customer-containerd", "customer-crio", "customer-dockerd"} {
 			runtimeName := strings.Join([]string{rt, "-", strconv.Itoa(i)}, "")
 			runtime := &nodev1.RuntimeClass{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: runtimeName,
-					Labels: map[string]string{
-						"name":        runtimeName,
-						"env":         "e2e",
-						"environment": "customers",
-					},
+				Name: runtimeName,
+				Labels: map[string]string{
+					"name":        runtimeName,
+					"env":         "e2e",
+					"environment": "customers",
 				},
 				Handler: "custom-handler",
 			}
@@ -485,9 +443,7 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 			})
 
 			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: rt,
-				},
+				Name: rt,
 				Spec: corev1.PodSpec{
 					SecurityContext:  nobodyPodSecurityContext(),
 					RuntimeClassName: &runtimeName,
@@ -553,10 +509,8 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 		})
 
 		pod := corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "rc-default",
-				Namespace: ns.Name,
-			},
+			Name:      "rc-default",
+			Namespace: ns.Name,
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{

@@ -104,7 +104,6 @@ func TestParseQuantities(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -135,10 +134,10 @@ func TestParseQuantityFromUnstructured_Success(t *testing.T) {
 	t.Parallel()
 
 	u := unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"spec": map[string]interface{}{
-				"resources": map[string]interface{}{
-					"requests": map[string]interface{}{
+		Object: map[string]any{
+			"spec": map[string]any{
+				"resources": map[string]any{
+					"requests": map[string]any{
 						"cpu": "250m",
 					},
 				},
@@ -166,8 +165,8 @@ func TestParseQuantityFromUnstructured_MissingPathReturnsError(t *testing.T) {
 	t.Parallel()
 
 	u := unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"spec": map[string]interface{}{},
+		Object: map[string]any{
+			"spec": map[string]any{},
 		},
 	}
 
@@ -191,8 +190,8 @@ func TestParseQuantityFromUnstructured_WhitespaceOnlyReturnsError(t *testing.T) 
 	t.Parallel()
 
 	u := unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"spec": map[string]interface{}{
+		Object: map[string]any{
+			"spec": map[string]any{
 				"value": "   \n\t   ",
 			},
 		},
@@ -216,10 +215,10 @@ func TestParseQuantityFromUnstructured_WhitespaceOnlyReturnsError(t *testing.T) 
 
 func TestParseUsageFromUnstructured_Success(t *testing.T) {
 	u := unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"spec": map[string]interface{}{
-				"resources": map[string]interface{}{
-					"requests": map[string]interface{}{
+		Object: map[string]any{
+			"spec": map[string]any{
+				"resources": map[string]any{
+					"requests": map[string]any{
 						"cpu":    "250m",
 						"memory": "512Mi",
 					},
@@ -245,8 +244,8 @@ func TestParseUsageFromUnstructured_Success(t *testing.T) {
 
 func TestParseUsageFromUnstructured_TrimsWhitespace(t *testing.T) {
 	u := unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"spec": map[string]interface{}{
+		Object: map[string]any{
+			"spec": map[string]any{
 				"value": " hello ",
 			},
 		},
@@ -271,8 +270,8 @@ func TestParseUsageFromUnstructured_MissingPath(t *testing.T) {
 	t.Parallel()
 
 	u := unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"spec": map[string]interface{}{},
+		Object: map[string]any{
+			"spec": map[string]any{},
 		},
 	}
 

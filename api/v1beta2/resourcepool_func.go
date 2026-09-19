@@ -78,12 +78,10 @@ func (r *ResourcePool) AddClaimToStatus(claim *ResourcePoolClaim) {
 	}
 
 	scl := &ResourcePoolClaimsItem{
-		NamespacedRFC1123ObjectReferenceWithNamespaceWithUID: meta.NamespacedRFC1123ObjectReferenceWithNamespaceWithUID{
-			UID:       claim.UID,
-			Name:      meta.RFC1123Name(claim.Name),
-			Namespace: meta.RFC1123SubdomainName(claim.Namespace),
-		},
-		Claims: claim.Spec.ResourceClaims,
+		UID:       claim.UID,
+		Name:      meta.RFC1123Name(claim.Name),
+		Namespace: meta.RFC1123SubdomainName(claim.Namespace),
+		Claims:    claim.Spec.ResourceClaims,
 	}
 
 	// Try to update existing entry if UID matches

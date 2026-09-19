@@ -85,7 +85,7 @@ func TestResourceReferenceLoadResources(t *testing.T) {
 			meta.RESTScopeRoot,
 		)
 		clusterClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(
-			&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "team-a"}},
+			&corev1.Namespace{Name: "team-a"},
 		).Build()
 
 		got, err := (tpl.ResourceReference{
@@ -175,12 +175,10 @@ func TestTemplateContextGatherContext(t *testing.T) {
 
 	templateContext := tpl.TemplateContext{
 		Resources: []*tpl.TemplateResourceReference{{
-			ResourceReference: tpl.ResourceReference{
-				VersionKind: tplVersionKind("v1", "ConfigMap"),
-				Name:        "settings",
-				Optional:    true,
-			},
-			Index: "configs",
+			VersionKind: tplVersionKind("v1", "ConfigMap"),
+			Name:        "settings",
+			Optional:    true,
+			Index:       "configs",
 		}},
 	}
 
@@ -214,13 +212,11 @@ func TestTemplateContextValidateVariables(t *testing.T) {
 	t.Parallel()
 
 	context := &tpl.TemplateContext{Resources: []*tpl.TemplateResourceReference{{
-		ResourceReference: tpl.ResourceReference{
-			Name:      "{{ .name }}",
-			Namespace: "{{ namespace }}",
-			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{
-				"app": "{{ application }}",
-			}},
-		},
+		Name:      "{{ .name }}",
+		Namespace: "{{ namespace }}",
+		Selector: &metav1.LabelSelector{MatchLabels: map[string]string{
+			"app": "{{ application }}",
+		}},
 	}}}
 
 	if err := context.ValidateVariables(map[string]string{
@@ -237,7 +233,7 @@ func TestTemplateContextValidateVariables(t *testing.T) {
 }
 
 func configMap(namespace, name string, lbls map[string]string) *corev1.ConfigMap {
-	return &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name, Labels: lbls}}
+	return &corev1.ConfigMap{Namespace: namespace, Name: name, Labels: lbls}
 }
 
 func templateRESTMapper() *meta.DefaultRESTMapper {

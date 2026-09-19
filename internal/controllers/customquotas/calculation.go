@@ -203,17 +203,13 @@ func reconcileQuotaUsage(
 			claim, exists := claimsByKey[key]
 			if !exists {
 				claim = capsulev1beta2.CustomQuotaClaimItem{
-					GroupVersionKind: metav1.GroupVersionKind{
-						Group:   target.Group,
-						Version: target.Version,
-						Kind:    target.Kind,
-					},
-					NamespacedObjectWithUIDReference: meta.NamespacedObjectWithUIDReference{
-						Name:      item.GetName(),
-						Namespace: meta.RFC1123SubdomainName(item.GetNamespace()),
-						UID:       item.GetUID(),
-					},
-					Usage: resource.MustParse("0"),
+					Group:     target.Group,
+					Version:   target.Version,
+					Kind:      target.Kind,
+					Name:      item.GetName(),
+					Namespace: meta.RFC1123SubdomainName(item.GetNamespace()),
+					UID:       item.GetUID(),
+					Usage:     resource.MustParse("0"),
 				}
 			}
 

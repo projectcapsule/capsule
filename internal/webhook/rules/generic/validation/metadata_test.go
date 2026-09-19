@@ -11,7 +11,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/utils/ptr"
 
 	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
@@ -136,7 +135,7 @@ func TestValidateManagedMetadata(t *testing.T) {
 				}
 				return body
 			}
-			managed := policyRule(apirules.MetadataValueRule{Managed: ptr.To("chainsaw")})
+			managed := policyRule(apirules.MetadataValueRule{Managed: new("chainsaw")})
 			deny := enforceMetadata(apirules.ActionTypeDeny, []string{"v1"}, []string{kind},
 				map[string]apirules.MetadataValueRule{".*example.corp.*": {}},
 				map[string]apirules.MetadataValueRule{".*example.corp.*": {}},
@@ -158,19 +157,19 @@ func TestValidateManagedMetadata(t *testing.T) {
 			}{
 				{name: "managed before deny", bodies: []*apirules.NamespaceRuleEnforceBody{managed, deny}, value: "chainsaw"},
 				{name: "managed after deny", bodies: []*apirules.NamespaceRuleEnforceBody{deny, managed}, value: "chainsaw"},
-				{name: "empty managed value", bodies: []*apirules.NamespaceRuleEnforceBody{policyRule(apirules.MetadataValueRule{Managed: ptr.To("")}), deny}},
+				{name: "empty managed value", bodies: []*apirules.NamespaceRuleEnforceBody{policyRule(apirules.MetadataValueRule{Managed: new("")}), deny}},
 				{name: "incorrect managed value", bodies: []*apirules.NamespaceRuleEnforceBody{managed, deny}, value: "user-value", wantBlocking: true},
 				{name: "empty value is not the managed value", bodies: []*apirules.NamespaceRuleEnforceBody{managed, deny}, wantBlocking: true},
 				{name: "other key is not exempt", bodies: []*apirules.NamespaceRuleEnforceBody{managed, deny}, value: "chainsaw", otherKey: true, wantBlocking: true},
 				{name: "other field is not exempt", bodies: []*apirules.NamespaceRuleEnforceBody{wrongField, deny}, value: "chainsaw", wantBlocking: true},
 				{name: "other kind is not exempt", bodies: []*apirules.NamespaceRuleEnforceBody{wrongKind, deny}, value: "chainsaw", wantBlocking: true},
 				{name: "other apiVersion is not exempt", bodies: []*apirules.NamespaceRuleEnforceBody{wrongVersion, deny}, value: "chainsaw", wantBlocking: true},
-				{name: "default is not exempt", bodies: []*apirules.NamespaceRuleEnforceBody{policyRule(apirules.MetadataValueRule{Default: ptr.To("chainsaw")}), deny}, value: "chainsaw", wantBlocking: true},
+				{name: "default is not exempt", bodies: []*apirules.NamespaceRuleEnforceBody{policyRule(apirules.MetadataValueRule{Default: new("chainsaw")}), deny}, value: "chainsaw", wantBlocking: true},
 				{name: "ordinary allow keeps rule precedence", bodies: []*apirules.NamespaceRuleEnforceBody{policyRule(metadataPolicy(false, exact("chainsaw"))), deny}, value: "chainsaw", wantBlocking: true},
-				{name: "last managed value wins", bodies: []*apirules.NamespaceRuleEnforceBody{managed, policyRule(apirules.MetadataValueRule{Managed: ptr.To("tests")}), deny}, value: "tests"},
-				{name: "earlier managed value is not exempt", bodies: []*apirules.NamespaceRuleEnforceBody{managed, policyRule(apirules.MetadataValueRule{Managed: ptr.To("tests")}), deny}, value: "chainsaw", wantBlocking: true},
-				{name: "required managed value satisfies presence", bodies: []*apirules.NamespaceRuleEnforceBody{policyRule(apirules.MetadataValueRule{Managed: ptr.To("chainsaw"), Required: true}), deny}, value: "chainsaw"},
-				{name: "missing required managed value is denied", bodies: []*apirules.NamespaceRuleEnforceBody{policyRule(apirules.MetadataValueRule{Managed: ptr.To("chainsaw"), Required: true}), deny}, absent: true, wantBlocking: true},
+				{name: "last managed value wins", bodies: []*apirules.NamespaceRuleEnforceBody{managed, policyRule(apirules.MetadataValueRule{Managed: new("tests")}), deny}, value: "tests"},
+				{name: "earlier managed value is not exempt", bodies: []*apirules.NamespaceRuleEnforceBody{managed, policyRule(apirules.MetadataValueRule{Managed: new("tests")}), deny}, value: "chainsaw", wantBlocking: true},
+				{name: "required managed value satisfies presence", bodies: []*apirules.NamespaceRuleEnforceBody{policyRule(apirules.MetadataValueRule{Managed: new("chainsaw"), Required: true}), deny}, value: "chainsaw"},
+				{name: "missing required managed value is denied", bodies: []*apirules.NamespaceRuleEnforceBody{policyRule(apirules.MetadataValueRule{Managed: new("chainsaw"), Required: true}), deny}, absent: true, wantBlocking: true},
 				{name: "managedFields does not grant exemption", bodies: []*apirules.NamespaceRuleEnforceBody{deny}, value: "chainsaw", wantBlocking: true},
 			}
 
@@ -761,15 +760,14 @@ func TestControlledMetadataEntriesMatchesKeyPatternsWithRegexCache(t *testing.T)
 	t.Parallel()
 
 	h := newMetadataTestRules(nil, nil)
-	obj := &metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{
+	obj := &metav1.PartialObjectMetadata{
 		Annotations: map[string]string{
 			"example.corp/cost-center": "INV-1234",
 			"unrelated":                "ignored",
-		},
-	}}
+		}}
 	enforce := []*apirules.NamespaceRuleEnforceBody{{
 		Metadata: []apirules.MetadataRule{{
-			VersionKinds: runtime.VersionKinds{APIGroups: []string{"v1"}, Kinds: []string{"Namespace"}},
+			APIGroups: []string{"v1"}, Kinds: []string{"Namespace"},
 			Annotations: map[string]apirules.MetadataValueRule{
 				"example.corp/*": {},
 			},
@@ -1711,10 +1709,8 @@ func metadataObject(
 	annotations map[string]string,
 ) genericObject {
 	return &metav1.PartialObjectMetadata{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels:      labels,
-			Annotations: annotations,
-		},
+		Labels:      labels,
+		Annotations: annotations,
 	}
 }
 
@@ -1737,10 +1733,8 @@ func enforceMetadata(
 		Action: action,
 		Metadata: []apirules.MetadataRule{
 			{
-				VersionKinds: runtime.VersionKinds{
-					APIGroups: apiVersion,
-					Kinds:     kinds,
-				},
+				APIGroups:   apiVersion,
+				Kinds:       kinds,
 				Labels:      labels,
 				Annotations: annotations,
 			},
@@ -1766,8 +1760,6 @@ func exact(values ...string) runtime.ExpressionMatch {
 
 func expression(value string) runtime.ExpressionMatch {
 	return runtime.ExpressionMatch{
-		ExpressionRegex: runtime.ExpressionRegex{
-			Expression: value,
-		},
+		Expression: value,
 	}
 }

@@ -20,21 +20,15 @@ import (
 
 var _ = Describe("enforcing an allowed set of Service external IPs", Ordered, Label("tenant", "networking", "service", "skip-on-openshift"), func() {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-allowed-external-ip",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-allowed-external-ip",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-svc-external-svc",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-svc-external-svc",
+					Kind: "User",
 				},
 			},
 			ServiceOptions: &api.ServiceOptions{
@@ -67,9 +61,7 @@ var _ = Describe("enforcing an allowed set of Service external IPs", Ordered, La
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
 		svc := &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "my-evil-dns-server",
-			},
+			Name: "my-evil-dns-server",
 			Spec: corev1.ServiceSpec{
 				Ports: []corev1.ServicePort{
 					{
@@ -104,9 +96,7 @@ var _ = Describe("enforcing an allowed set of Service external IPs", Ordered, La
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		svc := &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "dns-server",
-			},
+			Name: "dns-server",
 			Spec: corev1.ServiceSpec{
 				Ports: []corev1.ServicePort{
 					{
@@ -139,9 +129,7 @@ var _ = Describe("enforcing an allowed set of Service external IPs", Ordered, La
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
 		svc := &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "dns-server",
-			},
+			Name: "dns-server",
 			Spec: corev1.ServiceSpec{
 				Ports: []corev1.ServicePort{
 					{
