@@ -307,9 +307,9 @@ wait-for-helmreleases:
 	    echo "=== HelmReleases details ===" >&2; \
 	    $(KUBECTL) describe helmrelease -A >&2 || true; \
 	    echo "=== pods overview ===" >&2; \
-	    $(KUBECTL) get pods >&2 || true; \
+	    $(KUBECTL) get pods -A>&2 || true; \
 	    echo "=== pods details ===" >&2; \
-	    $(KUBECTL) describe pods >&2 || true; \
+	    $(KUBECTL) describe pods -A >&2 || true; \
 	    exit 1; \
 	  fi; \
 	  sleep $$interval; \
