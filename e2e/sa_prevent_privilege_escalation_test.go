@@ -24,21 +24,15 @@ import (
 
 var _ = Describe("trying to escalate from a Tenant Namespace ServiceAccount", Ordered, Label("tenant"), func() {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-sa-privilege-escalation",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-sa-privilege-escalation",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-sa-escalation",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-sa-escalation",
+					Kind: "User",
 				},
 			},
 			NodeSelector: map[string]string{
@@ -66,10 +60,8 @@ var _ = Describe("trying to escalate from a Tenant Namespace ServiceAccount", Or
 
 	It("should block Namespace changes", func() {
 		role := rbacv1.Role{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "ns-update-role",
-				Namespace: ns.GetName(),
-			},
+			Name:      "ns-update-role",
+			Namespace: ns.GetName(),
 			Rules: []rbacv1.PolicyRule{
 				{
 					Verbs:         []string{"update"},
@@ -85,10 +77,8 @@ var _ = Describe("trying to escalate from a Tenant Namespace ServiceAccount", Or
 		}).Should(Succeed())
 
 		rolebinding := rbacv1.RoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "attacker-rolebinding",
-				Namespace: ns.GetName(),
-			},
+			Name:      "attacker-rolebinding",
+			Namespace: ns.GetName(),
 			Subjects: []rbacv1.Subject{
 				{
 					Kind:      "ServiceAccount",

@@ -100,13 +100,11 @@ func CollectPromotions(
 					targets := appendTargetNamespace(targetNamespaces, sa.Namespace)
 
 					promotions.Upsert(rbac.PromotionSpec{
-						UserSpec: rbac.UserSpec{
-							Kind: rbac.ServiceAccountOwner,
-							Name: users.GetServiceAccountFullName(meta.NamespacedRFC1123ObjectReferenceWithNamespace{
-								Name:      meta.RFC1123Name(sa.Name),
-								Namespace: meta.RFC1123SubdomainName(sa.Namespace),
-							}),
-						},
+						Kind: rbac.ServiceAccountOwner,
+						Name: users.GetServiceAccountFullName(meta.NamespacedRFC1123ObjectReferenceWithNamespace{
+							Name:      meta.RFC1123Name(sa.Name),
+							Namespace: meta.RFC1123SubdomainName(sa.Namespace),
+						}),
 						ClusterRoles: promotion.ClusterRoles,
 						Targets:      targets,
 					})

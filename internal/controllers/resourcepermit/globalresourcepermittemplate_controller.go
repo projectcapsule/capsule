@@ -11,7 +11,6 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -159,7 +158,7 @@ func (r *GlobalResourcePermitTemplateReconciler) mapNamespaceToTemplates(
 		}
 
 		requests = append(requests, reconcile.Request{
-			NamespacedName: types.NamespacedName{Name: list.Items[i].Name},
+			Name: list.Items[i].Name,
 		})
 	}
 

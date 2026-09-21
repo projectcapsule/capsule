@@ -167,7 +167,6 @@ func (r *CacheInvalidator) Reconcile(ctx context.Context, request reconcile.Requ
 	interval := cfg.CacheInvalidation()
 
 	return reconcile.Result{
-		Requeue:      true,
 		RequeueAfter: interval.Duration,
 	}, err
 }

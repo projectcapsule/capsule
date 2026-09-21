@@ -12,7 +12,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -122,7 +121,7 @@ func (r *Manager) EnsureClusterRoleBindingsProvisioner(ctx context.Context) erro
 	cfg := r.Configuration.RBAC()
 
 	crb := &rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{Name: cfg.ProvisionerClusterRole},
+		Name: cfg.ProvisionerClusterRole,
 	}
 
 	started := time.Now()
@@ -227,9 +226,7 @@ func (r *Manager) EnsureClusterRoleBindingsProvisioner(ctx context.Context) erro
 
 func (r *Manager) EnsureClusterRoleProvisioner(ctx context.Context) (err error) {
 	clusterRole := &rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: r.Configuration.RBAC().ProvisionerClusterRole,
-		},
+		Name: r.Configuration.RBAC().ProvisionerClusterRole,
 	}
 
 	_, err = controllerutil.CreateOrUpdate(ctx, r.Client, clusterRole, func() error {
@@ -266,9 +263,7 @@ func (r *Manager) EnsureClusterRoleProvisioner(ctx context.Context) (err error) 
 
 func (r *Manager) EnsureClusterRoleDeleter(ctx context.Context) (err error) {
 	clusterRole := &rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: r.Configuration.RBAC().DeleterClusterRole,
-		},
+		Name: r.Configuration.RBAC().DeleterClusterRole,
 	}
 
 	_, err = controllerutil.CreateOrUpdate(ctx, r.Client, clusterRole, func() error {
@@ -310,17 +305,17 @@ func (r *Manager) enqueueServiceAccountChange(context.Context, client.Object) []
 		return nil
 	}
 
-	return []reconcile.Request{{NamespacedName: client.ObjectKey{
+	return []reconcile.Request{{
 		Name:      r.Configuration.RBAC().ProvisionerClusterRole,
 		Namespace: serviceAccountEventMarker,
-	}}}
+	}}
 }
 
 func (r *Manager) enqueueRBACConfiguration(context.Context, client.Object) []reconcile.Request {
-	return []reconcile.Request{{NamespacedName: client.ObjectKey{
+	return []reconcile.Request{{
 		Name:      r.Configuration.RBAC().ProvisionerClusterRole,
 		Namespace: rbacConfigurationEventMarker,
-	}}}
+	}}
 }
 
 func (r *Manager) reconcileConfiguration(ctx context.Context) error {

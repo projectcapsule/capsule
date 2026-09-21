@@ -11,7 +11,6 @@ import (
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/utils/ptr"
 
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 	"github.com/projectcapsule/capsule/pkg/api/runtime"
@@ -45,9 +44,9 @@ func TestValidateRuleStatusBody(t *testing.T) {
 			bodies: []*rules.NamespaceRuleBodyNamespace{{
 				Quota: []rules.ResourceQuotaRule{{
 					Name: "shared-compute",
-					ResourceQuotaSpec: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{
+					Hard: corev1.ResourceList{
 						corev1.ResourceRequestsCPU: resource.MustParse("8"),
-					}},
+					},
 				}},
 			}},
 		},
@@ -56,9 +55,9 @@ func TestValidateRuleStatusBody(t *testing.T) {
 			mapper: mapper,
 			bodies: []*rules.NamespaceRuleBodyNamespace{{
 				Quota: []rules.ResourceQuotaRule{{
-					ResourceQuotaSpec: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{
+					Hard: corev1.ResourceList{
 						corev1.ResourceRequestsCPU: resource.MustParse("8"),
-					}},
+					},
 				}},
 			}},
 			wantErr: "rules[0].quota[0].name",
@@ -69,9 +68,9 @@ func TestValidateRuleStatusBody(t *testing.T) {
 			bodies: []*rules.NamespaceRuleBodyNamespace{{
 				Quota: []rules.ResourceQuotaRule{{
 					Name: "Shared_Compute",
-					ResourceQuotaSpec: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{
+					Hard: corev1.ResourceList{
 						corev1.ResourceRequestsCPU: resource.MustParse("8"),
-					}},
+					},
 				}},
 			}},
 			wantErr: `rules[0].quota[0].name "Shared_Compute" is invalid`,
@@ -90,9 +89,9 @@ func TestValidateRuleStatusBody(t *testing.T) {
 			bodies: []*rules.NamespaceRuleBodyNamespace{{
 				Quota: []rules.ResourceQuotaRule{{
 					Name: "shared-compute",
-					ResourceQuotaSpec: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{
+					Hard: corev1.ResourceList{
 						corev1.ResourceRequestsCPU: resource.MustParse("-1"),
-					}},
+					},
 				}},
 			}},
 			wantErr: `rules[0].quota[0].hard["requests.cpu"] is invalid`,
@@ -101,8 +100,8 @@ func TestValidateRuleStatusBody(t *testing.T) {
 			name:   "quota names must be unique across rules",
 			mapper: mapper,
 			bodies: []*rules.NamespaceRuleBodyNamespace{
-				{Quota: []rules.ResourceQuotaRule{{Name: "shared-compute", ResourceQuotaSpec: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}}}}},
-				{Quota: []rules.ResourceQuotaRule{{Name: "shared-compute", ResourceQuotaSpec: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("1Gi")}}}}},
+				{Quota: []rules.ResourceQuotaRule{{Name: "shared-compute", Hard: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}}}},
+				{Quota: []rules.ResourceQuotaRule{{Name: "shared-compute", Hard: corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("1Gi")}}}},
 			},
 			wantErr: `rules[1].quota[0].name "shared-compute" is invalid: quota name is already used by rules[0].quota[0]`,
 		},
@@ -115,24 +114,20 @@ func TestValidateRuleStatusBody(t *testing.T) {
 						Action: rules.ActionTypeAllow,
 						Metadata: []rules.MetadataRule{
 							{
-								VersionKinds: runtime.VersionKinds{
-									APIGroups: []string{
-										"*",
-									},
-									Kinds: []string{
-										"ConfigMap",
-										"Service",
-										"Deployment",
-									},
+								APIGroups: []string{
+									"*",
+								},
+								Kinds: []string{
+									"ConfigMap",
+									"Service",
+									"Deployment",
 								},
 								Labels: map[string]rules.MetadataValueRule{
 									"env": {
 										Required: true,
 										Values: []runtime.ExpressionMatch{
 											{
-												ExpressionRegex: runtime.ExpressionRegex{
-													Expression: "^(prod|test|dev)$",
-												},
+												Expression: "^(prod|test|dev)$",
 											},
 											{
 												Exact: []string{
@@ -151,9 +146,7 @@ func TestValidateRuleStatusBody(t *testing.T) {
 										Required: false,
 										Values: []runtime.ExpressionMatch{
 											{
-												ExpressionRegex: runtime.ExpressionRegex{
-													Expression: "^INV-[0-9]{4}$",
-												},
+												Expression: "^INV-[0-9]{4}$",
 											},
 											{
 												Exact: []string{
@@ -169,25 +162,17 @@ func TestValidateRuleStatusBody(t *testing.T) {
 						Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
 							Registries: []rules.OCIRegistry{
 								{
-									ExpressionMatch: runtime.ExpressionMatch{
-										ExpressionRegex: runtime.ExpressionRegex{
-											Expression: "harbor/.*",
-										},
-									},
+									Expression: "harbor/.*",
 								},
 								{
-									ExpressionMatch: runtime.ExpressionMatch{
-										Exact: []string{
-											"harbor/platform/debian:latest",
-										},
+									Exact: []string{
+										"harbor/platform/debian:latest",
 									},
 								},
 							},
 							Schedulers: []runtime.ExpressionMatch{
 								{
-									ExpressionRegex: runtime.ExpressionRegex{
-										Expression: "tenant-[a-z0-9-]+",
-									},
+									Expression: "tenant-[a-z0-9-]+",
 								},
 							},
 						},
@@ -214,15 +199,11 @@ func TestValidateRuleStatusBody(t *testing.T) {
 										},
 									},
 									{
-										ExpressionRegex: runtime.ExpressionRegex{
-											Expression: ".*\\.example\\.com",
-										},
+										Expression: ".*\\.example\\.com",
 									},
 									{
-										ExpressionRegex: runtime.ExpressionRegex{
-											Expression: "trusted\\..*",
-											Negate:     true,
-										},
+										Expression: "trusted\\..*",
+										Negate:     true,
 									},
 								},
 							},
@@ -252,14 +233,12 @@ func TestValidateRuleStatusBody(t *testing.T) {
 						Action: rules.ActionTypeAllow,
 						Metadata: []rules.MetadataRule{
 							{
-								VersionKinds: runtime.VersionKinds{
-									APIGroups: []string{
-										"v1",
-									},
-									Kinds: []string{
-										"ConfigMap",
-										"Service",
-									},
+								APIGroups: []string{
+									"v1",
+								},
+								Kinds: []string{
+									"ConfigMap",
+									"Service",
 								},
 								Labels: map[string]rules.MetadataValueRule{
 									"env": {
@@ -288,21 +267,17 @@ func TestValidateRuleStatusBody(t *testing.T) {
 						Action: rules.ActionTypeAudit,
 						Metadata: []rules.MetadataRule{
 							{
-								VersionKinds: runtime.VersionKinds{
-									APIGroups: []string{
-										"*",
-									},
-									Kinds: []string{
-										"*",
-									},
+								APIGroups: []string{
+									"*",
+								},
+								Kinds: []string{
+									"*",
 								},
 								Annotations: map[string]rules.MetadataValueRule{
 									"example.corp/audit": {
 										Values: []runtime.ExpressionMatch{
 											{
-												ExpressionRegex: runtime.ExpressionRegex{
-													Expression: "^audit-.*",
-												},
+												Expression: "^audit-.*",
 											},
 										},
 									},
@@ -322,13 +297,11 @@ func TestValidateRuleStatusBody(t *testing.T) {
 						Action: rules.ActionTypeAllow,
 						Metadata: []rules.MetadataRule{
 							{
-								VersionKinds: runtime.VersionKinds{
-									APIGroups: []string{
-										"apps/*",
-									},
-									Kinds: []string{
-										"*Set",
-									},
+								APIGroups: []string{
+									"apps/*",
+								},
+								Kinds: []string{
+									"*Set",
 								},
 								Labels: map[string]rules.MetadataValueRule{
 									"env": {
@@ -356,22 +329,18 @@ func TestValidateRuleStatusBody(t *testing.T) {
 					Enforce: &rules.NamespaceRuleEnforceBody{
 						Metadata: []rules.MetadataRule{
 							{
-								VersionKinds: runtime.VersionKinds{
-									APIGroups: []string{
-										"*",
-									},
-									Kinds: []string{
-										"ConfigMap",
-									},
+								APIGroups: []string{
+									"*",
+								},
+								Kinds: []string{
+									"ConfigMap",
 								},
 								Labels: map[string]rules.MetadataValueRule{
 									"env": {
 										Required: true,
 										Values: []runtime.ExpressionMatch{
 											{
-												ExpressionRegex: runtime.ExpressionRegex{
-													Expression: "[",
-												},
+												Expression: "[",
 											},
 										},
 									},
@@ -391,21 +360,17 @@ func TestValidateRuleStatusBody(t *testing.T) {
 					Enforce: &rules.NamespaceRuleEnforceBody{
 						Metadata: []rules.MetadataRule{
 							{
-								VersionKinds: runtime.VersionKinds{
-									APIGroups: []string{
-										"*",
-									},
-									Kinds: []string{
-										"ConfigMap",
-									},
+								APIGroups: []string{
+									"*",
+								},
+								Kinds: []string{
+									"ConfigMap",
 								},
 								Annotations: map[string]rules.MetadataValueRule{
 									"example.corp/cost-center": {
 										Values: []runtime.ExpressionMatch{
 											{
-												ExpressionRegex: runtime.ExpressionRegex{
-													Expression: "[",
-												},
+												Expression: "[",
 											},
 										},
 									},
@@ -425,13 +390,11 @@ func TestValidateRuleStatusBody(t *testing.T) {
 					Enforce: &rules.NamespaceRuleEnforceBody{
 						Metadata: []rules.MetadataRule{
 							{
-								VersionKinds: runtime.VersionKinds{
-									APIGroups: []string{
-										"*",
-									},
-									Kinds: []string{
-										"ConfigMap",
-									},
+								APIGroups: []string{
+									"*",
+								},
+								Kinds: []string{
+									"ConfigMap",
 								},
 								Labels: map[string]rules.MetadataValueRule{
 									"bad/key/again": {
@@ -460,13 +423,11 @@ func TestValidateRuleStatusBody(t *testing.T) {
 					Enforce: &rules.NamespaceRuleEnforceBody{
 						Metadata: []rules.MetadataRule{
 							{
-								VersionKinds: runtime.VersionKinds{
-									APIGroups: []string{
-										"*",
-									},
-									Kinds: []string{
-										"ConfigMap",
-									},
+								APIGroups: []string{
+									"*",
+								},
+								Kinds: []string{
+									"ConfigMap",
 								},
 								Annotations: map[string]rules.MetadataValueRule{
 									"bad/key/again": {
@@ -494,21 +455,17 @@ func TestValidateRuleStatusBody(t *testing.T) {
 					Enforce: &rules.NamespaceRuleEnforceBody{
 						Metadata: []rules.MetadataRule{
 							{
-								VersionKinds: runtime.VersionKinds{
-									APIGroups: []string{
-										"*",
-									},
-									Kinds: []string{
-										"ConfigMap",
-									},
+								APIGroups: []string{
+									"*",
+								},
+								Kinds: []string{
+									"ConfigMap",
 								},
 								Labels: map[string]rules.MetadataValueRule{
 									"env": {
 										Values: []runtime.ExpressionMatch{
 											{
-												ExpressionRegex: runtime.ExpressionRegex{
-													Expression: "valid-.*",
-												},
+												Expression: "valid-.*",
 											},
 										},
 									},
@@ -521,13 +478,11 @@ func TestValidateRuleStatusBody(t *testing.T) {
 					Enforce: &rules.NamespaceRuleEnforceBody{
 						Metadata: []rules.MetadataRule{
 							{
-								VersionKinds: runtime.VersionKinds{
-									APIGroups: []string{
-										"*",
-									},
-									Kinds: []string{
-										"Service",
-									},
+								APIGroups: []string{
+									"*",
+								},
+								Kinds: []string{
+									"Service",
 								},
 								Labels: map[string]rules.MetadataValueRule{
 									"team": {
@@ -538,9 +493,7 @@ func TestValidateRuleStatusBody(t *testing.T) {
 												},
 											},
 											{
-												ExpressionRegex: runtime.ExpressionRegex{
-													Expression: "[",
-												},
+												Expression: "[",
 											},
 										},
 									},
@@ -561,11 +514,7 @@ func TestValidateRuleStatusBody(t *testing.T) {
 						Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
 							Registries: []rules.OCIRegistry{
 								{
-									ExpressionMatch: runtime.ExpressionMatch{
-										ExpressionRegex: runtime.ExpressionRegex{
-											Expression: "[",
-										},
-									},
+									Expression: "[",
 								},
 							},
 						},
@@ -583,9 +532,7 @@ func TestValidateRuleStatusBody(t *testing.T) {
 						Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
 							Schedulers: []runtime.ExpressionMatch{
 								{
-									ExpressionRegex: runtime.ExpressionRegex{
-										Expression: "[",
-									},
+									Expression: "[",
 								},
 							},
 						},
@@ -729,9 +676,7 @@ func TestValidateRuleStatusBody(t *testing.T) {
 							ExternalNames: &rules.ServiceExternalNameRule{
 								Hostnames: []runtime.ExpressionMatch{
 									{
-										ExpressionRegex: runtime.ExpressionRegex{
-											Expression: "[",
-										},
+										Expression: "[",
 									},
 								},
 							},
@@ -843,14 +788,10 @@ func TestValidateRuleStatusBody(t *testing.T) {
 							ExternalNames: &rules.ServiceExternalNameRule{
 								Hostnames: []runtime.ExpressionMatch{
 									{
-										ExpressionRegex: runtime.ExpressionRegex{
-											Expression: "valid\\..*",
-										},
+										Expression: "valid\\..*",
 									},
 									{
-										ExpressionRegex: runtime.ExpressionRegex{
-											Expression: "[",
-										},
+										Expression: "[",
 									},
 								},
 							},
@@ -903,7 +844,7 @@ func TestValidateMetadataKeyPatterns(t *testing.T) {
 
 func TestMutableMetadataRequiresConcreteKey(t *testing.T) {
 	t.Parallel()
-	policy := rules.MetadataValueRule{Managed: ptr.To("controlled")}
+	policy := rules.MetadataValueRule{Managed: new("controlled")}
 	if err := validateMutableMetadataKey("example.corp/key", policy); err != nil {
 		t.Fatalf("concrete key rejected: %v", err)
 	}
@@ -915,8 +856,8 @@ func TestMutableMetadataRequiresConcreteKey(t *testing.T) {
 	}
 
 	rule := rules.MetadataRule{
-		VersionKinds: runtime.VersionKinds{APIGroups: []string{"*"}, Kinds: []string{"ConfigMap"}},
-		Labels:       map[string]rules.MetadataValueRule{"example.corp/key": policy},
+		APIGroups: []string{"*"}, Kinds: []string{"ConfigMap"},
+		Labels: map[string]rules.MetadataValueRule{"example.corp/key": policy},
 	}
 	if err := validateMetadataRules(0, []rules.MetadataRule{rule}, nil); err == nil || !strings.Contains(err.Error(), "managed metadata requires concrete apiGroups and kinds") {
 		t.Fatalf("wildcard managed target error = %v", err)
@@ -942,13 +883,11 @@ func TestValidateRuleStatusBodyWithRESTMapper(t *testing.T) {
 					Enforce: &rules.NamespaceRuleEnforceBody{
 						Metadata: []rules.MetadataRule{
 							{
-								VersionKinds: runtime.VersionKinds{
-									APIGroups: []string{
-										"v1",
-									},
-									Kinds: []string{
-										"NotAThing",
-									},
+								APIGroups: []string{
+									"v1",
+								},
+								Kinds: []string{
+									"NotAThing",
 								},
 								Labels: map[string]rules.MetadataValueRule{
 									"env": {
@@ -969,15 +908,13 @@ func TestValidateRuleStatusBodyWithRESTMapper(t *testing.T) {
 					Enforce: &rules.NamespaceRuleEnforceBody{
 						Metadata: []rules.MetadataRule{
 							{
-								VersionKinds: runtime.VersionKinds{
-									APIGroups: []string{
-										"v1",
-									},
-									Kinds: []string{
-										"ConfigMap",
-										"Service",
-										"Pod",
-									},
+								APIGroups: []string{
+									"v1",
+								},
+								Kinds: []string{
+									"ConfigMap",
+									"Service",
+									"Pod",
 								},
 								Labels: map[string]rules.MetadataValueRule{
 									"env": {
@@ -1002,7 +939,7 @@ func TestValidateRuleStatusBodyWithRESTMapper(t *testing.T) {
 			mapper: mapper,
 			bodies: []*rules.NamespaceRuleBodyNamespace{{
 				Enforce: &rules.NamespaceRuleEnforceBody{Metadata: []rules.MetadataRule{{
-					VersionKinds: runtime.VersionKinds{APIGroups: []string{""}, Kinds: []string{"Namespace"}},
+					APIGroups: []string{""}, Kinds: []string{"Namespace"},
 					Annotations: map[string]rules.MetadataValueRule{
 						"example.corp/*": {Values: []runtime.ExpressionMatch{{Exact: []string{"allowed"}}}},
 					},
@@ -1017,14 +954,12 @@ func TestValidateRuleStatusBodyWithRESTMapper(t *testing.T) {
 					Enforce: &rules.NamespaceRuleEnforceBody{
 						Metadata: []rules.MetadataRule{
 							{
-								VersionKinds: runtime.VersionKinds{
-									APIGroups: []string{
-										"apps/v1",
-									},
-									Kinds: []string{
-										"Deployment",
-										"StatefulSet",
-									},
+								APIGroups: []string{
+									"apps/v1",
+								},
+								Kinds: []string{
+									"Deployment",
+									"StatefulSet",
 								},
 								Labels: map[string]rules.MetadataValueRule{
 									"env": {
@@ -1045,13 +980,11 @@ func TestValidateRuleStatusBodyWithRESTMapper(t *testing.T) {
 					Enforce: &rules.NamespaceRuleEnforceBody{
 						Metadata: []rules.MetadataRule{
 							{
-								VersionKinds: runtime.VersionKinds{
-									APIGroups: []string{
-										"v1",
-									},
-									Kinds: []string{
-										"NotAThing",
-									},
+								APIGroups: []string{
+									"v1",
+								},
+								Kinds: []string{
+									"NotAThing",
 								},
 								Labels: map[string]rules.MetadataValueRule{
 									"env": {
@@ -1076,13 +1009,11 @@ func TestValidateRuleStatusBodyWithRESTMapper(t *testing.T) {
 					Enforce: &rules.NamespaceRuleEnforceBody{
 						Metadata: []rules.MetadataRule{
 							{
-								VersionKinds: runtime.VersionKinds{
-									APIGroups: []string{
-										"v1",
-									},
-									Kinds: []string{
-										"Deployment",
-									},
+								APIGroups: []string{
+									"v1",
+								},
+								Kinds: []string{
+									"Deployment",
 								},
 								Labels: map[string]rules.MetadataValueRule{
 									"env": {
@@ -1107,13 +1038,11 @@ func TestValidateRuleStatusBodyWithRESTMapper(t *testing.T) {
 					Enforce: &rules.NamespaceRuleEnforceBody{
 						Metadata: []rules.MetadataRule{
 							{
-								VersionKinds: runtime.VersionKinds{
-									APIGroups: []string{
-										"apps/v1",
-									},
-									Kinds: []string{
-										"NotADeployment",
-									},
+								APIGroups: []string{
+									"apps/v1",
+								},
+								Kinds: []string{
+									"NotADeployment",
 								},
 								Labels: map[string]rules.MetadataValueRule{
 									"env": {
@@ -1138,13 +1067,11 @@ func TestValidateRuleStatusBodyWithRESTMapper(t *testing.T) {
 					Enforce: &rules.NamespaceRuleEnforceBody{
 						Metadata: []rules.MetadataRule{
 							{
-								VersionKinds: runtime.VersionKinds{
-									APIGroups: []string{
-										"*",
-									},
-									Kinds: []string{
-										"NotAThing",
-									},
+								APIGroups: []string{
+									"*",
+								},
+								Kinds: []string{
+									"NotAThing",
 								},
 								Labels: map[string]rules.MetadataValueRule{
 									"env": {
@@ -1165,13 +1092,11 @@ func TestValidateRuleStatusBodyWithRESTMapper(t *testing.T) {
 					Enforce: &rules.NamespaceRuleEnforceBody{
 						Metadata: []rules.MetadataRule{
 							{
-								VersionKinds: runtime.VersionKinds{
-									APIGroups: []string{
-										"v1",
-									},
-									Kinds: []string{
-										"*",
-									},
+								APIGroups: []string{
+									"v1",
+								},
+								Kinds: []string{
+									"*",
 								},
 								Labels: map[string]rules.MetadataValueRule{
 									"env": {
@@ -1192,13 +1117,11 @@ func TestValidateRuleStatusBodyWithRESTMapper(t *testing.T) {
 					Enforce: &rules.NamespaceRuleEnforceBody{
 						Metadata: []rules.MetadataRule{
 							{
-								VersionKinds: runtime.VersionKinds{
-									APIGroups: []string{
-										"apps/v1",
-									},
-									Kinds: []string{
-										"*Set",
-									},
+								APIGroups: []string{
+									"apps/v1",
+								},
+								Kinds: []string{
+									"*Set",
 								},
 								Labels: map[string]rules.MetadataValueRule{
 									"env": {
@@ -1219,13 +1142,11 @@ func TestValidateRuleStatusBodyWithRESTMapper(t *testing.T) {
 					Enforce: &rules.NamespaceRuleEnforceBody{
 						Metadata: []rules.MetadataRule{
 							{
-								VersionKinds: runtime.VersionKinds{
-									APIGroups: []string{
-										"v1",
-									},
-									Kinds: []string{
-										"ConfigMap",
-									},
+								APIGroups: []string{
+									"v1",
+								},
+								Kinds: []string{
+									"ConfigMap",
 								},
 								Labels: map[string]rules.MetadataValueRule{
 									"env": {
@@ -1234,14 +1155,12 @@ func TestValidateRuleStatusBodyWithRESTMapper(t *testing.T) {
 								},
 							},
 							{
-								VersionKinds: runtime.VersionKinds{
-									APIGroups: []string{
-										"apps/v1",
-									},
-									Kinds: []string{
-										"Deployment",
-										"NotADeployment",
-									},
+								APIGroups: []string{
+									"apps/v1",
+								},
+								Kinds: []string{
+									"Deployment",
+									"NotADeployment",
 								},
 								Labels: map[string]rules.MetadataValueRule{
 									"team": {
@@ -1266,22 +1185,18 @@ func TestValidateRuleStatusBodyWithRESTMapper(t *testing.T) {
 					Enforce: &rules.NamespaceRuleEnforceBody{
 						Metadata: []rules.MetadataRule{
 							{
-								VersionKinds: runtime.VersionKinds{
-									APIGroups: []string{
-										"v1",
-									},
-									Kinds: []string{
-										"ConfigMap",
-									},
+								APIGroups: []string{
+									"v1",
+								},
+								Kinds: []string{
+									"ConfigMap",
 								},
 								Labels: map[string]rules.MetadataValueRule{
 									"env": {
 										Required: true,
 										Values: []runtime.ExpressionMatch{
 											{
-												ExpressionRegex: runtime.ExpressionRegex{
-													Expression: "[",
-												},
+												Expression: "[",
 											},
 										},
 									},

@@ -16,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -28,35 +27,23 @@ import (
 
 var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1", Ordered, Label("tenant", "networking", "ingress"), func() {
 	tntNoDefault := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-ic-selector-networking-v1",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-ic-selector-networking-v1",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: []rbac.OwnerSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-ic-selector-networking-v1",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-ic-selector-networking-v1",
+					Kind: "User",
 				},
 			},
 			IngressOptions: capsulev1beta2.IngressOptions{
 				AllowedClasses: &api.DefaultAllowedListSpec{
-					SelectorAllowedListSpec: api.SelectorAllowedListSpec{
-						AllowedListSpec: api.AllowedListSpec{
-							Exact: []string{"nginx", "haproxy"},
-							Regex: "^oil-.*$",
-						},
-						LabelSelector: metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								"env": "customers",
-							},
-						},
+					Exact: []string{"nginx", "haproxy"},
+					Regex: "^oil-.*$",
+					MatchLabels: map[string]string{
+						"env": "customers",
 					},
 				},
 			},
@@ -64,32 +51,22 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 	}
 
 	tntWithDefault := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-ic-default-networking-v1",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-ic-default-networking-v1",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: []rbac.OwnerSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-ic-default-networking-v1",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-ic-default-networking-v1",
+					Kind: "User",
 				},
 			},
 			IngressOptions: capsulev1beta2.IngressOptions{
 				AllowedClasses: &api.DefaultAllowedListSpec{
 					Default: "tenant-default",
-					SelectorAllowedListSpec: api.SelectorAllowedListSpec{
-						LabelSelector: metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								"name": "tenant-default",
-							},
-						},
+					MatchLabels: map[string]string{
+						"name": "tenant-default",
 					},
 				},
 			},
@@ -97,12 +74,10 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 	}
 
 	tenantDefault := networkingv1.IngressClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenant-default",
-			Labels: map[string]string{
-				"name": "tenant-default",
-				"env":  "e2e",
-			},
+		Name: "tenant-default",
+		Labels: map[string]string{
+			"name": "tenant-default",
+			"env":  "e2e",
 		},
 		Spec: networkingv1.IngressClassSpec{
 			Controller: "k8s.io/ingress-nginx",
@@ -110,15 +85,13 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 	}
 
 	globalDefault := networkingv1.IngressClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "global-default",
-			Labels: map[string]string{
-				"name": "global-default",
-				"env":  "customers",
-			},
-			Annotations: map[string]string{
-				"ingressclass.kubernetes.io/is-default-class": "true",
-			},
+		Name: "global-default",
+		Labels: map[string]string{
+			"name": "global-default",
+			"env":  "customers",
+		},
+		Annotations: map[string]string{
+			"ingressclass.kubernetes.io/is-default-class": "true",
 		},
 		Spec: networkingv1.IngressClassSpec{
 			Controller: "k8s.io/ingress-nginx",
@@ -126,15 +99,13 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 	}
 
 	disallowedGlobalDefault := networkingv1.IngressClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "disallowed",
-			Labels: map[string]string{
-				"name": "disallowed-global-default",
-				"env":  "e2e",
-			},
-			Annotations: map[string]string{
-				"ingressclass.kubernetes.io/is-default-class": "true",
-			},
+		Name: "disallowed",
+		Labels: map[string]string{
+			"name": "disallowed-global-default",
+			"env":  "e2e",
+		},
+		Annotations: map[string]string{
+			"ingressclass.kubernetes.io/is-default-class": "true",
 		},
 		Spec: networkingv1.IngressClassSpec{
 			Controller: "k8s.io/ingress-nginx",
@@ -161,9 +132,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 			req, _ := labels.NewRequirement("env", selection.Exists, nil)
 
 			return k8sClient.DeleteAllOf(context.TODO(), &networkingv1.IngressClass{}, &client.DeleteAllOfOptions{
-				ListOptions: client.ListOptions{
-					LabelSelector: labels.NewSelector().Add(*req),
-				},
+				LabelSelector: labels.NewSelector().Add(*req),
 			})
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
@@ -186,9 +155,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 		By("non-specifying at all", func() {
 			Eventually(func() (err error) {
 				i := &networkingv1.Ingress{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "denied-ingress",
-					},
+					Name: "denied-ingress",
 					Spec: networkingv1.IngressSpec{
 						DefaultBackend: &networkingv1.IngressBackend{
 							Service: &networkingv1.IngressServiceBackend{
@@ -207,11 +174,9 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 		By("defining as deprecated annotation", func() {
 			Eventually(func() (err error) {
 				i := &networkingv1.Ingress{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "denied-ingress",
-						Annotations: map[string]string{
-							"kubernetes.io/ingress.class": "the-worst-ingress-available",
-						},
+					Name: "denied-ingress",
+					Annotations: map[string]string{
+						"kubernetes.io/ingress.class": "the-worst-ingress-available",
 					},
 					Spec: networkingv1.IngressSpec{
 						DefaultBackend: &networkingv1.IngressBackend{
@@ -231,11 +196,9 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 		By("using the ingressClassName", func() {
 			Eventually(func() (err error) {
 				i := &networkingv1.Ingress{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "denied-ingress",
-					},
+					Name: "denied-ingress",
 					Spec: networkingv1.IngressSpec{
-						IngressClassName: ptr.To("the-worst-ingress-available"),
+						IngressClassName: new("the-worst-ingress-available"),
 						DefaultBackend: &networkingv1.IngressBackend{
 							Service: &networkingv1.IngressServiceBackend{
 								Name: "foo",
@@ -270,11 +233,9 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 		for _, c := range tntNoDefault.Spec.IngressOptions.AllowedClasses.Exact {
 			Eventually(func() (err error) {
 				i := &networkingv1.Ingress{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: c,
-						Annotations: map[string]string{
-							"kubernetes.io/ingress.class": c,
-						},
+					Name: c,
+					Annotations: map[string]string{
+						"kubernetes.io/ingress.class": c,
 					},
 					Spec: networkingv1.IngressSpec{
 						DefaultBackend: &networkingv1.IngressBackend{
@@ -311,9 +272,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 		for _, c := range tntNoDefault.Spec.IngressOptions.AllowedClasses.Exact {
 			Eventually(func() (err error) {
 				i := &networkingv1.Ingress{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: c,
-					},
+					Name: c,
 					Spec: networkingv1.IngressSpec{
 						IngressClassName: &c,
 						DefaultBackend: &networkingv1.IngressBackend{
@@ -350,11 +309,9 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 
 		Eventually(func() (err error) {
 			i := &networkingv1.Ingress{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: ingressClass,
-					Annotations: map[string]string{
-						"kubernetes.io/ingress.class": ingressClass,
-					},
+				Name: ingressClass,
+				Annotations: map[string]string{
+					"kubernetes.io/ingress.class": ingressClass,
 				},
 				Spec: networkingv1.IngressSpec{
 					DefaultBackend: &networkingv1.IngressBackend{
@@ -390,9 +347,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 
 		Eventually(func() (err error) {
 			i := &networkingv1.Ingress{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: ingressClass,
-				},
+				Name: ingressClass,
 				Spec: networkingv1.IngressSpec{
 					IngressClassName: &ingressClass,
 					DefaultBackend: &networkingv1.IngressBackend{
@@ -420,12 +375,10 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 		for i, sc := range []string{"customer-nginx", "customer-haproxy"} {
 			ingressClass := strings.Join([]string{sc, "-", strconv.Itoa(i)}, "")
 			class := &networkingv1.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: ingressClass,
-					Labels: map[string]string{
-						"name": ingressClass,
-						"env":  "customers",
-					},
+				Name: ingressClass,
+				Labels: map[string]string{
+					"name": ingressClass,
+					"env":  "customers",
 				},
 				Spec: networkingv1.IngressClassSpec{
 					Controller: "k8s.io/ingress-nginx",
@@ -434,11 +387,9 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 			Expect(k8sClient.Create(context.TODO(), class)).Should(Succeed())
 
 			i := &networkingv1.Ingress{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: fmt.Sprintf("allowed-%s", ingressClass),
-					Annotations: map[string]string{
-						"kubernetes.io/ingress.class": ingressClass,
-					},
+				Name: fmt.Sprintf("allowed-%s", ingressClass),
+				Annotations: map[string]string{
+					"kubernetes.io/ingress.class": ingressClass,
 				},
 				Spec: networkingv1.IngressSpec{
 					DefaultBackend: &networkingv1.IngressBackend{
@@ -477,12 +428,10 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 		for i, sc := range []string{"customer-nginx", "customer-haproxy"} {
 			ingressClass := strings.Join([]string{sc, "-", strconv.Itoa(i)}, "")
 			class := &networkingv1.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: ingressClass,
-					Labels: map[string]string{
-						"name": ingressClass,
-						"env":  "customers",
-					},
+				Name: ingressClass,
+				Labels: map[string]string{
+					"name": ingressClass,
+					"env":  "customers",
 				},
 				Spec: networkingv1.IngressClassSpec{
 					Controller: "k8s.io/ingress-nginx",
@@ -491,9 +440,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 			Expect(k8sClient.Create(context.TODO(), class)).Should(Succeed())
 
 			i := &networkingv1.Ingress{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: fmt.Sprintf("allowed-%s", ingressClass),
-				},
+				Name: fmt.Sprintf("allowed-%s", ingressClass),
 				Spec: networkingv1.IngressSpec{
 					IngressClassName: &ingressClass,
 					DefaultBackend: &networkingv1.IngressBackend{
@@ -531,10 +478,8 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 		NamespaceIsPartOfTenant(tntWithDefault, ns).Should(Succeed())
 
 		i := &networkingv1.Ingress{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "e2e-default-ingress",
-				Namespace: ns.GetName(),
-			},
+			Name:      "e2e-default-ingress",
+			Namespace: ns.GetName(),
 			Spec: networkingv1.IngressSpec{
 				DefaultBackend: &networkingv1.IngressBackend{
 					Service: &networkingv1.IngressServiceBackend{
@@ -572,10 +517,8 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 		NamespaceIsPartOfTenant(tntWithDefault, ns).Should(Succeed())
 
 		i := &networkingv1.Ingress{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "e2e-default-ingress",
-				Namespace: ns.GetName(),
-			},
+			Name:      "e2e-default-ingress",
+			Namespace: ns.GetName(),
 			Spec: networkingv1.IngressSpec{
 				DefaultBackend: &networkingv1.IngressBackend{
 					Service: &networkingv1.IngressServiceBackend{
@@ -616,10 +559,8 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 		NamespaceIsPartOfTenant(tntWithDefault, ns).Should(Succeed())
 
 		i := &networkingv1.Ingress{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "e2e-default-global-ingress",
-				Namespace: ns.GetName(),
-			},
+			Name:      "e2e-default-global-ingress",
+			Namespace: ns.GetName(),
 			Spec: networkingv1.IngressSpec{
 				DefaultBackend: &networkingv1.IngressBackend{
 					Service: &networkingv1.IngressServiceBackend{
@@ -664,10 +605,8 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 		NamespaceIsPartOfTenant(tntWithDefault, ns).Should(Succeed())
 
 		i := &networkingv1.Ingress{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "e2e-default-global-ingress",
-				Namespace: ns.GetName(),
-			},
+			Name:      "e2e-default-global-ingress",
+			Namespace: ns.GetName(),
 			Spec: networkingv1.IngressSpec{
 				DefaultBackend: &networkingv1.IngressBackend{
 					Service: &networkingv1.IngressServiceBackend{

@@ -13,7 +13,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -49,10 +48,8 @@ func (r *Manager) syncNetworkPolicy(ctx context.Context, log logr.Logger, tenant
 	//nolint:staticcheck
 	for i, spec := range tenant.Spec.NetworkPolicies.Items {
 		target := &networkingv1.NetworkPolicy{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("capsule-%s-%d", tenant.Name, i),
-				Namespace: namespace,
-			},
+			Name:      fmt.Sprintf("capsule-%s-%d", tenant.Name, i),
+			Namespace: namespace,
 		}
 
 		var result controllerutil.OperationResult

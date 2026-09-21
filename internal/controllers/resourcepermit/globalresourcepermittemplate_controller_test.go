@@ -52,7 +52,7 @@ func TestGlobalResourcePermitTemplateReconciler(t *testing.T) {
 			t.Parallel()
 
 			template := &capsulev1beta2.GlobalResourcePermitTemplate{
-				ObjectMeta: metav1.ObjectMeta{Name: "template", Generation: 4},
+				Name: "template", Generation: 4,
 				Spec: capsulev1beta2.GlobalResourcePermitTemplateSpec{
 					NamespaceSelectors: tt.selectors,
 				},
@@ -62,15 +62,15 @@ func TestGlobalResourcePermitTemplateReconciler(t *testing.T) {
 				WithStatusSubresource(&capsulev1beta2.GlobalResourcePermitTemplate{}).
 				WithObjects(
 					template,
-					&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "team-a", Labels: map[string]string{"resource-permit": "enabled"}}},
-					&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "team-b"}},
-					&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "team-c", Labels: map[string]string{"resource-permit": "enabled"}}},
+					&corev1.Namespace{Name: "team-a", Labels: map[string]string{"resource-permit": "enabled"}},
+					&corev1.Namespace{Name: "team-b"},
+					&corev1.Namespace{Name: "team-c", Labels: map[string]string{"resource-permit": "enabled"}},
 				).
 				Build()
 
 			r := &GlobalResourcePermitTemplateReconciler{Client: cl}
 			if _, err := r.Reconcile(context.Background(), reconcile.Request{
-				NamespacedName: client.ObjectKey{Name: template.Name},
+				Name: template.Name,
 			}); err != nil {
 				t.Fatal(err)
 			}

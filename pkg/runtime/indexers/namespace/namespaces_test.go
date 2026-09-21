@@ -17,10 +17,10 @@ func TestOwnerReferenceIndexer(t *testing.T) {
 	t.Parallel()
 
 	idx := namespace.OwnerReference{}
-	got := idx.Func()(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{
+	got := idx.Func()(&corev1.Namespace{OwnerReferences: []metav1.OwnerReference{
 		{APIVersion: "v1", Kind: "ConfigMap", Name: "ignored"},
 		{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: "tenant-a"},
-	}}})
+	}})
 
 	if idx.Object() == nil || idx.Field() != namespace.OwnerReferenceIndex {
 		t.Fatalf("unexpected object/field")

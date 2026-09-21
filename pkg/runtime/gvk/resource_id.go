@@ -42,12 +42,8 @@ func NewResourceID(u *unstructured.Unstructured, tenant string, origin string) R
 		Kind:      gvk.Kind,
 		Name:      u.GetName(),
 		Namespace: u.GetNamespace(),
-		TenantResourceIDWithOrigin: TenantResourceIDWithOrigin{
-			TenantResourceID: TenantResourceID{
-				Tenant: tenant,
-			},
-			Origin: origin,
-		},
+		Tenant:    tenant,
+		Origin:    origin,
 	}
 }
 

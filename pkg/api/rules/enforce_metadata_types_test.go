@@ -7,8 +7,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-
-	"github.com/projectcapsule/capsule/pkg/api/runtime"
 )
 
 func TestMetadataRuleNamespaceRequiresExplicitKind(t *testing.T) {
@@ -29,10 +27,9 @@ func TestMetadataRuleNamespaceRequiresExplicitKind(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			rule := MetadataRule{VersionKinds: runtime.VersionKinds{
+			rule := MetadataRule{
 				APIGroups: []string{"*"},
-				Kinds:     tt.kinds,
-			}}
+				Kinds:     tt.kinds}
 			if got := rule.MatchesGroupVersionKind(namespace); got != tt.want {
 				t.Fatalf("MatchesGroupVersionKind() = %v, want %v", got, tt.want)
 			}

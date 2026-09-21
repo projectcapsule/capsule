@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2/klogr"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -88,11 +87,9 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 		{
 			name: "newly created",
 			br: &capsulev1beta2.ResourcePermit{
-				ObjectMeta: v1.ObjectMeta{
-					Name:              resourceName,
-					Namespace:         "default",
-					CreationTimestamp: v1.NewTime(time.Date(2026, time.September, 2, 8, 0, 0, 0, time.UTC)),
-				},
+				Name:              resourceName,
+				Namespace:         "default",
+				CreationTimestamp: v1.NewTime(time.Date(2026, time.September, 2, 8, 0, 0, 0, time.UTC)),
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Requestor: resourcepermit.AccessEntity{
 						Name: "alice",
@@ -141,7 +138,7 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 		{
 			name: "newly created with namespace-local template",
 			br: &capsulev1beta2.ResourcePermit{
-				ObjectMeta: v1.ObjectMeta{Name: resourceName, Namespace: "team-a"},
+				Name: resourceName, Namespace: "team-a",
 				Spec: capsulev1beta2.ResourcePermitSpec{Template: capsulev1beta2.ResourcePermitTemplateReference{
 					Kind: capsulev1beta2.ResourcePermitTemplateKind,
 					Name: templateName,
@@ -180,7 +177,7 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 		{
 			name: "rendering failure is reported as not ready",
 			br: &capsulev1beta2.ResourcePermit{
-				ObjectMeta: v1.ObjectMeta{Name: resourceName, Namespace: "default"},
+				Name: resourceName, Namespace: "default",
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: capsulev1beta2.GlobalResourcePermitTemplateReference{
 						Kind: capsulev1beta2.GlobalResourcePermitTemplateKind,
@@ -216,7 +213,7 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 		{
 			name: "dry-run failure is recoverable before review",
 			br: &capsulev1beta2.ResourcePermit{
-				ObjectMeta: v1.ObjectMeta{Name: resourceName, Namespace: "default"},
+				Name: resourceName, Namespace: "default",
 				Spec: capsulev1beta2.ResourcePermitSpec{Template: capsulev1beta2.ResourcePermitTemplateReference{
 					Kind: capsulev1beta2.GlobalResourcePermitTemplateKind,
 					Name: templateName,
@@ -252,7 +249,7 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 		{
 			name: "failed request remains not ready while waiting for retry",
 			br: &capsulev1beta2.ResourcePermit{
-				ObjectMeta: v1.ObjectMeta{Name: resourceName, Namespace: "default"},
+				Name: resourceName, Namespace: "default",
 				Status: capsulev1beta2.ResourcePermitStatus{
 					Phase: capsulev1beta2.ResourcePermitPhaseFailed,
 					Failure: &capsulev1beta2.ResourcePermitFailure{
@@ -286,7 +283,7 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 		{
 			name: "successful preflight retry returns to review",
 			br: &capsulev1beta2.ResourcePermit{
-				ObjectMeta: v1.ObjectMeta{Name: resourceName, Namespace: "default"},
+				Name: resourceName, Namespace: "default",
 				Status: capsulev1beta2.ResourcePermitStatus{
 					Phase: capsulev1beta2.ResourcePermitPhaseRetrying,
 					Failure: &capsulev1beta2.ResourcePermitFailure{
@@ -319,10 +316,8 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 		{
 			name: "approved but not yet to start",
 			br: &capsulev1beta2.ResourcePermit{
-				ObjectMeta: v1.ObjectMeta{
-					Name:      resourceName,
-					Namespace: "default",
-				},
+				Name:      resourceName,
+				Namespace: "default",
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: capsulev1beta2.GlobalResourcePermitTemplateReference{
 						Kind: capsulev1beta2.GlobalResourcePermitTemplateKind,
@@ -346,7 +341,7 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 						Reason:    "ApprovedByUser",
 					}},
 					Request: &capsulev1beta2.ResourcePermitStatusRequest{
-						StartTime: ptr.To(v1.NewTime(time.Now().Add(time.Hour))),
+						StartTime: new(v1.NewTime(time.Now().Add(time.Hour))),
 					},
 				},
 			},
@@ -366,10 +361,8 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 		{
 			name: "approved and ready",
 			br: &capsulev1beta2.ResourcePermit{
-				ObjectMeta: v1.ObjectMeta{
-					Name:      resourceName,
-					Namespace: "default",
-				},
+				Name:      resourceName,
+				Namespace: "default",
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: capsulev1beta2.GlobalResourcePermitTemplateReference{
 						Kind: capsulev1beta2.GlobalResourcePermitTemplateKind,
@@ -394,7 +387,7 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 						Reason:    "ApprovedByUser",
 					}},
 					Request: &capsulev1beta2.ResourcePermitStatusRequest{
-						StartTime: ptr.To(v1.Now()),
+						StartTime: new(v1.Now()),
 						Resources: []apiruntime.RenderedResource{{
 							Targets: []runtime.RawExtension{mtConfigMapRendered},
 						}},
@@ -442,10 +435,8 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 		{
 			name: "approved target apply fails",
 			br: &capsulev1beta2.ResourcePermit{
-				ObjectMeta: v1.ObjectMeta{
-					Name:      resourceName,
-					Namespace: "default",
-				},
+				Name:      resourceName,
+				Namespace: "default",
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: capsulev1beta2.GlobalResourcePermitTemplateReference{
 						Kind: capsulev1beta2.GlobalResourcePermitTemplateKind,
@@ -463,7 +454,7 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 						Type:               meta.ReadyCondition,
 					}},
 					Request: &capsulev1beta2.ResourcePermitStatusRequest{
-						StartTime: ptr.To(v1.Now()),
+						StartTime: new(v1.Now()),
 						Resources: []apiruntime.RenderedResource{{
 							Targets: []runtime.RawExtension{mtConfigMapRendered},
 						}},
@@ -610,15 +601,11 @@ func TestRecordTransitionEventOnce(t *testing.T) {
 			eventClient := fake.NewClientBuilder().WithScheme(eventScheme).Build()
 			recorder := evt.NewEventRecorder(eventClient, klogr.New(), nil, nil)
 			br := &capsulev1beta2.ResourcePermit{
-				TypeMeta: v1.TypeMeta{
-					APIVersion: capsulev1beta2.GroupVersion.String(),
-					Kind:       "ResourcePermit",
-				},
-				ObjectMeta: v1.ObjectMeta{
-					Name:      "temporary-permit",
-					Namespace: "team-a",
-					UID:       "request-uid",
-				},
+				APIVersion: capsulev1beta2.GroupVersion.String(),
+				Kind:       "ResourcePermit",
+				Name:       "temporary-permit",
+				Namespace:  "team-a",
+				UID:        "request-uid",
 				Status: capsulev1beta2.ResourcePermitStatus{
 					Phase: testCase.phase,
 					Transitions: []capsulev1beta2.ResourcePermitTransition{{
@@ -675,8 +662,8 @@ func TestResourcePermitReconcileReturnsStatusWriteError(t *testing.T) {
 			statusErr := errors.New("status update failed")
 			templateErr := errors.New("template read failed")
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: v1.ObjectMeta{Name: resourceName, Namespace: "test-namespace"},
-				Status:     capsulev1beta2.ResourcePermitStatus{Phase: capsulev1beta2.ResourcePermitPhaseRequested},
+				Name: resourceName, Namespace: "test-namespace",
+				Status: capsulev1beta2.ResourcePermitStatus{Phase: capsulev1beta2.ResourcePermitPhaseRequested},
 			}
 			if reconcileFails {
 				br.Status.Phase = ""
@@ -730,8 +717,8 @@ func TestReconcileDeleteSkipsRetentionForTerminatingNamespace(t *testing.T) {
 		{
 			name: "retains request while namespace is active",
 			namespace: &corev1.Namespace{
-				ObjectMeta: v1.ObjectMeta{Name: "team-a"},
-				Status:     corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
+				Name:   "team-a",
+				Status: corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
 			},
 			wantRequeue:   true,
 			wantFinalizer: true,
@@ -739,12 +726,10 @@ func TestReconcileDeleteSkipsRetentionForTerminatingNamespace(t *testing.T) {
 		{
 			name: "removes finalizer while namespace is terminating",
 			namespace: &corev1.Namespace{
-				ObjectMeta: v1.ObjectMeta{
-					Name:              "team-a",
-					DeletionTimestamp: &deletionTime,
-					Finalizers:        []string{"test.projectcapsule.dev/hold"},
-				},
-				Status: corev1.NamespaceStatus{Phase: corev1.NamespaceTerminating},
+				Name:              "team-a",
+				DeletionTimestamp: &deletionTime,
+				Finalizers:        []string{"test.projectcapsule.dev/hold"},
+				Status:            corev1.NamespaceStatus{Phase: corev1.NamespaceTerminating},
 			},
 			wantFinalizer: false,
 		},
@@ -759,13 +744,11 @@ func TestReconcileDeleteSkipsRetentionForTerminatingNamespace(t *testing.T) {
 			require.NoError(t, capsulev1beta2.AddToScheme(s))
 
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: v1.ObjectMeta{
-					Name:              "temporary-permit",
-					Namespace:         testCase.namespace.Name,
-					DeletionTimestamp: &deletionTime,
-					Finalizers:        []string{meta.ControllerFinalizer},
-				},
-				Status: capsulev1beta2.ResourcePermitStatus{KeepUntil: &keepUntil},
+				Name:              "temporary-permit",
+				Namespace:         testCase.namespace.Name,
+				DeletionTimestamp: &deletionTime,
+				Finalizers:        []string{meta.ControllerFinalizer},
+				Status:            capsulev1beta2.ResourcePermitStatus{KeepUntil: &keepUntil},
 			}
 			cl := fake.NewClientBuilder().WithScheme(s).WithObjects(testCase.namespace, br).Build()
 			r := &ResourcePermitReconciler{Client: cl}
@@ -819,14 +802,14 @@ func TestResourcePermitReconcilerLoadsNamespacedTemplateLocally(t *testing.T) {
 	require.NoError(t, capsulev1beta2.AddToScheme(s))
 
 	teamA := &capsulev1beta2.ResourcePermitTemplate{
-		ObjectMeta: v1.ObjectMeta{Name: templateName, Namespace: "team-a"},
+		Name: templateName, Namespace: "team-a",
 	}
 	teamB := &capsulev1beta2.ResourcePermitTemplate{
-		ObjectMeta: v1.ObjectMeta{Name: templateName, Namespace: "team-b"},
+		Name: templateName, Namespace: "team-b",
 	}
 	r := &ResourcePermitReconciler{Client: fake.NewClientBuilder().WithScheme(s).WithObjects(teamA, teamB).Build()}
 	br := &capsulev1beta2.ResourcePermit{
-		ObjectMeta: v1.ObjectMeta{Namespace: "team-a"},
+		Namespace: "team-a",
 		Spec: capsulev1beta2.ResourcePermitSpec{Template: capsulev1beta2.ResourcePermitTemplateReference{
 			Kind: capsulev1beta2.ResourcePermitTemplateKind,
 			Name: templateName,

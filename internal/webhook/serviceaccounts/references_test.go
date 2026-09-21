@@ -11,7 +11,6 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -31,11 +30,9 @@ func TestReferenceProtectionOnDelete(t *testing.T) {
 		Namespace: "capsule-system",
 	}
 	oldServiceAccount, err := json.Marshal(&corev1.ServiceAccount{
-		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "ServiceAccount"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "runner",
-			Namespace: "capsule-system",
-		},
+		APIVersion: "v1", Kind: "ServiceAccount",
+		Name:      "runner",
+		Namespace: "capsule-system",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -87,7 +84,7 @@ func TestReferenceProtectionOnDelete(t *testing.T) {
 		{
 			name: "denies an unexpired ResourcePermit reference",
 			objects: []client.Object{&capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{Name: "temporary-access", Namespace: "team-a"},
+				Name: "temporary-access", Namespace: "team-a",
 				Status: capsulev1beta2.ResourcePermitStatus{
 					Phase: capsulev1beta2.ResourcePermitPhaseActive,
 					Request: &capsulev1beta2.ResourcePermitStatusRequest{
@@ -100,7 +97,7 @@ func TestReferenceProtectionOnDelete(t *testing.T) {
 		{
 			name: "allows an expired ResourcePermit reference",
 			objects: []client.Object{&capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{Name: "expired-access", Namespace: "team-a"},
+				Name: "expired-access", Namespace: "team-a",
 				Status: capsulev1beta2.ResourcePermitStatus{
 					Phase: capsulev1beta2.ResourcePermitPhaseExpired,
 					Request: &capsulev1beta2.ResourcePermitStatusRequest{
@@ -112,7 +109,7 @@ func TestReferenceProtectionOnDelete(t *testing.T) {
 		{
 			name: "denies a GlobalTenantResource reference",
 			objects: []client.Object{&capsulev1beta2.GlobalTenantResource{
-				ObjectMeta: metav1.ObjectMeta{Name: "global-distribution"},
+				Name: "global-distribution",
 				Status: capsulev1beta2.GlobalTenantResourceStatus{
 					TenantResourceCommonStatus: capsulev1beta2.TenantResourceCommonStatus{
 						ServiceAccount: reference.DeepCopy(),
@@ -124,7 +121,7 @@ func TestReferenceProtectionOnDelete(t *testing.T) {
 		{
 			name: "denies a TenantResource reference",
 			objects: []client.Object{&capsulev1beta2.TenantResource{
-				ObjectMeta: metav1.ObjectMeta{Name: "namespace-distribution", Namespace: "capsule-system"},
+				Name: "namespace-distribution", Namespace: "capsule-system",
 				Status: capsulev1beta2.TenantResourceStatus{
 					TenantResourceCommonStatus: capsulev1beta2.TenantResourceCommonStatus{
 						ServiceAccount: reference.DeepCopy(),
@@ -202,10 +199,8 @@ func TestReferenceProtectionOnDeleteInvalidIdentity(t *testing.T) {
 
 			cl := referenceProtectionFakeClient(t)
 			response := ReferenceProtection().OnDelete(cl, cl, admission.NewDecoder(cl.Scheme()), nil)(context.Background(), admission.Request{
-				AdmissionRequest: admissionv1.AdmissionRequest{
-					Operation: admissionv1.Delete,
-					OldObject: runtime.RawExtension{Raw: testCase.oldObject},
-				},
+				Operation: admissionv1.Delete,
+				OldObject: runtime.RawExtension{Raw: testCase.oldObject},
 			})
 			if response == nil || response.Allowed {
 				t.Fatalf("OnDelete() = %#v, want denial", response)

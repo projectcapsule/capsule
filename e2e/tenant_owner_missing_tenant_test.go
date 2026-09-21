@@ -18,21 +18,15 @@ import (
 var _ = Describe("creating a Namespace creation with no Tenant assigned", Ordered, Label("tenant", "permissions", "owners"), func() {
 	It("should fail", func() {
 		tnt := &capsulev1beta2.Tenant{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "e2e-missing-user",
-				Labels: map[string]string{
-					"env": "e2e",
-				},
+			Name: "e2e-missing-user",
+			Labels: map[string]string{
+				"env": "e2e",
 			},
 			Spec: capsulev1beta2.TenantSpec{
 				Owners: rbac.OwnerListSpec{
 					{
-						CoreOwnerSpec: rbac.CoreOwnerSpec{
-							UserSpec: rbac.UserSpec{
-								Name: "e2e-missing-user",
-								Kind: "User",
-							},
-						},
+						Name: "e2e-missing-user",
+						Kind: "User",
 					},
 				},
 			},

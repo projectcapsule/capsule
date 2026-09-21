@@ -48,9 +48,7 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 		ctx = context.TODO()
 		namespace = createResourcePermitTestNamespace(ctx)
 		brt = &capsulev1beta2.GlobalResourcePermitTemplate{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "e2e-resourcepermit",
-			},
+			Name: "e2e-resourcepermit",
 			Spec: capsulev1beta2.GlobalResourcePermitTemplateSpec{
 				// Lifecycle tests use the controller identity explicitly; default
 				// ServiceAccount selection is covered by the configuration specs.
@@ -61,14 +59,10 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 				},
 				Resources: []apiruntime.ResourceTemplate{{
 					Targets: []runtime.RawExtension{{Object: &corev1.ConfigMap{
-						TypeMeta: metav1.TypeMeta{
-							Kind:       "ConfigMap",
-							APIVersion: "v1",
-						},
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "e2e-resourcepermit-cm",
-						},
-						Data: map[string]string{"key": "value"},
+						Kind:       "ConfigMap",
+						APIVersion: "v1",
+						Name:       "e2e-resourcepermit-cm",
+						Data:       map[string]string{"key": "value"},
 					}}},
 				},
 				},
@@ -98,10 +92,8 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 		})
 		It("should create a ConfigMap and delete it after timeout", func() {
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "e2e-resourcepermit-br",
-					Namespace: namespace.Name,
-				},
+				Name:      "e2e-resourcepermit-br",
+				Namespace: namespace.Name,
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.GetName()),
 				},
@@ -153,7 +145,7 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 
 		It("rejects deletion while active and archived, then deletes after retention expires", func() {
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-deletion-lifecycle", Namespace: namespace.Name},
+				Name: "e2e-resourcepermit-deletion-lifecycle", Namespace: namespace.Name,
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.Name),
 				},
@@ -197,8 +189,8 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 
 		It("allows the managed resource to be changed", func() {
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-unprotected", Namespace: namespace.Name},
-				Spec:       capsulev1beta2.ResourcePermitSpec{Template: globalResourcePermitTemplateReference(brt.GetName())},
+				Name: "e2e-resourcepermit-unprotected", Namespace: namespace.Name,
+				Spec: capsulev1beta2.ResourcePermitSpec{Template: globalResourcePermitTemplateReference(brt.GetName())},
 			}
 
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, br) }).Should(Succeed())
@@ -234,8 +226,8 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 
 		It("retains the resource and removes Capsule lifecycle metadata", func() {
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-orphan", Namespace: namespace.Name},
-				Spec:       capsulev1beta2.ResourcePermitSpec{Template: globalResourcePermitTemplateReference(brt.GetName())},
+				Name: "e2e-resourcepermit-orphan", Namespace: namespace.Name,
+				Spec: capsulev1beta2.ResourcePermitSpec{Template: globalResourcePermitTemplateReference(brt.GetName())},
 			}
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, br) }).Should(Succeed())
 
@@ -272,8 +264,8 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 			brt.Spec.DefaultDuration = nil
 			brt.Spec.Resources = []apiruntime.ResourceTemplate{{
 				Targets: []runtime.RawExtension{{Object: &rbacv1.ClusterRole{
-					TypeMeta:   metav1.TypeMeta{APIVersion: rbacv1.SchemeGroupVersion.String(), Kind: "ClusterRole"},
-					ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-cluster-role"},
+					APIVersion: rbacv1.SchemeGroupVersion.String(), Kind: "ClusterRole",
+					Name: "e2e-resourcepermit-cluster-role",
 					Rules: []rbacv1.PolicyRule{{
 						APIGroups: []string{"apps"},
 						Resources: []string{"deployments"},
@@ -285,8 +277,8 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 
 		It("cascades deletion through the ResourcePermit finalizer without an owner reference", func() {
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-cluster-scope", Namespace: namespace.Name},
-				Spec:       capsulev1beta2.ResourcePermitSpec{Template: globalResourcePermitTemplateReference(brt.GetName())},
+				Name: "e2e-resourcepermit-cluster-scope", Namespace: namespace.Name,
+				Spec: capsulev1beta2.ResourcePermitSpec{Template: globalResourcePermitTemplateReference(brt.GetName())},
 			}
 
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, br) }).Should(Succeed())
@@ -311,10 +303,8 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 		})
 		It("should create a ConfigMap and keep it", func() {
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "e2e-resourcepermit-br",
-					Namespace: namespace.Name,
-				},
+				Name:      "e2e-resourcepermit-br",
+				Namespace: namespace.Name,
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.GetName()),
 				},
@@ -342,10 +332,8 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 		It("resource permit need approval", func() {
 
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "e2e-resourcepermit-br",
-					Namespace: namespace.Name,
-				},
+				Name:      "e2e-resourcepermit-br",
+				Namespace: namespace.Name,
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.GetName()),
 				},
@@ -382,10 +370,8 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 		})
 		It("auto approves when any condition matches and ignores manual approvers", func() {
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "e2e-resourcepermit-br",
-					Namespace: namespace.Name,
-				},
+				Name:      "e2e-resourcepermit-br",
+				Namespace: namespace.Name,
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.GetName()),
 					Reason:   "open sesame",
@@ -406,10 +392,8 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 
 		It("rejects a resource permit when none of the automatic approval conditions match", func() {
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "e2e-resourcepermit-br",
-					Namespace: namespace.Name,
-				},
+				Name:      "e2e-resourcepermit-br",
+				Namespace: namespace.Name,
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.GetName()),
 					Reason:   "test",
@@ -435,7 +419,7 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 
 			aliceClient := impersonationClient("alice", []string{"developers"})
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-requestor-alice", Namespace: namespace.Name},
+				Name: "e2e-resourcepermit-requestor-alice", Namespace: namespace.Name,
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.GetName()),
 				},
@@ -454,7 +438,7 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 
 			bobClient := impersonationClient("bob", []string{"developers"})
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-requestor-bob", Namespace: namespace.Name},
+				Name: "e2e-resourcepermit-requestor-bob", Namespace: namespace.Name,
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.GetName()),
 				},
@@ -484,7 +468,7 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 			grantResourcePermitNamespaceAdmin(ctx, namespace.Name, "charlie")
 
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-reviewer", Namespace: namespace.Name},
+				Name: "e2e-resourcepermit-reviewer", Namespace: namespace.Name,
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.GetName()),
 				},
@@ -532,7 +516,7 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 				grantResourcePermitNamespaceAdmin(ctx, namespace.Name, "bob")
 
 				br := &capsulev1beta2.ResourcePermit{
-					ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-group-approver", Namespace: namespace.Name},
+					Name: "e2e-resourcepermit-group-approver", Namespace: namespace.Name,
 					Spec: capsulev1beta2.ResourcePermitSpec{
 						Template: globalResourcePermitTemplateReference(brt.GetName()),
 					},
@@ -598,10 +582,8 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 			expectGlobalResourcePermitTemplateNamespaces(ctx, brt.Name, allowedNamespace.Name)
 
 			request := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "e2e-resourcepermit-selected-namespace",
-					Namespace: allowedNamespace.Name,
-				},
+				Name:      "e2e-resourcepermit-selected-namespace",
+				Namespace: allowedNamespace.Name,
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.Name),
 				},
@@ -616,10 +598,8 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 			expectGlobalResourcePermitTemplateNamespaces(ctx, brt.Name, allowedNamespace.Name)
 
 			request := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "e2e-resourcepermit-unselected-namespace",
-					Namespace: deniedNamespace.Name,
-				},
+				Name:      "e2e-resourcepermit-unselected-namespace",
+				Namespace: deniedNamespace.Name,
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.Name),
 				},
@@ -633,10 +613,8 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 
 		It("rejects a reference to a template that does not exist", func() {
 			request := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "e2e-resourcepermit-missing-template",
-					Namespace: allowedNamespace.Name,
-				},
+				Name:      "e2e-resourcepermit-missing-template",
+				Namespace: allowedNamespace.Name,
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.Name + "-missing"),
 				},
@@ -652,14 +630,10 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 			brt.Spec.Resources = []apiruntime.ResourceTemplate{
 				{
 					Targets: []runtime.RawExtension{{Object: &corev1.ConfigMap{
-						TypeMeta: metav1.TypeMeta{
-							Kind:       "ConfigMap",
-							APIVersion: "v1",
-						},
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "e2e-resourcepermit-cm",
-						},
-						Data: map[string]string{"key": "{{.value}}"},
+						Kind:       "ConfigMap",
+						APIVersion: "v1",
+						Name:       "e2e-resourcepermit-cm",
+						Data:       map[string]string{"key": "{{.value}}"},
 					}}},
 				},
 			}
@@ -671,10 +645,8 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 		})
 		It("should create correct a ConfigMap data", func() {
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "e2e-resourcepermit-br",
-					Namespace: namespace.Name,
-				},
+				Name:      "e2e-resourcepermit-br",
+				Namespace: namespace.Name,
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.GetName()),
 					Params:   &runtime.RawExtension{Raw: []byte(`{"value": "test-value"}`)},
@@ -695,10 +667,8 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 
 		It("rejects invalid parameters at admission", func() {
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "e2e-resourcepermit-invalid-params",
-					Namespace: namespace.Name,
-				},
+				Name:      "e2e-resourcepermit-invalid-params",
+				Namespace: namespace.Name,
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.GetName()),
 					Params:   &runtime.RawExtension{Raw: []byte(`{"value":"admin:sad"}`)},
@@ -717,11 +687,9 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 
 		It("should prune only the fields managed by the resource permit", func() {
 			cm := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "e2e-resourcepermit-cm",
-					Namespace: namespace.Name,
-				},
-				Data: map[string]string{"existing": "preserved"},
+				Name:      "e2e-resourcepermit-cm",
+				Namespace: namespace.Name,
+				Data:      map[string]string{"existing": "preserved"},
 			}
 
 			EventuallyCreation(func() error {
@@ -731,11 +699,9 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 			}).Should(Succeed())
 
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "e2e-resourcepermit-adopt",
-					Namespace: namespace.Name,
-				},
-				Spec: capsulev1beta2.ResourcePermitSpec{Template: globalResourcePermitTemplateReference(brt.GetName())},
+				Name:      "e2e-resourcepermit-adopt",
+				Namespace: namespace.Name,
+				Spec:      capsulev1beta2.ResourcePermitSpec{Template: globalResourcePermitTemplateReference(brt.GetName())},
 			}
 
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, br) }).Should(Succeed())
@@ -767,10 +733,8 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 				"properties":{"sourceName":{"type":"string"}}
 			}`)}
 			brt.Spec.Context = &tpl.TemplateContext{Resources: []*tpl.TemplateResourceReference{{
-				ResourceReference: tpl.ResourceReference{
-					VersionKind: apiruntime.VersionKind{APIVersion: "v1", Kind: "ConfigMap"},
-					Name:        "{{ .sourceName }}",
-				},
+				APIVersion: "v1", Kind: "ConfigMap",
+				Name:  "{{ .sourceName }}",
 				Index: "settings",
 			}}}
 			brt.Spec.Resources = []apiruntime.ResourceTemplate{{Template: `
@@ -786,14 +750,14 @@ data:
 
 		It("makes parameter-selected context available to every rendered template", func() {
 			source := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-context", Namespace: namespace.Name},
-				Data:       map[string]string{"value": "from-context"},
+				Name: "e2e-resourcepermit-context", Namespace: namespace.Name,
+				Data: map[string]string{"value": "from-context"},
 			}
 
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, source) }).Should(Succeed())
 
 			br := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{Name: "e2e-resourcepermit-context", Namespace: namespace.Name},
+				Name: "e2e-resourcepermit-context", Namespace: namespace.Name,
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.Name),
 					Params: &runtime.RawExtension{Raw: []byte(`{
@@ -872,10 +836,8 @@ func expireResourcePermitForCleanup(ctx context.Context, request *capsulev1beta2
 
 func grantResourcePermitNamespaceAdmin(ctx context.Context, namespace, username string) {
 	roleBinding := &rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "e2e-resourcepermit-admin-",
-			Namespace:    namespace,
-		},
+		GenerateName: "e2e-resourcepermit-admin-",
+		Namespace:    namespace,
 		Subjects: []rbacv1.Subject{{
 			APIGroup: rbacv1.GroupName,
 			Kind:     rbacv1.UserKind,

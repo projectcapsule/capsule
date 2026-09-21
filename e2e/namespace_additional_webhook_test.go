@@ -19,29 +19,23 @@ import (
 
 var _ = Describe("creating a Namespace for a Tenant with additional metadata", Ordered, Label("namespace"), func() {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-tenant-additional-metadata",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: "cap",
-					Kind:       "dummy",
-					Name:       "tenant-metadata",
-					UID:        "tenant-metadata",
-				},
+		Name: "e2e-tenant-additional-metadata",
+		Labels: map[string]string{
+			"env": "e2e",
+		},
+		OwnerReferences: []metav1.OwnerReference{
+			{
+				APIVersion: "cap",
+				Kind:       "dummy",
+				Name:       "tenant-metadata",
+				UID:        "tenant-metadata",
 			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-tenant-additional-metadata",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-tenant-additional-metadata",
+					Kind: "User",
 				},
 			},
 			NodeSelector: map[string]string{

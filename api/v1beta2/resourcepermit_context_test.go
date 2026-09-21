@@ -31,8 +31,8 @@ func TestResourcePermitLoadsParameterTemplatedContextForAllItems(t *testing.T) {
 	}
 
 	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(&corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{Name: "platform-settings", Namespace: "team-a"},
-		Data:       map[string]string{"environment": "production"},
+		Name: "platform-settings", Namespace: "team-a",
+		Data: map[string]string{"environment": "production"},
 	}).Build()
 	mapper := k8smeta.NewDefaultRESTMapper([]schema.GroupVersion{{Version: "v1"}})
 	mapper.Add(corev1.SchemeGroupVersion.WithKind("ConfigMap"), k8smeta.RESTScopeNamespace)
@@ -46,10 +46,8 @@ func TestResourcePermitLoadsParameterTemplatedContextForAllItems(t *testing.T) {
 		}
 	}`)}
 	templateContext := &tpl.TemplateContext{Resources: []*tpl.TemplateResourceReference{{
-		ResourceReference: tpl.ResourceReference{
-			VersionKind: apiruntime.VersionKind{APIVersion: "v1", Kind: "ConfigMap"},
-			Name:        "{{ .source.name }}",
-		},
+		APIVersion: "v1", Kind: "ConfigMap",
+		Name:  "{{ .source.name }}",
 		Index: "settings",
 	}}}
 	resources := []apiruntime.ResourceTemplate{
@@ -57,7 +55,7 @@ func TestResourcePermitLoadsParameterTemplatedContextForAllItems(t *testing.T) {
 		{Targets: []runtime.RawExtension{{Raw: []byte(`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"{{ .name }}-two"},"data":{"environment":"{{ (index .settings 0).data.environment }}"}}`)}}},
 	}
 	br := &ResourcePermit{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "team-a"},
+		Namespace: "team-a",
 		Spec: ResourcePermitSpec{Params: &runtime.RawExtension{Raw: []byte(`{
 			"name":"temporary-permit",
 			"source":{"name":"platform-settings"}
@@ -143,7 +141,7 @@ func TestResourcePermitRendersTrustedRequestContext(t *testing.T) {
 
 	created := metav1.NewTime(time.Date(2026, time.September, 1, 8, 30, 0, 0, time.UTC))
 	br := &ResourcePermit{
-		ObjectMeta: metav1.ObjectMeta{Name: "temporary-permit", CreationTimestamp: created},
+		Name: "temporary-permit", CreationTimestamp: created,
 		Spec: ResourcePermitSpec{Requestor: resourcepermit.AccessEntity{
 			Name:   "alice",
 			Groups: []string{"system:authenticated", "platform-on-call"},
@@ -265,7 +263,7 @@ func TestResourcePermitRendersRequesterRoleBindingCartesianProduct(t *testing.T)
 
 	created := metav1.NewTime(time.Date(2026, time.September, 1, 9, 0, 0, 0, time.UTC))
 	br := &ResourcePermit{
-		ObjectMeta: metav1.ObjectMeta{CreationTimestamp: created},
+		CreationTimestamp: created,
 		Spec: ResourcePermitSpec{
 			Requestor: resourcepermit.AccessEntity{Name: "alice"},
 			Params: &runtime.RawExtension{Raw: []byte(`{

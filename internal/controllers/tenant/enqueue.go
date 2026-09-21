@@ -6,7 +6,6 @@ package tenant
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -35,9 +34,7 @@ func (r *Manager) enqueueForTenantsWithCondition(
 		}
 
 		q.Add(reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name: tnt.Name,
-			},
+			Name: tnt.Name,
 		})
 	}
 }
@@ -53,9 +50,7 @@ func (r *Manager) enqueueAllTenants(ctx context.Context, _ client.Object) []reco
 	reqs := make([]reconcile.Request, 0, len(tenants.Items))
 	for i := range tenants.Items {
 		reqs = append(reqs, reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name: tenants.Items[i].Name,
-			},
+			Name: tenants.Items[i].Name,
 		})
 	}
 

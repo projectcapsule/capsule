@@ -12,7 +12,6 @@ import (
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	admissionv1 "k8s.io/api/admission/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -67,13 +66,12 @@ func TestResourcePermitMutationHandlerOnCreate(t *testing.T) {
 			require.NoError(t, err)
 
 			decoder := &test.Decoder[*capsulev1beta2.ResourcePermit]{Object: br}
-			req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+			req := admission.Request{
 				Object: runtime.RawExtension{Raw: raw},
 				UserInfo: authenticationv1.UserInfo{
 					Username: tt.username,
 					Groups:   tt.groups,
-				},
-			}}
+				}}
 
 			resp := ResourcePermitMutationHandler(log.Log.WithName("test")).OnCreate(nil, nil, decoder, nil)(context.Background(), req)
 			require.NotNil(t, resp)
@@ -181,15 +179,14 @@ func TestResourcePermitMutationHandlerOnApproval(t *testing.T) {
 				groups = []string{"reviewers"}
 			}
 
-			req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+			req := admission.Request{
 				Object:      runtime.RawExtension{Raw: raw},
 				OldObject:   runtime.RawExtension{Raw: []byte(`{}`)},
 				SubResource: "status",
 				UserInfo: authenticationv1.UserInfo{
 					Username: username,
 					Groups:   groups,
-				},
-			}}
+				}}
 
 			resp := ResourcePermitMutationHandler(log.Log.WithName("test")).OnUpdate(nil, nil, decoder, nil)(context.Background(), req)
 			if tt.wantPatch {
@@ -224,14 +221,13 @@ func TestResourcePermitMutationHandlerIgnoresApprovalOutsideStatusSubresource(t 
 	require.NoError(t, err)
 
 	decoder := &test.Decoder[*capsulev1beta2.ResourcePermit]{Object: newBr, OldObject: oldBr}
-	req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+	req := admission.Request{
 		Object:    runtime.RawExtension{Raw: raw},
 		OldObject: runtime.RawExtension{Raw: []byte(`{}`)},
 		UserInfo: authenticationv1.UserInfo{
 			Username: "alice",
 			Groups:   []string{"reviewers"},
-		},
-	}}
+		}}
 
 	resp := ResourcePermitMutationHandler(log.Log.WithName("test")).OnUpdate(nil, nil, decoder, nil)(context.Background(), req)
 	assert.Nil(t, resp)
@@ -248,10 +244,8 @@ func TestResourcePermitMutationHandlerAppliesApprovalFromPhaseOnly(t *testing.T)
 		Namespace: "operations",
 	}
 	template := &capsulev1beta2.ResolvedResourcePermitTemplateReference{
-		ResourcePermitTemplateReference: capsulev1beta2.ResourcePermitTemplateReference{
-			Kind: capsulev1beta2.GlobalResourcePermitTemplateKind,
-			Name: "template",
-		},
+		Kind:            capsulev1beta2.GlobalResourcePermitTemplateKind,
+		Name:            "template",
 		ResourceVersion: "1234",
 	}
 	duration := &metav1.Duration{Duration: time.Hour}
@@ -278,15 +272,14 @@ func TestResourcePermitMutationHandlerAppliesApprovalFromPhaseOnly(t *testing.T)
 	require.NoError(t, err)
 
 	decoder := &test.Decoder[*capsulev1beta2.ResourcePermit]{Object: newBr, OldObject: oldBr}
-	req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+	req := admission.Request{
 		Object:      runtime.RawExtension{Raw: raw},
 		OldObject:   runtime.RawExtension{Raw: []byte(`{}`)},
 		SubResource: "status",
 		UserInfo: authenticationv1.UserInfo{
 			Username: "alice",
 			Groups:   []string{"reviewers"},
-		},
-	}}
+		}}
 
 	resp := ResourcePermitMutationHandler(log.Log.WithName("test")).OnUpdate(
 		nil,
@@ -327,10 +320,8 @@ func TestResourcePermitMutationHandlerAppliesExpirationFromStoredStatus(t *testi
 		Namespace: "operations",
 	}
 	template := &capsulev1beta2.ResolvedResourcePermitTemplateReference{
-		ResourcePermitTemplateReference: capsulev1beta2.ResourcePermitTemplateReference{
-			Kind: capsulev1beta2.GlobalResourcePermitTemplateKind,
-			Name: "template",
-		},
+		Kind:            capsulev1beta2.GlobalResourcePermitTemplateKind,
+		Name:            "template",
 		ResourceVersion: "1234",
 	}
 	oldBr := &capsulev1beta2.ResourcePermit{Status: capsulev1beta2.ResourcePermitStatus{
@@ -342,7 +333,7 @@ func TestResourcePermitMutationHandlerAppliesExpirationFromStoredStatus(t *testi
 			Template:      template,
 		},
 		Active: &capsulev1beta2.ActivePeriod{
-			ActiveFrom: ptrTo(metav1.Now()),
+			ActiveFrom: new(metav1.Now()),
 		},
 	}}
 	newBr := &capsulev1beta2.ResourcePermit{Status: capsulev1beta2.ResourcePermitStatus{
@@ -352,15 +343,14 @@ func TestResourcePermitMutationHandlerAppliesExpirationFromStoredStatus(t *testi
 	require.NoError(t, err)
 
 	decoder := &test.Decoder[*capsulev1beta2.ResourcePermit]{Object: newBr, OldObject: oldBr}
-	req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+	req := admission.Request{
 		Object:      runtime.RawExtension{Raw: raw},
 		OldObject:   runtime.RawExtension{Raw: []byte(`{}`)},
 		SubResource: "status",
 		UserInfo: authenticationv1.UserInfo{
 			Username: "alice",
 			Groups:   []string{"developers"},
-		},
-	}}
+		}}
 
 	resp := ResourcePermitMutationHandler(log.Log.WithName("test")).OnUpdate(nil, nil, decoder, nil)(context.Background(), req)
 	require.NotNil(t, resp)
@@ -424,15 +414,14 @@ func TestResourcePermitMutationHandlerAppliesRequesterRetryFromStoredFailure(t *
 	require.NoError(t, err)
 
 	decoder := &test.Decoder[*capsulev1beta2.ResourcePermit]{Object: newBr, OldObject: oldBr}
-	req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+	req := admission.Request{
 		Object:      runtime.RawExtension{Raw: raw},
 		OldObject:   runtime.RawExtension{Raw: []byte(`{}`)},
 		SubResource: "status",
 		UserInfo: authenticationv1.UserInfo{
 			Username: "alice",
 			Groups:   []string{"system:authenticated"},
-		},
-	}}
+		}}
 
 	resp := ResourcePermitMutationHandler(log.Log.WithName("test")).OnUpdate(nil, nil, decoder, nil)(context.Background(), req)
 	require.NotNil(t, resp)
@@ -462,14 +451,13 @@ func TestResourcePermitMutationHandlerRejectsInvalidTransition(t *testing.T) {
 	require.NoError(t, err)
 
 	decoder := &test.Decoder[*capsulev1beta2.ResourcePermit]{Object: newBr, OldObject: oldBr}
-	req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+	req := admission.Request{
 		Object:      runtime.RawExtension{Raw: raw},
 		OldObject:   runtime.RawExtension{Raw: []byte(`{}`)},
 		SubResource: "status",
 		UserInfo: authenticationv1.UserInfo{
 			Username: "alice",
-		},
-	}}
+		}}
 
 	resp := ResourcePermitMutationHandler(log.Log.WithName("test")).OnUpdate(nil, nil, decoder, nil)(context.Background(), req)
 	test.VerifyResponse(
@@ -480,8 +468,9 @@ func TestResourcePermitMutationHandlerRejectsInvalidTransition(t *testing.T) {
 	)
 }
 
+//go:fix inline
 func ptrTo[T any](value T) *T {
-	return &value
+	return new(value)
 }
 
 func applyResponsePatches(

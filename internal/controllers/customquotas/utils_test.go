@@ -38,14 +38,12 @@ func TestCompiledTargetsSupportMixedJSONPathAndCELSelectors(t *testing.T) {
 		celCache,
 		[]capsulev1beta2.CustomQuotaStatusTarget{
 			{
-				CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-					Operation: quota.OpCount,
-					Selectors: []selectors.SelectorWithFields{
-						{
-							FieldSelectors: []string{".spec.restartPolicy=Always"},
-							CELExpressions: []string{
-								`object.spec.containers.exists(c, c.image == "nginx:1.27.0")`,
-							},
+				Operation: quota.OpCount,
+				Selectors: []selectors.SelectorWithFields{
+					{
+						FieldSelectors: []string{".spec.restartPolicy=Always"},
+						CELExpressions: []string{
+							`object.spec.containers.exists(c, c.image == "nginx:1.27.0")`,
 						},
 					},
 				},
@@ -120,11 +118,9 @@ func TestUsageForTargetSupportsCELQuantityLists(t *testing.T) {
 		celCache,
 		[]capsulev1beta2.CustomQuotaStatusTarget{
 			{
-				CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-					Operation: quota.OpAdd,
-					CEL: `object.spec.containers` +
-						`.map(c, quantity(c.resources.requests["cpu"]))`,
-				},
+				Operation: quota.OpAdd,
+				CEL: `object.spec.containers` +
+					`.map(c, quantity(c.resources.requests["cpu"]))`,
 			},
 		},
 	)
@@ -290,13 +286,11 @@ func TestMaterializedReservationPositionsSupersedesOlderUpdates(t *testing.T) {
 	}
 	claims := []capsulev1beta2.CustomQuotaClaimItem{
 		{
-			GroupVersionKind: metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
-			NamespacedObjectWithUIDReference: capsulemeta.NamespacedObjectWithUIDReference{
-				Name:      "pod-a",
-				Namespace: "tenant-a",
-				UID:       types.UID("pod-uid"),
-			},
-			Usage: resource.MustParse("9"),
+			Version: "v1", Kind: "Pod",
+			Name:      "pod-a",
+			Namespace: "tenant-a",
+			UID:       types.UID("pod-uid"),
+			Usage:     resource.MustParse("9"),
 		},
 	}
 
@@ -330,7 +324,7 @@ func TestReconcileQuantityLedgerAllocationHandlesFastObjectTransition(t *testing
 		t.Parallel()
 
 		ledger := &capsulev1beta2.QuantityLedger{
-			ObjectMeta: metav1.ObjectMeta{Name: key.Name, Namespace: key.Namespace},
+			Name: key.Name, Namespace: key.Namespace,
 			Status: capsulev1beta2.QuantityLedgerStatus{
 				Allocated: resource.MustParse("1"),
 				Reserved:  resource.MustParse("1"),
@@ -396,7 +390,7 @@ func TestReconcileQuantityLedgerAllocationHandlesFastObjectTransition(t *testing
 		t.Parallel()
 
 		ledger := &capsulev1beta2.QuantityLedger{
-			ObjectMeta: metav1.ObjectMeta{Name: key.Name, Namespace: key.Namespace},
+			Name: key.Name, Namespace: key.Namespace,
 			Status: capsulev1beta2.QuantityLedgerStatus{
 				Allocated: resource.MustParse("2"),
 				Reserved:  resource.MustParse("1"),
@@ -423,13 +417,11 @@ func TestReconcileQuantityLedgerAllocationHandlesFastObjectTransition(t *testing
 			Build()
 		claims := []capsulev1beta2.CustomQuotaClaimItem{
 			{
-				GroupVersionKind: metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
-				NamespacedObjectWithUIDReference: capsulemeta.NamespacedObjectWithUIDReference{
-					Name:      ref.Name,
-					Namespace: capsulemeta.RFC1123SubdomainName(ref.Namespace),
-					UID:       ref.UID,
-				},
-				Usage: resource.MustParse("1"),
+				Version: "v1", Kind: "Pod",
+				Name:      ref.Name,
+				Namespace: capsulemeta.RFC1123SubdomainName(ref.Namespace),
+				UID:       ref.UID,
+				Usage:     resource.MustParse("1"),
 			},
 		}
 
@@ -467,7 +459,7 @@ func TestReconcileQuantityLedgerAllocationHandlesFastObjectTransition(t *testing
 
 		expiredCreatedAt := metav1.NewTime(now.Add(-31 * time.Second))
 		ledger := &capsulev1beta2.QuantityLedger{
-			ObjectMeta: metav1.ObjectMeta{Name: key.Name, Namespace: key.Namespace},
+			Name: key.Name, Namespace: key.Namespace,
 			Status: capsulev1beta2.QuantityLedgerStatus{
 				Allocated: resource.MustParse("1"),
 				PendingDeletes: []capsulev1beta2.QuantityLedgerPendingDelete{
@@ -482,13 +474,11 @@ func TestReconcileQuantityLedgerAllocationHandlesFastObjectTransition(t *testing
 			Build()
 		claims := []capsulev1beta2.CustomQuotaClaimItem{
 			{
-				GroupVersionKind: metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
-				NamespacedObjectWithUIDReference: capsulemeta.NamespacedObjectWithUIDReference{
-					Name:      ref.Name,
-					Namespace: capsulemeta.RFC1123SubdomainName(ref.Namespace),
-					UID:       ref.UID,
-				},
-				Usage: resource.MustParse("1"),
+				Version: "v1", Kind: "Pod",
+				Name:      ref.Name,
+				Namespace: capsulemeta.RFC1123SubdomainName(ref.Namespace),
+				UID:       ref.UID,
+				Usage:     resource.MustParse("1"),
 			},
 		}
 
@@ -531,7 +521,7 @@ func TestReconcileQuantityLedgerAllocationUsesDirectReader(t *testing.T) {
 
 	key := types.NamespacedName{Namespace: "tenant-a", Name: "pods"}
 	ledger := &capsulev1beta2.QuantityLedger{
-		ObjectMeta: metav1.ObjectMeta{Name: key.Name, Namespace: key.Namespace},
+		Name: key.Name, Namespace: key.Namespace,
 	}
 	direct := fake.NewClientBuilder().
 		WithScheme(scheme).

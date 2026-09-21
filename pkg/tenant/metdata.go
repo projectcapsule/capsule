@@ -5,6 +5,7 @@ package tenant
 
 import (
 	"maps"
+	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -29,14 +30,7 @@ func HasTenantReference(ns *corev1.Namespace) bool {
 		return true
 	}
 
-	//nolint:modernize
-	for _, ref := range ns.OwnerReferences {
-		if IsTenantOwnerReference(ref) {
-			return true
-		}
-	}
-
-	return false
+	return slices.ContainsFunc(ns.OwnerReferences, IsTenantOwnerReference)
 }
 
 // HasConsistentTenantReference reports whether Tenant ownership is either

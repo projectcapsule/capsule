@@ -452,7 +452,7 @@ func (r *NamespaceTrigger) gatherNamespacedResources(
 
 	// The sources of a TenantResource always live in the Namespace it is deployed in.
 	source := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{Name: tntResource.GetNamespace()},
+		Name: tntResource.GetNamespace(),
 	}
 
 	for resourceIndex, resource := range tntResource.Spec.Resources {

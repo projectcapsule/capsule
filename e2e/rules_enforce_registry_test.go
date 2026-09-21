@@ -21,7 +21,6 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
-	"github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
@@ -47,61 +46,41 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 
 	registryByExpression := func(expression string) rules.OCIRegistry {
 		return rules.OCIRegistry{
-			ExpressionMatch: runtime.ExpressionMatch{
-				ExpressionRegex: runtime.ExpressionRegex{
-					Expression: expression,
-				},
-			},
+			Expression: expression,
 		}
 	}
 
 	registryByNegatedExpression := func(expression string) rules.OCIRegistry {
 		return rules.OCIRegistry{
-			ExpressionMatch: runtime.ExpressionMatch{
-				ExpressionRegex: runtime.ExpressionRegex{
-					Expression: expression,
-					Negate:     true,
-				},
-			},
+			Expression: expression,
+			Negate:     true,
 		}
 	}
 
 	registryByExact := func(exact ...string) rules.OCIRegistry {
 		return rules.OCIRegistry{
-			ExpressionMatch: runtime.ExpressionMatch{
-				Exact: exact,
-			},
+			Exact: exact,
 		}
 	}
 
 	registryByMatch := func(exact []string, expression string) rules.OCIRegistry {
 		return rules.OCIRegistry{
-			ExpressionMatch: runtime.ExpressionMatch{
-				ExpressionRegex: runtime.ExpressionRegex{
-					Expression: expression,
-				},
-				Exact: exact,
-			},
+			Expression: expression,
+			Exact:      exact,
 		}
 	}
 
 	newTenant := func() *capsulev1beta2.Tenant {
 		return &capsulev1beta2.Tenant{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "e2e-rule-registry",
-				Labels: map[string]string{
-					"env": "e2e",
-				},
+			Name: "e2e-rule-registry",
+			Labels: map[string]string{
+				"env": "e2e",
 			},
 			Spec: capsulev1beta2.TenantSpec{
 				Owners: rbac.OwnerListSpec{
 					{
-						CoreOwnerSpec: rbac.CoreOwnerSpec{
-							UserSpec: rbac.UserSpec{
-								Name: ownerName,
-								Kind: "User",
-							},
-						},
+						Name: ownerName,
+						Kind: "User",
 					},
 				},
 				Rules: []*rules.NamespaceRuleBodyTenant{
@@ -284,11 +263,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 									Targets: targetContainers,
 									Registries: []rules.OCIRegistry{
 										{
-											ExpressionMatch: runtime.ExpressionMatch{
-												ExpressionRegex: runtime.ExpressionRegex{
-													Expression: "policy/.*",
-												},
-											},
+											Expression: "policy/.*",
 											Policy: []corev1.PullPolicy{
 												corev1.PullNever,
 											},
@@ -393,10 +368,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 					g.Expect(got.Enforce.Workloads.Targets).To(Equal(expected.targets))
 				}
 
-				wantRegistries := len(expected.expressions)
-				if len(expected.exact) > wantRegistries {
-					wantRegistries = len(expected.exact)
-				}
+				wantRegistries := max(len(expected.exact), len(expected.expressions))
 
 				g.Expect(got.Enforce.Workloads.Registries).To(HaveLen(wantRegistries))
 
@@ -566,9 +538,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 
 	restrictedPod := func(name string, image string, pullPolicy corev1.PullPolicy) *corev1.Pod {
 		return &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: name,
-			},
+			Name: name,
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
@@ -877,9 +847,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "init-denied",
-			},
+			Name: "init-denied",
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				InitContainers: []corev1.Container{
@@ -917,9 +885,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "volume-denied",
-			},
+			Name: "volume-denied",
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
@@ -933,11 +899,9 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 				Volumes: []corev1.Volume{
 					{
 						Name: "imgvol",
-						VolumeSource: corev1.VolumeSource{
-							Image: &corev1.ImageVolumeSource{
-								Reference:  "harbor/customer/volume/app:1",
-								PullPolicy: corev1.PullIfNotPresent,
-							},
+						Image: &corev1.ImageVolumeSource{
+							Reference:  "harbor/customer/volume/app:1",
+							PullPolicy: corev1.PullIfNotPresent,
 						},
 					},
 				},
@@ -960,9 +924,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "volume-audit-denied",
-			},
+			Name: "volume-audit-denied",
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
@@ -976,11 +938,9 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 				Volumes: []corev1.Volume{
 					{
 						Name: "imgvol",
-						VolumeSource: corev1.VolumeSource{
-							Image: &corev1.ImageVolumeSource{
-								Reference:  "audit/volumes/team/app:1",
-								PullPolicy: corev1.PullIfNotPresent,
-							},
+						Image: &corev1.ImageVolumeSource{
+							Reference:  "audit/volumes/team/app:1",
+							PullPolicy: corev1.PullIfNotPresent,
 						},
 					},
 				},
@@ -1017,12 +977,10 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 		createPodAndExpectAllowed(cs, ns.Name, pod)
 
 		ephemeral := corev1.EphemeralContainer{
-			EphemeralContainerCommon: corev1.EphemeralContainerCommon{
-				Name:            "debug",
-				Image:           "harbor/customer/debug/app:1",
-				ImagePullPolicy: corev1.PullIfNotPresent,
-				SecurityContext: restrictedContainerSecurityContext(),
-			},
+			Name:            "debug",
+			Image:           "harbor/customer/debug/app:1",
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			SecurityContext: restrictedContainerSecurityContext(),
 		}
 
 		Eventually(func() error {

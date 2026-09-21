@@ -486,10 +486,8 @@ var _ = Describe(
 
 		It("keeps a failed render observable and blocks application and approval", func() {
 			request := &capsulev1beta2.ResourcePermit{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "e2e-resourcepermit-rendering-failure",
-					Namespace: namespace.Name,
-				},
+				Name:      "e2e-resourcepermit-rendering-failure",
+				Namespace: namespace.Name,
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(renderingTemplate.Name),
 				},
@@ -554,7 +552,7 @@ var _ = Describe(
 
 func lifecycleResourcePermitTemplate() *capsulev1beta2.GlobalResourcePermitTemplate {
 	return &capsulev1beta2.GlobalResourcePermitTemplate{
-		ObjectMeta: metav1.ObjectMeta{Name: resourcePermitLifecycleTemplateName},
+		Name: resourcePermitLifecycleTemplateName,
 		Spec: capsulev1beta2.GlobalResourcePermitTemplateSpec{
 			Impersonation: resourcePermitServiceAccountReference(ControllerNamespace, ControllerServiceAccount),
 			Approvals: resourcepermitapi.ApprovalSpec{
@@ -582,7 +580,7 @@ func lifecycleResourcePermitTemplate() *capsulev1beta2.GlobalResourcePermitTempl
 
 func renderingFailureResourcePermitTemplate() *capsulev1beta2.GlobalResourcePermitTemplate {
 	return &capsulev1beta2.GlobalResourcePermitTemplate{
-		ObjectMeta: metav1.ObjectMeta{Name: resourcePermitRenderingTemplateName},
+		Name: resourcePermitRenderingTemplateName,
 		Spec: capsulev1beta2.GlobalResourcePermitTemplateSpec{
 			Impersonation: resourcePermitServiceAccountReference(ControllerNamespace, ControllerServiceAccount),
 			Approvals: resourcepermitapi.ApprovalSpec{
@@ -618,7 +616,7 @@ data:
 
 func newLifecycleResourcePermit(namespace, name, templateName, targetName string) *capsulev1beta2.ResourcePermit {
 	return &capsulev1beta2.ResourcePermit{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+		Name: name, Namespace: namespace,
 		Spec: capsulev1beta2.ResourcePermitSpec{
 			Template: globalResourcePermitTemplateReference(templateName),
 			Params: &runtime.RawExtension{Raw: []byte(fmt.Sprintf(

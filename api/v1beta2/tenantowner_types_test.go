@@ -7,8 +7,6 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
-
-	"k8s.io/utils/ptr"
 )
 
 func TestTenantOwnerAggregateEnabled(t *testing.T) {
@@ -20,8 +18,8 @@ func TestTenantOwnerAggregateEnabled(t *testing.T) {
 		want      bool
 	}{
 		{name: "unset defaults true", want: true},
-		{name: "explicit true", aggregate: ptr.To(true), want: true},
-		{name: "explicit false", aggregate: ptr.To(false), want: false},
+		{name: "explicit true", aggregate: new(true), want: true},
+		{name: "explicit false", aggregate: new(false), want: false},
 	}
 
 	for _, tt := range tests {
@@ -39,7 +37,7 @@ func TestTenantOwnerAggregateEnabled(t *testing.T) {
 func TestTenantOwnerAggregateFalseIsSerialized(t *testing.T) {
 	t.Parallel()
 
-	data, err := json.Marshal(TenantOwnerSpec{Aggregate: ptr.To(false)})
+	data, err := json.Marshal(TenantOwnerSpec{Aggregate: new(false)})
 	if err != nil {
 		t.Fatalf("marshal TenantOwnerSpec: %v", err)
 	}

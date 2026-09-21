@@ -110,10 +110,8 @@ func TestImpersonationCache_LoadOrCreate_SuccessCachesAndReturnsSameInstance(t *
 	// Provide a REST config that is syntactically valid so controller-runtime client can be constructed
 	// without needing a live apiserver.
 	validREST := &rest.Config{
-		Host: "https://127.0.0.1", // no connectivity required for client object creation
-		TLSClientConfig: rest.TLSClientConfig{
-			Insecure: true,
-		},
+		Host:     "https://127.0.0.1", // no connectivity required for client object creation
+		Insecure: true,
 	}
 
 	sch := scheme.Scheme
@@ -163,10 +161,8 @@ func TestImpersonationCache_LoadOrCreate_ConcurrentOnlyCachesOne(t *testing.T) {
 	sa := makeSA("monitoring", "alertmanager-sa")
 
 	validREST := &rest.Config{
-		Host: "https://127.0.0.1",
-		TLSClientConfig: rest.TLSClientConfig{
-			Insecure: true,
-		},
+		Host:     "https://127.0.0.1",
+		Insecure: true,
 	}
 	sch := scheme.Scheme
 
@@ -178,7 +174,7 @@ func TestImpersonationCache_LoadOrCreate_ConcurrentOnlyCachesOne(t *testing.T) {
 	results := make([]client.Client, goroutines)
 	errs := make([]error, goroutines)
 
-	for i := 0; i < goroutines; i++ {
+	for i := range goroutines {
 		i := i
 		go func() {
 			defer wg.Done()
@@ -205,7 +201,7 @@ func TestImpersonationCache_LoadOrCreate_ConcurrentOnlyCachesOne(t *testing.T) {
 
 	// All should succeed and return a non-nil client.
 	var first client.Client
-	for i := 0; i < goroutines; i++ {
+	for i := range goroutines {
 		if errs[i] != nil {
 			t.Fatalf("expected nil error for goroutine %d, got %v", i, errs[i])
 		}
@@ -236,10 +232,8 @@ func TestImpersonationCache_LoadOrCreate_DifferentKeysCreateDifferentEntries(t *
 	log := logr.Discard()
 
 	validREST := &rest.Config{
-		Host: "https://127.0.0.1",
-		TLSClientConfig: rest.TLSClientConfig{
-			Insecure: true,
-		},
+		Host:     "https://127.0.0.1",
+		Insecure: true,
 	}
 	sch := scheme.Scheme
 
@@ -275,10 +269,8 @@ func TestImpersonationCache_InvalidateThenLoadOrCreateCreatesNewInstance(t *test
 	sa := makeSA("monitoring", "alertmanager-sa")
 
 	validREST := &rest.Config{
-		Host: "https://127.0.0.1",
-		TLSClientConfig: rest.TLSClientConfig{
-			Insecure: true,
-		},
+		Host:     "https://127.0.0.1",
+		Insecure: true,
 	}
 	sch := scheme.Scheme
 

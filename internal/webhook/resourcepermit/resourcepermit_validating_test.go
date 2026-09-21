@@ -161,7 +161,7 @@ func TestResourcePermitValidationHandler(t *testing.T) {
 			{
 				name: "allow a namespace-local template",
 				br: &capsulev1beta2.ResourcePermit{
-					ObjectMeta: metav1.ObjectMeta{Namespace: "team-a"},
+					Namespace: "team-a",
 					Spec: capsulev1beta2.ResourcePermitSpec{
 						Template: localTemplateRef(alternateTemplateName),
 					},
@@ -243,7 +243,7 @@ func TestResourcePermitValidationHandler(t *testing.T) {
 			{
 				name: "allow template in a selected namespace",
 				br: &capsulev1beta2.ResourcePermit{
-					ObjectMeta: metav1.ObjectMeta{Namespace: "team-a"},
+					Namespace: "team-a",
 					Spec: capsulev1beta2.ResourcePermitSpec{
 						Template: templateRef(defaultTemplateName),
 					},
@@ -265,7 +265,7 @@ func TestResourcePermitValidationHandler(t *testing.T) {
 			{
 				name: "deny template outside selected namespaces",
 				br: &capsulev1beta2.ResourcePermit{
-					ObjectMeta: metav1.ObjectMeta{Namespace: "team-b"},
+					Namespace: "team-b",
 					Spec: capsulev1beta2.ResourcePermitSpec{
 						Template: templateRef(defaultTemplateName),
 					},
@@ -288,7 +288,7 @@ func TestResourcePermitValidationHandler(t *testing.T) {
 			{
 				name: "deny while selected namespaces are stale",
 				br: &capsulev1beta2.ResourcePermit{
-					ObjectMeta: metav1.ObjectMeta{Namespace: "team-a"},
+					Namespace: "team-a",
 					Spec: capsulev1beta2.ResourcePermitSpec{
 						Template: templateRef(defaultTemplateName),
 					},
@@ -411,18 +411,16 @@ func TestResourcePermitValidationHandler(t *testing.T) {
 			{
 				name: "allow an active request while its namespace is terminating",
 				br: &capsulev1beta2.ResourcePermit{
-					ObjectMeta: metav1.ObjectMeta{Namespace: "team-a"},
+					Namespace: "team-a",
 					Status: capsulev1beta2.ResourcePermitStatus{
 						Phase: capsulev1beta2.ResourcePermitPhaseActive,
 					},
 				},
 				objects: []client.Object{&corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:              "team-a",
-						DeletionTimestamp: &deletionTime,
-						Finalizers:        []string{"test.projectcapsule.dev/hold"},
-					},
-					Status: corev1.NamespaceStatus{Phase: corev1.NamespaceTerminating},
+					Name:              "team-a",
+					DeletionTimestamp: &deletionTime,
+					Finalizers:        []string{"test.projectcapsule.dev/hold"},
+					Status:            corev1.NamespaceStatus{Phase: corev1.NamespaceTerminating},
 				}},
 				request: admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
 					Namespace: "team-a",
@@ -919,14 +917,12 @@ func TestResourcePermitValidationRejectsInvalidParametersBeforeRendering(t *test
 	}
 
 	brt := &capsulev1beta2.GlobalResourcePermitTemplate{
-		ObjectMeta: metav1.ObjectMeta{Name: "context-template"},
+		Name: "context-template",
 		Spec: capsulev1beta2.GlobalResourcePermitTemplateSpec{
 			ParamSchema: &runtime.RawExtension{Raw: []byte(`{"type":"object","required":["source"],"properties":{"source":{"type":"string"}}}`)},
 			Context: &tpl.TemplateContext{Resources: []*tpl.TemplateResourceReference{{
-				ResourceReference: tpl.ResourceReference{
-					VersionKind: apiruntime.VersionKind{APIVersion: "v1", Kind: "ConfigMap"},
-					Name:        "{{ .source }}",
-				},
+				APIVersion: "v1", Kind: "ConfigMap",
+				Name:  "{{ .source }}",
 				Index: "settings",
 			}}},
 			Resources: []apiruntime.ResourceTemplate{{Targets: []runtime.RawExtension{{Raw: []byte(`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"rendered"},"data":{"value":"{{ (index .settings 0).data.value }}"}}`)}}}},
@@ -935,7 +931,7 @@ func TestResourcePermitValidationRejectsInvalidParametersBeforeRendering(t *test
 	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(brt).Build()
 
 	br := &capsulev1beta2.ResourcePermit{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "team-a"},
+		Namespace: "team-a",
 		Spec: capsulev1beta2.ResourcePermitSpec{
 			Template: capsulev1beta2.GlobalResourcePermitTemplateReference{
 				Kind: capsulev1beta2.GlobalResourcePermitTemplateKind,
@@ -1019,7 +1015,7 @@ func TestResourcePermitApprovalReadiness(t *testing.T) {
 			scheme := runtime.NewScheme()
 			assert.NoError(t, capsulev1beta2.AddToScheme(scheme))
 			template := &capsulev1beta2.GlobalResourcePermitTemplate{
-				ObjectMeta: metav1.ObjectMeta{Name: defaultTemplateName},
+				Name: defaultTemplateName,
 				Spec: capsulev1beta2.GlobalResourcePermitTemplateSpec{
 					Approvals: resourcepermit.ApprovalSpec{
 						Auto: true, Conditions: tt.conditions,
@@ -1043,9 +1039,8 @@ func TestResourcePermitApprovalReadiness(t *testing.T) {
 				Name: tt.username, Type: tt.reviewer,
 			}}
 			decoder := &test.Decoder[*capsulev1beta2.ResourcePermit]{Object: newBr, OldObject: oldBr}
-			req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
-				SubResource: "status", UserInfo: authenticationv1.UserInfo{Username: tt.username},
-			}}
+			req := admission.Request{
+				SubResource: "status", UserInfo: authenticationv1.UserInfo{Username: tt.username}}
 			resp := ResourcePermitValidationHandler(ctrl.Log, nil).OnUpdate(nil, reader, decoder, nil)(context.Background(), req)
 			if tt.denied == "" {
 				if resp != nil {

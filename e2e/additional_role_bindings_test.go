@@ -24,21 +24,15 @@ import (
 
 var _ = Describe("creating a Namespace with an additional Role Binding", Ordered, Label("tenant", "permissions", "rolebindings"), func() {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-additional-role-binding",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-additional-role-binding",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-additional-role-binding",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-additional-role-binding",
+					Kind: "User",
 				},
 			},
 			AdditionalRoleBindings: []rbac.AdditionalRoleBindingsSpec{
@@ -123,16 +117,12 @@ var _ = Describe("creating additional RoleBindings from namespace rules", Ordere
 	}
 
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{Name: "e2e-rule-role-bindings"},
+		Name: "e2e-rule-role-bindings",
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-rule-role-bindings",
-							Kind: rbac.UserOwner,
-						},
-					},
+					Name: "e2e-rule-role-bindings",
+					Kind: rbac.UserOwner,
 				},
 			},
 			Rules: []*rules.NamespaceRuleBodyTenant{

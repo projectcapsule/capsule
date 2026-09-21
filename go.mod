@@ -1,6 +1,6 @@
 module github.com/projectcapsule/capsule
 
-go 1.26.4
+go 1.27.1
 
 require (
 	filippo.io/age v1.3.2

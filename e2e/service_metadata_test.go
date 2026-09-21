@@ -15,7 +15,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -27,21 +26,15 @@ import (
 
 var _ = Describe("adding metadata to Service objects", Ordered, Label("tenant", "networking", "service"), func() {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-service-metadata",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-service-metadata",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-service-metadata",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-service-metadata",
+					Kind: "User",
 				},
 			},
 			ServiceOptions: &api.ServiceOptions{
@@ -81,10 +74,8 @@ var _ = Describe("adding metadata to Service objects", Ordered, Label("tenant", 
 		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		svc := &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "service-metadata",
-				Namespace: ns.GetName(),
-			},
+			Name:      "service-metadata",
+			Namespace: ns.GetName(),
 			Spec: corev1.ServiceSpec{
 				Type: corev1.ServiceTypeClusterIP,
 				Ports: []corev1.ServicePort{
@@ -102,9 +93,7 @@ var _ = Describe("adding metadata to Service objects", Ordered, Label("tenant", 
 		// Waiting for the reconciliation of required RBAC
 		EventuallyCreation(func() (err error) {
 			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "container",
-				},
+				Name: "container",
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
@@ -168,9 +157,7 @@ var _ = Describe("adding metadata to Service objects", Ordered, Label("tenant", 
 		// Waiting for the reconciliation of required RBAC
 		EventuallyCreation(func() (err error) {
 			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "container",
-				},
+				Name: "container",
 				Spec: corev1.PodSpec{
 					SecurityContext: nobodyPodSecurityContext(),
 					Containers: []corev1.Container{
@@ -190,10 +177,8 @@ var _ = Describe("adding metadata to Service objects", Ordered, Label("tenant", 
 		var eps client.Object
 
 		eps = &discoveryv1.EndpointSlice{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "endpointslice-metadata",
-				Namespace: ns.GetName(),
-			},
+			Name:        "endpointslice-metadata",
+			Namespace:   ns.GetName(),
 			AddressType: discoveryv1.AddressTypeIPv4,
 			Endpoints: []discoveryv1.Endpoint{
 				{
@@ -202,8 +187,8 @@ var _ = Describe("adding metadata to Service objects", Ordered, Label("tenant", 
 			},
 			Ports: []discoveryv1.EndpointPort{
 				{
-					Name: ptr.To("foo"),
-					Port: ptr.To(int32(9999)),
+					Name: new("foo"),
+					Port: new(int32(9999)),
 				},
 			},
 		}

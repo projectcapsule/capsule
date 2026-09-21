@@ -70,15 +70,13 @@ func TestGetTenantByNamespace(t *testing.T) {
 	tnt := tenantObject("tenant-a", withUID("tenant-uid"))
 	cl := tenantFakeClient(t,
 		tnt,
-		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+		&corev1.Namespace{
 			Name:            "ns-a",
-			OwnerReferences: []metav1.OwnerReference{tenantOwnerReference("tenant-a", "tenant-uid")},
-		}},
-		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+			OwnerReferences: []metav1.OwnerReference{tenantOwnerReference("tenant-a", "tenant-uid")}},
+		&corev1.Namespace{
 			Name:            "ns-mismatch",
-			OwnerReferences: []metav1.OwnerReference{tenantOwnerReference("tenant-a", "other-uid")},
-		}},
-		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns-unowned"}},
+			OwnerReferences: []metav1.OwnerReference{tenantOwnerReference("tenant-a", "other-uid")}},
+		&corev1.Namespace{Name: "ns-unowned"},
 	)
 
 	name, err := tenant.GetTenantNameByNamespace(ctx, cl, "ns-a")
@@ -191,9 +189,8 @@ func TestGetTenantByLabelsAndUser(t *testing.T) {
 		tenantObject("tenant-a", withStatusOwner(rbac.UserOwner, "alice")),
 	)
 
-	got, err := tenant.GetTenantByLabels(ctx, cl, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
-		Labels: map[string]string{meta.TenantLabel: "tenant-a"},
-	}})
+	got, err := tenant.GetTenantByLabels(ctx, cl, &corev1.Namespace{
+		Labels: map[string]string{meta.TenantLabel: "tenant-a"}})
 	if err != nil {
 		t.Fatalf("GetTenantByLabels() unexpected error: %v", err)
 	}
@@ -201,9 +198,8 @@ func TestGetTenantByLabelsAndUser(t *testing.T) {
 		t.Fatalf("GetTenantByLabels() = %#v, want tenant-a", got)
 	}
 
-	got, err = tenant.GetTenantByLabelsAndUser(ctx, cl, nil, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
-		Labels: map[string]string{meta.TenantLabel: "tenant-a"},
-	}}, users.NewAdmissionUser(users.AdmissionUserUnknown, authenticationv1.UserInfo{Username: "alice"}))
+	got, err = tenant.GetTenantByLabelsAndUser(ctx, cl, nil, &corev1.Namespace{
+		Labels: map[string]string{meta.TenantLabel: "tenant-a"}}, users.NewAdmissionUser(users.AdmissionUserUnknown, authenticationv1.UserInfo{Username: "alice"}))
 	if err != nil {
 		t.Fatalf("GetTenantByLabelsAndUser() unexpected error: %v", err)
 	}
@@ -211,9 +207,8 @@ func TestGetTenantByLabelsAndUser(t *testing.T) {
 		t.Fatalf("GetTenantByLabelsAndUser() = %#v, want tenant-a", got)
 	}
 
-	if _, err = tenant.GetTenantByLabelsAndUser(ctx, cl, nil, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
-		Labels: map[string]string{meta.TenantLabel: "tenant-a"},
-	}}, users.NewAdmissionUser(users.AdmissionUserUnknown, authenticationv1.UserInfo{Username: "bob"})); err == nil {
+	if _, err = tenant.GetTenantByLabelsAndUser(ctx, cl, nil, &corev1.Namespace{
+		Labels: map[string]string{meta.TenantLabel: "tenant-a"}}, users.NewAdmissionUser(users.AdmissionUserUnknown, authenticationv1.UserInfo{Username: "bob"})); err == nil {
 		t.Fatalf("GetTenantByLabelsAndUser() expected non-owner error")
 	}
 
@@ -258,7 +253,7 @@ func tenantFakeClient(t *testing.T, objects ...client.Object) client.Client {
 type tenantOption func(*capsulev1beta2.Tenant)
 
 func tenantObject(name string, opts ...tenantOption) *capsulev1beta2.Tenant {
-	tnt := &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: name}}
+	tnt := &capsulev1beta2.Tenant{Name: name}
 	for _, opt := range opts {
 		opt(tnt)
 	}
@@ -281,9 +276,7 @@ func withStatusNamespaces(namespaces ...string) tenantOption {
 func withSpecOwner(kind rbac.OwnerKind, name string) tenantOption {
 	return func(tnt *capsulev1beta2.Tenant) {
 		tnt.Spec.Owners = append(tnt.Spec.Owners, rbac.OwnerSpec{
-			CoreOwnerSpec: rbac.CoreOwnerSpec{
-				UserSpec: rbac.UserSpec{Kind: kind, Name: name},
-			},
+			Kind: kind, Name: name,
 		})
 	}
 }
@@ -291,7 +284,7 @@ func withSpecOwner(kind rbac.OwnerKind, name string) tenantOption {
 func withStatusOwner(kind rbac.OwnerKind, name string) tenantOption {
 	return func(tnt *capsulev1beta2.Tenant) {
 		tnt.Status.Owners = append(tnt.Status.Owners, rbac.CoreOwnerSpec{
-			UserSpec: rbac.UserSpec{Kind: kind, Name: name},
+			Kind: kind, Name: name,
 		})
 	}
 }
