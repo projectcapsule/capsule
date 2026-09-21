@@ -346,7 +346,7 @@ var _ = Describe("QuantityCache", func() {
 		var wg sync.WaitGroup
 		wg.Add(workers)
 
-		for i := 0; i < workers; i++ {
+		for i := range workers {
 			i := i
 			go func() {
 				defer GinkgoRecover()
@@ -388,7 +388,7 @@ var _ = Describe("QuantityCache", func() {
 		var wg sync.WaitGroup
 		wg.Add(workers)
 
-		for i := 0; i < workers; i++ {
+		for i := range workers {
 			i := i
 			go func() {
 				defer GinkgoRecover()

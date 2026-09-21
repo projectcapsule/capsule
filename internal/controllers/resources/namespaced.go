@@ -388,10 +388,8 @@ func (r *namespacedResourceController) enqueueAllResources(ctx context.Context, 
 	reqs := make([]reconcile.Request, 0, len(list.Items))
 	for i := range list.Items {
 		reqs = append(reqs, reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name:      list.Items[i].Name,
-				Namespace: list.Items[i].Namespace,
-			},
+			Name:      list.Items[i].Name,
+			Namespace: list.Items[i].Namespace,
 		})
 	}
 
@@ -484,7 +482,7 @@ func (r *namespacedResourceController) gatherResources(
 	}
 
 	for resourceIndex, resource := range tntResource.Spec.Resources {
-		objs, err := r.collector.CollectNamespacedItems(ctx, c, opts, resource, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: tntResource.GetNamespace()}}, tnt)
+		objs, err := r.collector.CollectNamespacedItems(ctx, c, opts, resource, &corev1.Namespace{Name: tntResource.GetNamespace()}, tnt)
 		if err != nil {
 			return err
 		}
@@ -680,7 +678,7 @@ func ForeachNamespace(
 			resourceClient,
 			opts,
 			&tnt,
-			strconv.Itoa((resourceIndex)),
+			strconv.Itoa(resourceIndex),
 			resource,
 			&ns,
 		)

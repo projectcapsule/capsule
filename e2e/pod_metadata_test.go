@@ -19,21 +19,15 @@ import (
 
 var _ = Describe("adding metadata to Pod objects", Ordered, Label("pod"), func() {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-pod-metadata",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-pod-metadata",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-pod-metadata",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-pod-metadata",
+					Kind: "User",
 				},
 			},
 			PodOptions: &api.PodOptions{
@@ -73,10 +67,8 @@ var _ = Describe("adding metadata to Pod objects", Ordered, Label("pod"), func()
 		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pod-metadata",
-				Namespace: ns.GetName(),
-			},
+			Name:      "pod-metadata",
+			Namespace: ns.GetName(),
 
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),

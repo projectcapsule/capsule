@@ -8,11 +8,11 @@ metadata:
 spec:
   quota:
     hard:
-      limits.memory: 2Gi
       limits.cpu: "0"
       requests.cpu: "2"
-      requests.memory: 2Gi
-      requests.storage: "5Gi"
+      requests.memory: "2Gi"
+      limits.memory: "4Gi"
+      requests.nvidia.com/gpu: 8
   selectors:
   - matchLabels:
       capsule.clastix.io/tenant: solar

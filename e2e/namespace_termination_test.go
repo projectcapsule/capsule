@@ -24,21 +24,15 @@ var _ = Describe("terminating namespace with guardrails", Ordered, Label("namesp
 	ctx := context.TODO()
 
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-termination",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-termination",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-termination",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-termination",
+					Kind: "User",
 				},
 			},
 		},
@@ -67,11 +61,9 @@ var _ = Describe("terminating namespace with guardrails", Ordered, Label("namesp
 
 		// Create a pod with a finalizer so the namespace can't complete deletion
 		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:       "finalizer-pod",
-				Namespace:  nsName,
-				Finalizers: []string{"e2e.capsule.io/block-delete"},
-			},
+			Name:       "finalizer-pod",
+			Namespace:  nsName,
+			Finalizers: []string{"e2e.capsule.io/block-delete"},
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
@@ -92,14 +84,14 @@ var _ = Describe("terminating namespace with guardrails", Ordered, Label("namesp
 	})
 
 	JustAfterEach(func() {
-		EventuallyDeletion(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: podKey.Name, Namespace: podKey.Namespace}})
-		EventuallyDeletion(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: nsName}})
+		EventuallyDeletion(&corev1.Pod{Name: podKey.Name, Namespace: podKey.Namespace})
+		EventuallyDeletion(&corev1.Namespace{Name: nsName})
 		EventuallyDeletionWithoutPodCleanup(tnt)
 	})
 
 	It("keeps managed rolebindings during namespace termination and cleans up after finalizer removal", func() {
 		By("deleting the namespace (it should get stuck terminating due to pod finalizer)", func() {
-			ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: nsName}}
+			ns := &corev1.Namespace{Name: nsName}
 			Expect(k8sClient.Delete(ctx, ns)).To(Succeed())
 		})
 

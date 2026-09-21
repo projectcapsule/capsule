@@ -21,7 +21,7 @@ builds:
     flags:
       - -trimpath
     mod_timestamp: '{{ .CommitTimestamp }}'
-    ldflags:
+    ldflags: &ldflags
       - >-
         -X github.com/projectcapsule/capsule/internal/version.Version={{ .Tag }}
         -X github.com/projectcapsule/capsule/internal/version.GitCommit={{ .Commit }}
@@ -29,8 +29,24 @@ builds:
         -X github.com/projectcapsule/capsule/internal/version.GitDirty={{ .Date }}
         -X github.com/projectcapsule/capsule/internal/version.BuildTime={{ .Date }}
         -X github.com/projectcapsule/capsule/internal/version.GitRepo={{ .ProjectName }}
+  - id: "{{ .ProjectName }}-cli"
+    main: ./cmd/cli
+    binary: "{{ .ProjectName }}-cli-{{ .Os }}-{{ .Arch }}"
+    env:
+      - CGO_ENABLED=0
+    goarch:
+      - amd64
+      - arm64
+    goos:
+      - linux
+      - windows
+      - darwin
+    flags:
+      - -trimpath
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    ldflags: *ldflags
   # - id: "{{ .ProjectName }}-wasm"
-  #   main: ./cmd/
+  #   main: ./cmd/controller/
   #   binary: "{{ .ProjectName }}.wasm"
   #   env:
   #     - CGO_ENABLED=0
@@ -43,12 +59,29 @@ builds:
   #   mod_timestamp: '{{ .CommitTimestamp }}'
   #   ldflags:
   #     - >-
-  #         -X main.Version={{ .Tag }}
-  #         -X main.GitCommit={{ .Commit }}
-  #         -X main.GitTag={{ .Tag }}
-  #         -X main.GitDirty={{ .Date }}
-  #         -X main.BuildTime={{ .Date }}
-  #         -X main.GitRepo={{ .ProjectName }}
+  #         -X github.com/projectcapsule/capsule/internal/version.Version={{ .Tag }}
+  #         -X github.com/projectcapsule/capsule/internal/version.GitCommit={{ .Commit }}
+  #         -X github.com/projectcapsule/capsule/internal/version.GitTag={{ .Tag }}
+  #         -X github.com/projectcapsule/capsule/internal/version.GitDirty={{ .Date }}
+  #         -X github.com/projectcapsule/capsule/internal/version.BuildTime={{ .Date }}
+  #         -X github.com/projectcapsule/capsule/internal/version.GitRepo={{ .ProjectName }}
+archives:
+  - id: controller
+    ids:
+      - "{{ .ProjectName }}"
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+  - id: cli
+    name_template: >-
+      {{ .ProjectName }}-cli_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+    ids:
+      - "{{ .ProjectName }}-cli"
 release:
   prerelease: auto
   footer: |

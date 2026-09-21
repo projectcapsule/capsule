@@ -29,11 +29,9 @@ func TestSyncCustomResourceQuotaUsagesCountsReadyNamespacesOnly(t *testing.T) {
 	}
 
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenant-a",
-			Annotations: map[string]string{
-				capsulev1beta2.LimitAnnotationForResource("widgets.example.com_v1"): "10",
-			},
+		Name: "tenant-a",
+		Annotations: map[string]string{
+			capsulev1beta2.LimitAnnotationForResource("widgets.example.com_v1"): "10",
 		},
 		Status: capsulev1beta2.TenantStatus{
 			Spaces: []*capsulev1beta2.TenantStatusNamespaceItem{
@@ -110,11 +108,9 @@ func TestSyncCustomResourceQuotaUsagesIgnoresMissingResource(t *testing.T) {
 	}
 
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenant-a",
-			Annotations: map[string]string{
-				capsulev1beta2.LimitAnnotationForResource("widgets.example.com_v1"): "10",
-			},
+		Name: "tenant-a",
+		Annotations: map[string]string{
+			capsulev1beta2.LimitAnnotationForResource("widgets.example.com_v1"): "10",
 		},
 		Status: capsulev1beta2.TenantStatus{
 			Spaces: []*capsulev1beta2.TenantStatusNamespaceItem{{
@@ -147,10 +143,8 @@ func TestSyncCustomResourceQuotaUsagesIgnoresMissingResource(t *testing.T) {
 
 func TestSyncCustomResourceQuotaUsagesSkipsTerminatingTenant(t *testing.T) {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "tenant-a",
-			DeletionTimestamp: &metav1.Time{},
-		},
+		Name:              "tenant-a",
+		DeletionTimestamp: &metav1.Time{},
 	}
 
 	manager := &Manager{}

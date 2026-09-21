@@ -731,8 +731,7 @@ func externalNameServiceForNodePortTest(name string, externalName string) *corev
 	}
 }
 
-func decisionMessageForNodePortTest(evaluation interface {
-}) string {
+func decisionMessageForNodePortTest(evaluation any) string {
 	e, ok := evaluation.(*ruleengine.Evaluation)
 	if !ok || e == nil {
 		return ""

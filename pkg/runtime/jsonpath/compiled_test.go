@@ -66,7 +66,6 @@ func TestCompileJSONPath(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -127,10 +126,10 @@ func TestCompiledJSONPathExecute(t *testing.T) {
 			name:      "extract string value",
 			prepareJP: ".spec.resources.requests.cpu",
 			object: unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"spec": map[string]interface{}{
-						"resources": map[string]interface{}{
-							"requests": map[string]interface{}{
+				Object: map[string]any{
+					"spec": map[string]any{
+						"resources": map[string]any{
+							"requests": map[string]any{
 								"cpu": "250m",
 							},
 						},
@@ -143,8 +142,8 @@ func TestCompiledJSONPathExecute(t *testing.T) {
 			name:      "trim surrounding whitespace",
 			prepareJP: ".spec.value",
 			object: unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"spec": map[string]interface{}{
+				Object: map[string]any{
+					"spec": map[string]any{
 						"value": "  hello world  ",
 					},
 				},
@@ -155,8 +154,8 @@ func TestCompiledJSONPathExecute(t *testing.T) {
 			name:      "extract numeric value",
 			prepareJP: ".spec.replicas",
 			object: unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"spec": map[string]interface{}{
+				Object: map[string]any{
+					"spec": map[string]any{
 						"replicas": int64(3),
 					},
 				},
@@ -167,10 +166,10 @@ func TestCompiledJSONPathExecute(t *testing.T) {
 			name:      "missing path returns empty string",
 			prepareJP: ".spec.resources.requests.memory",
 			object: unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"spec": map[string]interface{}{
-						"resources": map[string]interface{}{
-							"requests": map[string]interface{}{
+				Object: map[string]any{
+					"spec": map[string]any{
+						"resources": map[string]any{
+							"requests": map[string]any{
 								"cpu": "250m",
 							},
 						},
@@ -182,7 +181,6 @@ func TestCompiledJSONPathExecute(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -223,10 +221,10 @@ func TestCompileUsageJSONPath_Execute_Success(t *testing.T) {
 	}
 
 	u := unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"spec": map[string]interface{}{
-				"resources": map[string]interface{}{
-					"requests": map[string]interface{}{
+		Object: map[string]any{
+			"spec": map[string]any{
+				"resources": map[string]any{
+					"requests": map[string]any{
 						"memory": "1Gi",
 					},
 				},
@@ -248,7 +246,7 @@ func TestCompiledJSONPath_Execute_NilReceiver(t *testing.T) {
 	var compiled *CompiledJSONPath
 
 	u := unstructured.Unstructured{
-		Object: map[string]interface{}{},
+		Object: map[string]any{},
 	}
 
 	_, err := compiled.Execute(u)

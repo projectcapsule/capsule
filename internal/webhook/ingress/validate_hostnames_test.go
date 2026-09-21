@@ -176,7 +176,7 @@ func TestValidateHostnamesDeterministic(t *testing.T) {
 
 	h := &hostnames{}
 
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		err := h.validateHostnames(tenant, hostnameSet)
 		if err == nil {
 			t.Fatalf("iteration %d: expected denial, got no error", i)

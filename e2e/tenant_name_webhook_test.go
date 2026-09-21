@@ -8,7 +8,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
@@ -16,18 +15,12 @@ import (
 
 var _ = Describe("creating a Tenant with wrong name", Ordered, Label("tenant"), func() {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "non_rfc_dns_1123",
-		},
+		Name: "non_rfc_dns_1123",
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "john",
-							Kind: "User",
-						},
-					},
+					Name: "john",
+					Kind: "User",
 				},
 			},
 		},

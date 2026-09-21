@@ -5,7 +5,6 @@ import (
 
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
@@ -23,11 +22,9 @@ func TestUpdatedLabelsPredicate_StaticEvents(t *testing.T) {
 func TestUpdatedLabelsPredicate_Update(t *testing.T) {
 	pod := func(labels map[string]string) *corev1.Pod {
 		return &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "default",
-				Name:      "p",
-				Labels:    labels,
-			},
+			Namespace: "default",
+			Name:      "p",
+			Labels:    labels,
 		}
 	}
 
@@ -96,7 +93,6 @@ func TestUpdatedLabelsPredicate_Update(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
 

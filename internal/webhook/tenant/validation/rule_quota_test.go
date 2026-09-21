@@ -34,10 +34,8 @@ func TestValidateRuleQuotaUpdates(t *testing.T) {
 	oldTenant := ruleQuotaTenant("5")
 	desiredGlobalQuota := tenantutils.RuleGlobalResourceQuota(oldTenant, 0, 0)
 	globalQuota := &capsulev1beta2.GlobalResourceQuota{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: tenantutils.RuleGlobalResourceQuotaName(oldTenant, "services"),
-			UID:  types.UID("global-quota-uid"),
-		},
+		Name: tenantutils.RuleGlobalResourceQuotaName(oldTenant, "services"),
+		UID:  types.UID("global-quota-uid"),
 		Spec: desiredGlobalQuota.Spec,
 		Status: capsulev1beta2.GlobalResourceQuotaStatus{
 			Total: capsulev1beta2.GlobalResourceQuotaUsage{Used: corev1.ResourceList{
@@ -124,14 +122,14 @@ func (f *failingReader) Get(context.Context, client.ObjectKey, client.Object, ..
 
 func ruleQuotaTenant(hard string) *capsulev1beta2.Tenant {
 	return &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{Name: "tenant-a", UID: types.UID("tenant-a-uid")},
+		Name: "tenant-a", UID: types.UID("tenant-a-uid"),
 		Spec: capsulev1beta2.TenantSpec{Rules: []*rules.NamespaceRuleBodyTenant{{
 			NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
 				Quota: []rules.ResourceQuotaRule{{
 					Name: "services",
-					ResourceQuotaSpec: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{
+					Hard: corev1.ResourceList{
 						corev1.ResourceServices: resource.MustParse(hard),
-					}},
+					},
 				}},
 			},
 		}}},
@@ -143,10 +141,8 @@ func ruleQuotaLedger(
 	allocated string,
 ) *capsulev1beta2.QuantityLedger {
 	return &capsulev1beta2.QuantityLedger{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: configuration.ControllerNamespace(),
-			Name:      quota.GetLedgerName(),
-		},
+		Namespace: configuration.ControllerNamespace(),
+		Name:      quota.GetLedgerName(),
 		Spec: capsulev1beta2.QuantityLedgerSpec{
 			TargetRef: capsulev1beta2.QuantityLedgerTargetRef{UID: quota.UID},
 		},

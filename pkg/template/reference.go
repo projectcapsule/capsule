@@ -112,7 +112,9 @@ func (t ResourceReference) LoadResources(
 	}
 
 	ns := ref.Namespace
-	if ns == "" && namespace != "" {
+	if !isNamespaced {
+		ns = ""
+	} else if ns == "" && namespace != "" {
 		ns = namespace
 	}
 

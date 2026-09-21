@@ -12,7 +12,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -23,21 +22,15 @@ import (
 
 var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "claim"), func() {
 	_ = &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-test-claims-1",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-test-claims-1",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "wind-user",
-							Kind: "User",
-						},
-					},
+					Name: "wind-user",
+					Kind: "User",
 				},
 			},
 		},
@@ -90,11 +83,9 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 
 	It("Claim to Pool Assignment", func() {
 		pool1 := &capsulev1beta2.ResourcePool{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "test-binding-claims",
-				Labels: map[string]string{
-					"e2e-resourcepoolclaims": "test",
-				},
+			Name: "test-binding-claims",
+			Labels: map[string]string{
+				"e2e-resourcepoolclaims": "test",
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
 				Selectors: []selectors.NamespaceSelector{
@@ -125,10 +116,8 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 		}
 
 		claim1 := &capsulev1beta2.ResourcePoolClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "assign-pool-claim-1",
-				Namespace: "ns-1-pool-assign",
-			},
+			Name:      "assign-pool-claim-1",
+			Namespace: "ns-1-pool-assign",
 			Spec: capsulev1beta2.ResourcePoolClaimSpec{
 				Pool: "test-binding-claims",
 				ResourceClaims: corev1.ResourceList{
@@ -141,10 +130,8 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 		}
 
 		claim2 := &capsulev1beta2.ResourcePoolClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "assign-pool-claim-2",
-				Namespace: "ns-2-pool-assign",
-			},
+			Name:      "assign-pool-claim-2",
+			Namespace: "ns-2-pool-assign",
 			Spec: capsulev1beta2.ResourcePoolClaimSpec{
 				Pool: "test-binding-claims",
 				ResourceClaims: corev1.ResourceList{
@@ -171,12 +158,10 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 
 		By("Create Namespaces, which are selected by the pool", func() {
 			ns1 := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "ns-1-pool-assign",
-					Labels: map[string]string{
-						"e2e-resourcepoolclaims":     "test",
-						"e2e.capsule.dev/test-suite": "claims-bindings",
-					},
+				Name: "ns-1-pool-assign",
+				Labels: map[string]string{
+					"e2e-resourcepoolclaims":     "test",
+					"e2e.capsule.dev/test-suite": "claims-bindings",
 				},
 			}
 
@@ -184,12 +169,10 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 			Expect(err).Should(Succeed())
 
 			ns2 := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "ns-2-pool-assign",
-					Labels: map[string]string{
-						"e2e-resourcepoolclaims":     "test",
-						"e2e.capsule.dev/test-suite": "claims-bindings-2",
-					},
+				Name: "ns-2-pool-assign",
+				Labels: map[string]string{
+					"e2e-resourcepoolclaims":     "test",
+					"e2e.capsule.dev/test-suite": "claims-bindings-2",
 				},
 			}
 
@@ -197,12 +180,10 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 			Expect(err).Should(Succeed())
 
 			ns3 := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "ns-3-pool-assign",
-					Labels: map[string]string{
-						"e2e-resourcepoolclaims":     "test",
-						"e2e.capsule.dev/test-suite": "something-else",
-					},
+				Name: "ns-3-pool-assign",
+				Labels: map[string]string{
+					"e2e-resourcepoolclaims":     "test",
+					"e2e.capsule.dev/test-suite": "something-else",
 				},
 			}
 
@@ -239,10 +220,8 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 
 		By("Create a third claim and verify error", func() {
 			claim := &capsulev1beta2.ResourcePoolClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "assign-pool-claim-3",
-					Namespace: "ns-3-pool-assign",
-				},
+				Name:      "assign-pool-claim-3",
+				Namespace: "ns-3-pool-assign",
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
 					Pool: "test-binding-claims",
 					ResourceClaims: corev1.ResourceList{
@@ -277,15 +256,13 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 
 	It("Admission (Validation) - Patch Guard", Label("skip-on-openshift"), func() {
 		pool := &capsulev1beta2.ResourcePool{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "test-admission-claims",
-				Labels: map[string]string{
-					"e2e-resourcepoolclaims": "test",
-				},
+			Name: "test-admission-claims",
+			Labels: map[string]string{
+				"e2e-resourcepoolclaims": "test",
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
 				Config: capsulev1beta2.ResourcePoolSpecConfiguration{
-					DeleteBoundResources: ptr.To(false),
+					DeleteBoundResources: new(false),
 				},
 				Selectors: []selectors.NamespaceSelector{
 					{
@@ -308,10 +285,8 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 		}
 
 		claim := &capsulev1beta2.ResourcePoolClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "admission-pool-claim-1",
-				Namespace: "ns-1-pool-admission",
-			},
+			Name:      "admission-pool-claim-1",
+			Namespace: "ns-1-pool-admission",
 			Spec: capsulev1beta2.ResourcePoolClaimSpec{
 				Pool: pool.GetName(),
 				ResourceClaims: corev1.ResourceList{
@@ -325,12 +300,10 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 
 		By("Create the Claim", func() {
 			ns := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: claim.Namespace,
-					Labels: map[string]string{
-						"e2e-resourcepoolclaims":     "test",
-						"e2e.capsule.dev/test-suite": "admission-guards",
-					},
+				Name: claim.Namespace,
+				Labels: map[string]string{
+					"e2e-resourcepoolclaims":     "test",
+					"e2e.capsule.dev/test-suite": "admission-guards",
 				},
 			}
 
@@ -380,12 +353,10 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 
 		By("Create a pod with resource requests/limits", func() {
 			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "claim-pod",
-					Namespace: claim.Namespace,
-					Labels: map[string]string{
-						"e2e": "claim-pod",
-					},
+				Name:      "claim-pod",
+				Namespace: claim.Namespace,
+				Labels: map[string]string{
+					"e2e": "claim-pod",
 				},
 				Spec: corev1.PodSpec{
 					SecurityContext: nobodyPodSecurityContext(),
@@ -480,7 +451,7 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 			Expect(err).To(Succeed(), "pod must exist before deleting")
 
 			Expect(k8sClient.Delete(context.TODO(), pod, &client.DeleteOptions{
-				GracePeriodSeconds: ptr.To(int64(0)),
+				GracePeriodSeconds: new(int64(0)),
 			})).To(Succeed())
 
 			Eventually(func() bool {
@@ -623,15 +594,13 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 
 	It("Admission (Mutation) - Release Bound Claim", Label("skip-on-openshift"), func() {
 		pool := &capsulev1beta2.ResourcePool{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "test-release-bound-claim",
-				Labels: map[string]string{
-					"e2e-resourcepoolclaims": "test",
-				},
+			Name: "test-release-bound-claim",
+			Labels: map[string]string{
+				"e2e-resourcepoolclaims": "test",
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
 				Config: capsulev1beta2.ResourcePoolSpecConfiguration{
-					DeleteBoundResources: ptr.To(false),
+					DeleteBoundResources: new(false),
 				},
 				Selectors: []selectors.NamespaceSelector{
 					{
@@ -654,10 +623,8 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 		}
 
 		claim := &capsulev1beta2.ResourcePoolClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "release-bound-claim",
-				Namespace: "ns-release-bound-claim",
-			},
+			Name:      "release-bound-claim",
+			Namespace: "ns-release-bound-claim",
 			Spec: capsulev1beta2.ResourcePoolClaimSpec{
 				Pool: pool.GetName(),
 				ResourceClaims: corev1.ResourceList{
@@ -677,12 +644,10 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 			}).Should(Succeed(), "Failed to create %s", pool)
 
 			ns := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: claim.Namespace,
-					Labels: map[string]string{
-						"e2e-resourcepoolclaims":     "test",
-						"e2e.capsule.dev/test-suite": "release-bound-claim",
-					},
+				Name: claim.Namespace,
+				Labels: map[string]string{
+					"e2e-resourcepoolclaims":     "test",
+					"e2e.capsule.dev/test-suite": "release-bound-claim",
 				},
 			}
 
@@ -756,15 +721,13 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 
 	It("Admission (Mutation) - Auto Pool Assign", Label("skip-on-openshift"), func() {
 		pool1 := &capsulev1beta2.ResourcePool{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "test-auto-assign-1",
-				Labels: map[string]string{
-					"e2e-resourcepoolclaims": "test",
-				},
+			Name: "test-auto-assign-1",
+			Labels: map[string]string{
+				"e2e-resourcepoolclaims": "test",
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
 				Config: capsulev1beta2.ResourcePoolSpecConfiguration{
-					DeleteBoundResources: ptr.To(false),
+					DeleteBoundResources: new(false),
 				},
 				Selectors: []selectors.NamespaceSelector{
 					{
@@ -785,15 +748,13 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 		}
 
 		pool2 := &capsulev1beta2.ResourcePool{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "test-auto-assign-2",
-				Labels: map[string]string{
-					"e2e-resourcepoolclaims": "test",
-				},
+			Name: "test-auto-assign-2",
+			Labels: map[string]string{
+				"e2e-resourcepoolclaims": "test",
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
 				Config: capsulev1beta2.ResourcePoolSpecConfiguration{
-					DeleteBoundResources: ptr.To(false),
+					DeleteBoundResources: new(false),
 				},
 				Selectors: []selectors.NamespaceSelector{
 					{
@@ -829,10 +790,8 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 
 		By("Auto Assign Claim (CPU)", func() {
 			claim := &capsulev1beta2.ResourcePoolClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "auto-assign-1",
-					Namespace: "ns-1-pool-assign",
-				},
+				Name:      "auto-assign-1",
+				Namespace: "ns-1-pool-assign",
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
 					ResourceClaims: corev1.ResourceList{
 						corev1.ResourceLimitsCPU:   resource.MustParse("1"),
@@ -842,12 +801,10 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 			}
 
 			ns := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: claim.Namespace,
-					Labels: map[string]string{
-						"e2e-resourcepoolclaims":     "test",
-						"e2e.capsule.dev/test-suite": "admission-auto-assign",
-					},
+				Name: claim.Namespace,
+				Labels: map[string]string{
+					"e2e-resourcepoolclaims":     "test",
+					"e2e.capsule.dev/test-suite": "admission-auto-assign",
 				},
 			}
 
@@ -877,10 +834,8 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 
 		By("Auto Assign Claim (Memory)", func() {
 			claim := &capsulev1beta2.ResourcePoolClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "auto-assign-1",
-					Namespace: "ns-2-pool-assign",
-				},
+				Name:      "auto-assign-1",
+				Namespace: "ns-2-pool-assign",
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
 					ResourceClaims: corev1.ResourceList{
 						corev1.ResourceLimitsMemory:   resource.MustParse("1"),
@@ -890,12 +845,10 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 			}
 
 			ns := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: claim.Namespace,
-					Labels: map[string]string{
-						"e2e-resourcepoolclaims":     "test",
-						"e2e.capsule.dev/test-suite": "admission-auto-assign",
-					},
+				Name: claim.Namespace,
+				Labels: map[string]string{
+					"e2e-resourcepoolclaims":     "test",
+					"e2e.capsule.dev/test-suite": "admission-auto-assign",
 				},
 			}
 
@@ -918,10 +871,8 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 
 		By("No Default available (Storage)", func() {
 			claim := &capsulev1beta2.ResourcePoolClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "auto-assign-3",
-					Namespace: "ns-3-pool-assign",
-				},
+				Name:      "auto-assign-3",
+				Namespace: "ns-3-pool-assign",
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
 					ResourceClaims: corev1.ResourceList{
 						corev1.ResourceRequestsStorage: resource.MustParse("1"),
@@ -930,12 +881,10 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 			}
 
 			ns := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: claim.Namespace,
-					Labels: map[string]string{
-						"e2e-resourcepoolclaims":     "test",
-						"e2e.capsule.dev/test-suite": "admission-auto-assign",
-					},
+				Name: claim.Namespace,
+				Labels: map[string]string{
+					"e2e-resourcepoolclaims":     "test",
+					"e2e.capsule.dev/test-suite": "admission-auto-assign",
 				},
 			}
 

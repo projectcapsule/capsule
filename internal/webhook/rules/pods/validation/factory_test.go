@@ -7,7 +7,6 @@ import (
 	"context"
 	"testing"
 
-	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -44,7 +43,7 @@ func TestPodResourceRulesSkipSubresources(t *testing.T) {
 		},
 	}}
 	pod := resourceValidationPod("1Gi", "2Gi")
-	req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{SubResource: "ephemeralcontainers"}}
+	req := admission.Request{SubResource: "ephemeralcontainers"}
 
 	if err := h.validatePodRules(
 		context.Background(),

@@ -18,21 +18,15 @@ import (
 
 var _ = Describe("creating a Namespace for a Tenant with required metadata", Ordered, Label("namespace", "metadata", "forbidden"), func() {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-metadata-required",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-metadata-required",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-metadata-required",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-metadata-required",
+					Kind: "User",
 				},
 			},
 			NamespaceOptions: &capsulev1beta2.NamespaceOptions{

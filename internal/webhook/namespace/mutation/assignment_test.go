@@ -54,7 +54,7 @@ func TestOwnerReferenceHandlerAllowsAdminTenantDetachment(t *testing.T) {
 
 	green := testTenant("green", "green-uid")
 	oldNs := testTenantNamespace("workloads", green)
-	newNs := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: oldNs.GetName()}}
+	newNs := &corev1.Namespace{Name: oldNs.GetName()}
 	c := testClient(t, green)
 
 	response := (&ownerReferenceHandler{}).OnUpdate(
@@ -78,7 +78,7 @@ func TestOwnerReferenceHandlerAllowsAdminTenantDetachment(t *testing.T) {
 func TestOwnerReferenceHandlerRejectsTenantOwnerAssignmentChanges(t *testing.T) {
 	t.Parallel()
 
-	owner := rbac.CoreOwnerSpec{UserSpec: rbac.UserSpec{Name: "alice", Kind: rbac.UserOwner}}
+	owner := rbac.CoreOwnerSpec{Name: "alice", Kind: rbac.UserOwner}
 	green := testTenant("green", "green-uid")
 	green.Status.Owners = rbac.OwnerStatusListSpec{owner}
 	blue := testTenant("blue", "blue-uid")
@@ -92,12 +92,11 @@ func TestOwnerReferenceHandlerRejectsTenantOwnerAssignmentChanges(t *testing.T) 
 		{name: "migration", new: testTenantNamespace("workloads", blue)},
 		{
 			name: "label migration with empty ownerReferences",
-			new: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+			new: &corev1.Namespace{
 				Name:   "workloads",
-				Labels: map[string]string{meta.TenantLabel: blue.Name},
-			}},
+				Labels: map[string]string{meta.TenantLabel: blue.Name}},
 		},
-		{name: "detachment", new: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "workloads"}}},
+		{name: "detachment", new: &corev1.Namespace{Name: "workloads"}},
 	}
 
 	for _, tt := range tests {
@@ -125,7 +124,7 @@ func TestOwnerReferenceHandlerRejectsTenantOwnerAssignmentChanges(t *testing.T) 
 func TestOwnerReferenceHandlerRepairsTenantOwnerReferences(t *testing.T) {
 	t.Parallel()
 
-	owner := rbac.CoreOwnerSpec{UserSpec: rbac.UserSpec{Name: "alice", Kind: rbac.UserOwner}}
+	owner := rbac.CoreOwnerSpec{Name: "alice", Kind: rbac.UserOwner}
 	green := testTenant("green", "green-uid")
 	green.Status.Owners = rbac.OwnerStatusListSpec{owner}
 	oldNs := testTenantNamespace("workloads", green)
@@ -195,7 +194,7 @@ func TestOwnerReferenceHandlerRejectsNonOwnerJoin(t *testing.T) {
 		c,
 		users.AdmissionUser{Type: users.AdmissionUserCapsule, Username: "alice"},
 		testTenantNamespace("workloads", green),
-		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "workloads"}},
+		&corev1.Namespace{Name: "workloads"},
 		nil,
 		recorder,
 	)(context.Background(), admission.Request{})
@@ -206,11 +205,11 @@ func TestOwnerReferenceHandlerRejectsNonOwnerJoin(t *testing.T) {
 }
 
 func testTenant(name string, uid types.UID) *capsulev1beta2.Tenant {
-	return &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: name, UID: uid}}
+	return &capsulev1beta2.Tenant{Name: name, UID: uid}
 }
 
 func testTenantNamespace(name string, tnt *capsulev1beta2.Tenant) *corev1.Namespace {
-	return &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+	return &corev1.Namespace{
 		Name:   name,
 		Labels: map[string]string{meta.TenantLabel: tnt.GetName()},
 		OwnerReferences: []metav1.OwnerReference{{
@@ -218,8 +217,7 @@ func testTenantNamespace(name string, tnt *capsulev1beta2.Tenant) *corev1.Namesp
 			Kind:       tenant.ObjectReferenceTenantKind,
 			Name:       tnt.GetName(),
 			UID:        tnt.GetUID(),
-		}},
-	}}
+		}}}
 }
 
 func assertTenantAssignment(t *testing.T, ns *corev1.Namespace, tnt *capsulev1beta2.Tenant) {

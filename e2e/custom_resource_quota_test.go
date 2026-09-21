@@ -25,33 +25,25 @@ import (
 
 var _ = Describe("when Tenant limits custom Resource Quota", Ordered, Label("resourcequota"), func() {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-limiting-resources",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
-			Annotations: map[string]string{
-				"quota.resources.capsule.clastix.io/foos.test.clastix.io_v1": "3",
-			},
+		Name: "e2e-limiting-resources",
+		Labels: map[string]string{
+			"env": "e2e",
+		},
+		Annotations: map[string]string{
+			"quota.resources.capsule.clastix.io/foos.test.clastix.io_v1": "3",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-limiting-resources",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-limiting-resources",
+					Kind: "User",
 				},
 			},
 		},
 	}
 
 	crd := &v1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "foos.test.clastix.io",
-		},
+		Name: "foos.test.clastix.io",
 		Spec: v1.CustomResourceDefinitionSpec{
 			Group: "test.clastix.io",
 			Names: v1.CustomResourceDefinitionNames{
@@ -118,10 +110,10 @@ var _ = Describe("when Tenant limits custom Resource Quota", Ordered, Label("res
 			NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 			obj := &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"apiVersion": fmt.Sprintf("%s/%s", crd.Spec.Group, crd.Spec.Versions[0].Name),
 					"kind":       crd.Spec.Names.Kind,
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"name": fmt.Sprintf("resource-%d", i),
 					},
 				},
@@ -139,10 +131,10 @@ var _ = Describe("when Tenant limits custom Resource Quota", Ordered, Label("res
 			})
 
 			obj := &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"apiVersion": fmt.Sprintf("%s/%s", crd.Spec.Group, crd.Spec.Versions[0].Name),
 					"kind":       crd.Spec.Names.Kind,
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"name": fmt.Sprintf("fail-%d", i),
 					},
 				},

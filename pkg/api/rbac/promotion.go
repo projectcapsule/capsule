@@ -27,12 +27,10 @@ func (o PromotionSpec) ToAdditionalRolebindings() []AdditionalRoleBindingsWithNa
 	for _, ns := range o.Targets {
 		for _, clusterRoleName := range o.ClusterRoles {
 			bindings = append(bindings, AdditionalRoleBindingsWithNamespaceSpec{
-				Namespace: meta.RFC1123SubdomainName(ns),
-				AdditionalRoleBindingsSpec: AdditionalRoleBindingsSpec{
-					ClusterRoleName: clusterRoleName,
-					Subjects: []rbacv1.Subject{
-						o.Subject(),
-					},
+				Namespace:       meta.RFC1123SubdomainName(ns),
+				ClusterRoleName: clusterRoleName,
+				Subjects: []rbacv1.Subject{
+					o.Subject(),
 				},
 			})
 		}

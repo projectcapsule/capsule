@@ -73,7 +73,6 @@ func TestRequiresFastTemplate(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt // capture range variable
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -343,10 +342,10 @@ func TestTemplateForTenantAndNamespaceMap_Concurrency(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(goroutines)
 
-	for i := 0; i < goroutines; i++ {
+	for range goroutines {
 		go func() {
 			defer wg.Done()
-			for j := 0; j < iterations; j++ {
+			for range iterations {
 				out := tpl.FastTemplateMap(shared, tplContext)
 
 				// sanity checks

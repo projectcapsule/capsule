@@ -1,0 +1,34 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: ResourcePermit
+metadata:
+  name: clustrrole-alice
+  namespace: solar-test
+spec:
+  template:
+    kind: GlobalResourcePermitTemplate
+    name: clusterrole-bindings
+  reason: Temporarily investigate and repair CustomQuota configuration.
+  duration: 30m
+  params:
+    clusterRoles:
+      - admin
+    namespaces:
+      - solar-test
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: ResourcePermit
+metadata:
+  name: edit-alice
+  namespace: solar-test
+spec:
+  template:
+    kind: GlobalResourcePermitTemplate
+    name: clusterrole-bindings
+  reason: Temporarily investigate and repair CustomQuota configuration.
+  duration: 30m
+  params:
+    clusterRoles:
+      - edit
+    namespaces:
+      - solar-test

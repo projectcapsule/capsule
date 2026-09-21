@@ -12,16 +12,13 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
 	apimeta "github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
-	capruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 	"github.com/projectcapsule/capsule/pkg/template"
 )
@@ -53,15 +50,13 @@ var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace
 		additionalBindingUser = rbac.UserSpec{Name: "e2e-tr-additional", Kind: rbac.OwnerKind("User")}
 
 		tnt = &capsulev1beta2.Tenant{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "e2e-tenantresource-ssa",
-				Labels: map[string]string{
-					"env": "e2e",
-				},
+			Name: "e2e-tenantresource-ssa",
+			Labels: map[string]string{
+				"env": "e2e",
 			},
 			Spec: capsulev1beta2.TenantSpec{
 				Owners: rbac.OwnerListSpec{{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{UserSpec: tenantOwner},
+					UserSpec: tenantOwner,
 				}},
 				AdditionalRoleBindings: []rbac.AdditionalRoleBindingsSpec{{
 					ClusterRoleName: "admin",
@@ -71,33 +66,27 @@ var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace
 		}
 
 		sharedSourceSecret = &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "seed-secret",
-				Namespace: baseNamespace,
-				Labels: map[string]string{
-					"replicate": "true",
-					"source":    "static",
-				},
+			Name:      "seed-secret",
+			Namespace: baseNamespace,
+			Labels: map[string]string{
+				"replicate": "true",
+				"source":    "static",
 			},
 			Type:       corev1.SecretTypeOpaque,
 			StringData: map[string]string{"seed": "base"},
 		}
 
 		contextSecretOne = &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pull-secret-one",
-				Namespace: "e2e-tenantresource-ssa-one",
-				Labels:    map[string]string{"pullsecret.company.com": "true"},
-			},
+			Name:       "pull-secret-one",
+			Namespace:  "e2e-tenantresource-ssa-one",
+			Labels:     map[string]string{"pullsecret.company.com": "true"},
 			Type:       corev1.SecretTypeOpaque,
 			StringData: map[string]string{".dockerconfigjson": "e30="},
 		}
 		contextSecretTwo = &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pull-secret-two",
-				Namespace: "e2e-tenantresource-ssa-one",
-				Labels:    map[string]string{"pullsecret.company.com": "true"},
-			},
+			Name:       "pull-secret-two",
+			Namespace:  "e2e-tenantresource-ssa-one",
+			Labels:     map[string]string{"pullsecret.company.com": "true"},
 			Type:       corev1.SecretTypeOpaque,
 			StringData: map[string]string{".dockerconfigjson": "e30="},
 		}
@@ -146,35 +135,27 @@ var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace
 		It("rejects cluster-scoped rawItems", func() {
 			clusterRoleName := "tr-raw-cluster-scoped"
 			defer func() {
-				ignoreNotFound(k8sClient.Delete(ctx, &rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: clusterRoleName}}))
+				ignoreNotFound(k8sClient.Delete(ctx, &rbacv1.ClusterRole{Name: clusterRoleName}))
 			}()
 
 			tr := &capsulev1beta2.TenantResource{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "rawitems-cluster-scoped",
-					Namespace: baseNamespace,
-				},
+				Name:      "rawitems-cluster-scoped",
+				Namespace: baseNamespace,
 				Spec: capsulev1beta2.TenantResourceSpec{
 					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
-						PruningOnDelete: ptr.To(true),
+						PruningOnDelete: new(true),
 						ResyncPeriod:    resyncPeriod,
 						Resources: []capsulev1beta2.ResourceSpec{{
 							RawItems: []capsulev1beta2.RawExtension{{
-								RawExtension: runtime.RawExtension{
-									Object: &rbacv1.ClusterRole{
-										TypeMeta: metav1.TypeMeta{
-											APIVersion: rbacv1.SchemeGroupVersion.String(),
-											Kind:       "ClusterRole",
-										},
-										ObjectMeta: metav1.ObjectMeta{
-											Name: clusterRoleName,
-										},
-										Rules: []rbacv1.PolicyRule{{
-											APIGroups: []string{""},
-											Resources: []string{"configmaps"},
-											Verbs:     []string{"get"},
-										}},
-									},
+								Object: &rbacv1.ClusterRole{
+									APIVersion: rbacv1.SchemeGroupVersion.String(),
+									Kind:       "ClusterRole",
+									Name:       clusterRoleName,
+									Rules: []rbacv1.PolicyRule{{
+										APIGroups: []string{""},
+										Resources: []string{"configmaps"},
+										Verbs:     []string{"get"},
+									}},
 								},
 							}},
 						}},
@@ -190,7 +171,7 @@ var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace
 		It("rejects cluster-scoped generator output", func() {
 			clusterRoleName := "tr-generator-cluster-scoped"
 			defer func() {
-				ignoreNotFound(k8sClient.Delete(ctx, &rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: clusterRoleName}}))
+				ignoreNotFound(k8sClient.Delete(ctx, &rbacv1.ClusterRole{Name: clusterRoleName}))
 			}()
 
 			tr := newGeneratorConfigMapTenantResource(baseNamespace, "generator-cluster-scoped", fmt.Sprintf(`---
@@ -212,11 +193,9 @@ rules:
 		It("rejects cluster-scoped namespacedItems", func() {
 			clusterRoleName := "tr-source-cluster-scoped"
 			source := &rbacv1.ClusterRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: clusterRoleName,
-					Labels: map[string]string{
-						"replicate": "cluster-scoped",
-					},
+				Name: clusterRoleName,
+				Labels: map[string]string{
+					"replicate": "cluster-scoped",
 				},
 				Rules: []rbacv1.PolicyRule{{
 					APIGroups: []string{""},
@@ -231,20 +210,16 @@ rules:
 			}()
 
 			tr := &capsulev1beta2.TenantResource{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "namespaceditems-cluster-scoped",
-					Namespace: baseNamespace,
-				},
+				Name:      "namespaceditems-cluster-scoped",
+				Namespace: baseNamespace,
 				Spec: capsulev1beta2.TenantResourceSpec{
 					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
-						PruningOnDelete: ptr.To(true),
+						PruningOnDelete: new(true),
 						ResyncPeriod:    resyncPeriod,
 						Resources: []capsulev1beta2.ResourceSpec{{
 							NamespacedItems: []template.ResourceReference{{
-								VersionKind: capruntime.VersionKind{
-									APIVersion: rbacv1.SchemeGroupVersion.String(),
-									Kind:       "ClusterRole",
-								},
+								APIVersion: rbacv1.SchemeGroupVersion.String(),
+								Kind:       "ClusterRole",
 								Selector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{
 										"replicate": "cluster-scoped",
@@ -265,31 +240,23 @@ rules:
 		terminatingNamespace := targetNamespaces[2]
 
 		tr := &capsulev1beta2.TenantResource{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "skip-terminating-namespace",
-				Namespace: baseNamespace,
-			},
+			Name:      "skip-terminating-namespace",
+			Namespace: baseNamespace,
 			Spec: capsulev1beta2.TenantResourceSpec{
 				TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
-					PruningOnDelete: ptr.To(true),
+					PruningOnDelete: new(true),
 					ResyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 					Resources: []capsulev1beta2.ResourceSpec{{
 						NamespaceSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{tenantResourceTargetLabel: "true"},
 						},
 						RawItems: []capsulev1beta2.RawExtension{{
-							RawExtension: runtime.RawExtension{
-								Object: &corev1.ConfigMap{
-									TypeMeta: metav1.TypeMeta{
-										APIVersion: "v1",
-										Kind:       "ConfigMap",
-									},
-									ObjectMeta: metav1.ObjectMeta{
-										Name: "tr-skip-terminating",
-									},
-									Data: map[string]string{
-										"mode": "active",
-									},
+							Object: &corev1.ConfigMap{
+								APIVersion: "v1",
+								Kind:       "ConfigMap",
+								Name:       "tr-skip-terminating",
+								Data: map[string]string{
+									"mode": "active",
 								},
 							},
 						}},
@@ -331,15 +298,11 @@ rules:
 			}
 
 			current.Spec.Resources[0].RawItems[0] = capsulev1beta2.RawExtension{
-				RawExtension: runtime.RawExtension{
-					Object: &corev1.ConfigMap{
-						TypeMeta: metav1.TypeMeta{
-							APIVersion: "v1",
-							Kind:       "ConfigMap",
-						},
-						ObjectMeta: metav1.ObjectMeta{Name: "tr-skip-terminating"},
-						Data:       map[string]string{"mode": "updated"},
-					},
+				Object: &corev1.ConfigMap{
+					APIVersion: "v1",
+					Kind:       "ConfigMap",
+					Name:       "tr-skip-terminating",
+					Data:       map[string]string{"mode": "updated"},
 				},
 			}
 
@@ -380,12 +343,10 @@ rules:
 
 		It("fails when a templated namespace resolves to a forbidden namespace", func() {
 			foreignSecret := &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "templated-foreign-secret",
-					Namespace: "kube-system",
-					Labels: map[string]string{
-						"pullsecret.company.com": "true",
-					},
+				Name:      "templated-foreign-secret",
+				Namespace: "kube-system",
+				Labels: map[string]string{
+					"pullsecret.company.com": "true",
 				},
 				Type:       corev1.SecretTypeOpaque,
 				StringData: map[string]string{"token": "forbidden"},
@@ -394,28 +355,22 @@ rules:
 			defer ignoreNotFound(k8sClient.Delete(ctx, foreignSecret))
 
 			tr := &capsulev1beta2.TenantResource{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "templated-forbidden-namespace",
-					Namespace: baseNamespace,
-				},
+				Name:      "templated-forbidden-namespace",
+				Namespace: baseNamespace,
 				Spec: capsulev1beta2.TenantResourceSpec{
 					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
-						PruningOnDelete: ptr.To(true),
+						PruningOnDelete: new(true),
 						ResyncPeriod:    resyncPeriod,
 						Resources: []capsulev1beta2.ResourceSpec{{
 							Context: &template.TemplateContext{
 								Resources: []*template.TemplateResourceReference{{
-									Index: "secrets",
-									ResourceReference: template.ResourceReference{
-										VersionKind: capruntime.VersionKind{
-											APIVersion: "v1",
-											Kind:       "Secret",
-										},
-										Namespace: "{{ forbiddenNamespace }}",
-										Selector: &metav1.LabelSelector{
-											MatchLabels: map[string]string{
-												"pullsecret.company.com": "true",
-											},
+									Index:      "secrets",
+									APIVersion: "v1",
+									Kind:       "Secret",
+									Namespace:  "{{ forbiddenNamespace }}",
+									Selector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"pullsecret.company.com": "true",
 										},
 									},
 								}},
@@ -473,13 +428,11 @@ data:
 
 		It("places generated objects into the current tenant namespace even when the template sets metadata.namespace to a foreign namespace", func() {
 			tr := &capsulev1beta2.TenantResource{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "generator-enforce-target-namespace",
-					Namespace: baseNamespace,
-				},
+				Name:      "generator-enforce-target-namespace",
+				Namespace: baseNamespace,
 				Spec: capsulev1beta2.TenantResourceSpec{
 					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
-						PruningOnDelete: ptr.To(true),
+						PruningOnDelete: new(true),
 						ResyncPeriod:    resyncPeriod,
 						Resources: []capsulev1beta2.ResourceSpec{{
 							Generators: []capsulev1beta2.TemplateItemSpec{{
@@ -530,25 +483,21 @@ data:
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, contextSecretTwo) }).Should(Succeed())
 
 			tr := &capsulev1beta2.TenantResource{
-				ObjectMeta: metav1.ObjectMeta{Name: "context-loading-fixed-namespace", Namespace: baseNamespace},
+				Name: "context-loading-fixed-namespace", Namespace: baseNamespace,
 				Spec: capsulev1beta2.TenantResourceSpec{
 					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
-						PruningOnDelete: ptr.To(true),
+						PruningOnDelete: new(true),
 						ResyncPeriod:    resyncPeriod,
 						Resources: []capsulev1beta2.ResourceSpec{{
 							Context: &template.TemplateContext{
 								Resources: []*template.TemplateResourceReference{{
-									Index: "secrets",
-									ResourceReference: template.ResourceReference{
-										VersionKind: capruntime.VersionKind{
-											APIVersion: "v1",
-											Kind:       "Secret",
-										},
-										Namespace: "e2e-tenantresource-ssa-one",
-										Selector: &metav1.LabelSelector{
-											MatchLabels: map[string]string{
-												"pullsecret.company.com": "true",
-											},
+									Index:      "secrets",
+									APIVersion: "v1",
+									Kind:       "Secret",
+									Namespace:  "e2e-tenantresource-ssa-one",
+									Selector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"pullsecret.company.com": "true",
 										},
 									},
 								}},
@@ -582,25 +531,21 @@ data:
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, contextSecretTwo) }).Should(Succeed())
 
 			tr := &capsulev1beta2.TenantResource{
-				ObjectMeta: metav1.ObjectMeta{Name: "context-loading-variable-namespace", Namespace: baseNamespace},
+				Name: "context-loading-variable-namespace", Namespace: baseNamespace,
 				Spec: capsulev1beta2.TenantResourceSpec{
 					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
-						PruningOnDelete: ptr.To(true),
+						PruningOnDelete: new(true),
 						ResyncPeriod:    resyncPeriod,
 						Resources: []capsulev1beta2.ResourceSpec{{
 							Context: &template.TemplateContext{
 								Resources: []*template.TemplateResourceReference{{
-									Index: "secrets",
-									ResourceReference: template.ResourceReference{
-										VersionKind: capruntime.VersionKind{
-											APIVersion: "v1",
-											Kind:       "Secret",
-										},
-										Namespace: "{{ namespace }}",
-										Selector: &metav1.LabelSelector{
-											MatchLabels: map[string]string{
-												"pullsecret.company.com": "true",
-											},
+									Index:      "secrets",
+									APIVersion: "v1",
+									Kind:       "Secret",
+									Namespace:  "{{ namespace }}",
+									Selector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"pullsecret.company.com": "true",
 										},
 									},
 								}},
@@ -634,12 +579,10 @@ data:
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, contextSecretTwo) }).Should(Succeed())
 
 			solarTwoSecret := &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pull-secret-e2e-tenantresource-ssa-two",
-					Namespace: "e2e-tenantresource-ssa-two",
-					Labels: map[string]string{
-						"pullsecret.company.com": "true",
-					},
+				Name:      "pull-secret-e2e-tenantresource-ssa-two",
+				Namespace: "e2e-tenantresource-ssa-two",
+				Labels: map[string]string{
+					"pullsecret.company.com": "true",
 				},
 				Type:       corev1.SecretTypeOpaque,
 				StringData: map[string]string{".dockerconfigjson": "e30="},
@@ -647,25 +590,21 @@ data:
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, solarTwoSecret) }).Should(Succeed())
 
 			tr := &capsulev1beta2.TenantResource{
-				ObjectMeta: metav1.ObjectMeta{Name: "context-variable-namespace", Namespace: baseNamespace},
+				Name: "context-variable-namespace", Namespace: baseNamespace,
 				Spec: capsulev1beta2.TenantResourceSpec{
 					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
-						PruningOnDelete: ptr.To(true),
+						PruningOnDelete: new(true),
 						ResyncPeriod:    resyncPeriod,
 						Resources: []capsulev1beta2.ResourceSpec{{
 							Context: &template.TemplateContext{
 								Resources: []*template.TemplateResourceReference{{
-									Index: "secrets",
-									ResourceReference: template.ResourceReference{
-										VersionKind: capruntime.VersionKind{
-											APIVersion: "v1",
-											Kind:       "Secret",
-										},
-										Namespace: "{{.namespace}}",
-										Selector: &metav1.LabelSelector{
-											MatchLabels: map[string]string{
-												"pullsecret.company.com": "true",
-											},
+									Index:      "secrets",
+									APIVersion: "v1",
+									Kind:       "Secret",
+									Namespace:  "{{.namespace}}",
+									Selector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"pullsecret.company.com": "true",
 										},
 									},
 								}},
@@ -696,12 +635,10 @@ data:
 
 		It("fails when context tries to load from a namespace outside the tenant", func() {
 			foreignSecret := &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foreign-pull-secret",
-					Namespace: "kube-system",
-					Labels: map[string]string{
-						"pullsecret.company.com": "true",
-					},
+				Name:      "foreign-pull-secret",
+				Namespace: "kube-system",
+				Labels: map[string]string{
+					"pullsecret.company.com": "true",
 				},
 				Type:       corev1.SecretTypeOpaque,
 				StringData: map[string]string{".dockerconfigjson": "e30="},
@@ -710,28 +647,22 @@ data:
 			defer ignoreNotFound(k8sClient.Delete(ctx, foreignSecret))
 
 			tr := &capsulev1beta2.TenantResource{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "context-forbidden-namespace",
-					Namespace: baseNamespace,
-				},
+				Name:      "context-forbidden-namespace",
+				Namespace: baseNamespace,
 				Spec: capsulev1beta2.TenantResourceSpec{
 					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
-						PruningOnDelete: ptr.To(true),
+						PruningOnDelete: new(true),
 						ResyncPeriod:    resyncPeriod,
 						Resources: []capsulev1beta2.ResourceSpec{{
 							Context: &template.TemplateContext{
 								Resources: []*template.TemplateResourceReference{{
-									Index: "secrets",
-									ResourceReference: template.ResourceReference{
-										VersionKind: capruntime.VersionKind{
-											APIVersion: "v1",
-											Kind:       "Secret",
-										},
-										Namespace: "kube-system",
-										Selector: &metav1.LabelSelector{
-											MatchLabels: map[string]string{
-												"pullsecret.company.com": "true",
-											},
+									Index:      "secrets",
+									APIVersion: "v1",
+									Kind:       "Secret",
+									Namespace:  "kube-system",
+									Selector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"pullsecret.company.com": "true",
 										},
 									},
 								}},
@@ -774,12 +705,10 @@ data:
 
 		It("fails when namespacedItems tries to load from a namespace outside the tenant", func() {
 			foreignSecret := &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foreign-source-secret",
-					Namespace: "kube-system",
-					Labels: map[string]string{
-						"pullsecret.company.com": "true",
-					},
+				Name:      "foreign-source-secret",
+				Namespace: "kube-system",
+				Labels: map[string]string{
+					"pullsecret.company.com": "true",
 				},
 				Type:       corev1.SecretTypeOpaque,
 				StringData: map[string]string{"token": "forbidden"},
@@ -788,22 +717,18 @@ data:
 			defer ignoreNotFound(k8sClient.Delete(ctx, foreignSecret))
 
 			tr := &capsulev1beta2.TenantResource{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "namespaceditems-forbidden-namespace",
-					Namespace: baseNamespace,
-				},
+				Name:      "namespaceditems-forbidden-namespace",
+				Namespace: baseNamespace,
 				Spec: capsulev1beta2.TenantResourceSpec{
 					ServiceAccount: &apimeta.LocalRFC1123ObjectReference{Name: apimeta.RFC1123Name("replicator")},
 					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
-						PruningOnDelete: ptr.To(true),
+						PruningOnDelete: new(true),
 						ResyncPeriod:    resyncPeriod,
 						Resources: []capsulev1beta2.ResourceSpec{{
 							NamespacedItems: []template.ResourceReference{{
-								VersionKind: capruntime.VersionKind{
-									APIVersion: "v1",
-									Kind:       "Secret",
-								},
-								Namespace: "kube-system",
+								APIVersion: "v1",
+								Kind:       "Secret",
+								Namespace:  "kube-system",
 								Selector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{
 										"pullsecret.company.com": "true",
@@ -840,29 +765,21 @@ data:
 
 		It("places rawItems into the current tenant namespace even when metadata.namespace is set to a foreign namespace", func() {
 			tr := &capsulev1beta2.TenantResource{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "rawitems-enforce-target-namespace",
-					Namespace: baseNamespace,
-				},
+				Name:      "rawitems-enforce-target-namespace",
+				Namespace: baseNamespace,
 				Spec: capsulev1beta2.TenantResourceSpec{
 					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
-						PruningOnDelete: ptr.To(true),
+						PruningOnDelete: new(true),
 						ResyncPeriod:    resyncPeriod,
 						Resources: []capsulev1beta2.ResourceSpec{{
 							RawItems: []capsulev1beta2.RawExtension{{
-								RawExtension: runtime.RawExtension{
-									Object: &corev1.ConfigMap{
-										TypeMeta: metav1.TypeMeta{
-											APIVersion: "v1",
-											Kind:       "ConfigMap",
-										},
-										ObjectMeta: metav1.ObjectMeta{
-											Name:      "raw-namespace-locked",
-											Namespace: "kube-system",
-										},
-										Data: map[string]string{
-											"source": "raw",
-										},
+								Object: &corev1.ConfigMap{
+									APIVersion: "v1",
+									Kind:       "ConfigMap",
+									Name:       "raw-namespace-locked",
+									Namespace:  "kube-system",
+									Data: map[string]string{
+										"source": "raw",
 									},
 								},
 							}},
@@ -927,7 +844,7 @@ data:
 
 			second := newRawConfigMapTenantResource(baseNamespace, "same-object-conflict-b", map[string]string{"shared": "two"})
 			second.Spec.Resources[0].RawItems[0].RawExtension.Object.(*corev1.ConfigMap).Name = "force-target"
-			second.Spec.Settings.Force = ptr.To(false)
+			second.Spec.Settings.Force = new(false)
 
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, first) }).Should(Succeed())
 			expectTenantResourceReady(baseNamespace, first.Name)
@@ -946,7 +863,7 @@ data:
 
 			second := newRawConfigMapTenantResource(baseNamespace, "same-object-force-b", map[string]string{"shared": "two"})
 			second.Spec.Resources[0].RawItems[0].RawExtension.Object.(*corev1.ConfigMap).Name = "forced-target"
-			second.Spec.Settings.Force = ptr.To(true)
+			second.Spec.Settings.Force = new(true)
 
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, first) }).Should(Succeed())
 			expectTenantResourceReady(baseNamespace, first.Name)
@@ -965,19 +882,17 @@ data:
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, sharedSourceSecret) }).Should(Succeed())
 
 			tr := &capsulev1beta2.TenantResource{
-				ObjectMeta: metav1.ObjectMeta{Name: "selector-replication", Namespace: baseNamespace},
+				Name: "selector-replication", Namespace: baseNamespace,
 				Spec: capsulev1beta2.TenantResourceSpec{
 					ServiceAccount: &apimeta.LocalRFC1123ObjectReference{Name: apimeta.RFC1123Name("replicator")},
 					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
-						PruningOnDelete: ptr.To(true),
+						PruningOnDelete: new(true),
 						ResyncPeriod:    resyncPeriod,
 						Resources: []capsulev1beta2.ResourceSpec{{
 							NamespacedItems: []template.ResourceReference{{
-								VersionKind: capruntime.VersionKind{
-									APIVersion: "v1",
-									Kind:       "Secret",
-								},
-								Namespace: baseNamespace,
+								APIVersion: "v1",
+								Kind:       "Secret",
+								Namespace:  baseNamespace,
 								Selector: &metav1.LabelSelector{MatchLabels: map[string]string{
 									"replicate": "true",
 								}},
@@ -1012,7 +927,7 @@ data:
 				"mode": "before",
 				"foo":  "one",
 			})
-			tr.Spec.PruningOnDelete = ptr.To(true)
+			tr.Spec.PruningOnDelete = new(true)
 
 			By("creating the TenantResource")
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
@@ -1033,20 +948,14 @@ data:
 				}
 
 				current.Spec.Resources[0].RawItems[0] = capsulev1beta2.RawExtension{
-					RawExtension: runtime.RawExtension{
-						Object: &corev1.ConfigMap{
-							TypeMeta: metav1.TypeMeta{
-								APIVersion: "v1",
-								Kind:       "ConfigMap",
-							},
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "shared-config",
-							},
-							Data: map[string]string{
-								"mode": "after",
-								"foo":  "two",
-								"bar":  "three",
-							},
+					Object: &corev1.ConfigMap{
+						APIVersion: "v1",
+						Kind:       "ConfigMap",
+						Name:       "shared-config",
+						Data: map[string]string{
+							"mode": "after",
+							"foo":  "two",
+							"bar":  "three",
 						},
 					},
 				}
@@ -1069,13 +978,11 @@ data:
 
 	It("places generated objects into the current tenant namespace even when the template sets metadata.namespace to a foreign namespace", func() {
 		tr := &capsulev1beta2.TenantResource{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "generator-enforce-target-namespace",
-				Namespace: baseNamespace,
-			},
+			Name:      "generator-enforce-target-namespace",
+			Namespace: baseNamespace,
 			Spec: capsulev1beta2.TenantResourceSpec{
 				TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
-					PruningOnDelete: ptr.To(true),
+					PruningOnDelete: new(true),
 					ResyncPeriod:    resyncPeriod,
 					Resources: []capsulev1beta2.ResourceSpec{{
 						Generators: []capsulev1beta2.TemplateItemSpec{{
@@ -1123,28 +1030,20 @@ data:
 
 	It("merge rawItems and generators when they target the same object", func() {
 		tr := &capsulev1beta2.TenantResource{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "raw-and-generator-same-object",
-				Namespace: baseNamespace,
-			},
+			Name:      "raw-and-generator-same-object",
+			Namespace: baseNamespace,
 			Spec: capsulev1beta2.TenantResourceSpec{
 				TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
-					PruningOnDelete: ptr.To(true),
+					PruningOnDelete: new(true),
 					ResyncPeriod:    resyncPeriod,
 					Resources: []capsulev1beta2.ResourceSpec{{
 						RawItems: []capsulev1beta2.RawExtension{{
-							RawExtension: runtime.RawExtension{
-								Object: &corev1.ConfigMap{
-									TypeMeta: metav1.TypeMeta{
-										APIVersion: "v1",
-										Kind:       "ConfigMap",
-									},
-									ObjectMeta: metav1.ObjectMeta{
-										Name: "raw-generated-shared",
-									},
-									Data: map[string]string{
-										"static": "raw",
-									},
+							Object: &corev1.ConfigMap{
+								APIVersion: "v1",
+								Kind:       "ConfigMap",
+								Name:       "raw-generated-shared",
+								Data: map[string]string{
+									"static": "raw",
 								},
 							},
 						}},
@@ -1180,10 +1079,8 @@ data:
 		By("creating the preexisting object in all target namespaces")
 		for _, ns := range targetNamespaces {
 			cm := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "shared-adopted-config",
-					Namespace: ns,
-				},
+				Name:      "shared-adopted-config",
+				Namespace: ns,
 				Data: map[string]string{
 					"existing": "true",
 				},
@@ -1198,43 +1095,31 @@ data:
 			"foo": "one",
 		})
 		trA.Spec.Resources[0].RawItems[0] = capsulev1beta2.RawExtension{
-			RawExtension: runtime.RawExtension{
-				Object: &corev1.ConfigMap{
-					TypeMeta: metav1.TypeMeta{
-						APIVersion: "v1",
-						Kind:       "ConfigMap",
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "shared-adopted-config",
-					},
-					Data: map[string]string{
-						"foo": "one",
-					},
+			Object: &corev1.ConfigMap{
+				APIVersion: "v1",
+				Kind:       "ConfigMap",
+				Name:       "shared-adopted-config",
+				Data: map[string]string{
+					"foo": "one",
 				},
 			},
 		}
-		trA.Spec.Settings.Adopt = ptr.To(true)
+		trA.Spec.Settings.Adopt = new(true)
 
 		trB := newRawConfigMapTenantResource(baseNamespace, "adopt-shared-b", map[string]string{
 			"bar": "two",
 		})
 		trB.Spec.Resources[0].RawItems[0] = capsulev1beta2.RawExtension{
-			RawExtension: runtime.RawExtension{
-				Object: &corev1.ConfigMap{
-					TypeMeta: metav1.TypeMeta{
-						APIVersion: "v1",
-						Kind:       "ConfigMap",
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "shared-adopted-config",
-					},
-					Data: map[string]string{
-						"bar": "two",
-					},
+			Object: &corev1.ConfigMap{
+				APIVersion: "v1",
+				Kind:       "ConfigMap",
+				Name:       "shared-adopted-config",
+				Data: map[string]string{
+					"bar": "two",
 				},
 			},
 		}
-		trB.Spec.Settings.Adopt = ptr.To(true)
+		trB.Spec.Settings.Adopt = new(true)
 
 		By("creating both TenantResources")
 		EventuallyCreation(func() error { return k8sClient.Create(ctx, trA) }).Should(Succeed())
@@ -1261,13 +1146,11 @@ data:
 		By("creating legacy-labelled objects in all target namespaces")
 		for _, ns := range targetNamespaces {
 			cm := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "legacy-aligned-config",
-					Namespace: ns,
-					Labels: map[string]string{
-						"capsule.clastix.io/resources": "0",
-						apimeta.TenantLabel:            tnt.GetName(),
-					},
+				Name:      "legacy-aligned-config",
+				Namespace: ns,
+				Labels: map[string]string{
+					"capsule.clastix.io/resources": "0",
+					apimeta.TenantLabel:            tnt.GetName(),
 				},
 				Data: map[string]string{
 					"legacy": "true",
@@ -1284,19 +1167,13 @@ data:
 			"foo":  "bar",
 		})
 		tr.Spec.Resources[0].RawItems[0] = capsulev1beta2.RawExtension{
-			RawExtension: runtime.RawExtension{
-				Object: &corev1.ConfigMap{
-					TypeMeta: metav1.TypeMeta{
-						APIVersion: "v1",
-						Kind:       "ConfigMap",
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "legacy-aligned-config",
-					},
-					Data: map[string]string{
-						"mode": "new-controller",
-						"foo":  "bar",
-					},
+			Object: &corev1.ConfigMap{
+				APIVersion: "v1",
+				Kind:       "ConfigMap",
+				Name:       "legacy-aligned-config",
+				Data: map[string]string{
+					"mode": "new-controller",
+					"foo":  "bar",
 				},
 			},
 		}
@@ -1389,12 +1266,10 @@ data:
 
 			// Create context source secret.
 			sec := &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "ctx-secret",
-					Namespace: "e2e-tenantresource-ssa-one",
-					Labels: map[string]string{
-						"pullsecret.company.com": "true",
-					},
+				Name:      "ctx-secret",
+				Namespace: "e2e-tenantresource-ssa-one",
+				Labels: map[string]string{
+					"pullsecret.company.com": "true",
 				},
 				Type:       corev1.SecretTypeOpaque,
 				StringData: map[string]string{".dockerconfigjson": "e30="},
@@ -1408,28 +1283,24 @@ data:
 			// But do NOT grant get/list on secrets in e2e-tenantresource-ssa-one.
 
 			tr := &capsulev1beta2.TenantResource{
-				ObjectMeta: metav1.ObjectMeta{Name: "sa-no-context-read", Namespace: baseNamespace},
+				Name: "sa-no-context-read", Namespace: baseNamespace,
 				Spec: capsulev1beta2.TenantResourceSpec{
 					ServiceAccount: &apimeta.LocalRFC1123ObjectReference{
 						Name: apimeta.RFC1123Name(saName),
 					},
 					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
 						ResyncPeriod:    resyncPeriod,
-						PruningOnDelete: ptr.To(true),
+						PruningOnDelete: new(true),
 						Resources: []capsulev1beta2.ResourceSpec{{
 							Context: &template.TemplateContext{
 								Resources: []*template.TemplateResourceReference{{
-									Index: "secrets",
-									ResourceReference: template.ResourceReference{
-										VersionKind: capruntime.VersionKind{
-											APIVersion: "v1",
-											Kind:       "Secret",
-										},
-										Namespace: "e2e-tenantresource-ssa-one",
-										Selector: &metav1.LabelSelector{
-											MatchLabels: map[string]string{
-												"pullsecret.company.com": "true",
-											},
+									Index:      "secrets",
+									APIVersion: "v1",
+									Kind:       "Secret",
+									Namespace:  "e2e-tenantresource-ssa-one",
+									Selector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"pullsecret.company.com": "true",
 										},
 									},
 								}},
@@ -1556,7 +1427,7 @@ data:
 			tr.Spec.ServiceAccount = &apimeta.LocalRFC1123ObjectReference{
 				Name: apimeta.RFC1123Name(saCreate),
 			}
-			tr.Spec.PruningOnDelete = ptr.To(true)
+			tr.Spec.PruningOnDelete = new(true)
 			renameFirstTenantResourceRawConfigMap(tr, "prune-protected")
 
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
@@ -1584,6 +1455,16 @@ data:
 				g.Expect(current.Status.ServiceAccount).ToNot(BeNil())
 				g.Expect(current.Status.ServiceAccount.Name).To(Equal(apimeta.RFC1123Name(saNoDelete)))
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+			By("protecting the ServiceAccount referenced by TenantResource status")
+			serviceAccount := &corev1.ServiceAccount{
+				Name:      saNoDelete,
+				Namespace: baseNamespace}
+			Eventually(func() bool {
+				err := k8sClient.Delete(ctx, serviceAccount, client.DryRunAll)
+
+				return apierrors.IsForbidden(err)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
 
 			Expect(k8sClient.Delete(ctx, tr)).To(Succeed())
 
@@ -1613,12 +1494,10 @@ data:
 			ensureServiceAccount(baseNamespace, saName)
 
 			source := &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "source-secret",
-					Namespace: baseNamespace,
-					Labels: map[string]string{
-						"replicate": "true",
-					},
+				Name:      "source-secret",
+				Namespace: baseNamespace,
+				Labels: map[string]string{
+					"replicate": "true",
 				},
 				Type:       corev1.SecretTypeOpaque,
 				StringData: map[string]string{"token": "abc"},
@@ -1631,21 +1510,19 @@ data:
 			}
 
 			tr := &capsulev1beta2.TenantResource{
-				ObjectMeta: metav1.ObjectMeta{Name: "sa-no-namespaceditem-read", Namespace: baseNamespace},
+				Name: "sa-no-namespaceditem-read", Namespace: baseNamespace,
 				Spec: capsulev1beta2.TenantResourceSpec{
 					ServiceAccount: &apimeta.LocalRFC1123ObjectReference{
 						Name: apimeta.RFC1123Name(saName),
 					},
 					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
 						ResyncPeriod:    resyncPeriod,
-						PruningOnDelete: ptr.To(true),
+						PruningOnDelete: new(true),
 						Resources: []capsulev1beta2.ResourceSpec{{
 							NamespacedItems: []template.ResourceReference{{
-								VersionKind: capruntime.VersionKind{
-									APIVersion: "v1",
-									Kind:       "Secret",
-								},
-								Namespace: baseNamespace,
+								APIVersion: "v1",
+								Kind:       "Secret",
+								Namespace:  baseNamespace,
 								Selector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{
 										"replicate": "true",
@@ -1674,10 +1551,8 @@ data:
 			By("creating the preexisting object in all target namespaces")
 			for _, ns := range targetNamespaces {
 				cm := &corev1.ConfigMap{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "shared-no-adopt-config",
-						Namespace: ns,
-					},
+					Name:      "shared-no-adopt-config",
+					Namespace: ns,
 					Data: map[string]string{
 						"existing": "true",
 					},
@@ -1692,43 +1567,31 @@ data:
 				"foo": "one",
 			})
 			trA.Spec.Resources[0].RawItems[0] = capsulev1beta2.RawExtension{
-				RawExtension: runtime.RawExtension{
-					Object: &corev1.ConfigMap{
-						TypeMeta: metav1.TypeMeta{
-							APIVersion: "v1",
-							Kind:       "ConfigMap",
-						},
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "shared-no-adopt-config",
-						},
-						Data: map[string]string{
-							"foo": "one",
-						},
+				Object: &corev1.ConfigMap{
+					APIVersion: "v1",
+					Kind:       "ConfigMap",
+					Name:       "shared-no-adopt-config",
+					Data: map[string]string{
+						"foo": "one",
 					},
 				},
 			}
-			trA.Spec.Settings.Adopt = ptr.To(false)
+			trA.Spec.Settings.Adopt = new(false)
 
 			trB := newRawConfigMapTenantResource(baseNamespace, "no-adopt-shared-b", map[string]string{
 				"bar": "two",
 			})
 			trB.Spec.Resources[0].RawItems[0] = capsulev1beta2.RawExtension{
-				RawExtension: runtime.RawExtension{
-					Object: &corev1.ConfigMap{
-						TypeMeta: metav1.TypeMeta{
-							APIVersion: "v1",
-							Kind:       "ConfigMap",
-						},
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "shared-no-adopt-config",
-						},
-						Data: map[string]string{
-							"bar": "two",
-						},
+				Object: &corev1.ConfigMap{
+					APIVersion: "v1",
+					Kind:       "ConfigMap",
+					Name:       "shared-no-adopt-config",
+					Data: map[string]string{
+						"bar": "two",
 					},
 				},
 			}
-			trB.Spec.Settings.Adopt = ptr.To(false)
+			trB.Spec.Settings.Adopt = new(false)
 
 			By("creating both TenantResources")
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, trA) }).Should(Succeed())
@@ -1753,29 +1616,21 @@ data:
 
 		It("forces rawItems into the current iterating tenant namespace regardless of metadata.namespace", func() {
 			tr := &capsulev1beta2.TenantResource{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "raw-target-namespace",
-					Namespace: baseNamespace,
-				},
+				Name:      "raw-target-namespace",
+				Namespace: baseNamespace,
 				Spec: capsulev1beta2.TenantResourceSpec{
 					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
-						PruningOnDelete: ptr.To(true),
+						PruningOnDelete: new(true),
 						ResyncPeriod:    resyncPeriod,
 						Resources: []capsulev1beta2.ResourceSpec{{
 							RawItems: []capsulev1beta2.RawExtension{{
-								RawExtension: runtime.RawExtension{
-									Object: &corev1.ConfigMap{
-										TypeMeta: metav1.TypeMeta{
-											APIVersion: "v1",
-											Kind:       "ConfigMap",
-										},
-										ObjectMeta: metav1.ObjectMeta{
-											Name:      "raw-namespace-enforced",
-											Namespace: "kube-system",
-										},
-										Data: map[string]string{
-											"source": "raw",
-										},
+								Object: &corev1.ConfigMap{
+									APIVersion: "v1",
+									Kind:       "ConfigMap",
+									Name:       "raw-namespace-enforced",
+									Namespace:  "kube-system",
+									Data: map[string]string{
+										"source": "raw",
 									},
 								},
 							}},
@@ -1805,7 +1660,7 @@ data:
 	Context("apply lifecycle with prune disabled", func() {
 		It("applies, updates and keeps objects while removing managed ownership", func() {
 			tr := newRawConfigMapTenantResource(baseNamespace, "raw-prune-disabled", map[string]string{"mode": "keep"})
-			tr.Spec.PruningOnDelete = ptr.To(false)
+			tr.Spec.PruningOnDelete = new(false)
 
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
 			expectTenantResourceReady(baseNamespace, tr.Name)
@@ -1833,8 +1688,8 @@ data:
 	Context("adoption", func() {
 		It("fails without adopt and succeeds with adopt", func() {
 			preexisting := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{Name: "adopt-me", Namespace: "e2e-tenantresource-ssa-one"},
-				Data:       map[string]string{"existing": "true"},
+				Name: "adopt-me", Namespace: "e2e-tenantresource-ssa-one",
+				Data: map[string]string{"existing": "true"},
 			}
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, preexisting) }).Should(Succeed())
 
@@ -1847,8 +1702,8 @@ data:
   source: generator
   namespace: "{{ $.namespace.metadata.name }}"
 `)
-			withoutAdopt.Spec.PruningOnDelete = ptr.To(true)
-			withoutAdopt.Spec.Settings.Adopt = ptr.To(false)
+			withoutAdopt.Spec.PruningOnDelete = new(true)
+			withoutAdopt.Spec.Settings.Adopt = new(false)
 
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, withoutAdopt) }).Should(Succeed())
 			expectTenantResourceFailed(baseNamespace, withoutAdopt.Name, "applying of")
@@ -1864,8 +1719,8 @@ data:
   source: generator
   namespace: "{{ $.namespace.metadata.name }}"
 `)
-			withAdopt.Spec.PruningOnDelete = ptr.To(true)
-			withAdopt.Spec.Settings.Adopt = ptr.To(true)
+			withAdopt.Spec.PruningOnDelete = new(true)
+			withAdopt.Spec.Settings.Adopt = new(true)
 
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, withAdopt) }).Should(Succeed())
 			expectTenantResourceReady(baseNamespace, withAdopt.Name)
@@ -1884,10 +1739,10 @@ data:
 	Context("same object within one TenantResource", func() {
 		It("merges non-conflicting fields from generator and raw item", func() {
 			tr := &capsulev1beta2.TenantResource{
-				ObjectMeta: metav1.ObjectMeta{Name: "same-object-merge", Namespace: baseNamespace},
+				Name: "same-object-merge", Namespace: baseNamespace,
 				Spec: capsulev1beta2.TenantResourceSpec{
 					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
-						PruningOnDelete: ptr.To(true),
+						PruningOnDelete: new(true),
 						ResyncPeriod:    resyncPeriod,
 						Resources: []capsulev1beta2.ResourceSpec{{
 							Generators: []capsulev1beta2.TemplateItemSpec{{
@@ -1901,11 +1756,11 @@ data:
   generated-{{ $.namespace.metadata.name }}: from-generator
 `,
 							}},
-							RawItems: []capsulev1beta2.RawExtension{{RawExtension: runtime.RawExtension{Object: &corev1.ConfigMap{
-								TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"},
-								ObjectMeta: metav1.ObjectMeta{Name: "common-config"},
-								Data:       map[string]string{"additional-data": "raw"},
-							}}}},
+							RawItems: []capsulev1beta2.RawExtension{{Object: &corev1.ConfigMap{
+								APIVersion: "v1", Kind: "ConfigMap",
+								Name: "common-config",
+								Data: map[string]string{"additional-data": "raw"},
+							}}},
 						}},
 					},
 				},
@@ -1927,17 +1782,17 @@ data:
 
 func newRawConfigMapTenantResource(namespace, name string, data map[string]string) *capsulev1beta2.TenantResource {
 	return &capsulev1beta2.TenantResource{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+		Name: name, Namespace: namespace,
 		Spec: capsulev1beta2.TenantResourceSpec{
 			TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
 				ResyncPeriod:    resyncPeriod,
-				PruningOnDelete: ptr.To(true),
+				PruningOnDelete: new(true),
 				Resources: []capsulev1beta2.ResourceSpec{{
-					RawItems: []capsulev1beta2.RawExtension{{RawExtension: runtime.RawExtension{Object: &corev1.ConfigMap{
-						TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"},
-						ObjectMeta: metav1.ObjectMeta{Name: "shared-config"},
-						Data:       data,
-					}}}},
+					RawItems: []capsulev1beta2.RawExtension{{Object: &corev1.ConfigMap{
+						APIVersion: "v1", Kind: "ConfigMap",
+						Name: "shared-config",
+						Data: data,
+					}}},
 					AdditionalMetadata: &api.AdditionalMetadataSpec{Labels: map[string]string{"extra-label": "set-by-tr"}},
 				}},
 			},
@@ -1947,11 +1802,11 @@ func newRawConfigMapTenantResource(namespace, name string, data map[string]strin
 
 func newGeneratorConfigMapTenantResource(namespace, name, tpl string) *capsulev1beta2.TenantResource {
 	return &capsulev1beta2.TenantResource{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+		Name: name, Namespace: namespace,
 		Spec: capsulev1beta2.TenantResourceSpec{
 			TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
 				ResyncPeriod:    resyncPeriod,
-				PruningOnDelete: ptr.To(true),
+				PruningOnDelete: new(true),
 				Resources: []capsulev1beta2.ResourceSpec{{
 					Generators: []capsulev1beta2.TemplateItemSpec{{MissingKey: "zero", Template: tpl}},
 				}},
@@ -2144,10 +1999,8 @@ func configMapRID(tenant, namespace, name, origin string) gvk.ResourceID {
 		Kind:      "ConfigMap",
 		Name:      name,
 		Namespace: namespace,
-		TenantResourceIDWithOrigin: gvk.TenantResourceIDWithOrigin{
-			Origin:           origin,
-			TenantResourceID: gvk.TenantResourceID{Tenant: tenant},
-		},
+		Origin:    origin,
+		Tenant:    tenant,
 	}
 }
 
@@ -2177,17 +2030,11 @@ func expectClusterRoleAbsent(name string) {
 
 func renameFirstTenantResourceRawConfigMap(tr *capsulev1beta2.TenantResource, name string) {
 	tr.Spec.Resources[0].RawItems[0] = capsulev1beta2.RawExtension{
-		RawExtension: runtime.RawExtension{
-			Object: &corev1.ConfigMap{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: "v1",
-					Kind:       "ConfigMap",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: name,
-				},
-				Data: tr.Spec.Resources[0].RawItems[0].RawExtension.Object.(*corev1.ConfigMap).Data,
-			},
+		Object: &corev1.ConfigMap{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+			Name:       name,
+			Data:       tr.Spec.Resources[0].RawItems[0].RawExtension.Object.(*corev1.ConfigMap).Data,
 		},
 	}
 }
@@ -2203,10 +2050,8 @@ func bindServiceAccountToNamespacedResource(
 	roleBindingName := fmt.Sprintf("sa-%s-%s-%s-binding", saName, resourceKey, targetNamespace)
 
 	role := &rbacv1.Role{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      roleName,
-			Namespace: targetNamespace,
-		},
+		Name:      roleName,
+		Namespace: targetNamespace,
 		Rules: []rbacv1.PolicyRule{{
 			APIGroups: []string{""},
 			Resources: resources,
@@ -2215,10 +2060,8 @@ func bindServiceAccountToNamespacedResource(
 	}
 
 	roleBinding := &rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      roleBindingName,
-			Namespace: targetNamespace,
-		},
+		Name:      roleBindingName,
+		Namespace: targetNamespace,
 		Subjects: []rbacv1.Subject{{
 			Kind:      "ServiceAccount",
 			Name:      saName,
@@ -2315,10 +2158,8 @@ func ensureServiceAccount(namespace, name string) {
 	ctx := context.Background()
 
 	sa := &corev1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
+		Name:      name,
+		Namespace: namespace,
 	}
 
 	Eventually(func() error {

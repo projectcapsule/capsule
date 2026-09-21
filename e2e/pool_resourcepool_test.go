@@ -17,7 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -81,11 +80,9 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 	It("Assign Defaults correctly", func() {
 		pool := &capsulev1beta2.ResourcePool{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "defaults-pool",
-				Labels: map[string]string{
-					"e2e-resourcepool": "test",
-				},
+			Name: "defaults-pool",
+			Labels: map[string]string{
+				"e2e-resourcepool": "test",
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
 				Selectors: []selectors.NamespaceSelector{
@@ -157,12 +154,10 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 		By("Create Namespaces, which are selected by the pool", func() {
 			ns1 := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "ns-1-default-pool",
-					Labels: map[string]string{
-						"e2e-resourcepool":           "test",
-						"e2e.capsule.dev/test-suite": "defaults-pool",
-					},
+				Name: "ns-1-default-pool",
+				Labels: map[string]string{
+					"e2e-resourcepool":           "test",
+					"e2e.capsule.dev/test-suite": "defaults-pool",
 				},
 			}
 
@@ -170,12 +165,10 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 			Expect(err).Should(Succeed())
 
 			ns2 := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "ns-2-default-pool",
-					Labels: map[string]string{
-						"e2e-resourcepool":           "test",
-						"e2e.capsule.dev/test-suite": "defaults-pool",
-					},
+				Name: "ns-2-default-pool",
+				Labels: map[string]string{
+					"e2e-resourcepool":           "test",
+					"e2e.capsule.dev/test-suite": "defaults-pool",
 				},
 			}
 
@@ -183,12 +176,10 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 			Expect(err).Should(Succeed())
 
 			ns3 := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "ns-3-default-pool",
-					Labels: map[string]string{
-						"e2e-resourcepool":           "test",
-						"e2e.capsule.dev/test-suite": "defaults-pool",
-					},
+				Name: "ns-3-default-pool",
+				Labels: map[string]string{
+					"e2e-resourcepool":           "test",
+					"e2e.capsule.dev/test-suite": "defaults-pool",
 				},
 			}
 
@@ -214,10 +205,8 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 		})
 		By("Add Claims for namespaces", func() {
 			claim1 := &capsulev1beta2.ResourcePoolClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "simple-1",
-					Namespace: "ns-1-default-pool",
-				},
+				Name:      "simple-1",
+				Namespace: "ns-1-default-pool",
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
 					ResourceClaims: corev1.ResourceList{
 						corev1.ResourceLimitsMemory: resource.MustParse("128Mi"),
@@ -234,10 +223,8 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 			isSuccessfullyBoundAndUnsedToPool(pool, claim1)
 
 			claim2 := &capsulev1beta2.ResourcePoolClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "simple-2",
-					Namespace: "ns-2-default-pool",
-				},
+				Name:      "simple-2",
+				Namespace: "ns-2-default-pool",
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
 					ResourceClaims: corev1.ResourceList{
 						corev1.ResourceLimitsMemory: resource.MustParse("512Mi"),
@@ -254,10 +241,8 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 			isSuccessfullyBoundAndUnsedToPool(pool, claim2)
 
 			claim3 := &capsulev1beta2.ResourcePoolClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "simple-3",
-					Namespace: "ns-3-default-pool",
-				},
+				Name:      "simple-3",
+				Namespace: "ns-3-default-pool",
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
 					ResourceClaims: corev1.ResourceList{
 						corev1.ResourceLimitsMemory: resource.MustParse("10Gi"),
@@ -407,9 +392,7 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 		By("Remove namespace from being selected (Patch Labels)", func() {
 			ns := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "ns-2-default-pool",
-				},
+				Name: "ns-2-default-pool",
 			}
 
 			Eventually(func(g Gomega) {
@@ -479,9 +462,7 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 		By("Remove namespace from being selected (Delete Namespace)", func() {
 			ns := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "ns-3-default-pool",
-				},
+				Name: "ns-3-default-pool",
 			}
 
 			EventuallyDeletion(ns)
@@ -520,11 +501,9 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 	It("Assigns Defaults correctly (DefaultsZero)", func() {
 		pool := &capsulev1beta2.ResourcePool{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "no-defaults-pool",
-				Labels: map[string]string{
-					"e2e-resourcepool": "test",
-				},
+			Name: "no-defaults-pool",
+			Labels: map[string]string{
+				"e2e-resourcepool": "test",
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
 				Selectors: []selectors.NamespaceSelector{
@@ -544,7 +523,7 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 					},
 				},
 				Config: capsulev1beta2.ResourcePoolSpecConfiguration{
-					DefaultsAssignZero: ptr.To(true),
+					DefaultsAssignZero: new(true),
 				},
 				Quota: corev1.ResourceQuotaSpec{
 					Hard: corev1.ResourceList{
@@ -600,12 +579,10 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 		By("Create Namespaces, which are selected by the pool", func() {
 			ns1 := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "ns-1-zero-pool",
-					Labels: map[string]string{
-						"e2e-resourcepool":           "test",
-						"e2e.capsule.dev/test-suite": "no-defaults",
-					},
+				Name: "ns-1-zero-pool",
+				Labels: map[string]string{
+					"e2e-resourcepool":           "test",
+					"e2e.capsule.dev/test-suite": "no-defaults",
 				},
 			}
 
@@ -613,12 +590,10 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 			Expect(err).Should(Succeed())
 
 			ns2 := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "ns-2-zero-pool",
-					Labels: map[string]string{
-						"e2e-resourcepool":           "test",
-						"e2e.capsule.dev/test-suite": "no-defaults",
-					},
+				Name: "ns-2-zero-pool",
+				Labels: map[string]string{
+					"e2e-resourcepool":           "test",
+					"e2e.capsule.dev/test-suite": "no-defaults",
 				},
 			}
 
@@ -664,11 +639,9 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 	It("ResourcePool Scheduling - Unordered", func() {
 		pool := &capsulev1beta2.ResourcePool{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "unordered-scheduling",
-				Labels: map[string]string{
-					"e2e-resourcepool": "test",
-				},
+			Name: "unordered-scheduling",
+			Labels: map[string]string{
+				"e2e-resourcepool": "test",
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
 				Selectors: []selectors.NamespaceSelector{
@@ -681,7 +654,7 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 					},
 				},
 				Config: capsulev1beta2.ResourcePoolSpecConfiguration{
-					OrderedQueue: ptr.To(false),
+					OrderedQueue: new(false),
 				},
 				Quota: corev1.ResourceQuotaSpec{
 					Hard: corev1.ResourceList{
@@ -704,12 +677,10 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 		By("Create source namespaces", func() {
 			ns1 := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "ns-1-pool-unordered",
-					Labels: map[string]string{
-						"e2e-resourcepool":           "test",
-						"e2e.capsule.dev/test-suite": "unordered-scheduling",
-					},
+				Name: "ns-1-pool-unordered",
+				Labels: map[string]string{
+					"e2e-resourcepool":           "test",
+					"e2e.capsule.dev/test-suite": "unordered-scheduling",
 				},
 			}
 
@@ -717,12 +688,10 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 			Expect(err).Should(Succeed(), "Failed to create Namespace %s", ns1)
 
 			ns2 := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "ns-2-pool-unordered",
-					Labels: map[string]string{
-						"e2e-resourcepool":           "test",
-						"e2e.capsule.dev/test-suite": "unordered-scheduling",
-					},
+				Name: "ns-2-pool-unordered",
+				Labels: map[string]string{
+					"e2e-resourcepool":           "test",
+					"e2e.capsule.dev/test-suite": "unordered-scheduling",
 				},
 			}
 
@@ -733,10 +702,8 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 		By("Create claim for limits.memory", func() {
 			claim := &capsulev1beta2.ResourcePoolClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "simple-1",
-					Namespace: "ns-1-pool-unordered",
-				},
+				Name:      "simple-1",
+				Namespace: "ns-1-pool-unordered",
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
 					ResourceClaims: corev1.ResourceList{
 						corev1.ResourceLimitsMemory: resource.MustParse("128Mi"),
@@ -783,10 +750,8 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 		By("Create claim exhausting requests.cpu", func() {
 			claim := &capsulev1beta2.ResourcePoolClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "simple-2",
-					Namespace: "ns-1-pool-unordered",
-				},
+				Name:      "simple-2",
+				Namespace: "ns-1-pool-unordered",
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
 					ResourceClaims: corev1.ResourceList{
 						corev1.ResourceRequestsCPU: resource.MustParse("4"),
@@ -805,10 +770,8 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 		By("Create claim for request.memory", func() {
 			claim := &capsulev1beta2.ResourcePoolClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "simple-3",
-					Namespace: "ns-2-pool-unordered",
-				},
+				Name:      "simple-3",
+				Namespace: "ns-2-pool-unordered",
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
 					ResourceClaims: corev1.ResourceList{
 						corev1.ResourceRequestsMemory: resource.MustParse("1Gi"),
@@ -847,10 +810,8 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 		By("Create claim for requests.cpu (skip exhausting one)", func() {
 			claim := &capsulev1beta2.ResourcePoolClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "simple-4",
-					Namespace: "ns-2-pool-unordered",
-				},
+				Name:      "simple-4",
+				Namespace: "ns-2-pool-unordered",
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
 					ResourceClaims: corev1.ResourceList{
 						corev1.ResourceRequestsCPU: resource.MustParse("2"),
@@ -926,11 +887,9 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 	It("ResourcePool Claim Resize - Recalculates Allocation", func() {
 		pool := &capsulev1beta2.ResourcePool{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "claim-resize-recalculation",
-				Labels: map[string]string{
-					"e2e-resourcepool": "test",
-				},
+			Name: "claim-resize-recalculation",
+			Labels: map[string]string{
+				"e2e-resourcepool": "test",
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
 				Selectors: []selectors.NamespaceSelector{
@@ -951,20 +910,16 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 		}
 
 		namespace := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "ns-claim-resize-recalculation",
-				Labels: map[string]string{
-					"e2e-resourcepool":           "test",
-					"e2e.capsule.dev/test-suite": "claim-resize-recalculation",
-				},
+			Name: "ns-claim-resize-recalculation",
+			Labels: map[string]string{
+				"e2e-resourcepool":           "test",
+				"e2e.capsule.dev/test-suite": "claim-resize-recalculation",
 			},
 		}
 
 		claim := &capsulev1beta2.ResourcePoolClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "resize",
-				Namespace: namespace.Name,
-			},
+			Name:      "resize",
+			Namespace: namespace.Name,
 			Spec: capsulev1beta2.ResourcePoolClaimSpec{
 				Pool: pool.Name,
 				ResourceClaims: corev1.ResourceList{
@@ -1089,10 +1044,8 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 		By("Create workload usage for the claim", func() {
 			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "resize-claim-pod",
-					Namespace: namespace.Name,
-				},
+				Name:      "resize-claim-pod",
+				Namespace: namespace.Name,
 				Spec: corev1.PodSpec{
 					SecurityContext: nobodyPodSecurityContext(),
 					RestartPolicy:   corev1.RestartPolicyNever,
@@ -1143,11 +1096,9 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 	It("ResourcePool Scheduling - Ordered", func() {
 		pool := &capsulev1beta2.ResourcePool{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "ordered-scheduling",
-				Labels: map[string]string{
-					"e2e-resourcepool": "test",
-				},
+			Name: "ordered-scheduling",
+			Labels: map[string]string{
+				"e2e-resourcepool": "test",
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
 				Selectors: []selectors.NamespaceSelector{
@@ -1160,7 +1111,7 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 					},
 				},
 				Config: capsulev1beta2.ResourcePoolSpecConfiguration{
-					OrderedQueue: ptr.To(true),
+					OrderedQueue: new(true),
 				},
 				Quota: corev1.ResourceQuotaSpec{
 					Hard: corev1.ResourceList{
@@ -1183,12 +1134,10 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 		By("Create source namespaces", func() {
 			ns1 := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "ns-1-pool-ordered",
-					Labels: map[string]string{
-						"e2e-resourcepool":           "test",
-						"e2e.capsule.dev/test-suite": "ordered-scheduling",
-					},
+				Name: "ns-1-pool-ordered",
+				Labels: map[string]string{
+					"e2e-resourcepool":           "test",
+					"e2e.capsule.dev/test-suite": "ordered-scheduling",
 				},
 			}
 
@@ -1196,12 +1145,10 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 			Expect(err).Should(Succeed(), "Failed to create Namespace %s", ns1)
 
 			ns2 := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "ns-2-pool-ordered",
-					Labels: map[string]string{
-						"e2e-resourcepool":           "test",
-						"e2e.capsule.dev/test-suite": "ordered-scheduling",
-					},
+				Name: "ns-2-pool-ordered",
+				Labels: map[string]string{
+					"e2e-resourcepool":           "test",
+					"e2e.capsule.dev/test-suite": "ordered-scheduling",
 				},
 			}
 
@@ -1212,11 +1159,10 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 		By("Create claim for limits.memory", func() {
 			claim := &capsulev1beta2.ResourcePoolClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "simple-1",
-					Namespace: "ns-1-pool-ordered",
-				},
+				Name:      "simple-1",
+				Namespace: "ns-1-pool-ordered",
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
+					Pool: pool.Name,
 					ResourceClaims: corev1.ResourceList{
 						corev1.ResourceLimitsMemory: resource.MustParse("512Mi"),
 					},
@@ -1231,11 +1177,10 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 		By("Create claim for requests.requests", func() {
 			claim := &capsulev1beta2.ResourcePoolClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "simple-1",
-					Namespace: "ns-2-pool-ordered",
-				},
+				Name:      "simple-1",
+				Namespace: "ns-2-pool-ordered",
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
+					Pool: pool.Name,
 					ResourceClaims: corev1.ResourceList{
 						corev1.ResourceRequestsMemory: resource.MustParse("750Mi"),
 					},
@@ -1276,11 +1221,10 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 		By("Create claim exhausting requests.cpu", func() {
 			claim := &capsulev1beta2.ResourcePoolClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "simple-2",
-					Namespace: "ns-2-pool-ordered",
-				},
+				Name:      "simple-2",
+				Namespace: "ns-2-pool-ordered",
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
+					Pool: pool.Name,
 					ResourceClaims: corev1.ResourceList{
 						corev1.ResourceRequestsCPU: resource.MustParse("4"),
 					},
@@ -1300,11 +1244,10 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 		By("Create claim exhausting limits.cpu", func() {
 			claim := &capsulev1beta2.ResourcePoolClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "simple-3",
-					Namespace: "ns-1-pool-ordered",
-				},
+				Name:      "simple-3",
+				Namespace: "ns-1-pool-ordered",
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
+					Pool: pool.Name,
 					ResourceClaims: corev1.ResourceList{
 						corev1.ResourceLimitsCPU: resource.MustParse("4"),
 					},
@@ -1324,11 +1267,10 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 		By("Create claim for requests.cpu (attempt to skip exhausting one)", func() {
 			claim := &capsulev1beta2.ResourcePoolClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "simple-4",
-					Namespace: "ns-2-pool-ordered",
-				},
+				Name:      "simple-4",
+				Namespace: "ns-2-pool-ordered",
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
+					Pool: pool.Name,
 					ResourceClaims: corev1.ResourceList{
 						corev1.ResourceLimitsCPU:   resource.MustParse("2"),
 						corev1.ResourceRequestsCPU: resource.MustParse("2"),
@@ -1519,11 +1461,9 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 	It("ResourcePool - Namespace Selection", func() {
 		pool := &capsulev1beta2.ResourcePool{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "bind-ns-pool-1",
-				Labels: map[string]string{
-					"e2e-resourcepool": "test",
-				},
+			Name: "bind-ns-pool-1",
+			Labels: map[string]string{
+				"e2e-resourcepool": "test",
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
 				Selectors: []selectors.NamespaceSelector{
@@ -1536,7 +1476,7 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 					},
 				},
 				Config: capsulev1beta2.ResourcePoolSpecConfiguration{
-					DeleteBoundResources: ptr.To(false),
+					DeleteBoundResources: new(false),
 				},
 				Quota: corev1.ResourceQuotaSpec{
 					Hard: corev1.ResourceList{
@@ -1555,12 +1495,10 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 		By("Create source namespaces", func() {
 			ns1 := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "ns-1-pool-bind",
-					Labels: map[string]string{
-						"e2e-resourcepool":           "test",
-						"e2e.capsule.dev/test-suite": "bind-namespaces",
-					},
+				Name: "ns-1-pool-bind",
+				Labels: map[string]string{
+					"e2e-resourcepool":           "test",
+					"e2e.capsule.dev/test-suite": "bind-namespaces",
 				},
 			}
 
@@ -1570,12 +1508,10 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 			}).Should(Succeed(), "Failed to create Namespace %s", ns1)
 
 			ns2 := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "ns-2-pool-bind",
-					Labels: map[string]string{
-						"e2e-resourcepool":           "test",
-						"e2e.capsule.dev/test-suite": "bind-namespaces-no",
-					},
+				Name: "ns-2-pool-bind",
+				Labels: map[string]string{
+					"e2e-resourcepool":           "test",
+					"e2e.capsule.dev/test-suite": "bind-namespaces-no",
 				},
 			}
 
@@ -1600,10 +1536,8 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 		By("Create claim in matching namespace", func() {
 			claim := &capsulev1beta2.ResourcePoolClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "simple-1",
-					Namespace: "ns-1-pool-bind",
-				},
+				Name:      "simple-1",
+				Namespace: "ns-1-pool-bind",
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
 					ResourceClaims: corev1.ResourceList{
 						corev1.ResourceLimitsMemory: resource.MustParse("128Mi"),
@@ -1621,10 +1555,8 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 		By("Create claim non matching namespace", func() {
 			claim := &capsulev1beta2.ResourcePoolClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "simple-1",
-					Namespace: "ns-2-pool-bind",
-				},
+				Name:      "simple-1",
+				Namespace: "ns-2-pool-bind",
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
 					Pool: "bind-ns-pool-1",
 					ResourceClaims: corev1.ResourceList{
@@ -1693,11 +1625,9 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 	It("ResourcePool Deletion - Not Cascading", func() {
 		pool := &capsulev1beta2.ResourcePool{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "deletion-pool-1",
-				Labels: map[string]string{
-					"e2e-resourcepool": "test",
-				},
+			Name: "deletion-pool-1",
+			Labels: map[string]string{
+				"e2e-resourcepool": "test",
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
 				Selectors: []selectors.NamespaceSelector{
@@ -1710,7 +1640,7 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 					},
 				},
 				Config: capsulev1beta2.ResourcePoolSpecConfiguration{
-					DeleteBoundResources: ptr.To(false),
+					DeleteBoundResources: new(false),
 				},
 				Quota: corev1.ResourceQuotaSpec{
 					Hard: corev1.ResourceList{
@@ -1730,10 +1660,8 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 		By("Unbinding From Pool", func() {
 			claim1 := &capsulev1beta2.ResourcePoolClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "delete-1",
-					Namespace: "ns-1-pool-no-deletion",
-				},
+				Name:      "delete-1",
+				Namespace: "ns-1-pool-no-deletion",
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
 					ResourceClaims: corev1.ResourceList{
 						corev1.ResourceLimitsMemory: resource.MustParse("128Mi"),
@@ -1742,10 +1670,8 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 			}
 
 			claim2 := &capsulev1beta2.ResourcePoolClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "delete-2",
-					Namespace: "ns-2-pool-no-deletion",
-				},
+				Name:      "delete-2",
+				Namespace: "ns-2-pool-no-deletion",
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
 					ResourceClaims: corev1.ResourceList{
 						corev1.ResourceLimitsMemory: resource.MustParse("128Mi"),
@@ -1754,22 +1680,18 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 			}
 
 			ns1 := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: claim1.Namespace,
-					Labels: map[string]string{
-						"e2e-resourcepool":           "test",
-						"e2e.capsule.dev/test-suite": "delete-bound-resources",
-					},
+				Name: claim1.Namespace,
+				Labels: map[string]string{
+					"e2e-resourcepool":           "test",
+					"e2e.capsule.dev/test-suite": "delete-bound-resources",
 				},
 			}
 
 			ns2 := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: claim2.Namespace,
-					Labels: map[string]string{
-						"e2e-resourcepool":           "test",
-						"e2e.capsule.dev/test-suite": "delete-bound-resources",
-					},
+				Name: claim2.Namespace,
+				Labels: map[string]string{
+					"e2e-resourcepool":           "test",
+					"e2e.capsule.dev/test-suite": "delete-bound-resources",
 				},
 			}
 
@@ -1834,11 +1756,9 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 	It("ResourcePool Deletion - Cascading (DeleteBoundResources)", func() {
 		pool := &capsulev1beta2.ResourcePool{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "deletion-pool",
-				Labels: map[string]string{
-					"e2e-resourcepool": "test",
-				},
+			Name: "deletion-pool",
+			Labels: map[string]string{
+				"e2e-resourcepool": "test",
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
 				Selectors: []selectors.NamespaceSelector{
@@ -1851,7 +1771,7 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 					},
 				},
 				Config: capsulev1beta2.ResourcePoolSpecConfiguration{
-					DeleteBoundResources: ptr.To(true),
+					DeleteBoundResources: new(true),
 				},
 				Quota: corev1.ResourceQuotaSpec{
 					Hard: corev1.ResourceList{
@@ -1871,10 +1791,8 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 		By("Cascading Deletion", func() {
 			claim1 := &capsulev1beta2.ResourcePoolClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "delete-1",
-					Namespace: "ns-1-pool-deletion",
-				},
+				Name:      "delete-1",
+				Namespace: "ns-1-pool-deletion",
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
 					ResourceClaims: corev1.ResourceList{
 						corev1.ResourceLimitsMemory: resource.MustParse("128Mi"),
@@ -1883,10 +1801,8 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 			}
 
 			claim2 := &capsulev1beta2.ResourcePoolClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "delete-2",
-					Namespace: "ns-2-pool-deletion",
-				},
+				Name:      "delete-2",
+				Namespace: "ns-2-pool-deletion",
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
 					ResourceClaims: corev1.ResourceList{
 						corev1.ResourceLimitsMemory: resource.MustParse("128Mi"),
@@ -1895,22 +1811,18 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 			}
 
 			ns1 := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: claim1.Namespace,
-					Labels: map[string]string{
-						"e2e-resourcepool":           "test",
-						"e2e.capsule.dev/test-suite": "delete-bound-resources",
-					},
+				Name: claim1.Namespace,
+				Labels: map[string]string{
+					"e2e-resourcepool":           "test",
+					"e2e.capsule.dev/test-suite": "delete-bound-resources",
 				},
 			}
 
 			ns2 := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: claim2.Namespace,
-					Labels: map[string]string{
-						"e2e-resourcepool":           "test",
-						"e2e.capsule.dev/test-suite": "delete-bound-resources",
-					},
+				Name: claim2.Namespace,
+				Labels: map[string]string{
+					"e2e-resourcepool":           "test",
+					"e2e.capsule.dev/test-suite": "delete-bound-resources",
 				},
 			}
 
@@ -1961,11 +1873,9 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 	It("Admission Guards ", func() {
 		pool := &capsulev1beta2.ResourcePool{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "admission-pool",
-				Labels: map[string]string{
-					"e2e-resourcepool": "test",
-				},
+			Name: "admission-pool",
+			Labels: map[string]string{
+				"e2e-resourcepool": "test",
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
 				Selectors: []selectors.NamespaceSelector{
@@ -1978,7 +1888,7 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 					},
 				},
 				Config: capsulev1beta2.ResourcePoolSpecConfiguration{
-					DefaultsAssignZero: ptr.To(true),
+					DefaultsAssignZero: new(true),
 				},
 				Quota: corev1.ResourceQuotaSpec{
 					Hard: corev1.ResourceList{
@@ -2001,12 +1911,10 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 		By("Create Namespaces, which are selected by the pool", func() {
 			ns1 := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "ns-1-admission-pool",
-					Labels: map[string]string{
-						"e2e-resourcepool":           "test",
-						"e2e.capsule.dev/test-suite": "admission",
-					},
+				Name: "ns-1-admission-pool",
+				Labels: map[string]string{
+					"e2e-resourcepool":           "test",
+					"e2e.capsule.dev/test-suite": "admission",
 				},
 			}
 
@@ -2014,12 +1922,10 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 			Expect(err).Should(Succeed())
 
 			ns2 := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "ns-2-admission-pool",
-					Labels: map[string]string{
-						"e2e-resourcepool":           "test",
-						"e2e.capsule.dev/test-suite": "admission",
-					},
+				Name: "ns-2-admission-pool",
+				Labels: map[string]string{
+					"e2e-resourcepool":           "test",
+					"e2e.capsule.dev/test-suite": "admission",
 				},
 			}
 
@@ -2035,10 +1941,8 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 		By("Create claims", func() {
 			claim := &capsulev1beta2.ResourcePoolClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "simple-1",
-					Namespace: "ns-1-admission-pool",
-				},
+				Name:      "simple-1",
+				Namespace: "ns-1-admission-pool",
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
 					ResourceClaims: corev1.ResourceList{
 						corev1.ResourceRequestsMemory: resource.MustParse("512Mi"),
@@ -2054,10 +1958,8 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 		By("Create claims", func() {
 			claim := &capsulev1beta2.ResourcePoolClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "simple-2",
-					Namespace: "ns-2-admission-pool",
-				},
+				Name:      "simple-2",
+				Namespace: "ns-2-admission-pool",
 				Spec: capsulev1beta2.ResourcePoolClaimSpec{
 					ResourceClaims: corev1.ResourceList{
 						corev1.ResourceLimitsMemory: resource.MustParse("1Gi"),
@@ -2268,10 +2170,11 @@ func isSuccessfullyBoundAndUnsedToPool(pool *capsulev1beta2.ResourcePool, claim 
 		}, fetchedClaim)
 		g.Expect(err).Should(Succeed())
 
-		isBoundToPool(fetchedPool, fetchedClaim)
-
-		g.Expect(fetchedClaim.Status.Pool.Name.String()).To(Equal(fetchedPool.Name))
+		g.Expect(fetchedClaim.Status.Pool.Name.String()).To(Equal(fetchedPool.Name),
+			"claim spec.pool=%q; claim conditions: %+v; pool conditions: %+v; pool namespaces: %v",
+			fetchedClaim.Spec.Pool, fetchedClaim.Status.Conditions, fetchedPool.Status.Conditions, fetchedPool.Status.Namespaces)
 		g.Expect(fetchedClaim.Status.Pool.UID).To(Equal(fetchedPool.GetUID()))
+		g.Expect(isBoundToPool(fetchedPool, fetchedClaim)).To(Succeed())
 
 		bound := fetchedClaim.Status.Conditions.GetConditionByType(meta.BoundCondition)
 		g.Expect(bound).NotTo(BeNil(), "Bound condition should be present")

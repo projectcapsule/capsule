@@ -16,7 +16,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -38,18 +37,14 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 
 	externalNameByExpression := func(expression string) runtime.ExpressionMatch {
 		return runtime.ExpressionMatch{
-			ExpressionRegex: runtime.ExpressionRegex{
-				Expression: expression,
-			},
+			Expression: expression,
 		}
 	}
 
 	externalNameByNegatedExpression := func(expression string) runtime.ExpressionMatch {
 		return runtime.ExpressionMatch{
-			ExpressionRegex: runtime.ExpressionRegex{
-				Expression: expression,
-				Negate:     true,
-			},
+			Expression: expression,
+			Negate:     true,
 		}
 	}
 
@@ -61,10 +56,8 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 
 	externalNameByMatch := func(exact []string, expression string) runtime.ExpressionMatch {
 		return runtime.ExpressionMatch{
-			ExpressionRegex: runtime.ExpressionRegex{
-				Expression: expression,
-			},
-			Exact: exact,
+			Expression: expression,
+			Exact:      exact,
 		}
 	}
 
@@ -242,28 +235,22 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 
 	newTenant := func() *capsulev1beta2.Tenant {
 		return &capsulev1beta2.Tenant{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "e2e-rule-services",
-				Labels: map[string]string{
-					"env": "e2e",
-				},
+			Name: "e2e-rule-services",
+			Labels: map[string]string{
+				"env": "e2e",
 			},
 			Spec: capsulev1beta2.TenantSpec{
 				Owners: rbac.OwnerListSpec{
 					{
-						CoreOwnerSpec: rbac.CoreOwnerSpec{
-							UserSpec: rbac.UserSpec{
-								Name: ownerName,
-								Kind: "User",
-							},
-						},
+						Name: ownerName,
+						Kind: "User",
 					},
 				},
 				ServiceOptions: &capsuleapi.ServiceOptions{
 					AllowedServices: &capsuleapi.AllowedServices{
-						ExternalName: ptr.To(true),
-						LoadBalancer: ptr.To(true),
-						NodePort:     ptr.To(true),
+						ExternalName: new(true),
+						LoadBalancer: new(true),
+						NodePort:     new(true),
 					},
 				},
 				Rules: tenantRules,
@@ -336,10 +323,7 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 					g.Expect(got.Enforce.Services.NodePorts.Ports).To(Equal(expected.nodePortRanges))
 				}
 
-				wantHostnames := len(expected.externalExpressions)
-				if len(expected.externalExact) > wantHostnames {
-					wantHostnames = len(expected.externalExact)
-				}
+				wantHostnames := max(len(expected.externalExact), len(expected.externalExpressions))
 
 				if wantHostnames == 0 {
 					if got.Enforce.Services.ExternalNames != nil {
@@ -605,9 +589,7 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 
 	clusterIPService := func(name string) *corev1.Service {
 		return &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: name,
-			},
+			Name: name,
 			Spec: corev1.ServiceSpec{
 				Type: corev1.ServiceTypeClusterIP,
 				Ports: []corev1.ServicePort{
@@ -629,9 +611,7 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 		port.NodePort = nodePort
 
 		return &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: name,
-			},
+			Name: name,
 			Spec: corev1.ServiceSpec{
 				Type: corev1.ServiceTypeNodePort,
 				Ports: []corev1.ServicePort{
@@ -643,9 +623,7 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 
 	nodePortServiceWithoutExplicitNodePort := func(name string) *corev1.Service {
 		return &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: name,
-			},
+			Name: name,
 			Spec: corev1.ServiceSpec{
 				Type: corev1.ServiceTypeNodePort,
 				Ports: []corev1.ServicePort{
@@ -715,9 +693,7 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 		allocateLoadBalancerNodePorts *bool,
 	) *corev1.Service {
 		return &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: name,
-			},
+			Name: name,
 			Spec: corev1.ServiceSpec{
 				Type:                          corev1.ServiceTypeLoadBalancer,
 				LoadBalancerIP:                loadBalancerIP,
@@ -732,9 +708,7 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 
 	externalNameService := func(name string, externalName string) *corev1.Service {
 		return &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: name,
-			},
+			Name: name,
 			Spec: corev1.ServiceSpec{
 				Type:         corev1.ServiceTypeExternalName,
 				ExternalName: externalName,
@@ -1115,16 +1089,16 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 		ns := createNamespace(nil)
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
-		createServiceAndExpectAllowed(cs, ns.Name, loadBalancerService("lb-ip-allowed", "10.0.0.2", nil, ptr.To(false)))
-		createServiceAndExpectAllowed(cs, ns.Name, loadBalancerService("lb-ip-range-allowed", "10.0.1.44", nil, ptr.To(false)))
-		createServiceAndExpectAllowed(cs, ns.Name, loadBalancerService("lb-source-range-allowed", "", []string{"10.0.1.0/25"}, ptr.To(false)))
+		createServiceAndExpectAllowed(cs, ns.Name, loadBalancerService("lb-ip-allowed", "10.0.0.2", nil, new(false)))
+		createServiceAndExpectAllowed(cs, ns.Name, loadBalancerService("lb-ip-range-allowed", "10.0.1.44", nil, new(false)))
+		createServiceAndExpectAllowed(cs, ns.Name, loadBalancerService("lb-source-range-allowed", "", []string{"10.0.1.0/25"}, new(false)))
 	})
 
 	It("denies LoadBalancer IPs outside configured CIDRs and reports allowed CIDRs", func() {
 		ns := createNamespace(nil)
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
-		createServiceAndExpectDenied(cs, ns.Name, loadBalancerService("lb-ip-denied", "10.0.171.239", nil, ptr.To(false)),
+		createServiceAndExpectDenied(cs, ns.Name, loadBalancerService("lb-ip-denied", "10.0.171.239", nil, new(false)),
 			"loadBalancer CIDR",
 			"10.0.171.239",
 			"spec.loadBalancerIP",
@@ -1139,7 +1113,7 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 		ns := createNamespace(nil)
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
-		createServiceAndExpectDenied(cs, ns.Name, loadBalancerService("lb-source-range-denied", "", []string{"10.0.0.0/23"}, ptr.To(false)),
+		createServiceAndExpectDenied(cs, ns.Name, loadBalancerService("lb-source-range-denied", "", []string{"10.0.0.0/23"}, new(false)),
 			"loadBalancer CIDR",
 			"10.0.0.0/23",
 			"spec.loadBalancerSourceRanges[0]",
@@ -1151,7 +1125,7 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 		ns := createNamespace(nil)
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
-		createServiceAndExpectDenied(cs, ns.Name, loadBalancerService("lb-required-value-denied", "", nil, ptr.To(false)),
+		createServiceAndExpectDenied(cs, ns.Name, loadBalancerService("lb-required-value-denied", "", nil, new(false)),
 			"spec.loadBalancerIP or spec.loadBalancerSourceRanges is required by namespace rule",
 		)
 	})
@@ -1160,7 +1134,7 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 		ns := createNamespace(nil)
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
-		createServiceAndExpectDenied(cs, ns.Name, loadBalancerService("lb-later-deny", "10.0.66.10", nil, ptr.To(false)),
+		createServiceAndExpectDenied(cs, ns.Name, loadBalancerService("lb-later-deny", "10.0.66.10", nil, new(false)),
 			`loadBalancer CIDR "10.0.66.10" at spec.loadBalancerIP is denied by namespace rule`,
 		)
 	})
@@ -1171,7 +1145,7 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 		})
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
-		createServiceAndExpectAllowed(cs, ns.Name, loadBalancerService("lb-prod-selected-allowed", "10.0.171.239", nil, ptr.To(false)))
+		createServiceAndExpectAllowed(cs, ns.Name, loadBalancerService("lb-prod-selected-allowed", "10.0.171.239", nil, new(false)))
 	})
 
 	It("allows explicit nodePorts inside configured ranges", func() {
@@ -1256,7 +1230,7 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 		createServiceAndExpectAllowed(
 			cs,
 			ns.Name,
-			loadBalancerService("lb-node-port-allocation-disabled", "10.0.0.2", nil, ptr.To(false)),
+			loadBalancerService("lb-node-port-allocation-disabled", "10.0.0.2", nil, new(false)),
 		)
 	})
 
@@ -1336,7 +1310,7 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 		createServiceAndExpectAllowed(
 			cs,
 			ns.Name,
-			loadBalancerService("lb-no-cidr-rule-allowed", "", nil, ptr.To(false)),
+			loadBalancerService("lb-no-cidr-rule-allowed", "", nil, new(false)),
 		)
 	})
 })

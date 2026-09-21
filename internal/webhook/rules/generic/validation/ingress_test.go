@@ -86,7 +86,7 @@ func TestIngressHostnameEvaluationRegexAndAllowMiss(t *testing.T) {
 	body := ingressRuleBodies(
 		rules.ActionTypeAllow,
 		rules.IngressTypeHTTPRoute,
-		runtime.ExpressionMatch{ExpressionRegex: runtime.ExpressionRegex{Expression: ".*\\.example\\.com"}},
+		runtime.ExpressionMatch{Expression: ".*\\.example\\.com"},
 	)
 
 	allowed, err := testIngressRules().evaluate(objectWithSpec(routeSpec("api.example.com")), rules.IngressTypeHTTPRoute, body)

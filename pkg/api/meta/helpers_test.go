@@ -22,11 +22,11 @@ import (
 func TestReleaseAndReconcileAnnotations(t *testing.T) {
 	t.Parallel()
 
-	obj := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+	obj := &corev1.ConfigMap{Annotations: map[string]string{
 		meta.ReleaseAnnotation:   "TRUE",
 		meta.ReconcileAnnotation: "now",
 		"keep":                   "value",
-	}}}
+	}}
 
 	if !meta.ReleaseAnnotationTriggers(obj) {
 		t.Fatalf("ReleaseAnnotationTriggers() = false, want true")
@@ -44,7 +44,7 @@ func TestReleaseAndReconcileAnnotations(t *testing.T) {
 		t.Fatalf("RemoveReconcileTriggerAnnotation() removed unrelated annotation")
 	}
 
-	onlyReconcile := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{meta.ReconcileAnnotation: "now"}}}
+	onlyReconcile := &corev1.ConfigMap{Annotations: map[string]string{meta.ReconcileAnnotation: "now"}}
 	meta.RemoveReconcileTriggerAnnotation(onlyReconcile)
 	if onlyReconcile.Annotations != nil {
 		t.Fatalf("RemoveReconcileTriggerAnnotation() = %#v, want nil when last annotation removed", onlyReconcile.Annotations)
@@ -79,7 +79,7 @@ func TestTriggerRequestReconcileAnnotation(t *testing.T) {
 func TestConditionHelpers(t *testing.T) {
 	t.Parallel()
 
-	obj := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Generation: 7}}
+	obj := &corev1.ConfigMap{Generation: 7}
 
 	conditions := meta.ConditionList{meta.NewReadyCondition(obj)}
 	if !meta.IsStatusConditionTrue(conditions, meta.ReadyCondition) {
@@ -131,6 +131,22 @@ func TestManagerAndNameHelpers(t *testing.T) {
 	}
 	if got := meta.ResourceControllerFieldOwnerPrefix(); got != "projectcapsule.dev/resource/controller" {
 		t.Fatalf("ResourceControllerFieldOwnerPrefix() = %q", got)
+	}
+	if got := meta.ResourceFieldOwner("resourcepermit/id"); got != "projectcapsule.dev/resource/resourcepermit/id" {
+		t.Fatalf("ResourceFieldOwner() = %q", got)
+	}
+	withUID := &corev1.ConfigMap{
+		Name: "request", Namespace: "default", UID: types.UID("request-uid")}
+	if got := meta.ResourcePermitFieldOwner(withUID); got != "projectcapsule.dev/resource/resourcepermit/request-uid" {
+		t.Fatalf("ResourcePermitFieldOwner() = %q", got)
+	}
+	withoutUID := &corev1.ConfigMap{Name: "request", Namespace: "default"}
+	got := meta.ResourcePermitFieldOwner(withoutUID)
+	if got != meta.ResourcePermitFieldOwner(withoutUID.DeepCopy()) {
+		t.Fatalf("ResourcePermitFieldOwner() is not deterministic: %q", got)
+	}
+	if len(got) > 128 {
+		t.Fatalf("ResourcePermitFieldOwner() length = %d, want <= 128", len(got))
 	}
 	if got := meta.NameForManagedRuleStatus(); got != "capsule-managed-rules" {
 		t.Fatalf("NameForManagedRuleStatus() = %q", got)

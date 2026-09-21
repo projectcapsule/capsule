@@ -16,17 +16,13 @@ func TestCreatedItemsIndexersUseAdmissionKeyForClusterScopedItems(t *testing.T) 
 	t.Parallel()
 
 	item := meta.ObjectReferenceStatus{
-		ResourceID: gvk.ResourceID{
-			Group:     "rbac.authorization.k8s.io",
-			Version:   "v1",
-			Kind:      "ClusterRole",
-			Namespace: "tenant-a",
-			Name:      "example",
-		},
-		ObjectReferenceStatusCondition: meta.ObjectReferenceStatusCondition{
-			Created:       true,
-			ClusterScoped: true,
-		},
+		Group:         "rbac.authorization.k8s.io",
+		Version:       "v1",
+		Kind:          "ClusterRole",
+		Namespace:     "tenant-a",
+		Name:          "example",
+		Created:       true,
+		ClusterScoped: true,
 	}
 
 	want := []string{
@@ -67,12 +63,10 @@ func TestProcessedItemKeyKeepsNamespaceForNamespacedItems(t *testing.T) {
 	t.Parallel()
 
 	item := meta.ObjectReferenceStatus{
-		ResourceID: gvk.ResourceID{
-			Version:   "v1",
-			Kind:      "Secret",
-			Namespace: "tenant-a",
-			Name:      "example",
-		},
+		Version:   "v1",
+		Kind:      "Secret",
+		Namespace: "tenant-a",
+		Name:      "example",
 	}
 
 	want := item.GetGVKKey("")

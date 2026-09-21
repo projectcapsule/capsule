@@ -13,8 +13,10 @@ import (
 
 type CapsuleConfigSpecAdministratorsChangedPredicate struct{}
 
-func (CapsuleConfigSpecAdministratorsChangedPredicate) Create(event.CreateEvent) bool   { return false }
-func (CapsuleConfigSpecAdministratorsChangedPredicate) Delete(event.DeleteEvent) bool   { return false }
+func (CapsuleConfigSpecAdministratorsChangedPredicate) Create(event.CreateEvent) bool { return false }
+
+func (CapsuleConfigSpecAdministratorsChangedPredicate) Delete(event.DeleteEvent) bool { return false }
+
 func (CapsuleConfigSpecAdministratorsChangedPredicate) Generic(event.GenericEvent) bool { return false }
 
 func (CapsuleConfigSpecAdministratorsChangedPredicate) Update(e event.UpdateEvent) bool {
@@ -30,8 +32,10 @@ func (CapsuleConfigSpecAdministratorsChangedPredicate) Update(e event.UpdateEven
 
 type CapsuleConfigSpecImpersonationChangedPredicate struct{}
 
-func (CapsuleConfigSpecImpersonationChangedPredicate) Create(event.CreateEvent) bool   { return false }
-func (CapsuleConfigSpecImpersonationChangedPredicate) Delete(event.DeleteEvent) bool   { return false }
+func (CapsuleConfigSpecImpersonationChangedPredicate) Create(event.CreateEvent) bool { return false }
+
+func (CapsuleConfigSpecImpersonationChangedPredicate) Delete(event.DeleteEvent) bool { return false }
+
 func (CapsuleConfigSpecImpersonationChangedPredicate) Generic(event.GenericEvent) bool { return false }
 
 func (CapsuleConfigSpecImpersonationChangedPredicate) Update(e event.UpdateEvent) bool {

@@ -9,7 +9,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -23,18 +22,12 @@ var _ = Describe("observedGeneration is tracked in status", Ordered, Label("obse
 
 	JustBeforeEach(func() {
 		tnt = &capsulev1beta2.Tenant{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "e2e-observed-generation",
-			},
+			Name: "e2e-observed-generation",
 			Spec: capsulev1beta2.TenantSpec{
 				Owners: rbac.OwnerListSpec{
 					{
-						CoreOwnerSpec: rbac.CoreOwnerSpec{
-							UserSpec: rbac.UserSpec{
-								Name: "e2e-observed-generation-owner",
-								Kind: "User",
-							},
-						},
+						Name: "e2e-observed-generation-owner",
+						Kind: "User",
 					},
 				},
 			},
@@ -183,18 +176,12 @@ var _ = Describe("RuleStatus observedGeneration is tracked in status", Ordered, 
 
 	JustBeforeEach(func() {
 		tnt = &capsulev1beta2.Tenant{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "e2e-rulestatus-observed-gen",
-			},
+			Name: "e2e-rulestatus-observed-gen",
 			Spec: capsulev1beta2.TenantSpec{
 				Owners: rbac.OwnerListSpec{
 					{
-						CoreOwnerSpec: rbac.CoreOwnerSpec{
-							UserSpec: rbac.UserSpec{
-								Name: "e2e-rulestatus-observed-gen-owner",
-								Kind: "User",
-							},
-						},
+						Name: "e2e-rulestatus-observed-gen-owner",
+						Kind: "User",
 					},
 				},
 			},

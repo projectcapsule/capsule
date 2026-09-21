@@ -9,32 +9,30 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestNamespacedTenantResourceIndexers(t *testing.T) {
 	t.Parallel()
 
 	item := meta.ObjectReferenceStatus{
-		ResourceID: gvk.ResourceID{
-			Version:   "v1",
-			Kind:      "ConfigMap",
-			Namespace: "tenant-a",
-			Name:      "settings",
-		},
+		Version:   "v1",
+		Kind:      "ConfigMap",
+		Namespace: "tenant-a",
+		Name:      "settings",
 	}
 	wantItemKey := item.GetGVKKey("")
 
 	tr := &capsulev1beta2.TenantResource{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "tenant-a"},
+		Namespace: "tenant-a",
 		Status: capsulev1beta2.TenantResourceStatus{
 			TenantResourceCommonStatus: capsulev1beta2.TenantResourceCommonStatus{
 				ServiceAccount: &meta.NamespacedRFC1123ObjectReferenceWithNamespace{Name: "builder"},
-				ProcessedItems: meta.ProcessedItems{
-					item,
-					{ResourceID: gvk.ResourceID{Version: "v1", Kind: "Secret", Namespace: "tenant-a", Name: "token"}},
+				ManagedResourcesStatus: meta.ManagedResourcesStatus{
+					ProcessedItems: meta.ProcessedItems{
+						item,
+						{Version: "v1", Kind: "Secret", Namespace: "tenant-a", Name: "token"},
+					},
 				},
 			},
 		},
@@ -70,12 +68,14 @@ func TestGlobalProcessedItemsIndexer(t *testing.T) {
 	t.Parallel()
 
 	item := meta.ObjectReferenceStatus{
-		ResourceID: gvk.ResourceID{Version: "v1", Kind: "ConfigMap", Namespace: "tenant-a", Name: "settings"},
+		Version: "v1", Kind: "ConfigMap", Namespace: "tenant-a", Name: "settings",
 	}
 	gtr := &capsulev1beta2.GlobalTenantResource{
 		Status: capsulev1beta2.GlobalTenantResourceStatus{
 			TenantResourceCommonStatus: capsulev1beta2.TenantResourceCommonStatus{
-				ProcessedItems: meta.ProcessedItems{item},
+				ManagedResourcesStatus: meta.ManagedResourcesStatus{
+					ProcessedItems: meta.ProcessedItems{item},
+				},
 			},
 		},
 	}

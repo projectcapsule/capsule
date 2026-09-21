@@ -48,7 +48,7 @@ func TestPreparedStaticRulesPreserveRendering(t *testing.T) {
 			if prepared.NeedsContext() {
 				t.Fatal("static rules request a context")
 			}
-			for i := 0; i < 2; i++ {
+			for range 2 {
 				got, err := prepared.Render(nil)
 				if err != nil {
 					t.Fatal(err)
@@ -79,7 +79,7 @@ func TestPreparedRulesReuseParsingWithFreshContext(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
-	for i := 0; i < 16; i++ {
+	for i := range 16 {
 		wg.Go(func() {
 			name := fmt.Sprintf("namespace-%d", i)
 			got, err := prepared.Render(map[string]any{"name": name})

@@ -51,10 +51,8 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Control
 	enqueueFn := handler.EnqueueRequestsFromMapFunc(func(context.Context, client.Object) []reconcile.Request {
 		return []reconcile.Request{
 			{
-				NamespacedName: types.NamespacedName{
-					Namespace: configuration.ControllerNamespace(),
-					Name:      r.Configuration.TLSSecretName(),
-				},
+				Namespace: configuration.ControllerNamespace(),
+				Name:      r.Configuration.TLSSecretName(),
 			},
 		}
 	})
@@ -144,7 +142,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.
 	log.V(4).Info("TLS reconciliation completed", "requeueAfter", requeueAfter.String())
 
 	return ctrl.Result{
-		Requeue:      true,
 		RequeueAfter: requeueAfter,
 	}, nil
 }

@@ -6,6 +6,7 @@ package rbac_test
 import (
 	"math/rand"
 	"reflect"
+	"slices"
 	"sort"
 	"testing"
 	"time"
@@ -30,10 +31,8 @@ func slowIsPresent(u rbac.UserListSpec, name string, groups []string) bool {
 				return true
 			}
 		case rbac.GroupOwner:
-			for _, group := range groups {
-				if group == user.Name {
-					return true
-				}
+			if slices.Contains(groups, user.Name) {
+				return true
 			}
 		}
 	}
@@ -86,10 +85,10 @@ func TestFindUser_Randomized(t *testing.T) {
 		numLookupsPerList = 80
 	)
 
-	for listIdx := 0; listIdx < numLists; listIdx++ {
+	for listIdx := range numLists {
 		var list rbac.UserListSpec
 		n := rnd.Intn(maxLength)
-		for i := 0; i < n; i++ {
+		for range n {
 			k := ownerKinds[rnd.Intn(len(ownerKinds))]
 			list = append(list, rbac.UserSpec{
 				Name: randomName(rnd, 3+rnd.Intn(4)), // length 3–6
@@ -97,7 +96,7 @@ func TestFindUser_Randomized(t *testing.T) {
 			})
 		}
 
-		for lookupIdx := 0; lookupIdx < numLookupsPerList; lookupIdx++ {
+		for lookupIdx := range numLookupsPerList {
 			var qName string
 			var qKind rbac.OwnerKind
 
@@ -144,11 +143,11 @@ func TestIsPresent_RandomizedMatchesSlowImplementation(t *testing.T) {
 		maxGroupsPerUser  = 10
 	)
 
-	for listIdx := 0; listIdx < numLists; listIdx++ {
+	for listIdx := range numLists {
 		// Generate a random user list (possibly with duplicates).
 		var users rbac.UserListSpec
 		nOwners := rnd.Intn(maxOwnersPerList)
-		for i := 0; i < nOwners; i++ {
+		for range nOwners {
 			kind := ownerKinds[rnd.Intn(len(ownerKinds))]
 			users = append(users, rbac.UserSpec{
 				Name: randomName(rnd, 3+rnd.Intn(4)), // length 3–6
@@ -156,7 +155,7 @@ func TestIsPresent_RandomizedMatchesSlowImplementation(t *testing.T) {
 			})
 		}
 
-		for lookupIdx := 0; lookupIdx < numLookupsPerList; lookupIdx++ {
+		for lookupIdx := range numLookupsPerList {
 			// Generate a random userName and groups,
 			// sometimes biased to hit existing owners/groups.
 			var userName string
@@ -172,7 +171,7 @@ func TestIsPresent_RandomizedMatchesSlowImplementation(t *testing.T) {
 
 			// Random groups, sometimes including owner names
 			nGroups := rnd.Intn(maxGroupsPerUser)
-			for i := 0; i < nGroups; i++ {
+			for range nGroups {
 				if len(users) > 0 && rnd.Float64() < 0.5 {
 					pick := users[rnd.Intn(len(users))]
 					groups = append(groups, pick.Name)
@@ -267,10 +266,10 @@ func TestGetByKinds_Randomized(t *testing.T) {
 		maxOwnersPerList = 50
 	)
 
-	for listIdx := 0; listIdx < numLists; listIdx++ {
+	for listIdx := range numLists {
 		var users rbac.UserListSpec
 		n := rnd.Intn(maxOwnersPerList)
-		for i := 0; i < n; i++ {
+		for range n {
 			k := ownerKinds[rnd.Intn(len(ownerKinds))]
 			users = append(users, rbac.UserSpec{
 				Name: randomName(rnd, 3+rnd.Intn(4)), // reuse your helper
@@ -279,7 +278,7 @@ func TestGetByKinds_Randomized(t *testing.T) {
 		}
 
 		// Try several random kind-subsets per list
-		for subsetIdx := 0; subsetIdx < 10; subsetIdx++ {
+		for subsetIdx := range 10 {
 			// Build a random subset of kinds
 			var kinds []rbac.OwnerKind
 			for _, k := range ownerKinds {
@@ -422,7 +421,6 @@ func TestUserListSpec_SplitUsersAndGroups(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 

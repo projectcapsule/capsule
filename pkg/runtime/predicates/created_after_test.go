@@ -22,10 +22,8 @@ func TestCreatedAfterPredicate_Create(t *testing.T) {
 
 	namespace := func(created time.Time) *corev1.Namespace {
 		return &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:              "example",
-				CreationTimestamp: metav1.NewTime(created),
-			},
+			Name:              "example",
+			CreationTimestamp: metav1.NewTime(created),
 		}
 	}
 
@@ -51,7 +49,7 @@ func TestCreatedAfterPredicate_Create(t *testing.T) {
 		},
 		{
 			name: "no creation timestamp",
-			obj:  &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "example"}},
+			obj:  &corev1.Namespace{Name: "example"},
 			want: false,
 		},
 	} {
@@ -75,9 +73,7 @@ func TestCreatedAfterPredicate_TruncatesToSecond(t *testing.T) {
 	p := predicates.NewCreatedAfterPredicate(since)
 
 	created := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			CreationTimestamp: metav1.NewTime(since.Truncate(time.Second)),
-		},
+		CreationTimestamp: metav1.NewTime(since.Truncate(time.Second)),
 	}
 
 	if !p.Create(event.CreateEvent{Object: created}) {
@@ -91,9 +87,7 @@ func TestCreatedAfterPredicate_IgnoresAnyOtherEvent(t *testing.T) {
 	p := predicates.NewCreatedAfterPredicate(time.Date(2026, time.August, 11, 10, 0, 0, 0, time.UTC))
 
 	recent := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			CreationTimestamp: metav1.NewTime(time.Date(2026, time.August, 11, 11, 0, 0, 0, time.UTC)),
-		},
+		CreationTimestamp: metav1.NewTime(time.Date(2026, time.August, 11, 11, 0, 0, 0, time.UTC)),
 	}
 
 	if p.Update(event.UpdateEvent{ObjectOld: recent, ObjectNew: recent}) {

@@ -1,0 +1,47 @@
+{{- if and (not $.Values.crds.exclusive) $.Values.global.jobs.postDelete.enabled }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "capsule.post-delete.name" . }}
+  annotations:
+    "helm.sh/hook-weight": "-3"
+    {{- include "capsule.post-delete.annotations" . | nindent 4 }}
+  labels:
+    app.kubernetes.io/component: {{ include "capsule.post-delete.component" . | quote }}
+    app.kubernetes.io/name: {{ include "capsule.post-delete.component" . | quote }}
+    {{- include "capsule.baselabels" . | nindent 4 }}
+    {{- include "capsule.selectorLabelInstance" . | nindent 4 }}
+rules:
+- apiGroups:
+  - admissionregistration.k8s.io
+  resourceNames:
+  - {{ include "capsule.fullname" . }}-dynamic-webhook
+  resources:
+  - mutatingwebhookconfigurations
+  - validatingwebhookconfigurations
+  verbs:
+  - get
+  - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "capsule.post-delete.name" . }}
+  annotations:
+    "helm.sh/hook-weight": "-2"
+    {{- include "capsule.post-delete.annotations" . | nindent 4 }}
+  labels:
+    app.kubernetes.io/component: {{ include "capsule.post-delete.component" . | quote }}
+    app.kubernetes.io/name: {{ include "capsule.post-delete.component" . | quote }}
+    {{- include "capsule.baselabels" . | nindent 4 }}
+    {{- include "capsule.selectorLabelInstance" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "capsule.post-delete.name" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "capsule.post-delete.name" . }}
+    namespace: {{ .Release.Namespace | quote }}
+{{- end }}

@@ -626,11 +626,9 @@ func (r *resourcePoolController) handleClaimDisassociation(
 	claim *capsulev1beta2.ResourcePoolClaimsItem,
 ) error {
 	current := &capsulev1beta2.ResourcePoolClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      claim.Name.String(),
-			Namespace: claim.Namespace.String(),
-			UID:       claim.UID,
-		},
+		Name:      claim.Name.String(),
+		Namespace: claim.Namespace.String(),
+		UID:       claim.UID,
 	}
 
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
@@ -723,10 +721,8 @@ func (r *resourcePoolController) syncResourceQuota(
 	}
 
 	target := &corev1.ResourceQuota{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      pool.GetQuotaName(),
-			Namespace: namespace.GetName(),
-		},
+		Name:      pool.GetQuotaName(),
+		Namespace: namespace.GetName(),
 	}
 
 	if err := reader.Get(ctx, types.NamespacedName{Name: target.Name, Namespace: target.Namespace}, target); err != nil && !apierrors.IsNotFound(err) {
@@ -957,10 +953,8 @@ func (r *resourcePoolController) garbageCollectNamespace(
 
 	// Attempt to delete the ResourceQuota
 	target := &corev1.ResourceQuota{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
+		Name:      name,
+		Namespace: namespace,
 	}
 
 	err := r.reader.Get(ctx, types.NamespacedName{Namespace: namespace, Name: target.GetName()}, target)

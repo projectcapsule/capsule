@@ -20,21 +20,15 @@ var _ = Describe("creating a Namespace with a protected Namespace regex enabled"
 	originConfig := &capsulev1beta2.CapsuleConfiguration{}
 
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-protected-namespace",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-protected-namespace",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-protected-namespace",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-protected-namespace",
+					Kind: "User",
 				},
 			},
 		},
