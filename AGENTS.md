@@ -22,6 +22,10 @@ design and follow the conventions of the package you are changing.
 - Every e2e change must cover positive and negative cases with one or more real
   Tenant objects present. Add multiple tenants whenever isolation or shared state
   is involved.
+- **Run e2e locally only for new feature tests and subsystems/components impacted by
+  the change. The full e2e suite runs in GitHub Actions.** Collect observations with
+  minimal reasoning during execution; perform forensics after the relevant suites
+  have finished.
 - New or materially changed performance-sensitive execution paths require benchmark
   coverage; extend existing benchmarks where appropriate.
 - **All admission changes are performance critical**, including changes to shared
@@ -86,8 +90,9 @@ Before implementing a change:
    indexers; inspect their callers, lifetime, and consistency requirements.
 4. Identify tenant boundaries, compatibility requirements, and admission impact.
 5. Define the unit tests and positive/negative tenant e2e scenarios needed to prove
-   the change. Identify new or materially changed performance-sensitive execution
-   paths and plan benchmark coverage for them.
+   the change. Select local e2e tests for the new feature and impacted components;
+   leave full-suite execution to GitHub Actions. Identify new or materially changed
+   performance-sensitive execution paths and plan benchmark coverage for them.
 
 ## Repository map and extension points
 
@@ -325,6 +330,50 @@ Use the existing Ginkgo v2/Gomega suite in `e2e/`. It uses
 Capsule controller, CRDs, RBAC, and webhooks installed. Merely compiling the suite,
 using a fake client, or running against an old controller image is not an e2e pass.
 
+### Local execution scope and GitHub coverage
+
+- Execute locally only the new e2e tests for newly developed features and the
+  existing suites for subsystems/components impacted by the change. Trace shared
+  helper, rules, cache, API, and admission dependencies to identify impacted suites;
+  include those consumers in the selection.
+- Use Ginkgo labels or spec filters to select that scope. Verify the selection
+  includes the intended new tests and affected regressions; zero selected tests
+  is not a successful validation. Avoid broad labels that unnecessarily select
+  unrelated components.
+- The full e2e suite runs in GitHub Actions. Do not run an unfiltered full suite
+  locally as a completion step or broaden a local run merely for extra confidence.
+  A passing scoped run satisfies local e2e execution requirements; report GitHub
+  full-suite results separately, including when they are pending or unavailable.
+- Preserve the parallel non-configuration and serial `config` phases within the
+  selected scope. Run relevant OpenShift scenarios when platform behavior is
+  impacted, using the same scoped approach.
+
+### Observe during execution; perform forensics afterward
+
+1. Before running, choose the relevant suites and prepare observation capture.
+   Record the commands/filters, controller build or image, cluster context, Ginkgo
+   seed, and artifact locations so the run can be reproduced.
+2. While e2e tests execute, **keep reasoning to a minimum and collect observations**.
+   Capture runner output, pass/fail/skip counts, durations, failed assertions,
+   controller/webhook logs, and relevant Kubernetes events or resource status.
+   Preserve transient evidence before test or cluster cleanup removes it. Keep
+   progress updates brief and factual; avoid speculative diagnoses or repeated
+   analysis of partial output.
+3. Let the planned relevant suites finish before performing forensics. Do not edit
+   code, change the environment, or repeatedly restart tests in response to an
+   intermediate failure. If one runner command fails before later planned phases
+   start, execute the remaining relevant phases when the environment is usable.
+   If the environment blocks execution, record the blocker and the unrun suites.
+4. After the relevant suites finish, analyze the collected evidence together.
+   Correlate failures with tenant/namespace state, admission decisions, controller
+   reconciliation, and timing. Distinguish product regressions, test/fixture issues,
+   and environment failures before choosing a fix.
+5. Apply fixes after that analysis, then rerun the failed and newly impacted suites
+   with the updated build. Preserve the original observations and report the final
+   scoped results separately from full-suite GitHub results.
+
+### Required scenario coverage
+
 For every change, add or extend a scenario set with all applicable rows below.
 **Positive and negative cases with at least one Tenant actually created are
 mandatory.** A Tenant value constructed only in Go, without creating it in the
@@ -413,11 +462,12 @@ and `go.mod` instead of independently selecting newer tools.
 | Deep-copy generation | `make generate`. |
 | CRD generation | `make manifests` (also invokes generation). |
 | Build controller | `go build -o bin/manager ./cmd/controller`. The entry point is under `cmd/controller/`. |
-| E2E with cluster lifecycle | `make e2e` creates a KinD cluster, builds/installs Capsule, runs the suite, and destroys the cluster on success. Requires Docker and the target's cluster tooling. |
-| E2E on a prepared test cluster | `make e2e-exec` runs non-configuration tests in parallel and then invokes the serial configuration suite. Ensure the cluster runs the current changes. |
-| Focused tenant e2e | `make e2e-exec FILTER='&& !skip && tenant'`. Replace/add labels for the feature; a filtered run does not replace full-suite validation. |
-| Configuration-only e2e | `make e2e-exec-config`. |
-| OpenShift e2e | `make e2e-openshift` when the change affects platform behavior; CI also exercises OpenShift. |
+| Prepare local e2e cluster | `make e2e-build` creates a KinD cluster and builds/installs Capsule. Requires Docker and the target's cluster tooling; follow with a scoped test run. |
+| Scoped local e2e | `make e2e-exec FILTER='&& !skip && scheduler'`. Replace the example label with the new feature/impacted component selection. Runs selected non-configuration tests in parallel, then selected configuration tests serially. Ensure the cluster runs the current changes. |
+| Scoped configuration e2e | `make e2e-exec-config FILTER='&& !skip && feature-label'`. Replace `feature-label` with the relevant existing label. |
+| Scoped OpenShift e2e | Prepare with `make e2e-build-openshift`, then use `make e2e-exec FILTER='&& !skip && !skip-on-openshift && feature-label'` for impacted platform behavior, replacing `feature-label`. |
+| Full e2e in GitHub Actions | `make e2e` and `make e2e-openshift` are the full-suite CI entry points; local execution uses the scoped commands above. |
+| Local e2e cleanup | `make e2e-destroy` or `make e2e-destroy-openshift` after preserving observations and completing the relevant run. |
 | Focused benchmarks | `go test ./path/to/changed/package -run '^$' -bench 'BenchmarkName' -benchmem -count=5` (replace path/name). |
 | Existing benchmark examples | `go test ./pkg/tenant ./internal/controllers/resources -run '^$' -bench . -benchmem -count=5`. |
 | Chart checks | `make helm-lint`; use `make helm-test` for installation behavior. |
@@ -450,7 +500,8 @@ usage, request latency/throughput, and errors for any reported comparison.
   extension points, tenant scenarios, commands/results, and benchmark evidence when
   required in the handoff or PR. Identify unrun checks and their concrete blockers;
   never claim success from compilation alone or omit required e2e/performance
-  evidence.
+  evidence. Separate scoped local e2e results from the full-suite GitHub status and
+  summarize forensic findings after the relevant suites finish.
 - If preparing commits or a PR, follow the repository's Conventional Commit and
   DCO requirements in `CONTRIBUTING.md`.
 

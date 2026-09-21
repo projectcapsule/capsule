@@ -7,6 +7,7 @@ import (
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 
 	"github.com/projectcapsule/capsule/internal/webhook/rules/status"
+	"github.com/projectcapsule/capsule/pkg/ruleengine"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
@@ -14,18 +15,20 @@ import (
 type rulesValidating struct {
 	configuration configuration.Configuration
 	mapper        k8smeta.RESTMapper
+	compiler      ruleengine.ConditionCompiler
 }
 
-func RulesValidating(mapper k8smeta.RESTMapper, configuration configuration.Configuration) handlers.Webhook {
+func RulesValidating(mapper k8smeta.RESTMapper, configuration configuration.Configuration, compiler ruleengine.ConditionCompiler) handlers.Webhook {
 	return &rulesValidating{
 		configuration: configuration,
 		mapper:        mapper,
+		compiler:      compiler,
 	}
 }
 
 func (w *rulesValidating) GetHandlers() []handlers.Handler {
 	return []handlers.Handler{
-		status.RuleStatusValidationHandler(w.mapper, w.configuration),
+		status.RuleStatusValidationHandler(w.mapper, w.configuration, w.compiler),
 	}
 }
 

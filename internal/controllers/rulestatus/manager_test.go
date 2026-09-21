@@ -150,6 +150,20 @@ func TestReconcileExcludesQuotaFromRuleStatus(t *testing.T) {
 	}
 }
 
+func TestReconcilePreservesMutationOnlyRules(t *testing.T) {
+	instance := &capsulev1beta2.RuleStatus{Spec: []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{{Workloads: rules.WorkloadMutation{NodeSelector: map[string]string{"pool": "shared"}}}}}}}
+	if err := (Manager{}).reconcile(context.Background(), instance); err != nil {
+		t.Fatal(err)
+	}
+	if len(instance.Status.Rules) != 1 || instance.Status.Rules[0].Mutate[0].Workloads.NodeSelector["pool"] != "shared" {
+		t.Fatalf("lost mutation-only rule: %+v", instance.Status.Rules)
+	}
+	instance.Status.Rules[0].Mutate[0].Workloads.NodeSelector["pool"] = "other"
+	if instance.Spec[0].Mutate[0].Workloads.NodeSelector["pool"] != "shared" {
+		t.Fatal("status aliases the rule spec")
+	}
+}
+
 func TestRemoveQuotaDefinitionsCleansLegacyStatus(t *testing.T) {
 	t.Parallel()
 

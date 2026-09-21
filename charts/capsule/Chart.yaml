@@ -41,4 +41,8 @@ annotations:
       url: https://projectcapsule.dev/
   artifacthub.io/changes: |
     - kind: added
+      description: added typed workload placement mutations with merge/replace actions, resource conditions, and enforcement rules
+    - kind: added
+      description: added hostUsers workload mutation and clarified mutation actions and diagnostics
+    - kind: added
       description: added toggles for podSecurityContexts and securityContexts

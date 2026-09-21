@@ -50,6 +50,28 @@ func (c *CELCache) GetOrCompileQuantity(
 	return c.getOrCompile(expression, celruntime.ResultTypeQuantity, mode)
 }
 
+func (c *CELCache) GetOrCompileCondition(expression string, mode environment.Type) (*celruntime.CompiledExpression, error) {
+	return c.getOrCompile(expression, celruntime.ResultTypeCondition, mode)
+}
+
+// PruneConditions retires rule expressions without changing custom-quota entries.
+func (c *CELCache) PruneConditions(retain map[string]struct{}) {
+	if c == nil {
+		return
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for key := range c.data {
+		if key.resultType == celruntime.ResultTypeCondition {
+			if _, ok := retain[key.expression]; !ok {
+				delete(c.data, key)
+			}
+		}
+	}
+}
+
 func (c *CELCache) DeleteMany(expressions ...string) int {
 	if c == nil {
 		return 0
@@ -123,6 +145,8 @@ func (c *CELCache) getOrCompile(
 		compiled, err = c.compiler.CompileBoolean(expression, mode)
 	case celruntime.ResultTypeQuantity:
 		compiled, err = c.compiler.CompileQuantity(expression, mode)
+	case celruntime.ResultTypeCondition:
+		compiled, err = c.compiler.CompileCondition(expression, mode)
 	default:
 		err = fmt.Errorf("unsupported CEL result type %q", resultType)
 	}

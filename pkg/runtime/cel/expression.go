@@ -27,12 +27,14 @@ const (
 type ResultType string
 
 const (
-	ResultTypeBoolean  ResultType = "boolean"
-	ResultTypeQuantity ResultType = "quantity"
+	ResultTypeBoolean   ResultType = "boolean"
+	ResultTypeQuantity  ResultType = "quantity"
+	ResultTypeCondition ResultType = "condition"
 )
 
 type Compiler struct {
-	envSet *environment.EnvSet
+	envSet          *environment.EnvSet
+	conditionEnvSet *environment.EnvSet
 }
 
 type CompiledExpression struct {
@@ -57,7 +59,19 @@ func NewCompiler() (*Compiler, error) {
 		return nil, fmt.Errorf("build Kubernetes CEL environment: %w", err)
 	}
 
-	return &Compiler{envSet: envSet}, nil
+	conditionEnvSet, err := envSet.Extend(environment.VersionedOptions{
+		IntroducedVersion: version.MajorMinor(1, 0),
+		EnvOptions:        []celgo.EnvOption{celgo.Variable("request", celgo.DynType)},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("build admission condition CEL environment: %w", err)
+	}
+
+	return &Compiler{envSet: envSet, conditionEnvSet: conditionEnvSet}, nil
+}
+
+func (c *Compiler) CompileCondition(expression string, mode environment.Type) (*CompiledExpression, error) {
+	return c.compile(expression, mode, ResultTypeCondition)
 }
 
 func (c *Compiler) CompileBoolean(expression string, mode environment.Type) (*CompiledExpression, error) {
@@ -86,7 +100,12 @@ func (c *Compiler) compile(
 		return nil, fmt.Errorf("CEL expression exceeds max length of %d", MaxExpressionLength)
 	}
 
-	env, err := c.envSet.Env(mode)
+	envSet := c.envSet
+	if resultType == ResultTypeCondition {
+		envSet = c.conditionEnvSet
+	}
+
+	env, err := envSet.Env(mode)
 	if err != nil {
 		return nil, fmt.Errorf("load Kubernetes CEL %s environment: %w", mode, err)
 	}
@@ -100,10 +119,12 @@ func (c *Compiler) compile(
 		return nil, fmt.Errorf("compile CEL expression %q: %w", expression, err)
 	}
 
-	program, err := env.Program(
-		ast,
-		celgo.InterruptCheckFrequency(celconfig.CheckFrequency),
-	)
+	options := []celgo.ProgramOption{celgo.InterruptCheckFrequency(celconfig.CheckFrequency)}
+	if resultType == ResultTypeCondition {
+		options = append(options, celgo.CostLimit(100000))
+	}
+
+	program, err := env.Program(ast, options...)
 	if err != nil {
 		return nil, fmt.Errorf("create CEL program for %q: %w", expression, err)
 	}
@@ -117,7 +138,7 @@ func (c *Compiler) compile(
 
 func validateOutputType(output *celgo.Type, resultType ResultType) error {
 	switch resultType {
-	case ResultTypeBoolean:
+	case ResultTypeBoolean, ResultTypeCondition:
 		if !output.IsExactType(celgo.BoolType) {
 			return fmt.Errorf("expression must evaluate to bool, got %s", output)
 		}
@@ -168,6 +189,24 @@ func (c *CompiledExpression) EvaluateBoolean(
 	result, ok := value.(types.Bool)
 	if !ok {
 		return false, fmt.Errorf("CEL expression %q returned %T, expected bool", c.expression, value)
+	}
+
+	return bool(result), nil
+}
+
+func (c *CompiledExpression) EvaluateCondition(ctx context.Context, object, request map[string]any) (bool, error) {
+	if c == nil || c.program == nil || c.resultType != ResultTypeCondition {
+		return false, fmt.Errorf("compiled admission condition is invalid")
+	}
+
+	value, _, err := c.program.ContextEval(ctx, map[string]any{ObjectVariable: object, "request": request})
+	if err != nil {
+		return false, fmt.Errorf("evaluate CEL condition %q: %w", c.expression, err)
+	}
+
+	result, ok := value.(types.Bool)
+	if !ok {
+		return false, fmt.Errorf("CEL condition %q returned %T, expected bool", c.expression, value)
 	}
 
 	return bool(result), nil
