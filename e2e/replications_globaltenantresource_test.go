@@ -49,6 +49,14 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 		allNamespaces     []string
 	)
 
+	It("converts legacy settings and applies independent resource policies across tenant boundaries", Label("replication-policy"), func() {
+		exerciseReplicationPolicies(true, tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner)
+	})
+
+	It("rotates age keys after five minutes and retains all history in selected tenant namespaces", Label("resource-condition", "age-rotation"), func() {
+		exerciseGlobalAgeRotation(tenantA.Name, tenantB.Name, tenantANamespaces[0], tenantANamespaces[1], tenantBNamespaces[0])
+	})
+
 	BeforeEach(func() {
 		ctx = context.Background()
 

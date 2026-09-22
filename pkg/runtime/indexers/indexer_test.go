@@ -57,6 +57,7 @@ func TestAddToManagerRegistersIndexers(t *testing.T) {
 		".spec.name",
 		".status.namespaces",
 		"status.request.impersonation",
+		"status.items.protected",
 		"hostnamePathPair",
 		".spec.dependsOn.global",
 		".spec.dependsOn.namespaced",

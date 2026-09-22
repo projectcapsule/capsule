@@ -18,6 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/ssa"
 )
 
@@ -162,7 +163,16 @@ func (p *Processor) pruneProcessedItem(
 	obj *unstructured.Unstructured,
 	itemErrors *int,
 ) bool {
-	if !opts.Prune {
+	if item.Policy != nil && item.Policy.ShouldOrphan() {
+		err := p.resourceManager().Orphan(ctx, c, obj, opts.Owner)
+		if !failAndRecord(processed, itemErrors, item, "orphaning failed for item: ", err) {
+			processed.RemoveItem(item)
+		}
+
+		return true
+	}
+
+	if item.Policy == nil && !opts.Prune {
 		return false
 	}
 
@@ -242,6 +252,9 @@ func (p *Processor) applyAccumulatedItem(
 		ResourceID: item.Resource,
 		Type:       meta.ReadyCondition,
 	}
+	if current := processed.GetItem(item.Resource); current != nil {
+		or = *current
+	}
 
 	clusterScoped, err := p.isClusterScoped(item.Resource.GetGVK())
 	if err != nil {
@@ -302,7 +315,7 @@ func (p *Processor) applyAccumulatorObject(
 		return false
 	}
 
-	ver, created, err := p.Apply(
+	result, err := p.Apply(
 		ctx,
 		c,
 		obj.Object,
@@ -310,24 +323,52 @@ func (p *Processor) applyAccumulatorObject(
 		opts.Force,
 		opts.Adopt,
 		opts.Owner,
-		processed.GetItem(item.Resource),
+		or,
+		obj.Policy,
+		obj.ExpectedResourceVersion,
 	)
 
-	or.Created = created
+	or.Created = or.Created || result.Created
 
-	if err != nil {
+	switch {
+	case err != nil:
+		if result.LastApply != nil {
+			or.LastApply = *result.LastApply
+
+			if !result.Skipped {
+				or.Policy = obj.Policy.DeepCopy()
+			}
+		}
+
 		or.Status = metav1.ConditionFalse
 		or.Message = "apply failed for item " + obj.Origin.Origin + ": " + err.Error()
 
 		log.V(4).Info("failed to apply item", "item", obj.Origin.Origin)
-	} else {
-		if ver != nil {
-			or.LastApply = *ver
+	case result.Skipped:
+		or.Status = metav1.ConditionTrue
+		or.Message = ssa.ConditionNotMet
+
+		or.Created = result.Created
+
+		if or.LastApply.IsZero() && result.LastApply != nil {
+			or.LastApply = *result.LastApply
+		}
+
+		if result.PolicyReconciled {
+			or.Policy = obj.Policy.DeepCopy()
+		}
+	default:
+		or.Created = result.Created
+		or.Policy = obj.Policy.DeepCopy()
+
+		if result.LastApply != nil {
+			or.LastApply = *result.LastApply
 		}
 
 		or.Status = metav1.ConditionTrue
+		or.Message = ""
 
-		log.V(4).Info("successfully applied item", "item", obj.Origin.Origin, "version", ver)
+		log.V(4).Info("successfully applied item", "item", obj.Origin.Origin, "version", result.LastApply)
 	}
 
 	processed.UpdateItem(*or)
@@ -396,11 +437,13 @@ func (p *Processor) Prune(
 
 func (p *Processor) resourceManager() ssa.Manager {
 	return ssa.Manager{
-		Reader: p.GatherClient,
-		Mapper: p.Mapper,
+		Conditions: p.Conditions,
+		Reader:     p.GatherClient,
+		Mapper:     p.Mapper,
 		Metadata: ssa.Metadata{
 			CreatedByValue:     meta.ValueControllerReplications,
 			ManagedByValue:     meta.ValueControllerReplications,
+			ProtectedByValue:   meta.ValueControllerReplications,
 			LegacyCreatedLabel: meta.ResourcesLabel,
 		},
 	}
@@ -424,17 +467,28 @@ func (r *Processor) Apply(
 	adopt bool,
 	ownerreference *metav1.OwnerReference,
 	current *meta.ObjectReferenceStatus,
-) (lastApply *metav1.Time, created bool, err error) {
+	policy *apiruntime.ResourceTemplatePolicy,
+	expectedResourceVersion *string,
+) (ssa.ApplyResult, error) {
 	previouslyCreated := current != nil && current.Created
-	result, err := r.resourceManager().Apply(ctx, c, obj, ssa.ApplyOptions{
-		FieldOwner:        fieldOwner,
-		Force:             force,
-		Adopt:             adopt,
-		OwnerReference:    ownerreference,
-		PreviouslyCreated: previouslyCreated,
-	})
 
-	return result.LastApply, result.Created, err
+	options := ssa.ApplyOptions{
+		FieldOwner:              fieldOwner,
+		Force:                   force,
+		Adopt:                   adopt,
+		OwnerReference:          ownerreference,
+		PreviouslyCreated:       previouslyCreated,
+		ExpectedResourceVersion: expectedResourceVersion,
+	}
+
+	if policy != nil {
+		options.Condition = policy.Condition
+		options.Force = policy.Force
+		options.Adopt = policy.AllowsAdoption()
+		options.Protect = policy.IsProtected()
+	}
+
+	return r.resourceManager().Apply(ctx, c, obj, options)
 }
 
 func (r *Processor) isNamespaceTerminatingForObject(

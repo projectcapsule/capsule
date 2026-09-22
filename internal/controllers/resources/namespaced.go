@@ -53,6 +53,7 @@ type namespacedResourceController struct {
 	clients       impersonatedClientLoader[*capsulev1beta2.TenantResource]
 
 	impersonation *cache.ImpersonationCache
+	conditions    *cache.CELCache
 }
 
 func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager, ctrlConfig cutils.ControllerOptions) error {
@@ -60,6 +61,7 @@ func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager, ctrlCo
 	r.reader = mgr.GetAPIReader()
 
 	r.processor = processor.Processor{
+		Conditions:                   r.conditions,
 		Configuration:                r.configuration,
 		AllowCrossNamespaceSelection: false,
 		GatherClient:                 mgr.GetAPIReader(),
@@ -451,13 +453,8 @@ func (r *namespacedResourceController) reconcile(
 		c,
 		&tntResource.Status.ProcessedItems,
 		acc,
-		processor.ProcessorOptions{
-			FieldOwnerPrefix: getFieldOwner(tntResource.GetName(), tntResource.GetNamespace()),
-			Prune:            *tntResource.Spec.PruningOnDelete,
-			Adopt:            *tntResource.Spec.Settings.Adopt,
-			Force:            *tntResource.Spec.Settings.Force,
-			Owner:            nil,
-		})
+		replicationProcessorOptions(tntResource, &tntResource.Spec.TenantResourceCommonSpec, nil),
+	)
 }
 
 func (r *namespacedResourceController) gatherResources(

@@ -9,7 +9,12 @@ spec:
     name: gtr-reconciler
     namespace: capsule-system
   resources:
-    - rawItems:
+    - policy:
+        creation: Owner
+        force: false
+        protect: true
+        deletion: Remove
+      rawItems:
         - apiVersion: networking.k8s.io/v1
           kind: NetworkPolicy
           metadata:

@@ -8,11 +8,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	celruntime "github.com/projectcapsule/capsule/pkg/runtime/cel"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 )
 
 type Processor struct {
+	Conditions                   celruntime.ResourceConditionCompiler
 	Configuration                configuration.Configuration
 	AllowCrossNamespaceSelection bool
 	GatherClient                 client.Reader

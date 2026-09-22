@@ -114,6 +114,10 @@ var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace
 		}
 	})
 
+	It("applies conditional targets without pruning skipped resources", Label("resource-condition"), func() {
+		exerciseTenantResourceConditions(tnt.Name, baseNamespace, targetNamespaces[0], targetNamespaces[1])
+	})
+
 	AfterEach(func() {
 		cleanupTenantResourcesWithDefaultServiceAccount(
 			ctx,
@@ -129,6 +133,10 @@ var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace
 		}
 
 		EventuallyDeletion(tnt)
+	})
+
+	It("converts legacy settings and applies independent resource policies", Label("replication-policy"), func() {
+		exerciseReplicationPolicies(false, tnt.Name, baseNamespace, targetNamespaces[0], targetNamespaces[1], tenantOwner)
 	})
 
 	Context("cluster-scoped object protection", func() {
@@ -1677,7 +1685,7 @@ data:
 				Eventually(func(g Gomega) {
 					cm := &corev1.ConfigMap{}
 					g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "shared-config", Namespace: ns}, cm)).To(Succeed())
-					g.Expect(cm.Labels).To(HaveKeyWithValue(apimeta.CreatedByCapsuleLabel, apimeta.ValueControllerReplications))
+					g.Expect(cm.Labels).ToNot(HaveKey(apimeta.CreatedByCapsuleLabel))
 					g.Expect(cm.Labels).ToNot(HaveKey(apimeta.NewManagedByCapsuleLabel))
 					g.Expect(cm.Data).To(HaveKeyWithValue("mode", "keep"))
 				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())

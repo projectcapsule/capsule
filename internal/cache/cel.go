@@ -13,16 +13,22 @@ import (
 )
 
 type celCacheKey struct {
-	expression string
-	resultType celruntime.ResultType
-	mode       environment.Type
+	expression        string
+	resultType        celruntime.ResultType
+	mode              environment.Type
+	resourceCondition bool
 }
 
 type CELCache struct {
-	mu       sync.RWMutex
-	compiler *celruntime.Compiler
-	data     map[celCacheKey]*celruntime.CompiledExpression
+	mu                 sync.RWMutex
+	compiler           *celruntime.Compiler
+	data               map[celCacheKey]*celruntime.CompiledExpression
+	resourceConditions int
 }
+
+// Resource policies can be edited independently of the quota invalidation
+// lifecycle. Bound their compiled working set within the shared cache.
+const maxResourceConditions = 256
 
 func NewCELCache() (*CELCache, error) {
 	compiler, err := celruntime.NewCompiler()
@@ -36,18 +42,22 @@ func NewCELCache() (*CELCache, error) {
 	}, nil
 }
 
+func (c *CELCache) GetOrCompileResourceCondition(expression string, mode environment.Type) (*celruntime.CompiledExpression, error) {
+	return c.getOrCompile(expression, celruntime.ResultTypeBoolean, mode, true)
+}
+
 func (c *CELCache) GetOrCompileBoolean(
 	expression string,
 	mode environment.Type,
 ) (*celruntime.CompiledExpression, error) {
-	return c.getOrCompile(expression, celruntime.ResultTypeBoolean, mode)
+	return c.getOrCompile(expression, celruntime.ResultTypeBoolean, mode, false)
 }
 
 func (c *CELCache) GetOrCompileQuantity(
 	expression string,
 	mode environment.Type,
 ) (*celruntime.CompiledExpression, error) {
-	return c.getOrCompile(expression, celruntime.ResultTypeQuantity, mode)
+	return c.getOrCompile(expression, celruntime.ResultTypeQuantity, mode, false)
 }
 
 func (c *CELCache) DeleteMany(expressions ...string) int {
@@ -64,6 +74,10 @@ func (c *CELCache) DeleteMany(expressions ...string) int {
 		for _, expression := range expressions {
 			if expression != "" && key.expression == expression {
 				delete(c.data, key)
+
+				if key.resourceCondition {
+					c.resourceConditions--
+				}
 
 				deleted++
 
@@ -90,6 +104,7 @@ func (c *CELCache) getOrCompile(
 	expression string,
 	resultType celruntime.ResultType,
 	mode environment.Type,
+	resourceCondition bool,
 ) (*celruntime.CompiledExpression, error) {
 	if c == nil || c.compiler == nil {
 		return nil, fmt.Errorf("CEL cache is nil")
@@ -100,6 +115,7 @@ func (c *CELCache) getOrCompile(
 		resultType: resultType,
 		mode:       mode,
 	}
+	key.resourceCondition = resourceCondition
 
 	c.mu.RLock()
 	compiled, ok := c.data[key]
@@ -121,7 +137,11 @@ func (c *CELCache) getOrCompile(
 	//nolint:exhaustive //cel.ResultTypeString not used yet
 	switch resultType {
 	case celruntime.ResultTypeBoolean:
-		compiled, err = c.compiler.CompileBoolean(expression, mode)
+		if key.resourceCondition {
+			compiled, err = c.compiler.CompileResourceCondition(expression, mode)
+		} else {
+			compiled, err = c.compiler.CompileBoolean(expression, mode)
+		}
 	case celruntime.ResultTypeQuantity:
 		compiled, err = c.compiler.CompileQuantity(expression, mode)
 	default:
@@ -130,6 +150,22 @@ func (c *CELCache) getOrCompile(
 
 	if err != nil {
 		return nil, err
+	}
+
+	if key.resourceCondition {
+		if c.resourceConditions >= maxResourceConditions {
+			for oldKey := range c.data {
+				if oldKey.resourceCondition {
+					delete(c.data, oldKey)
+
+					c.resourceConditions--
+
+					break
+				}
+			}
+		}
+
+		c.resourceConditions++
 	}
 
 	c.data[key] = compiled

@@ -7,6 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 )
 
@@ -151,6 +152,13 @@ type ObjectReferenceStatus struct {
 
 // +kubebuilder:object:generate=true
 type ObjectReferenceStatusCondition struct {
+	// Policy is the last reconciled replication policy, including policy changes
+	// when an apply condition skips rendered content. It remains available for
+	// protection and cleanup after the originating resource block is removed.
+	// An absent policy preserves legacy replication behavior.
+	// +optional
+	Policy *apiruntime.ResourceTemplatePolicy `json:"policy,omitempty"`
+
 	// status of the condition, one of True, False, Unknown.
 	// +required
 	// +kubebuilder:validation:Required

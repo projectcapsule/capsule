@@ -112,6 +112,7 @@ type ResourcePermitReconciler struct {
 
 	Configuration      configuration.Configuration
 	ImpersonationCache *cache.ImpersonationCache
+	Conditions         *cache.CELCache
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -129,8 +130,9 @@ func (r *ResourcePermitReconciler) SetupWithManager(mgr ctrl.Manager, _ utils.Co
 	}
 
 	r.resources = ssa.Manager{
-		Reader: mgr.GetAPIReader(),
-		Mapper: mgr.GetRESTMapper(),
+		Conditions: r.Conditions,
+		Reader:     mgr.GetAPIReader(),
+		Mapper:     mgr.GetRESTMapper(),
 		Metadata: ssa.Metadata{
 			CreatedByValue:                      meta.ValueControllerResourcePermit,
 			ManagedByValue:                      meta.ValueControllerResourcePermit,
@@ -998,6 +1000,7 @@ func (r *ResourcePermitReconciler) dryRunItems(
 			_, err = manager.Apply(ctx, resourceClient, obj, ssa.ApplyOptions{
 				FieldOwner: fieldOwner,
 				Force:      resource.Policy.Force,
+				Condition:  resource.Policy.Condition,
 				Adopt:      resource.Policy.AllowsAdoption(),
 				Protect:    resource.Policy.IsProtected(),
 				DryRun:     true,
@@ -1086,14 +1089,21 @@ func (r *ResourcePermitReconciler) reconcileItems(
 			}
 
 			current := currentItems.GetItem(item.ResourceID)
+
 			result, applyErr := manager.Apply(ctx, resourceClient, obj, ssa.ApplyOptions{
 				FieldOwner:        fieldOwner,
 				Force:             resource.Policy.Force,
+				Condition:         resource.Policy.Condition,
 				Adopt:             resource.Policy.AllowsAdoption(),
 				Protect:           resource.Policy.IsProtected(),
 				PreviouslyCreated: current != nil && current.Created,
 			})
-			item.Created = result.Created
+
+			if current != nil {
+				item = *current
+			}
+
+			item.Created = item.Created || result.Created
 
 			if result.LastApply != nil {
 				item.LastApply = *result.LastApply
@@ -1105,6 +1115,12 @@ func (r *ResourcePermitReconciler) reconcileItems(
 				syncErr = errors.Join(syncErr, applyErr)
 			} else {
 				item.Status = metav1.ConditionTrue
+
+				item.Message = ""
+
+				if result.Skipped {
+					item.Message = ssa.ConditionNotMet
+				}
 			}
 
 			processedItems.UpdateItem(item)
@@ -1152,23 +1168,30 @@ func (r *ResourcePermitReconciler) pruneItems(
 			current := br.Status.ProcessedItems.GetItem(item.ResourceID)
 			obj.SetNamespace(item.Namespace)
 
-			//nolint:nestif
-			if current != nil {
+			if current != nil && (current.Created || !current.LastApply.IsZero()) {
 				item = *current
 			} else {
 				// Applying a resource and persisting its status are separate writes.
 				// Recover successful applies from the immutable rendered snapshot,
 				// but never prune a preview that this permit did not actually apply.
 				actual := obj.DeepCopy()
-				if getErr := resourceClient.Get(ctx, client.ObjectKeyFromObject(actual), actual); getErr != nil {
-					if !apierrors.IsNotFound(getErr) {
-						syncErr = errors.Join(syncErr, getErr)
-					}
+
+				getErr := resourceClient.Get(ctx, client.ObjectKeyFromObject(actual), actual)
+				if apierrors.IsNotFound(getErr) {
+					br.Status.ProcessedItems.RemoveItem(item)
+
+					continue
+				}
+
+				if getErr != nil {
+					syncErr = errors.Join(syncErr, getErr)
 
 					continue
 				}
 
 				if _, owned := meta.CapsuleFieldOwners(actual, fieldOwner)[fieldOwner]; !owned {
+					br.Status.ProcessedItems.RemoveItem(item)
+
 					continue
 				}
 

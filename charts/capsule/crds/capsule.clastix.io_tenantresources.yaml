@@ -90,6 +90,8 @@ spec:
                 description: |-
                   When the replicated resource manifest is deleted, all the objects replicated so far will be automatically deleted.
                   Disable this to keep replicated resources although the deletion of the replication manifest.
+
+                  Deprecated: use resources[].policy.deletion instead. Retained for blocks without a policy.
                 type: boolean
               resources:
                 description: Defines the rules to select targeting Namespace, along
@@ -373,6 +375,59 @@ spec:
                         - kind
                         type: object
                       type: array
+                    policy:
+                      description: |-
+                        Policy controls creation, admission protection, SSA conflict ownership,
+                        and deletion for every raw item, namespaced item, and generator in this block.
+                        An explicit policy replaces the deprecated spec.settings for this block.
+                        When omitted, admission converts legacy settings and pruningOnDelete into a policy.
+                      properties:
+                        condition:
+                          description: |-
+                            Condition is an optional CEL boolean expression checked before each target
+                            is applied. object is the existing destination object, or null when absent;
+                            now is the evaluation timestamp. False skips rendered content without
+                            pruning or releasing an already managed object. Policy and protection are
+                            still reconciled for managed objects. Evaluation errors prevent writes.
+                            Rendering still occurs before evaluation. Omitting Condition preserves the
+                            existing apply behavior. Conditions do not affect deletion or orphaning.
+                          maxLength: 4096
+                          minLength: 1
+                          type: string
+                        creation:
+                          default: Owner
+                          description: |-
+                            Creation controls how an existing target is handled. Owner requires the
+                            resource to have been created by the applying controller and otherwise
+                            returns an error. Merge adopts an existing resource when possible and
+                            creates the resource when it does not exist.
+                          enum:
+                          - Owner
+                          - Merge
+                          type: string
+                        deletion:
+                          default: Remove
+                          description: |-
+                            Deletion controls what happens when the parent stops managing the target.
+                            Remove deletes resources created for the parent and relinquishes adopted
+                            resources. Orphan keeps the resource and removes Capsule's lifecycle
+                            metadata. Removal is the default.
+                          enum:
+                          - Remove
+                          - Orphan
+                          type: string
+                        force:
+                          default: false
+                          description: Force allows server-side apply to acquire conflicting
+                            field ownership.
+                          type: boolean
+                        protect:
+                          default: true
+                          description: |-
+                            Protect prevents users from changing or deleting the target through
+                            admission while it is managed. Protection is enabled by default.
+                          type: boolean
+                      type: object
                     rawItems:
                       description: List of raw resources that must be replicated.
                       items:
@@ -402,19 +457,25 @@ spec:
                 type: object
               settings:
                 default: {}
-                description: Provide additional settings
+                description: |-
+                  Deprecated: configure resources[].policy instead. Admission converts Settings
+                  into policies for blocks without one. Retained as a compatibility fallback
+                  for stored resources that have not passed through admission again.
                 properties:
                   adopt:
                     default: false
-                    description: Enabling this allows TenanResources to interact with
-                      objects which were not created by a TenantResource. In this
-                      case on prune no deletion of the entire object is made.
+                    description: |-
+                      Enabling this allows TenanResources to interact with objects which were not created by a TenantResource. In this case on prune no deletion of the entire object is made.
+
+                      Deprecated: use resources[].policy.creation: Merge instead.
                     type: boolean
                   force:
                     default: false
                     description: |-
                       Force indicates that in case of conflicts with server-side apply, the client should acquire ownership of the conflicting field.
                       You may create collisions with this.
+
+                      Deprecated: use resources[].policy.force instead.
                     type: boolean
                 type: object
             required:
@@ -532,6 +593,59 @@ spec:
                             This may be an empty string.
                           maxLength: 32768
                           type: string
+                        policy:
+                          description: |-
+                            Policy is the last reconciled replication policy, including policy changes
+                            when an apply condition skips rendered content. It remains available for
+                            protection and cleanup after the originating resource block is removed.
+                            An absent policy preserves legacy replication behavior.
+                          properties:
+                            condition:
+                              description: |-
+                                Condition is an optional CEL boolean expression checked before each target
+                                is applied. object is the existing destination object, or null when absent;
+                                now is the evaluation timestamp. False skips rendered content without
+                                pruning or releasing an already managed object. Policy and protection are
+                                still reconciled for managed objects. Evaluation errors prevent writes.
+                                Rendering still occurs before evaluation. Omitting Condition preserves the
+                                existing apply behavior. Conditions do not affect deletion or orphaning.
+                              maxLength: 4096
+                              minLength: 1
+                              type: string
+                            creation:
+                              default: Owner
+                              description: |-
+                                Creation controls how an existing target is handled. Owner requires the
+                                resource to have been created by the applying controller and otherwise
+                                returns an error. Merge adopts an existing resource when possible and
+                                creates the resource when it does not exist.
+                              enum:
+                              - Owner
+                              - Merge
+                              type: string
+                            deletion:
+                              default: Remove
+                              description: |-
+                                Deletion controls what happens when the parent stops managing the target.
+                                Remove deletes resources created for the parent and relinquishes adopted
+                                resources. Orphan keeps the resource and removes Capsule's lifecycle
+                                metadata. Removal is the default.
+                              enum:
+                              - Remove
+                              - Orphan
+                              type: string
+                            force:
+                              default: false
+                              description: Force allows server-side apply to acquire
+                                conflicting field ownership.
+                              type: boolean
+                            protect:
+                              default: true
+                              description: |-
+                                Protect prevents users from changing or deleting the target through
+                                admission while it is managed. Protection is enabled by default.
+                              type: boolean
+                          type: object
                         status:
                           description: status of the condition, one of True, False,
                             Unknown.

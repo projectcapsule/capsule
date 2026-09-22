@@ -48,6 +48,7 @@ type CollectorOptions struct {
 	ReplicationContext           map[string]any
 	ValidatorNamespaces          tpl.NamespaceValidator
 	preserveOwnerReferences      bool
+	contextVersions              map[contextObjectKey]string
 }
 
 type CollectorIteratorOptions struct {
@@ -113,13 +114,19 @@ func (co *Collector) Collect(
 	// Only generators consume the full context. Raw items use the fast context,
 	// and copied resources do not need a template context at all.
 	var tplContext tpl.ReferenceContext
+
 	if len(spec.Generators) > 0 {
-		tplContext, err = co.gatherTemplateContext(ctx, c, opts, tnt, spec, ns)
+		contextClient := c
+
+		if spec.Policy != nil && spec.Policy.Condition != "" && spec.Context != nil {
+			opts.contextVersions = map[contextObjectKey]string{}
+			contextClient = &contextSnapshotClient{Client: c, versions: opts.contextVersions}
+		}
+
+		tplContext, err = co.gatherTemplateContext(ctx, contextClient, opts, tnt, spec, ns)
 		if err != nil {
 			return err
 		}
-
-		log.V(7).Info("available context", "context", tplContext)
 	}
 
 	authoredOpts := opts
@@ -238,8 +245,15 @@ func (co *Collector) AddToAccumulation(
 
 	sanitize.SanitizeUnstructured(obj, sanitizeOptions)
 
+	var expectedVersion *string
+	if version, found := opts.contextVersions[contextObjectKey{GVK: obj.GroupVersionKind(), Key: client.ObjectKeyFromObject(obj)}]; found {
+		expectedVersion = new(version)
+	}
+
 	processor.AccumulatorAdd(opts.Accumulator, resource, processor.AccumulatorObject{
-		Object: obj,
+		Object:                  obj,
+		Policy:                  spec.Policy,
+		ExpectedResourceVersion: expectedVersion,
 		Origin: gvk.TenantResourceIDWithOrigin{
 			TenantResourceID: gvk.TenantResourceID{
 				Tenant: tntName,

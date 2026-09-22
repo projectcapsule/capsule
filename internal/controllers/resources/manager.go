@@ -20,12 +20,14 @@ func Add(
 	mgr manager.Manager,
 	configuration configuration.Configuration,
 	opts utils.ControllerOptions,
-	cache *cache.ImpersonationCache,
+	impersonation *cache.ImpersonationCache,
+	conditions *cache.CELCache,
 ) (err error) {
 	if err = (&NamespaceTrigger{
 		log:           log.WithName("Global"),
 		configuration: configuration,
-		impersonation: cache,
+		impersonation: impersonation,
+		conditions:    conditions,
 	}).SetupWithManager(mgr, opts); err != nil {
 		return fmt.Errorf("unable to create watcher controller: %w", err)
 	}
@@ -35,7 +37,8 @@ func Add(
 		configuration: configuration,
 		metrics:       metrics.MustMakeGlobalTenantResourceRecorder(),
 
-		impersonation: cache,
+		impersonation: impersonation,
+		conditions:    conditions,
 	}).SetupWithManager(mgr, opts); err != nil {
 		return fmt.Errorf("unable to create global controller: %w", err)
 	}
@@ -45,7 +48,8 @@ func Add(
 		configuration: configuration,
 		metrics:       metrics.MustMakeTenantResourceRecorder(),
 
-		impersonation: cache,
+		impersonation: impersonation,
+		conditions:    conditions,
 	}).SetupWithManager(mgr, opts); err != nil {
 		return fmt.Errorf("unable to create namespaced controller: %w", err)
 	}

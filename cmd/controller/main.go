@@ -765,7 +765,7 @@ func main() {
 		route.GenericCustomResources(generic.ResourceCounterHandler(manager.GetClient())),
 		route.Gateway(gateway.Class(cfg)),
 		route.DeviceClass(dra.DeviceClass()),
-		route.Defaults(defaults.Handler(cfg, kubeVersion)),
+		route.Defaults(defaults.Handler(cfg, kubeVersion, celCache)),
 		route.TenantMutation(
 			tenantmutation.MetaHandler(),
 		),
@@ -855,8 +855,9 @@ func main() {
 		)),
 		route.ResourcePermitTemplateValidation(resourcepermit.ResourcePermitTemplateValidationHandler(
 			ctrl.Log.WithName("webhooks").WithName("resourcepermittemplates"),
+			celCache,
 		)),
-		route.GlobalResourcePermitTemplateValidation(resourcepermit.GlobalResourcePermitTemplateValidationHandler(ctrl.Log.WithName("webhooks").WithName("globalresourcepermittemplates"))),
+		route.GlobalResourcePermitTemplateValidation(resourcepermit.GlobalResourcePermitTemplateValidationHandler(ctrl.Log.WithName("webhooks").WithName("globalresourcepermittemplates"), celCache)),
 		route.GenericResourcePermitHandler(),
 	)
 
@@ -957,6 +958,7 @@ func main() {
 		Metrics:            *metrics.MustMakeResourcePermitsRecorder(),
 		Configuration:      cfg,
 		ImpersonationCache: impersonationCache,
+		Conditions:         celCache,
 	}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ResourcePermitReconciler")
 		os.Exit(1)
@@ -1002,6 +1004,7 @@ func main() {
 		cfg,
 		controllerConfig,
 		impersonationCache,
+		celCache,
 	); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "tenantresources")
 		os.Exit(1)

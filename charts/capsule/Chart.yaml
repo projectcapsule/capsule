@@ -41,4 +41,8 @@ annotations:
       url: https://projectcapsule.dev/
   artifacthub.io/changes: |
     - kind: added
+      description: added CEL apply conditions to resource policies and a five-minute age-key rotation example retaining all historical keys
+    - kind: added
+      description: added per-resource SSA policy to TenantResource and GlobalTenantResource, with legacy settings fallback
+    - kind: added
       description: added toggles for podSecurityContexts and securityContexts

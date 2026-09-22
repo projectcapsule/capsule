@@ -209,7 +209,7 @@ metadata:
 			decoder := &test.Decoder[*capsulev1beta2.GlobalResourcePermitTemplate]{
 				Object: tt.brt,
 			}
-			validator := GlobalResourcePermitTemplateValidationHandler(log)
+			validator := GlobalResourcePermitTemplateValidationHandler(log, nil)
 
 			if tt.setup != nil {
 				tt.setup(cl)

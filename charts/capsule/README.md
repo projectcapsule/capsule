@@ -23,6 +23,10 @@ The following Values have changed key or Value:
 
 ## Values
 
+For resource policies, CEL apply conditions, and compatibility guidance, see the
+[managed-resource reference](https://projectcapsule.dev/docs/operating/concepts/managed-resources/)
+and [replication documentation](https://projectcapsule.dev/docs/replications/).
+
 ### CustomResourceDefinition Lifecycle
 
 | Key | Type | Default | Description |
@@ -387,12 +391,20 @@ The following Values have changed key or Value:
 | webhooks.hooks.pods.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
 | webhooks.hooks.pods.opts | object | `{}` | Capsule Hook Options |
 | webhooks.hooks.pods.reinvocationPolicy | string | `"Never"` | [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy) |
+| webhooks.hooks.replicationDefaults.enabled | bool | `true` | Convert deprecated TenantResource and GlobalTenantResource settings to per-resource policies |
+| webhooks.hooks.replicationDefaults.failurePolicy | string | `"Fail"` | Admission failure policy |
+| webhooks.hooks.replicationDefaults.matchConditions | list | `[]` | Additional admission match conditions |
+| webhooks.hooks.replicationDefaults.matchPolicy | string | `"Equivalent"` | Admission match policy |
+| webhooks.hooks.replicationDefaults.namespaceSelector | object | `{}` | Namespace selector for replication policy conversion |
+| webhooks.hooks.replicationDefaults.objectSelector | object | `{}` | Object selector for replication policy conversion |
+| webhooks.hooks.replicationDefaults.opts | object | `{}` | Capsule Hook Options |
+| webhooks.hooks.replicationDefaults.reinvocationPolicy | string | `"IfNeeded"` | Admission reinvocation policy |
 | webhooks.hooks.replications.enabled | bool | `true` | Enable the Hook |
 | webhooks.hooks.replications.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
 | webhooks.hooks.replications.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
 | webhooks.hooks.replications.matchPolicy | string | `"Equivalent"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
 | webhooks.hooks.replications.namespaceSelector | object | `{}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
-| webhooks.hooks.replications.objectSelector | object | `{"matchExpressions":[{"key":"projectcapsule.dev/created-by","operator":"In","values":["replications"]}]}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
+| webhooks.hooks.replications.objectSelector | object | `{"matchExpressions":[{"key":"projectcapsule.dev/managed-by","operator":"In","values":["replications"]}]}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
 | webhooks.hooks.replications.opts | object | `{}` | Capsule Hook Options |
 | webhooks.hooks.replications.rules | list | `[{"apiGroups":["*"],"apiVersions":["*"],"operations":["UPDATE","DELETE"],"resources":["*"],"scope":"*"}]` | [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules) |
 | webhooks.hooks.resourcePermit | object | `{"enabled":true,"failurePolicy":"Fail","matchConditions":[],"matchPolicy":"Equivalent","namespaceSelector":{},"objectSelector":{"matchExpressions":[{"key":"projectcapsule.dev/protected-by","operator":"In","values":["resource-permit"]}]},"opts":{},"rules":[{"apiGroups":["*"],"apiVersions":["*"],"operations":["UPDATE","DELETE"],"resources":["*"],"scope":"*"}]}` | Protect resources managed by ResourcePermits from changes outside the Capsule controller |

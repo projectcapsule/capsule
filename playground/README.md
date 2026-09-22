@@ -180,6 +180,12 @@ reconcile it.
 
 ## Resource permit examples
 
+The [apply-condition guide](https://projectcapsule.dev/docs/permits/templates/#conditional-resources)
+covers optional CEL policies for namespaced and global permit templates, with
+examples, execution permissions, and status diagnostics. For recurring behavior,
+the [age-key rotation guide](https://projectcapsule.dev/docs/replications/global/#conditional-age-key-rotation) uses a
+GlobalTenantResource to rotate after 30 days (`720h`) and preserve previous keys.
+
 The platform Kustomization includes two additional `GlobalResourcePermitTemplate`
 examples. Their sample requests live in `user/solar/resourcepermits/` and are
 submitted as `alice` by `make apply-user`. Use a development build with the CRDs

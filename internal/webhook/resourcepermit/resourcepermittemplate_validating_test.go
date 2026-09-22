@@ -50,7 +50,7 @@ func TestResourcePermitTemplateValidationHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			decoder := &test.Decoder[*capsulev1beta2.ResourcePermitTemplate]{Object: tt.template}
-			handler := ResourcePermitTemplateValidationHandler(ctrl.Log.WithName("test"))
+			handler := ResourcePermitTemplateValidationHandler(ctrl.Log.WithName("test"), nil)
 			response := handler.OnCreate(nil, nil, decoder, nil)(context.Background(), admission.Request{})
 			if tt.expected == 0 {
 				assert.Nil(t, response)

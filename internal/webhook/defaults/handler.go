@@ -11,20 +11,24 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	celruntime "github.com/projectcapsule/capsule/pkg/runtime/cel"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type handler struct {
-	cfg     configuration.Configuration
-	version *version.Version
+	conditions celruntime.ResourceConditionCompiler
+	cfg        configuration.Configuration
+	version    *version.Version
 }
 
-func Handler(cfg configuration.Configuration, version *version.Version) handlers.Handler {
+func Handler(cfg configuration.Configuration, version *version.Version, conditions celruntime.ResourceConditionCompiler) handlers.Handler {
 	return &handler{
-		cfg:     cfg,
-		version: version,
+		conditions: conditions,
+		cfg:        cfg,
+		version:    version,
 	}
 }
 
@@ -65,6 +69,9 @@ func (h *handler) mutate(ctx context.Context, req admission.Request, c client.Cl
 	var response *admission.Response
 
 	switch req.Resource {
+	case metav1.GroupVersionResource{Group: capsulev1beta2.GroupVersion.Group, Version: "v1beta2", Resource: "tenantresources"},
+		metav1.GroupVersionResource{Group: capsulev1beta2.GroupVersion.Group, Version: "v1beta2", Resource: "globaltenantresources"}:
+		response = mutateReplicationPolicy(req, decoder, h.conditions)
 	case metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}:
 		response = mutatePodDefaults(ctx, req, c, decoder, req.Namespace)
 	case metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "persistentvolumeclaims"}:

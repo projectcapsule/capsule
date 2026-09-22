@@ -1560,6 +1560,28 @@ webhooks:
             - globalresourcequotas
           scope: "Cluster"
 
+    replicationDefaults:
+      # -- Convert deprecated TenantResource and GlobalTenantResource settings to per-resource policies
+      enabled: true
+      # -- Capsule Hook Options
+      opts: {}
+      # -- Admission failure policy
+      failurePolicy: Fail
+      # -- Admission match policy
+      matchPolicy: Equivalent
+      # -- Admission reinvocation policy
+      reinvocationPolicy: IfNeeded
+      # @schema type: object
+      # @schema additionalProperties: true
+      # -- Object selector for replication policy conversion
+      objectSelector: {}
+      # @schema type: object
+      # @schema additionalProperties: true
+      # -- Namespace selector for replication policy conversion
+      namespaceSelector: {}
+      # -- Additional admission match conditions
+      matchConditions: []
+
     replications:
       # -- Enable the Hook
       enabled: true
@@ -1574,7 +1596,7 @@ webhooks:
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector:
         matchExpressions:
-          - key: projectcapsule.dev/created-by
+          - key: projectcapsule.dev/managed-by
             operator: In
             values:
               - "replications"

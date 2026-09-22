@@ -13,12 +13,14 @@ import (
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	celruntime "github.com/projectcapsule/capsule/pkg/runtime/cel"
 	clt "github.com/projectcapsule/capsule/pkg/runtime/client"
 	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 )
@@ -36,26 +38,35 @@ type Metadata struct {
 
 // Manager applies and prunes resources with server-side apply.
 type Manager struct {
-	Reader   client.Reader
-	Mapper   k8smeta.RESTMapper
-	Metadata Metadata
+	Reader     client.Reader
+	Mapper     k8smeta.RESTMapper
+	Metadata   Metadata
+	Conditions celruntime.ResourceConditionCompiler
 }
 
 // ApplyOptions configures one server-side apply operation.
 type ApplyOptions struct {
-	FieldOwner        string
-	Force             bool
-	Adopt             bool
-	Protect           bool
-	DryRun            bool
-	OwnerReference    *metav1.OwnerReference
-	PreviouslyCreated bool
+	Condition string
+	// ExpectedResourceVersion binds a stateful render to its context snapshot.
+	// A non-nil empty version requires the destination to still be absent.
+	ExpectedResourceVersion *string
+	FieldOwner              string
+	Force                   bool
+	Adopt                   bool
+	Protect                 bool
+	DryRun                  bool
+	OwnerReference          *metav1.OwnerReference
+	PreviouslyCreated       bool
 }
 
 // ApplyResult describes the resource after a successful apply.
 type ApplyResult struct {
 	LastApply *metav1.Time
 	Created   bool
+	Skipped   bool
+	// PolicyReconciled means a skipped target is owned by this field manager
+	// and its lifecycle metadata reflects the requested policy.
+	PolicyReconciled bool
 }
 
 // PruneOptions configures one server-side apply prune operation.
@@ -116,20 +127,63 @@ func (m Manager) Apply(
 	actual := objectReference(desired)
 	key := client.ObjectKeyFromObject(actual)
 
-	patches, created, err := m.managedMetadataPatches(ctx, c, desired, opts)
+	var snapshot []*unstructured.Unstructured
+
+	if opts.Condition != "" {
+		existing, result, err := m.checkCondition(ctx, c, desired, opts)
+		if err != nil {
+			return result, err
+		}
+
+		if result.Skipped {
+			result.PolicyReconciled, err = m.reconcileSkippedPolicy(ctx, c, existing, opts)
+
+			return result, err
+		}
+
+		snapshot = append(snapshot, existing)
+
+		if existing != nil {
+			err = m.upgradeConditionalOwnership(ctx, c, existing, opts)
+			desired.SetResourceVersion(existing.GetResourceVersion())
+			desired.SetUID(existing.GetUID())
+		}
+
+		if err != nil {
+			return result, err
+		}
+	}
+
+	patches, created, err := m.managedMetadataPatches(ctx, c, desired, opts, snapshot...)
 	if err != nil {
 		return ApplyResult{Created: created}, fmt.Errorf("evaluating managed metadata: %w", err)
 	}
 
-	err = retry.OnError(
-		retry.DefaultBackoff,
-		apierrors.IsConflict,
-		func() error {
-			return clt.PatchApply(ctx, c, desired, opts.FieldOwner, opts.Force, opts.DryRun)
-		},
-	)
+	var initialized *metav1.Time
+
+	if len(snapshot) > 0 && snapshot[0] == nil {
+		// Create is the absent-object precondition: an SSA upsert could overwrite
+		// a concurrent creation. Establish SSA ownership immediately afterwards.
+		initialized, err = m.createConditionalTarget(ctx, c, desired, opts)
+		if err != nil {
+			return ApplyResult{Created: initialized != nil, LastApply: initialized}, err
+		}
+
+		if opts.DryRun {
+			return ApplyResult{Created: true}, nil
+		}
+	}
+
+	apply := func() error { return clt.PatchApply(ctx, c, desired, opts.FieldOwner, opts.Force, opts.DryRun) }
+	if opts.Condition != "" {
+		// A conflict must restart evaluation and rendering from fresh state.
+		err = apply()
+	} else {
+		err = retry.OnError(retry.DefaultBackoff, apierrors.IsConflict, apply)
+	}
+
 	if err != nil {
-		return ApplyResult{Created: created}, fmt.Errorf("applying object failed: %w", err)
+		return ApplyResult{Created: created, LastApply: initialized}, fmt.Errorf("applying object failed: %w", err)
 	}
 
 	// A server-side dry-run exercises discovery, authorization, admission,
@@ -148,7 +202,19 @@ func (m Manager) Apply(
 		},
 	)
 	if err != nil {
-		return ApplyResult{Created: created}, fmt.Errorf("failed to get object after apply: %w", err)
+		return ApplyResult{Created: created, LastApply: initialized}, fmt.Errorf("failed to get object after apply: %w", err)
+	}
+
+	if opts.Condition != "" {
+		// Ownership migration can make SSA relinquish lifecycle labels. Build
+		// their patches against the resulting object without another API read.
+		metadataOptions := opts
+		metadataOptions.PreviouslyCreated = created
+
+		patches, created, err = m.managedMetadataPatches(ctx, c, desired, metadataOptions, actual)
+		if err != nil {
+			return ApplyResult{Created: created, LastApply: clt.LastApplyTimeForManager(actual, opts.FieldOwner)}, err
+		}
 	}
 
 	log.FromContext(ctx).V(4).Info("applying managed resource metadata", "patches", len(patches))
@@ -160,7 +226,7 @@ func (m Manager) Apply(
 		patches,
 		meta.ResourceControllerFieldOwnerPrefix(),
 	); err != nil {
-		return ApplyResult{Created: created}, fmt.Errorf("applying managed metadata failed: %w", err)
+		return ApplyResult{Created: created, LastApply: clt.LastApplyTimeForManager(actual, opts.FieldOwner)}, fmt.Errorf("applying managed metadata failed: %w", err)
 	}
 
 	return ApplyResult{
@@ -256,6 +322,9 @@ func (m Manager) Disown(
 		patches = append(patches, clt.PatchRemoveLabels(actual.GetLabels(), []string{
 			meta.NewManagedByCapsuleLabel,
 		})...)
+		// A skipped apply can update protection through the lifecycle manager.
+		// The preceding identity-only SSA prune cannot relinquish those fields.
+		patches = append(patches, m.protectionPatches(actual, false)...)
 	}
 
 	if err := clt.ApplyPatches(
@@ -379,9 +448,18 @@ func (m Manager) managedMetadataPatches(
 	c client.Client,
 	obj *unstructured.Unstructured,
 	opts ApplyOptions,
+	snapshot ...*unstructured.Unstructured,
 ) (patches []clt.JSONPatch, created bool, err error) {
 	existing := obj.DeepCopy()
-	err = c.Get(ctx, client.ObjectKeyFromObject(existing), existing)
+
+	switch {
+	case len(snapshot) == 0:
+		err = c.Get(ctx, client.ObjectKeyFromObject(existing), existing)
+	case snapshot[0] == nil:
+		err = apierrors.NewNotFound(schema.GroupResource{Resource: obj.GetKind()}, obj.GetName())
+	default:
+		existing = snapshot[0].DeepCopy()
+	}
 
 	switch {
 	case apierrors.IsNotFound(err):

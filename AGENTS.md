@@ -325,6 +325,13 @@ Use the existing Ginkgo v2/Gomega suite in `e2e/`. It uses
 Capsule controller, CRDs, RBAC, and webhooks installed. Merely compiling the suite,
 using a fake client, or running against an old controller image is not an e2e pass.
 
+Run e2e locally only for newly developed features (including their new e2e tests)
+and subsystems or components impacted by the change. Select the relevant suites
+with Ginkgo labels or focused commands; the full suite runs on GitHub. While those
+suites execute, keep reasoning to a minimum and collect observations, logs, and
+test results. Perform failure analysis and forensics after the relevant suites
+have finished, then rerun the affected cases after any fixes.
+
 For every change, add or extend a scenario set with all applicable rows below.
 **Positive and negative cases with at least one Tenant actually created are
 mandatory.** A Tenant value constructed only in Go, without creating it in the
@@ -415,7 +422,7 @@ and `go.mod` instead of independently selecting newer tools.
 | Build controller | `go build -o bin/manager ./cmd/controller`. The entry point is under `cmd/controller/`. |
 | E2E with cluster lifecycle | `make e2e` creates a KinD cluster, builds/installs Capsule, runs the suite, and destroys the cluster on success. Requires Docker and the target's cluster tooling. |
 | E2E on a prepared test cluster | `make e2e-exec` runs non-configuration tests in parallel and then invokes the serial configuration suite. Ensure the cluster runs the current changes. |
-| Focused tenant e2e | `make e2e-exec FILTER='&& !skip && tenant'`. Replace/add labels for the feature; a filtered run does not replace full-suite validation. |
+| Focused tenant e2e | `make e2e-exec FILTER='&& !skip && tenant'`. Replace/add labels for new features and impacted components; full-suite validation runs on GitHub. |
 | Configuration-only e2e | `make e2e-exec-config`. |
 | OpenShift e2e | `make e2e-openshift` when the change affects platform behavior; CI also exercises OpenShift. |
 | Focused benchmarks | `go test ./path/to/changed/package -run '^$' -bench 'BenchmarkName' -benchmem -count=5` (replace path/name). |
@@ -436,6 +443,10 @@ usage, request latency/throughput, and errors for any reported comparison.
 
 ## Generated files, charts, and completion
 
+- Maintain user-facing feature documentation in the sibling `../website` repository,
+  integrating with its existing concepts, replication, and permit guides. Keep
+  runnable examples here and link to the canonical website documentation instead
+  of duplicating feature guides in chart or playground READMEs.
 - Edit API source and Kubebuilder markers, then regenerate. Do not hand-edit
   `zz_generated.deepcopy.go` or generated CRDs under `charts/capsule/crds/`.
 - Keep API types, defaults/validation, conversions, CRDs, RBAC, webhook rules, and
