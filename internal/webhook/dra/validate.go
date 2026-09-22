@@ -106,6 +106,7 @@ func (h *deviceClass) validateResourceRequest(
 	// Check every alternative: the scheduler may allocate any firstAvailable
 	// subrequest, not just the first one listed by the tenant.
 	classNames := make([]string, 0, len(requests))
+
 	for _, dr := range requests {
 		if dr.Exactly == nil && len(dr.FirstAvailable) == 0 {
 			return ad.Deny(caperrors.NewDeviceClassUndefined(*allowed).Error())
@@ -122,8 +123,8 @@ func (h *deviceClass) validateResourceRequest(
 
 	// An absent selector must not override an explicit name/regex allowlist.
 	// Preserve the existing match-all behavior of a completely empty policy.
-	matchSelector := len(allowed.MatchLabels) > 0 || len(allowed.MatchExpressions) > 0 ||
-		(len(allowed.Exact) == 0 && allowed.Regex == "")
+	//nolint:staticcheck
+	matchSelector := len(allowed.MatchLabels) > 0 || len(allowed.MatchExpressions) > 0 || (len(allowed.Exact) == 0 && allowed.Regex == "")
 
 	for i, name := range classNames {
 		// Repeated references need one lookup per admission request. Do not cache
