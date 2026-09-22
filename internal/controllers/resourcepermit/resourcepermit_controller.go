@@ -499,7 +499,7 @@ func (r *ResourcePermitReconciler) reconcileNew(
 	log logr.Logger,
 	br *capsulev1beta2.ResourcePermit,
 ) (ctrl.Result, error) {
-	if err := br.SetCreated(&br.Spec.Requestor); err != nil {
+	if err := br.SetCreated(&br.Spec.Requester); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -569,7 +569,7 @@ func (r *ResourcePermitReconciler) reconcileNew(
 		)
 	}
 
-	if err := br.SetRequestedBy(&br.Spec.Requestor); err != nil {
+	if err := br.SetRequestedBy(&br.Spec.Requester); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -1247,7 +1247,7 @@ func (r *ResourcePermitReconciler) pruneItems(
 			}
 
 			if !deleted {
-				if disownErr := manager.Disown(ctx, resourceClient, obj, nil); disownErr != nil {
+				if disownErr := manager.Disown(ctx, resourceClient, obj, fieldOwner, nil); disownErr != nil {
 					item.Status = metav1.ConditionFalse
 					item.Message = "disown failed: " + disownErr.Error()
 					br.Status.ProcessedItems.UpdateItem(item)

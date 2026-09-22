@@ -108,7 +108,7 @@ func (m Manager) reconcileSkippedPolicy(ctx context.Context, c client.Client, ex
 		return false, nil
 	}
 
-	patches := m.protectionPatches(existing, opts.Protect)
+	patches := m.protectionPatches(existing, opts.Protect, opts.FieldOwner)
 	if len(patches) == 0 {
 		return true, nil
 	}
@@ -134,7 +134,7 @@ func (m Manager) reconcileSkippedPolicy(ctx context.Context, c client.Client, ex
 	return true, nil
 }
 
-func (m Manager) protectionPatches(existing *unstructured.Unstructured, protect bool) (patches []clt.JSONPatch) {
+func (m Manager) protectionPatches(existing *unstructured.Unstructured, protect bool, fieldOwner string) (patches []clt.JSONPatch) {
 	labels := existing.GetLabels()
 	annotations := existing.GetAnnotations()
 	annotation := m.Metadata.ProtectedByServiceAccountAnnotation
@@ -159,7 +159,25 @@ func (m Manager) protectionPatches(existing *unstructured.Unstructured, protect 
 		patches = append(patches, clt.PatchRemoveAnnotations(annotations, []string{annotation})...)
 	}
 
+	if len(patches) > 0 && hasOtherResourceOwners(existing, fieldOwner) {
+		return nil
+	}
+
 	return patches
+}
+
+// Shared lifecycle metadata cannot identify which resource manager still needs
+// protection. Preserve it conservatively while another Capsule resource owner
+// remains; the last departing owner can remove it. Ordinary external field
+// managers and the shared lifecycle manager do not require this protection.
+func hasOtherResourceOwners(obj *unstructured.Unstructured, fieldOwner string) bool {
+	for owner := range meta.CapsuleResourceFieldOwners(obj) {
+		if owner != fieldOwner && owner != meta.ResourceControllerFieldOwnerPrefix() {
+			return true
+		}
+	}
+
+	return false
 }
 
 func hasFieldManager(obj *unstructured.Unstructured, manager string) bool {

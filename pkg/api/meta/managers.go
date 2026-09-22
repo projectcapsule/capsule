@@ -69,6 +69,36 @@ func CapsuleFieldOwners(obj *unstructured.Unstructured, prefix string) map[strin
 	return out
 }
 
+// CapsuleResourceFieldOwners includes permit managers and the established
+// replication format: <base36 parent hash>/<namespace>/<tenant>/<origin>/.
+// Keep recognizing these names without migrating existing SSA ownership.
+func CapsuleResourceFieldOwners(obj *unstructured.Unstructured) map[string]struct{} {
+	owners := map[string]struct{}{}
+	if obj == nil {
+		return owners
+	}
+
+	for _, field := range obj.GetManagedFields() {
+		if strings.HasPrefix(field.Manager, ResourceFieldOwner("")) {
+			owners[field.Manager] = struct{}{}
+
+			continue
+		}
+
+		parts := strings.SplitN(field.Manager, "/", 4)
+		if len(parts) != 4 || len(parts[3]) < 2 || !strings.HasSuffix(parts[3], "/") {
+			continue
+		}
+
+		hash, err := strconv.ParseUint(parts[0], 36, 64)
+		if err == nil && strconv.FormatUint(hash, 36) == parts[0] {
+			owners[field.Manager] = struct{}{}
+		}
+	}
+
+	return owners
+}
+
 func HasExactlyCapsuleOwners(obj *unstructured.Unstructured, prefix string, allowed []string) bool {
 	owners := CapsuleFieldOwners(obj, prefix)
 

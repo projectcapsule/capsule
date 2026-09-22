@@ -53,6 +53,10 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 		exerciseReplicationPolicies(true, tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner)
 	})
 
+	It("keeps a shared adopted target protected until its last owner departs", Label("shared-protection"), func() {
+		exerciseSharedReplicationProtection(true, tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner)
+	})
+
 	It("rotates age keys after five minutes and retains all history in selected tenant namespaces", Label("resource-condition", "age-rotation"), func() {
 		exerciseGlobalAgeRotation(tenantA.Name, tenantB.Name, tenantANamespaces[0], tenantANamespaces[1], tenantBNamespaces[0])
 	})

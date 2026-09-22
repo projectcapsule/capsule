@@ -92,7 +92,7 @@ spec:
               reason:
                 description: A reason on why the request is needed
                 type: string
-              requestor:
+              requester:
                 description: Requesting actor for the resource permit.
                 properties:
                   groups:

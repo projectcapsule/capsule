@@ -5,6 +5,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -26,7 +27,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/ssa"
 )
 
-var _ = DescribeTable("ResourcePermit template apply conditions", Label("resource-permit", "resource-condition", "permit-condition"), func(global bool) {
+var _ = DescribeTable("ResourcePermit template apply conditions", Label("resource-permit", "resource-condition", "permit-condition", "requester"), func(global bool) {
 	ctx := context.Background()
 	prefix := "e2e-permit-condition-" + rand.String(6)
 	var namespaces []string
@@ -64,16 +65,19 @@ var _ = DescribeTable("ResourcePermit template apply conditions", Label("resourc
 		{Policy: apiruntime.ResourceTemplatePolicy{Condition: "false", Deletion: apiruntime.ResourceDeletionPolicyOrphan}, Targets: []runtime.RawExtension{target("skipped-target"), target("existing-orphan")}},
 		{Targets: []runtime.RawExtension{target("unconditional-target")}},
 	}
+	approvals := resourcepermit.ApprovalSpec{Auto: true, Conditions: []string{fmt.Sprintf(
+		`requester.name == %q && %q in requester.groups && request.spec.requester.name == requester.name`, owners[0].Name, owners[0].Name,
+	)}}
 	var template client.Object = &capsulev1beta2.ResourcePermitTemplate{Name: prefix, Namespace: selected, Spec: capsulev1beta2.ResourcePermitTemplateSpec{
 		Impersonation: &meta.LocalRFC1123ObjectReference{Name: "condition-runner"},
-		Approvals:     resourcepermit.ApprovalSpec{Auto: true}, DefaultDuration: &metav1.Duration{Duration: 5 * time.Minute}, Resources: resources,
+		Approvals:     approvals, DefaultDuration: &metav1.Duration{Duration: 5 * time.Minute}, Resources: resources,
 	}}
 	kind := capsulev1beta2.ResourcePermitTemplateKind
 	if global {
 		kind = capsulev1beta2.GlobalResourcePermitTemplateKind
 		template = &capsulev1beta2.GlobalResourcePermitTemplate{Name: prefix, Spec: capsulev1beta2.GlobalResourcePermitTemplateSpec{
 			Impersonation: resourcePermitServiceAccountReference(selected, "condition-runner"),
-			Approvals:     resourcepermit.ApprovalSpec{Auto: true}, DefaultDuration: &metav1.Duration{Duration: 5 * time.Minute}, Resources: resources,
+			Approvals:     approvals, DefaultDuration: &metav1.Duration{Duration: 5 * time.Minute}, Resources: resources,
 			NamespaceSelectors: []selectors.NamespaceSelector{{LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"kubernetes.io/metadata.name": selected}}}},
 		}}
 	}
@@ -109,6 +113,17 @@ var _ = DescribeTable("ResourcePermit template apply conditions", Label("resourc
 	}
 	Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(denied), &capsulev1beta2.ResourcePermit{}))).To(BeTrue())
 
+	By("rejecting spoofed requester groups through the renamed CEL identity")
+	unapproved := impersonationClient(owners[0].Name, withDefaultGroups([]string{"unapproved"}))
+	spoofed := &capsulev1beta2.ResourcePermit{Name: "spoofed-requester", Namespace: selected, Spec: capsulev1beta2.ResourcePermitSpec{
+		Template:  capsulev1beta2.ResourcePermitTemplateReference{Kind: kind, Name: template.GetName()},
+		Requester: resourcepermit.AccessEntity{Name: owners[0].Name, Type: resourcepermit.AccessEntityTypeUser, Groups: []string{owners[0].Name}},
+	}}
+	err = unapproved.Create(ctx, spoofed)
+	Expect(apierrors.IsForbidden(err)).To(BeTrue())
+	Expect(err).To(MatchError(ContainSubstring("approval conditions not satisfied for template")))
+	Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(spoofed), &capsulev1beta2.ResourcePermit{}))).To(BeTrue())
+
 	existingVersions := map[string]string{}
 	for _, name := range []string{"existing-remove", "existing-orphan"} {
 		existing := &corev1.ConfigMap{APIVersion: "v1", Kind: "ConfigMap", Name: name, Namespace: selected, Data: map[string]string{"value": "external"}}
@@ -116,10 +131,20 @@ var _ = DescribeTable("ResourcePermit template apply conditions", Label("resourc
 		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(existing), existing)).To(Succeed())
 		existingVersions[name] = existing.ResourceVersion
 	}
-	request := &capsulev1beta2.ResourcePermit{Name: "conditional-permit", Namespace: selected, Spec: capsulev1beta2.ResourcePermitSpec{Template: capsulev1beta2.ResourcePermitTemplateReference{Kind: kind, Name: template.GetName()}}}
+	By("persisting the authenticated requester and using it in approval and lifecycle transitions")
+	request := &capsulev1beta2.ResourcePermit{Name: "conditional-permit", Namespace: selected, Spec: capsulev1beta2.ResourcePermitSpec{
+		Template:  capsulev1beta2.ResourcePermitTemplateReference{Kind: kind, Name: template.GetName()},
+		Requester: resourcepermit.AccessEntity{Name: "spoofed", Groups: []string{"spoofed"}},
+	}}
 	Expect(owner.Create(ctx, request)).To(Succeed())
 	DeferCleanup(func() { cleanupLifecycleResourcePermit(ctx, request) })
 	active := waitForResourcePermitPhase(ctx, request, capsulev1beta2.ResourcePermitPhaseActive)
+	Expect(active.Spec.Requester.Name).To(Equal(owners[0].Name))
+	Expect(active.Spec.Requester.Type).To(Equal(resourcepermit.AccessEntityTypeUser))
+	Expect(active.Spec.Requester.Groups).To(ContainElement(owners[0].Name))
+	Expect(active.Spec.Requester.Groups).NotTo(ContainElement("spoofed"))
+	Expect(active.Status.Transitions).NotTo(BeEmpty())
+	Expect(active.Status.Transitions[0].Actor.Name).To(Equal(owners[0].Name))
 	Expect(active.Status.ProcessedItems).To(HaveLen(5))
 	for _, item := range active.Status.ProcessedItems {
 		switch item.Name {

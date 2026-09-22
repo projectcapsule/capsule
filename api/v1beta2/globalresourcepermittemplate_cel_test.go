@@ -32,18 +32,26 @@ func TestGlobalResourcePermitTemplateApprovalCondition(t *testing.T) {
 			name: "conditions are ORed",
 			conditions: []string{
 				`request.spec.reason == "maintenance"`,
-				`requestor.name == "alice"`,
+				`requester.name == "alice"`,
 			},
 			request: ResourcePermit{Spec: ResourcePermitSpec{
 				Reason:    "incident",
-				Requestor: resourcepermit.AccessEntity{Name: "alice"},
+				Requester: resourcepermit.AccessEntity{Name: "alice"},
 			}},
 			want: true,
 		},
 		{
-			name:       "requestor",
-			conditions: []string{`requestor.name == "alice" && "developers" in requestor.groups`},
-			request: ResourcePermit{Spec: ResourcePermitSpec{Requestor: resourcepermit.AccessEntity{
+			name:       "requester",
+			conditions: []string{`requester.name == "alice" && "developers" in requester.groups`},
+			request: ResourcePermit{Spec: ResourcePermitSpec{Requester: resourcepermit.AccessEntity{
+				Name: "alice", Groups: []string{"developers"},
+			}}},
+			want: true,
+		},
+		{
+			name:       "request spec requester matches the CEL identity",
+			conditions: []string{`request.spec.requester.name == requester.name && request.spec.requester.groups == requester.groups`},
+			request: ResourcePermit{Spec: ResourcePermitSpec{Requester: resourcepermit.AccessEntity{
 				Name: "alice", Groups: []string{"developers"},
 			}}},
 			want: true,
@@ -63,10 +71,10 @@ func TestGlobalResourcePermitTemplateApprovalCondition(t *testing.T) {
 		},
 		{
 			name:       "no condition met",
-			conditions: []string{`request.spec.reason == "incident"`, `requestor.name == "alice"`},
+			conditions: []string{`request.spec.reason == "incident"`, `requester.name == "alice"`},
 			request: ResourcePermit{Spec: ResourcePermitSpec{
 				Reason:    "maintenance",
-				Requestor: resourcepermit.AccessEntity{Name: "bob"},
+				Requester: resourcepermit.AccessEntity{Name: "bob"},
 			}},
 			want: false,
 		},

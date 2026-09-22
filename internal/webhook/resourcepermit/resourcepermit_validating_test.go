@@ -178,11 +178,11 @@ func TestResourcePermitValidationHandler(t *testing.T) {
 				expected: 0,
 			},
 			{
-				name: "allow auto approval when requestor condition matches",
+				name: "allow auto approval when requester condition matches",
 				br: &capsulev1beta2.ResourcePermit{
 					Spec: capsulev1beta2.ResourcePermitSpec{
 						Template: templateRef(defaultTemplateName),
-						Requestor: resourcepermit.AccessEntity{
+						Requester: resourcepermit.AccessEntity{
 							Name:   "alice",
 							Groups: []string{"developers"},
 						},
@@ -195,18 +195,18 @@ func TestResourcePermitValidationHandler(t *testing.T) {
 							brt.Spec.Approvals = resourcepermit.ApprovalSpec{
 								Auto:       true,
 								Approvers:  rbac.UserListSpec{{Kind: rbac.UserOwner, Name: "timmy"}},
-								Conditions: []string{`requestor.name == "alice" && "developers" in requestor.groups`},
+								Conditions: []string{`requester.name == "alice" && "developers" in requester.groups`},
 							}
 						})
 				},
 				expected: 0,
 			},
 			{
-				name: "deny auto approval when requestor condition does not match",
+				name: "deny auto approval when requester condition does not match",
 				br: &capsulev1beta2.ResourcePermit{
 					Spec: capsulev1beta2.ResourcePermitSpec{
 						Template:  templateRef(defaultTemplateName),
-						Requestor: resourcepermit.AccessEntity{Name: "bob"},
+						Requester: resourcepermit.AccessEntity{Name: "bob"},
 					},
 				},
 				setup: func(reader *mc.MockReader) {
@@ -215,7 +215,7 @@ func TestResourcePermitValidationHandler(t *testing.T) {
 						Do(func(_ any, _ any, brt *capsulev1beta2.GlobalResourcePermitTemplate, _ ...any) {
 							brt.Spec.Approvals = resourcepermit.ApprovalSpec{
 								Auto:       true,
-								Conditions: []string{`requestor.name == "alice"`},
+								Conditions: []string{`requester.name == "alice"`},
 							}
 						})
 				},

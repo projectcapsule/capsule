@@ -142,7 +142,7 @@ func TestResourcePermitRendersTrustedRequestContext(t *testing.T) {
 	created := metav1.NewTime(time.Date(2026, time.September, 1, 8, 30, 0, 0, time.UTC))
 	br := &ResourcePermit{
 		Name: "temporary-permit", CreationTimestamp: created,
-		Spec: ResourcePermitSpec{Requestor: resourcepermit.AccessEntity{
+		Spec: ResourcePermitSpec{Requester: resourcepermit.AccessEntity{
 			Name:   "alice",
 			Groups: []string{"system:authenticated", "platform-on-call"},
 		}},
@@ -265,7 +265,7 @@ func TestResourcePermitRendersRequesterRoleBindingCartesianProduct(t *testing.T)
 	br := &ResourcePermit{
 		CreationTimestamp: created,
 		Spec: ResourcePermitSpec{
-			Requestor: resourcepermit.AccessEntity{Name: "alice"},
+			Requester: resourcepermit.AccessEntity{Name: "alice"},
 			Params: &runtime.RawExtension{Raw: []byte(`{
 				"clusterRoles":["view","edit"],
 				"namespaces":["solar-dev","solar-test"]

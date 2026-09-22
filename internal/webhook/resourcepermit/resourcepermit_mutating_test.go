@@ -6,6 +6,7 @@ package resourcepermit
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -25,6 +26,42 @@ import (
 	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 )
+
+func BenchmarkResourcePermitRequesterAdmission(b *testing.B) {
+	scheme := runtime.NewScheme()
+	require.NoError(b, capsulev1beta2.AddToScheme(scheme))
+	raw, err := json.Marshal(&capsulev1beta2.ResourcePermit{
+		APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "ResourcePermit",
+		Name: "example", Namespace: "team-a",
+		Spec: capsulev1beta2.ResourcePermitSpec{Template: capsulev1beta2.ResourcePermitTemplateReference{
+			Kind: capsulev1beta2.GlobalResourcePermitTemplateKind, Name: "example",
+		}},
+	})
+	require.NoError(b, err)
+	run := ResourcePermitMutationHandler(log.Log).OnCreate(nil, nil, admission.NewDecoder(scheme), nil)
+	for _, username := range []string{"alice", "system:serviceaccount:team-a:runner"} {
+		for _, count := range []int{0, 32} {
+			b.Run(fmt.Sprintf("%s/groups=%d", username, count), func(b *testing.B) {
+				groups := make([]string, count)
+				for i := range groups {
+					groups[i] = fmt.Sprintf("group-%d", i)
+				}
+				req := admission.Request{Object: runtime.RawExtension{Raw: raw}, UserInfo: authenticationv1.UserInfo{Username: username, Groups: groups}}
+				b.ReportAllocs()
+				for b.Loop() {
+					response := run(b.Context(), req)
+					if response == nil || !response.Allowed || len(response.Patches) != 1 || response.Patches[0].Path != "/spec/requester" {
+						b.Fatal("authenticated identity was not patched")
+					}
+					actor, ok := response.Patches[0].Value.(resourcepermitapi.AccessEntity)
+					if !ok || actor.Name != username || len(actor.Groups) != count {
+						b.Fatal("incorrect authenticated identity")
+					}
+				}
+			})
+		}
+	}
+}
 
 func TestResourcePermitMutationHandlerOnCreate(t *testing.T) {
 	t.Parallel()
@@ -59,7 +96,7 @@ func TestResourcePermitMutationHandlerOnCreate(t *testing.T) {
 						Kind: capsulev1beta2.GlobalResourcePermitTemplateKind,
 						Name: "template",
 					},
-					Requestor: resourcepermitapi.AccessEntity{Name: "spoofed"},
+					Requester: resourcepermitapi.AccessEntity{Name: "spoofed"},
 				},
 			}
 			raw, err := json.Marshal(br)
@@ -77,13 +114,13 @@ func TestResourcePermitMutationHandlerOnCreate(t *testing.T) {
 			require.NotNil(t, resp)
 			assert.True(t, resp.Allowed)
 			require.Len(t, resp.Patches, 1)
-			assert.Equal(t, "/spec/requestor", resp.Patches[0].Path)
+			assert.Equal(t, "/spec/requester", resp.Patches[0].Path)
 			mutated := applyResponsePatches(t, raw, resp)
 			assert.Equal(t, resourcepermitapi.AccessEntity{
 				Name:   tt.username,
 				Type:   tt.entityType,
 				Groups: tt.groups,
-			}, mutated.Spec.Requestor)
+			}, mutated.Spec.Requester)
 		})
 	}
 }
@@ -393,7 +430,7 @@ func TestResourcePermitMutationHandlerAppliesRequesterRetryFromStoredFailure(t *
 		`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"target"}}`,
 	)}}}}
 	oldBr := &capsulev1beta2.ResourcePermit{
-		Spec: capsulev1beta2.ResourcePermitSpec{Requestor: resourcepermitapi.AccessEntity{
+		Spec: capsulev1beta2.ResourcePermitSpec{Requester: resourcepermitapi.AccessEntity{
 			Name: "alice",
 			Type: resourcepermitapi.AccessEntityTypeUser,
 		}},

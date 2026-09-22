@@ -91,7 +91,7 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 				Namespace:         "default",
 				CreationTimestamp: v1.NewTime(time.Date(2026, time.September, 2, 8, 0, 0, 0, time.UTC)),
 				Spec: capsulev1beta2.ResourcePermitSpec{
-					Requestor: resourcepermit.AccessEntity{
+					Requester: resourcepermit.AccessEntity{
 						Name: "alice",
 						Type: resourcepermit.AccessEntityTypeUser,
 					},

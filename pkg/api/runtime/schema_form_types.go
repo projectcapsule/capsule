@@ -12,7 +12,7 @@ type JSONSchemaFormWidget string
 
 const (
 	// JSONSchemaFormWidgetKubernetesResource renders a selector whose options
-	// are loaded from the Kubernetes API using discovery and the requestor's
+	// are loaded from the Kubernetes API using discovery and the requester's
 	// credentials.
 	JSONSchemaFormWidgetKubernetesResource JSONSchemaFormWidget = "kubernetes-resource"
 

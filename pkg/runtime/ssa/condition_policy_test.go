@@ -157,13 +157,17 @@ func TestSkippedConditionPolicyChecksResourceVersion(t *testing.T) {
 }
 
 func TestDisownRemovesPolicyProtection(t *testing.T) {
+	// Legacy non-pruning cleanup can retain the departing manager's fields.
 	existing := skippedPolicyTarget(testFieldOwner, true)
 	labels := existing.GetLabels()
 	labels[meta.NewManagedByCapsuleLabel] = testCreatedBy
 	existing.SetLabels(labels)
-	c := fake.NewClientBuilder().WithObjects(existing).Build()
+	fields := existing.GetManagedFields()
+	fields = append(fields, managedField("external"), managedField(meta.ResourceControllerFieldOwnerPrefix()))
+	existing.SetManagedFields(fields)
+	c := fake.NewClientBuilder().WithObjects(existing).WithReturnManagedFields().Build()
 	m := skippedPolicyManager(t)
-	require.NoError(t, m.Disown(t.Context(), c, existing, nil))
+	require.NoError(t, m.Disown(t.Context(), c, existing, testFieldOwner, nil))
 	actual := configMap("guarded", nil)
 	require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(existing), actual))
 	require.NotContains(t, actual.GetLabels(), meta.NewManagedByCapsuleLabel)
@@ -172,6 +176,217 @@ func TestDisownRemovesPolicyProtection(t *testing.T) {
 	require.Equal(t, existing.Object["data"], actual.Object["data"])
 	require.Equal(t, "original", actual.GetLabels()["example.org/keep"])
 	require.Equal(t, "original", actual.GetAnnotations()["example.org/keep"])
+}
+
+func TestDisownPreservesSharedProtection(t *testing.T) {
+	for _, operation := range []metav1.ManagedFieldsOperationType{metav1.ManagedFieldsOperationApply, metav1.ManagedFieldsOperationUpdate} {
+		t.Run(string(operation), func(t *testing.T) {
+			const remaining = "2lclct9cwq6mg/default/tenant-a/0/raw-0/"
+			existing := skippedPolicyTarget(remaining, true)
+			fields := existing.GetManagedFields()
+			fields[0].Operation = operation
+			existing.SetManagedFields(fields)
+			labels := existing.GetLabels()
+			labels[meta.NewManagedByCapsuleLabel] = testCreatedBy
+			existing.SetLabels(labels)
+			c := fake.NewClientBuilder().WithObjects(existing).WithReturnManagedFields().Build()
+			m := skippedPolicyManager(t)
+			require.NoError(t, m.Disown(t.Context(), c, existing, testFieldOwner, nil))
+			actual := configMap("guarded", nil)
+			require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(existing), actual))
+			require.Equal(t, existing.GetLabels(), actual.GetLabels())
+			require.Equal(t, existing.GetAnnotations(), actual.GetAnnotations())
+			require.Equal(t, existing.Object["data"], actual.Object["data"])
+			// Once the remaining resource owner departs, external fields must not
+			// keep the lifecycle metadata around indefinitely.
+			require.NoError(t, m.Disown(t.Context(), c, actual, remaining, nil))
+			require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(existing), actual))
+			require.NotContains(t, actual.GetLabels(), meta.NewManagedByCapsuleLabel)
+			require.NotContains(t, actual.GetLabels(), meta.ProtectedByCapsuleLabel)
+			require.NotContains(t, actual.GetAnnotations(), meta.ResourcePermitServiceAccountAnnotation)
+		})
+	}
+}
+
+func TestApplyRemovesProtectionFromPreviousSkip(t *testing.T) {
+	for _, condition := range []string{"true", ""} {
+		for _, shared := range []bool{false, true} {
+			t.Run(fmt.Sprintf("condition=%q/shared=%t", condition, shared), func(t *testing.T) {
+				existing := skippedPolicyTarget(testFieldOwner, false)
+				if shared {
+					fields := existing.GetManagedFields()
+					other := fields[0].DeepCopy()
+					other.Manager = "2lclct9cwq6mg/default/tenant-a/0/raw-0/"
+					existing.SetManagedFields(append(fields, *other))
+				}
+				c := fake.NewClientBuilder().WithObjects(existing).WithReturnManagedFields().Build()
+				m := skippedPolicyManager(t)
+				opts := ApplyOptions{FieldOwner: testFieldOwner, Condition: "false", Protect: true, Adopt: true}
+				result, err := m.Apply(t.Context(), c, existing, opts)
+				require.NoError(t, err)
+				require.True(t, result.Skipped)
+				opts.Condition, opts.Protect = condition, false
+				desired := configMap("guarded", map[string]any{"value": "retained", "new": "applied"})
+				result, err = m.Apply(t.Context(), c, desired, opts)
+				require.NoError(t, err)
+				require.False(t, result.Skipped)
+				actual := configMap("guarded", nil)
+				require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(existing), actual))
+				require.Equal(t, desired.Object["data"], actual.Object["data"])
+				if shared {
+					require.Equal(t, testCreatedBy, actual.GetLabels()[meta.ProtectedByCapsuleLabel])
+					require.Equal(t, m.Metadata.ProtectedByServiceAccount, actual.GetAnnotations()[meta.ResourcePermitServiceAccountAnnotation])
+				} else {
+					require.NotContains(t, actual.GetLabels(), meta.ProtectedByCapsuleLabel)
+					require.NotContains(t, actual.GetAnnotations(), meta.ResourcePermitServiceAccountAnnotation)
+				}
+			})
+		}
+	}
+}
+
+func TestSkippedPolicyPreservesSharedProtection(t *testing.T) {
+	existing := skippedPolicyTarget(testFieldOwner, true)
+	fields := existing.GetManagedFields()
+	other := fields[0].DeepCopy()
+	other.Manager = meta.ResourceFieldOwner("remaining")
+	existing.SetManagedFields(append(fields, *other))
+	c := fake.NewClientBuilder().WithObjects(existing).WithReturnManagedFields().Build()
+	m := skippedPolicyManager(t)
+	result, err := m.Apply(t.Context(), c, existing, ApplyOptions{FieldOwner: testFieldOwner, Condition: "false", Protect: false, Adopt: true})
+	require.NoError(t, err)
+	require.True(t, result.Skipped)
+	actual := configMap("guarded", nil)
+	require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(existing), actual))
+	require.Equal(t, existing.GetLabels(), actual.GetLabels())
+	require.Equal(t, existing.GetAnnotations(), actual.GetAnnotations())
+}
+
+func TestApplyTracksSharedFieldsWithoutManagerTimestamp(t *testing.T) {
+	existing := skippedPolicyTarget(testFieldOwner, false)
+	existing.SetLabels(nil) // An adopted target, not created by Capsule.
+	c := fake.NewClientBuilder().WithObjects(existing).WithReturnManagedFields().WithInterceptorFuncs(interceptor.Funcs{
+		Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+			if err := c.Get(ctx, key, obj, opts...); err != nil {
+				return err
+			}
+			fields := obj.GetManagedFields()
+			for i := range fields {
+				fields[i].Time = nil
+			}
+			obj.SetManagedFields(fields)
+			return nil
+		},
+	}).Build()
+	m := skippedPolicyManager(t)
+	before := metav1.Now()
+	result, err := m.Apply(t.Context(), c, configMap("guarded", map[string]any{"value": "retained"}), ApplyOptions{FieldOwner: testFieldOwner, Adopt: true})
+	require.NoError(t, err)
+	require.False(t, result.Created)
+	require.NotNil(t, result.LastApply, "a shared SSA claim is still a completed apply that requires cleanup")
+	require.False(t, result.LastApply.Before(&before))
+}
+
+func TestProtectionCleanupChecksResourceVersion(t *testing.T) {
+	for _, disown := range []bool{false, true} {
+		t.Run(fmt.Sprintf("disown=%t", disown), func(t *testing.T) {
+			existing := skippedPolicyTarget(testFieldOwner, true)
+			labels := existing.GetLabels()
+			labels[meta.NewManagedByCapsuleLabel] = testCreatedBy
+			existing.SetLabels(labels)
+			writes := 0
+			c := fake.NewClientBuilder().WithObjects(existing).WithReturnManagedFields().WithInterceptorFuncs(interceptor.Funcs{
+				Patch: func(ctx context.Context, c client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+					if patch.Type() == types.JSONPatchType {
+						writes++
+						current := configMap("guarded", nil)
+						require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(obj), current))
+						current.SetManagedFields(append(current.GetManagedFields(), managedField(meta.ResourceFieldOwner("concurrent"))))
+						current.SetAnnotations(map[string]string{"concurrent": "retained", meta.ResourcePermitServiceAccountAnnotation: "another-owner"})
+						require.NoError(t, c.Update(ctx, current))
+					}
+					return c.Patch(ctx, obj, patch, opts...)
+				},
+			}).Build()
+			m := skippedPolicyManager(t)
+			var err error
+			if disown {
+				err = m.Disown(t.Context(), c, existing, testFieldOwner, nil)
+			} else {
+				_, err = m.Apply(t.Context(), c, configMap("guarded", map[string]any{"value": "retained"}), ApplyOptions{FieldOwner: testFieldOwner, Condition: "true", Adopt: true})
+			}
+			require.Error(t, err)
+			require.Equal(t, 1, writes, "must re-read ownership instead of retrying stale cleanup")
+			actual := configMap("guarded", nil)
+			require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(existing), actual))
+			require.Equal(t, testCreatedBy, actual.GetLabels()[meta.ProtectedByCapsuleLabel])
+			require.Equal(t, "another-owner", actual.GetAnnotations()[meta.ResourcePermitServiceAccountAnnotation])
+		})
+	}
+}
+
+func BenchmarkProtectionCleanup(b *testing.B) {
+	for _, disown := range []bool{false, true} {
+		for _, peers := range []int{0, 16} {
+			b.Run(fmt.Sprintf("disown=%t/peers=%d", disown, peers), func(b *testing.B) {
+				m := skippedPolicyManager(b)
+				// Warm the shared condition compiler outside the timed operation.
+				warmClient := fake.NewClientBuilder().Build()
+				_, err := m.Apply(b.Context(), warmClient, configMap("warm", nil), ApplyOptions{FieldOwner: testFieldOwner, Condition: "false"})
+				if err != nil {
+					b.Fatal(err)
+				}
+				reads, writes := 0, 0
+				b.ReportAllocs()
+				for b.Loop() {
+					b.StopTimer()
+					existing := skippedPolicyTarget(testFieldOwner, true)
+					labels := existing.GetLabels()
+					labels[meta.NewManagedByCapsuleLabel] = testCreatedBy
+					existing.SetLabels(labels)
+					fields := existing.GetManagedFields()
+					for i := range peers {
+						field := fields[0].DeepCopy()
+						field.Manager = fmt.Sprintf("%d/default/tenant-a/0/raw-0/", i+1)
+						fields = append(fields, *field)
+					}
+					existing.SetManagedFields(fields)
+					c := fake.NewClientBuilder().WithObjects(existing).WithReturnManagedFields().WithInterceptorFuncs(interceptor.Funcs{
+						Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+							reads++
+							return c.Get(ctx, key, obj, opts...)
+						},
+						Patch: func(ctx context.Context, c client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+							writes++
+							return c.Patch(ctx, obj, patch, opts...)
+						},
+					}).Build()
+					desired := configMap("guarded", map[string]any{"value": "retained", "new": "applied"})
+					b.StartTimer()
+					if disown {
+						err = m.Disown(b.Context(), c, existing, testFieldOwner, nil)
+					} else {
+						_, err = m.Apply(b.Context(), c, desired, ApplyOptions{FieldOwner: testFieldOwner, Condition: "true", Adopt: true})
+					}
+					if err != nil {
+						b.Fatal(err)
+					}
+					b.StopTimer()
+					actual := configMap("guarded", nil)
+					if err := c.Get(b.Context(), client.ObjectKeyFromObject(existing), actual); err != nil {
+						b.Fatal(err)
+					}
+					reads-- // Exclude validation reads from the operation's metrics.
+					if protected := actual.GetLabels()[meta.ProtectedByCapsuleLabel] == testCreatedBy; protected != (peers > 0) {
+						b.Fatal("unexpected protection after cleanup")
+					}
+					b.StartTimer()
+				}
+				b.ReportMetric(float64(reads)/float64(b.N), "reads/op")
+				b.ReportMetric(float64(writes)/float64(b.N), "writes/op")
+			})
+		}
+	}
 }
 
 func BenchmarkSkippedConditionPolicy(b *testing.B) {

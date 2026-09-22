@@ -205,6 +205,8 @@ func (m Manager) Apply(
 		return ApplyResult{Created: created, LastApply: initialized}, fmt.Errorf("failed to get object after apply: %w", err)
 	}
 
+	lastApply := successfulApplyTime(actual, opts.FieldOwner)
+
 	if opts.Condition != "" {
 		// Ownership migration can make SSA relinquish lifecycle labels. Build
 		// their patches against the resulting object without another API read.
@@ -213,8 +215,15 @@ func (m Manager) Apply(
 
 		patches, created, err = m.managedMetadataPatches(ctx, c, desired, metadataOptions, actual)
 		if err != nil {
-			return ApplyResult{Created: created, LastApply: clt.LastApplyTimeForManager(actual, opts.FieldOwner)}, err
+			return ApplyResult{Created: created, LastApply: lastApply}, err
 		}
+	}
+
+	// A previous skipped apply may have assigned protection to the lifecycle
+	// manager. Omitting it from this manager's SSA payload cannot remove it.
+	patches = append(patches, m.protectionPatches(actual, opts.Protect, opts.FieldOwner)...)
+	if len(patches) > 0 {
+		patches = append([]clt.JSONPatch{{Operation: "test", Path: "/metadata/resourceVersion", Value: actual.GetResourceVersion()}}, patches...)
 	}
 
 	log.FromContext(ctx).V(4).Info("applying managed resource metadata", "patches", len(patches))
@@ -226,11 +235,11 @@ func (m Manager) Apply(
 		patches,
 		meta.ResourceControllerFieldOwnerPrefix(),
 	); err != nil {
-		return ApplyResult{Created: created, LastApply: clt.LastApplyTimeForManager(actual, opts.FieldOwner)}, fmt.Errorf("applying managed metadata failed: %w", err)
+		return ApplyResult{Created: created, LastApply: lastApply}, fmt.Errorf("applying managed metadata failed: %w", err)
 	}
 
 	return ApplyResult{
-		LastApply: clt.LastApplyTimeForManager(actual, opts.FieldOwner),
+		LastApply: lastApply,
 		Created:   created,
 	}, nil
 }
@@ -297,11 +306,13 @@ func (m Manager) Prune(
 }
 
 // Disown removes metadata which is not part of the caller's SSA field set.
-// This is used after pruning an adopted or shared resource.
+// This is used after pruning an adopted or shared resource. fieldOwner identifies
+// the departing manager, including legacy cleanup that retains its SSA fields.
 func (m Manager) Disown(
 	ctx context.Context,
 	c client.Client,
 	obj *unstructured.Unstructured,
+	fieldOwner string,
 	ownerReference *metav1.OwnerReference,
 ) error {
 	actual, err := m.scopedObjectReference(obj)
@@ -318,13 +329,18 @@ func (m Manager) Disown(
 	}
 
 	patches := clt.RemoveOwnerReferencePatch(actual.GetOwnerReferences(), ownerReference)
-	if value, ok := actual.GetLabels()[meta.NewManagedByCapsuleLabel]; ok && value == m.Metadata.ManagedByValue {
+	if value, ok := actual.GetLabels()[meta.NewManagedByCapsuleLabel]; ok && value == m.Metadata.ManagedByValue && !hasOtherResourceOwners(actual, fieldOwner) {
 		patches = append(patches, clt.PatchRemoveLabels(actual.GetLabels(), []string{
 			meta.NewManagedByCapsuleLabel,
 		})...)
 		// A skipped apply can update protection through the lifecycle manager.
 		// The preceding identity-only SSA prune cannot relinquish those fields.
-		patches = append(patches, m.protectionPatches(actual, false)...)
+		patches = append(patches, m.protectionPatches(actual, false, fieldOwner)...)
+	}
+
+	if len(patches) > 0 {
+		// Another resource manager may have acquired the target since the read.
+		patches = append([]clt.JSONPatch{{Operation: "test", Path: "/metadata/resourceVersion", Value: actual.GetResourceVersion()}}, patches...)
 	}
 
 	if err := clt.ApplyPatches(
@@ -605,6 +621,18 @@ func objectReference(obj *unstructured.Unstructured) *unstructured.Unstructured 
 	actual.SetNamespace(obj.GetNamespace())
 
 	return actual
+}
+
+func successfulApplyTime(obj *unstructured.Unstructured, manager string) *metav1.Time {
+	lastApply := clt.LastApplyTimeForManager(obj, manager)
+	if lastApply == nil && hasApplyManager(obj, manager) {
+		// SSA can acquire shared fields without changing their values and omit
+		// the manager's timestamp. Record the successful apply so cleanup does
+		// not mistake this owned target for one that was never applied.
+		return new(metav1.Now())
+	}
+
+	return lastApply
 }
 
 func hasApplyManager(obj *unstructured.Unstructured, manager string) bool {

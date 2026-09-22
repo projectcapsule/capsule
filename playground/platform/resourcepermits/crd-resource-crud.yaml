@@ -10,7 +10,7 @@ spec:
   template:
     kind: GlobalResourcePermitTemplate
     name: crd-resource-crud
-  requestor:
+  requester:
     type: User
     name: alice@example.com
   reason: Temporarily investigate and repair CustomQuota configuration.
@@ -30,7 +30,7 @@ spec:
   template:
     kind: GlobalResourcePermitTemplate
     name: crd-resource-crud
-  requestor:
+  requester:
     type: User
     name: platform-lead@example.com
   reason: Allow the platform team to perform a temporary TenantResource migration.
@@ -50,7 +50,7 @@ spec:
   template:
     kind: GlobalResourcePermitTemplate
     name: crd-resource-crud-2
-  requestor:
+  requester:
     type: User
     name: platform-lead@example.com
   reason: Allow the platform team to perform a temporary TenantResource migration.

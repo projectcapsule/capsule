@@ -139,6 +139,10 @@ var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace
 		exerciseReplicationPolicies(false, tnt.Name, baseNamespace, targetNamespaces[0], targetNamespaces[1], tenantOwner)
 	})
 
+	It("keeps a shared adopted target protected until its last owner departs", Label("shared-protection"), func() {
+		exerciseSharedReplicationProtection(false, tnt.Name, baseNamespace, targetNamespaces[0], targetNamespaces[1], tenantOwner)
+	})
+
 	Context("cluster-scoped object protection", func() {
 		It("rejects cluster-scoped rawItems", func() {
 			clusterRoleName := "tr-raw-cluster-scoped"

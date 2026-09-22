@@ -17,7 +17,7 @@ import (
 
 const (
 	celRequestVariable   = "request"
-	celRequestorVariable = "requestor"
+	celRequesterVariable = "requester"
 	celReviewerVariable  = "reviewer"
 	groupsField          = "groups"
 )
@@ -48,7 +48,7 @@ func validateApprovalConditions(approvals resourcepermit.ApprovalSpec) error {
 			condition,
 			environment.NewExpressions,
 			celRequestVariable,
-			celRequestorVariable,
+			celRequesterVariable,
 			celReviewerVariable,
 		); err != nil {
 			return fmt.Errorf("compile approval condition %d: %w", i, err)
@@ -59,7 +59,7 @@ func validateApprovalConditions(approvals resourcepermit.ApprovalSpec) error {
 }
 
 // EvaluateApprovalConditions evaluates the stored approval conditions against
-// a ResourcePermit and its requestor/reviewer identities. Conditions are ORed.
+// a ResourcePermit and its requester/reviewer identities. Conditions are ORed.
 func (brt *GlobalResourcePermitTemplate) EvaluateApprovalConditions(
 	ctx context.Context,
 	br *ResourcePermit,
@@ -120,12 +120,12 @@ func evaluateApprovalConditions(
 		return false, fmt.Errorf("convert ResourcePermit for approval condition: %w", err)
 	}
 
-	requestor, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&br.Spec.Requestor)
+	requester, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&br.Spec.Requester)
 	if err != nil {
-		return false, fmt.Errorf("convert requestor for approval condition: %w", err)
+		return false, fmt.Errorf("convert requester for approval condition: %w", err)
 	}
 
-	ensureGroups(requestor)
+	ensureGroups(requester)
 
 	reviewer := map[string]any{}
 	if br.Status.Review != nil && br.Status.Review.Reviewer != nil {
@@ -139,7 +139,7 @@ func evaluateApprovalConditions(
 
 	variables := map[string]any{
 		celRequestVariable:   request,
-		celRequestorVariable: requestor,
+		celRequesterVariable: requester,
 		celReviewerVariable:  reviewer,
 	}
 
@@ -150,7 +150,7 @@ func evaluateApprovalConditions(
 			condition,
 			environment.StoredExpressions,
 			celRequestVariable,
-			celRequestorVariable,
+			celRequesterVariable,
 			celReviewerVariable,
 		)
 		if compileErr != nil {

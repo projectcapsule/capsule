@@ -32,7 +32,7 @@ func TestResourcePermitTemplateValidationHandler(t *testing.T) {
 		{
 			name: "valid template",
 			template: &capsulev1beta2.ResourcePermitTemplate{Spec: capsulev1beta2.ResourcePermitTemplateSpec{
-				Approvals: resourcepermit.ApprovalSpec{Conditions: []string{`requestor.name == "alice"`}},
+				Approvals: resourcepermit.ApprovalSpec{Conditions: []string{`requester.name == "alice"`}},
 				Resources: []apiruntime.ResourceTemplate{{Targets: []runtime.RawExtension{{Object: &corev1.ConfigMap{}}}}},
 			}},
 		},

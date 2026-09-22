@@ -219,6 +219,37 @@ func exerciseReplicationPolicies(global bool, tenantName, baseNamespace, targetN
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	}
 	expectConfigMapData(excludedNamespace, "policy-conflict", map[string]string{"mode": "excluded"})
+	By("removing lifecycle-owned protection when conditional content applies again")
+	Eventually(func() error {
+		if err := k8sClient.Get(ctx, parentKey, parent); err != nil {
+			return err
+		}
+		for _, i := range []int{1, 3} {
+			spec.Resources[i].Policy.Condition = "true"
+			spec.Resources[i].Policy.Protect = new(false)
+			name := "policy-owner"
+			if i == 3 {
+				name = "policy-unprotected"
+			}
+			spec.Resources[i].RawItems[0] = capsulev1beta2.RawExtension{Object: &corev1.ConfigMap{
+				APIVersion: "v1", Kind: "ConfigMap", Name: name,
+				Data: map[string]string{"mode": "replicated", "resumed": "true"},
+			}}
+		}
+		return k8sClient.Update(ctx, parent)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	Eventually(func(g Gomega) {
+		g.Expect(k8sClient.Get(ctx, parentKey, parent)).To(Succeed())
+		g.Expect(status.ObservedGeneration).To(Equal(parent.GetGeneration()))
+		for _, name := range []string{"policy-owner", "policy-unprotected"} {
+			cm := &corev1.ConfigMap{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: targetNamespace, Name: name}, cm)).To(Succeed())
+			g.Expect(cm.Data).To(HaveKeyWithValue("resumed", "true"))
+			g.Expect(cm.Labels).NotTo(HaveKey(meta.ProtectedByCapsuleLabel))
+			g.Expect(ownerClient.Patch(ctx, cm, client.RawPatch(types.MergePatchType, []byte(`{"metadata":{"annotations":{"policy-resumed":"allowed"}}}`)))).To(Succeed())
+			g.Expect(ownerClient.Delete(ctx, cm, client.DryRunAll)).To(Succeed())
+		}
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	By("orphaning removed items with the reconciled policy")
 	Eventually(func() error {
 		if err := k8sClient.Get(ctx, parentKey, parent); err != nil {

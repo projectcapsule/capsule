@@ -203,7 +203,9 @@ func (p *Processor) disownProcessedItem(
 	obj *unstructured.Unstructured,
 	itemErrors *int,
 ) {
-	err := p.resourceManager().Disown(ctx, c, obj, opts.Owner)
+	fieldOwner := opts.FieldOwnerPrefix + "/" + item.FieldOwner("")
+
+	err := p.resourceManager().Disown(ctx, c, obj, fieldOwner, opts.Owner)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			processed.RemoveItem(item)
