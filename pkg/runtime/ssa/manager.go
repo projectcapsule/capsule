@@ -93,9 +93,11 @@ func (m Manager) Apply(
 	// field manager. This also prevents templates from marking adopted objects
 	// as created by Capsule.
 	meta.SetFilteredLabels(desired, map[string]struct{}{
-		meta.CreatedByCapsuleLabel:    {},
-		meta.NewManagedByCapsuleLabel: {},
-		meta.ProtectedByCapsuleLabel:  {},
+		meta.CreatedByCapsuleLabel:         {},
+		meta.NewManagedByCapsuleLabel:      {},
+		meta.ProtectedByCapsuleLabel:       {},
+		meta.ReplicationProtectionLabel:    {},
+		meta.ResourcePermitProtectionLabel: {},
 	})
 
 	protectionAnnotation := m.Metadata.ProtectedByServiceAccountAnnotation
@@ -120,7 +122,7 @@ func (m Manager) Apply(
 			labels = map[string]string{}
 		}
 
-		labels[meta.ProtectedByCapsuleLabel] = m.Metadata.ProtectedByValue
+		labels[meta.ProtectionLabelPrefix+m.Metadata.ProtectedByValue] = meta.ValueTrue
 		desired.SetLabels(labels)
 	}
 
@@ -154,14 +156,19 @@ func (m Manager) Apply(
 		}
 	}
 
-	patches, created, err := m.managedMetadataPatches(ctx, c, desired, opts, snapshot...)
+	snapshot, err = m.prepareProtection(ctx, c, desired, opts, snapshot)
+	if err != nil {
+		return ApplyResult{}, err
+	}
+
+	_, created, err := m.managedMetadataPatches(ctx, c, desired, opts, snapshot...)
 	if err != nil {
 		return ApplyResult{Created: created}, fmt.Errorf("evaluating managed metadata: %w", err)
 	}
 
 	var initialized *metav1.Time
 
-	if len(snapshot) > 0 && snapshot[0] == nil {
+	if opts.Condition != "" && snapshot[0] == nil {
 		// Create is the absent-object precondition: an SSA upsert could overwrite
 		// a concurrent creation. Establish SSA ownership immediately afterwards.
 		initialized, err = m.createConditionalTarget(ctx, c, desired, opts)
@@ -207,21 +214,19 @@ func (m Manager) Apply(
 
 	lastApply := successfulApplyTime(actual, opts.FieldOwner)
 
-	if opts.Condition != "" {
-		// Ownership migration can make SSA relinquish lifecycle labels. Build
-		// their patches against the resulting object without another API read.
-		metadataOptions := opts
-		metadataOptions.PreviouslyCreated = created
+	// Build patches against the resulting object: SSA can add protection
+	// markers or relinquish legacy labels. Reuse the read above.
+	metadataOptions := opts
+	metadataOptions.PreviouslyCreated = created
 
-		patches, created, err = m.managedMetadataPatches(ctx, c, desired, metadataOptions, actual)
-		if err != nil {
-			return ApplyResult{Created: created, LastApply: lastApply}, err
-		}
+	patches, created, err := m.managedMetadataPatches(ctx, c, desired, metadataOptions, actual)
+	if err != nil {
+		return ApplyResult{Created: created, LastApply: lastApply}, err
 	}
 
 	// A previous skipped apply may have assigned protection to the lifecycle
 	// manager. Omitting it from this manager's SSA payload cannot remove it.
-	patches = append(patches, m.protectionPatches(actual, opts.Protect, opts.FieldOwner)...)
+	patches = append(patches, m.protectionPatches(actual, opts.Protect, opts.FieldOwner, nil)...)
 	if len(patches) > 0 {
 		patches = append([]clt.JSONPatch{{Operation: "test", Path: "/metadata/resourceVersion", Value: actual.GetResourceVersion()}}, patches...)
 	}
@@ -328,15 +333,17 @@ func (m Manager) Disown(
 		return err
 	}
 
+	owners := meta.CapsuleResourceFieldOwners(actual)
+
 	patches := clt.RemoveOwnerReferencePatch(actual.GetOwnerReferences(), ownerReference)
-	if value, ok := actual.GetLabels()[meta.NewManagedByCapsuleLabel]; ok && value == m.Metadata.ManagedByValue && !hasOtherResourceOwners(actual, fieldOwner) {
+	if value, ok := actual.GetLabels()[meta.NewManagedByCapsuleLabel]; ok && value == m.Metadata.ManagedByValue && !hasOtherResourceOwners(owners, fieldOwner) {
 		patches = append(patches, clt.PatchRemoveLabels(actual.GetLabels(), []string{
 			meta.NewManagedByCapsuleLabel,
 		})...)
-		// A skipped apply can update protection through the lifecycle manager.
-		// The preceding identity-only SSA prune cannot relinquish those fields.
-		patches = append(patches, m.protectionPatches(actual, false, fieldOwner)...)
 	}
+	// Protection is composed per controller, independently of shared tracking.
+	// A skipped apply can leave it owned by the lifecycle manager after pruning.
+	patches = append(patches, m.protectionPatches(actual, false, fieldOwner, owners)...)
 
 	if len(patches) > 0 {
 		// Another resource manager may have acquired the target since the read.
@@ -362,8 +369,8 @@ func (m Manager) Disown(
 
 // Orphan stops lifecycle management without removing the resource or
 // relinquishing the fields applied by the previous manager. Capsule tracking
-// and protection metadata is removed only when no other Capsule resource field
-// owner remains, so shared targets retain their existing protection.
+// metadata is removed only when no other Capsule resource field owner remains.
+// Protection is removed only when no other owner of this controller remains.
 func (m Manager) Orphan(
 	ctx context.Context,
 	c client.Client,
@@ -384,10 +391,14 @@ func (m Manager) Orphan(
 		return err
 	}
 
+	owners := meta.CapsuleResourceFieldOwners(actual)
+
 	patches := clt.RemoveOwnerReferencePatch(actual.GetOwnerReferences(), ownerReference)
-	if !hasOtherResourceOwners(actual, fieldOwner) {
+	if !hasOtherResourceOwners(owners, fieldOwner) {
 		patches = append(patches, m.orphanMetadataPatches(actual)...)
 	}
+
+	patches = append(patches, m.protectionPatches(actual, false, fieldOwner, owners)...)
 
 	if len(patches) > 0 {
 		// Ownership may have changed since the read. Reconcile again instead
@@ -444,12 +455,6 @@ func (m Manager) orphanMetadataPatches(actual *unstructured.Unstructured) (patch
 		}
 	}
 
-	if m.Metadata.ProtectedByValue != "" {
-		if value, ok := labels[meta.ProtectedByCapsuleLabel]; ok && value == m.Metadata.ProtectedByValue {
-			removeLabels = append(removeLabels, meta.ProtectedByCapsuleLabel)
-		}
-	}
-
 	if m.Metadata.AppManagedByValue != "" {
 		if value, ok := labels[meta.AppManagedByLabel]; ok && value == m.Metadata.AppManagedByValue {
 			removeLabels = append(removeLabels, meta.AppManagedByLabel)
@@ -463,13 +468,6 @@ func (m Manager) orphanMetadataPatches(actual *unstructured.Unstructured) (patch
 	}
 
 	patches = append(patches, clt.PatchRemoveLabels(labels, removeLabels)...)
-
-	if annotation := m.Metadata.ProtectedByServiceAccountAnnotation; annotation != "" {
-		annotations := actual.GetAnnotations()
-		if _, ok := annotations[annotation]; ok {
-			patches = append(patches, clt.PatchRemoveAnnotations(annotations, []string{annotation})...)
-		}
-	}
 
 	return patches
 }

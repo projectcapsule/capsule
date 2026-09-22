@@ -40,6 +40,8 @@ annotations:
     - name: Documentation
       url: https://projectcapsule.dev/
   artifacthub.io/changes: |
+    - kind: fixed
+      description: preserve legacy replication admission matching and independent protection for targets shared with ResourcePermits
     - kind: added
       description: added CEL apply conditions to resource policies and a five-minute age-key rotation example retaining all historical keys
     - kind: added

@@ -5,7 +5,9 @@ package e2e
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"maps"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -113,6 +115,52 @@ func exerciseSharedReplicationProtection(global bool, tenantName, baseNamespace,
 		g.Expect(condition).NotTo(BeNil())
 		g.Expect(condition.Status).To(Equal(metav1.ConditionTrue))
 	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	if !orphan {
+		By("matching legacy and independent markers without controller repair")
+		first := parents[0]
+		Eventually(func() error {
+			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(first.object), first.object); err != nil {
+				return err
+			}
+			first.spec.Cordoned = new(true)
+			return k8sClient.Update(ctx, first.object)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Eventually(func(g Gomega) {
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(first.object), first.object)).To(Succeed())
+			condition := first.status.Conditions.GetConditionByType(meta.CordonedCondition)
+			g.Expect(condition).NotTo(BeNil())
+			g.Expect(condition.Status).To(Equal(metav1.ConditionTrue))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		cm := &corev1.ConfigMap{}
+		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: name, Namespace: targetNamespace}, cm)).To(Succeed())
+		original := maps.Clone(cm.Labels)
+		sa := survivor.status.ServiceAccount
+		Expect(sa).NotTo(BeNil())
+		runner := impersonationClient(serviceAccountUsername(sa.Namespace.String(), sa.Name.String()), serviceAccountGroups(sa.Namespace.String()))
+		ownerClient := impersonationClient(owner.Name, withDefaultGroups([]string{owner.Name}))
+		for _, marker := range []map[string]string{
+			{meta.CreatedByCapsuleLabel: meta.ValueControllerReplications},
+			{meta.NewManagedByCapsuleLabel: meta.ValueControllerReplications},
+			{meta.ReplicationProtectionLabel: meta.ValueTrue},
+			original,
+		} {
+			// Tenant ownership labels are maintained by metadata admission.
+			// Vary only the markers involved in protection webhook selection.
+			expected := maps.Clone(original)
+			for _, key := range []string{meta.CreatedByCapsuleLabel, meta.NewManagedByCapsuleLabel, meta.ProtectedByCapsuleLabel, meta.ReplicationProtectionLabel, meta.ResourcePermitProtectionLabel} {
+				delete(expected, key)
+			}
+			maps.Copy(expected, marker)
+			patch, err := json.Marshal([]map[string]any{{"op": "replace", "path": "/metadata/labels", "value": expected}})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(runner.Patch(ctx, cm, client.RawPatch(types.JSONPatchType, patch))).To(Succeed())
+			err = ownerClient.Patch(ctx, cm, client.RawPatch(types.MergePatchType, []byte(`{"metadata":{"labels":null}}`)))
+			Expect(err).To(MatchError(ContainSubstring("is managed by a")))
+			Expect(ownerClient.Delete(ctx, cm, client.DryRunAll)).To(MatchError(ContainSubstring("is managed by a")))
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cm), cm)).To(Succeed())
+			Expect(cm.Labels).To(Equal(expected))
+		}
+	}
 	removeParent := func(parent replication) {
 		Expect(k8sClient.Delete(ctx, parent.object)).To(Succeed())
 		Eventually(func() bool {

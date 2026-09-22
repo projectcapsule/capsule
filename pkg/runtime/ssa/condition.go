@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -108,7 +109,7 @@ func (m Manager) reconcileSkippedPolicy(ctx context.Context, c client.Client, ex
 		return false, nil
 	}
 
-	patches := m.protectionPatches(existing, opts.Protect, opts.FieldOwner)
+	patches := m.protectionPatches(existing, opts.Protect, opts.FieldOwner, nil)
 	if len(patches) == 0 {
 		return true, nil
 	}
@@ -134,14 +135,51 @@ func (m Manager) reconcileSkippedPolicy(ctx context.Context, c client.Client, ex
 	return true, nil
 }
 
-func (m Manager) protectionPatches(existing *unstructured.Unstructured, protect bool, fieldOwner string) (patches []clt.JSONPatch) {
+// Reuse the condition snapshot or the ordinary adoption read to prepare
+// compatibility metadata without an additional API lookup.
+func (m Manager) prepareProtection(ctx context.Context, c client.Client, desired *unstructured.Unstructured, opts ApplyOptions, snapshot []*unstructured.Unstructured) ([]*unstructured.Unstructured, error) {
+	if len(snapshot) == 0 {
+		existing := objectReference(desired)
+		if err := c.Get(ctx, client.ObjectKeyFromObject(desired), existing); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return nil, fmt.Errorf("reading managed target: %w", err)
+			}
+
+			existing = nil
+		}
+
+		snapshot = append(snapshot, existing)
+	}
+	// Preserve a different controller's legacy identity even when force is set.
+	// Our own compatibility label stays in the SSA field set alongside its
+	// execution identity, so pruning cannot leave it without authorization.
+	if opts.Protect && m.Metadata.ProtectedByValue != "" {
+		existing := snapshot[0]
+		if existing == nil || existing.GetLabels()[meta.ProtectedByCapsuleLabel] == "" || existing.GetLabels()[meta.ProtectedByCapsuleLabel] == m.Metadata.ProtectedByValue {
+			labels := desired.GetLabels()
+			labels[meta.ProtectedByCapsuleLabel] = m.Metadata.ProtectedByValue
+			desired.SetLabels(labels)
+		}
+	}
+
+	return snapshot, nil
+}
+
+func (m Manager) protectionPatches(existing *unstructured.Unstructured, protect bool, fieldOwner string, owners map[string]struct{}) (patches []clt.JSONPatch) {
 	labels := existing.GetLabels()
 	annotations := existing.GetAnnotations()
 	annotation := m.Metadata.ProtectedByServiceAccountAnnotation
 
 	if protect {
 		if m.Metadata.ProtectedByValue != "" {
-			patches = append(patches, clt.AddLabelsPatch(labels, map[string]string{meta.ProtectedByCapsuleLabel: m.Metadata.ProtectedByValue})...)
+			add := map[string]string{meta.ProtectionLabelPrefix + m.Metadata.ProtectedByValue: meta.ValueTrue}
+			// Keep legacy admission identities, including those installed by a
+			// different controller. Each controller now has its own marker.
+			if labels[meta.ProtectedByCapsuleLabel] == "" {
+				add[meta.ProtectedByCapsuleLabel] = m.Metadata.ProtectedByValue
+			}
+
+			patches = append(patches, clt.AddLabelsPatch(labels, add)...)
 		}
 
 		if annotation != "" && m.Metadata.ProtectedByServiceAccount != "" {
@@ -151,27 +189,75 @@ func (m Manager) protectionPatches(existing *unstructured.Unstructured, protect 
 		return patches
 	}
 
-	if m.Metadata.ProtectedByValue != "" && labels[meta.ProtectedByCapsuleLabel] == m.Metadata.ProtectedByValue {
-		patches = append(patches, clt.PatchRemoveLabels(labels, []string{meta.ProtectedByCapsuleLabel})...)
+	if m.Metadata.ProtectedByValue != "" {
+		patches = append(patches, m.removeProtectionLabels(labels)...)
 	}
 
 	if annotation != "" {
 		patches = append(patches, clt.PatchRemoveAnnotations(annotations, []string{annotation})...)
 	}
 
-	if len(patches) > 0 && hasOtherResourceOwners(existing, fieldOwner) {
-		return nil
+	if len(patches) > 0 {
+		if owners == nil {
+			owners = meta.CapsuleResourceFieldOwners(existing)
+		}
+
+		if m.hasOtherProtectionOwners(owners, fieldOwner) {
+			return nil
+		}
 	}
 
 	return patches
 }
 
-// Shared lifecycle metadata cannot identify which resource manager still needs
-// protection. Preserve it conservatively while another Capsule resource owner
-// remains; the last departing owner can remove it. Ordinary external field
-// managers and the shared lifecycle manager do not require this protection.
-func hasOtherResourceOwners(obj *unstructured.Unstructured, fieldOwner string) bool {
-	for owner := range meta.CapsuleResourceFieldOwners(obj) {
+func (m Manager) removeProtectionLabels(labels map[string]string) []clt.JSONPatch {
+	patches := clt.PatchRemoveLabels(labels, []string{meta.ProtectionLabelPrefix + m.Metadata.ProtectedByValue})
+	if labels[meta.ProtectedByCapsuleLabel] != m.Metadata.ProtectedByValue {
+		return patches
+	}
+
+	// Restore the compatibility marker to a surviving controller.
+	for _, controller := range []string{meta.ValueControllerResourcePermit, meta.ValueControllerReplications} {
+		if controller != m.Metadata.ProtectedByValue && labels[meta.ProtectionLabelPrefix+controller] == meta.ValueTrue {
+			return append(patches, clt.AddLabelsPatch(labels, map[string]string{meta.ProtectedByCapsuleLabel: controller})...)
+		}
+	}
+
+	return append(patches, clt.PatchRemoveLabels(labels, []string{meta.ProtectedByCapsuleLabel})...)
+}
+
+// Owners of the same controller share a protection marker. Owners from a
+// different controller have an independent marker and authorization metadata.
+// Unknown Capsule owner formats retain the conservative compatibility behavior.
+func (m Manager) hasOtherProtectionOwners(owners map[string]struct{}, fieldOwner string) bool {
+	for owner := range owners {
+		if owner == fieldOwner || owner == meta.ResourceControllerFieldOwnerPrefix() {
+			continue
+		}
+
+		switch m.Metadata.ProtectedByValue {
+		case meta.ValueControllerReplications:
+			if strings.HasPrefix(owner, meta.ResourceFieldOwner("resourcepermit/")) {
+				continue
+			}
+		case meta.ValueControllerResourcePermit:
+			if !strings.HasPrefix(owner, meta.ResourceFieldOwner("")) {
+				continue
+			}
+		}
+
+		return true
+	}
+
+	return false
+}
+
+// Shared tracking metadata cannot identify which resource manager still needs
+// it. Preserve it conservatively while another Capsule resource owner remains;
+// the last departing owner can remove it. Protection has a separate guard per
+// controller. External field managers and the lifecycle manager do not count.
+func hasOtherResourceOwners(owners map[string]struct{}, fieldOwner string) bool {
+	for owner := range owners {
 		if owner != fieldOwner && owner != meta.ResourceControllerFieldOwnerPrefix() {
 			return true
 		}

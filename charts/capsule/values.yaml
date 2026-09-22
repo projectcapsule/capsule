@@ -1594,18 +1594,23 @@ webhooks:
       # @schema type: object
       # @schema additionalProperties: true
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
-      objectSelector:
-        matchExpressions:
-          - key: projectcapsule.dev/managed-by
-            operator: In
-            values:
-              - "replications"
+      # Match either legacy tracking marker or independent protection below.
+      # A LabelSelector cannot express OR across different label keys.
+      objectSelector: {}
       # @schema type: object
       # @schema additionalProperties: true
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
       namespaceSelector: {}
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
-      matchConditions: []
+      matchConditions:
+        - name: replication-markers
+          expression: >-
+            [object, oldObject].exists(o, o != null && has(o.metadata.labels) && (
+              ('projectcapsule.dev/created-by' in o.metadata.labels && o.metadata.labels['projectcapsule.dev/created-by'] == 'replications') ||
+              ('projectcapsule.dev/managed-by' in o.metadata.labels && o.metadata.labels['projectcapsule.dev/managed-by'] == 'replications') ||
+              ('projectcapsule.dev/protected-by' in o.metadata.labels && o.metadata.labels['projectcapsule.dev/protected-by'] == 'replications') ||
+              ('protection.projectcapsule.dev/replications' in o.metadata.labels && o.metadata.labels['protection.projectcapsule.dev/replications'] == 'true')
+            ))
       #  - name: "exclude-privileged-users"
       #    expression: >
       #      !(
@@ -1745,18 +1750,19 @@ webhooks:
       # @schema type: object
       # @schema additionalProperties: true
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
-      objectSelector:
-        matchExpressions:
-          - key: projectcapsule.dev/protected-by
-            operator: In
-            values:
-              - "resource-permit"
+      objectSelector: {}
       # @schema type: object
       # @schema additionalProperties: true
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
       namespaceSelector: {}
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
-      matchConditions: []
+      matchConditions:
+        - name: resource-permit-protection
+          expression: >-
+            [object, oldObject].exists(o, o != null && has(o.metadata.labels) && (
+              ('projectcapsule.dev/protected-by' in o.metadata.labels && o.metadata.labels['projectcapsule.dev/protected-by'] == 'resource-permit') ||
+              ('protection.projectcapsule.dev/resource-permit' in o.metadata.labels && o.metadata.labels['protection.projectcapsule.dev/resource-permit'] == 'true')
+            ))
       # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
       rules:
         - apiGroups:

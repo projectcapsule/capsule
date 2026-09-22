@@ -101,7 +101,8 @@ func resourcePermitProtectionObject(
 	// object's controller-owned authorization annotation. Once protection is
 	// active, always trust the old object so callers cannot authorize themselves
 	// by changing the annotation in the same request.
-	if preferOld && obj.GetLabels()[meta.ProtectedByCapsuleLabel] == meta.ValueControllerResourcePermit {
+	if preferOld && (obj.GetLabels()[meta.ProtectedByCapsuleLabel] == meta.ValueControllerResourcePermit ||
+		obj.GetLabels()[meta.ResourcePermitProtectionLabel] == meta.ValueTrue) {
 		return obj, nil
 	}
 

@@ -139,7 +139,11 @@ var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace
 		exerciseReplicationPolicies(false, tnt.Name, baseNamespace, targetNamespaces[0], targetNamespaces[1], tenantOwner)
 	})
 
-	It("keeps a shared adopted target protected until its last owner departs", Label("shared-protection"), func() {
+	It("composes replication and ResourcePermit protection", Label("protection-composition"), func() {
+		exerciseMixedProtection(false, tnt.Name, baseNamespace, targetNamespaces[0], targetNamespaces[1], tenantOwner)
+	})
+
+	It("keeps a shared adopted target protected until its last owner departs", Label("shared-protection", "protection-markers"), func() {
 		exerciseSharedReplicationProtection(false, tnt.Name, baseNamespace, targetNamespaces[0], targetNamespaces[1], tenantOwner, false)
 	})
 

@@ -145,9 +145,11 @@ func TestApplyUsesServerSideApply(t *testing.T) {
 	}}
 	desired := configMap("applied", map[string]any{"requested": "value"})
 	desired.SetLabels(map[string]string{
-		meta.CreatedByCapsuleLabel:    "template-value",
-		meta.NewManagedByCapsuleLabel: "template-value",
-		meta.ProtectedByCapsuleLabel:  "template-value",
+		meta.CreatedByCapsuleLabel:         "template-value",
+		meta.NewManagedByCapsuleLabel:      "template-value",
+		meta.ProtectedByCapsuleLabel:       "template-value",
+		meta.ReplicationProtectionLabel:    "true",
+		meta.ResourcePermitProtectionLabel: "true",
 	})
 	desired.SetAnnotations(map[string]string{
 		meta.ResourcePermitServiceAccountAnnotation: "system:serviceaccount:spoofed:runner",
@@ -184,8 +186,11 @@ func TestApplyUsesServerSideApply(t *testing.T) {
 	if labels := apply.object.GetLabels(); labels[meta.CreatedByCapsuleLabel] != "" || labels[meta.NewManagedByCapsuleLabel] != "" {
 		t.Fatalf("Apply() allowed rendered tracking labels: %#v", labels)
 	}
-	if value := apply.object.GetLabels()[meta.ProtectedByCapsuleLabel]; value != testCreatedBy {
-		t.Fatalf("Apply() protection label = %q, want %q", value, testCreatedBy)
+	if value := apply.object.GetLabels()[meta.ProtectionLabelPrefix+testCreatedBy]; value != meta.ValueTrue {
+		t.Fatalf("Apply() independent protection label = %q, want true", value)
+	}
+	if labels := apply.object.GetLabels(); labels[meta.ReplicationProtectionLabel] != "" || labels[meta.ResourcePermitProtectionLabel] != "" {
+		t.Fatalf("Apply() allowed rendered protection identities: %#v", labels)
 	}
 	if value := apply.object.GetAnnotations()[meta.ResourcePermitServiceAccountAnnotation]; value != "system:serviceaccount:test:runner" {
 		t.Fatalf("Apply() protection ServiceAccount = %q, want resolved identity", value)

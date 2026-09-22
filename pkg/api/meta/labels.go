@@ -36,10 +36,15 @@ const (
 
 	CreatedByCapsuleLabel   = "projectcapsule.dev/created-by"
 	ProtectedByCapsuleLabel = "projectcapsule.dev/protected-by"
-	CustomResourcesLabel    = "projectcapsule.dev/custom-resources"
-	ResourceOriginLabel     = "projectcapsule.dev/resource-origin"
-	EventActorLabel         = "event.projectcapsule.dev/actor"
-	EventActorKindLabel     = "event.projectcapsule.dev/actor-kind"
+	// Independent protection markers allow different Capsule controllers to
+	// protect the same object without replacing each other's admission identity.
+	ProtectionLabelPrefix         = "protection.projectcapsule.dev/"
+	ReplicationProtectionLabel    = ProtectionLabelPrefix + "replications"
+	ResourcePermitProtectionLabel = ProtectionLabelPrefix + "resource-permit"
+	CustomResourcesLabel          = "projectcapsule.dev/custom-resources"
+	ResourceOriginLabel           = "projectcapsule.dev/resource-origin"
+	EventActorLabel               = "event.projectcapsule.dev/actor"
+	EventActorKindLabel           = "event.projectcapsule.dev/actor-kind"
 
 	NewManagedByCapsuleLabel = "projectcapsule.dev/managed-by"
 	ManagedByCapsuleLabel    = "capsule.clastix.io/managed-by"

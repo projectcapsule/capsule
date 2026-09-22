@@ -53,7 +53,11 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 		exerciseReplicationPolicies(true, tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner)
 	})
 
-	It("keeps a shared adopted target protected until its last owner departs", Label("shared-protection"), func() {
+	It("composes replication and ResourcePermit protection", Label("protection-composition"), func() {
+		exerciseMixedProtection(true, tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner)
+	})
+
+	It("keeps a shared adopted target protected until its last owner departs", Label("shared-protection", "protection-markers"), func() {
 		exerciseSharedReplicationProtection(true, tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner, false)
 	})
 

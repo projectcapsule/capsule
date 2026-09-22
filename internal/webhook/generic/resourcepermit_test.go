@@ -5,10 +5,13 @@ package generic
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"testing"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	webhooktest "github.com/projectcapsule/capsule/internal/webhook/test"
@@ -100,6 +103,60 @@ func TestResourcePermitResourceHandler(t *testing.T) {
 			t.Fatalf("expected configured ServiceAccount deletion to be allowed, got %#v", resp)
 		}
 	})
+
+	t.Run("independent marker retains the old authorization identity", func(t *testing.T) {
+		oldObj := protectedResourcePermitResource("system:serviceaccount:operations:runner")
+		oldObj.SetLabels(map[string]string{
+			meta.ProtectedByCapsuleLabel:       meta.ValueControllerReplications,
+			meta.ResourcePermitProtectionLabel: meta.ValueTrue,
+		})
+		newObj := oldObj.DeepCopy()
+		newObj.SetLabels(nil)
+		newObj.SetAnnotations(map[string]string{meta.ResourcePermitServiceAccountAnnotation: "system:serviceaccount:attacker:runner"})
+		decoder := &webhooktest.Decoder[*unstructured.Unstructured]{Object: newObj, OldObject: oldObj}
+		for _, username := range []string{"attacker", "operations"} {
+			response := handler.OnUpdate(nil, nil, decoder, nil)(t.Context(), admission.Request{UserInfo: users.ServiceAccountUserInfo(username, "runner")})
+			if username == "attacker" {
+				webhooktest.VerifyResponse(t, response, 403, "can only be changed by the Capsule controller")
+			} else if response != nil {
+				t.Fatalf("expected original ServiceAccount to remain authorized, got %#v", response)
+			}
+		}
+		response := handler.OnDelete(nil, nil, decoder, nil)(t.Context(), admission.Request{UserInfo: users.ServiceAccountUserInfo("attacker", "runner")})
+		webhooktest.VerifyResponse(t, response, 403, "can only be changed by the Capsule controller")
+	})
+}
+
+func BenchmarkResourcePermitProtectionAdmission(b *testing.B) {
+	for _, independent := range []bool{false, true} {
+		for _, authorized := range []bool{false, true} {
+			b.Run(fmt.Sprintf("independent=%t/authorized=%t", independent, authorized), func(b *testing.B) {
+				obj := protectedResourcePermitResource("system:serviceaccount:test:runner")
+				obj.SetAPIVersion("v1")
+				obj.SetKind("ConfigMap")
+				obj.SetName("shared")
+				if independent {
+					obj.SetLabels(map[string]string{meta.ProtectedByCapsuleLabel: meta.ValueControllerReplications, meta.ResourcePermitProtectionLabel: meta.ValueTrue})
+				}
+				raw, err := json.Marshal(obj)
+				if err != nil {
+					b.Fatal(err)
+				}
+				request := admission.Request{Object: runtime.RawExtension{Raw: raw}, OldObject: runtime.RawExtension{Raw: raw}, UserInfo: authenticationv1.UserInfo{Username: "tenant-owner"}}
+				if authorized {
+					request.UserInfo = users.ServiceAccountUserInfo("test", "runner")
+				}
+				handler := ResourcePermitResourceHandler().OnUpdate(nil, nil, admission.NewDecoder(runtime.NewScheme()), nil)
+				b.ReportAllocs()
+				for b.Loop() {
+					response := handler(b.Context(), request)
+					if (response == nil) != authorized {
+						b.Fatalf("unexpected admission decision: %#v", response)
+					}
+				}
+			})
+		}
+	}
 }
 
 func protectedResourcePermitResource(serviceAccount string) *unstructured.Unstructured {
