@@ -187,6 +187,34 @@ func BenchmarkProcessorPolicy(b *testing.B) {
 		}
 	}
 
+	b.Run("metadata-failure", func(b *testing.B) {
+		for _, items := range []int{1, 100} {
+			b.Run(fmt.Sprintf("items=%d", items), func(b *testing.B) {
+				p, c := policyProcessor()
+				c.metadataError = errors.New("injected metadata failure")
+				acc := Accumulator{}
+				for i := range items {
+					obj := policyConfigMap("target", fmt.Sprintf("item-%d", i))
+					AccumulatorAdd(acc, gvk.NewResourceID(obj, "tenant-a", "0/raw"), AccumulatorObject{Object: obj, Policy: &apiruntime.ResourceTemplatePolicy{Protect: new(false)}})
+				}
+				processed := meta.ProcessedItems{}
+				b.ReportAllocs()
+				for b.Loop() {
+					c.applies = c.applies[:0]
+					c.force = c.force[:0]
+					c.metadataPatches = 0
+					if err := p.Reconcile(b.Context(), logr.Discard(), c, &processed, acc, ProcessorOptions{}); err == nil {
+						b.Fatal("metadata failure was ignored")
+					}
+					if len(processed) != items || len(c.applies) != items || c.metadataPatches != items {
+						b.Fatal("did not exercise each apply and metadata failure")
+					}
+				}
+				b.ReportMetric(float64(items), "applies/op")
+				b.ReportMetric(float64(items), "metadata-patches/op")
+			})
+		}
+	})
 }
 
 func policyConfigMap(namespace, name string) *unstructured.Unstructured {

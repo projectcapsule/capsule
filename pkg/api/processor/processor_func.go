@@ -338,11 +338,10 @@ func (p *Processor) applyAccumulatorObject(
 	case err != nil:
 		if result.LastApply != nil {
 			or.LastApply = *result.LastApply
-
-			if !result.Skipped {
-				or.Policy = obj.Policy.DeepCopy()
-			}
 		}
+		// Content may have applied before lifecycle metadata failed. Keep its
+		// timestamp for cleanup, but retain the last reconciled policy so
+		// admission protection and deletion behavior cannot change on failure.
 
 		or.Status = metav1.ConditionFalse
 		or.Message = "apply failed for item " + obj.Origin.Origin + ": " + err.Error()
