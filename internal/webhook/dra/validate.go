@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	resources "k8s.io/api/resource/v1"
@@ -102,8 +103,36 @@ func (h *deviceClass) validateResourceRequest(
 		return nil
 	}
 
+	// Check every alternative: the scheduler may allocate any firstAvailable
+	// subrequest, not just the first one listed by the tenant.
+	classNames := make([]string, 0, len(requests))
 	for _, dr := range requests {
-		dc, err := utils.GetDeviceClassByName(ctx, c, dr.Exactly.DeviceClassName)
+		if dr.Exactly == nil && len(dr.FirstAvailable) == 0 {
+			return ad.Deny(caperrors.NewDeviceClassUndefined(*allowed).Error())
+		}
+
+		if dr.Exactly != nil {
+			classNames = append(classNames, dr.Exactly.DeviceClassName)
+		}
+
+		for _, alternative := range dr.FirstAvailable {
+			classNames = append(classNames, alternative.DeviceClassName)
+		}
+	}
+
+	// An absent selector must not override an explicit name/regex allowlist.
+	// Preserve the existing match-all behavior of a completely empty policy.
+	matchSelector := len(allowed.MatchLabels) > 0 || len(allowed.MatchExpressions) > 0 ||
+		(len(allowed.Exact) == 0 && allowed.Regex == "")
+
+	for i, name := range classNames {
+		// Repeated references need one lookup per admission request. Do not cache
+		// authorization across requests, where tenant policies or labels can change.
+		if slices.Contains(classNames[:i], name) {
+			continue
+		}
+
+		dc, err := utils.GetDeviceClassByName(ctx, c, name)
 		if err != nil && !k8serrors.IsNotFound(err) {
 			response := admission.Errored(http.StatusInternalServerError, err)
 
@@ -114,18 +143,16 @@ func (h *deviceClass) validateResourceRequest(
 			return ad.Deny(caperrors.NewDeviceClassUndefined(*allowed).Error())
 		}
 
-		selector := allowed.SelectorMatch(dc)
-
 		switch {
-		case allowed.Match(dc.Name) || selector:
-			return nil
+		case allowed.Match(dc.Name) || (matchSelector && allowed.SelectorMatch(dc)):
+			continue
 		default:
 			recorder.LabeledEvent(
 				obj,
 				corev1.EventTypeWarning,
 				events.ReasonForbiddenDeviceClass,
 				events.ActionValidationDenied,
-				fmt.Sprintf("%s %s/%s DeviceClass %s is forbidden for the current tenant", req.Kind.Kind, req.Namespace, req.Name, dc),
+				fmt.Sprintf("%s %s/%s DeviceClass %s is forbidden for the current tenant", req.Kind.Kind, req.Namespace, req.Name, dc.Name),
 			).
 				WithRelated(tnt).
 				WithTenantLabel(tnt).
