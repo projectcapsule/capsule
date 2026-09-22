@@ -140,7 +140,11 @@ var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace
 	})
 
 	It("keeps a shared adopted target protected until its last owner departs", Label("shared-protection"), func() {
-		exerciseSharedReplicationProtection(false, tnt.Name, baseNamespace, targetNamespaces[0], targetNamespaces[1], tenantOwner)
+		exerciseSharedReplicationProtection(false, tnt.Name, baseNamespace, targetNamespaces[0], targetNamespaces[1], tenantOwner, false)
+	})
+
+	It("keeps shared protection when one parent switches to Orphan", Label("shared-orphan-protection"), func() {
+		exerciseSharedReplicationProtection(false, tnt.Name, baseNamespace, targetNamespaces[0], targetNamespaces[1], tenantOwner, true)
 	})
 
 	Context("cluster-scoped object protection", func() {

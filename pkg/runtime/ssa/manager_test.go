@@ -497,6 +497,7 @@ func TestOrphan(t *testing.T) {
 		UID:        types.UID("request-uid"),
 	}
 	existing := configMap("orphaned", map[string]any{"requested": "value"})
+	existing.SetManagedFields([]metav1.ManagedFieldsEntry{managedField(testFieldOwner), managedField("external")})
 	existing.SetOwnerReferences([]metav1.OwnerReference{owner})
 	existing.SetLabels(map[string]string{
 		meta.CreatedByCapsuleLabel:    testCreatedBy,
@@ -513,6 +514,7 @@ func TestOrphan(t *testing.T) {
 	c := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithRuntimeObjects(existing).
+		WithReturnManagedFields().
 		Build()
 	manager := Manager{Metadata: Metadata{
 		CreatedByValue:                      testCreatedBy,
@@ -523,7 +525,7 @@ func TestOrphan(t *testing.T) {
 		AppManagedByValue:                   "test-app-manager",
 	}}
 
-	if err := manager.Orphan(context.Background(), c, existing, &owner); err != nil {
+	if err := manager.Orphan(context.Background(), c, existing, testFieldOwner, &owner); err != nil {
 		t.Fatalf("Orphan() error = %v", err)
 	}
 

@@ -287,9 +287,33 @@ func TestApplyTracksSharedFieldsWithoutManagerTimestamp(t *testing.T) {
 	require.False(t, result.LastApply.Before(&before))
 }
 
+func TestOrphanPreservesSharedProtection(t *testing.T) {
+	for _, peer := range []string{meta.ResourceFieldOwner("remaining"), "2lclct9cwq6mg/default/tenant-a/0/raw-0/"} {
+		t.Run(peer, func(t *testing.T) {
+			existing := skippedPolicyTarget(testFieldOwner, true)
+			labels := existing.GetLabels()
+			labels[meta.NewManagedByCapsuleLabel] = testCreatedBy
+			existing.SetLabels(labels)
+			fields := existing.GetManagedFields()
+			remaining := fields[0].DeepCopy()
+			remaining.Manager = peer
+			existing.SetManagedFields(append(fields, *remaining))
+			c := fake.NewClientBuilder().WithObjects(existing).WithReturnManagedFields().Build()
+			m := skippedPolicyManager(t)
+			require.NoError(t, m.Orphan(t.Context(), c, existing, testFieldOwner, nil))
+			actual := configMap("guarded", nil)
+			require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(existing), actual))
+			require.Equal(t, existing.GetLabels(), actual.GetLabels())
+			require.Equal(t, existing.GetAnnotations(), actual.GetAnnotations())
+			require.Equal(t, existing.Object["data"], actual.Object["data"])
+			require.True(t, hasFieldManager(actual, peer))
+		})
+	}
+}
+
 func TestProtectionCleanupChecksResourceVersion(t *testing.T) {
-	for _, disown := range []bool{false, true} {
-		t.Run(fmt.Sprintf("disown=%t", disown), func(t *testing.T) {
+	for _, operation := range []string{"apply", "disown", "orphan"} {
+		t.Run(operation, func(t *testing.T) {
 			existing := skippedPolicyTarget(testFieldOwner, true)
 			labels := existing.GetLabels()
 			labels[meta.NewManagedByCapsuleLabel] = testCreatedBy
@@ -310,8 +334,10 @@ func TestProtectionCleanupChecksResourceVersion(t *testing.T) {
 			}).Build()
 			m := skippedPolicyManager(t)
 			var err error
-			if disown {
+			if operation == "disown" {
 				err = m.Disown(t.Context(), c, existing, testFieldOwner, nil)
+			} else if operation == "orphan" {
+				err = m.Orphan(t.Context(), c, existing, testFieldOwner, nil)
 			} else {
 				_, err = m.Apply(t.Context(), c, configMap("guarded", map[string]any{"value": "retained"}), ApplyOptions{FieldOwner: testFieldOwner, Condition: "true", Adopt: true})
 			}
@@ -326,9 +352,9 @@ func TestProtectionCleanupChecksResourceVersion(t *testing.T) {
 }
 
 func BenchmarkProtectionCleanup(b *testing.B) {
-	for _, disown := range []bool{false, true} {
+	for _, operation := range []string{"apply", "disown", "orphan"} {
 		for _, peers := range []int{0, 16} {
-			b.Run(fmt.Sprintf("disown=%t/peers=%d", disown, peers), func(b *testing.B) {
+			b.Run(fmt.Sprintf("%s/peers=%d", operation, peers), func(b *testing.B) {
 				m := skippedPolicyManager(b)
 				// Warm the shared condition compiler outside the timed operation.
 				warmClient := fake.NewClientBuilder().Build()
@@ -363,8 +389,10 @@ func BenchmarkProtectionCleanup(b *testing.B) {
 					}).Build()
 					desired := configMap("guarded", map[string]any{"value": "retained", "new": "applied"})
 					b.StartTimer()
-					if disown {
+					if operation == "disown" {
 						err = m.Disown(b.Context(), c, existing, testFieldOwner, nil)
+					} else if operation == "orphan" {
+						err = m.Orphan(b.Context(), c, existing, testFieldOwner, nil)
 					} else {
 						_, err = m.Apply(b.Context(), c, desired, ApplyOptions{FieldOwner: testFieldOwner, Condition: "true", Adopt: true})
 					}

@@ -1200,7 +1200,7 @@ func (r *ResourcePermitReconciler) pruneItems(
 			}
 
 			if resource.Policy.ShouldOrphan() {
-				if orphanErr := manager.Orphan(ctx, resourceClient, obj, nil); orphanErr != nil {
+				if orphanErr := manager.Orphan(ctx, resourceClient, obj, fieldOwner, nil); orphanErr != nil {
 					item.Status = metav1.ConditionFalse
 					item.Message = "orphan failed: " + orphanErr.Error()
 					br.Status.ProcessedItems.UpdateItem(item)

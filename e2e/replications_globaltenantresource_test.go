@@ -54,7 +54,11 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 	})
 
 	It("keeps a shared adopted target protected until its last owner departs", Label("shared-protection"), func() {
-		exerciseSharedReplicationProtection(true, tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner)
+		exerciseSharedReplicationProtection(true, tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner, false)
+	})
+
+	It("keeps shared protection when one parent switches to Orphan", Label("shared-orphan-protection"), func() {
+		exerciseSharedReplicationProtection(true, tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner, true)
 	})
 
 	It("rotates age keys after five minutes and retains all history in selected tenant namespaces", Label("resource-condition", "age-rotation"), func() {

@@ -66,7 +66,7 @@ var _ = DescribeTable("ResourcePermit template apply conditions", Label("resourc
 		{Targets: []runtime.RawExtension{target("unconditional-target")}},
 	}
 	approvals := resourcepermit.ApprovalSpec{Auto: true, Conditions: []string{fmt.Sprintf(
-		`requester.name == %q && %q in requester.groups && request.spec.requester.name == requester.name`, owners[0].Name, owners[0].Name,
+		`requestor.name == %q && %q in requestor.groups && requestor == requester && request.spec.requester.name == requester.name`, owners[0].Name, owners[0].Name,
 	)}}
 	var template client.Object = &capsulev1beta2.ResourcePermitTemplate{Name: prefix, Namespace: selected, Spec: capsulev1beta2.ResourcePermitTemplateSpec{
 		Impersonation: &meta.LocalRFC1123ObjectReference{Name: "condition-runner"},
@@ -145,6 +145,7 @@ var _ = DescribeTable("ResourcePermit template apply conditions", Label("resourc
 	Expect(active.Spec.Requester.Groups).NotTo(ContainElement("spoofed"))
 	Expect(active.Status.Transitions).NotTo(BeEmpty())
 	Expect(active.Status.Transitions[0].Actor.Name).To(Equal(owners[0].Name))
+	Expect(active.Status.Request.Approvals.Conditions).To(Equal(approvals.Conditions), "legacy expressions must remain usable without rewriting the approval snapshot")
 	Expect(active.Status.ProcessedItems).To(HaveLen(5))
 	for _, item := range active.Status.ProcessedItems {
 		switch item.Name {

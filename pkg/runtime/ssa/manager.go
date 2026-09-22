@@ -362,12 +362,13 @@ func (m Manager) Disown(
 
 // Orphan stops lifecycle management without removing the resource or
 // relinquishing the fields applied by the previous manager. Capsule tracking
-// and protection metadata is removed so the retained object can be managed by
-// users or another controller.
+// and protection metadata is removed only when no other Capsule resource field
+// owner remains, so shared targets retain their existing protection.
 func (m Manager) Orphan(
 	ctx context.Context,
 	c client.Client,
 	obj *unstructured.Unstructured,
+	fieldOwner string,
 	ownerReference *metav1.OwnerReference,
 ) error {
 	actual, err := m.scopedObjectReference(obj)
@@ -384,6 +385,50 @@ func (m Manager) Orphan(
 	}
 
 	patches := clt.RemoveOwnerReferencePatch(actual.GetOwnerReferences(), ownerReference)
+	if !hasOtherResourceOwners(actual, fieldOwner) {
+		patches = append(patches, m.orphanMetadataPatches(actual)...)
+	}
+
+	if len(patches) > 0 {
+		// Ownership may have changed since the read. Reconcile again instead
+		// of removing another manager's lifecycle metadata from stale state.
+		patches = append([]clt.JSONPatch{{Operation: "test", Path: "/metadata/resourceVersion", Value: actual.GetResourceVersion()}}, patches...)
+	}
+
+	if err := clt.ApplyPatches(
+		ctx,
+		c,
+		actual,
+		patches,
+		meta.ResourceControllerFieldOwnerPrefix(),
+	); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+
+		return err
+	}
+
+	return nil
+}
+
+// ResolveResourceID returns the canonical identity and scope of a resource as
+// it will be managed. In particular, a namespace rendered onto a cluster-scoped
+// resource is removed from the returned identity.
+func (m Manager) ResolveResourceID(
+	obj *unstructured.Unstructured,
+	tenant string,
+	origin string,
+) (gvk.ResourceID, bool, error) {
+	scoped, clusterScoped, err := m.scopedObjectWithScope(obj)
+	if err != nil {
+		return gvk.ResourceID{}, false, err
+	}
+
+	return gvk.NewResourceID(scoped, tenant, origin), clusterScoped, nil
+}
+
+func (m Manager) orphanMetadataPatches(actual *unstructured.Unstructured) (patches []clt.JSONPatch) {
 	labels := actual.GetLabels()
 	removeLabels := make([]string, 0, 5)
 
@@ -426,37 +471,7 @@ func (m Manager) Orphan(
 		}
 	}
 
-	if err := clt.ApplyPatches(
-		ctx,
-		c,
-		actual,
-		patches,
-		meta.ResourceControllerFieldOwnerPrefix(),
-	); err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil
-		}
-
-		return err
-	}
-
-	return nil
-}
-
-// ResolveResourceID returns the canonical identity and scope of a resource as
-// it will be managed. In particular, a namespace rendered onto a cluster-scoped
-// resource is removed from the returned identity.
-func (m Manager) ResolveResourceID(
-	obj *unstructured.Unstructured,
-	tenant string,
-	origin string,
-) (gvk.ResourceID, bool, error) {
-	scoped, clusterScoped, err := m.scopedObjectWithScope(obj)
-	if err != nil {
-		return gvk.ResourceID{}, false, err
-	}
-
-	return gvk.NewResourceID(scoped, tenant, origin), clusterScoped, nil
+	return patches
 }
 
 func (m Manager) managedMetadataPatches(

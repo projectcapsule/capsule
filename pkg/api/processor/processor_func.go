@@ -164,7 +164,9 @@ func (p *Processor) pruneProcessedItem(
 	itemErrors *int,
 ) bool {
 	if item.Policy != nil && item.Policy.ShouldOrphan() {
-		err := p.resourceManager().Orphan(ctx, c, obj, opts.Owner)
+		fieldOwner := opts.FieldOwnerPrefix + "/" + item.FieldOwner("")
+
+		err := p.resourceManager().Orphan(ctx, c, obj, fieldOwner, opts.Owner)
 		if !failAndRecord(processed, itemErrors, item, "orphaning failed for item: ", err) {
 			processed.RemoveItem(item)
 		}

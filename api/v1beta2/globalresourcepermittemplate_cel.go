@@ -18,6 +18,8 @@ import (
 const (
 	celRequestVariable   = "request"
 	celRequesterVariable = "requester"
+	// Deprecated CEL alias retained for stored templates and approval snapshots.
+	celRequestorVariable = "requestor"
 	celReviewerVariable  = "reviewer"
 	groupsField          = "groups"
 )
@@ -49,6 +51,7 @@ func validateApprovalConditions(approvals resourcepermit.ApprovalSpec) error {
 			environment.NewExpressions,
 			celRequestVariable,
 			celRequesterVariable,
+			celRequestorVariable,
 			celReviewerVariable,
 		); err != nil {
 			return fmt.Errorf("compile approval condition %d: %w", i, err)
@@ -140,6 +143,7 @@ func evaluateApprovalConditions(
 	variables := map[string]any{
 		celRequestVariable:   request,
 		celRequesterVariable: requester,
+		celRequestorVariable: requester,
 		celReviewerVariable:  reviewer,
 	}
 
@@ -151,6 +155,7 @@ func evaluateApprovalConditions(
 			environment.StoredExpressions,
 			celRequestVariable,
 			celRequesterVariable,
+			celRequestorVariable,
 			celReviewerVariable,
 		)
 		if compileErr != nil {

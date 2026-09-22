@@ -23,7 +23,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/ssa"
 )
 
-func exerciseSharedReplicationProtection(global bool, tenantName, baseNamespace, targetNamespace, excludedNamespace string, owner rbac.UserSpec) {
+func exerciseSharedReplicationProtection(global bool, tenantName, baseNamespace, targetNamespace, excludedNamespace string, owner rbac.UserSpec, orphan bool) {
 	ctx := context.Background()
 	const name = "shared-protected"
 	seed := &corev1.ConfigMap{APIVersion: "v1", Kind: "ConfigMap", Name: name, Namespace: targetNamespace, Data: map[string]string{"outside": "retained"}}
@@ -77,13 +77,16 @@ func exerciseSharedReplicationProtection(global bool, tenantName, baseNamespace,
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	}
 	By("assigning protection through skipped policy reconciliation")
-	for _, parent := range parents {
+	for i, parent := range parents {
 		Eventually(func() error {
 			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(parent.object), parent.object); err != nil {
 				return err
 			}
 			parent.spec.Resources[0].Policy.Condition = "false"
 			parent.spec.Resources[0].Policy.Protect = new(true)
+			if orphan && i == 0 {
+				parent.spec.Resources[0].Policy.Deletion = apiruntime.ResourceDeletionPolicyOrphan
+			}
 			return k8sClient.Update(ctx, parent.object)
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		Eventually(func(g Gomega) {
@@ -92,6 +95,7 @@ func exerciseSharedReplicationProtection(global bool, tenantName, baseNamespace,
 			g.Expect(parent.status.ProcessedItems).To(HaveLen(1))
 			g.Expect(parent.status.ProcessedItems[0].Message).To(Equal(ssa.ConditionNotMet))
 			g.Expect(parent.status.ProcessedItems[0].Policy.IsProtected()).To(BeTrue())
+			g.Expect(parent.status.ProcessedItems[0].Policy.ShouldOrphan()).To(Equal(orphan && i == 0))
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	}
 	By("cordoning the surviving parent so it cannot repair incorrect cleanup")
@@ -132,12 +136,19 @@ func exerciseSharedReplicationProtection(global bool, tenantName, baseNamespace,
 	Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cm), cm)).To(Succeed())
 	Expect(cm.Annotations).NotTo(HaveKey("shared-protection"))
 	expectConfigMapData(excludedNamespace, name, map[string]string{"outside": "excluded"})
-	By("removing protection after the final parent leaves while retaining external fields")
+	By("allowing owner writes after the final active parent leaves and retaining orphaned fields")
 	removeParent(survivor)
 	Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cm), cm)).To(Succeed())
-	Expect(cm.Data).To(Equal(map[string]string{"outside": "retained"}))
-	Expect(cm.Labels).NotTo(HaveKey(meta.NewManagedByCapsuleLabel))
-	Expect(cm.Labels).NotTo(HaveKey(meta.ProtectedByCapsuleLabel))
-	Expect(actor.Patch(ctx, cm, client.RawPatch(types.MergePatchType, []byte(`{"metadata":{"annotations":{"shared-protection":"allowed"}}}`)))).To(Succeed())
+	if orphan {
+		// Orphan retains the departing manager's fields and SSA ownership.
+		Expect(cm.Data).To(Equal(map[string]string{"outside": "retained", "shared": "managed"}))
+	} else {
+		Expect(cm.Data).To(Equal(map[string]string{"outside": "retained"}))
+		Expect(cm.Labels).NotTo(HaveKey(meta.NewManagedByCapsuleLabel))
+		Expect(cm.Labels).NotTo(HaveKey(meta.ProtectedByCapsuleLabel))
+	}
+	Eventually(func() error {
+		return actor.Patch(ctx, cm, client.RawPatch(types.MergePatchType, []byte(`{"metadata":{"annotations":{"shared-protection":"allowed"}}}`)))
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	Expect(actor.Delete(ctx, cm)).To(Succeed())
 }
