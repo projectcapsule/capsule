@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	authenticationv1 "k8s.io/api/authentication/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -78,6 +79,7 @@ func BenchmarkReplicationPolicyAdmission(b *testing.B) {
 func replicationAdmissionFixture(t testing.TB, global, protected bool, tenants int) (client.Client, admission.Request) {
 	t.Helper()
 	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
 	if err := capsulev1beta2.AddToScheme(scheme); err != nil {
 		t.Fatal(err)
 	}
@@ -120,9 +122,15 @@ func TestReplicationProtectionWithoutIndexedParent(t *testing.T) {
 				if operation == "remove protection" {
 					req.Object.Raw = []byte(`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"item","namespace":"tenant-a"}}`)
 				}
-				reads, lists := 0, 0
+				reads, lists, namespaceReads := 0, 0, 0
 				c = interceptor.NewClient(c.(client.WithWatch), interceptor.Funcs{
-					Get: func(context.Context, client.WithWatch, client.ObjectKey, client.Object, ...client.GetOption) error {
+					Get: func(_ context.Context, _ client.WithWatch, key client.ObjectKey, obj client.Object, _ ...client.GetOption) error {
+						if ns, ok := obj.(*corev1.Namespace); ok {
+							namespaceReads++
+							require.Equal(t, client.ObjectKey{Name: req.Namespace}, key)
+							ns.Name = key.Name
+							return nil
+						}
 						reads++
 						return errors.New("unexpected read")
 					},
@@ -142,6 +150,11 @@ func TestReplicationProtectionWithoutIndexedParent(t *testing.T) {
 				require.EqualValues(t, 403, response.Result.Code)
 				require.Contains(t, response.Result.Message, "protected by a capsule replication")
 				require.Zero(t, reads)
+				if operation == "delete" {
+					require.Equal(t, 1, namespaceReads)
+				} else {
+					require.Zero(t, namespaceReads)
+				}
 				require.Equal(t, 2, lists)
 			})
 		}

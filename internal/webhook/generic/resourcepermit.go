@@ -36,12 +36,12 @@ func (h *resourcePermitResourceHandler) OnCreate(
 
 func (h *resourcePermitResourceHandler) OnDelete(
 	_ client.Client,
-	_ client.Reader,
+	reader client.Reader,
 	decoder admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(ctx, req, decoder, true)
+		return allowTerminatingNamespaceDeletion(ctx, reader, req, h.handle(ctx, req, decoder, true))
 	}
 }
 

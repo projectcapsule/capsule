@@ -5,6 +5,7 @@ package resourcepermit
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -194,5 +195,62 @@ func TestPermitConditionDoesNotCleanUpUnappliedTargets(t *testing.T) {
 				require.Equal(t, target.Labels, actual.Labels)
 			})
 		}
+	}
+}
+
+func TestPermitConditionCleanupAfterStatusRoundTrip(t *testing.T) {
+	conditions, err := cache.NewCELCache()
+	require.NoError(t, err)
+	mapper := k8smeta.NewDefaultRESTMapper([]schema.GroupVersion{{Version: "v1"}})
+	mapper.Add(corev1.SchemeGroupVersion.WithKind("ConfigMap"), k8smeta.RESTScopeNamespace)
+	permit := &capsulev1beta2.ResourcePermit{Name: "permit", Namespace: "tenant-a", UID: "permit-uid"}
+	permit.Status.Active = &capsulev1beta2.ActivePeriod{}
+	permit.Status.Request = &capsulev1beta2.ResourcePermitStatusRequest{}
+	var existing []client.Object
+	existing = append(existing, &corev1.Namespace{Name: permit.Namespace})
+	for _, tc := range []struct {
+		name, condition string
+		exists          bool
+		orphan          bool
+	}{
+		{"conditional-target", "object == null", false, false},
+		{"existing-remove", "object == null", true, false},
+		{"skipped-target", "false", false, true},
+		{"existing-orphan", "false", true, true},
+		{"unconditional-target", "", false, false},
+	} {
+		target := &corev1.ConfigMap{APIVersion: "v1", Kind: "ConfigMap", Name: tc.name, Data: map[string]string{"value": "rendered"}}
+		policy := apiruntime.ResourceTemplatePolicy{Condition: tc.condition}
+		if tc.orphan {
+			policy.Deletion = apiruntime.ResourceDeletionPolicyOrphan
+		}
+		permit.Status.Request.Resources = append(permit.Status.Request.Resources, apiruntime.RenderedResource{Policy: policy, Targets: []runtime.RawExtension{{Object: target}}})
+		if tc.exists {
+			other := target.DeepCopy()
+			other.Namespace = permit.Namespace
+			other.Data["value"] = "external"
+			existing = append(existing, other)
+		}
+	}
+	c := fake.NewClientBuilder().WithObjects(existing...).WithReturnManagedFields().Build()
+	r := ResourcePermitReconciler{Client: c, resources: ssa.Manager{Mapper: mapper, Conditions: conditions}}
+	require.NoError(t, r.reconcileItems(t.Context(), permit, c))
+	require.Len(t, permit.Status.ProcessedItems, 5)
+	// Controllers read RawExtensions from the API rather than retaining Object.
+	raw, err := json.Marshal(permit)
+	require.NoError(t, err)
+	stored := &capsulev1beta2.ResourcePermit{}
+	require.NoError(t, json.Unmarshal(raw, stored))
+	for range 2 {
+		require.NoError(t, r.pruneItems(t.Context(), stored, c))
+		require.Empty(t, stored.Status.ProcessedItems)
+	}
+	for _, name := range []string{"conditional-target", "unconditional-target", "skipped-target"} {
+		require.True(t, apierrors.IsNotFound(c.Get(t.Context(), client.ObjectKey{Namespace: permit.Namespace, Name: name}, &corev1.ConfigMap{})))
+	}
+	for _, name := range []string{"existing-remove", "existing-orphan"} {
+		actual := &corev1.ConfigMap{}
+		require.NoError(t, c.Get(t.Context(), client.ObjectKey{Namespace: permit.Namespace, Name: name}, actual))
+		require.Equal(t, map[string]string{"value": "external"}, actual.Data)
 	}
 }

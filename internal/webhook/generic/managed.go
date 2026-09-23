@@ -6,9 +6,7 @@ package generic
 import (
 	"context"
 
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -55,8 +53,8 @@ func (h *managedValidatingHandler) OnDelete(
 		// the namespace terminating, allow its garbage collector and finalizers
 		// to remove controller-managed namespaced objects.
 		if req.Namespace != "" {
-			ns := &corev1.Namespace{}
-			if err := c.Get(ctx, types.NamespacedName{Name: req.Namespace}, ns); err != nil {
+			terminating, err := namespaceTerminating(ctx, c, req.Namespace)
+			if err != nil {
 				if apierrors.IsNotFound(err) {
 					return nil
 				}
@@ -64,7 +62,7 @@ func (h *managedValidatingHandler) OnDelete(
 				return ad.ErroredResponse(err)
 			}
 
-			if ns.DeletionTimestamp != nil || ns.Status.Phase == corev1.NamespaceTerminating {
+			if terminating {
 				return nil
 			}
 		}

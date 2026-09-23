@@ -342,10 +342,8 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 		})
 	})
 
-	It("skips applying resources to terminating namespaces and removes them from processedItems", func() {
+	It("skips applying resources to terminating namespaces and removes them from processedItems", Label("protection-termination"), func() {
 		terminatingNamespace := tenantANamespaces[2]
-		releaseNamespace := holdNamespaceTerminating(ctx, terminatingNamespace)
-		defer releaseNamespace()
 
 		gtr := newRawConfigMapGlobalTenantResource("gtr-skip-terminating-namespace", map[string]string{
 			"mode": "active",
@@ -361,20 +359,33 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 			return k8sClient.Create(ctx, gtr)
 		}).Should(Succeed())
 
+		By("establishing protected resources before namespace termination")
+		actor := impersonationClient(tenantAOwner.Name, withDefaultGroups(nil))
+		for _, ns := range tenantANamespaces {
+			expectConfigMapData(ns, "gtr-skip-terminating", map[string]string{"mode": "active"})
+			Eventually(func() error {
+				return actor.Delete(ctx, &corev1.ConfigMap{Name: "gtr-skip-terminating", Namespace: ns}, client.DryRunAll)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(MatchError(ContainSubstring("managed by a global capsule replication")))
+		}
+		releaseNamespace := holdNamespaceTerminating(ctx, terminatingNamespace)
+		defer releaseNamespace()
+
 		By("verifying non-terminating selected namespaces still receive the resource")
 		for _, ns := range tenantANamespaces[:2] {
 			expectConfigMapData(ns, "gtr-skip-terminating", map[string]string{
 				"mode": "active",
 			})
+			Expect(actor.Delete(ctx, &corev1.ConfigMap{Name: "gtr-skip-terminating", Namespace: ns}, client.DryRunAll)).To(MatchError(ContainSubstring("managed by a global capsule replication")))
 		}
 
 		By("verifying the terminating selected namespace is skipped")
-		Consistently(func() error {
-			return k8sClient.Get(ctx, types.NamespacedName{
+		expectConfigMapAbsent(terminatingNamespace, "gtr-skip-terminating")
+		Consistently(func() bool {
+			return apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{
 				Name:      "gtr-skip-terminating",
 				Namespace: terminatingNamespace,
-			}, &corev1.ConfigMap{})
-		}, 2*resyncPeriod.Duration, defaultPollInterval).Should(HaveOccurred())
+			}, &corev1.ConfigMap{}))
+		}, 2*resyncPeriod.Duration, defaultPollInterval).Should(BeTrue())
 
 		By("verifying non-selected tenants do not receive the resource")
 		for _, ns := range tenantBNamespaces {
@@ -388,6 +399,7 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 			g.Expect(k8sClient.Get(ctx, types.NamespacedName{
 				Name: gtr.Name,
 			}, current)).To(Succeed())
+			g.Expect(current.Status.ProcessedItems).To(HaveLen(len(tenantANamespaces) - 1))
 
 			for _, item := range current.Status.ProcessedItems {
 				g.Expect(item.Name).To(Equal("gtr-skip-terminating"))

@@ -264,7 +264,7 @@ rules:
 		})
 	})
 
-	It("skips applying resources to terminating namespaces and removes them from processedItems", func() {
+	It("skips applying resources to terminating namespaces and removes them from processedItems", Label("protection-termination"), func() {
 		terminatingNamespace := targetNamespaces[2]
 
 		tr := &capsulev1beta2.TenantResource{
@@ -306,10 +306,14 @@ rules:
 		)
 
 		By("establishing the resource in every active namespace")
+		actor := impersonationClient(tenantOwner.Name, withDefaultGroups(nil))
 		for _, ns := range targetNamespaces {
 			expectConfigMapData(ns, "tr-skip-terminating", map[string]string{
 				"mode": "active",
 			})
+			Eventually(func() error {
+				return actor.Delete(ctx, &corev1.ConfigMap{Name: "tr-skip-terminating", Namespace: ns}, client.DryRunAll)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(MatchError(ContainSubstring("managed by a tenant capsule replication")))
 		}
 
 		releaseNamespace := holdNamespaceTerminating(ctx, terminatingNamespace)
@@ -342,21 +346,24 @@ rules:
 			expectConfigMapData(ns, "tr-skip-terminating", map[string]string{
 				"mode": "updated",
 			})
+			Eventually(func() error {
+				return actor.Delete(ctx, &corev1.ConfigMap{Name: "tr-skip-terminating", Namespace: ns}, client.DryRunAll)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(MatchError(ContainSubstring("managed by a tenant capsule replication")))
 		}
 
 		By("verifying the terminating namespace is skipped")
-		Eventually(func() error {
-			return k8sClient.Get(ctx, types.NamespacedName{
+		Eventually(func() bool {
+			return apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{
 				Name:      "tr-skip-terminating",
 				Namespace: terminatingNamespace,
-			}, &corev1.ConfigMap{})
-		}, defaultTimeoutInterval, defaultPollInterval).Should(HaveOccurred())
-		Consistently(func() error {
-			return k8sClient.Get(ctx, types.NamespacedName{
+			}, &corev1.ConfigMap{}))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
+		Consistently(func() bool {
+			return apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{
 				Name:      "tr-skip-terminating",
 				Namespace: terminatingNamespace,
-			}, &corev1.ConfigMap{})
-		}, 2*resyncPeriod.Duration, defaultPollInterval).Should(HaveOccurred())
+			}, &corev1.ConfigMap{}))
+		}, 2*resyncPeriod.Duration, defaultPollInterval).Should(BeTrue())
 
 		By("verifying the terminating namespace item is not kept in processedItems")
 		expectTenantResourceProcessedNamespaces(

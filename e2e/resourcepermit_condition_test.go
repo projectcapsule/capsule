@@ -203,9 +203,17 @@ var _ = DescribeTable("ResourcePermit template apply conditions", Label("resourc
 
 	By("pruning applied targets and making no writes to skipped targets on expiration")
 	expireActiveResourcePermit(ctx, request)
-	Eventually(func() bool {
-		return apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(request), &capsulev1beta2.ResourcePermit{}))
-	}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
+	Eventually(func() error {
+		current := &capsulev1beta2.ResourcePermit{}
+		err := k8sClient.Get(ctx, client.ObjectKeyFromObject(request), current)
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("permit still exists: phase=%s keepUntil=%v conditions=%+v processedItems=%+v", current.Status.Phase, current.Status.KeepUntil, current.Status.Conditions, current.Status.ProcessedItems)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	for _, name := range []string{"conditional-target", "unconditional-target", "skipped-target"} {
 		expectConfigMapAbsent(selected, name)
 	}

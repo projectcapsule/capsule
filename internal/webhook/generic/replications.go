@@ -47,7 +47,7 @@ func (h *replicaHandler) OnDelete(
 	_ events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handler(ctx, c, reader, decoder, req)
+		return allowTerminatingNamespaceDeletion(ctx, reader, req, h.handler(ctx, c, reader, decoder, req))
 	}
 }
 
