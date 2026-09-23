@@ -109,7 +109,11 @@ func (m Manager) reconcileSkippedPolicy(ctx context.Context, c client.Client, ex
 		return false, nil
 	}
 
-	patches := m.protectionPatches(existing, opts.Protect, opts.FieldOwner, nil)
+	patches, err := m.protectionPatches(ctx, existing, opts.Protect, opts.FieldOwner, nil)
+	if err != nil {
+		return false, err
+	}
+
 	if len(patches) == 0 {
 		return true, nil
 	}
@@ -165,7 +169,7 @@ func (m Manager) prepareProtection(ctx context.Context, c client.Client, desired
 	return snapshot, nil
 }
 
-func (m Manager) protectionPatches(existing *unstructured.Unstructured, protect bool, fieldOwner string, owners map[string]struct{}) (patches []clt.JSONPatch) {
+func (m Manager) protectionPatches(ctx context.Context, existing *unstructured.Unstructured, protect bool, fieldOwner string, owners map[string]struct{}) (patches []clt.JSONPatch, err error) {
 	labels := existing.GetLabels()
 	annotations := existing.GetAnnotations()
 	annotation := m.Metadata.ProtectedByServiceAccountAnnotation
@@ -186,7 +190,7 @@ func (m Manager) protectionPatches(existing *unstructured.Unstructured, protect 
 			patches = append(patches, clt.AddAnnotationsPatch(annotations, map[string]string{annotation: m.Metadata.ProtectedByServiceAccount})...)
 		}
 
-		return patches
+		return patches, nil
 	}
 
 	if m.Metadata.ProtectedByValue != "" {
@@ -199,15 +203,18 @@ func (m Manager) protectionPatches(existing *unstructured.Unstructured, protect 
 
 	if len(patches) > 0 {
 		if owners == nil {
-			owners = meta.CapsuleResourceFieldOwners(existing)
+			owners, err = m.resourceFieldOwners(ctx, existing, fieldOwner)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		if m.hasOtherProtectionOwners(owners, fieldOwner) {
-			return nil
+			return nil, nil
 		}
 	}
 
-	return patches
+	return patches, nil
 }
 
 func (m Manager) removeProtectionLabels(labels map[string]string) []clt.JSONPatch {

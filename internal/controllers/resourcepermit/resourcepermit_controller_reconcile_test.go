@@ -505,8 +505,9 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 			}
 
 			r := &ResourcePermitReconciler{
-				Client: cl,
-				Log:    ctrl.Log,
+				Client:           cl,
+				ControllerClient: cl,
+				Log:              ctrl.Log,
 			}
 
 			_, err := r.reconcile(context.Background(), ctrl.Log, tt.br)

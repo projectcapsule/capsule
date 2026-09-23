@@ -31,6 +31,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/processor"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
+	"github.com/projectcapsule/capsule/pkg/runtime/ssa"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
 )
 
@@ -95,6 +96,7 @@ func (r *NamespaceTrigger) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.C
 	r.reader = mgr.GetAPIReader()
 
 	r.processor = processor.Processor{
+		ReplicationOwners:            ssa.NewReplicationOwnerResolver(mgr.GetClient(), mgr.GetAPIReader()),
 		Conditions:                   r.conditions,
 		Configuration:                r.configuration,
 		GatherClient:                 mgr.GetAPIReader(),

@@ -78,6 +78,11 @@ func exerciseSharedReplicationProtection(global bool, tenantName, baseNamespace,
 			g.Expect(item.Namespace).To(Equal(targetNamespace))
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	}
+	By("retaining a user field whose manager imitates a replication")
+	actor := impersonationClient(owner.Name, withDefaultGroups([]string{owner.Name}))
+	forged := &corev1.ConfigMap{APIVersion: "v1", Kind: "ConfigMap", Name: name, Namespace: targetNamespace,
+		Data: map[string]string{"forged-owner": "retained"}}
+	Expect(actor.Patch(ctx, forged, client.Apply, client.FieldOwner("2lclct9cwq6mg/"+targetNamespace+"/"+tenantName+"/0/raw-0/"))).To(Succeed())
 	By("assigning protection through skipped policy reconciliation")
 	for i, parent := range parents {
 		Eventually(func() error {
@@ -169,10 +174,9 @@ func exerciseSharedReplicationProtection(global bool, tenantName, baseNamespace,
 	}
 	By("preserving shared tracking and denying owner writes after the first parent leaves")
 	removeParent(parents[0])
-	actor := impersonationClient(owner.Name, withDefaultGroups([]string{owner.Name}))
 	cm := &corev1.ConfigMap{}
 	Expect(k8sClient.Get(ctx, client.ObjectKey{Name: name, Namespace: targetNamespace}, cm)).To(Succeed())
-	Expect(cm.Data).To(Equal(map[string]string{"outside": "retained", "shared": "managed"}))
+	Expect(cm.Data).To(Equal(map[string]string{"outside": "retained", "shared": "managed", "forged-owner": "retained"}))
 	Expect(cm.Labels).To(HaveKeyWithValue(meta.NewManagedByCapsuleLabel, meta.ValueControllerReplications))
 	Expect(cm.Labels).To(HaveKeyWithValue(meta.ProtectedByCapsuleLabel, meta.ValueControllerReplications))
 	err := actor.Patch(ctx, cm, client.RawPatch(types.MergePatchType, []byte(`{"metadata":{"annotations":{"shared-protection":"denied"}}}`)))
@@ -189,12 +193,13 @@ func exerciseSharedReplicationProtection(global bool, tenantName, baseNamespace,
 	Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cm), cm)).To(Succeed())
 	if orphan {
 		// Orphan retains the departing manager's fields and SSA ownership.
-		Expect(cm.Data).To(Equal(map[string]string{"outside": "retained", "shared": "managed"}))
+		Expect(cm.Data).To(Equal(map[string]string{"outside": "retained", "shared": "managed", "forged-owner": "retained"}))
 	} else {
-		Expect(cm.Data).To(Equal(map[string]string{"outside": "retained"}))
-		Expect(cm.Labels).NotTo(HaveKey(meta.NewManagedByCapsuleLabel))
-		Expect(cm.Labels).NotTo(HaveKey(meta.ProtectedByCapsuleLabel))
+		Expect(cm.Data).To(Equal(map[string]string{"outside": "retained", "forged-owner": "retained"}))
 	}
+	Expect(cm.Labels).NotTo(HaveKey(meta.NewManagedByCapsuleLabel))
+	Expect(cm.Labels).NotTo(HaveKey(meta.ProtectedByCapsuleLabel))
+	Expect(cm.Labels).NotTo(HaveKey(meta.ReplicationProtectionLabel))
 	Eventually(func() error {
 		return actor.Patch(ctx, cm, client.RawPatch(types.MergePatchType, []byte(`{"metadata":{"annotations":{"shared-protection":"allowed"}}}`)))
 	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())

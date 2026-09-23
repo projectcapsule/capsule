@@ -41,6 +41,7 @@ func TestProtectionComposesAcrossControllers(t *testing.T) {
 					existing.SetManagedFields(fields)
 					c := fake.NewClientBuilder().WithObjects(existing).WithReturnManagedFields().Build()
 					manager := skippedPolicyManager(t)
+					manager.ReplicationOwners = knownReplicationOwners(replicationOwner)
 					manager.Metadata = Metadata{CreatedByValue: second, ManagedByValue: second, ProtectedByValue: second}
 					if second == meta.ValueControllerResourcePermit {
 						manager.Metadata.ProtectedByServiceAccountAnnotation = meta.ResourcePermitServiceAccountAnnotation

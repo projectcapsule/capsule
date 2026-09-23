@@ -11,9 +11,11 @@ import (
 	celruntime "github.com/projectcapsule/capsule/pkg/runtime/cel"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
+	"github.com/projectcapsule/capsule/pkg/runtime/ssa"
 )
 
 type Processor struct {
+	ReplicationOwners            ssa.ReplicationOwnerResolver
 	Conditions                   celruntime.ResourceConditionCompiler
 	Configuration                configuration.Configuration
 	AllowCrossNamespaceSelection bool

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -168,6 +169,7 @@ func BenchmarkPermitPolicyStatus(b *testing.B) {
 							return c.Patch(ctx, obj, patch, opts...)
 						},
 					})
+					r.ControllerClient = c
 					for _, permit := range permits {
 						require.NoError(b, r.reconcileItems(b.Context(), permit, c))
 					}
@@ -176,7 +178,11 @@ func BenchmarkPermitPolicyStatus(b *testing.B) {
 					b.ResetTimer()
 					for range b.N {
 						for _, permit := range permits {
-							if err := r.reconcileItems(b.Context(), permit, c); err != nil {
+							execution, err := r.resourceClient(b.Context(), logr.Discard(), permit, nil)
+							if err != nil {
+								b.Fatal(err)
+							}
+							if err := r.reconcileItems(b.Context(), permit, execution); err != nil {
 								b.Fatal(err)
 							}
 							if len(permit.Status.ProcessedItems) != targets {

@@ -954,6 +954,7 @@ func main() {
 	}
 
 	if err = (&resourcepermitcontroller.ResourcePermitReconciler{
+		ControllerClient:   directClient,
 		Log:                ctrl.Log.WithName("capsule.ctrl").WithName("resourcepermit"),
 		Metrics:            *metrics.MustMakeResourcePermitsRecorder(),
 		Configuration:      cfg,

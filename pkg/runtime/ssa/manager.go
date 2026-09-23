@@ -38,10 +38,11 @@ type Metadata struct {
 
 // Manager applies and prunes resources with server-side apply.
 type Manager struct {
-	Reader     client.Reader
-	Mapper     k8smeta.RESTMapper
-	Metadata   Metadata
-	Conditions celruntime.ResourceConditionCompiler
+	Reader            client.Reader
+	Mapper            k8smeta.RESTMapper
+	Metadata          Metadata
+	Conditions        celruntime.ResourceConditionCompiler
+	ReplicationOwners ReplicationOwnerResolver
 }
 
 // ApplyOptions configures one server-side apply operation.
@@ -219,14 +220,11 @@ func (m Manager) Apply(
 	metadataOptions := opts
 	metadataOptions.PreviouslyCreated = created
 
-	patches, created, err := m.managedMetadataPatches(ctx, c, desired, metadataOptions, actual)
+	patches, created, err := m.appliedMetadataPatches(ctx, c, desired, metadataOptions, actual)
 	if err != nil {
 		return ApplyResult{Created: created, LastApply: lastApply}, err
 	}
 
-	// A previous skipped apply may have assigned protection to the lifecycle
-	// manager. Omitting it from this manager's SSA payload cannot remove it.
-	patches = append(patches, m.protectionPatches(actual, opts.Protect, opts.FieldOwner, nil)...)
 	if len(patches) > 0 {
 		patches = append([]clt.JSONPatch{{Operation: "test", Path: "/metadata/resourceVersion", Value: actual.GetResourceVersion()}}, patches...)
 	}
@@ -333,7 +331,10 @@ func (m Manager) Disown(
 		return err
 	}
 
-	owners := meta.CapsuleResourceFieldOwners(actual)
+	owners, err := m.resourceFieldOwners(ctx, actual, fieldOwner)
+	if err != nil {
+		return err
+	}
 
 	patches := clt.RemoveOwnerReferencePatch(actual.GetOwnerReferences(), ownerReference)
 	if value, ok := actual.GetLabels()[meta.NewManagedByCapsuleLabel]; ok && value == m.Metadata.ManagedByValue && !hasOtherResourceOwners(owners, fieldOwner) {
@@ -343,7 +344,12 @@ func (m Manager) Disown(
 	}
 	// Protection is composed per controller, independently of shared tracking.
 	// A skipped apply can leave it owned by the lifecycle manager after pruning.
-	patches = append(patches, m.protectionPatches(actual, false, fieldOwner, owners)...)
+	protection, err := m.protectionPatches(ctx, actual, false, fieldOwner, owners)
+	if err != nil {
+		return err
+	}
+
+	patches = append(patches, protection...)
 
 	if len(patches) > 0 {
 		// Another resource manager may have acquired the target since the read.
@@ -391,14 +397,22 @@ func (m Manager) Orphan(
 		return err
 	}
 
-	owners := meta.CapsuleResourceFieldOwners(actual)
+	owners, err := m.resourceFieldOwners(ctx, actual, fieldOwner)
+	if err != nil {
+		return err
+	}
 
 	patches := clt.RemoveOwnerReferencePatch(actual.GetOwnerReferences(), ownerReference)
 	if !hasOtherResourceOwners(owners, fieldOwner) {
 		patches = append(patches, m.orphanMetadataPatches(actual)...)
 	}
 
-	patches = append(patches, m.protectionPatches(actual, false, fieldOwner, owners)...)
+	protection, err := m.protectionPatches(ctx, actual, false, fieldOwner, owners)
+	if err != nil {
+		return err
+	}
+
+	patches = append(patches, protection...)
 
 	if len(patches) > 0 {
 		// Ownership may have changed since the read. Reconcile again instead
@@ -437,6 +451,23 @@ func (m Manager) ResolveResourceID(
 	}
 
 	return gvk.NewResourceID(scoped, tenant, origin), clusterScoped, nil
+}
+
+// Combine lifecycle patches from the post-apply snapshot without another read.
+func (m Manager) appliedMetadataPatches(ctx context.Context, c client.Client, desired *unstructured.Unstructured, opts ApplyOptions, actual *unstructured.Unstructured) ([]clt.JSONPatch, bool, error) {
+	patches, created, err := m.managedMetadataPatches(ctx, c, desired, opts, actual)
+	if err != nil {
+		return nil, created, err
+	}
+
+	// A previous skipped apply may have assigned protection to the lifecycle
+	// manager. Omitting it from this manager's SSA payload cannot remove it.
+	protection, err := m.protectionPatches(ctx, actual, opts.Protect, opts.FieldOwner, nil)
+	if err != nil {
+		return nil, created, err
+	}
+
+	return append(patches, protection...), created, nil
 }
 
 func (m Manager) orphanMetadataPatches(actual *unstructured.Unstructured) (patches []clt.JSONPatch) {

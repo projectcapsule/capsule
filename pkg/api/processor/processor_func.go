@@ -459,9 +459,10 @@ func (p *Processor) Prune(
 
 func (p *Processor) resourceManager() ssa.Manager {
 	return ssa.Manager{
-		Conditions: p.Conditions,
-		Reader:     p.GatherClient,
-		Mapper:     p.Mapper,
+		ReplicationOwners: p.ReplicationOwners,
+		Conditions:        p.Conditions,
+		Reader:            p.GatherClient,
+		Mapper:            p.Mapper,
 		Metadata: ssa.Metadata{
 			CreatedByValue:     meta.ValueControllerReplications,
 			ManagedByValue:     meta.ValueControllerReplications,

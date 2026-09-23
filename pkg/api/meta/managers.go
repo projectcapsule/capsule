@@ -69,29 +69,28 @@ func CapsuleFieldOwners(obj *unstructured.Unstructured, prefix string) map[strin
 	return out
 }
 
-// CapsuleResourceFieldOwners includes permit managers and the established
-// replication format: <base36 parent hash>/<namespace>/<tenant>/<origin>/.
-// Keep recognizing these names without migrating existing SSA ownership.
-func CapsuleResourceFieldOwners(obj *unstructured.Unstructured) map[string]struct{} {
-	owners := map[string]struct{}{}
-	if obj == nil {
-		return owners
+// ReplicationFieldOwnerPrefix preserves the established parent identity used by
+// replication SSA managers, including managers created before policy support.
+func ReplicationFieldOwnerPrefix(name, namespace string) string {
+	if namespace == "" {
+		namespace = "Cluster"
 	}
 
-	for _, field := range obj.GetManagedFields() {
-		if strings.HasPrefix(field.Manager, ResourceFieldOwner("")) {
-			owners[field.Manager] = struct{}{}
+	hash := fnv.New64a()
+	_, _ = hash.Write([]byte(namespace))
+	_, _ = hash.Write([]byte{0})
+	_, _ = hash.Write([]byte(name))
 
-			continue
-		}
+	return strconv.FormatUint(hash.Sum64(), 36)
+}
 
-		parts := strings.SplitN(field.Manager, "/", 4)
-		if len(parts) != 4 || len(parts[3]) < 2 || !strings.HasSuffix(parts[3], "/") {
-			continue
-		}
+// CapsuleResourceFieldOwners includes established replication managers only
+// when they match a known processed item. Manager names alone are user input.
+func CapsuleResourceFieldOwners(fields []metav1.ManagedFieldsEntry, replicationOwners map[string]struct{}) map[string]struct{} {
+	owners := map[string]struct{}{}
 
-		hash, err := strconv.ParseUint(parts[0], 36, 64)
-		if err == nil && strconv.FormatUint(hash, 36) == parts[0] {
+	for _, field := range fields {
+		if _, known := replicationOwners[field.Manager]; known || strings.HasPrefix(field.Manager, ResourceFieldOwner("")) {
 			owners[field.Manager] = struct{}{}
 		}
 	}

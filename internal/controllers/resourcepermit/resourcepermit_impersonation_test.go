@@ -8,12 +8,15 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
@@ -167,7 +170,8 @@ func TestResourceClientPinsControllerIdentityWithoutImpersonation(t *testing.T) 
 	t.Setenv(configuration.EnvironmentControllerNamespace, "capsule-system")
 
 	base := fake.NewClientBuilder().Build()
-	r := &ResourcePermitReconciler{Client: base}
+	direct := fake.NewClientBuilder().Build()
+	r := &ResourcePermitReconciler{Client: base, ControllerClient: direct}
 
 	for _, tt := range []struct {
 		name     string
@@ -182,8 +186,8 @@ func TestResourceClientPinsControllerIdentityWithoutImpersonation(t *testing.T) 
 			if err != nil {
 				t.Fatalf("resourceClient() error = %v", err)
 			}
-			if got != base {
-				t.Fatalf("resourceClient() = %T, want controller client", got)
+			if got != direct {
+				t.Fatalf("resourceClient() = %T, want uncached controller client", got)
 			}
 			if br.Status.Request.Impersonation == nil {
 				t.Fatal("controller ServiceAccount was not posted to ResourcePermit status")
@@ -263,4 +267,46 @@ func TestTemplateContextUsesImpersonatedClient(t *testing.T) {
 	if err != nil || !found || data["value"] != "loaded-with-template-client" {
 		t.Fatalf("rendered data = %#v, found=%v, error=%v", data, found, err)
 	}
+}
+
+func TestControllerResourceClientReadsAppliedTarget(t *testing.T) {
+	t.Setenv(configuration.EnvironmentServiceaccountName, "capsule-controller")
+	t.Setenv(configuration.EnvironmentControllerNamespace, "capsule-system")
+	r, permits, direct := permitPolicyStatusFixture(t, 2, 1, "")
+	permit := permits[0]
+	permit.Status.Request.Resources[0].Policy.Protect = new(true)
+	snapshot := &unstructured.Unstructured{}
+	snapshot.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ConfigMap"))
+	require.NoError(t, direct.Get(t.Context(), client.ObjectKey{Namespace: permit.Namespace, Name: "target-0"}, snapshot))
+	cachedReads := 0
+	r.Client = interceptor.NewClient(direct, interceptor.Funcs{
+		Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+			cachedReads++
+			if target, ok := obj.(*unstructured.Unstructured); ok {
+				// A manager-cache read can still hold the pre-apply version.
+				snapshot.DeepCopyInto(target)
+				return nil
+			}
+			return c.Get(ctx, key, obj, opts...)
+		},
+	})
+	r.ControllerClient = direct
+	execution, err := r.resourceClient(t.Context(), logr.Discard(), permit, nil)
+	require.NoError(t, err)
+	require.NoError(t, r.reconcileItems(t.Context(), permit, execution))
+	require.Zero(t, cachedReads, "SSA execution must not read snapshots from the manager cache")
+	require.False(t, permit.Status.ProcessedItems[0].LastApply.IsZero())
+	require.True(t, permit.Status.ProcessedItems[0].Policy.IsProtected())
+	target := &corev1.ConfigMap{}
+	require.NoError(t, direct.Get(t.Context(), client.ObjectKeyFromObject(snapshot), target))
+	require.Equal(t, meta.ValueTrue, target.Labels[meta.ResourcePermitProtectionLabel])
+	require.Equal(t, "system:serviceaccount:capsule-system:capsule-controller", target.Annotations[meta.ResourcePermitServiceAccountAnnotation])
+	require.NoError(t, direct.Get(t.Context(), client.ObjectKey{Namespace: permits[1].Namespace, Name: "target-0"}, target))
+	require.NotContains(t, target.Labels, meta.ResourcePermitProtectionLabel)
+}
+
+func TestControllerResourceClientRequiresDirectClient(t *testing.T) {
+	r := &ResourcePermitReconciler{Client: fake.NewClientBuilder().Build()}
+	_, err := r.resourceClient(t.Context(), logr.Discard(), &capsulev1beta2.ResourcePermit{}, nil)
+	require.ErrorContains(t, err, "direct controller resource client is not configured")
 }

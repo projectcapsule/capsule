@@ -12,7 +12,7 @@ import (
 )
 
 func TestCapsuleResourceFieldOwners(t *testing.T) {
-	require.Empty(t, CapsuleResourceFieldOwners(nil))
+	require.Empty(t, CapsuleResourceFieldOwners(nil, nil))
 	for _, tc := range []struct {
 		manager string
 		owned   bool
@@ -35,7 +35,11 @@ func TestCapsuleResourceFieldOwners(t *testing.T) {
 		t.Run(tc.manager, func(t *testing.T) {
 			obj := &unstructured.Unstructured{}
 			obj.SetManagedFields([]metav1.ManagedFieldsEntry{{Manager: tc.manager}, {Manager: tc.manager}})
-			owners := CapsuleResourceFieldOwners(obj)
+			known := map[string]struct{}{}
+			if tc.owned {
+				known[tc.manager] = struct{}{}
+			}
+			owners := CapsuleResourceFieldOwners(obj.GetManagedFields(), known)
 			_, found := owners[tc.manager]
 			require.Equal(t, tc.owned, found)
 			if tc.owned {
@@ -45,4 +49,21 @@ func TestCapsuleResourceFieldOwners(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCapsuleResourceFieldOwnersRejectsUnknownReplications(t *testing.T) {
+	obj := &unstructured.Unstructured{}
+	obj.SetManagedFields([]metav1.ManagedFieldsEntry{
+		{Manager: "2lclct9cwq6mg/target/tenant-a/0/raw-0/"},
+		{Manager: "2lclct9cwq6mg/target/tenant-b/0/raw-0/"},
+	})
+	require.Empty(t, CapsuleResourceFieldOwners(obj.GetManagedFields(), nil))
+	known := map[string]struct{}{"2lclct9cwq6mg/target/tenant-a/0/raw-0/": {}}
+	require.Equal(t, known, CapsuleResourceFieldOwners(obj.GetManagedFields(), known))
+}
+
+func TestReplicationFieldOwnerPrefixCompatibility(t *testing.T) {
+	require.Equal(t, "3bzzrpaonu5zb", ReplicationFieldOwnerPrefix("replication", ""))
+	require.Equal(t, "2elz2dfz41umt", ReplicationFieldOwnerPrefix("replication", "tenant-a"))
+	require.Equal(t, "2883zttmw7ldw", ReplicationFieldOwnerPrefix("replication", "tenant-b"))
 }

@@ -76,7 +76,12 @@ func exerciseMixedProtection(global bool, tenantName, baseNamespace, targetNames
 	permit := &capsulev1beta2.ResourcePermit{Name: name, Namespace: targetNamespace, Spec: capsulev1beta2.ResourcePermitSpec{Template: capsulev1beta2.ResourcePermitTemplateReference{Kind: capsulev1beta2.GlobalResourcePermitTemplateKind, Name: name}}}
 	Expect(actor.Create(ctx, permit)).To(Succeed())
 	DeferCleanup(func() { cleanupLifecycleResourcePermit(ctx, permit) })
-	waitForResourcePermitPhase(ctx, permit, capsulev1beta2.ResourcePermitPhaseActive)
+	permit = waitForResourcePermitPhase(ctx, permit, capsulev1beta2.ResourcePermitPhaseActive)
+	// The controller identity must observe its completed SSA write, just as an
+	// impersonated execution client does, before publishing lifecycle status.
+	Expect(permit.Status.ProcessedItems).To(HaveLen(1))
+	Expect(permit.Status.ProcessedItems[0].LastApply.IsZero()).To(BeFalse())
+	Expect(permit.Status.ProcessedItems[0].Policy.IsProtected()).To(BeTrue())
 	By("enabling replication protection on a target already protected by a permit")
 	setProtection := func(protect, cordoned bool) {
 		Eventually(func() error {

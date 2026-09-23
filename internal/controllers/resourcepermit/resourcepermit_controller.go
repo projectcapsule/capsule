@@ -105,6 +105,9 @@ func setReconcileReady(br *capsulev1beta2.ResourcePermit, err error) {
 type ResourcePermitReconciler struct {
 	client.Client
 
+	// ControllerClient executes resources with uncached reads under the controller identity.
+	ControllerClient client.Client
+
 	Metrics   metrics.ResourcePermitsRecorder
 	recorder  evt.EventRecorder
 	Log       logr.Logger
@@ -130,9 +133,10 @@ func (r *ResourcePermitReconciler) SetupWithManager(mgr ctrl.Manager, _ utils.Co
 	}
 
 	r.resources = ssa.Manager{
-		Conditions: r.Conditions,
-		Reader:     mgr.GetAPIReader(),
-		Mapper:     mgr.GetRESTMapper(),
+		ReplicationOwners: ssa.NewReplicationOwnerResolver(mgr.GetClient(), mgr.GetAPIReader()),
+		Conditions:        r.Conditions,
+		Reader:            mgr.GetAPIReader(),
+		Mapper:            mgr.GetRESTMapper(),
 		Metadata: ssa.Metadata{
 			CreatedByValue:                      meta.ValueControllerResourcePermit,
 			ManagedByValue:                      meta.ValueControllerResourcePermit,
@@ -1396,7 +1400,11 @@ func (r *ResourcePermitReconciler) resourceClient(
 	controllerName, controllerNamespace := configuration.ControllerServiceAccount()
 	if serviceAccount.Name.String() == controllerName &&
 		serviceAccount.Namespace.String() == controllerNamespace {
-		return r.Client, nil
+		if r.ControllerClient == nil {
+			return nil, errors.New("direct controller resource client is not configured")
+		}
+
+		return r.ControllerClient, nil
 	}
 
 	if r.ImpersonationCache == nil {

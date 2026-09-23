@@ -191,6 +191,7 @@ func TestDisownPreservesSharedProtection(t *testing.T) {
 			existing.SetLabels(labels)
 			c := fake.NewClientBuilder().WithObjects(existing).WithReturnManagedFields().Build()
 			m := skippedPolicyManager(t)
+			m.ReplicationOwners = knownReplicationOwners(remaining)
 			require.NoError(t, m.Disown(t.Context(), c, existing, testFieldOwner, nil))
 			actual := configMap("guarded", nil)
 			require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(existing), actual))
@@ -221,6 +222,7 @@ func TestApplyRemovesProtectionFromPreviousSkip(t *testing.T) {
 				}
 				c := fake.NewClientBuilder().WithObjects(existing).WithReturnManagedFields().Build()
 				m := skippedPolicyManager(t)
+				m.ReplicationOwners = knownReplicationOwners("2lclct9cwq6mg/default/tenant-a/0/raw-0/")
 				opts := ApplyOptions{FieldOwner: testFieldOwner, Condition: "false", Protect: true, Adopt: true}
 				result, err := m.Apply(t.Context(), c, existing, opts)
 				require.NoError(t, err)
@@ -300,6 +302,7 @@ func TestOrphanPreservesSharedProtection(t *testing.T) {
 			existing.SetManagedFields(append(fields, *remaining))
 			c := fake.NewClientBuilder().WithObjects(existing).WithReturnManagedFields().Build()
 			m := skippedPolicyManager(t)
+			m.ReplicationOwners = knownReplicationOwners(peer)
 			require.NoError(t, m.Orphan(t.Context(), c, existing, testFieldOwner, nil))
 			actual := configMap("guarded", nil)
 			require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(existing), actual))
@@ -356,6 +359,11 @@ func BenchmarkProtectionCleanup(b *testing.B) {
 		for _, peers := range []int{0, 16} {
 			b.Run(fmt.Sprintf("%s/peers=%d", operation, peers), func(b *testing.B) {
 				m := skippedPolicyManager(b)
+				known := make([]string, 0, peers)
+				for i := range peers {
+					known = append(known, fmt.Sprintf("%d/default/tenant-a/0/raw-0/", i+1))
+				}
+				m.ReplicationOwners = knownReplicationOwners(known...)
 				// Warm the shared condition compiler outside the timed operation.
 				warmClient := fake.NewClientBuilder().Build()
 				_, err := m.Apply(b.Context(), warmClient, configMap("warm", nil), ApplyOptions{FieldOwner: testFieldOwner, Condition: "false"})
