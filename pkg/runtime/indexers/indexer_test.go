@@ -7,10 +7,10 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"reflect"
 	"testing"
 
 	"github.com/go-logr/logr"
-	"github.com/projectcapsule/capsule/pkg/runtime/indexers"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
@@ -24,6 +24,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/conversion"
+
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/runtime/indexers"
+	"github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
 )
 
 func TestAddToManagerRegistersIndexers(t *testing.T) {
@@ -35,11 +39,12 @@ func TestAddToManagerRegistersIndexers(t *testing.T) {
 		t.Fatalf("AddToManager() unexpected error: %v", err)
 	}
 
-	if got, want := len(mgr.indexer.calls), 23; got != want {
-		t.Fatalf("registered indexers = %d, want %d", got, want)
-	}
-
 	fields := map[string]bool{}
+	type registration struct {
+		object reflect.Type
+		field  string
+	}
+	registrations := map[registration]bool{}
 	for _, call := range mgr.indexer.calls {
 		if call.object == nil {
 			t.Fatalf("registered nil object for field %q", call.field)
@@ -51,6 +56,11 @@ func TestAddToManagerRegistersIndexers(t *testing.T) {
 			t.Fatalf("registered nil indexer func for field %q", call.field)
 		}
 		fields[call.field] = true
+		key := registration{reflect.TypeOf(call.object), call.field}
+		if registrations[key] {
+			t.Fatalf("duplicate index registration %v", key)
+		}
+		registrations[key] = true
 	}
 
 	for _, field := range []string{
@@ -64,6 +74,14 @@ func TestAddToManagerRegistersIndexers(t *testing.T) {
 	} {
 		if !fields[field] {
 			t.Fatalf("expected field %q to be registered; got %#v", field, fields)
+		}
+	}
+	for _, obj := range []client.Object{&capsulev1beta2.TenantResource{}, &capsulev1beta2.GlobalTenantResource{}} {
+		for _, field := range []string{tenantresource.ProtectedIndexerFieldName, tenantresource.FieldOwnerIndexerFieldName} {
+			key := registration{reflect.TypeOf(obj), field}
+			if !registrations[key] {
+				t.Errorf("missing replication index %v", key)
+			}
 		}
 	}
 }

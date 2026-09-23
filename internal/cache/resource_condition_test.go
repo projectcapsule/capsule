@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/apiserver/pkg/cel/environment"
 
 	celruntime "github.com/projectcapsule/capsule/pkg/runtime/cel"
@@ -103,6 +104,71 @@ func TestResourceConditionConcurrentMiss(t *testing.T) {
 	}
 }
 
+func TestCELCacheReset(t *testing.T) {
+	c, err := NewCELCache()
+	require.NoError(t, err)
+	for _, mode := range []environment.Type{environment.NewExpressions, environment.StoredExpressions} {
+		_, err = c.GetOrCompileBoolean("true", mode)
+		require.NoError(t, err)
+		_, err = c.GetOrCompileQuantity(`quantity('1')`, mode)
+		require.NoError(t, err)
+		_, err = c.GetOrCompileResourceCondition("object == null", mode)
+		require.NoError(t, err)
+	}
+	require.Equal(t, 6, c.Stats())
+	old, err := c.GetOrCompileResourceCondition("object == null", environment.StoredExpressions)
+	require.NoError(t, err)
+	c.Reset()
+	require.Zero(t, c.Stats())
+	// In-flight evaluations retain immutable programs after the cache retires them.
+	allowed, err := old.EvaluateBooleanWithVariables(t.Context(), map[string]any{"object": nil})
+	require.NoError(t, err)
+	require.True(t, allowed)
+	next, err := c.GetOrCompileResourceCondition("object == null", environment.StoredExpressions)
+	require.NoError(t, err)
+	require.NotSame(t, old, next)
+	for i := 1; i < maxResourceConditions; i++ {
+		_, err = c.GetOrCompileResourceCondition(fmt.Sprintf("object == null || %d == 0", i), environment.StoredExpressions)
+		require.NoError(t, err)
+	}
+	require.Equal(t, maxResourceConditions, c.Stats(), "reset must also clear resource-condition accounting")
+	c.Reset()
+	c.Reset()
+	require.Zero(t, c.Stats())
+	(*CELCache)(nil).Reset()
+}
+
+func TestCELCacheConcurrentReset(t *testing.T) {
+	c, err := NewCELCache()
+	require.NoError(t, err)
+	var wg sync.WaitGroup
+	for worker := range 8 {
+		wg.Go(func() {
+			for range 20 {
+				compiled, err := c.GetOrCompileResourceCondition(`object.metadata.namespace == 'tenant-a'`, environment.StoredExpressions)
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				c.Reset()
+				namespace := "tenant-a"
+				if worker%2 != 0 {
+					namespace = "tenant-b"
+				}
+				allowed, err := compiled.EvaluateBooleanWithVariables(t.Context(), map[string]any{
+					"object": map[string]any{"metadata": map[string]any{"namespace": namespace}},
+				})
+				if err != nil || allowed != (worker%2 == 0) {
+					t.Errorf("namespace %s: allowed=%v, error=%v", namespace, allowed, err)
+				}
+			}
+		})
+	}
+	wg.Wait()
+	c.Reset()
+	require.Zero(t, c.Stats())
+}
+
 func BenchmarkResourceCondition(b *testing.B) {
 	c, err := NewCELCache()
 	if err != nil {
@@ -134,6 +200,30 @@ func BenchmarkResourceCondition(b *testing.B) {
 		b.ReportAllocs()
 		b.RunParallel(func(pb *testing.PB) {
 			for pb.Next() {
+				if _, err := c.GetOrCompileResourceCondition(expression, environment.StoredExpressions); err != nil {
+					b.Error(err)
+				}
+			}
+		})
+	})
+	b.Run("reset-cache", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			c.Reset()
+			if _, err := c.GetOrCompileResourceCondition(expression, environment.StoredExpressions); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+	b.Run("parallel-reset", func(b *testing.B) {
+		b.ReportAllocs()
+		b.RunParallel(func(pb *testing.PB) {
+			calls := 0
+			for pb.Next() {
+				if calls%128 == 0 {
+					c.Reset()
+				}
+				calls++
 				if _, err := c.GetOrCompileResourceCondition(expression, environment.StoredExpressions); err != nil {
 					b.Error(err)
 				}

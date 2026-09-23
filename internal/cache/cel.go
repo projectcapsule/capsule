@@ -100,6 +100,19 @@ func (c *CELCache) Stats() int {
 	return len(c.data)
 }
 
+// Reset retires cached programs without changing programs already in use.
+func (c *CELCache) Reset() {
+	if c == nil {
+		return
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.data = make(map[celCacheKey]*celruntime.CompiledExpression)
+	c.resourceConditions = 0
+}
+
 func (c *CELCache) getOrCompile(
 	expression string,
 	resultType celruntime.ResultType,

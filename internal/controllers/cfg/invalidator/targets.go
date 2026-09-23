@@ -27,10 +27,14 @@ func (r *CacheInvalidator) rebuildTargetsCache(ctx context.Context, log logr.Log
 
 	log.V(5).Info("rebuilding custom quota targets cache",
 		"targetsBefore", r.TargetsCache.Stats(),
+		"celBefore", r.CELCache.Stats(),
 		"customQuotas", len(customQuotas.Items),
 		"globalCustomQuotas", len(globalCustomQuotas.Items),
 	)
 
+	// Retire unused CEL programs before warming the active quota expressions.
+	// Resource-policy conditions are compiled on demand in the same shared cache.
+	r.CELCache.Reset()
 	r.TargetsCache.Reset()
 
 	targetsByKey := make(map[string][]capsulev1beta2.CustomQuotaStatusTarget, len(customQuotas.Items)+len(globalCustomQuotas.Items))
@@ -57,6 +61,7 @@ func (r *CacheInvalidator) rebuildTargetsCache(ctx context.Context, log logr.Log
 	log.V(5).Info("rebuilt custom quota targets cache",
 		"targets", len(targetsByKey),
 		"targetsAfter", r.TargetsCache.Stats(),
+		"celAfter", r.CELCache.Stats(),
 	)
 
 	return nil

@@ -5,7 +5,9 @@ package generic
 
 import (
 	"context"
+	"slices"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -41,30 +43,31 @@ func (h *replicaHandler) OnCreate(
 func (h *replicaHandler) OnDelete(
 	c client.Client,
 	reader client.Reader,
-	_ admission.Decoder,
-	recorder events.EventRecorder,
+	decoder admission.Decoder,
+	_ events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handler(ctx, c, req, recorder)
+		return h.handler(ctx, c, reader, decoder, req)
 	}
 }
 
 func (h *replicaHandler) OnUpdate(
 	c client.Client,
-	_ client.Reader,
-	_ admission.Decoder,
-	recorder events.EventRecorder,
+	reader client.Reader,
+	decoder admission.Decoder,
+	_ events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handler(ctx, c, req, recorder)
+		return h.handler(ctx, c, reader, decoder, req)
 	}
 }
 
 func (h *replicaHandler) handler(
 	ctx context.Context,
 	c client.Client,
+	reader client.Reader,
+	decoder admission.Decoder,
 	req admission.Request,
-	recorder events.EventRecorder,
 ) *admission.Response {
 	// Replicated objects are applied with the replication's impersonated client,
 	// but controllers reconcile their own metadata, finalizers, and status with
@@ -98,7 +101,16 @@ func (h *replicaHandler) handler(
 
 	if len(global.Items) > 0 {
 		for i := range global.Items {
-			if isAllowedServiceAccount(req.UserInfo.Username, global.Items[i].Status.ServiceAccount) {
+			if !isAllowedServiceAccount(req.UserInfo.Username, global.Items[i].Status.ServiceAccount) {
+				continue
+			}
+
+			allowed, err := replicationServiceAccountAllowed(ctx, reader, &global.Items[i], gvkKey, req.UserInfo.Username)
+			if err != nil {
+				return ad.ErroredResponse(err)
+			}
+
+			if allowed {
 				return nil
 			}
 		}
@@ -123,7 +135,16 @@ func (h *replicaHandler) handler(
 
 	if len(local.Items) > 0 {
 		for i := range local.Items {
-			if isAllowedServiceAccount(req.UserInfo.Username, local.Items[i].Status.ServiceAccount) {
+			if !isAllowedServiceAccount(req.UserInfo.Username, local.Items[i].Status.ServiceAccount) {
+				continue
+			}
+
+			allowed, err := replicationServiceAccountAllowed(ctx, reader, &local.Items[i], gvkKey, req.UserInfo.Username)
+			if err != nil {
+				return ad.ErroredResponse(err)
+			}
+
+			if allowed {
 				return nil
 			}
 		}
@@ -136,7 +157,44 @@ func (h *replicaHandler) handler(
 		)
 	}
 
+	// Protection is written to the target before its parent's status and cache
+	// index catch up. The API server's old object closes that window, including
+	// attempts to remove the marker in the same update. An unknown owner must
+	// retry after the index catches up; an empty index cannot authorize a write.
+	old := &metav1.PartialObjectMetadata{}
+	if err := decoder.DecodeRaw(req.OldObject, old); err != nil {
+		return ad.ErroredResponse(err)
+	}
+
+	if old.Labels[meta.ReplicationProtectionLabel] == meta.ValueTrue ||
+		old.Labels[meta.ProtectedByCapsuleLabel] == meta.ValueControllerReplications {
+		return ad.Denyf("resource %s is protected by a capsule replication; its managing parent is not yet available", req.Name)
+	}
+
 	return nil
+}
+
+// The status index only selects candidates. Verify an authorization against
+// the current parent identity, target policy, and ServiceAccount before allowing.
+func replicationServiceAccountAllowed(ctx context.Context, reader client.Reader, parent client.Object, targetKey, username string) (bool, error) {
+	uid := parent.GetUID()
+
+	if err := reader.Get(ctx, client.ObjectKeyFromObject(parent), parent); err != nil {
+		return false, client.IgnoreNotFound(err)
+	}
+
+	if parent.GetUID() != uid || !slices.Contains((tenantresource.ProtectedItems{}).Func()(parent), targetKey) {
+		return false, nil
+	}
+
+	switch parent := parent.(type) {
+	case *capsulev1beta2.GlobalTenantResource:
+		return isAllowedServiceAccount(username, parent.Status.ServiceAccount), nil
+	case *capsulev1beta2.TenantResource:
+		return isAllowedServiceAccount(username, parent.Status.ServiceAccount), nil
+	}
+
+	return false, nil
 }
 
 func isAllowedServiceAccount(username string, sa *meta.NamespacedRFC1123ObjectReferenceWithNamespace) bool {

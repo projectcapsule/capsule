@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -143,6 +144,39 @@ func exerciseSharedReplicationProtection(global bool, tenantName, baseNamespace,
 		Expect(sa).NotTo(BeNil())
 		runner := impersonationClient(serviceAccountUsername(sa.Namespace.String(), sa.Name.String()), serviceAccountGroups(sa.Namespace.String()))
 		ownerClient := impersonationClient(owner.Name, withDefaultGroups([]string{owner.Name}))
+		By("denying target changes while protection is absent from parent status")
+		restore := make([]func(), 0, len(parents))
+		for _, parent := range parents {
+			patch, err := json.Marshal(map[string]any{"status": map[string]any{"processedItems": parent.status.ProcessedItems}})
+			Expect(err).NotTo(HaveOccurred())
+			restored := false
+			restoreParent := func() {
+				if !restored {
+					Expect(k8sClient.Status().Patch(ctx, parent.object, client.RawPatch(types.MergePatchType, patch))).To(Succeed())
+					restored = true
+				}
+			}
+			DeferCleanup(restoreParent)
+			restore = append(restore, restoreParent)
+			Expect(k8sClient.Status().Patch(ctx, parent.object, client.RawPatch(types.MergePatchType, []byte(`{"status":{"processedItems":[]}}`)))).To(Succeed())
+		}
+		// Wait for the missing-parent denial so this tests the real cache after
+		// both indexed entries have disappeared, not just stale positive entries.
+		Eventually(func() error {
+			return ownerClient.Delete(ctx, cm, client.DryRunAll)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(MatchError(ContainSubstring("protected by a capsule replication; its managing parent is not yet available")))
+		Consistently(func(g Gomega) {
+			g.Expect(ownerClient.Patch(ctx, cm, client.RawPatch(types.MergePatchType, []byte(`{"metadata":{"labels":null}}`)))).To(MatchError(ContainSubstring("protected by a capsule replication")))
+			g.Expect(ownerClient.Delete(ctx, cm, client.DryRunAll)).To(MatchError(ContainSubstring("protected by a capsule replication")))
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cm), cm)).To(Succeed())
+			g.Expect(cm.Labels).To(Equal(original))
+		}, 3*time.Second, defaultPollInterval).Should(Succeed())
+		for _, restoreParent := range restore {
+			restoreParent()
+		}
+		Eventually(func() error {
+			return runner.Delete(ctx, cm, client.DryRunAll)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		for _, marker := range []map[string]string{
 			{meta.CreatedByCapsuleLabel: meta.ValueControllerReplications},
 			{meta.NewManagedByCapsuleLabel: meta.ValueControllerReplications},
