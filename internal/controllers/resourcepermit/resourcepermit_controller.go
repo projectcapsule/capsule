@@ -1103,6 +1103,16 @@ func (r *ResourcePermitReconciler) reconcileItems(
 				item = *current
 			}
 
+			policyReconciled := applyErr == nil && (!result.Skipped || result.PolicyReconciled)
+			// A first content write records its policy even if the subsequent
+			// metadata patch fails. Previously applied items retain their last
+			// effective policy on failure, including a legacy nil snapshot.
+			firstContentApply := !result.Skipped && result.LastApply != nil && item.LastApply.IsZero() && item.Policy == nil
+			if policyReconciled || firstContentApply {
+				item.Policy = resource.Policy.DeepCopy()
+				item.Policy.Condition = ""
+			}
+
 			item.Created = item.Created || result.Created
 
 			if result.LastApply != nil {

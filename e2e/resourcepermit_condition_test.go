@@ -152,28 +152,49 @@ var _ = DescribeTable("ResourcePermit template apply conditions", Label("resourc
 		case "conditional-target", "unconditional-target":
 			Expect(item.LastApply.IsZero()).To(BeFalse())
 			Expect(item.Created).To(BeTrue())
+			resourceIndex := 0
+			if item.Name == "unconditional-target" {
+				resourceIndex = 2
+			}
+			expectedPolicy := active.Status.Request.Resources[resourceIndex].Policy.DeepCopy()
+			expectedPolicy.Condition = ""
+			Expect(item.Policy).To(Equal(expectedPolicy), "applied targets must expose their lifecycle policy without repeating the condition")
 		default:
 			Expect(item.Message).To(Equal(ssa.ConditionNotMet))
 			Expect(item.LastApply.IsZero()).To(BeTrue())
 			Expect(item.Created).To(BeFalse())
+			Expect(item.Policy).To(BeNil(), "a skipped target that the permit does not own has no effective policy")
 		}
 	}
 	for _, name := range []string{"conditional-target", "unconditional-target"} {
 		expectConfigMapData(selected, name, map[string]string{"value": "rendered"})
 	}
 
+	By("rejecting owner writes to protected targets without changing their policy status")
+	protected := &corev1.ConfigMap{}
+	Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: selected, Name: "conditional-target"}, protected)).To(Succeed())
+	protected.Data["value"] = "unauthorized"
+	Expect(owner.Update(ctx, protected)).To(MatchError(ContainSubstring("resources protected by a ResourcePermit")))
+	expectConfigMapData(selected, protected.Name, map[string]string{"value": "rendered"})
+	Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(request), request)).To(Succeed())
+	Expect(request.Status.ProcessedItems).To(Equal(active.Status.ProcessedItems))
+
 	By("keeping conditions and rendered targets frozen after template edits")
 	snapshot := active.Status.Request.DeepCopy()
+	itemsSnapshot := active.DeepCopy().Status.ProcessedItems
 	Eventually(func() error {
 		if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(template), template); err != nil {
 			return err
 		}
 		resourcePolicies(template)[1].Policy.Condition = "true"
+		resourcePolicies(template)[0].Policy.Protect = new(false)
+		resourcePolicies(template)[0].Policy.Deletion = apiruntime.ResourceDeletionPolicyOrphan
 		return k8sClient.Update(ctx, template)
 	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	Consistently(func(g Gomega) {
 		g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(request), request)).To(Succeed())
 		g.Expect(request.Status.Request).To(Equal(snapshot))
+		g.Expect(request.Status.ProcessedItems).To(Equal(itemsSnapshot))
 		g.Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKey{Namespace: selected, Name: "skipped-target"}, &corev1.ConfigMap{}))).To(BeTrue())
 		for _, name := range []string{"conditional-target", "unconditional-target", "skipped-target"} {
 			g.Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKey{Namespace: excluded, Name: name}, &corev1.ConfigMap{}))).To(BeTrue())
@@ -211,6 +232,7 @@ var _ = DescribeTable("ResourcePermit template apply conditions", Label("resourc
 	Expect(failed.Status.Failure.Stage).To(Equal(capsulev1beta2.ResourcePermitFailureStagePreflight))
 	Expect(failed.Status.Failure.Reason).To(Equal("ResourceDryRunFailed"))
 	Expect(failed.Status.Failure.Message).To(ContainSubstring("ConditionEvaluationFailed"))
+	Expect(failed.Status.ProcessedItems).To(BeEmpty(), "failed preflight must not publish an effective target policy")
 	for _, name := range []string{"conditional-target", "unconditional-target", "skipped-target"} {
 		expectConfigMapAbsent(selected, name)
 	}
