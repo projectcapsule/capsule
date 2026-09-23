@@ -5,8 +5,7 @@ package api
 
 import (
 	"regexp"
-	"sort"
-	"strings"
+	"slices"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -72,18 +71,8 @@ func (in *AllowedListSpec) Match(value string) (ok bool) {
 	return false
 }
 
-func (in *AllowedListSpec) ExactMatch(value string) (ok bool) {
-	if len(in.Exact) > 0 {
-		sort.SliceStable(in.Exact, func(i, j int) bool {
-			return strings.ToLower(in.Exact[i]) < strings.ToLower(in.Exact[j])
-		})
-
-		i := sort.SearchStrings(in.Exact, value)
-
-		ok = i < len(in.Exact) && in.Exact[i] == value
-	}
-
-	return ok
+func (in *AllowedListSpec) ExactMatch(value string) bool {
+	return slices.Contains(in.Exact, value)
 }
 
 func (in *AllowedListSpec) RegexMatch(value string) (ok bool) {

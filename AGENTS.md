@@ -22,6 +22,10 @@ design and follow the conventions of the package you are changing.
 - Every e2e change must cover positive and negative cases with one or more real
   Tenant objects present. Add multiple tenants whenever isolation or shared state
   is involved.
+- **Run e2e locally only for new feature tests and subsystems/components impacted by
+  the change. The full e2e suite runs in GitHub Actions.** Collect observations with
+  minimal reasoning during execution; perform forensics after the relevant suites
+  have finished.
 - New or materially changed performance-sensitive execution paths require benchmark
   coverage; extend existing benchmarks where appropriate.
 - **All admission changes are performance critical**, including changes to shared
@@ -31,6 +35,9 @@ design and follow the conventions of the package you are changing.
   compilation, redundant reads, and full-list filtering when these facilities apply.
 - A change is not fully validated until its required checks pass. Report missing
   coverage, unavailable environments, and unrun checks explicitly.
+- **Every change requires a self-review of scalability, performance, and security.**
+  Explain the impact in each area, address findings and feedback, and repeat the
+  review and relevant validation until the completion criteria below are met.
 
 ## Primary design direction: namespace profiling through rules
 
@@ -86,8 +93,9 @@ Before implementing a change:
    indexers; inspect their callers, lifetime, and consistency requirements.
 4. Identify tenant boundaries, compatibility requirements, and admission impact.
 5. Define the unit tests and positive/negative tenant e2e scenarios needed to prove
-   the change. Identify new or materially changed performance-sensitive execution
-   paths and plan benchmark coverage for them.
+   the change. Select local e2e tests for the new feature and impacted components;
+   leave full-suite execution to GitHub Actions. Identify new or materially changed
+   performance-sensitive execution paths and plan benchmark coverage for them.
 
 ## Repository map and extension points
 
@@ -325,6 +333,50 @@ Use the existing Ginkgo v2/Gomega suite in `e2e/`. It uses
 Capsule controller, CRDs, RBAC, and webhooks installed. Merely compiling the suite,
 using a fake client, or running against an old controller image is not an e2e pass.
 
+### Local execution scope and GitHub coverage
+
+- Execute locally only the new e2e tests for newly developed features and the
+  existing suites for subsystems/components impacted by the change. Trace shared
+  helper, rules, cache, API, and admission dependencies to identify impacted suites;
+  include those consumers in the selection.
+- Use Ginkgo labels or spec filters to select that scope. Verify the selection
+  includes the intended new tests and affected regressions; zero selected tests
+  is not a successful validation. Avoid broad labels that unnecessarily select
+  unrelated components.
+- When the e2e workflow is triggered by a matching pull-request path, the full e2e suite runs in GitHub Actions. Do not run an unfiltered full suite
+  locally as a completion step or broaden a local run merely for extra confidence.
+  A passing scoped run satisfies local e2e execution requirements; report GitHub
+  full-suite results separately, including when they are pending or unavailable.
+- Preserve the parallel non-configuration and serial `config` phases within the
+  selected scope. Run relevant OpenShift scenarios when platform behavior is
+  impacted, using the same scoped approach.
+
+### Observe during execution; perform forensics afterward
+
+1. Before running, choose the relevant suites and prepare observation capture.
+   Record the commands/filters, controller build or image, cluster context, Ginkgo
+   seed, and artifact locations so the run can be reproduced.
+2. While e2e tests execute, **keep reasoning to a minimum and collect observations**.
+   Capture runner output, pass/fail/skip counts, durations, failed assertions,
+   controller/webhook logs, and relevant Kubernetes events or resource status.
+   Preserve transient evidence before test or cluster cleanup removes it. Keep
+   progress updates brief and factual; avoid speculative diagnoses or repeated
+   analysis of partial output.
+3. Let the planned relevant suites finish before performing forensics. Do not edit
+   code, change the environment, or repeatedly restart tests in response to an
+   intermediate failure. If one runner command fails before later planned phases
+   start, execute the remaining relevant phases when the environment is usable.
+   If the environment blocks execution, record the blocker and the unrun suites.
+4. After the relevant suites finish, analyze the collected evidence together.
+   Correlate failures with tenant/namespace state, admission decisions, controller
+   reconciliation, and timing. Distinguish product regressions, test/fixture issues,
+   and environment failures before choosing a fix.
+5. Apply fixes after that analysis, then rerun the failed and newly impacted suites
+   with the updated build. Preserve the original observations and report the final
+   scoped results separately from full-suite GitHub results.
+
+### Required scenario coverage
+
 For every change, add or extend a scenario set with all applicable rows below.
 **Positive and negative cases with at least one Tenant actually created are
 mandatory.** A Tenant value constructed only in Go, without creating it in the
@@ -341,6 +393,7 @@ for missing-tenant rejection, keep another valid tenant present.
 | Lifecycle | Exercise affected update/delete/recreation, policy-change, namespace-selection, and cache-invalidation behavior. |
 
 Test implementation requirements:
+
 
 - Reuse helpers from `e2e/suite_test.go` and `e2e/utils_test.go`, such as
   `ownerClient`, `impersonationClient`, `NewNamespace`, `TenantReady`, and
@@ -413,11 +466,12 @@ and `go.mod` instead of independently selecting newer tools.
 | Deep-copy generation | `make generate`. |
 | CRD generation | `make manifests` (also invokes generation). |
 | Build controller | `go build -o bin/manager ./cmd/controller`. The entry point is under `cmd/controller/`. |
-| E2E with cluster lifecycle | `make e2e` creates a KinD cluster, builds/installs Capsule, runs the suite, and destroys the cluster on success. Requires Docker and the target's cluster tooling. |
-| E2E on a prepared test cluster | `make e2e-exec` runs non-configuration tests in parallel and then invokes the serial configuration suite. Ensure the cluster runs the current changes. |
-| Focused tenant e2e | `make e2e-exec FILTER='&& !skip && tenant'`. Replace/add labels for the feature; a filtered run does not replace full-suite validation. |
-| Configuration-only e2e | `make e2e-exec-config`. |
-| OpenShift e2e | `make e2e-openshift` when the change affects platform behavior; CI also exercises OpenShift. |
+| Prepare local e2e cluster | `make e2e-build` creates a KinD cluster and builds/installs Capsule. Requires Docker and the target's cluster tooling; follow with a scoped test run. |
+| Scoped local e2e | `make e2e-exec FILTER='&& !skip && scheduler'`. Replace the example label with the new feature/impacted component selection. Runs selected non-configuration tests in parallel, then selected configuration tests serially. Ensure the cluster runs the current changes. |
+| Scoped configuration e2e | `make e2e-exec-config FILTER='&& !skip && feature-label'`. Replace `feature-label` with the relevant existing label. |
+| Scoped OpenShift e2e | Prepare with `make e2e-build-openshift`, then use `make e2e-exec FILTER='&& !skip && !skip-on-openshift && feature-label'` for impacted platform behavior, replacing `feature-label`. |
+| Full e2e in GitHub Actions | `make e2e` and `make e2e-openshift` are the full-suite CI entry points; local execution uses the scoped commands above. |
+| Local e2e cleanup | `make e2e-destroy` or `make e2e-destroy-openshift` after preserving observations and completing the relevant run. |
 | Focused benchmarks | `go test ./path/to/changed/package -run '^$' -bench 'BenchmarkName' -benchmem -count=5` (replace path/name). |
 | Existing benchmark examples | `go test ./pkg/tenant ./internal/controllers/resources -run '^$' -bench . -benchmem -count=5`. |
 | Chart checks | `make helm-lint`; use `make helm-test` for installation behavior. |
@@ -433,6 +487,48 @@ For scalability work, follow [e2e/stress/README.md](e2e/stress/README.md). This
 environment supplements unit benchmarks and functional e2e tests; seeding a workload
 alone is not performance evidence. Record the workload, controller version, resource
 usage, request latency/throughput, and errors for any reported comparison.
+
+
+## Mandatory self-review and iteration
+
+Every change, including documentation, configuration, tests, and generated changes,
+must receive a self-review before completion. Review the final diff and affected
+callers against the requested behavior and this repository's requirements. Provide
+a concise assessment supported by code inspection, tests, or measurements for each
+area; if no impact is expected, explain why rather than omitting the area.
+
+- **Scalability:** Assess how work and retained state grow with tenants, namespaces,
+  rules, resources, and concurrent requests. Look for full-list scans, per-item API
+  calls, unbounded caches or queues, reconciliation fan-out, and contention. Explain
+  relevant bounds and behavior as unrelated tenants or resources are added.
+- **Performance:** Assess admission and reconciliation latency, CPU, allocations,
+  memory, API round trips, repeated compilation/serialization, and cache reuse.
+  Follow the benchmark and real-cluster evidence requirements above for affected
+  paths; distinguish measured results from expectations and identify regressions.
+- **Security:** Assess tenant and namespace isolation, authorization and ownership,
+  privilege boundaries, untrusted input, resource/reference scoping, cache freshness,
+  failure behavior, sensitive data exposure, and denial-of-service risks. Check
+  negative cases and ensure optimizations do not bypass enforcement.
+
+Use the following loop for the initial change and every subsequent revision:
+
+1. Review the current diff and available validation evidence. Identify concrete
+   findings, assumptions, missing coverage, and feedback from the user or reviewers.
+2. Revise the change to address actionable findings and feedback. Add or update
+   regression coverage and performance evidence where required. If feedback does
+   not warrant a change, explain the decision with evidence.
+3. Rerun checks affected by the revision and inspect the resulting diff. Keep local
+   e2e runs scoped to the affected components and complete planned suites before
+   analyzing failures, as required above.
+4. Repeat the self-review across all three areas until no actionable findings remain
+   unresolved, feedback has been addressed, and required checks pass. Review fixes
+   for new regressions; do not stop at identifying issues or rely on passing tests
+   alone as evidence that the review is complete.
+
+In the handoff or PR, summarize the scalability, performance, and security
+assessments, findings addressed, validation evidence, and remaining risks or
+limitations. Disclose blocked checks and unresolved findings explicitly; do not
+declare the change fully validated while required evidence is missing.
 
 ## Generated files, charts, and completion
 
@@ -450,7 +546,8 @@ usage, request latency/throughput, and errors for any reported comparison.
   extension points, tenant scenarios, commands/results, and benchmark evidence when
   required in the handoff or PR. Identify unrun checks and their concrete blockers;
   never claim success from compilation alone or omit required e2e/performance
-  evidence.
+  evidence. Separate scoped local e2e results from the full-suite GitHub status and
+  summarize forensic findings after the relevant suites finish.
 - If preparing commits or a PR, follow the repository's Conventional Commit and
   DCO requirements in `CONTRIBUTING.md`.
 
@@ -460,4 +557,5 @@ structure, reuses available code, includes unit and tenant-aware positive/negati
 e2e coverage, includes benchmarks for new or materially changed performance-sensitive
 execution paths, and preserves isolation/API contracts. Assess performance impact
 for every admission change and supply the required evidence. Explain any necessary
-departure from the rules API approach.
+departure from the rules API approach. Complete the self-review and iteration loop
+above, including the scalability, performance, and security assessments.
