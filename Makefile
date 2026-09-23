@@ -131,8 +131,14 @@ dev-build: kind
 dev-destroy: kind
 	$(KIND) delete cluster --name capsule
 
-dev-install-deps: dev-setup-fluxcd dev-setup-cert-manager dev-install-gw-api-crds dev-install-prometheus-crds wait-for-helmreleases
-dev-install-deps-openshift: dev-setup-fluxcd-openshift dev-setup-cert-manager dev-install-gw-api-crds dev-install-prometheus-crds wait-for-helmreleases
+# Target used to install Flux. Overridden on OpenShift so that dependents (e.g. cert-manager)
+# never re-apply the vanilla Flux manifests over the SCC-compatible overlay.
+FLUX_SETUP_TARGET ?= dev-setup-fluxcd
+
+.PHONY: dev-install-deps dev-install-deps-openshift dev-setup-cert-manager dev-setup-fluxcd dev-setup-fluxcd-openshift
+dev-install-deps: $(FLUX_SETUP_TARGET) dev-setup-cert-manager dev-install-gw-api-crds dev-install-prometheus-crds wait-for-helmreleases
+dev-install-deps-openshift:
+	$(MAKE) dev-install-deps FLUX_SETUP_TARGET=dev-setup-fluxcd-openshift
 
 API_GW         := none
 API_GW_VERSION := v1.3.0
@@ -274,7 +280,7 @@ dev-setup-argocd: dev-setup-fluxcd
 	@printf "  \033[1mkubectl get secret -n argocd argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d\033[0m\n\n"
 	@printf "  \033[1mkubectl port-forward svc/argocd-server 9091:80 -n argocd\033[0m\n\n"
 
-dev-setup-cert-manager: dev-setup-fluxcd
+dev-setup-cert-manager: $(FLUX_SETUP_TARGET)
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/cert-manager | envsubst | kubectl apply -f -
 
 dev-setup-fluxcd:
@@ -292,10 +298,28 @@ dev-setup-capsule:
 	@$(MAKE) -C playground dev-capsule
 
 
+HELM_RELEASES_WAIT_TIMEOUT_SECONDS ?= 900
+
 wait-for-helmreleases:
 	@ echo "Waiting for all HelmReleases to have observedGeneration >= 0..."
-	@while [ "$$($(KUBECTL) get helmrelease -A -o jsonpath='{range .items[?(@.status.observedGeneration<0)]}{.metadata.namespace}{" "}{.metadata.name}{"\n"}{end}' | wc -l)" -ne 0 ]; do \
-	  sleep 5; \
+	@timeout=$(HELM_RELEASES_WAIT_TIMEOUT_SECONDS); \
+	interval=5; \
+	elapsed=0; \
+	while [ "$$($(KUBECTL) get helmrelease -A -o jsonpath='{range .items[?(@.status.observedGeneration<0)]}{.metadata.namespace}{" "}{.metadata.name}{"\n"}{end}' | wc -l)" -ne 0 ]; do \
+	  if [ $$elapsed -ge $$timeout ]; then \
+	    echo "Timeout of $${timeout}s reached waiting for HelmReleases to have observedGeneration >= 0" >&2; \
+	    echo "=== HelmReleases overview ===" >&2; \
+	    $(KUBECTL) get helmrelease -A >&2 || true; \
+	    echo "=== HelmReleases details ===" >&2; \
+	    $(KUBECTL) describe helmrelease -A >&2 || true; \
+	    echo "=== pods overview ===" >&2; \
+	    $(KUBECTL) get pods -A>&2 || true; \
+	    echo "=== pods details ===" >&2; \
+	    $(KUBECTL) describe pods -A >&2 || true; \
+	    exit 1; \
+	  fi; \
+	  sleep $$interval; \
+	  elapsed=$$((elapsed + interval)); \
 	done
 
 ####################

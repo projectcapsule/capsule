@@ -33,6 +33,13 @@ func TestAllowedListSpec_ExactMatch(t *testing.T) {
 			[]string{"a", "b", "c"},
 		},
 		{
+			// Entries differing only by case must all be found, while the
+			// match itself stays case-sensitive.
+			[]string{"nginx", "NGINX", "traefik"},
+			[]string{"nginx", "NGINX", "traefik"},
+			[]string{"Nginx", "haproxy"},
+		},
+		{
 			nil,
 			nil,
 			[]string{"any", "value"},
