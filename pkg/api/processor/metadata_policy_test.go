@@ -90,7 +90,10 @@ func TestMetadataFailureRetainsEffectivePolicy(t *testing.T) {
 					t.Errorf("global=%t: target still protected, but protected-items index returned %v", global, keys)
 				}
 			}
-			require.Equal(t, oldPolicy, processed[0].Policy, "failed metadata reconciliation must retain previous effective policy")
+			expectedOld := oldPolicy.DeepCopy()
+			expectedOld.Condition = ""
+			require.Equal(t, expectedOld, processed[0].Policy, "failed metadata reconciliation must retain previous effective policy")
+			require.Equal(t, "false", oldPolicy.Condition, "status projection must not mutate the input policy")
 			t.Run("removal follows the previous orphan policy", func(t *testing.T) {
 				cleanupClient := fake.NewClientBuilder().WithObjects(actual.DeepCopy(), &corev1.Namespace{Name: "target"}).WithReturnManagedFields().Build()
 				cleanupStatus := append(meta.ProcessedItems(nil), processed...)
@@ -104,7 +107,9 @@ func TestMetadataFailureRetainsEffectivePolicy(t *testing.T) {
 
 			failMetadata = false
 			require.NoError(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, acc, opts))
-			require.Equal(t, newPolicy, processed[0].Policy, "successful retry commits the new policy")
+			expectedNew := newPolicy.DeepCopy()
+			expectedNew.Condition = ""
+			require.Equal(t, expectedNew, processed[0].Policy, "successful retry commits the new policy")
 			require.NotSame(t, newPolicy, processed[0].Policy)
 			require.Equal(t, metav1.ConditionTrue, processed[0].Status)
 			require.Empty(t, processed[0].Message)
@@ -115,32 +120,105 @@ func TestMetadataFailureRetainsEffectivePolicy(t *testing.T) {
 	}
 }
 
-func TestMetadataFailureTracksPartiallyCreatedResource(t *testing.T) {
-	obj := policyConfigMap("target", "partial")
-	p, _ := policyProcessor()
-	failMetadata := true
-	c := fake.NewClientBuilder().WithObjects(&corev1.Namespace{Name: "target"}).WithReturnManagedFields().WithInterceptorFuncs(interceptor.Funcs{
+func TestMetadataFailureTracksFirstApplyPolicy(t *testing.T) {
+	for _, condition := range []string{"", "true"} {
+		for _, tc := range []struct {
+			name                       string
+			adopted, previouslySkipped bool
+			policy                     *apiruntime.ResourceTemplatePolicy
+		}{
+			{name: "created orphan", policy: &apiruntime.ResourceTemplatePolicy{Deletion: apiruntime.ResourceDeletionPolicyOrphan}},
+			{name: "created remove", policy: &apiruntime.ResourceTemplatePolicy{Deletion: apiruntime.ResourceDeletionPolicyRemove}},
+			{name: "adopted orphan", adopted: true, policy: &apiruntime.ResourceTemplatePolicy{Creation: apiruntime.ResourceCreationPolicyMerge, Deletion: apiruntime.ResourceDeletionPolicyOrphan}},
+			{name: "previous skip then orphan", previouslySkipped: true, policy: &apiruntime.ResourceTemplatePolicy{Deletion: apiruntime.ResourceDeletionPolicyOrphan}},
+			{name: "legacy creation"},
+		} {
+			t.Run(fmt.Sprintf("%s/condition=%q", tc.name, condition), func(t *testing.T) {
+				obj := policyConfigMap("target", "partial")
+				objects := []client.Object{&corev1.Namespace{Name: "target"}}
+				if tc.adopted {
+					objects = append(objects, obj.DeepCopy())
+				}
+				failMetadata := true
+				c := fake.NewClientBuilder().WithObjects(objects...).WithReturnManagedFields().WithInterceptorFuncs(interceptor.Funcs{
+					Patch: func(ctx context.Context, c client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+						options := (&client.PatchOptions{}).ApplyOptions(opts)
+						if failMetadata && patch.Type() == types.JSONPatchType && options.FieldManager == meta.ResourceControllerFieldOwnerPrefix() {
+							return errors.New("injected lifecycle metadata failure")
+						}
+						return c.Patch(ctx, obj, patch, opts...)
+					},
+				}).Build()
+				p, _ := policyProcessor()
+				p.GatherClient = c
+				var err error
+				p.Conditions, err = cache.NewCELCache()
+				require.NoError(t, err)
+				policy := tc.policy.DeepCopy()
+				if policy != nil {
+					policy.Condition = condition
+				}
+				id := gvk.NewResourceID(obj, "tenant-a", "0/raw-0")
+				acc := Accumulator{}
+				AccumulatorAdd(acc, id, AccumulatorObject{Object: obj, Policy: policy})
+				processed := meta.ProcessedItems{}
+				if tc.previouslySkipped {
+					processed = append(processed, meta.ObjectReferenceStatus{ResourceID: id})
+				}
+				opts := ProcessorOptions{FieldOwnerPrefix: "2lclct9cwq6mg", Prune: true}
+				require.Error(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, acc, opts))
+				require.Len(t, processed, 1)
+				require.Equal(t, !tc.adopted, processed[0].Created)
+				require.False(t, processed[0].LastApply.IsZero(), "partial apply must remain tracked for cleanup")
+				require.Equal(t, tc.policy, processed[0].Policy, "the first content write must preserve its lifecycle policy")
+				require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(obj), obj))
+				failMetadata = false
+				require.NoError(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, Accumulator{}, opts))
+				require.Empty(t, processed)
+				err = c.Get(t.Context(), client.ObjectKeyFromObject(obj), obj)
+				if tc.policy != nil && tc.policy.ShouldOrphan() {
+					require.NoError(t, err, "explicit Orphan must survive cleanup before a retry")
+					require.Equal(t, map[string]any{"key": "value"}, obj.Object["data"])
+					require.NotContains(t, obj.GetLabels(), meta.ReplicationProtectionLabel)
+				} else {
+					require.True(t, apierrors.IsNotFound(err), "Remove and legacy pruning must clean up the created target")
+				}
+			})
+		}
+	}
+}
+
+func TestMetadataFailureRetainsLegacyProtection(t *testing.T) {
+	obj := policyConfigMap("target", "legacy")
+	id := gvk.NewResourceID(obj, "tenant-a", "0/raw-0")
+	opts := ProcessorOptions{FieldOwnerPrefix: "2lclct9cwq6mg"}
+	obj.SetLabels(map[string]string{meta.CreatedByCapsuleLabel: meta.ValueControllerReplications, meta.ReplicationProtectionLabel: meta.ValueTrue})
+	obj.SetManagedFields([]metav1.ManagedFieldsEntry{
+		{Manager: opts.FieldOwnerPrefix + "/" + id.FieldOwner(""), Operation: metav1.ManagedFieldsOperationApply, APIVersion: "v1", FieldsType: "FieldsV1", FieldsV1: &metav1.FieldsV1{Raw: []byte(`{"f:data":{"f:key":{}}}`)}},
+		{Manager: meta.ResourceControllerFieldOwnerPrefix(), Operation: metav1.ManagedFieldsOperationUpdate, APIVersion: "v1", FieldsType: "FieldsV1", FieldsV1: &metav1.FieldsV1{Raw: []byte(`{"f:metadata":{"f:labels":{"f:protection.projectcapsule.dev/replications":{},"f:projectcapsule.dev/created-by":{}}}}`)}},
+	})
+	c := fake.NewClientBuilder().WithObjects(obj, &corev1.Namespace{Name: "target"}).WithReturnManagedFields().WithInterceptorFuncs(interceptor.Funcs{
 		Patch: func(ctx context.Context, c client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-			if failMetadata && patch.Type() == types.JSONPatchType {
+			if patch.Type() == types.JSONPatchType {
 				return errors.New("injected lifecycle metadata failure")
 			}
 			return c.Patch(ctx, obj, patch, opts...)
 		},
 	}).Build()
+	p, _ := policyProcessor()
 	p.GatherClient = c
-	id := gvk.NewResourceID(obj, "tenant-a", "0/raw-0")
+	old := meta.ObjectReferenceStatus{ResourceID: id, Created: true, LastApply: metav1.NewTime(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))}
+	processed := meta.ProcessedItems{old}
 	acc := Accumulator{}
-	AccumulatorAdd(acc, id, AccumulatorObject{Object: obj, Policy: &apiruntime.ResourceTemplatePolicy{Deletion: apiruntime.ResourceDeletionPolicyOrphan}})
-	processed := meta.ProcessedItems{}
-	opts := ProcessorOptions{FieldOwnerPrefix: "2lclct9cwq6mg", Prune: true}
-	require.Error(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, acc, opts))
-	require.Len(t, processed, 1)
-	require.True(t, processed[0].Created)
-	require.False(t, processed[0].LastApply.IsZero(), "partial creation must remain tracked for cleanup")
-	require.Nil(t, processed[0].Policy, "the initial policy has not reconciled")
+	desired := policyConfigMap("target", "legacy")
+	desired.Object["data"] = map[string]any{"key": "updated"}
+	AccumulatorAdd(acc, id, AccumulatorObject{Object: desired, Policy: &apiruntime.ResourceTemplatePolicy{Protect: new(false), Deletion: apiruntime.ResourceDeletionPolicyOrphan}})
+	require.ErrorContains(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, acc, opts), "applying of 1 resources failed")
+	require.Contains(t, processed[0].Message, "injected lifecycle metadata failure")
 	require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(obj), obj))
-	failMetadata = false
-	require.NoError(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, Accumulator{}, opts))
-	require.Empty(t, processed)
-	require.True(t, apierrors.IsNotFound(c.Get(t.Context(), client.ObjectKeyFromObject(obj), obj)), "legacy pruning must clean up the partially created target")
+	require.Equal(t, desired.Object["data"], obj.Object["data"])
+	require.True(t, processed[0].LastApply.After(old.LastApply.Time), "exercise the error path after a successful content write")
+	require.Nil(t, processed[0].Policy, "nil is a valid effective policy for an already applied legacy item")
+	parent := &capsulev1beta2.TenantResource{Status: capsulev1beta2.TenantResourceStatus{ProcessedItems: processed}}
+	require.Len(t, (tenantresource.ProtectedItems{}).Func()(parent), 1, "legacy protection must remain indexed")
 }

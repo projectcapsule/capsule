@@ -258,6 +258,9 @@ func (p *Processor) applyAccumulatedItem(
 	}
 	if current := processed.GetItem(item.Resource); current != nil {
 		or = *current
+		if current.Policy != nil && current.Policy.Condition != "" {
+			or.Policy = processedPolicy(current.Policy)
+		}
 	}
 
 	clusterScoped, err := p.isClusterScoped(item.Resource.GetGVK())
@@ -337,11 +340,15 @@ func (p *Processor) applyAccumulatorObject(
 	switch {
 	case err != nil:
 		if result.LastApply != nil {
+			// A first successful content write needs its cleanup policy even
+			// when metadata fails. Previously applied items, including legacy
+			// items with nil Policy, must retain their effective policy.
+			if !result.Skipped && or.LastApply.IsZero() && or.Policy == nil {
+				or.Policy = processedPolicy(obj.Policy)
+			}
+
 			or.LastApply = *result.LastApply
 		}
-		// Content may have applied before lifecycle metadata failed. Keep its
-		// timestamp for cleanup, but retain the last reconciled policy so
-		// admission protection and deletion behavior cannot change on failure.
 
 		or.Status = metav1.ConditionFalse
 		or.Message = "apply failed for item " + obj.Origin.Origin + ": " + err.Error()
@@ -358,11 +365,11 @@ func (p *Processor) applyAccumulatorObject(
 		}
 
 		if result.PolicyReconciled {
-			or.Policy = obj.Policy.DeepCopy()
+			or.Policy = processedPolicy(obj.Policy)
 		}
 	default:
 		or.Created = result.Created
-		or.Policy = obj.Policy.DeepCopy()
+		or.Policy = processedPolicy(obj.Policy)
 
 		if result.LastApply != nil {
 			or.LastApply = *result.LastApply
@@ -377,6 +384,17 @@ func (p *Processor) applyAccumulatorObject(
 	processed.UpdateItem(*or)
 
 	return err != nil
+}
+
+// Conditions are evaluated from the source block, never from item status.
+// Keep a detached lifecycle snapshot without duplicating CEL text per target.
+func processedPolicy(policy *apiruntime.ResourceTemplatePolicy) *apiruntime.ResourceTemplatePolicy {
+	snapshot := policy.DeepCopy()
+	if snapshot != nil {
+		snapshot.Condition = ""
+	}
+
+	return snapshot
 }
 
 func (p *Processor) objectForProcessedItem(item meta.ObjectReferenceStatus) (*unstructured.Unstructured, error) {
@@ -416,6 +434,7 @@ func failAndRecord(
 	(*itemErrors)++
 	item.Status = metav1.ConditionFalse
 	item.Message = msg + err.Error()
+	item.Policy = processedPolicy(item.Policy)
 	processed.UpdateItem(item)
 
 	return true

@@ -152,10 +152,11 @@ type ObjectReferenceStatus struct {
 
 // +kubebuilder:object:generate=true
 type ObjectReferenceStatusCondition struct {
-	// Policy is the last reconciled replication policy, including policy changes
-	// when an apply condition skips rendered content. It remains available for
-	// protection and cleanup after the originating resource block is removed.
-	// An absent policy preserves legacy replication behavior.
+	// Policy is a lifecycle snapshot for protection and cleanup. Conditions are
+	// evaluated from the source block and omitted here. Failed updates retain the
+	// previous snapshot; a first successful content write records its policy even
+	// if metadata reconciliation fails, so cleanup respects explicit retention.
+	// An absent policy on an already applied item preserves legacy behavior.
 	// +optional
 	Policy *apiruntime.ResourceTemplatePolicy `json:"policy,omitempty"`
 

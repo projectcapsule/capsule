@@ -86,11 +86,13 @@ func TestSkippedConditionUpdatesPolicyUntilRemoval(t *testing.T) {
 	}
 	c.metadataError = nil
 	c.metadataPatches = 0
+	expectedPolicy := policy.DeepCopy()
+	expectedPolicy.Condition = ""
 	for range 2 {
 		if err := p.Reconcile(t.Context(), logr.Discard(), c, &processed, acc, ProcessorOptions{Prune: true}); err != nil {
 			t.Fatal(err)
 		}
-		if len(c.applies) != 0 || len(processed) != 1 || processed[0].Message != ssa.ConditionNotMet || !processed[0].Created || !processed[0].LastApply.Equal(&old.LastApply) || !reflect.DeepEqual(processed[0].Policy, policy) {
+		if len(c.applies) != 0 || len(processed) != 1 || processed[0].Message != ssa.ConditionNotMet || !processed[0].Created || !processed[0].LastApply.Equal(&old.LastApply) || !reflect.DeepEqual(processed[0].Policy, expectedPolicy) {
 			t.Fatalf("skip did not update policy while retaining content apply state: applies=%d processed=%+v policy=%+v old=%+v", len(c.applies), processed, processed[0].Policy, old)
 		}
 		current := policyConfigMap("target", "example")
