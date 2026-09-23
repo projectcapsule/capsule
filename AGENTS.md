@@ -343,7 +343,7 @@ using a fake client, or running against an old controller image is not an e2e pa
   includes the intended new tests and affected regressions; zero selected tests
   is not a successful validation. Avoid broad labels that unnecessarily select
   unrelated components.
-- The full e2e suite runs in GitHub Actions. Do not run an unfiltered full suite
+- When the e2e workflow is triggered by a matching pull-request path, the full e2e suite runs in GitHub Actions. Do not run an unfiltered full suite
   locally as a completion step or broaden a local run merely for extra confidence.
   A passing scoped run satisfies local e2e execution requirements; report GitHub
   full-suite results separately, including when they are pending or unavailable.
