@@ -29,6 +29,10 @@ func ResolveAdmissionUser(
 		return user
 	}
 
+	if config == nil {
+		return user
+	}
+
 	if users.HasIgnoredGroup(req.UserInfo.Groups, config.IgnoreUserWithGroups()) {
 		return user
 	}

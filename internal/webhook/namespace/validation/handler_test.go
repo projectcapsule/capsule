@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -18,6 +19,8 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 )
 
 func TestNamespaceHandlerAllowsUnchangedFinalizeWithoutTenant(t *testing.T) {
@@ -64,6 +67,100 @@ func TestNamespaceHandlerRejectsTenantChangeDuringFinalize(t *testing.T) {
 
 	if response == nil || response.Allowed {
 		t.Fatalf("finalize response = %#v, want tenant assignment denial", response)
+	}
+}
+
+func TestNamespaceHandlerRejectsTenantChangeDuringFinalizeNonTerminating(t *testing.T) {
+	t.Parallel()
+
+	scheme := namespaceValidationScheme(t)
+	oldNs := namespaceWithTenantReference("workloads", "solar", "solar-uid")
+	newNs := namespaceWithTenantReference("workloads", "lunar", "lunar-uid")
+
+	response := NamespaceHandler(nil).OnUpdate(
+		nil,
+		nil,
+		admission.NewDecoder(scheme),
+		nil,
+	)(context.Background(), namespaceUpdateRequest(t, oldNs, newNs, "finalize"))
+
+	if response == nil || response.Allowed {
+		t.Fatalf("finalize response = %#v, want tenant assignment denial", response)
+	}
+}
+
+func TestNamespaceHandlerRejectsCapsuleUserOnUnownedNamespace(t *testing.T) {
+	t.Parallel()
+
+	scheme := namespaceValidationScheme(t)
+	ctx := context.Background()
+	owner := rbac.CoreOwnerSpec{Name: "alice", Kind: rbac.UserOwner}
+	configurationObject := &capsulev1beta2.CapsuleConfiguration{
+		Name: "capsule",
+		Status: capsulev1beta2.CapsuleConfigurationStatus{
+			Users: rbac.UserListSpec{owner.UserSpec},
+		},
+	}
+	cl := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(configurationObject).
+		Build()
+	cfg := configuration.NewCapsuleConfiguration(ctx, cl, cl, nil, configurationObject.Name)
+
+	oldNs := &corev1.Namespace{Name: "kube-system"}
+	newNs := oldNs.DeepCopy()
+
+	for _, subresource := range []string{"", "status", "finalize"} {
+		req := namespaceUpdateRequest(t, oldNs, newNs, subresource)
+		req.UserInfo = authenticationv1.UserInfo{Username: owner.Name}
+
+		response := NamespaceHandler(cfg).OnUpdate(
+			cl,
+			cl,
+			admission.NewDecoder(scheme),
+			nil,
+		)(ctx, req)
+
+		if response == nil || response.Allowed {
+			t.Fatalf("subresource %q: expected rejection for unowned namespace, got %#v", subresource, response)
+		}
+		if response.Result.Message != "namespace is not owned by any tenant" {
+			t.Fatalf("subresource %q: expected 'namespace is not owned by any tenant', got %q", subresource, response.Result.Message)
+		}
+	}
+}
+
+func TestNamespaceHandlerAllowsUnknownUserOnUnownedNamespace(t *testing.T) {
+	t.Parallel()
+
+	scheme := namespaceValidationScheme(t)
+	ctx := context.Background()
+	configurationObject := &capsulev1beta2.CapsuleConfiguration{
+		Name: "capsule",
+	}
+	cl := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(configurationObject).
+		Build()
+	cfg := configuration.NewCapsuleConfiguration(ctx, cl, cl, nil, configurationObject.Name)
+
+	oldNs := &corev1.Namespace{Name: "kube-system"}
+	newNs := oldNs.DeepCopy()
+
+	for _, subresource := range []string{"", "status", "finalize"} {
+		req := namespaceUpdateRequest(t, oldNs, newNs, subresource)
+		req.UserInfo = authenticationv1.UserInfo{Username: "system:kube-controller-manager"}
+
+		response := NamespaceHandler(cfg).OnUpdate(
+			cl,
+			cl,
+			admission.NewDecoder(scheme),
+			nil,
+		)(ctx, req)
+
+		if response != nil {
+			t.Fatalf("subresource %q: expected unknown user to be allowed, got %#v", subresource, response)
+		}
 	}
 }
 

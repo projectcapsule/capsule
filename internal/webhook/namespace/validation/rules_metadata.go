@@ -5,6 +5,7 @@ package validation
 
 import (
 	"context"
+	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,6 +16,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/cache"
 	genericvalidation "github.com/projectcapsule/capsule/internal/webhook/rules/generic/validation"
 	"github.com/projectcapsule/capsule/pkg/ruleengine"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -67,6 +69,10 @@ func (h *rulesMetadataHandler) OnUpdate(
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if req.SubResource == "finalize" {
+			if namespaceMetadataChanged(old, ns) {
+				return ad.Deny("metadata cannot be modified on finalize subresource")
+			}
+
 			return nil
 		}
 
@@ -103,6 +109,26 @@ func (h *rulesMetadataHandler) OnDelete(
 	*capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response { return nil }
+}
+
+func namespaceMetadataChanged(oldNs, newNs *corev1.Namespace) bool {
+	if oldNs == nil || newNs == nil {
+		return oldNs != newNs
+	}
+
+	return !reflect.DeepEqual(
+		normalizeMetadata(oldNs.ObjectMeta),
+		normalizeMetadata(newNs.ObjectMeta),
+	)
+}
+
+func normalizeMetadata(meta metav1.ObjectMeta) metav1.ObjectMeta {
+	meta.Generation = 0
+	meta.ResourceVersion = ""
+	meta.Finalizers = nil
+	meta.ManagedFields = nil
+
+	return meta
 }
 
 func partialNamespaceMetadata(ns *corev1.Namespace) *metav1.PartialObjectMetadata {
