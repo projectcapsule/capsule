@@ -1,0 +1,11 @@
+# Test-only instrumentation; telemetry endpoints stay inside the test cluster.
+manager:
+  options:
+    tracing:
+      enabled: true
+      endpoint: capsule-alloy.capsule-observability.svc.cluster.local:4317
+      insecure: true
+      sampleRatio: 1.0
+  extraArgs:
+    - --zap-encoder=json
+    - --enable-pprof=true
