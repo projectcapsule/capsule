@@ -17,13 +17,13 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
-type containerRegistryRegexHandler struct{}
+type priorityClassRegexHandler struct{}
 
-func ContainerRegistryRegexHandler() handlers.TypedHandler[*capsulev1beta2.Tenant] {
-	return &containerRegistryRegexHandler{}
+func PriorityClassRegexHandler() handlers.TypedHandler[*capsulev1beta2.Tenant] {
+	return &priorityClassRegexHandler{}
 }
 
-func (h *containerRegistryRegexHandler) OnCreate(
+func (h *priorityClassRegexHandler) OnCreate(
 	_ client.Client,
 	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
@@ -31,15 +31,15 @@ func (h *containerRegistryRegexHandler) OnCreate(
 	_ events.EventRecorder,
 ) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
-		if err := h.validate(tnt, req); err != nil {
-			return err
+		if response := h.validate(tnt, req); response != nil {
+			return response
 		}
 
 		return nil
 	}
 }
 
-func (h *containerRegistryRegexHandler) OnDelete(
+func (h *priorityClassRegexHandler) OnDelete(
 	client.Client,
 	client.Reader,
 	*capsulev1beta2.Tenant,
@@ -51,7 +51,7 @@ func (h *containerRegistryRegexHandler) OnDelete(
 	}
 }
 
-func (h *containerRegistryRegexHandler) OnUpdate(
+func (h *priorityClassRegexHandler) OnUpdate(
 	_ client.Client,
 	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
@@ -68,14 +68,11 @@ func (h *containerRegistryRegexHandler) OnUpdate(
 	}
 }
 
-//nolint:staticcheck
-func (h *containerRegistryRegexHandler) validate(
-	tnt *capsulev1beta2.Tenant,
-	_ admission.Request,
-) *admission.Response {
-	if tnt.Spec.ContainerRegistries != nil && len(tnt.Spec.ContainerRegistries.Regex) > 0 {
-		if _, err := regexp.Compile(tnt.Spec.ContainerRegistries.Regex); err != nil {
-			return ad.Deny("unable to compile containerRegistries allowedRegex")
+func (h *priorityClassRegexHandler) validate(tnt *capsulev1beta2.Tenant, req admission.Request) *admission.Response {
+	//nolint:staticcheck
+	if tnt.Spec.PriorityClasses != nil && len(tnt.Spec.PriorityClasses.Regex) > 0 {
+		if _, err := regexp.Compile(tnt.Spec.PriorityClasses.Regex); err != nil {
+			return ad.Deny("unable to compile priorityClasses allowedRegex")
 		}
 	}
 

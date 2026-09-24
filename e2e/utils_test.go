@@ -90,6 +90,27 @@ func ServiceCreation(svc *corev1.Service, owner rbac.UserSpec, timeout time.Dura
 	}, timeout, defaultPollInterval)
 }
 
+func NewObjectMeta(name string, labels ...map[string]string) metav1.ObjectMeta {
+	if len(name) == 0 {
+		name = rand.String(10)
+	}
+
+	objectMetaLabels := make(map[string]string)
+
+	if len(labels) > 0 {
+		for _, lab := range labels {
+			maps.Copy(objectMetaLabels, lab)
+		}
+	}
+
+	objectMetaLabels["env"] = "e2e"
+
+	return metav1.ObjectMeta{
+		Name:   name,
+		Labels: objectMetaLabels,
+	}
+}
+
 func NewNamespace(name string, labels ...map[string]string) *corev1.Namespace {
 	if len(name) == 0 {
 		name = rand.String(10)
