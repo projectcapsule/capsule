@@ -3,6 +3,77 @@ logging {
 	format = "json"
 }
 
+// Capsule sends OTLP to this collector inside the disposable test cluster.
+// The collector adds the same run identity used by metrics, logs, and profiles.
+otelcol.receiver.otlp "capsule" {
+	grpc {
+		endpoint = "0.0.0.0:4317"
+	}
+
+	http {
+		endpoint = "0.0.0.0:4318"
+	}
+
+	output {
+		traces = [otelcol.processor.memory_limiter.traces.input]
+	}
+}
+
+otelcol.processor.memory_limiter "traces" {
+	check_interval = "1s"
+	limit          = "512MiB"
+	spike_limit    = "128MiB"
+
+	output {
+		traces = [otelcol.processor.transform.run_context.input]
+	}
+}
+
+otelcol.processor.transform "run_context" {
+	trace_statements {
+		context    = "resource"
+		statements = [
+			string.format("set(resource.attributes[\"run_id\"], %q)", sys.env("RUN_ID")),
+			string.format("set(resource.attributes[\"repository\"], %q)", sys.env("REPOSITORY")),
+			string.format("set(resource.attributes[\"revision\"], %q)", sys.env("REVISION")),
+		]
+	}
+
+	output {
+		traces = [otelcol.processor.batch.traces.input]
+	}
+}
+
+otelcol.processor.batch "traces" {
+	timeout             = "5s"
+	send_batch_size     = 512
+	send_batch_max_size = 1024
+
+	output {
+		traces = [otelcol.exporter.otlphttp.tempo.input]
+	}
+}
+
+otelcol.auth.basic "monitoring" {
+	// Alloy 1.19.2's client_auth-only configuration also initializes an empty
+	// server authenticator and fails startup. These supported compatibility
+	// fields initialize the authenticator correctly in the pinned version.
+	username = convert.nonsensitive(local.file.username.content)
+	password = local.file.password.content
+}
+
+otelcol.exporter.otlphttp "tempo" {
+	client {
+		endpoint = "https://tempo.dev.projectcapsule.dev"
+		auth     = otelcol.auth.basic.monitoring.handler
+	}
+
+	sending_queue {
+		num_consumers = 2
+		queue_size    = 100
+	}
+}
+
 local.file "username" {
 	filename  = "/etc/monitoring-credentials/username"
 	is_secret = true
@@ -87,7 +158,7 @@ loki.write "monitoring" {
 		url = "https://loki.dev.projectcapsule.dev/loki/api/v1/push"
 
 		basic_auth {
-			username = local.file.username.content
+			username = convert.nonsensitive(local.file.username.content)
 			password = local.file.password.content
 		}
 	}
@@ -155,7 +226,7 @@ prometheus.remote_write "monitoring" {
 		url = "https://prometheus.dev.projectcapsule.dev/api/v1/write"
 
 		basic_auth {
-			username = local.file.username.content
+			username = convert.nonsensitive(local.file.username.content)
 			password = local.file.password.content
 		}
 
@@ -208,7 +279,7 @@ pyroscope.write "monitoring" {
 		url = "https://pyroscope.dev.projectcapsule.dev"
 
 		basic_auth {
-			username = local.file.username.content
+			username = convert.nonsensitive(local.file.username.content)
 			password = local.file.password.content
 		}
 	}

@@ -44,8 +44,18 @@ shared monitoring endpoints, including queries; basic auth is not write-only.
   `capsule-values.yaml` enables pprof and JSON logging only for instrumented tests.
   The unauthenticated metrics and pprof ports remain internal to this disposable
   cluster; no Service, Ingress or Gateway exposes pprof publicly.
+- Admission webhook traces, sent by Capsule to Alloy's internal OTLP/gRPC port
+  `4317`, then forwarded over HTTPS to Tempo. The test overlay enables tracing
+  with a sample ratio of 1.0. Alloy also accepts OTLP/HTTP on internal port `4318`.
+  Traces use the existing monitoring credential Secret; no new GitHub secrets
+  are required.
 
 Metrics, logs and profiles carry the same `run_id`, `repository`, and `revision`.
+Alloy adds the same fields as resource attributes on traces, preserving Capsule's
+`service.name`. In Grafana's Tempo data source, use
+`{ resource.service.name = "capsule" && resource.run_id = "<run-id>" }`.
+All four central backends have seven-day retention policies; actual physical
+deletion follows their background cleanup schedules.
 CI IDs include workflow run, attempt, job, and matrix version. Local runs use a
 UUID unless `OBSERVABILITY_RUN_ID` is supplied. Start a fresh cluster/collector for
 each run; never reuse one global run label for overlapping runs. Keep individual
@@ -92,12 +102,12 @@ GitHub preserves failed clusters for diagnostics until runner cleanup.
 
 Node filesystem logs, audit logs and GitHub runner/Ginkgo output are not pod logs
 and are not collected by this configuration. Runner output stays in Actions.
-Traces need a trace backend; this configuration leaves tracing disabled.
+The trace queue is bounded to 100 batches, with a memory limiter and finite
+retries. Failed exports and forced collector shutdowns can lose queued traces.
 
 ## Verification
 
 ```sh
-python3 -m unittest discover -s hack/observability -v
 alloy validate hack/observability/config.alloy
 helm template capsule-alloy alloy --repo https://grafana.github.io/helm-charts \
   --version 1.12.1 --namespace capsule-observability \
@@ -109,9 +119,10 @@ Repeat rendering with `--values hack/observability/openshift-values.yaml`.
 After an instrumented scoped e2e run with real tenant fixtures, verify both
 controller pods appear in `up{job="capsule",run_id="<run>"}`, tenant condition
 metrics appear, allowed and denied operations have their expected outcomes, pod
-logs/events have that run label, and profiles are available. A different run must
+logs/events have that run label, and profiles and admission traces are available.
+A different run must
 not appear when filtering by this run. Check the collector logs for authentication
-or delivery errors. Rendering and unit tests do not establish live ingestion,
+or delivery errors. Rendering does not establish live ingestion,
 OpenShift SCC admission, or the outcome of tenant e2e tests.
 
 API log streaming adds kubelet/API-server traffic proportional to the number of

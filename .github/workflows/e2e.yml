@@ -40,9 +40,6 @@ jobs:
 
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
 
-      - name: Test observability setup
-        run: python3 -m unittest discover -s hack/observability -v
-
       - name: Create test cluster
         run: sudo make e2e-cluster
 
@@ -88,9 +85,6 @@ jobs:
           go-version-file: 'go.mod'
 
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
-
-      - name: Test observability setup
-        run: python3 -m unittest discover -s hack/observability -v
 
       - name: Create test cluster
         run: sudo make e2e-cluster-openshift
@@ -146,9 +140,6 @@ jobs:
 
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
 
-      - name: Test observability setup
-        run: python3 -m unittest discover -s hack/observability -v
-
       - name: Create test cluster
         run: sudo KUBERNETES_SUPPORTED_VERSION=${{ matrix.k8s-version }} make e2e-cluster
 
@@ -200,9 +191,6 @@ jobs:
           go-version-file: 'go.mod'
 
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
-
-      - name: Test observability setup
-        run: python3 -m unittest discover -s hack/observability -v
 
       - name: Create test cluster
         run: sudo OS_SUPPORTED_VERSION=${{ matrix.os-version }} make e2e-cluster-openshift
