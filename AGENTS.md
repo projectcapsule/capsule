@@ -135,7 +135,8 @@ consistent with the existing layering and avoid circular imports.
   dependencies and the standard library before adding a dependency.
 - Format Go code according to `.golangci.yaml`, including standard-library,
   external, and `github.com/projectcapsule/capsule` import groups. Format test files
-  too, even where lint configuration excludes them.
+  too, even where lint configuration excludes them. Run `go fix ./...` on new code
+  to apply standard Go fixes and modernization.
 - Include the repository's copyright and Apache-2.0 SPDX headers in new Go files.
   Follow the current source/linter convention; leave generated headers to tooling.
 - Pass the caller's `context.Context` through API calls and work that can block.
@@ -462,6 +463,7 @@ and `go.mod` instead of independently selecting newer tools.
 | --- | --- |
 | Focused unit tests | `go test -race ./path/to/changed/package/...` (replace the path). |
 | Full unit suite | `make test` runs non-e2e packages with race detection and coverage, and invokes generation. Inspect resulting generated diffs. |
+| Go fix | `make gofix` (or `go fix ./...`) to apply standard Go fixes and modernizations on new code. |
 | Go lint | `make golint`. Format changed files first and inspect any automatic fixes. |
 | Deep-copy generation | `make generate`. |
 | CRD generation | `make manifests` (also invokes generation). |
