@@ -1,0 +1,215 @@
+logging {
+	level  = "info"
+	format = "json"
+}
+
+local.file "username" {
+	filename  = "/etc/monitoring-credentials/username"
+	is_secret = true
+}
+
+local.file "password" {
+	filename  = "/etc/monitoring-credentials/password"
+	is_secret = true
+}
+
+// These are disposable test clusters. Read pod logs and events across all
+// namespaces so evidence survives deletion of the short-lived tenant fixtures.
+discovery.kubernetes "pods" {
+	role = "pod"
+}
+
+discovery.relabel "logs" {
+	targets = discovery.kubernetes.pods.targets
+
+	rule {
+		source_labels = ["__meta_kubernetes_namespace"]
+		regex         = "capsule-observability"
+		action        = "drop"
+	}
+
+	rule {
+		source_labels = ["__meta_kubernetes_namespace"]
+		target_label  = "namespace"
+	}
+
+	rule {
+		source_labels = ["__meta_kubernetes_pod_name"]
+		target_label  = "pod"
+	}
+
+	rule {
+		source_labels = ["__meta_kubernetes_pod_container_name"]
+		target_label  = "container"
+	}
+
+	rule {
+		source_labels = ["__meta_kubernetes_pod_node_name"]
+		target_label  = "node"
+	}
+
+	rule {
+		source_labels = ["__meta_kubernetes_pod_container_name"]
+		target_label  = "service_name"
+	}
+
+	rule {
+		source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
+		regex         = "(.+)"
+		target_label  = "service_name"
+	}
+
+	rule {
+		target_label = "job"
+		replacement  = "kubernetes-pods"
+	}
+}
+
+loki.source.kubernetes "pods" {
+	targets    = discovery.relabel.logs.output
+	forward_to = [loki.write.monitoring.receiver]
+}
+
+loki.source.kubernetes_events "events" {
+	job_name   = "kubernetes-events"
+	log_format = "json"
+	forward_to = [loki.write.monitoring.receiver]
+}
+
+loki.write "monitoring" {
+	external_labels = {
+		run_id     = sys.env("RUN_ID"),
+		repository = sys.env("REPOSITORY"),
+		revision   = sys.env("REVISION"),
+	}
+
+	endpoint {
+		url = "https://loki.dev.projectcapsule.dev/loki/api/v1/push"
+
+		basic_auth {
+			username = local.file.username.content
+			password = local.file.password.content
+		}
+	}
+}
+
+// The e2e chart runs two replicas: retain one target per manager pod, rather
+// than scraping a load-balanced Service and mixing the replicas' counters.
+discovery.relabel "capsule" {
+	targets = discovery.kubernetes.pods.targets
+
+	rule {
+		source_labels = ["__meta_kubernetes_namespace", "__meta_kubernetes_pod_label_app_kubernetes_io_name", "__meta_kubernetes_pod_container_name", "__meta_kubernetes_pod_container_port_name", "__meta_kubernetes_pod_phase"]
+		regex         = "capsule-system;capsule;manager;metrics;Running"
+		action        = "keep"
+	}
+
+	rule {
+		source_labels = ["__meta_kubernetes_namespace"]
+		target_label  = "namespace"
+	}
+
+	rule {
+		source_labels = ["__meta_kubernetes_pod_name"]
+		target_label  = "pod"
+	}
+
+	rule {
+		source_labels = ["__meta_kubernetes_pod_container_name"]
+		target_label  = "container"
+	}
+
+	rule {
+		target_label = "service_name"
+		replacement  = "capsule"
+	}
+}
+
+prometheus.scrape "capsule" {
+	targets         = discovery.relabel.capsule.output
+	job_name        = "capsule"
+	scrape_interval = "15s"
+	scrape_timeout  = "10s"
+	forward_to      = [prometheus.remote_write.monitoring.receiver]
+}
+
+prometheus.scrape "alloy" {
+	targets = [{
+		__address__  = "127.0.0.1:12345",
+		service_name = "alloy",
+		run_url      = sys.env("RUN_URL"),
+	}]
+	job_name        = "alloy"
+	scrape_interval = "15s"
+	forward_to      = [prometheus.remote_write.monitoring.receiver]
+}
+
+prometheus.remote_write "monitoring" {
+	external_labels = {
+		run_id     = sys.env("RUN_ID"),
+		repository = sys.env("REPOSITORY"),
+		revision   = sys.env("REVISION"),
+	}
+
+	endpoint {
+		url = "https://prometheus.dev.projectcapsule.dev/api/v1/write"
+
+		basic_auth {
+			username = local.file.username.content
+			password = local.file.password.content
+		}
+
+		queue_config {
+			min_shards           = 1
+			max_shards           = 4
+			capacity             = 2500
+			max_samples_per_send = 1000
+		}
+	}
+}
+
+discovery.relabel "profiles" {
+	targets = discovery.relabel.capsule.output
+
+	rule {
+		source_labels = ["__address__"]
+		regex         = "(.*):[0-9]+"
+		replacement   = "$1:8082"
+		target_label  = "__address__"
+	}
+}
+
+pyroscope.scrape "capsule" {
+	targets         = discovery.relabel.profiles.output
+	scrape_interval = "60s"
+	forward_to      = [pyroscope.write.monitoring.receiver]
+
+	profiling_config {
+		// Go needs additional runtime sampling configuration for useful block and
+		// mutex profiles; do not imply those are collected by enabling pprof alone.
+		profile.block {
+			enabled = false
+		}
+
+		profile.mutex {
+			enabled = false
+		}
+	}
+}
+
+pyroscope.write "monitoring" {
+	external_labels = {
+		run_id     = sys.env("RUN_ID"),
+		repository = sys.env("REPOSITORY"),
+		revision   = sys.env("REVISION"),
+	}
+
+	endpoint {
+		url = "https://pyroscope.dev.projectcapsule.dev"
+
+		basic_auth {
+			username = local.file.username.content
+			password = local.file.password.content
+		}
+	}
+}

@@ -1,0 +1,5 @@
+# Test-only instrumentation; both endpoints stay inside the test cluster.
+manager:
+  extraArgs:
+    - --zap-encoder=json
+    - --enable-pprof=true

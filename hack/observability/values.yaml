@@ -1,0 +1,76 @@
+# One collector per disposable test cluster. No node access or monitoring CRDs.
+fullnameOverride: capsule-alloy
+crds:
+  create: false
+global:
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    fsGroup: 10001
+    seccompProfile:
+      type: RuntimeDefault
+controller:
+  type: deployment
+  replicas: 1
+  updateStrategy:
+    type: Recreate
+  terminationGracePeriodSeconds: 120
+  volumes:
+    extra:
+      - name: data
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: credentials
+        secret:
+          secretName: monitoring-credentials
+          defaultMode: 0440
+alloy:
+  enableReporting: false
+  storagePath: /var/lib/alloy
+  clustering:
+    enabled: false
+  envFrom:
+    - configMapRef:
+        name: observability-run
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: [ALL]
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 768Mi
+      ephemeral-storage: 2Gi
+  mounts:
+    varlog: false
+    dockercontainers: false
+    extra:
+      - name: data
+        mountPath: /var/lib/alloy
+      - name: credentials
+        mountPath: /etc/monitoring-credentials
+        readOnly: true
+configReloader:
+  securityContext:
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: [ALL]
+    seccompProfile:
+      type: RuntimeDefault
+rbac:
+  create: true
+  rules:
+    - apiGroups: [""]
+      resources: [pods, events]
+      verbs: [get, list, watch]
+  # Both lists must be nonempty: this chart concatenates their rendered YAML.
+  clusterRules:
+    - apiGroups: [""]
+      resources: [pods/log]
+      verbs: [get]

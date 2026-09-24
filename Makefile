@@ -28,6 +28,8 @@ OS_SUPPORTED_VERSION ?= "4.22.0-okd-scos.ec.10"
 KUBECTL ?= kubectl
 HELM ?= helm
 DEV_SETUP_TIMEOUT ?= 10m
+E2E_OBSERVABILITY ?= false
+E2E_OBSERVABILITY_VALUES = $(if $(filter true,$(E2E_OBSERVABILITY)),--values hack/observability/capsule-values.yaml,)
 
 # Options for 'bundle-build'
 ifneq ($(origin CHANNELS), undefined)
@@ -479,13 +481,16 @@ mocks: mockgen
 e2e-openshift: ginkgo
 	$(MAKE) e2e-build-openshift && $(MAKE) e2e-exec FILTER='&& !skip && !skip-on-openshift' && $(MAKE) e2e-destroy-openshift
 
-e2e-build-openshift: minc
+.PHONY: e2e-cluster-openshift
+e2e-cluster-openshift: minc
 	$(MINC) config set provider docker
 	$(MINC) config set microshift-version $(OS_SUPPORTED_VERSION)
 	$(MINC) create --disable-overlay-cache true
 	$(MINC) status
 	$(MAKE) dev-install-deps-openshift
 	$(MAKE) dev-setup-openshift-specifics
+
+e2e-build-openshift: e2e-cluster-openshift
 	$(MAKE) e2e-install-openshift
 
 
@@ -497,8 +502,11 @@ e2e-destroy-openshift: minc
 e2e: ginkgo
 	$(MAKE) e2e-build && $(MAKE) e2e-exec && $(MAKE) e2e-destroy
 
-e2e-build: kind
+.PHONY: e2e-cluster
+e2e-cluster: kind
 	$(MAKE) dev-build
+
+e2e-build: e2e-cluster
 	$(MAKE) e2e-install
 
 .PHONY: e2e-install
@@ -547,6 +555,7 @@ e2e-install: helm-controller-version ko-build-all dev-install-gw-api-crds
 		--set 'webhooks.hooks.calculations.rules[0].resources[2]=persistentvolumeclaims' \
 		--set 'webhooks.hooks.calculations.rules[0].scope=Namespaced' \
 		--set 'webhooks.hooks.calculations.namespaceSelector.matchLabels.env=e2e' \
+		$(E2E_OBSERVABILITY_VALUES) \
 		capsule \
 		./charts/capsule
 
@@ -571,6 +580,7 @@ e2e-install-openshift: helm-controller-version ko-build-all
 		--set "manager.options.logLevel=debug"\
 		--set "jobs.podSecurityContext.enabled=false"\
 		--set "jobs.securityContext.enabled=false"\
+		$(E2E_OBSERVABILITY_VALUES) \
 		capsule \
 		./charts/capsule
 
