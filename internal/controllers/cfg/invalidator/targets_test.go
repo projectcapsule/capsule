@@ -60,10 +60,13 @@ func TestRebuildTargetsInvalidatesCEL(t *testing.T) {
 	require.NoError(t, err)
 	_, err = r.CELCache.GetOrCompileBoolean("false", environment.NewExpressions)
 	require.NoError(t, err)
-	_, err = r.CELCache.GetOrCompileResourceCondition("object == null", environment.StoredExpressions)
+	condition, err := r.CELCache.GetOrCompileResourceCondition("object == null", environment.StoredExpressions)
 	require.NoError(t, err)
 	require.NoError(t, r.rebuildTargetsCache(t.Context(), logr.Discard()))
-	require.Equal(t, 3, r.CELCache.Stats(), "only active quota expressions should be warmed")
+	require.Equal(t, 4, r.CELCache.Stats(), "active quota expressions should be warmed without evicting resource conditions")
+	reused, err := r.CELCache.GetOrCompileResourceCondition("object == null", environment.StoredExpressions)
+	require.NoError(t, err)
+	require.Same(t, condition, reused)
 	keys := []string{customquotas.MakeCustomQuotaCacheKey(local.Namespace, local.Name), customquotas.MakeGlobalCustomQuotaCacheKey(global.Name)}
 	for i, key := range keys {
 		targets, ok := r.TargetsCache.Get(key)
@@ -81,7 +84,7 @@ func TestRebuildTargetsInvalidatesCEL(t *testing.T) {
 	require.NoError(t, r.Update(t.Context(), local))
 	require.NoError(t, r.Delete(t.Context(), global))
 	require.NoError(t, r.rebuildTargetsCache(t.Context(), logr.Discard()))
-	require.Equal(t, 2, r.CELCache.Stats())
+	require.Equal(t, 3, r.CELCache.Stats())
 	_, ok := r.TargetsCache.Get(keys[1])
 	require.False(t, ok)
 	targets, ok := r.TargetsCache.Get(keys[0])
@@ -91,7 +94,10 @@ func TestRebuildTargetsInvalidatesCEL(t *testing.T) {
 	require.Equal(t, "2", value.String())
 	require.NoError(t, r.Delete(t.Context(), local))
 	require.NoError(t, r.rebuildTargetsCache(t.Context(), logr.Discard()))
-	require.Zero(t, r.CELCache.Stats())
+	require.Equal(t, 1, r.CELCache.Stats())
+	reused, err = r.CELCache.GetOrCompileResourceCondition("object == null", environment.StoredExpressions)
+	require.NoError(t, err)
+	require.Same(t, condition, reused)
 }
 
 func TestRebuildTargetsPreservesCELOnListError(t *testing.T) {
@@ -134,11 +140,23 @@ func BenchmarkRebuildCELTargets(b *testing.B) {
 					}
 				}
 				r := newCELInvalidator(b, objects...)
+				conditions := make([]string, tenants*quotas)
+				for i := range conditions {
+					conditions[i] = fmt.Sprintf("object == null || object.metadata.namespace == 'tenant-%d'", i)
+					_, err := r.CELCache.GetOrCompileResourceCondition(conditions[i], environment.StoredExpressions)
+					require.NoError(b, err)
+				}
 				require.NoError(b, r.rebuildTargetsCache(b.Context(), logr.Discard()))
 				b.ReportAllocs()
 				for b.Loop() {
 					if err := r.rebuildTargetsCache(b.Context(), logr.Discard()); err != nil {
 						b.Fatal(err)
+					}
+					// Include the next use of resource conditions after quota invalidation.
+					for _, expression := range conditions {
+						if _, err := r.CELCache.GetOrCompileResourceCondition(expression, environment.StoredExpressions); err != nil {
+							b.Fatal(err)
+						}
 					}
 					if r.TargetsCache.Stats() != tenants*quotas {
 						b.Fatal("missing compiled targets")

@@ -113,6 +113,23 @@ func (c *CELCache) Reset() {
 	c.resourceConditions = 0
 }
 
+// ResetQuotaExpressions retires quota programs while preserving the separately
+// bounded resource-condition working set and programs already in use.
+func (c *CELCache) ResetQuotaExpressions() {
+	if c == nil {
+		return
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for key := range c.data {
+		if !key.resourceCondition {
+			delete(c.data, key)
+		}
+	}
+}
+
 func (c *CELCache) getOrCompile(
 	expression string,
 	resultType celruntime.ResultType,

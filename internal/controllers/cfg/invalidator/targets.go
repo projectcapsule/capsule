@@ -32,9 +32,9 @@ func (r *CacheInvalidator) rebuildTargetsCache(ctx context.Context, log logr.Log
 		"globalCustomQuotas", len(globalCustomQuotas.Items),
 	)
 
-	// Retire unused CEL programs before warming the active quota expressions.
-	// Resource-policy conditions are compiled on demand in the same shared cache.
-	r.CELCache.Reset()
+	// Retire quota programs before warming active expressions. Resource-policy
+	// conditions have a separate bounded lifecycle in the shared cache.
+	r.CELCache.ResetQuotaExpressions()
 	r.TargetsCache.Reset()
 
 	targetsByKey := make(map[string][]capsulev1beta2.CustomQuotaStatusTarget, len(customQuotas.Items)+len(globalCustomQuotas.Items))

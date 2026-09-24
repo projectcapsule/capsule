@@ -138,6 +138,48 @@ func TestCELCacheReset(t *testing.T) {
 	(*CELCache)(nil).Reset()
 }
 
+func TestCELCacheResetQuotaExpressions(t *testing.T) {
+	c, err := NewCELCache()
+	require.NoError(t, err)
+	for _, mode := range []environment.Type{environment.NewExpressions, environment.StoredExpressions} {
+		// Identical text must not confuse quota and resource-condition entries.
+		quota, err := c.GetOrCompileBoolean("true", mode)
+		require.NoError(t, err)
+		_, err = c.GetOrCompileQuantity(`quantity('1')`, mode)
+		require.NoError(t, err)
+		condition, err := c.GetOrCompileResourceCondition("true", mode)
+		require.NoError(t, err)
+		var wg sync.WaitGroup
+		for range 8 {
+			wg.Go(func() {
+				c.ResetQuotaExpressions()
+				reused, err := c.GetOrCompileResourceCondition("true", mode)
+				if err != nil || reused != condition {
+					t.Errorf("quota reset evicted a resource condition: %v", err)
+				}
+			})
+		}
+		wg.Wait()
+		next, err := c.GetOrCompileBoolean("true", mode)
+		require.NoError(t, err)
+		require.NotSame(t, quota, next)
+		allowed, err := quota.EvaluateBooleanWithVariables(t.Context(), nil)
+		require.NoError(t, err)
+		require.True(t, allowed, "in-flight quota evaluation must remain valid")
+	}
+	c.ResetQuotaExpressions()
+	require.Equal(t, 2, c.Stats())
+	for i := range maxResourceConditions {
+		_, err = c.GetOrCompileResourceCondition(fmt.Sprintf("object == null || %d == 0", i), environment.StoredExpressions)
+		require.NoError(t, err)
+	}
+	require.Equal(t, maxResourceConditions, c.Stats(), "quota resets must preserve condition eviction accounting")
+	c.Reset()
+	c.ResetQuotaExpressions()
+	require.Zero(t, c.Stats())
+	(*CELCache)(nil).ResetQuotaExpressions()
+}
+
 func TestCELCacheConcurrentReset(t *testing.T) {
 	c, err := NewCELCache()
 	require.NoError(t, err)
@@ -206,30 +248,36 @@ func BenchmarkResourceCondition(b *testing.B) {
 			}
 		})
 	})
-	b.Run("reset-cache", func(b *testing.B) {
-		b.ReportAllocs()
-		for b.Loop() {
-			c.Reset()
-			if _, err := c.GetOrCompileResourceCondition(expression, environment.StoredExpressions); err != nil {
-				b.Fatal(err)
-			}
-		}
-	})
-	b.Run("parallel-reset", func(b *testing.B) {
-		b.ReportAllocs()
-		b.RunParallel(func(pb *testing.PB) {
-			calls := 0
-			for pb.Next() {
-				if calls%128 == 0 {
-					c.Reset()
-				}
-				calls++
+	for name, reset := range map[string]func(){"reset-cache": c.Reset, "quota-reset-cache": c.ResetQuotaExpressions} {
+		b.Run(name, func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				reset()
 				if _, err := c.GetOrCompileResourceCondition(expression, environment.StoredExpressions); err != nil {
-					b.Error(err)
+					b.Fatal(err)
 				}
 			}
 		})
-	})
+	}
+
+	for name, reset := range map[string]func(){"parallel-reset": c.Reset, "parallel-quota-reset": c.ResetQuotaExpressions} {
+		b.Run(name, func(b *testing.B) {
+			b.ReportAllocs()
+			b.RunParallel(func(pb *testing.PB) {
+				calls := 0
+				for pb.Next() {
+					if calls%128 == 0 {
+						reset()
+					}
+					calls++
+					if _, err := c.GetOrCompileResourceCondition(expression, environment.StoredExpressions); err != nil {
+						b.Error(err)
+					}
+				}
+			})
+		})
+	}
+
 	b.Run("evaluate", func(b *testing.B) {
 		variables := map[string]any{"object": map[string]any{"metadata": map[string]any{"annotations": map[string]any{"rotated-at": "2026-09-21T10:00:00Z"}}}, "now": time.Date(2026, 9, 21, 10, 5, 0, 0, time.UTC)}
 		b.ReportAllocs()

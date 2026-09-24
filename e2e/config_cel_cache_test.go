@@ -111,6 +111,10 @@ var _ = Describe("CEL cache invalidation", Serial, Label("config", "cel-cache", 
 				g.Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(denied), &corev1.Pod{}))).To(BeTrue())
 			}
 		}, 3*interval, defaultPollInterval).Should(Succeed())
+		By("applying condition changes correctly with programs retained across quota rebuilds")
+		for i, namespace := range namespaces {
+			exerciseTenantResourceConditions(namespace, namespace, namespace, namespaces[1-i])
+		}
 		for _, namespace := range namespaces {
 			pod := &corev1.Pod{}
 			Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: namespace, Name: "quota-first"}, pod)).To(Succeed())
