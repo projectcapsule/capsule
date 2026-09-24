@@ -82,6 +82,9 @@ configReloader:
       type: RuntimeDefault
 rbac:
   create: true
+  # With no namespace restriction, chart 1.12.1 puts both rule lists in one
+  # ClusterRole and binds it to Alloy across the entire disposable cluster.
+  namespaces: []
   rules:
     - apiGroups: [""]
       resources: [pods, events]

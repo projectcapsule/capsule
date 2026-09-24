@@ -512,11 +512,15 @@ alloy-install:
 	export MONITORING_USERNAME_JSON MONITORING_PASSWORD_JSON; \
 	$(KUBECTL) apply --server-side --field-manager=capsule-observability -f hack/observability/namespace.yaml; \
 	if [ -n "$${GITHUB_OUTPUT:-}" ]; then echo 'started=true' >> "$$GITHUB_OUTPUT"; fi; \
-	if ! envsubst '$${MONITORING_USERNAME_JSON} $${MONITORING_PASSWORD_JSON}' < hack/observability/secret.yaml \
-		| $(KUBECTL) apply --field-manager=capsule-observability -f - >/dev/null 2>&1; then \
+	MONITORING_SECRET_RESOURCE_VERSION=$$($(KUBECTL) --namespace capsule-observability get secret monitoring-credentials --ignore-not-found -o jsonpath='{.metadata.resourceVersion}'); \
+	export MONITORING_SECRET_RESOURCE_VERSION; \
+	secret_action=create; \
+	if [ -n "$$MONITORING_SECRET_RESOURCE_VERSION" ]; then secret_action=replace; fi; \
+	if ! envsubst '$${MONITORING_USERNAME_JSON} $${MONITORING_PASSWORD_JSON} $${MONITORING_SECRET_RESOURCE_VERSION}' < hack/observability/secret.yaml \
+		| $(KUBECTL) "$$secret_action" --field-manager=capsule-observability -f - >/dev/null 2>&1; then \
 		echo 'Observability credential provisioning failed' >&2; exit 1; \
 	fi; \
-	unset MONITORING_USERNAME_JSON MONITORING_PASSWORD_JSON; \
+	unset MONITORING_USERNAME_JSON MONITORING_PASSWORD_JSON MONITORING_SECRET_RESOURCE_VERSION; \
 	envsubst '$${RUN_ID_JSON} $${REPOSITORY_JSON} $${REVISION_JSON} $${RUN_URL_JSON}' < hack/observability/values.yaml \
 		| $(HELM) upgrade --install capsule-alloy alloy \
 			--repo https://grafana.github.io/helm-charts --version $(ALLOY_CHART_VERSION) \
@@ -534,8 +538,11 @@ alloy-install-openshift: ALLOY_EXTRA_VALUES = --values hack/observability/opensh
 alloy-install-openshift: alloy-install
 
 alloy-uninstall:
-	$(HELM) uninstall capsule-alloy --namespace capsule-observability --ignore-not-found --wait --timeout 3m
-	$(KUBECTL) --namespace capsule-observability delete secret monitoring-credentials --ignore-not-found
+	@helm_status=0; secret_status=0; \
+	$(HELM) uninstall capsule-alloy --namespace capsule-observability --ignore-not-found --wait --timeout 3m || helm_status=$$?; \
+	$(KUBECTL) --namespace capsule-observability delete secret monitoring-credentials --ignore-not-found --request-timeout=30s --timeout=30s || secret_status=$$?; \
+	if [ "$$helm_status" -ne 0 ]; then exit "$$helm_status"; fi; \
+	exit "$$secret_status"
 
 .PHONY: e2e-cluster-openshift
 e2e-cluster-openshift: minc

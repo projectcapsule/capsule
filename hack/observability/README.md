@@ -24,6 +24,9 @@ variables through `sudo`, and sends a Kubernetes Secret through kubectl stdin.
 into kubectl and Helm stdin. Credentials do not enter Helm values, command
 arguments, generated files, or the run summary. Alloy mounts the Secret as files.
 There is no second manually managed collector Secret in each test cluster.
+The target creates or replaces that Secret using `stringData` without a
+last-applied annotation. Replacement checks its resource version and removes any
+annotation left by the earlier client-side apply implementation.
 
 The `e2e` workflow runs on matching branch pushes and manual `workflow_dispatch`
 runs in **projectcapsule/capsule**. Every job checks the repository, event, and
@@ -31,6 +34,9 @@ branch ref before starting. Pull-request events, PR refs, tags, and runs in fork
 are excluded. All checkouts use the event's exact commit (`github.sha`) from
 `projectcapsule/capsule`; no caller-supplied repository or SHA is accepted, and
 checkout credentials are not persisted.
+This intentionally provides no automatic e2e result for fork PRs. To validate a
+contribution with this workflow, a maintainer must first review and promote it to
+a trusted branch in `projectcapsule/capsule`.
 
 In the **monitoring** environment settings, restrict deployment branches to the
 repository branches trusted to execute with these credentials. These GitHub
@@ -83,6 +89,9 @@ Kubernetes Secrets, edit workloads, or access nodes. All containers use restrict
 PSS settings; the OpenShift overlay lets the SCC assign UID/groups. This is an
 administrator-operated collector for a dedicated test cluster, not a tenant-scoped
 installation for a shared production cluster.
+With `rbac.namespaces: []`, chart 1.12.1 combines `rbac.rules` and
+`rbac.clusterRules` in a ClusterRole, with a ClusterRoleBinding for Alloy's
+ServiceAccount. Pod/event discovery therefore has cluster-wide list/watch access.
 
 ## Local scoped run
 
@@ -112,7 +121,9 @@ workflow separates their stages to restrict credentials to collector setup.
 
 The collector uses a bounded ephemeral volume for its metrics WAL. Stop it while
 the cluster still exists: Helm waits for shutdown with a 120-second pod grace
-period, then `make alloy-uninstall` deletes the client Secret. A terminated runner,
+period, then `make alloy-uninstall` deletes the client Secret. Secret deletion is
+also attempted if Helm fails or times out, and the target still reports the Helm
+failure. A failed Secret deletion also fails the target. A terminated runner,
 prolonged backend outage, pod replacement, or exhausted volume can lose unsent telemetry.
 This is deliberately a single, non-HA collector, not a durable ingestion queue.
 GitHub preserves failed clusters for diagnostics until runner cleanup.
