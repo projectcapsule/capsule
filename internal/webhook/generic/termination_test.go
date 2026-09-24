@@ -24,7 +24,7 @@ import (
 )
 
 func TestProtectionAllowsNamespaceCleanup(t *testing.T) {
-	for name, handler := range map[string]handlers.Handler{"replication": ReplicaHandler(), "permit": ResourcePermitResourceHandler()} {
+	for name, handler := range map[string]handlers.Handler{"replication": ReplicaHandler()} {
 		for _, state := range []string{"active", "deleting", "terminating", "missing", "read error", "other namespace", "recreated", "cluster scoped"} {
 			for _, deleting := range []bool{false, true} {
 				t.Run(fmt.Sprintf("%s/%s/delete=%t", name, state, deleting), func(t *testing.T) {
@@ -106,7 +106,7 @@ func TestProtectionAllowsNamespaceCleanup(t *testing.T) {
 }
 
 func TestProtectionDeletionPreservesAdmissionErrors(t *testing.T) {
-	for name, handler := range map[string]handlers.Handler{"replication": ReplicaHandler(), "permit": ResourcePermitResourceHandler()} {
+	for name, handler := range map[string]handlers.Handler{"replication": ReplicaHandler()} {
 		t.Run(name, func(t *testing.T) {
 			c, req := replicationAdmissionFixture(t, false, false, 1)
 			req.OldObject.Raw = []byte("{")
@@ -122,7 +122,7 @@ func TestProtectionDeletionPreservesAdmissionErrors(t *testing.T) {
 func BenchmarkProtectionDeletion(b *testing.B) {
 	b.Setenv(configuration.EnvironmentServiceaccountName, "capsule")
 	b.Setenv(configuration.EnvironmentControllerNamespace, "capsule-system")
-	for name, handler := range map[string]handlers.Handler{"replication": ReplicaHandler(), "permit": ResourcePermitResourceHandler()} {
+	for name, handler := range map[string]handlers.Handler{"replication": ReplicaHandler()} {
 		for _, state := range []string{"active", "terminating", "authorized", "controller"} {
 			for _, namespaces := range []int{1, 1000} {
 				b.Run(fmt.Sprintf("%s/%s/namespaces=%d", name, state, namespaces), func(b *testing.B) {

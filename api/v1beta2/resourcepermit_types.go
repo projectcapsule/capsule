@@ -20,7 +20,7 @@ type ResourcePermitSpec struct {
 	// Params the parameters to use for the template.
 	Params *k8sruntime.RawExtension `json:"params,omitempty"`
 	// Requesting actor for the resource permit.
-	Requester resourcepermit.AccessEntity `json:"requester,omitempty"`
+	Requestor resourcepermit.AccessEntity `json:"requestor,omitempty"`
 	// A reason on why the request is needed
 	Reason string `json:"reason,omitempty"`
 	// The duration of this ResourcePermit should be valid for.

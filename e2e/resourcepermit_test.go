@@ -406,20 +406,20 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 		})
 	})
 
-	Describe("Approval based on requester identity", func() {
+	Describe("Approval based on requestor identity", func() {
 		BeforeEach(func() {
 			brt.Spec.Approvals = resourcepermit.ApprovalSpec{
 				Auto:       true,
-				Conditions: []string{`requester.name == "alice" && "developers" in requester.groups`},
+				Conditions: []string{`requestor.name == "alice" && "developers" in requestor.groups`},
 			}
 		})
 
-		It("auto-approves a matching authenticated requester", func() {
+		It("auto-approves a matching authenticated requestor", func() {
 			grantResourcePermitNamespaceAdmin(ctx, namespace.Name, "alice")
 
 			aliceClient := impersonationClient("alice", []string{"developers"})
 			br := &capsulev1beta2.ResourcePermit{
-				Name: "e2e-resourcepermit-requester-alice", Namespace: namespace.Name,
+				Name: "e2e-resourcepermit-requestor-alice", Namespace: namespace.Name,
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.GetName()),
 				},
@@ -433,12 +433,12 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 
-		It("rejects a non-matching authenticated requester", func() {
+		It("rejects a non-matching authenticated requestor", func() {
 			grantResourcePermitNamespaceAdmin(ctx, namespace.Name, "bob")
 
 			bobClient := impersonationClient("bob", []string{"developers"})
 			br := &capsulev1beta2.ResourcePermit{
-				Name: "e2e-resourcepermit-requester-bob", Namespace: namespace.Name,
+				Name: "e2e-resourcepermit-requestor-bob", Namespace: namespace.Name,
 				Spec: capsulev1beta2.ResourcePermitSpec{
 					Template: globalResourcePermitTemplateReference(brt.GetName()),
 				},

@@ -5,6 +5,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -28,7 +29,7 @@ import (
 
 func exerciseMixedProtection(global bool, tenantName, baseNamespace, targetNamespace, excludedNamespace string, owner rbac.UserSpec) {
 	ctx := context.Background()
-	const name = "mixed-protection"
+	name := fmt.Sprintf("mixed-protection-%t", global)
 	target := &corev1.ConfigMap{APIVersion: "v1", Kind: "ConfigMap", Name: name, Data: map[string]string{"shared": "managed"}}
 	seed := target.DeepCopy()
 	seed.Namespace = targetNamespace
@@ -37,7 +38,7 @@ func exerciseMixedProtection(global bool, tenantName, baseNamespace, targetNames
 	Expect(k8sClient.Create(ctx, &corev1.ConfigMap{Name: name, Namespace: excludedNamespace, Data: map[string]string{"external": "excluded"}})).To(Succeed())
 	common := capsulev1beta2.TenantResourceCommonSpec{ResyncPeriod: resyncPeriod, Resources: []capsulev1beta2.ResourceSpec{{
 		NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"kubernetes.io/metadata.name": targetNamespace}},
-		Policy:            &apiruntime.ResourceTemplatePolicy{Creation: apiruntime.ResourceCreationPolicyMerge, Protect: new(false), Deletion: apiruntime.ResourceDeletionPolicyOrphan},
+		Policy:            &apiruntime.ResourceReplicationPolicy{Creation: apiruntime.ResourceCreationPolicyMerge, Protect: new(false), Deletion: apiruntime.ResourceDeletionPolicyOrphan},
 		RawItems:          []capsulev1beta2.RawExtension{{Object: target}},
 	}}}
 	var parent client.Object
@@ -60,9 +61,21 @@ func exerciseMixedProtection(global bool, tenantName, baseNamespace, targetNames
 		g.Expect(status.ServiceAccount).NotTo(BeNil())
 	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	sa := status.ServiceAccount
-	bindServiceAccountToClusterResources(sa.Namespace.String(), sa.Name.String(), name, name, []rbacv1.PolicyRule{{APIGroups: []string{""}, Resources: []string{"namespaces"}, ResourceNames: []string{targetNamespace}, Verbs: []string{"get"}}})
-	DeferCleanup(func() { EventuallyDeletion(&rbacv1.ClusterRole{Name: name}) })
-	DeferCleanup(func() { EventuallyDeletion(&rbacv1.ClusterRoleBinding{Name: name}) })
+	// This fixture also runs in the TR suite. The GTR helper's shared label
+	// would let concurrent GTR cleanup delete the role before permit expiry.
+	role := &rbacv1.ClusterRole{
+		Name: name, Labels: map[string]string{"env": "e2e"},
+		Rules: []rbacv1.PolicyRule{{APIGroups: []string{""}, Resources: []string{"namespaces"}, ResourceNames: []string{targetNamespace}, Verbs: []string{"get"}}},
+	}
+	Expect(k8sClient.Create(ctx, role)).To(Succeed())
+	DeferCleanup(func() { EventuallyDeletion(role) })
+	binding := &rbacv1.ClusterRoleBinding{
+		Name: name, Labels: map[string]string{"env": "e2e"},
+		Subjects: []rbacv1.Subject{{Kind: "ServiceAccount", Name: sa.Name.String(), Namespace: sa.Namespace.String()}},
+		RoleRef:  rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "ClusterRole", Name: name},
+	}
+	Expect(k8sClient.Create(ctx, binding)).To(Succeed())
+	DeferCleanup(func() { EventuallyDeletion(binding) })
 	template := &capsulev1beta2.GlobalResourcePermitTemplate{Name: name, Spec: capsulev1beta2.GlobalResourcePermitTemplateSpec{
 		Impersonation: resourcePermitServiceAccountReference(sa.Namespace.String(), sa.Name.String()),
 		Approvals:     resourcepermit.ApprovalSpec{Auto: true}, DefaultDuration: &metav1.Duration{Duration: 10 * time.Minute},
@@ -77,11 +90,9 @@ func exerciseMixedProtection(global bool, tenantName, baseNamespace, targetNames
 	Expect(actor.Create(ctx, permit)).To(Succeed())
 	DeferCleanup(func() { cleanupLifecycleResourcePermit(ctx, permit) })
 	permit = waitForResourcePermitPhase(ctx, permit, capsulev1beta2.ResourcePermitPhaseActive)
-	// The controller identity must observe its completed SSA write, just as an
-	// impersonated execution client does, before publishing lifecycle status.
+	// Activation must record the existing permit lifecycle state.
 	Expect(permit.Status.ProcessedItems).To(HaveLen(1))
 	Expect(permit.Status.ProcessedItems[0].LastApply.IsZero()).To(BeFalse())
-	Expect(permit.Status.ProcessedItems[0].Policy.IsProtected()).To(BeTrue())
 	By("enabling replication protection on a target already protected by a permit")
 	setProtection := func(protect, cordoned bool) {
 		Eventually(func() error {

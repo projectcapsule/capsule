@@ -91,7 +91,7 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 				Namespace:         "default",
 				CreationTimestamp: v1.NewTime(time.Date(2026, time.September, 2, 8, 0, 0, 0, time.UTC)),
 				Spec: capsulev1beta2.ResourcePermitSpec{
-					Requester: resourcepermit.AccessEntity{
+					Requestor: resourcepermit.AccessEntity{
 						Name: "alice",
 						Type: resourcepermit.AccessEntityTypeUser,
 					},
@@ -401,7 +401,6 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 				cl.EXPECT().Get(gm.Any(), gm.Any(), matchUs).
 					Return(apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, "test-configmap"))
 				cl.EXPECT().Patch(gm.Any(), matchUs, gm.Any(), gm.Any()).Return(nil).Times(2)
-				cl.EXPECT().Get(gm.Any(), gm.Any(), matchUs).Return(nil)
 				scl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
 			},
 			verify: func(t *testing.T, br *capsulev1beta2.ResourcePermit) {
@@ -505,9 +504,8 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 			}
 
 			r := &ResourcePermitReconciler{
-				Client:           cl,
-				ControllerClient: cl,
-				Log:              ctrl.Log,
+				Client: cl,
+				Log:    ctrl.Log,
 			}
 
 			_, err := r.reconcile(context.Background(), ctrl.Log, tt.br)

@@ -44,7 +44,7 @@ func mutateReplicationPolicy(req admission.Request, decoder admission.Decoder, c
 		spec = &resource.Spec.TenantResourceCommonSpec
 	}
 
-	policy := apiruntime.ResourceTemplatePolicy{
+	policy := apiruntime.ResourceReplicationPolicy{
 		Creation: apiruntime.ResourceCreationPolicyOwner,
 		Deletion: apiruntime.ResourceDeletionPolicyRemove,
 		Protect:  new(true),

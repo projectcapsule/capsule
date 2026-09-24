@@ -127,7 +127,8 @@ func BenchmarkRebuildCELTargets(b *testing.B) {
 				for tenant := range tenants {
 					for item := range quotas {
 						namespace := fmt.Sprintf("tenant-%d", tenant)
-						objects = append(objects, &capsulev1beta2.CustomQuota{Name: fmt.Sprintf("quota-%d", item), Namespace: namespace,
+						objects = append(objects, &capsulev1beta2.CustomQuota{
+							Name: fmt.Sprintf("quota-%d", item), Namespace: namespace,
 							Spec: capsulev1beta2.CustomQuotaSpec{Sources: []capsulev1beta2.CustomQuotaSpecSource{quotaCELSource(fmt.Sprintf("quantity('%d')", item+1), namespace)}},
 						})
 					}

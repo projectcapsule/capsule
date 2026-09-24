@@ -90,7 +90,7 @@ func TestResourcePermitWaitsForManagedResourceDeletion(t *testing.T) {
 					}
 					cl := fake.NewClientBuilder().WithScheme(scheme).
 						WithStatusSubresource(permit).WithObjects(namespace, permit, target).WithReturnManagedFields().Build()
-					r := &ResourcePermitReconciler{Client: cl, ControllerClient: cl, resources: manager}
+					r := &ResourcePermitReconciler{Client: cl, resources: manager}
 					key := client.ObjectKeyFromObject(permit)
 
 					for range 2 {
@@ -146,7 +146,7 @@ func TestResourcePermitDeletionDoesNotPruneUnappliedPreview(t *testing.T) {
 	}
 	cl := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(permit).
 		WithObjects(namespace, permit, target).WithReturnManagedFields().Build()
-	r := &ResourcePermitReconciler{Client: cl, ControllerClient: cl}
+	r := &ResourcePermitReconciler{Client: cl}
 	current := &capsulev1beta2.ResourcePermit{}
 	require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(permit), current))
 	_, err := r.reconcile(ctx, ctrl.Log, current)
@@ -181,7 +181,7 @@ func TestResourcePermitExpiryBeforeActivationDoesNotNeedExecutionIdentity(t *tes
 		},
 	}
 	cl := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(permit).WithObjects(permit).Build()
-	r := &ResourcePermitReconciler{Client: cl, ControllerClient: cl}
+	r := &ResourcePermitReconciler{Client: cl}
 	current := &capsulev1beta2.ResourcePermit{}
 	require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(permit), current))
 	_, err := r.reconcile(ctx, ctrl.Log, current)

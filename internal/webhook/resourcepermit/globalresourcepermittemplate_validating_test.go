@@ -84,7 +84,7 @@ func TestGlobalResourcePermitTemplateValidationHandler(t *testing.T) {
 				Spec: capsulev1beta2.GlobalResourcePermitTemplateSpec{
 					Approvals: resourcepermit.ApprovalSpec{
 						Auto:       true,
-						Conditions: []string{"request.spec.reason == 'test'", `requester.name == "alice"`, `requestor.name == "alice"`},
+						Conditions: []string{"request.spec.reason == 'test'", `requestor.name == "alice"`},
 					},
 					Resources: []apiruntime.ResourceTemplate{{Targets: []runtime.RawExtension{{Object: &corev1.ConfigMap{}}}}},
 				},
@@ -209,7 +209,7 @@ metadata:
 			decoder := &test.Decoder[*capsulev1beta2.GlobalResourcePermitTemplate]{
 				Object: tt.brt,
 			}
-			validator := GlobalResourcePermitTemplateValidationHandler(log, nil)
+			validator := GlobalResourcePermitTemplateValidationHandler(log)
 
 			if tt.setup != nil {
 				tt.setup(cl)

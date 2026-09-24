@@ -29,15 +29,11 @@ func TestConditionalApply(t *testing.T) {
 	for _, tc := range []struct {
 		name, condition                               string
 		existing, skip, wantError, conflict, failRead bool
-		expected                                      *string
 	}{
 		{name: "absent false", condition: "false", skip: true},
 		{name: "existing false", condition: "false", existing: true, skip: true},
-		{name: "initial creation", condition: "object == null", expected: new("")},
-		{name: "existing true", condition: "object != null", existing: true, expected: new("7")},
-		{name: "stale context", condition: "true", existing: true, expected: new("6"), wantError: true},
-		{name: "context expected absent", condition: "true", existing: true, expected: new(""), wantError: true},
-		{name: "target disappeared", condition: "true", expected: new("7"), wantError: true},
+		{name: "initial creation", condition: "object == null"},
+		{name: "existing true", condition: "object != null", existing: true},
 		{name: "invalid condition", condition: "object..bad", wantError: true},
 		{name: "evaluation error", condition: "object.data.missing == 'x'", existing: true, wantError: true},
 		{name: "read denied", condition: "true", failRead: true, wantError: true},
@@ -54,7 +50,7 @@ func TestConditionalApply(t *testing.T) {
 			manager := Manager{Conditions: compiler, Metadata: Metadata{CreatedByValue: testCreatedBy, ManagedByValue: testCreatedBy}}
 			desired := configMap("guarded", map[string]any{"value": "new"})
 			original := desired.DeepCopy()
-			result, err := manager.Apply(t.Context(), c, desired, ApplyOptions{FieldOwner: testFieldOwner, Adopt: true, Condition: tc.condition, ExpectedResourceVersion: tc.expected})
+			result, err := manager.Apply(t.Context(), c, desired, ApplyOptions{FieldOwner: testFieldOwner, Adopt: true, Condition: tc.condition})
 			if (err != nil) != tc.wantError || result.Skipped != tc.skip {
 				t.Fatalf("result=%+v, error=%v", result, err)
 			}
@@ -119,6 +115,7 @@ func (c *conditionalClient) Get(ctx context.Context, key client.ObjectKey, obj c
 	}
 	return c.Client.Get(ctx, key, obj, opts...)
 }
+
 func (c *conditionalClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
 	c.creates++
 	if c.createRace {
@@ -126,6 +123,7 @@ func (c *conditionalClient) Create(ctx context.Context, obj client.Object, opts 
 	}
 	return c.Client.Create(ctx, obj, opts...)
 }
+
 func (c *conditionalClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
 	c.patches++
 	if patch.Type() != types.ApplyPatchType {

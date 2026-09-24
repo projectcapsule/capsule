@@ -1693,7 +1693,7 @@ func (in *ResourcePermitSpec) DeepCopyInto(out *ResourcePermitSpec) {
 		*out = new(runtime.RawExtension)
 		(*in).DeepCopyInto(*out)
 	}
-	in.Requester.DeepCopyInto(&out.Requester)
+	in.Requestor.DeepCopyInto(&out.Requestor)
 	if in.Duration != nil {
 		in, out := &in.Duration, &out.Duration
 		*out = new(metav1.Duration)
@@ -2413,7 +2413,7 @@ func (in *ResourceSpec) DeepCopyInto(out *ResourceSpec) {
 	*out = *in
 	if in.Policy != nil {
 		in, out := &in.Policy, &out.Policy
-		*out = new(apiruntime.ResourceTemplatePolicy)
+		*out = new(apiruntime.ResourceReplicationPolicy)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.NamespaceSelector != nil {

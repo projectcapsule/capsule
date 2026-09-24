@@ -13,7 +13,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/cel/environment"
@@ -60,17 +59,6 @@ func (m Manager) checkCondition(ctx context.Context, c client.Client, desired *u
 
 	if !allowed {
 		return existing, m.skippedResult(existing, opts), nil
-	}
-
-	if opts.ExpectedResourceVersion != nil {
-		version := ""
-		if existing != nil {
-			version = existing.GetResourceVersion()
-		}
-
-		if version != *opts.ExpectedResourceVersion {
-			return nil, result, apierrors.NewConflict(schema.GroupResource{Group: desired.GroupVersionKind().Group, Resource: desired.GetKind()}, desired.GetName(), fmt.Errorf("template context changed; render again from the current target"))
-		}
 	}
 
 	return existing, result, nil

@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	clt "github.com/projectcapsule/capsule/pkg/runtime/client"
@@ -124,6 +125,88 @@ func TestManagedMetadataPatches(t *testing.T) {
 		assertPatchValue(t, patches, "/metadata/labels/projectcapsule.dev~1created-by", testCreatedBy)
 		assertPatchValue(t, patches, "/metadata/ownerReferences/-", &owner)
 	})
+}
+
+func TestApplyUsesResponseWhenCacheLags(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		exists     bool
+		concurrent bool
+	}{
+		{name: "created object is absent from cache"},
+		{name: "adopted object has stale cached version", exists: true},
+		{name: "concurrent metadata change remains guarded", exists: true, concurrent: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := t.Context()
+			base := fake.NewClientBuilder().WithReturnManagedFields().Build()
+			existing := configMap("lagging", map[string]any{"external": "retained"})
+			if tc.exists {
+				if err := base.Create(ctx, existing); err != nil {
+					t.Fatal(err)
+				}
+			}
+			reads, writes := 0, 0
+			c := interceptor.NewClient(base, interceptor.Funcs{
+				Get: func(_ context.Context, _ client.WithWatch, _ client.ObjectKey, obj client.Object, _ ...client.GetOption) error {
+					reads++
+					if !tc.exists {
+						return apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, existing.GetName())
+					}
+					obj.(*unstructured.Unstructured).Object = existing.DeepCopy().Object
+					return nil
+				},
+				Patch: func(ctx context.Context, c client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+					writes++
+					if tc.concurrent && patch.Type() == types.JSONPatchType {
+						current := configMap("lagging", nil)
+						if err := c.Get(ctx, client.ObjectKeyFromObject(current), current); err != nil {
+							return err
+						}
+						current.SetAnnotations(map[string]string{"example.org/concurrent": "retained"})
+						if err := c.Update(ctx, current); err != nil {
+							return err
+						}
+					}
+					return c.Patch(ctx, obj, patch, opts...)
+				},
+			})
+			m := Manager{Metadata: Metadata{CreatedByValue: testCreatedBy, ManagedByValue: testCreatedBy, ProtectedByValue: testCreatedBy}}
+			desired := configMap("lagging", map[string]any{"requested": "applied"})
+			result, err := m.Apply(ctx, c, desired, ApplyOptions{FieldOwner: testFieldOwner, Adopt: tc.exists, Protect: true})
+			if tc.concurrent {
+				if err == nil {
+					t.Fatal("concurrent write must fail the metadata precondition")
+				}
+			} else if err != nil {
+				t.Fatalf("Apply() with stale cache: %v", err)
+			}
+			if reads != 1 || writes != 2 {
+				t.Fatalf("reads=%d, writes=%d; want one preflight read and two writes", reads, writes)
+			}
+			if result.LastApply == nil || result.Created == tc.exists {
+				t.Fatalf("unexpected lifecycle result: %+v", result)
+			}
+			actual := configMap("lagging", nil)
+			if err := base.Get(ctx, client.ObjectKeyFromObject(actual), actual); err != nil {
+				t.Fatal(err)
+			}
+			if tc.concurrent {
+				if actual.GetAnnotations()["example.org/concurrent"] != "retained" || actual.GetLabels()[meta.NewManagedByCapsuleLabel] != "" {
+					t.Fatalf("concurrent metadata was overwritten: %#v", actual.Object)
+				}
+			} else if actual.GetLabels()[meta.NewManagedByCapsuleLabel] != testCreatedBy {
+				t.Fatalf("missing lifecycle metadata: %#v", actual.GetLabels())
+			}
+			data, _, _ := unstructured.NestedStringMap(actual.Object, "data")
+			if data["requested"] != "applied" || (tc.exists && data["external"] != "retained") {
+				t.Fatalf("unexpected applied data: %#v", data)
+			}
+			if desired.GetResourceVersion() != "" || desired.GetLabels() != nil {
+				t.Fatal("Apply mutated its input")
+			}
+		})
+	}
 }
 
 func TestApplyUsesServerSideApply(t *testing.T) {
@@ -609,7 +692,7 @@ func (c *applyingClient) Patch(
 		return nil
 	}
 
-	return c.Client.Create(ctx, unstructuredObject.DeepCopy())
+	return c.Client.Create(ctx, unstructuredObject)
 }
 
 func (c *recordingClient) Patch(

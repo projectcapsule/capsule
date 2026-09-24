@@ -13,18 +13,16 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
-	celruntime "github.com/projectcapsule/capsule/pkg/runtime/cel"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
-func ResourcePermitTemplateValidationHandler(log logr.Logger, conditions celruntime.ResourceConditionCompiler) handlers.Handler {
-	return &resourcePermitTemplateValidationHandler{log: log, conditions: conditions}
+func ResourcePermitTemplateValidationHandler(log logr.Logger) handlers.Handler {
+	return &resourcePermitTemplateValidationHandler{log: log}
 }
 
 type resourcePermitTemplateValidationHandler struct {
-	log        logr.Logger
-	conditions celruntime.ResourceConditionCompiler
+	log logr.Logger
 }
 
 func (b *resourcePermitTemplateValidationHandler) OnCreate(
@@ -36,7 +34,7 @@ func (b *resourcePermitTemplateValidationHandler) OnCreate(
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		b.log.Info("Validation for ResourcePermitTemplate upon creation", "namespace", req.Namespace, "name", req.Name)
 
-		return validateNamespacedResourcePermitTemplate(decoder, req, b.conditions)
+		return validateNamespacedResourcePermitTemplate(decoder, req)
 	}
 }
 
@@ -58,19 +56,18 @@ func (b *resourcePermitTemplateValidationHandler) OnUpdate(
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		b.log.Info("Validation for ResourcePermitTemplate upon update", "namespace", req.Namespace, "name", req.Name)
 
-		return validateNamespacedResourcePermitTemplate(decoder, req, b.conditions)
+		return validateNamespacedResourcePermitTemplate(decoder, req)
 	}
 }
 
 func validateNamespacedResourcePermitTemplate(
 	decoder admission.Decoder,
 	req admission.Request,
-	conditions celruntime.ResourceConditionCompiler,
 ) *admission.Response {
 	brt := &capsulev1beta2.ResourcePermitTemplate{}
 	if err := decoder.Decode(req, brt); err != nil {
 		return ad.ErroredResponse(fmt.Errorf("failed to decode new object: %w", err))
 	}
 
-	return validateResourcePermitTemplate(brt, conditions)
+	return validateResourcePermitTemplate(brt)
 }

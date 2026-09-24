@@ -32,7 +32,7 @@ func exerciseReplicationPolicies(global bool, tenantName, baseNamespace, targetN
 		selected = append(selected, excludedNamespace)
 	}
 	selector := &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "kubernetes.io/metadata.name", Operator: metav1.LabelSelectorOpIn, Values: selected}}}
-	block := func(name string, policy *apiruntime.ResourceTemplatePolicy) capsulev1beta2.ResourceSpec {
+	block := func(name string, policy *apiruntime.ResourceReplicationPolicy) capsulev1beta2.ResourceSpec {
 		return capsulev1beta2.ResourceSpec{
 			NamespaceSelector: selector,
 			Policy:            policy,
@@ -47,9 +47,9 @@ func exerciseReplicationPolicies(global bool, tenantName, baseNamespace, targetN
 		PruningOnDelete: new(false),
 		Resources: []capsulev1beta2.ResourceSpec{
 			block("policy-legacy", nil),
-			block("policy-owner", &apiruntime.ResourceTemplatePolicy{Creation: apiruntime.ResourceCreationPolicyOwner, Protect: new(false)}),
-			block("policy-conflict", &apiruntime.ResourceTemplatePolicy{Creation: apiruntime.ResourceCreationPolicyMerge}),
-			block("policy-unprotected", &apiruntime.ResourceTemplatePolicy{Protect: new(false)}),
+			block("policy-owner", &apiruntime.ResourceReplicationPolicy{Creation: apiruntime.ResourceCreationPolicyOwner, Protect: new(false)}),
+			block("policy-conflict", &apiruntime.ResourceReplicationPolicy{Creation: apiruntime.ResourceCreationPolicyMerge}),
+			block("policy-unprotected", &apiruntime.ResourceReplicationPolicy{Protect: new(false)}),
 		},
 	}
 	var parent client.Object
@@ -79,7 +79,7 @@ func exerciseReplicationPolicies(global bool, tenantName, baseNamespace, targetN
 	By("retaining deprecated fields while converting only the missing policy")
 	Expect(spec.Settings.Adopt).To(Equal(new(true)))
 	Expect(spec.Settings.Force).To(Equal(new(true)))
-	Expect(spec.Resources[0].Policy).To(Equal(&apiruntime.ResourceTemplatePolicy{Creation: apiruntime.ResourceCreationPolicyMerge, Force: true, Protect: new(true), Deletion: apiruntime.ResourceDeletionPolicyOrphan}))
+	Expect(spec.Resources[0].Policy).To(Equal(&apiruntime.ResourceReplicationPolicy{Creation: apiruntime.ResourceCreationPolicyMerge, Force: true, Protect: new(true), Deletion: apiruntime.ResourceDeletionPolicyOrphan}))
 	Expect(spec.Resources[1].Policy.Creation).To(Equal(apiruntime.ResourceCreationPolicyOwner))
 	Expect(spec.Resources[2].Policy.Force).To(BeFalse())
 	By("rejecting adoption and SSA conflicts according to each explicit block policy")

@@ -48,10 +48,8 @@ func exerciseSharedReplicationProtection(global bool, tenantName, baseNamespace,
 			ResyncPeriod: resyncPeriod,
 			Resources: []capsulev1beta2.ResourceSpec{{
 				NamespaceSelector: &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "kubernetes.io/metadata.name", Operator: metav1.LabelSelectorOpIn, Values: selected}}},
-				Policy: &apiruntime.ResourceTemplatePolicy{
-					Creation: apiruntime.ResourceCreationPolicyMerge, Protect: new(false), Deletion: apiruntime.ResourceDeletionPolicyRemove,
-				},
-				RawItems: []capsulev1beta2.RawExtension{{Object: &corev1.ConfigMap{APIVersion: "v1", Kind: "ConfigMap", Name: name, Data: map[string]string{"shared": "managed"}}}},
+				Policy:            &apiruntime.ResourceReplicationPolicy{Creation: apiruntime.ResourceCreationPolicyMerge, Protect: new(false), Deletion: apiruntime.ResourceDeletionPolicyRemove},
+				RawItems:          []capsulev1beta2.RawExtension{{Object: &corev1.ConfigMap{APIVersion: "v1", Kind: "ConfigMap", Name: name, Data: map[string]string{"shared": "managed"}}}},
 			}},
 		}
 		parentName := fmt.Sprintf("shared-protection-%d", i)
@@ -81,8 +79,10 @@ func exerciseSharedReplicationProtection(global bool, tenantName, baseNamespace,
 	}
 	By("retaining a user field whose manager imitates a replication")
 	actor := impersonationClient(owner.Name, withDefaultGroups([]string{owner.Name}))
-	forged := &corev1.ConfigMap{APIVersion: "v1", Kind: "ConfigMap", Name: name, Namespace: targetNamespace,
-		Data: map[string]string{"forged-owner": "retained"}}
+	forged := &corev1.ConfigMap{
+		APIVersion: "v1", Kind: "ConfigMap", Name: name, Namespace: targetNamespace,
+		Data: map[string]string{"forged-owner": "retained"},
+	}
 	Expect(actor.Patch(ctx, forged, client.Apply, client.FieldOwner("2lclct9cwq6mg/"+targetNamespace+"/"+tenantName+"/0/raw-0/"))).To(Succeed())
 	By("assigning protection through skipped policy reconciliation")
 	for i, parent := range parents {
@@ -198,6 +198,36 @@ func exerciseSharedReplicationProtection(global bool, tenantName, baseNamespace,
 			Expect(ownerClient.Delete(ctx, cm, client.DryRunAll)).To(MatchError(ContainSubstring("is managed by a")))
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cm), cm)).To(Succeed())
 			Expect(cm.Labels).To(Equal(expected))
+			if marker[meta.CreatedByCapsuleLabel] != "" || marker[meta.NewManagedByCapsuleLabel] != "" {
+				By("keeping legacy tracking protected while the status index is empty")
+				var restore []func()
+				for _, parent := range parents {
+					patch, err := json.Marshal(map[string]any{"status": map[string]any{"processedItems": parent.status.ProcessedItems}})
+					Expect(err).NotTo(HaveOccurred())
+					restored := false
+					restoreParent := func() {
+						if !restored {
+							Expect(k8sClient.Status().Patch(ctx, parent.object, client.RawPatch(types.MergePatchType, patch))).To(Succeed())
+							restored = true
+						}
+					}
+					DeferCleanup(restoreParent)
+					restore = append(restore, restoreParent)
+					Expect(k8sClient.Status().Patch(ctx, parent.object, client.RawPatch(types.MergePatchType, []byte(`{"status":{"processedItems":[]}}`)))).To(Succeed())
+				}
+				Eventually(func() error {
+					return ownerClient.Delete(ctx, cm, client.DryRunAll)
+				}, defaultTimeoutInterval, defaultPollInterval).Should(MatchError(ContainSubstring("its managing parent is not yet available")))
+				Expect(ownerClient.Patch(ctx, cm, client.RawPatch(types.MergePatchType, []byte(`{"metadata":{"labels":null}}`)))).To(MatchError(ContainSubstring("protected by a capsule replication")))
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cm), cm)).To(Succeed())
+				Expect(cm.Labels).To(Equal(expected))
+				for _, restoreParent := range restore {
+					restoreParent()
+				}
+				Eventually(func() error {
+					return runner.Delete(ctx, cm, client.DryRunAll)
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			}
 		}
 	}
 	removeParent := func(parent replication) {

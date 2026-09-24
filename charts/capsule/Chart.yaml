@@ -43,7 +43,7 @@ annotations:
     - kind: fixed
       description: preserve legacy replication admission matching and independent protection for targets shared with ResourcePermits
     - kind: added
-      description: added CEL apply conditions to resource policies and a five-minute age-key rotation example retaining all historical keys
+      description: added CEL apply conditions to TenantResource and GlobalTenantResource policies
     - kind: added
       description: added per-resource SSA policy to TenantResource and GlobalTenantResource, with legacy settings fallback
     - kind: added

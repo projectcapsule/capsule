@@ -17,23 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func TestResourcePermitRequesterJSON(t *testing.T) {
-	t.Parallel()
-
-	spec := ResourcePermitSpec{
-		Template: ResourcePermitTemplateReference{Kind: GlobalResourcePermitTemplateKind, Name: "example"},
-		Requester: resourcepermit.AccessEntity{
-			Name: "alice", Type: resourcepermit.AccessEntityTypeUser, Groups: []string{"developers"},
-		},
-	}
-	raw, err := json.Marshal(spec)
-	require.NoError(t, err)
-	require.JSONEq(t, `{"template":{"kind":"GlobalResourcePermitTemplate","name":"example"},"requester":{"name":"alice","type":"User","groups":["developers"]}}`, string(raw))
-	var decoded ResourcePermitSpec
-	require.NoError(t, json.Unmarshal(raw, &decoded))
-	require.Equal(t, spec, decoded)
-}
-
 func TestOptionalResourcePermitFieldsAreOmitted(t *testing.T) {
 	t.Parallel()
 
@@ -74,7 +57,7 @@ func TestOptionalResourcePermitFieldsAreOmitted(t *testing.T) {
 func TestTransitionAuditTrail(t *testing.T) {
 	t.Parallel()
 
-	requester := &resourcepermit.AccessEntity{
+	requestor := &resourcepermit.AccessEntity{
 		Name:   "alice",
 		Type:   resourcepermit.AccessEntityTypeUser,
 		Groups: []string{"developers"},
@@ -82,8 +65,8 @@ func TestTransitionAuditTrail(t *testing.T) {
 	createdAt := metav1.NewTime(time.Date(2026, time.September, 2, 8, 0, 0, 0, time.UTC))
 	br := &ResourcePermit{CreationTimestamp: createdAt}
 
-	require.NoError(t, br.SetCreated(requester))
-	require.NoError(t, br.SetRequestedBy(requester))
+	require.NoError(t, br.SetCreated(requestor))
+	require.NoError(t, br.SetRequestedBy(requestor))
 	require.NoError(t, br.ApprovePermit(
 		&resourcepermit.AccessEntity{Type: resourcepermit.AccessEntityTypeSystem},
 		&ResourcePermitStatusRequest{},
@@ -93,15 +76,15 @@ func TestTransitionAuditTrail(t *testing.T) {
 
 	require.Len(t, br.Status.Transitions, 4)
 	assert.Equal(t, ResourcePermitPhaseCreated, br.Status.Transitions[0].Type)
-	assert.Equal(t, requester.Name, br.Status.Transitions[0].Actor.Name)
-	assert.Equal(t, requester.Type, br.Status.Transitions[0].Actor.Type)
+	assert.Equal(t, requestor.Name, br.Status.Transitions[0].Actor.Name)
+	assert.Equal(t, requestor.Type, br.Status.Transitions[0].Actor.Type)
 	assert.Equal(t, createdAt, br.Status.Transitions[0].Timestamp)
 	actorJSON, err := json.Marshal(br.Status.Transitions[0].Actor)
 	require.NoError(t, err)
 	assert.NotContains(t, string(actorJSON), "groups")
 	assert.Equal(t, ResourcePermitPhaseRequested, br.Status.Transitions[1].Type)
-	assert.Equal(t, requester.Name, br.Status.Transitions[1].Actor.Name)
-	assert.Equal(t, requester.Type, br.Status.Transitions[1].Actor.Type)
+	assert.Equal(t, requestor.Name, br.Status.Transitions[1].Actor.Name)
+	assert.Equal(t, requestor.Type, br.Status.Transitions[1].Actor.Type)
 	assert.Equal(t, ResourcePermitPhaseApproved, br.Status.Transitions[2].Type)
 	assert.Equal(t, ResourcePermitTransitionActor{
 		Name: capsuleControllerActorName,
@@ -144,12 +127,12 @@ func TestResourcePermitResolvedDataIsNestedUnderRequest(t *testing.T) {
 func TestResourcePermitFailureRetryLifecycle(t *testing.T) {
 	t.Parallel()
 
-	requester := &resourcepermit.AccessEntity{Name: "alice", Type: resourcepermit.AccessEntityTypeUser}
+	requestor := &resourcepermit.AccessEntity{Name: "alice", Type: resourcepermit.AccessEntityTypeUser}
 	br := &ResourcePermit{Status: ResourcePermitStatus{
 		Phase:   ResourcePermitPhaseApproved,
 		Request: &ResourcePermitStatusRequest{},
 		Review: &ReviewInfo{
-			Reviewer: requester,
+			Reviewer: requestor,
 			Verdict:  ResourcePermitVerdictApproved,
 		},
 	}}
@@ -164,19 +147,19 @@ func TestResourcePermitFailureRetryLifecycle(t *testing.T) {
 	require.NotNil(t, br.Status.Failure)
 	assert.Equal(t, ResourcePermitFailureStageActivation, br.Status.Failure.Stage)
 
-	require.NoError(t, br.RetryPermit(requester))
+	require.NoError(t, br.RetryPermit(requestor))
 	assert.Equal(t, ResourcePermitPhaseRetrying, br.Status.Phase)
 	require.NoError(t, br.CompleteRetry())
 	assert.Equal(t, ResourcePermitPhaseApproved, br.Status.Phase)
 	assert.Nil(t, br.Status.Failure)
-	assert.Equal(t, requester, br.Status.Review.Reviewer)
+	assert.Equal(t, requestor, br.Status.Review.Reviewer)
 
 	require.Len(t, br.Status.Transitions, 3)
 	assert.Equal(t, ResourcePermitPhaseFailed, br.Status.Transitions[0].Type)
 	assert.Equal(t, ResourcePermitPhaseRetrying, br.Status.Transitions[1].Type)
 	assert.Equal(t, ResourcePermitPhaseApproved, br.Status.Transitions[2].Type)
-	assert.Equal(t, requester.Name, br.Status.Transitions[1].Actor.Name)
-	assert.Equal(t, requester.Type, br.Status.Transitions[1].Actor.Type)
+	assert.Equal(t, requestor.Name, br.Status.Transitions[1].Actor.Name)
+	assert.Equal(t, requestor.Type, br.Status.Transitions[1].Actor.Type)
 }
 
 func TestExpirePermitTracksActor(t *testing.T) {

@@ -56,8 +56,8 @@ func TestMetadataFailureRetainsEffectivePolicy(t *testing.T) {
 			var err error
 			p.Conditions, err = cache.NewCELCache()
 			require.NoError(t, err)
-			oldPolicy := &apiruntime.ResourceTemplatePolicy{Condition: "false", Creation: apiruntime.ResourceCreationPolicyMerge, Protect: new(true), Deletion: apiruntime.ResourceDeletionPolicyOrphan}
-			processed := meta.ProcessedItems{{ResourceID: id, LastApply: previousApply, Policy: oldPolicy.DeepCopy()}}
+			oldPolicy := &apiruntime.ResourceReplicationPolicy{Condition: "false", Creation: apiruntime.ResourceCreationPolicyMerge, Protect: new(true), Deletion: apiruntime.ResourceDeletionPolicyOrphan}
+			processed := meta.ProcessedItems{{ResourceID: id, LastApply: previousApply, Policy: processedPolicy(oldPolicy)}}
 			acc := Accumulator{}
 			AccumulatorAdd(acc, id, AccumulatorObject{Object: obj.DeepCopy(), Policy: oldPolicy})
 			require.NoError(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, acc, opts))
@@ -68,7 +68,7 @@ func TestMetadataFailureRetainsEffectivePolicy(t *testing.T) {
 			failMetadata = true
 			desired := policyConfigMap("target", "example")
 			desired.Object["data"] = map[string]any{"key": "changed"}
-			newPolicy := &apiruntime.ResourceTemplatePolicy{Condition: condition, Creation: apiruntime.ResourceCreationPolicyMerge, Protect: new(false), Deletion: apiruntime.ResourceDeletionPolicyRemove}
+			newPolicy := &apiruntime.ResourceReplicationPolicy{Condition: condition, Creation: apiruntime.ResourceCreationPolicyMerge, Protect: new(false), Deletion: apiruntime.ResourceDeletionPolicyRemove}
 			acc = Accumulator{}
 			AccumulatorAdd(acc, id, AccumulatorObject{Object: desired, Policy: newPolicy})
 			require.Error(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, acc, opts))
@@ -90,8 +90,7 @@ func TestMetadataFailureRetainsEffectivePolicy(t *testing.T) {
 					t.Errorf("global=%t: target still protected, but protected-items index returned %v", global, keys)
 				}
 			}
-			expectedOld := oldPolicy.DeepCopy()
-			expectedOld.Condition = ""
+			expectedOld := processedPolicy(oldPolicy)
 			require.Equal(t, expectedOld, processed[0].Policy, "failed metadata reconciliation must retain previous effective policy")
 			require.Equal(t, "false", oldPolicy.Condition, "status projection must not mutate the input policy")
 			t.Run("removal follows the previous orphan policy", func(t *testing.T) {
@@ -107,8 +106,7 @@ func TestMetadataFailureRetainsEffectivePolicy(t *testing.T) {
 
 			failMetadata = false
 			require.NoError(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, acc, opts))
-			expectedNew := newPolicy.DeepCopy()
-			expectedNew.Condition = ""
+			expectedNew := processedPolicy(newPolicy)
 			require.Equal(t, expectedNew, processed[0].Policy, "successful retry commits the new policy")
 			require.NotSame(t, newPolicy, processed[0].Policy)
 			require.Equal(t, metav1.ConditionTrue, processed[0].Status)
@@ -125,12 +123,12 @@ func TestMetadataFailureTracksFirstApplyPolicy(t *testing.T) {
 		for _, tc := range []struct {
 			name                       string
 			adopted, previouslySkipped bool
-			policy                     *apiruntime.ResourceTemplatePolicy
+			policy                     *apiruntime.ResourceReplicationPolicy
 		}{
-			{name: "created orphan", policy: &apiruntime.ResourceTemplatePolicy{Deletion: apiruntime.ResourceDeletionPolicyOrphan}},
-			{name: "created remove", policy: &apiruntime.ResourceTemplatePolicy{Deletion: apiruntime.ResourceDeletionPolicyRemove}},
-			{name: "adopted orphan", adopted: true, policy: &apiruntime.ResourceTemplatePolicy{Creation: apiruntime.ResourceCreationPolicyMerge, Deletion: apiruntime.ResourceDeletionPolicyOrphan}},
-			{name: "previous skip then orphan", previouslySkipped: true, policy: &apiruntime.ResourceTemplatePolicy{Deletion: apiruntime.ResourceDeletionPolicyOrphan}},
+			{name: "created orphan", policy: &apiruntime.ResourceReplicationPolicy{Deletion: apiruntime.ResourceDeletionPolicyOrphan}},
+			{name: "created remove", policy: &apiruntime.ResourceReplicationPolicy{Deletion: apiruntime.ResourceDeletionPolicyRemove}},
+			{name: "adopted orphan", adopted: true, policy: &apiruntime.ResourceReplicationPolicy{Creation: apiruntime.ResourceCreationPolicyMerge, Deletion: apiruntime.ResourceDeletionPolicyOrphan}},
+			{name: "previous skip then orphan", previouslySkipped: true, policy: &apiruntime.ResourceReplicationPolicy{Deletion: apiruntime.ResourceDeletionPolicyOrphan}},
 			{name: "legacy creation"},
 		} {
 			t.Run(fmt.Sprintf("%s/condition=%q", tc.name, condition), func(t *testing.T) {
@@ -170,7 +168,7 @@ func TestMetadataFailureTracksFirstApplyPolicy(t *testing.T) {
 				require.Len(t, processed, 1)
 				require.Equal(t, !tc.adopted, processed[0].Created)
 				require.False(t, processed[0].LastApply.IsZero(), "partial apply must remain tracked for cleanup")
-				require.Equal(t, tc.policy, processed[0].Policy, "the first content write must preserve its lifecycle policy")
+				require.Equal(t, processedPolicy(tc.policy), processed[0].Policy, "the first content write must preserve its lifecycle policy")
 				require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(obj), obj))
 				failMetadata = false
 				require.NoError(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, Accumulator{}, opts))
@@ -212,7 +210,7 @@ func TestMetadataFailureRetainsLegacyProtection(t *testing.T) {
 	acc := Accumulator{}
 	desired := policyConfigMap("target", "legacy")
 	desired.Object["data"] = map[string]any{"key": "updated"}
-	AccumulatorAdd(acc, id, AccumulatorObject{Object: desired, Policy: &apiruntime.ResourceTemplatePolicy{Protect: new(false), Deletion: apiruntime.ResourceDeletionPolicyOrphan}})
+	AccumulatorAdd(acc, id, AccumulatorObject{Object: desired, Policy: &apiruntime.ResourceReplicationPolicy{Protect: new(false), Deletion: apiruntime.ResourceDeletionPolicyOrphan}})
 	require.ErrorContains(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, acc, opts), "applying of 1 resources failed")
 	require.Contains(t, processed[0].Message, "injected lifecycle metadata failure")
 	require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(obj), obj))

@@ -268,8 +268,8 @@ func TestApplyTracksSharedFieldsWithoutManagerTimestamp(t *testing.T) {
 	existing := skippedPolicyTarget(testFieldOwner, false)
 	existing.SetLabels(nil) // An adopted target, not created by Capsule.
 	c := fake.NewClientBuilder().WithObjects(existing).WithReturnManagedFields().WithInterceptorFuncs(interceptor.Funcs{
-		Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-			if err := c.Get(ctx, key, obj, opts...); err != nil {
+		Patch: func(ctx context.Context, c client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+			if err := c.Patch(ctx, obj, patch, opts...); err != nil {
 				return err
 			}
 			fields := obj.GetManagedFields()

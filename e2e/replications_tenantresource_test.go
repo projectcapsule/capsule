@@ -23,9 +23,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/template"
 )
 
-var (
-	resyncPeriod = metav1.Duration{Duration: 10 * time.Second}
-)
+var resyncPeriod = metav1.Duration{Duration: 10 * time.Second}
 
 const tenantResourceTargetLabel = "e2e.projectcapsule.dev/tenantresource-target"
 
@@ -375,7 +373,6 @@ rules:
 	})
 
 	Context("generators and template context", func() {
-
 		It("fails when a templated namespace resolves to a forbidden namespace", func() {
 			foreignSecret := &corev1.Secret{
 				Name:      "templated-foreign-secret",
@@ -846,7 +843,6 @@ data:
 				}, &corev1.ConfigMap{})
 			}, 5*time.Second, defaultPollInterval).Should(HaveOccurred())
 		})
-
 	})
 
 	Context("multiple TenantResources targeting the same object", func() {
@@ -1494,7 +1490,8 @@ data:
 			By("protecting the ServiceAccount referenced by TenantResource status")
 			serviceAccount := &corev1.ServiceAccount{
 				Name:      saNoDelete,
-				Namespace: baseNamespace}
+				Namespace: baseNamespace,
+			}
 			Eventually(func() bool {
 				err := k8sClient.Delete(ctx, serviceAccount, client.DryRunAll)
 
@@ -1522,7 +1519,6 @@ data:
 				}
 				return k8sClient.Update(ctx, current)
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-
 		})
 		It("fails to replicate namespacedItems when the impersonated service account cannot read source resources", func() {
 			saName := "restricted-source-reader"
@@ -1578,7 +1574,6 @@ data:
 				expectSecretAbsent(ns, "source-secret")
 			}
 		})
-
 	})
 
 	Context("advanced TenantResource ownership and namespace behavior", func() {
@@ -1812,7 +1807,6 @@ data:
 			}
 		})
 	})
-
 })
 
 func newRawConfigMapTenantResource(namespace, name string, data map[string]string) *capsulev1beta2.TenantResource {

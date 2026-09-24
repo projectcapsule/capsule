@@ -39,15 +39,15 @@ func (h *resourcePermitMutationHandler) OnCreate(_ client.Client, _ client.Reade
 			return ad.ErroredResponse(fmt.Errorf("failed to decode new object: %w", err))
 		}
 
-		requester := resourcepermit.AccessEntity{
+		requestor := resourcepermit.AccessEntity{
 			Name:   req.UserInfo.Username,
 			Type:   h.getAccessEntityType(req.UserInfo.Username),
 			Groups: req.UserInfo.Groups,
 		}
 
 		response := admission.Patched(
-			"set authenticated ResourcePermit requester",
-			jsonpatch.NewOperation("add", "/spec/requester", requester),
+			"set authenticated ResourcePermit requestor",
+			jsonpatch.NewOperation("add", "/spec/requestor", requestor),
 		)
 
 		return &response

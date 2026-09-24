@@ -182,12 +182,22 @@ func (p *Processor) pruneProcessedItem(
 
 	fieldOwner := opts.FieldOwnerPrefix + "/" + item.FieldOwner("")
 
+	// An unprotected adopted target is authorized through its SSA ownership.
+	// Release lifecycle metadata before pruning removes that ownership proof.
+	disowned := !item.Created && (item.Policy == nil || !item.Policy.IsProtected())
+	if disowned {
+		err := p.resourceManager().Disown(ctx, c, obj, fieldOwner, opts.Owner)
+		if failAndRecord(processed, itemErrors, item, "disowning failed for item: ", err) {
+			return true
+		}
+	}
+
 	deleted, err := p.Prune(ctx, c, obj, fieldOwner, &item)
 	if failAndRecord(processed, itemErrors, item, "pruning failed for item: ", err) {
 		return true
 	}
 
-	if deleted {
+	if deleted || disowned {
 		processed.RemoveItem(item)
 
 		return true
@@ -258,9 +268,6 @@ func (p *Processor) applyAccumulatedItem(
 	}
 	if current := processed.GetItem(item.Resource); current != nil {
 		or = *current
-		if current.Policy != nil && current.Policy.Condition != "" {
-			or.Policy = processedPolicy(current.Policy)
-		}
 	}
 
 	clusterScoped, err := p.isClusterScoped(item.Resource.GetGVK())
@@ -332,7 +339,6 @@ func (p *Processor) applyAccumulatorObject(
 		opts.Owner,
 		or,
 		obj.Policy,
-		obj.ExpectedResourceVersion,
 	)
 
 	or.Created = or.Created || result.Created
@@ -388,13 +394,12 @@ func (p *Processor) applyAccumulatorObject(
 
 // Conditions are evaluated from the source block, never from item status.
 // Keep a detached lifecycle snapshot without duplicating CEL text per target.
-func processedPolicy(policy *apiruntime.ResourceTemplatePolicy) *apiruntime.ResourceTemplatePolicy {
-	snapshot := policy.DeepCopy()
-	if snapshot != nil {
-		snapshot.Condition = ""
+func processedPolicy(policy *apiruntime.ResourceReplicationPolicy) *apiruntime.ResourceTemplatePolicy {
+	if policy == nil {
+		return nil
 	}
 
-	return snapshot
+	return policy.ResourceTemplatePolicy.DeepCopy()
 }
 
 func (p *Processor) objectForProcessedItem(item meta.ObjectReferenceStatus) (*unstructured.Unstructured, error) {
@@ -434,7 +439,7 @@ func failAndRecord(
 	(*itemErrors)++
 	item.Status = metav1.ConditionFalse
 	item.Message = msg + err.Error()
-	item.Policy = processedPolicy(item.Policy)
+	item.Policy = item.Policy.DeepCopy()
 	processed.UpdateItem(item)
 
 	return true
@@ -490,18 +495,16 @@ func (r *Processor) Apply(
 	adopt bool,
 	ownerreference *metav1.OwnerReference,
 	current *meta.ObjectReferenceStatus,
-	policy *apiruntime.ResourceTemplatePolicy,
-	expectedResourceVersion *string,
+	policy *apiruntime.ResourceReplicationPolicy,
 ) (ssa.ApplyResult, error) {
 	previouslyCreated := current != nil && current.Created
 
 	options := ssa.ApplyOptions{
-		FieldOwner:              fieldOwner,
-		Force:                   force,
-		Adopt:                   adopt,
-		OwnerReference:          ownerreference,
-		PreviouslyCreated:       previouslyCreated,
-		ExpectedResourceVersion: expectedResourceVersion,
+		FieldOwner:        fieldOwner,
+		Force:             force,
+		Adopt:             adopt,
+		OwnerReference:    ownerreference,
+		PreviouslyCreated: previouslyCreated,
 	}
 
 	if policy != nil {

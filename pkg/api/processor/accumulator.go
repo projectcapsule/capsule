@@ -21,10 +21,9 @@ type AccumulatorItem struct {
 
 // Keeps track of generated items.
 type AccumulatorObject struct {
-	Origin                  gvk.TenantResourceIDWithOrigin
-	Object                  *unstructured.Unstructured
-	Policy                  *apiruntime.ResourceTemplatePolicy
-	ExpectedResourceVersion *string
+	Origin gvk.TenantResourceIDWithOrigin
+	Object *unstructured.Unstructured
+	Policy *apiruntime.ResourceReplicationPolicy
 }
 
 func AccumulatorAdd(

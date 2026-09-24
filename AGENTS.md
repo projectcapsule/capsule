@@ -532,10 +532,6 @@ declare the change fully validated while required evidence is missing.
 
 ## Generated files, charts, and completion
 
-- Maintain user-facing feature documentation in the sibling `../website` repository,
-  integrating with its existing concepts, replication, and permit guides. Keep
-  runnable examples here and link to the canonical website documentation instead
-  of duplicating feature guides in chart or playground READMEs.
 - Edit API source and Kubebuilder markers, then regenerate. Do not hand-edit
   `zz_generated.deepcopy.go` or generated CRDs under `charts/capsule/crds/`.
 - Keep API types, defaults/validation, conversions, CRDs, RBAC, webhook rules, and

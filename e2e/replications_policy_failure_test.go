@@ -35,7 +35,7 @@ func exerciseReplicationPolicyFailure(global bool, tenantName, baseNamespace, ta
 	Expect(k8sClient.Create(ctx, &corev1.ConfigMap{Name: name, Namespace: excludedNamespace, Data: map[string]string{"external": "excluded"}})).To(Succeed())
 	common := capsulev1beta2.TenantResourceCommonSpec{ResyncPeriod: resyncPeriod, Resources: []capsulev1beta2.ResourceSpec{{
 		NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"kubernetes.io/metadata.name": targetNamespace}},
-		Policy:            &apiruntime.ResourceTemplatePolicy{Creation: apiruntime.ResourceCreationPolicyMerge, Protect: new(false), Deletion: apiruntime.ResourceDeletionPolicyOrphan},
+		Policy:            &apiruntime.ResourceReplicationPolicy{Creation: apiruntime.ResourceCreationPolicyMerge, Protect: new(false), Deletion: apiruntime.ResourceDeletionPolicyOrphan},
 		RawItems:          []capsulev1beta2.RawExtension{{Object: target}},
 	}}}
 	var parent client.Object
@@ -130,8 +130,7 @@ func exerciseReplicationPolicyFailure(global bool, tenantName, baseNamespace, ta
 		g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(parent), parent)).To(Succeed())
 		g.Expect(status.ProcessedItems).To(HaveLen(1))
 		g.Expect(status.ProcessedItems[0].Status).To(Equal(metav1.ConditionTrue))
-		expectedPolicy := spec.Resources[0].Policy.DeepCopy()
-		expectedPolicy.Condition = ""
+		expectedPolicy := spec.Resources[0].Policy.ResourceTemplatePolicy.DeepCopy()
 		g.Expect(status.ProcessedItems[0].Policy).To(Equal(expectedPolicy))
 		g.Expect(status.ProcessedItems[0].Message).To(BeEmpty())
 		g.Expect(k8sClient.Get(ctx, key, cm)).To(Succeed())
@@ -194,7 +193,7 @@ func exerciseInitialReplicationPolicyFailure(global bool, tenantName, baseNamesp
 	block := func(deletion apiruntime.ResourceDeletionPolicy, names ...string) capsulev1beta2.ResourceSpec {
 		resource := capsulev1beta2.ResourceSpec{
 			NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"kubernetes.io/metadata.name": targetNamespace}},
-			Policy:            &apiruntime.ResourceTemplatePolicy{Condition: condition, Creation: apiruntime.ResourceCreationPolicyMerge, Protect: new(true), Deletion: deletion},
+			Policy:            &apiruntime.ResourceReplicationPolicy{Condition: condition, Creation: apiruntime.ResourceCreationPolicyMerge, Protect: new(true), Deletion: deletion},
 		}
 		for _, target := range names {
 			resource.RawItems = append(resource.RawItems, capsulev1beta2.RawExtension{Object: &corev1.ConfigMap{APIVersion: "v1", Kind: "ConfigMap", Name: target, Data: map[string]string{"managed": "retained"}}})
@@ -224,7 +223,6 @@ func exerciseInitialReplicationPolicyFailure(global bool, tenantName, baseNamesp
 			g.Expect(item.LastApply.IsZero()).To(BeFalse())
 			g.Expect(item.Tenant).To(Equal(tenantName))
 			g.Expect(item.Policy).NotTo(BeNil())
-			g.Expect(item.Policy.Condition).To(BeEmpty())
 			g.Expect(item.Policy.IsProtected()).To(BeTrue())
 			g.Expect(item.Policy.ShouldOrphan()).To(Equal(item.Name != removed))
 			g.Expect(item.Created).To(Equal(item.Name != adopted))

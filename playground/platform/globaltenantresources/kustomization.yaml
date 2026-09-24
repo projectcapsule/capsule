@@ -6,4 +6,3 @@ resources:
   - gtr-sa-owner.yaml
   - gtr-proxy.yaml
   - gtr-limitranges.yaml
-  - gtr-age-keys.yaml

@@ -79,7 +79,7 @@ func TestResourcePermitActivationRetry(t *testing.T) {
 					return c.Patch(ctx, obj, patch, opts...)
 				},
 			})
-			r := &ResourcePermitReconciler{Client: cl, ControllerClient: cl}
+			r := &ResourcePermitReconciler{Client: cl}
 			key := client.ObjectKeyFromObject(permit)
 			current := &capsulev1beta2.ResourcePermit{}
 			require.NoError(t, cl.Get(ctx, key, current))

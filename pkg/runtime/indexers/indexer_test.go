@@ -145,6 +145,8 @@ func (f *fakeManager) GetControllerOptions() ctrlconfig.Controller {
 }
 func (f *fakeManager) GetConverterRegistry() conversion.Registry { return nil }
 
-var _ manager.Manager = (*fakeManager)(nil)
-var _ client.FieldIndexer = (*recordingFieldIndexer)(nil)
-var _ cluster.Cluster = (*fakeManager)(nil)
+var (
+	_ manager.Manager     = (*fakeManager)(nil)
+	_ client.FieldIndexer = (*recordingFieldIndexer)(nil)
+	_ cluster.Cluster     = (*fakeManager)(nil)
+)

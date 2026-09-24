@@ -25,7 +25,7 @@ func TestReplicationPolicyConversion(t *testing.T) {
 		t.Fatal(err)
 	}
 	decoder := admission.NewDecoder(scheme)
-	explicit := &apiruntime.ResourceTemplatePolicy{Creation: apiruntime.ResourceCreationPolicyOwner, Protect: new(false), Deletion: apiruntime.ResourceDeletionPolicyRemove}
+	explicit := &apiruntime.ResourceReplicationPolicy{Creation: apiruntime.ResourceCreationPolicyOwner, Protect: new(false), Deletion: apiruntime.ResourceDeletionPolicyRemove}
 	for _, kind := range []string{"TenantResource", "GlobalTenantResource"} {
 		for _, operation := range []admissionv1.Operation{admissionv1.Create, admissionv1.Update} {
 			for _, legacy := range []bool{false, true} {
@@ -67,7 +67,7 @@ func TestReplicationPolicyConversion(t *testing.T) {
 					if err := json.Unmarshal(mutated, &actual); err != nil {
 						t.Fatal(err)
 					}
-					want := &apiruntime.ResourceTemplatePolicy{Creation: apiruntime.ResourceCreationPolicyOwner, Protect: new(true), Force: legacy, Deletion: apiruntime.ResourceDeletionPolicyRemove}
+					want := &apiruntime.ResourceReplicationPolicy{Creation: apiruntime.ResourceCreationPolicyOwner, Protect: new(true), Force: legacy, Deletion: apiruntime.ResourceDeletionPolicyRemove}
 					if legacy {
 						want.Creation = apiruntime.ResourceCreationPolicyMerge
 						want.Deletion = apiruntime.ResourceDeletionPolicyOrphan
@@ -110,7 +110,7 @@ func TestReplicationPolicyConversionDefaultsAndSkips(t *testing.T) {
 	if !response.Allowed || len(response.Patches) != 1 {
 		t.Fatalf("missing defaults: %#v", response)
 	}
-	policy := response.Patches[0].Value.(apiruntime.ResourceTemplatePolicy)
+	policy := response.Patches[0].Value.(apiruntime.ResourceReplicationPolicy)
 	if policy.AllowsAdoption() || policy.Force || !policy.IsProtected() || policy.ShouldOrphan() {
 		t.Fatalf("incorrect defaults: %#v", policy)
 	}
@@ -145,7 +145,7 @@ func BenchmarkReplicationPolicyConversion(b *testing.B) {
 				for i := range spec.Resources {
 					spec.Resources[i].RawItems = []capsulev1beta2.RawExtension{{Raw: []byte(`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"example"},"data":{"key":"value"}}`)}}
 					if explicit {
-						spec.Resources[i].Policy = &apiruntime.ResourceTemplatePolicy{}
+						spec.Resources[i].Policy = &apiruntime.ResourceReplicationPolicy{}
 					}
 				}
 				req := replicationPolicyRequest(b, "GlobalTenantResource", spec)

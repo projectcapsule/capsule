@@ -30,11 +30,15 @@ func replicationOwnerFixture(global bool, target *unstructured.Unstructured, ten
 	item.LastApply = metav1.Now()
 	var parent client.Object
 	if global {
-		parent = &capsulev1beta2.GlobalTenantResource{Name: "global-parent", UID: "global-uid",
-			Status: capsulev1beta2.GlobalTenantResourceStatus{ProcessedItems: meta.ProcessedItems{item}}}
+		parent = &capsulev1beta2.GlobalTenantResource{
+			Name: "global-parent", UID: "global-uid",
+			Status: capsulev1beta2.GlobalTenantResourceStatus{ProcessedItems: meta.ProcessedItems{item}},
+		}
 	} else {
-		parent = &capsulev1beta2.TenantResource{Name: "local-parent", Namespace: "source-" + tenant, UID: "local-uid",
-			Status: capsulev1beta2.TenantResourceStatus{ProcessedItems: meta.ProcessedItems{item}}}
+		parent = &capsulev1beta2.TenantResource{
+			Name: "local-parent", Namespace: "source-" + tenant, UID: "local-uid",
+			Status: capsulev1beta2.TenantResourceStatus{ProcessedItems: meta.ProcessedItems{item}},
+		}
 	}
 	return parent, meta.ReplicationFieldOwnerPrefix(parent.GetName(), parent.GetNamespace()) + "/" + item.FieldOwner("")
 }

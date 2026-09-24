@@ -86,7 +86,7 @@ type ResourceSpec struct {
 	// An explicit policy replaces the deprecated spec.settings for this block.
 	// When omitted, admission converts legacy settings and pruningOnDelete into a policy.
 	// +optional
-	Policy *apiruntime.ResourceTemplatePolicy `json:"policy,omitempty"`
+	Policy *apiruntime.ResourceReplicationPolicy `json:"policy,omitempty"`
 
 	// Defines the Namespace selector to select the Tenant Namespaces on which the resources must be propagated.
 	// In case of nil value, all the Tenant Namespaces are targeted.

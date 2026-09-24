@@ -855,9 +855,8 @@ func main() {
 		)),
 		route.ResourcePermitTemplateValidation(resourcepermit.ResourcePermitTemplateValidationHandler(
 			ctrl.Log.WithName("webhooks").WithName("resourcepermittemplates"),
-			celCache,
 		)),
-		route.GlobalResourcePermitTemplateValidation(resourcepermit.GlobalResourcePermitTemplateValidationHandler(ctrl.Log.WithName("webhooks").WithName("globalresourcepermittemplates"), celCache)),
+		route.GlobalResourcePermitTemplateValidation(resourcepermit.GlobalResourcePermitTemplateValidationHandler(ctrl.Log.WithName("webhooks").WithName("globalresourcepermittemplates"))),
 		route.GenericResourcePermitHandler(),
 	)
 
@@ -954,12 +953,10 @@ func main() {
 	}
 
 	if err = (&resourcepermitcontroller.ResourcePermitReconciler{
-		ControllerClient:   directClient,
 		Log:                ctrl.Log.WithName("capsule.ctrl").WithName("resourcepermit"),
 		Metrics:            *metrics.MustMakeResourcePermitsRecorder(),
 		Configuration:      cfg,
 		ImpersonationCache: impersonationCache,
-		Conditions:         celCache,
 	}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ResourcePermitReconciler")
 		os.Exit(1)

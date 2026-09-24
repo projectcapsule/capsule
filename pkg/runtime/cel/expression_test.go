@@ -69,9 +69,9 @@ func TestCompileBooleanWithVariables(t *testing.T) {
 	}
 
 	compiled, err := compiler.CompileBooleanWithVariables(
-		`requester.name == "alice" && "admin" in reviewer.groups`,
+		`requestor.name == "alice" && "admin" in reviewer.groups`,
 		environment.StoredExpressions,
-		"requester",
+		"requestor",
 		"reviewer",
 	)
 	if err != nil {
@@ -79,7 +79,7 @@ func TestCompileBooleanWithVariables(t *testing.T) {
 	}
 
 	got, err := compiled.EvaluateBooleanWithVariables(context.Background(), map[string]any{
-		"requester": map[string]any{"name": "alice"},
+		"requestor": map[string]any{"name": "alice"},
 		"reviewer":  map[string]any{"groups": []string{"users", "admin"}},
 	})
 	if err != nil {

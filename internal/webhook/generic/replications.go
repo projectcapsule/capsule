@@ -20,6 +20,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
+	"github.com/projectcapsule/capsule/pkg/runtime/ssa"
 	"github.com/projectcapsule/capsule/pkg/users"
 )
 
@@ -171,7 +172,116 @@ func (h *replicaHandler) handler(
 		return ad.Denyf("resource %s is protected by a capsule replication; its managing parent is not yet available", req.Name)
 	}
 
+	if old.Labels[meta.CreatedByCapsuleLabel] == meta.ValueControllerReplications ||
+		old.Labels[meta.NewManagedByCapsuleLabel] == meta.ValueControllerReplications {
+		// Current unprotected targets also carry tracking labels. Only an
+		// authoritative lifecycle status can distinguish them from legacy targets
+		// whose protection has not reached the status index yet.
+		unprotected, err := replicationKnownUnprotected(ctx, c, reader, old, gvkKey, req.UserInfo.Username)
+		if err != nil {
+			return ad.ErroredResponse(err)
+		}
+
+		if !unprotected {
+			return ad.Denyf("resource %s is protected by a capsule replication; its managing parent is not yet available", req.Name)
+		}
+	}
+
 	return nil
+}
+
+// Stable parent identities avoid using another lagging status index to authorize
+// a legacy target. Every replication manager must be accounted for before allowing
+// arbitrary users. A verified managing ServiceAccount can also proceed when an
+// unrelated field manager imitates a replication with no corresponding parent.
+func replicationKnownUnprotected(ctx context.Context, indexed, reader client.Reader, target client.Object, targetKey, username string) (bool, error) {
+	prefixes := ssa.ReplicationOwnerPrefixes(target, "")
+	if len(prefixes) == 0 {
+		return false, nil
+	}
+
+	allKnown, managingServiceAccount := true, false
+
+	for prefix := range prefixes {
+		parents, err := ssa.ReplicationOwnerCandidates(ctx, indexed, prefix)
+		if err != nil {
+			return false, err
+		}
+
+		if len(parents) == 0 {
+			allKnown = false
+
+			continue
+		}
+
+		for _, parent := range parents {
+			allowed, err := replicationParentUnprotected(ctx, reader, parent, target, targetKey)
+			if err != nil || !allowed {
+				return false, err
+			}
+
+			// The read above verified the current UID, applied target, exact
+			// field manager, and unprotected policy. Reuse that same snapshot.
+			switch parent := parent.(type) {
+			case *capsulev1beta2.GlobalTenantResource:
+				managingServiceAccount = managingServiceAccount || isAllowedServiceAccount(username, parent.Status.ServiceAccount)
+			case *capsulev1beta2.TenantResource:
+				managingServiceAccount = managingServiceAccount || isAllowedServiceAccount(username, parent.Status.ServiceAccount)
+			}
+		}
+	}
+
+	return allKnown || managingServiceAccount, nil
+}
+
+func replicationParentUnprotected(ctx context.Context, reader client.Reader, parent, target client.Object, targetKey string) (bool, error) {
+	uid := parent.GetUID()
+
+	if err := reader.Get(ctx, client.ObjectKeyFromObject(parent), parent); err != nil {
+		return false, client.IgnoreNotFound(err)
+	}
+
+	if parent.GetUID() != uid {
+		return false, nil
+	}
+
+	var items meta.ProcessedItems
+
+	switch parent := parent.(type) {
+	case *capsulev1beta2.GlobalTenantResource:
+		items = parent.Status.ProcessedItems
+	case *capsulev1beta2.TenantResource:
+		items = parent.Status.ProcessedItems
+	}
+
+	matched := false
+	prefix := meta.ReplicationFieldOwnerPrefix(parent.GetName(), parent.GetNamespace()) + "/"
+
+	for _, item := range items {
+		ref := item.ResourceID
+		if item.ClusterScoped {
+			ref.Namespace = ""
+		}
+
+		owner := prefix + item.FieldOwner("")
+
+		if (!item.Created && item.LastApply.IsZero()) || ref.GetGVKKey("") != targetKey || !slices.ContainsFunc(target.GetManagedFields(), func(field metav1.ManagedFieldsEntry) bool { return field.Manager == owner }) {
+			continue
+		}
+
+		protected := item.Created
+		if item.Policy != nil {
+			protected = item.Policy.IsProtected()
+		}
+
+		if protected {
+			return false, nil
+		}
+
+		matched = true
+	}
+
+	return matched, nil
 }
 
 // The status index only selects candidates. Verify an authorization against

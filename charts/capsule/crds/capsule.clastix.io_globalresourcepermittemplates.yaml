@@ -306,18 +306,6 @@ spec:
                       description: Policy controls how every target in this resource
                         group is created and managed.
                       properties:
-                        condition:
-                          description: |-
-                            Condition is an optional CEL boolean expression checked before each target
-                            is applied. object is the existing destination object, or null when absent;
-                            now is the evaluation timestamp. False skips rendered content without
-                            pruning or releasing an already managed object. Policy and protection are
-                            still reconciled for managed objects. Evaluation errors prevent writes.
-                            Rendering still occurs before evaluation. Omitting Condition preserves the
-                            existing apply behavior. Conditions do not affect deletion or orphaning.
-                          maxLength: 4096
-                          minLength: 1
-                          type: string
                         creation:
                           default: Owner
                           description: |-

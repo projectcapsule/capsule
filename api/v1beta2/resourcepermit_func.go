@@ -27,7 +27,7 @@ import (
 const capsuleControllerActorName = "capsule-controller"
 
 // SetCreated records the initial lifecycle state using the API server's object
-// creation time and attributes it to the authenticated requester.
+// creation time and attributes it to the authenticated requestor.
 func (br *ResourcePermit) SetCreated(entity *resourcepermit.AccessEntity) error {
 	timestamp := metav1.Now()
 	if !br.CreationTimestamp.IsZero() {
@@ -58,7 +58,7 @@ func (br *ResourcePermit) SetRequested() error {
 }
 
 // SetRequestedBy sets the ResourcePermit phase to Requested and attributes the
-// initial lifecycle transition to the authenticated requester.
+// initial lifecycle transition to the authenticated requestor.
 func (br *ResourcePermit) SetRequestedBy(entity *resourcepermit.AccessEntity) error {
 	return br.setRequested(entity)
 }
@@ -585,8 +585,8 @@ func (br *ResourcePermit) RenderResources(
 }
 
 func (br *ResourcePermit) templateRequestContext() template.ReferenceContext {
-	groups := make([]string, len(br.Spec.Requester.Groups))
-	copy(groups, br.Spec.Requester.Groups)
+	groups := make([]string, len(br.Spec.Requestor.Groups))
+	copy(groups, br.Spec.Requestor.Groups)
 
 	timestamp := ""
 	if !br.CreationTimestamp.IsZero() {
@@ -595,7 +595,7 @@ func (br *ResourcePermit) templateRequestContext() template.ReferenceContext {
 
 	return template.ReferenceContext{
 		"name":      br.Name,
-		"username":  br.Spec.Requester.Name,
+		"username":  br.Spec.Requestor.Name,
 		"groups":    groups,
 		"timestamp": timestamp,
 	}

@@ -30,14 +30,14 @@ import (
 func TestProcessorItemPolicy(t *testing.T) {
 	for _, tc := range []struct {
 		name                                                                  string
-		policy                                                                *apiruntime.ResourceTemplatePolicy
+		policy                                                                *apiruntime.ResourceReplicationPolicy
 		existing, legacyAdopt, legacyForce, wantError, wantForce, wantProtect bool
 	}{
 		{name: "legacy settings", existing: true, legacyAdopt: true, legacyForce: true, wantForce: true},
-		{name: "owner rejects adoption despite legacy setting", policy: &apiruntime.ResourceTemplatePolicy{}, existing: true, legacyAdopt: true, wantError: true},
-		{name: "merge overrides legacy settings", policy: &apiruntime.ResourceTemplatePolicy{Creation: apiruntime.ResourceCreationPolicyMerge}, existing: true, legacyForce: true, wantProtect: true},
-		{name: "owner creates protected resource", policy: &apiruntime.ResourceTemplatePolicy{}, wantProtect: true},
-		{name: "unprotected forced merge", policy: &apiruntime.ResourceTemplatePolicy{Creation: apiruntime.ResourceCreationPolicyMerge, Protect: new(false), Force: true}, existing: true, wantForce: true},
+		{name: "owner rejects adoption despite legacy setting", policy: &apiruntime.ResourceReplicationPolicy{}, existing: true, legacyAdopt: true, wantError: true},
+		{name: "merge overrides legacy settings", policy: &apiruntime.ResourceReplicationPolicy{Creation: apiruntime.ResourceCreationPolicyMerge}, existing: true, legacyForce: true, wantProtect: true},
+		{name: "owner creates protected resource", policy: &apiruntime.ResourceReplicationPolicy{}, wantProtect: true},
+		{name: "unprotected forced merge", policy: &apiruntime.ResourceReplicationPolicy{Creation: apiruntime.ResourceCreationPolicyMerge, Protect: new(false), Force: true}, existing: true, wantForce: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			obj := policyConfigMap("target", "example")
@@ -72,10 +72,10 @@ func TestProcessorItemPolicy(t *testing.T) {
 			if protected != tc.wantProtect {
 				t.Fatalf("protected=%v, want %v", protected, tc.wantProtect)
 			}
-			if !reflect.DeepEqual(processed[0].Policy, tc.policy) {
+			if !reflect.DeepEqual(processed[0].Policy, processedPolicy(tc.policy)) {
 				t.Fatalf("policy was not saved: %#v", processed[0].Policy)
 			}
-			if tc.policy != nil && processed[0].Policy == tc.policy {
+			if tc.policy != nil && processed[0].Policy == &tc.policy.ResourceTemplatePolicy {
 				t.Fatal("status shares mutable spec policy")
 			}
 		})
@@ -123,7 +123,7 @@ func TestProcessorRemovedItemPolicy(t *testing.T) {
 			if len(actual.GetOwnerReferences()) != 0 || actual.GetLabels()[meta.NewManagedByCapsuleLabel] != "" {
 				t.Fatalf("retained lifecycle metadata: %#v", actual.Object)
 			}
-			if tc.policy != nil && (actual.GetLabels()[meta.CreatedByCapsuleLabel] != "" || actual.GetLabels()[meta.ProtectedByCapsuleLabel] != "") {
+			if actual.GetLabels()[meta.CreatedByCapsuleLabel] != "" || actual.GetLabels()[meta.ProtectedByCapsuleLabel] != "" {
 				t.Fatalf("orphan retained tracking/protection: %#v", actual.GetLabels())
 			}
 			if actual.Object["data"] == nil {
@@ -141,7 +141,7 @@ func TestProcessorFailedPolicyUpdateRetainsCleanupState(t *testing.T) {
 	old := meta.ObjectReferenceStatus{ResourceID: id, LastApply: metav1.Now(), Policy: &apiruntime.ResourceTemplatePolicy{Deletion: apiruntime.ResourceDeletionPolicyOrphan}}
 	processed := meta.ProcessedItems{old}
 	acc := Accumulator{}
-	AccumulatorAdd(acc, id, AccumulatorObject{Object: obj, Policy: &apiruntime.ResourceTemplatePolicy{Creation: apiruntime.ResourceCreationPolicyMerge}})
+	AccumulatorAdd(acc, id, AccumulatorObject{Object: obj, Policy: &apiruntime.ResourceReplicationPolicy{Creation: apiruntime.ResourceCreationPolicyMerge}})
 	if err := p.Reconcile(t.Context(), logr.Discard(), c, &processed, acc, ProcessorOptions{}); err == nil {
 		t.Fatal("expected apply failure")
 	}
@@ -165,9 +165,9 @@ func BenchmarkProcessorPolicy(b *testing.B) {
 				acc := Accumulator{}
 				for i := range items {
 					obj := policyConfigMap("target", fmt.Sprintf("item-%d", i))
-					var policy *apiruntime.ResourceTemplatePolicy
+					var policy *apiruntime.ResourceReplicationPolicy
 					if explicit {
-						policy = &apiruntime.ResourceTemplatePolicy{}
+						policy = &apiruntime.ResourceReplicationPolicy{}
 					}
 					AccumulatorAdd(acc, gvk.NewResourceID(obj, "tenant-a", "0/raw"), AccumulatorObject{Object: obj, Policy: policy})
 				}
@@ -195,7 +195,7 @@ func BenchmarkProcessorPolicy(b *testing.B) {
 				acc := Accumulator{}
 				for i := range items {
 					obj := policyConfigMap("target", fmt.Sprintf("item-%d", i))
-					AccumulatorAdd(acc, gvk.NewResourceID(obj, "tenant-a", "0/raw"), AccumulatorObject{Object: obj, Policy: &apiruntime.ResourceTemplatePolicy{Protect: new(false)}})
+					AccumulatorAdd(acc, gvk.NewResourceID(obj, "tenant-a", "0/raw"), AccumulatorObject{Object: obj, Policy: &apiruntime.ResourceReplicationPolicy{Protect: new(false)}})
 				}
 				processed := meta.ProcessedItems{}
 				b.ReportAllocs()
@@ -257,13 +257,12 @@ func (c *policyRecordingClient) Patch(ctx context.Context, obj client.Object, pa
 	}
 	actual := policyConfigMap(obj.GetNamespace(), obj.GetName())
 	err := c.Client.Get(ctx, client.ObjectKeyFromObject(obj), actual)
-	desired := obj.DeepCopyObject().(client.Object)
 	if apierrors.IsNotFound(err) {
-		return c.Client.Create(ctx, desired)
+		return c.Client.Create(ctx, obj)
 	}
 	if err != nil {
 		return err
 	}
-	desired.SetResourceVersion(actual.GetResourceVersion())
-	return c.Client.Update(ctx, desired)
+	obj.SetResourceVersion(actual.GetResourceVersion())
+	return c.Client.Update(ctx, obj)
 }

@@ -32,10 +32,15 @@ func TestReplicationConditionsAdmission(t *testing.T) {
 				expression string
 				allow      bool
 			}{
-				{"", true}, {"false", true}, {`object == null || now > timestamp(object.metadata.creationTimestamp) + duration('5m')`, true},
-				{"object..broken", false}, {"42", false}, {" ", false}, {"undeclared == true", false},
+				{"", true},
+				{"false", true},
+				{`object == null || now > timestamp(object.metadata.creationTimestamp) + duration('5m')`, true},
+				{"object..broken", false},
+				{"42", false},
+				{" ", false},
+				{"undeclared == true", false},
 			} {
-				spec := capsulev1beta2.TenantResourceCommonSpec{Resources: []capsulev1beta2.ResourceSpec{{Policy: &apiruntime.ResourceTemplatePolicy{Condition: tc.expression}}}}
+				spec := capsulev1beta2.TenantResourceCommonSpec{Resources: []capsulev1beta2.ResourceSpec{{Policy: &apiruntime.ResourceReplicationPolicy{Condition: tc.expression}}}}
 				req := replicationPolicyRequest(t, kind, spec)
 				req.Operation = operation
 				run := h.OnCreate(nil, nil, decoder, nil)
@@ -68,7 +73,7 @@ func BenchmarkReplicationConditionAdmission(b *testing.B) {
 		b.Fatal(err)
 	}
 	h := Handler(nil, nil, conditions).OnCreate(nil, nil, decoder, nil)
-	spec := capsulev1beta2.TenantResourceCommonSpec{Resources: []capsulev1beta2.ResourceSpec{{Policy: &apiruntime.ResourceTemplatePolicy{Condition: `object == null || now > timestamp(object.metadata.creationTimestamp) + duration('5m')`}}}}
+	spec := capsulev1beta2.TenantResourceCommonSpec{Resources: []capsulev1beta2.ResourceSpec{{Policy: &apiruntime.ResourceReplicationPolicy{Condition: `object == null || now > timestamp(object.metadata.creationTimestamp) + duration('5m')`}}}}
 	req := replicationPolicyRequest(b, "GlobalTenantResource", spec)
 	if response := h(b.Context(), req); response == nil || !response.Allowed {
 		b.Fatal("condition rejected")

@@ -28,7 +28,7 @@ func TestCollectorCarriesBlockPolicyToEveryItem(t *testing.T) {
 	source := newUnstructured("v1", "ConfigMap", "source", "copied")
 	key, _ := gvk.KeyFromUnstructured(source)
 	sources := map[gvk.ResourceKey]*unstructured.Unstructured{key: source}
-	for _, policy := range []*apiruntime.ResourceTemplatePolicy{nil, {Creation: apiruntime.ResourceCreationPolicyMerge, Protect: new(false), Force: true, Deletion: apiruntime.ResourceDeletionPolicyOrphan}} {
+	for _, policy := range []*apiruntime.ResourceReplicationPolicy{nil, {Creation: apiruntime.ResourceCreationPolicyMerge, Protect: new(false), Force: true, Deletion: apiruntime.ResourceDeletionPolicyOrphan}} {
 		spec := capsulev1beta2.ResourceSpec{
 			Policy:     policy,
 			RawItems:   []capsulev1beta2.RawExtension{{Raw: []byte(`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"raw"}}`)}},

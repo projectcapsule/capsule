@@ -60,7 +60,8 @@ var _ = Describe("CEL cache invalidation", Serial, Label("config", "cel-cache", 
 			namespaces = append(namespaces, name)
 			actor := impersonationClient(owner.Name, withDefaultGroups([]string{owner.Name}))
 			actors = append(actors, actor)
-			customQuota := &capsulev1beta2.CustomQuota{Name: "cel-cache-quota", Namespace: name, Labels: map[string]string{"env": "e2e"},
+			customQuota := &capsulev1beta2.CustomQuota{
+				Name: "cel-cache-quota", Namespace: name, Labels: map[string]string{"env": "e2e"},
 				Spec: capsulev1beta2.CustomQuotaSpec{Limit: resource.MustParse("1"), Sources: []capsulev1beta2.CustomQuotaSpecSource{{
 					VersionKind: apiruntime.VersionKind{APIVersion: "v1", Kind: "Pod"},
 					CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
@@ -89,10 +90,11 @@ var _ = Describe("CEL cache invalidation", Serial, Label("config", "cel-cache", 
 		By("accepting valid conditions and rejecting invalid ones through repeated cache rebuilds")
 		Consistently(func(g Gomega) {
 			for i, namespace := range namespaces {
-				parent := &capsulev1beta2.TenantResource{Name: "condition-validation", Namespace: namespace,
+				parent := &capsulev1beta2.TenantResource{
+					Name: "condition-validation", Namespace: namespace,
 					Spec: capsulev1beta2.TenantResourceSpec{TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
 						Resources: []capsulev1beta2.ResourceSpec{{
-							Policy: &apiruntime.ResourceTemplatePolicy{Condition: "object == null"},
+							Policy: &apiruntime.ResourceReplicationPolicy{Condition: "object == null"},
 							RawItems: []capsulev1beta2.RawExtension{{Object: &corev1.ConfigMap{
 								APIVersion: "v1", Kind: "ConfigMap", Name: "validated", Data: map[string]string{"tenant": namespace},
 							}}},

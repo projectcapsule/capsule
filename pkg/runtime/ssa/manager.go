@@ -48,16 +48,14 @@ type Manager struct {
 // ApplyOptions configures one server-side apply operation.
 type ApplyOptions struct {
 	Condition string
-	// ExpectedResourceVersion binds a stateful render to its context snapshot.
-	// A non-nil empty version requires the destination to still be absent.
-	ExpectedResourceVersion *string
-	FieldOwner              string
-	Force                   bool
-	Adopt                   bool
-	Protect                 bool
-	DryRun                  bool
-	OwnerReference          *metav1.OwnerReference
-	PreviouslyCreated       bool
+
+	FieldOwner        string
+	Force             bool
+	Adopt             bool
+	Protect           bool
+	DryRun            bool
+	OwnerReference    *metav1.OwnerReference
+	PreviouslyCreated bool
 }
 
 // ApplyResult describes the resource after a successful apply.
@@ -126,9 +124,6 @@ func (m Manager) Apply(
 		labels[meta.ProtectionLabelPrefix+m.Metadata.ProtectedByValue] = meta.ValueTrue
 		desired.SetLabels(labels)
 	}
-
-	actual := objectReference(desired)
-	key := client.ObjectKeyFromObject(actual)
 
 	var snapshot []*unstructured.Unstructured
 
@@ -202,21 +197,13 @@ func (m Manager) Apply(
 		return ApplyResult{Created: created}, nil
 	}
 
-	err = retry.OnError(
-		retry.DefaultBackoff,
-		apierrors.IsNotFound,
-		func() error {
-			return c.Get(ctx, key, actual)
-		},
-	)
-	if err != nil {
-		return ApplyResult{Created: created, LastApply: initialized}, fmt.Errorf("failed to get object after apply: %w", err)
-	}
-
+	// Patch populates desired with the API response. A cached Get can still
+	// return the pre-apply version and fail the metadata patch's precondition.
+	actual := desired
 	lastApply := successfulApplyTime(actual, opts.FieldOwner)
 
 	// Build patches against the resulting object: SSA can add protection
-	// markers or relinquish legacy labels. Reuse the read above.
+	// markers or relinquish legacy labels. Reuse the apply response.
 	metadataOptions := opts
 	metadataOptions.PreviouslyCreated = created
 
@@ -337,10 +324,14 @@ func (m Manager) Disown(
 	}
 
 	patches := clt.RemoveOwnerReferencePatch(actual.GetOwnerReferences(), ownerReference)
-	if value, ok := actual.GetLabels()[meta.NewManagedByCapsuleLabel]; ok && value == m.Metadata.ManagedByValue && !hasOtherResourceOwners(owners, fieldOwner) {
-		patches = append(patches, clt.PatchRemoveLabels(actual.GetLabels(), []string{
-			meta.NewManagedByCapsuleLabel,
-		})...)
+	// Legacy replication retention also releases admission protection. Leaving
+	// created-by behind would look like an active parent with a stale index.
+	if !hasOtherResourceOwners(owners, fieldOwner) {
+		if m.Metadata.CreatedByValue == meta.ValueControllerReplications {
+			patches = append(patches, m.orphanMetadataPatches(actual)...)
+		} else if actual.GetLabels()[meta.NewManagedByCapsuleLabel] == m.Metadata.ManagedByValue {
+			patches = append(patches, clt.PatchRemoveLabels(actual.GetLabels(), []string{meta.NewManagedByCapsuleLabel})...)
+		}
 	}
 	// Protection is composed per controller, independently of shared tracking.
 	// A skipped apply can leave it owned by the lifecycle manager after pruning.

@@ -86,8 +86,8 @@ var _ = Describe("Replication settings migration", Serial,
 			for _, global := range []bool{false, true} {
 				for _, adopt := range []bool{false, true} {
 					name := fmt.Sprintf("migration-global-%t-adopt-%t", global, adopt)
-					explicit := &apiruntime.ResourceTemplatePolicy{Creation: apiruntime.ResourceCreationPolicyOwner, Force: false, Protect: new(false), Deletion: apiruntime.ResourceDeletionPolicyRemove}
-					block := func(suffix string, policy *apiruntime.ResourceTemplatePolicy) capsulev1beta2.ResourceSpec {
+					explicit := &apiruntime.ResourceReplicationPolicy{Creation: apiruntime.ResourceCreationPolicyOwner, Force: false, Protect: new(false), Deletion: apiruntime.ResourceDeletionPolicyRemove}
+					block := func(suffix string, policy *apiruntime.ResourceReplicationPolicy) capsulev1beta2.ResourceSpec {
 						return capsulev1beta2.ResourceSpec{
 							Policy:            policy,
 							NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"e2e.projectcapsule.dev/migration-target": "true"}},
@@ -138,6 +138,33 @@ var _ = Describe("Replication settings migration", Serial,
 					Expect(k8sClient.Get(ctx, key, parent)).To(Succeed())
 					Expect(spec.Resources[0].Policy).To(BeNil())
 					Expect(spec.Resources[2].Policy).To(BeNil())
+					if adopt {
+						By("releasing legacy retained targets without leaving admission tracking behind")
+						retained := common
+						retained.Cordoned = new(false)
+						retained.Resources = []capsulev1beta2.ResourceSpec{block("-legacy-retained", nil)}
+						var legacy client.Object
+						if global {
+							legacy = &capsulev1beta2.GlobalTenantResource{Name: name + "-legacy", Labels: map[string]string{seedLabel: "true"}, Spec: capsulev1beta2.GlobalTenantResourceSpec{Scope: api.ResourceScopeNamespace, TenantSelector: metav1.LabelSelector{MatchLabels: map[string]string{"e2e.projectcapsule.dev/migration": target}}, TenantResourceCommonSpec: retained}}
+						} else {
+							legacy = &capsulev1beta2.TenantResource{Name: name + "-legacy", Namespace: target, Labels: map[string]string{seedLabel: "true"}, Spec: capsulev1beta2.TenantResourceSpec{TenantResourceCommonSpec: retained}}
+						}
+						Expect(k8sClient.Create(ctx, legacy)).To(Succeed())
+						DeferCleanup(func() { ignoreNotFound(k8sClient.Delete(ctx, legacy)) })
+						expectConfigMapData(target, name+"-legacy-retained", map[string]string{"mode": "replicated"})
+						cm := &corev1.ConfigMap{Name: name + "-legacy-retained", Namespace: target}
+						actor := impersonationClient(owner.Name, withDefaultGroups(nil))
+						Eventually(func() error {
+							return actor.Delete(ctx, cm, client.DryRunAll)
+						}, defaultTimeoutInterval, defaultPollInterval).Should(MatchError(ContainSubstring("capsule replication")))
+						Expect(k8sClient.Delete(ctx, legacy)).To(Succeed())
+						Eventually(func() bool {
+							return apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(legacy), legacy))
+						}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
+						expectReplicationPolicyOrphan(target, cm.Name)
+						Expect(actor.Patch(ctx, cm, client.RawPatch(types.MergePatchType, []byte(`{"metadata":{"annotations":{"released":"true"}}}`)))).To(Succeed())
+						expectConfigMapAbsent(excluded, cm.Name)
+					}
 					seed := &corev1.ConfigMap{APIVersion: "v1", Kind: "ConfigMap", Name: name + "-existing", Namespace: target, Data: map[string]string{"mode": "external", "outside": "retained"}}
 					Expect(k8sClient.Patch(ctx, seed, client.Apply, client.FieldOwner("e2e-migration-external"))).To(Succeed())
 					By("migrating " + name + " through UPDATE admission")
@@ -152,7 +179,7 @@ var _ = Describe("Replication settings migration", Serial,
 						return k8sClient.Update(ctx, parent)
 					}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 					Expect(k8sClient.Get(ctx, key, parent)).To(Succeed())
-					want := &apiruntime.ResourceTemplatePolicy{Creation: apiruntime.ResourceCreationPolicyOwner, Force: adopt, Protect: new(true), Deletion: apiruntime.ResourceDeletionPolicyRemove}
+					want := &apiruntime.ResourceReplicationPolicy{Creation: apiruntime.ResourceCreationPolicyOwner, Force: adopt, Protect: new(true), Deletion: apiruntime.ResourceDeletionPolicyRemove}
 					if adopt {
 						want.Creation, want.Deletion = apiruntime.ResourceCreationPolicyMerge, apiruntime.ResourceDeletionPolicyOrphan
 					}

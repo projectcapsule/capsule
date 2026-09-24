@@ -105,9 +105,6 @@ func setReconcileReady(br *capsulev1beta2.ResourcePermit, err error) {
 type ResourcePermitReconciler struct {
 	client.Client
 
-	// ControllerClient executes resources with uncached reads under the controller identity.
-	ControllerClient client.Client
-
 	Metrics   metrics.ResourcePermitsRecorder
 	recorder  evt.EventRecorder
 	Log       logr.Logger
@@ -115,7 +112,6 @@ type ResourcePermitReconciler struct {
 
 	Configuration      configuration.Configuration
 	ImpersonationCache *cache.ImpersonationCache
-	Conditions         *cache.CELCache
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -134,7 +130,6 @@ func (r *ResourcePermitReconciler) SetupWithManager(mgr ctrl.Manager, _ utils.Co
 
 	r.resources = ssa.Manager{
 		ReplicationOwners: ssa.NewReplicationOwnerResolver(mgr.GetClient(), mgr.GetAPIReader()),
-		Conditions:        r.Conditions,
 		Reader:            mgr.GetAPIReader(),
 		Mapper:            mgr.GetRESTMapper(),
 		Metadata: ssa.Metadata{
@@ -503,7 +498,7 @@ func (r *ResourcePermitReconciler) reconcileNew(
 	log logr.Logger,
 	br *capsulev1beta2.ResourcePermit,
 ) (ctrl.Result, error) {
-	if err := br.SetCreated(&br.Spec.Requester); err != nil {
+	if err := br.SetCreated(&br.Spec.Requestor); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -573,7 +568,7 @@ func (r *ResourcePermitReconciler) reconcileNew(
 		)
 	}
 
-	if err := br.SetRequestedBy(&br.Spec.Requester); err != nil {
+	if err := br.SetRequestedBy(&br.Spec.Requestor); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -1004,7 +999,6 @@ func (r *ResourcePermitReconciler) dryRunItems(
 			_, err = manager.Apply(ctx, resourceClient, obj, ssa.ApplyOptions{
 				FieldOwner: fieldOwner,
 				Force:      resource.Policy.Force,
-				Condition:  resource.Policy.Condition,
 				Adopt:      resource.Policy.AllowsAdoption(),
 				Protect:    resource.Policy.IsProtected(),
 				DryRun:     true,
@@ -1093,31 +1087,14 @@ func (r *ResourcePermitReconciler) reconcileItems(
 			}
 
 			current := currentItems.GetItem(item.ResourceID)
-
 			result, applyErr := manager.Apply(ctx, resourceClient, obj, ssa.ApplyOptions{
 				FieldOwner:        fieldOwner,
 				Force:             resource.Policy.Force,
-				Condition:         resource.Policy.Condition,
 				Adopt:             resource.Policy.AllowsAdoption(),
 				Protect:           resource.Policy.IsProtected(),
 				PreviouslyCreated: current != nil && current.Created,
 			})
-
-			if current != nil {
-				item = *current
-			}
-
-			policyReconciled := applyErr == nil && (!result.Skipped || result.PolicyReconciled)
-			// A first content write records its policy even if the subsequent
-			// metadata patch fails. Previously applied items retain their last
-			// effective policy on failure, including a legacy nil snapshot.
-			firstContentApply := !result.Skipped && result.LastApply != nil && item.LastApply.IsZero() && item.Policy == nil
-			if policyReconciled || firstContentApply {
-				item.Policy = resource.Policy.DeepCopy()
-				item.Policy.Condition = ""
-			}
-
-			item.Created = item.Created || result.Created
+			item.Created = result.Created
 
 			if result.LastApply != nil {
 				item.LastApply = *result.LastApply
@@ -1129,12 +1106,6 @@ func (r *ResourcePermitReconciler) reconcileItems(
 				syncErr = errors.Join(syncErr, applyErr)
 			} else {
 				item.Status = metav1.ConditionTrue
-
-				item.Message = ""
-
-				if result.Skipped {
-					item.Message = ssa.ConditionNotMet
-				}
 			}
 
 			processedItems.UpdateItem(item)
@@ -1182,30 +1153,23 @@ func (r *ResourcePermitReconciler) pruneItems(
 			current := br.Status.ProcessedItems.GetItem(item.ResourceID)
 			obj.SetNamespace(item.Namespace)
 
-			if current != nil && (current.Created || !current.LastApply.IsZero()) {
+			//nolint:nestif
+			if current != nil {
 				item = *current
 			} else {
 				// Applying a resource and persisting its status are separate writes.
 				// Recover successful applies from the immutable rendered snapshot,
 				// but never prune a preview that this permit did not actually apply.
 				actual := obj.DeepCopy()
-
-				getErr := resourceClient.Get(ctx, client.ObjectKeyFromObject(actual), actual)
-				if apierrors.IsNotFound(getErr) {
-					br.Status.ProcessedItems.RemoveItem(item)
-
-					continue
-				}
-
-				if getErr != nil {
-					syncErr = errors.Join(syncErr, getErr)
+				if getErr := resourceClient.Get(ctx, client.ObjectKeyFromObject(actual), actual); getErr != nil {
+					if !apierrors.IsNotFound(getErr) {
+						syncErr = errors.Join(syncErr, getErr)
+					}
 
 					continue
 				}
 
 				if _, owned := meta.CapsuleFieldOwners(actual, fieldOwner)[fieldOwner]; !owned {
-					br.Status.ProcessedItems.RemoveItem(item)
-
 					continue
 				}
 
@@ -1400,11 +1364,7 @@ func (r *ResourcePermitReconciler) resourceClient(
 	controllerName, controllerNamespace := configuration.ControllerServiceAccount()
 	if serviceAccount.Name.String() == controllerName &&
 		serviceAccount.Namespace.String() == controllerNamespace {
-		if r.ControllerClient == nil {
-			return nil, errors.New("direct controller resource client is not configured")
-		}
-
-		return r.ControllerClient, nil
+		return r.Client, nil
 	}
 
 	if r.ImpersonationCache == nil {

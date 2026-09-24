@@ -17,8 +17,6 @@ import (
 
 const (
 	celRequestVariable   = "request"
-	celRequesterVariable = "requester"
-	// Deprecated CEL alias retained for stored templates and approval snapshots.
 	celRequestorVariable = "requestor"
 	celReviewerVariable  = "reviewer"
 	groupsField          = "groups"
@@ -50,7 +48,6 @@ func validateApprovalConditions(approvals resourcepermit.ApprovalSpec) error {
 			condition,
 			environment.NewExpressions,
 			celRequestVariable,
-			celRequesterVariable,
 			celRequestorVariable,
 			celReviewerVariable,
 		); err != nil {
@@ -62,7 +59,7 @@ func validateApprovalConditions(approvals resourcepermit.ApprovalSpec) error {
 }
 
 // EvaluateApprovalConditions evaluates the stored approval conditions against
-// a ResourcePermit and its requester/reviewer identities. Conditions are ORed.
+// a ResourcePermit and its requestor/reviewer identities. Conditions are ORed.
 func (brt *GlobalResourcePermitTemplate) EvaluateApprovalConditions(
 	ctx context.Context,
 	br *ResourcePermit,
@@ -123,12 +120,12 @@ func evaluateApprovalConditions(
 		return false, fmt.Errorf("convert ResourcePermit for approval condition: %w", err)
 	}
 
-	requester, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&br.Spec.Requester)
+	requestor, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&br.Spec.Requestor)
 	if err != nil {
-		return false, fmt.Errorf("convert requester for approval condition: %w", err)
+		return false, fmt.Errorf("convert requestor for approval condition: %w", err)
 	}
 
-	ensureGroups(requester)
+	ensureGroups(requestor)
 
 	reviewer := map[string]any{}
 	if br.Status.Review != nil && br.Status.Review.Reviewer != nil {
@@ -142,8 +139,7 @@ func evaluateApprovalConditions(
 
 	variables := map[string]any{
 		celRequestVariable:   request,
-		celRequesterVariable: requester,
-		celRequestorVariable: requester,
+		celRequestorVariable: requestor,
 		celReviewerVariable:  reviewer,
 	}
 
@@ -154,7 +150,6 @@ func evaluateApprovalConditions(
 			condition,
 			environment.StoredExpressions,
 			celRequestVariable,
-			celRequesterVariable,
 			celRequestorVariable,
 			celReviewerVariable,
 		)

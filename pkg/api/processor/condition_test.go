@@ -32,7 +32,7 @@ func BenchmarkProcessorCondition(b *testing.B) {
 					obj := policyConfigMap("target", fmt.Sprintf("conditional-%d", i))
 					obj.SetLabels(map[string]string{meta.CreatedByCapsuleLabel: meta.ValueControllerReplications})
 					objects = append(objects, obj)
-					AccumulatorAdd(acc, gvk.NewResourceID(obj, "tenant-a", "0/raw"), AccumulatorObject{Object: obj, Policy: &apiruntime.ResourceTemplatePolicy{Condition: condition}})
+					AccumulatorAdd(acc, gvk.NewResourceID(obj, "tenant-a", "0/raw"), AccumulatorObject{Object: obj, Policy: &apiruntime.ResourceReplicationPolicy{Condition: condition}})
 				}
 				p, c := policyProcessor(objects...)
 				conditions, err := cache.NewCELCache()
@@ -68,26 +68,25 @@ func TestSkippedConditionUpdatesPolicyUntilRemoval(t *testing.T) {
 		t.Fatal(err)
 	}
 	id := gvk.NewResourceID(obj, "tenant-a", "0/raw-0")
-	oldPolicy := &apiruntime.ResourceTemplatePolicy{Protect: new(true)}
-	old := meta.ObjectReferenceStatus{ResourceID: id, LastApply: metav1.NewTime(time.Now().UTC().Truncate(time.Second)), Created: true, Policy: oldPolicy, Type: meta.ReadyCondition, Status: metav1.ConditionTrue}
+	oldPolicy := &apiruntime.ResourceReplicationPolicy{Protect: new(true)}
+	old := meta.ObjectReferenceStatus{ResourceID: id, LastApply: metav1.NewTime(time.Now().UTC().Truncate(time.Second)), Created: true, Policy: processedPolicy(oldPolicy), Type: meta.ReadyCondition, Status: metav1.ConditionTrue}
 	obj.SetManagedFields([]metav1.ManagedFieldsEntry{{Manager: "/" + id.FieldOwner(""), Operation: metav1.ManagedFieldsOperationApply, APIVersion: "v1", Time: &old.LastApply, FieldsType: "FieldsV1", FieldsV1: &metav1.FieldsV1{Raw: []byte(`{"f:data":{"f:key":{}}}`)}}})
 	p, c := policyProcessor(obj)
 	p.Conditions = conditions
 	processed := meta.ProcessedItems{old}
 	acc := Accumulator{}
-	policy := &apiruntime.ResourceTemplatePolicy{Condition: "false", Protect: new(false), Deletion: apiruntime.ResourceDeletionPolicyOrphan}
+	policy := &apiruntime.ResourceReplicationPolicy{Condition: "false", Protect: new(false), Deletion: apiruntime.ResourceDeletionPolicyOrphan}
 	AccumulatorAdd(acc, id, AccumulatorObject{Object: obj, Policy: policy})
 	c.metadataError = errors.New("policy write denied")
 	if err := p.Reconcile(t.Context(), logr.Discard(), c, &processed, acc, ProcessorOptions{Prune: true}); err == nil {
 		t.Fatal("policy patch failure was ignored")
 	}
-	if !reflect.DeepEqual(processed[0].Policy, oldPolicy) || !processed[0].LastApply.Equal(&old.LastApply) {
+	if !reflect.DeepEqual(processed[0].Policy, processedPolicy(oldPolicy)) || !processed[0].LastApply.Equal(&old.LastApply) {
 		t.Fatal("failed metadata write changed the effective policy or content timestamp")
 	}
 	c.metadataError = nil
 	c.metadataPatches = 0
-	expectedPolicy := policy.DeepCopy()
-	expectedPolicy.Condition = ""
+	expectedPolicy := processedPolicy(policy)
 	for range 2 {
 		if err := p.Reconcile(t.Context(), logr.Discard(), c, &processed, acc, ProcessorOptions{Prune: true}); err != nil {
 			t.Fatal(err)

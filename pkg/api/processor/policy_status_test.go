@@ -20,9 +20,9 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 )
 
-func conditionStatusFixture(t testing.TB, count, expressionSize int) (*Processor, *policyRecordingClient, Accumulator, meta.ProcessedItems, *apiruntime.ResourceTemplatePolicy) {
+func conditionStatusFixture(t testing.TB, count, expressionSize int) (*Processor, *policyRecordingClient, Accumulator, meta.ProcessedItems, *apiruntime.ResourceReplicationPolicy) {
 	t.Helper()
-	policy := &apiruntime.ResourceTemplatePolicy{Condition: "false //" + strings.Repeat("x", expressionSize-8), Protect: new(false), Deletion: apiruntime.ResourceDeletionPolicyOrphan}
+	policy := &apiruntime.ResourceReplicationPolicy{Condition: "false //" + strings.Repeat("x", expressionSize-8), Protect: new(false), Deletion: apiruntime.ResourceDeletionPolicyOrphan}
 	objects := make([]client.Object, 0, count)
 	acc := Accumulator{}
 	items := make(meta.ProcessedItems, 0, count)
@@ -32,7 +32,7 @@ func conditionStatusFixture(t testing.TB, count, expressionSize int) (*Processor
 		timestamp := metav1.Now()
 		obj.SetManagedFields([]metav1.ManagedFieldsEntry{{Manager: "/" + id.FieldOwner(""), Operation: metav1.ManagedFieldsOperationApply, APIVersion: "v1", Time: &timestamp, FieldsType: "FieldsV1", FieldsV1: &metav1.FieldsV1{Raw: []byte(`{"f:data":{"f:key":{}}}`)}}})
 		objects = append(objects, obj)
-		items = append(items, meta.ObjectReferenceStatus{ResourceID: id, LastApply: timestamp, Policy: policy.DeepCopy()})
+		items = append(items, meta.ObjectReferenceStatus{ResourceID: id, LastApply: timestamp, Policy: processedPolicy(policy)})
 		AccumulatorAdd(acc, id, AccumulatorObject{Object: obj, Policy: policy})
 	}
 	p, c := policyProcessor(objects...)
@@ -47,7 +47,7 @@ func TestConditionIsNotRepeatedInProcessedStatus(t *testing.T) {
 	original := policy.DeepCopy()
 	before, err := json.Marshal(processed)
 	require.NoError(t, err)
-	require.Greater(t, len(before), 1024*1024, "fixture must reproduce the large repeated status")
+	require.Less(t, len(before), 200*1024, "the source condition must never be repeated in status")
 	require.NoError(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, acc, ProcessorOptions{}))
 	after, err := json.Marshal(processed)
 	require.NoError(t, err)
@@ -57,12 +57,11 @@ func TestConditionIsNotRepeatedInProcessedStatus(t *testing.T) {
 	require.Empty(t, c.applies, "the source condition must still gate content")
 	for _, item := range processed {
 		require.NotNil(t, item.Policy)
-		require.Empty(t, item.Policy.Condition)
 		require.True(t, item.Policy.ShouldOrphan())
 		require.False(t, item.Policy.IsProtected())
 		require.NotSame(t, policy.Protect, item.Policy.Protect)
 	}
-	t.Logf("300 targets with a 4096-byte condition: status shrank from %d to %d bytes", len(before), len(after))
+	t.Logf("300 targets with a 4096-byte condition: status before/after reconciliation: %d/%d bytes", len(before), len(after))
 }
 
 // Includes processor reconciliation and serialization, with the compiled

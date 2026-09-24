@@ -137,7 +137,7 @@ func TestPatchResourcePermitStatusPreservesControllerManagedFields(t *testing.T)
 		Name:      "template-runner",
 		Namespace: "operations",
 	}
-	approvals := &resourcepermitapi.ApprovalSpec{Conditions: []string{`requester.name == "alice"`}}
+	approvals := &resourcepermitapi.ApprovalSpec{Conditions: []string{`requestor.name == "alice"`}}
 	stored := &capsulev1beta2.ResourcePermit{
 		Name: "request", Namespace: "tenant",
 		Status: capsulev1beta2.ResourcePermitStatus{

@@ -5,76 +5,11 @@ package v1beta2
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/projectcapsule/capsule/pkg/api/resourcepermit"
 )
-
-func TestApprovalRequesterCompatibility(t *testing.T) {
-	for _, expression := range []string{
-		`requestor.name == "alice" && "developers" in requestor.groups`,
-		`requester.name == "alice" && "developers" in requester.groups`,
-		`requestor == requester && requester.name == "alice" && "developers" in requestor.groups`,
-	} {
-		for _, global := range []bool{false, true} {
-			t.Run(fmt.Sprintf("global=%t/%s", global, expression), func(t *testing.T) {
-				approvals := resourcepermit.ApprovalSpec{Conditions: []string{expression}}
-				var template ResourcePermitTemplateSource = &ResourcePermitTemplate{Spec: ResourcePermitTemplateSpec{Approvals: approvals}}
-				if global {
-					template = &GlobalResourcePermitTemplate{Spec: GlobalResourcePermitTemplateSpec{Approvals: approvals}}
-				}
-				require.NoError(t, template.ValidateApprovalConditions())
-				for _, actor := range []resourcepermit.AccessEntity{
-					{Name: "alice", Groups: []string{"developers"}},
-					{Name: "bob", Groups: []string{"developers"}},
-					{Name: "alice"},
-				} {
-					request := &ResourcePermit{Spec: ResourcePermitSpec{Requester: actor}}
-					want := actor.Name == "alice" && len(actor.Groups) > 0
-					matched, err := template.EvaluateApprovalConditions(t.Context(), request)
-					require.NoError(t, err)
-					require.Equal(t, want, matched)
-					// Existing approval snapshots must keep working even after the
-					// source template changes or disappears.
-					request.Status.Request = &ResourcePermitStatusRequest{Approvals: &approvals}
-					matched, err = request.EvaluateApprovalConditions(t.Context(), nil)
-					require.NoError(t, err)
-					require.Equal(t, want, matched)
-				}
-			})
-		}
-	}
-}
-
-func BenchmarkApprovalConditions(b *testing.B) {
-	for _, count := range []int{1, 8} {
-		for _, evaluate := range []bool{false, true} {
-			b.Run(fmt.Sprintf("conditions=%d/evaluate=%t", count, evaluate), func(b *testing.B) {
-				conditions := make([]string, count)
-				for i := range conditions {
-					conditions[i] = fmt.Sprintf(`requester.name == "user-%d" && "developers" in requester.groups`, i)
-				}
-				template := &GlobalResourcePermitTemplate{Spec: GlobalResourcePermitTemplateSpec{Approvals: resourcepermit.ApprovalSpec{Conditions: conditions}}}
-				request := &ResourcePermit{Spec: ResourcePermitSpec{Requester: resourcepermit.AccessEntity{Name: fmt.Sprintf("user-%d", count-1), Groups: []string{"developers"}}}}
-				b.ReportAllocs()
-				for b.Loop() {
-					if evaluate {
-						matched, err := template.EvaluateApprovalConditions(b.Context(), request)
-						if err != nil || !matched {
-							b.Fatalf("approval evaluation: matched=%t err=%v", matched, err)
-						}
-					} else if err := template.ValidateApprovalConditions(); err != nil {
-						b.Fatal(err)
-					}
-				}
-			})
-		}
-	}
-}
 
 func TestGlobalResourcePermitTemplateApprovalCondition(t *testing.T) {
 	t.Parallel()
@@ -97,26 +32,18 @@ func TestGlobalResourcePermitTemplateApprovalCondition(t *testing.T) {
 			name: "conditions are ORed",
 			conditions: []string{
 				`request.spec.reason == "maintenance"`,
-				`requester.name == "alice"`,
+				`requestor.name == "alice"`,
 			},
 			request: ResourcePermit{Spec: ResourcePermitSpec{
 				Reason:    "incident",
-				Requester: resourcepermit.AccessEntity{Name: "alice"},
+				Requestor: resourcepermit.AccessEntity{Name: "alice"},
 			}},
 			want: true,
 		},
 		{
-			name:       "requester",
-			conditions: []string{`requester.name == "alice" && "developers" in requester.groups`},
-			request: ResourcePermit{Spec: ResourcePermitSpec{Requester: resourcepermit.AccessEntity{
-				Name: "alice", Groups: []string{"developers"},
-			}}},
-			want: true,
-		},
-		{
-			name:       "request spec requester matches the CEL identity",
-			conditions: []string{`request.spec.requester.name == requester.name && request.spec.requester.groups == requester.groups`},
-			request: ResourcePermit{Spec: ResourcePermitSpec{Requester: resourcepermit.AccessEntity{
+			name:       "requestor",
+			conditions: []string{`requestor.name == "alice" && "developers" in requestor.groups`},
+			request: ResourcePermit{Spec: ResourcePermitSpec{Requestor: resourcepermit.AccessEntity{
 				Name: "alice", Groups: []string{"developers"},
 			}}},
 			want: true,
@@ -136,10 +63,10 @@ func TestGlobalResourcePermitTemplateApprovalCondition(t *testing.T) {
 		},
 		{
 			name:       "no condition met",
-			conditions: []string{`request.spec.reason == "incident"`, `requester.name == "alice"`},
+			conditions: []string{`request.spec.reason == "incident"`, `requestor.name == "alice"`},
 			request: ResourcePermit{Spec: ResourcePermitSpec{
 				Reason:    "maintenance",
-				Requester: resourcepermit.AccessEntity{Name: "bob"},
+				Requestor: resourcepermit.AccessEntity{Name: "bob"},
 			}},
 			want: false,
 		},

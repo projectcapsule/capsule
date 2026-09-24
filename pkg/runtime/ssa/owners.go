@@ -32,8 +32,8 @@ func NewReplicationOwnerResolver(indexed, reader client.Reader) ReplicationOwner
 		key := gvk.NewResourceID(target, "", "").GetGVKKey("")
 		owners := map[string]struct{}{}
 
-		for prefix := range replicationOwnerPrefixes(target, departing) {
-			parents, err := replicationOwnerCandidates(ctx, indexed, prefix)
+		for prefix := range ReplicationOwnerPrefixes(target, departing) {
+			parents, err := ReplicationOwnerCandidates(ctx, indexed, prefix)
 			if err != nil {
 				return nil, err
 			}
@@ -49,7 +49,9 @@ func NewReplicationOwnerResolver(indexed, reader client.Reader) ReplicationOwner
 	}
 }
 
-func replicationOwnerPrefixes(target *unstructured.Unstructured, departing string) map[string]struct{} {
+// ReplicationOwnerPrefixes selects legacy replication identities from managed fields.
+// It supplies lookup keys, never proof of ownership.
+func ReplicationOwnerPrefixes(target client.Object, departing string) map[string]struct{} {
 	prefixes := map[string]struct{}{}
 
 	for _, field := range target.GetManagedFields() {
@@ -61,7 +63,9 @@ func replicationOwnerPrefixes(target *unstructured.Unstructured, departing strin
 	return prefixes
 }
 
-func replicationOwnerCandidates(ctx context.Context, indexed client.Reader, prefix string) ([]client.Object, error) {
+// ReplicationOwnerCandidates uses the stable parent identity index. Callers must
+// verify current parent UID, status, and exact field ownership before trusting it.
+func ReplicationOwnerCandidates(ctx context.Context, indexed client.Reader, prefix string) ([]client.Object, error) {
 	global := &capsulev1beta2.GlobalTenantResourceList{}
 	if err := indexed.List(ctx, global, client.MatchingFields{tenantresource.FieldOwnerIndexerFieldName: prefix}); err != nil {
 		return nil, err

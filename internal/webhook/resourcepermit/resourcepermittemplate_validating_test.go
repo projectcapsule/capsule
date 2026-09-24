@@ -32,7 +32,7 @@ func TestResourcePermitTemplateValidationHandler(t *testing.T) {
 		{
 			name: "valid template",
 			template: &capsulev1beta2.ResourcePermitTemplate{Spec: capsulev1beta2.ResourcePermitTemplateSpec{
-				Approvals: resourcepermit.ApprovalSpec{Conditions: []string{`requester.name == "alice"`, `requestor.name == "alice"`}},
+				Approvals: resourcepermit.ApprovalSpec{Conditions: []string{`requestor.name == "alice"`}},
 				Resources: []apiruntime.ResourceTemplate{{Targets: []runtime.RawExtension{{Object: &corev1.ConfigMap{}}}}},
 			}},
 		},
@@ -50,7 +50,7 @@ func TestResourcePermitTemplateValidationHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			decoder := &test.Decoder[*capsulev1beta2.ResourcePermitTemplate]{Object: tt.template}
-			handler := ResourcePermitTemplateValidationHandler(ctrl.Log.WithName("test"), nil)
+			handler := ResourcePermitTemplateValidationHandler(ctrl.Log.WithName("test"))
 			response := handler.OnCreate(nil, nil, decoder, nil)(context.Background(), admission.Request{})
 			if tt.expected == 0 {
 				assert.Nil(t, response)
