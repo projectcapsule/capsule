@@ -175,7 +175,6 @@ func TestImpersonationCache_LoadOrCreate_ConcurrentOnlyCachesOne(t *testing.T) {
 	errs := make([]error, goroutines)
 
 	for i := range goroutines {
-		i := i
 		go func() {
 			defer wg.Done()
 			<-start

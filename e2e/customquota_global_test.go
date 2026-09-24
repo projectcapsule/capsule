@@ -544,7 +544,6 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 		)
 
 		for i := range totalAttempts {
-			i := i
 
 			go func() {
 				name := fmt.Sprintf("gq-concurrent-pod-%02d", i)
