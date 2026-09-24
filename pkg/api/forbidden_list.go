@@ -23,7 +23,12 @@ func (in ForbiddenListSpec) ExactMatch(value string) bool {
 
 func (in ForbiddenListSpec) RegexMatch(value string) (ok bool) {
 	if len(in.Regex) > 0 {
-		ok = regexp.MustCompile(in.Regex).MatchString(value)
+		r, err := regexp.Compile(in.Regex)
+		if err != nil {
+			return false
+		}
+
+		ok = r.MatchString(value)
 	}
 
 	return ok
