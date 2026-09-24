@@ -1,11 +1,12 @@
 name: e2e
-permissions: {}
+permissions:
+  contents: read
 
 on:
   workflow_dispatch:
-  pull_request:
+  push:
     branches:
-      - "*"
+      - "**"
     paths:
       - '.github/workflows/e2e.yml'
       - 'hack/observability/**'
@@ -24,14 +25,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # These jobs execute repository code with monitoring credentials. Never run PR refs.
   e2e:
     name: E2E Testing (CE)
+    if: >-
+      github.repository == 'projectcapsule/capsule' &&
+      startsWith(github.ref, 'refs/heads/') &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     environment: monitoring
     runs-on:
       labels: ubuntu-latest-8-cores
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          repository: projectcapsule/capsule
+          ref: ${{ github.sha }}
+          persist-credentials: false
           fetch-depth: 0
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -50,11 +59,11 @@ jobs:
           MONITORING_PASSWORD: ${{ secrets.MONITORING_PASSWORD }}
           OBSERVABILITY_RUN_ID: capsule-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
           OBSERVABILITY_REPOSITORY: ${{ github.repository }}
-          OBSERVABILITY_REVISION: ${{ github.event.client_payload.sha || github.sha }}
+          OBSERVABILITY_REVISION: ${{ github.sha }}
           OBSERVABILITY_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
         run: >-
           sudo --preserve-env=MONITORING_USERNAME,MONITORING_PASSWORD,OBSERVABILITY_RUN_ID,OBSERVABILITY_REPOSITORY,OBSERVABILITY_REVISION,OBSERVABILITY_RUN_URL,GITHUB_OUTPUT,GITHUB_STEP_SUMMARY
-          python3 hack/observability/collector.py install
+          make alloy-install
 
       - name: Install Capsule
         run: sudo make e2e-install E2E_OBSERVABILITY=${{ steps.observability.outputs.enabled }}
@@ -64,7 +73,7 @@ jobs:
 
       - name: Stop run observability
         if: always() && steps.observability.outputs.started == 'true'
-        run: sudo python3 hack/observability/collector.py stop
+        run: sudo make alloy-uninstall
 
       - name: Delete successful test cluster
         if: success()
@@ -72,12 +81,19 @@ jobs:
 
   e2e-openshift-CE:
     name: E2E OpenShift Testing (CE)
+    if: >-
+      github.repository == 'projectcapsule/capsule' &&
+      startsWith(github.ref, 'refs/heads/') &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     environment: monitoring
     runs-on:
       labels: ubuntu-latest-8-cores
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          repository: projectcapsule/capsule
+          ref: ${{ github.sha }}
+          persist-credentials: false
           fetch-depth: 0
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -96,11 +112,11 @@ jobs:
           MONITORING_PASSWORD: ${{ secrets.MONITORING_PASSWORD }}
           OBSERVABILITY_RUN_ID: capsule-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
           OBSERVABILITY_REPOSITORY: ${{ github.repository }}
-          OBSERVABILITY_REVISION: ${{ github.event.client_payload.sha || github.sha }}
+          OBSERVABILITY_REVISION: ${{ github.sha }}
           OBSERVABILITY_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
         run: >-
           sudo --preserve-env=MONITORING_USERNAME,MONITORING_PASSWORD,OBSERVABILITY_RUN_ID,OBSERVABILITY_REPOSITORY,OBSERVABILITY_REVISION,OBSERVABILITY_RUN_URL,GITHUB_OUTPUT,GITHUB_STEP_SUMMARY
-          python3 hack/observability/collector.py install --openshift
+          make alloy-install-openshift
 
       - name: Install Capsule
         run: sudo make e2e-install-openshift E2E_OBSERVABILITY=${{ steps.observability.outputs.enabled }}
@@ -110,7 +126,7 @@ jobs:
 
       - name: Stop run observability
         if: always() && steps.observability.outputs.started == 'true'
-        run: sudo python3 hack/observability/collector.py stop
+        run: sudo make alloy-uninstall
 
       - name: Delete successful test cluster
         if: success()
@@ -118,6 +134,10 @@ jobs:
 
   run-e2e:
     name: E2E Testing
+    if: >-
+      github.repository == 'projectcapsule/capsule' &&
+      startsWith(github.ref, 'refs/heads/') &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     strategy:
       fail-fast: false
       matrix:
@@ -131,8 +151,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          repository: ${{ github.event.client_payload.repo || github.repository }}
-          ref: ${{ github.event.client_payload.sha || github.sha }}
+          repository: projectcapsule/capsule
+          ref: ${{ github.sha }}
+          persist-credentials: false
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
@@ -150,11 +171,11 @@ jobs:
           MONITORING_PASSWORD: ${{ secrets.MONITORING_PASSWORD }}
           OBSERVABILITY_RUN_ID: capsule-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-${{ matrix.k8s-version }}
           OBSERVABILITY_REPOSITORY: ${{ github.repository }}
-          OBSERVABILITY_REVISION: ${{ github.event.client_payload.sha || github.sha }}
+          OBSERVABILITY_REVISION: ${{ github.sha }}
           OBSERVABILITY_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
         run: >-
           sudo --preserve-env=MONITORING_USERNAME,MONITORING_PASSWORD,OBSERVABILITY_RUN_ID,OBSERVABILITY_REPOSITORY,OBSERVABILITY_REVISION,OBSERVABILITY_RUN_URL,GITHUB_OUTPUT,GITHUB_STEP_SUMMARY
-          python3 hack/observability/collector.py install
+          make alloy-install
 
       - name: Install Capsule
         run: sudo make e2e-install E2E_OBSERVABILITY=${{ steps.observability.outputs.enabled }}
@@ -164,7 +185,7 @@ jobs:
 
       - name: Stop run observability
         if: always() && steps.observability.outputs.started == 'true'
-        run: sudo python3 hack/observability/collector.py stop
+        run: sudo make alloy-uninstall
 
       - name: Delete successful test cluster
         if: success()
@@ -172,6 +193,10 @@ jobs:
 
   e2e-openshift:
     name: E2E Testing (OpenShift)
+    if: >-
+      github.repository == 'projectcapsule/capsule' &&
+      startsWith(github.ref, 'refs/heads/') &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     strategy:
       fail-fast: false
       matrix:
@@ -184,6 +209,9 @@ jobs:
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          repository: projectcapsule/capsule
+          ref: ${{ github.sha }}
+          persist-credentials: false
           fetch-depth: 0
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -202,11 +230,11 @@ jobs:
           MONITORING_PASSWORD: ${{ secrets.MONITORING_PASSWORD }}
           OBSERVABILITY_RUN_ID: capsule-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-${{ matrix.os-version }}
           OBSERVABILITY_REPOSITORY: ${{ github.repository }}
-          OBSERVABILITY_REVISION: ${{ github.event.client_payload.sha || github.sha }}
+          OBSERVABILITY_REVISION: ${{ github.sha }}
           OBSERVABILITY_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
         run: >-
           sudo --preserve-env=MONITORING_USERNAME,MONITORING_PASSWORD,OBSERVABILITY_RUN_ID,OBSERVABILITY_REPOSITORY,OBSERVABILITY_REVISION,OBSERVABILITY_RUN_URL,GITHUB_OUTPUT,GITHUB_STEP_SUMMARY
-          python3 hack/observability/collector.py install --openshift
+          make alloy-install-openshift
 
       - name: Install Capsule
         run: sudo make e2e-install-openshift E2E_OBSERVABILITY=${{ steps.observability.outputs.enabled }}
@@ -216,7 +244,7 @@ jobs:
 
       - name: Stop run observability
         if: always() && steps.observability.outputs.started == 'true'
-        run: sudo python3 hack/observability/collector.py stop
+        run: sudo make alloy-uninstall
 
       - name: Delete successful test cluster
         if: success()

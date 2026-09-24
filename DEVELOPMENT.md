@@ -44,7 +44,10 @@ You can also just run the e2e tests without the creation of a new kind cluster:
 make e2e-exec
 ```
 
-The E2E tests are also executed via the [github workflow](./.github/workflows/e2e.yaml) on every PR and push to the main branch.
+The E2E tests also run through the [GitHub workflow](./.github/workflows/e2e.yml)
+on matching branch pushes and manual runs in `projectcapsule/capsule`. The workflow
+does not execute pull-request sources or run in forks because it uses monitoring
+credentials. See [test observability](./hack/observability/README.md) for setup.
 
 # Development Environment
 

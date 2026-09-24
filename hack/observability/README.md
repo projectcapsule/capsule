@@ -20,17 +20,28 @@ and add these **environment secrets**:
 The `e2e` workflow references `environment: monitoring`. Its setup step reads
 these secrets through `env`, explicitly preserves only the necessary environment
 variables through `sudo`, and sends a Kubernetes Secret through kubectl stdin.
-Credentials do not enter Helm values, command arguments, generated files, or the
-run summary. Alloy mounts the Secret as files. There is no second manually managed
-collector Secret in each test cluster.
+`make alloy-install` uses `envsubst` to render the Secret and Helm values directly
+into kubectl and Helm stdin. Credentials do not enter Helm values, command
+arguments, generated files, or the run summary. Alloy mounts the Secret as files.
+There is no second manually managed collector Secret in each test cluster.
 
-GitHub does not supply secrets to ordinary fork pull-request workflows. With both
-secrets absent, tests run with remote collection disabled. A partially configured
-credential pair fails setup. The workflow also supports `workflow_dispatch` for
-trusted runs. Configure environment protection/branch rules for the intended
-trusted refs; do not switch to `pull_request_target` to run untrusted code with
-these credentials. Environment secrets authorize their holder to access the
-shared monitoring endpoints, including queries; basic auth is not write-only.
+The `e2e` workflow runs on matching branch pushes and manual `workflow_dispatch`
+runs in **projectcapsule/capsule**. Every job checks the repository, event, and
+branch ref before starting. Pull-request events, PR refs, tags, and runs in forks
+are excluded. All checkouts use the event's exact commit (`github.sha`) from
+`projectcapsule/capsule`; no caller-supplied repository or SHA is accepted, and
+checkout credentials are not persisted.
+
+In the **monitoring** environment settings, restrict deployment branches to the
+repository branches trusted to execute with these credentials. These GitHub
+settings are managed separately from the workflow. Keep monitoring credentials
+as environment secrets. Do not add `pull_request_target` or check out PR code in
+these jobs; see [GitHub's guidance on untrusted code checkout](https://docs.github.com/en/actions/reference/security/secure-use#mitigating-the-risks-of-untrusted-code-checkout).
+
+With both secrets absent, tests run with remote collection disabled. A partially
+configured credential pair fails setup. Environment secrets authorize their
+holder to access the shared monitoring endpoints, including queries; basic auth
+is not write-only.
 
 ## Collected data
 
@@ -57,9 +68,11 @@ Alloy adds the same fields as resource attributes on traces, preserving Capsule'
 All four central backends have seven-day retention policies; actual physical
 deletion follows their background cleanup schedules.
 CI IDs include workflow run, attempt, job, and matrix version. Local runs use a
-UUID unless `OBSERVABILITY_RUN_ID` is supplied. Start a fresh cluster/collector for
-each run; never reuse one global run label for overlapping runs. Keep individual
-test names and admission UIDs in logs rather than additional metric labels.
+UUID unless `OBSERVABILITY_RUN_ID` is supplied. Run metadata is part of the Helm
+pod template, so installing with a different run ID automatically rolls Alloy.
+Start a fresh cluster/collector for each run; never reuse one global run label for
+overlapping runs. Keep individual test names and admission UIDs in logs rather
+than additional metric labels.
 
 The Actions summary links to the **Capsule runs** Grafana dashboard with the run
 selected. It is provisioned by the infrastructure repository. For profiles, use
@@ -76,27 +89,31 @@ installation for a shared production cluster.
 Use a dedicated disposable cluster. These commands use the existing `capsule`
 KinD cluster name; do not run them against a cluster you want to keep. Supply the
 two credential variables through your local secret manager/environment first.
+The install target needs Helm, kubectl, Bash, `envsubst` (gettext), and `jq`;
+local run ID generation also needs `uuidgen`. Set `OBSERVABILITY_RUN_ID` to choose
+your own ID, and optionally set `OBSERVABILITY_REPOSITORY`,
+`OBSERVABILITY_REVISION`, and `OBSERVABILITY_RUN_URL`.
 
 ```sh
 make e2e-cluster
-python3 hack/observability/collector.py install
+make alloy-install
 make e2e-install E2E_OBSERVABILITY=true
 make e2e-exec FILTER='&& !skip && scheduler'
 # Capture diagnostics before stopping collection if a test failed.
-python3 hack/observability/collector.py stop
+make alloy-uninstall
 make e2e-destroy
 ```
 
 Choose a filter for the subsystem under investigation. For OpenShift, use
-`e2e-cluster-openshift`, `install --openshift`, `e2e-install-openshift`, and
+`e2e-cluster-openshift`, `alloy-install-openshift`, `e2e-install-openshift`, and
 `e2e-destroy-openshift`, adding `!skip-on-openshift` to the test filter.
 The original `make e2e` targets still work without observability; the GitHub
 workflow separates their stages to restrict credentials to collector setup.
 
 The collector uses a bounded ephemeral volume for its metrics WAL. Stop it while
 the cluster still exists: Helm waits for shutdown with a 120-second pod grace
-period, then the helper deletes the client Secret. A terminated runner, prolonged
-backend outage, pod replacement, or exhausted volume can lose unsent telemetry.
+period, then `make alloy-uninstall` deletes the client Secret. A terminated runner,
+prolonged backend outage, pod replacement, or exhausted volume can lose unsent telemetry.
 This is deliberately a single, non-HA collector, not a durable ingestion queue.
 GitHub preserves failed clusters for diagnostics until runner cleanup.
 
@@ -109,9 +126,13 @@ retries. Failed exports and forced collector shutdowns can lose queued traces.
 
 ```sh
 alloy validate hack/observability/config.alloy
+export RUN_ID_JSON='"render-check"' REPOSITORY_JSON='"projectcapsule/capsule"'
+export REVISION_JSON='"local"' RUN_URL_JSON='""'
+envsubst '${RUN_ID_JSON} ${REPOSITORY_JSON} ${REVISION_JSON} ${RUN_URL_JSON}' \
+  < hack/observability/values.yaml | \
 helm template capsule-alloy alloy --repo https://grafana.github.io/helm-charts \
   --version 1.12.1 --namespace capsule-observability \
-  --values hack/observability/values.yaml \
+  --values - \
   --set-file alloy.configMap.content=hack/observability/config.alloy
 ```
 

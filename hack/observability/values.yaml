@@ -39,9 +39,17 @@ alloy:
       port: 4318
       targetPort: 4318
       protocol: TCP
-  envFrom:
-    - configMapRef:
-        name: observability-run
+  # JSON strings substituted by make alloy-install are also valid YAML strings.
+  # Putting run metadata in the pod template rolls Alloy when the run changes.
+  extraEnv:
+    - name: RUN_ID
+      value: ${RUN_ID_JSON}
+    - name: REPOSITORY
+      value: ${REPOSITORY_JSON}
+    - name: REVISION
+      value: ${REVISION_JSON}
+    - name: RUN_URL
+      value: ${RUN_URL_JSON}
   securityContext:
     allowPrivilegeEscalation: false
     readOnlyRootFilesystem: true

@@ -27,6 +27,8 @@ OS_SUPPORTED_VERSION ?= "4.22.0-okd-scos.ec.10"
 ## Tool Binaries
 KUBECTL ?= kubectl
 HELM ?= helm
+ALLOY_CHART_VERSION ?= 1.12.1
+ALLOY_EXTRA_VALUES ?=
 DEV_SETUP_TIMEOUT ?= 10m
 E2E_OBSERVABILITY ?= false
 E2E_OBSERVABILITY_VALUES = $(if $(filter true,$(E2E_OBSERVABILITY)),--values hack/observability/capsule-values.yaml,)
@@ -480,6 +482,60 @@ mocks: mockgen
 .PHONY: e2e-openshift
 e2e-openshift: ginkgo
 	$(MAKE) e2e-build-openshift && $(MAKE) e2e-exec FILTER='&& !skip && !skip-on-openshift' && $(MAKE) e2e-destroy-openshift
+
+# Install one Alloy collector in the current disposable test cluster.
+# Only run metadata enters Helm values; credentials go directly to a Secret.
+.PHONY: alloy-install alloy-install-openshift alloy-uninstall
+alloy-install: SHELL := /bin/bash
+alloy-install:
+	@set -euo pipefail; \
+	if [ -n "$${GITHUB_OUTPUT:-}" ]; then echo 'enabled=false' >> "$$GITHUB_OUTPUT"; fi; \
+	if [ -z "$${MONITORING_USERNAME:-}" ] && [ -z "$${MONITORING_PASSWORD:-}" ]; then \
+		echo 'Observability disabled: monitoring credentials are unavailable.'; exit 0; \
+	fi; \
+	if [ -z "$${MONITORING_USERNAME:-}" ] || [ -z "$${MONITORING_PASSWORD:-}" ]; then \
+		echo 'Set both MONITORING_USERNAME and MONITORING_PASSWORD' >&2; exit 1; \
+	fi; \
+	for tool in envsubst jq; do command -v "$$tool" >/dev/null || { echo "Install $$tool first" >&2; exit 1; }; done; \
+	if [ -z "$${OBSERVABILITY_RUN_ID:-}" ]; then OBSERVABILITY_RUN_ID=local-$$(uuidgen); fi; \
+	if [[ $${#OBSERVABILITY_RUN_ID} -gt 200 || $$OBSERVABILITY_RUN_ID =~ [[:space:]] ]]; then \
+		echo 'OBSERVABILITY_RUN_ID must be at most 200 characters, without whitespace' >&2; exit 1; \
+	fi; \
+	RUN_ID_JSON=$$(printf '%s' "$$OBSERVABILITY_RUN_ID" | jq -Rs .); \
+	REPOSITORY_JSON=$$(printf '%s' "$${OBSERVABILITY_REPOSITORY:-projectcapsule/capsule}" | jq -Rs .); \
+	REVISION_JSON=$$(printf '%s' "$${OBSERVABILITY_REVISION:-local}" | jq -Rs .); \
+	RUN_URL_JSON=$$(printf '%s' "$${OBSERVABILITY_RUN_URL:-}" | jq -Rs .); \
+	export RUN_ID_JSON REPOSITORY_JSON REVISION_JSON RUN_URL_JSON; \
+	MONITORING_USERNAME_JSON=$$(printf '%s' "$$MONITORING_USERNAME" | jq -Rs .); \
+	MONITORING_PASSWORD_JSON=$$(printf '%s' "$$MONITORING_PASSWORD" | jq -Rs .); \
+	unset MONITORING_USERNAME MONITORING_PASSWORD; \
+	export MONITORING_USERNAME_JSON MONITORING_PASSWORD_JSON; \
+	$(KUBECTL) apply --server-side --field-manager=capsule-observability -f hack/observability/namespace.yaml; \
+	if [ -n "$${GITHUB_OUTPUT:-}" ]; then echo 'started=true' >> "$$GITHUB_OUTPUT"; fi; \
+	if ! envsubst '$${MONITORING_USERNAME_JSON} $${MONITORING_PASSWORD_JSON}' < hack/observability/secret.yaml \
+		| $(KUBECTL) apply --field-manager=capsule-observability -f - >/dev/null 2>&1; then \
+		echo 'Observability credential provisioning failed' >&2; exit 1; \
+	fi; \
+	unset MONITORING_USERNAME_JSON MONITORING_PASSWORD_JSON; \
+	envsubst '$${RUN_ID_JSON} $${REPOSITORY_JSON} $${REVISION_JSON} $${RUN_URL_JSON}' < hack/observability/values.yaml \
+		| $(HELM) upgrade --install capsule-alloy alloy \
+			--repo https://grafana.github.io/helm-charts --version $(ALLOY_CHART_VERSION) \
+			--namespace capsule-observability --values - $(ALLOY_EXTRA_VALUES) \
+			--set-file alloy.configMap.content=hack/observability/config.alloy --wait --timeout 3m; \
+	if [ -n "$${GITHUB_OUTPUT:-}" ]; then echo 'enabled=true' >> "$$GITHUB_OUTPUT"; fi; \
+	run_query=$$(printf '%s' "$$OBSERVABILITY_RUN_ID" | jq -sRr @uri); \
+	grafana_url="https://monitoring.dev.projectcapsule.dev/d/capsule-runs/capsule-runs?var-run_id=$$run_query&from=$$((($$(date +%s) - 60) * 1000))&to=now"; \
+	printf 'Observability run: %s\nGrafana: %s\n' "$$OBSERVABILITY_RUN_ID" "$$grafana_url"; \
+	if [ -n "$${GITHUB_STEP_SUMMARY:-}" ]; then \
+		printf '\nCapsule observability: [open this run in Grafana](%s).\n' "$$grafana_url" >> "$$GITHUB_STEP_SUMMARY"; \
+	fi
+
+alloy-install-openshift: ALLOY_EXTRA_VALUES = --values hack/observability/openshift-values.yaml
+alloy-install-openshift: alloy-install
+
+alloy-uninstall:
+	$(HELM) uninstall capsule-alloy --namespace capsule-observability --ignore-not-found --wait --timeout 3m
+	$(KUBECTL) --namespace capsule-observability delete secret monitoring-credentials --ignore-not-found
 
 .PHONY: e2e-cluster-openshift
 e2e-cluster-openshift: minc
