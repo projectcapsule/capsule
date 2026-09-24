@@ -7,7 +7,7 @@ require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/alecthomas/chroma/v2 v2.27.0
 	github.com/evanphx/json-patch/v5 v5.9.11
-	github.com/fluxcd/pkg/apis/kustomize v1.15.0
+	github.com/fluxcd/pkg/apis/kustomize v1.20.0
 	github.com/fluxcd/pkg/ssa v0.77.0
 	github.com/go-logr/logr v1.4.4
 	github.com/go-sprout/sprout v1.1.1
