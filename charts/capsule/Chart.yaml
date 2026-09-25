@@ -40,6 +40,8 @@ annotations:
     - name: Documentation
       url: https://projectcapsule.dev/
   artifacthub.io/changes: |
+    - kind: security
+      description: validate replication tracking and protection markers on resource creation
     - kind: fixed
       description: preserve legacy replication admission matching and independent protection for targets shared with ResourcePermits
     - kind: added

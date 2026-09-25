@@ -182,9 +182,9 @@ func (p *Processor) pruneProcessedItem(
 
 	fieldOwner := opts.FieldOwnerPrefix + "/" + item.FieldOwner("")
 
-	// An unprotected adopted target is authorized through its SSA ownership.
+	// An adopted target is authorized through its SSA ownership.
 	// Release lifecycle metadata before pruning removes that ownership proof.
-	disowned := !item.Created && (item.Policy == nil || !item.Policy.IsProtected())
+	disowned := !item.Created
 	if disowned {
 		err := p.resourceManager().Disown(ctx, c, obj, fieldOwner, opts.Owner)
 		if failAndRecord(processed, itemErrors, item, "disowning failed for item: ", err) {

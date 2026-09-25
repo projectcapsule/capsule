@@ -1626,6 +1626,7 @@ webhooks:
           apiVersions:
             - '*'
           operations:
+            - CREATE
             - UPDATE
             - DELETE
           resources:

@@ -25,7 +25,7 @@ import (
 
 func TestProtectionAllowsNamespaceCleanup(t *testing.T) {
 	for name, handler := range map[string]handlers.Handler{"replication": ReplicaHandler(), "resource-permit": ResourcePermitResourceHandler()} {
-		for _, state := range []string{"active", "deleting", "terminating", "missing", "read error", "other namespace", "recreated", "cluster scoped"} {
+		for _, state := range []string{"active", "deleting", "terminating", "missing", "read error", "other namespace", "recreated", "cluster scoped", "nil reader"} {
 			for _, deleting := range []bool{false, true} {
 				t.Run(fmt.Sprintf("%s/%s/delete=%t", name, state, deleting), func(t *testing.T) {
 					c, req := replicationAdmissionFixture(t, false, false, 1)
@@ -77,9 +77,13 @@ func TestProtectionAllowsNamespaceCleanup(t *testing.T) {
 					req.Object = runtime.RawExtension{Raw: raw}
 					req.OldObject = req.Object
 					decoder := admission.NewDecoder(c.Scheme())
-					call := handler.OnUpdate(c, reader, decoder, nil)
+					var authoritative client.Reader = reader
+					if state == "nil reader" {
+						authoritative = nil
+					}
+					call := handler.OnUpdate(c, authoritative, decoder, nil)
 					if deleting {
-						call = handler.OnDelete(c, reader, decoder, nil)
+						call = handler.OnDelete(c, authoritative, decoder, nil)
 					}
 					response := call(t.Context(), req)
 					if deleting && (state == "deleting" || state == "terminating") {
@@ -94,7 +98,7 @@ func TestProtectionAllowsNamespaceCleanup(t *testing.T) {
 							require.EqualValues(t, 403, response.Result.Code)
 						}
 					}
-					if !deleting || state == "cluster scoped" {
+					if !deleting || state == "cluster scoped" || state == "nil reader" {
 						require.Zero(t, reads, "updates and cluster resources must not read namespace termination")
 					} else {
 						require.Equal(t, 1, reads)
@@ -142,6 +146,7 @@ func BenchmarkProtectionDeletion(b *testing.B) {
 					obj.SetName(req.Name)
 					obj.SetNamespace(req.Namespace)
 					obj.SetLabels(map[string]string{meta.ReplicationProtectionLabel: meta.ValueTrue, meta.ResourcePermitProtectionLabel: meta.ValueTrue})
+					obj.SetManagedFields([]metav1.ManagedFieldsEntry{{Manager: meta.ReplicationFieldOwnerPrefix("parent", "tenant-a") + "/tenant-a/tenant-a/0/raw-0/"}})
 					raw, err := json.Marshal(obj)
 					require.NoError(b, err)
 					req.OldObject = runtime.RawExtension{Raw: raw}

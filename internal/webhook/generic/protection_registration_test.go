@@ -38,7 +38,7 @@ func TestProtectionWebhookRegistration(t *testing.T) {
 			{"disabled markers", map[string]string{meta.ReplicationProtectionLabel: "false", meta.ResourcePermitProtectionLabel: "false"}, false},
 		}
 		for _, tc := range cases {
-			for _, operation := range []string{"update", "remove labels", "add labels", "delete"} {
+			for _, operation := range []string{"update", "remove labels", "add labels", "delete", "create"} {
 				t.Run(hook+"/"+tc.name+"/"+operation, func(t *testing.T) {
 					object, old := protectionRegistrationObject(tc.labels), protectionRegistrationObject(tc.labels)
 					switch operation {
@@ -46,6 +46,8 @@ func TestProtectionWebhookRegistration(t *testing.T) {
 						object = protectionRegistrationObject(nil)
 					case "add labels":
 						old = protectionRegistrationObject(nil)
+					case "create":
+						old = nil
 					case "delete":
 						object = nil
 					}
@@ -70,6 +72,9 @@ func protectionWebhookMatcher(t testing.TB, hook string) func(map[string]any, ma
 	require.NoError(t, yaml.Unmarshal(raw, &values))
 	registration, exists := values.Webhooks.Hooks[hook]
 	require.True(t, exists)
+	if hook == "replications" {
+		require.Contains(t, registration.Rules[0].Operations, admissionregistrationv1.Create)
+	}
 	selector := labels.Everything()
 	if registration.ObjectSelector != nil {
 		selector, err = metav1.LabelSelectorAsSelector(registration.ObjectSelector)

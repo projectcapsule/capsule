@@ -5,10 +5,13 @@ package generic
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientgocache "k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -21,7 +24,7 @@ import (
 
 func BenchmarkReplicationAdmissionFreshness(b *testing.B) {
 	for _, tenants := range []int{1, 100, 1000} {
-		for _, scenario := range []string{"unprotected", "deny", "allow", "missing-parent", "legacy-unprotected", "forged-manager", "forged-owner"} {
+		for _, scenario := range []string{"unprotected", "deny", "allow", "missing-parent", "legacy-unprotected", "forged-manager", "forged-owner", "marker-add-allow", "marker-add-deny", "marker-add-cross-tenant"} {
 			b.Run(fmt.Sprintf("tenants=%d/%s", tenants, scenario), func(b *testing.B) {
 				protected := scenario == "deny" || scenario == "allow"
 				c, req := replicationAdmissionFixture(b, false, protected, tenants)
@@ -57,6 +60,21 @@ func BenchmarkReplicationAdmissionFreshness(b *testing.B) {
 							fields += `,{"manager":"2lclct9cwq6mg/tenant-a/tenant-a/0/raw-0/"}`
 						}
 						req.OldObject.Raw = []byte(fmt.Sprintf(`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"item","namespace":"tenant-a","labels":{"projectcapsule.dev/managed-by":"replications"},"managedFields":[%s]}}`, fields))
+					}
+				}
+				req.Object = req.OldObject
+				if strings.HasPrefix(scenario, "marker-add-") {
+					next := &metav1.PartialObjectMetadata{}
+					require.NoError(b, json.Unmarshal(req.Object.Raw, next))
+					next.Labels = map[string]string{meta.ReplicationProtectionLabel: meta.ValueTrue}
+					var err error
+					req.Object.Raw, err = json.Marshal(next)
+					require.NoError(b, err)
+					if scenario == "marker-add-allow" {
+						req.UserInfo.Username = "system:serviceaccount:tenant-a:runner"
+					}
+					if scenario == "marker-add-cross-tenant" {
+						req.UserInfo.Username = "system:serviceaccount:tenant-b:runner"
 					}
 				}
 				lists, reads := 0, 0
@@ -96,7 +114,7 @@ func BenchmarkReplicationAdmissionFreshness(b *testing.B) {
 				b.ReportAllocs()
 				for b.Loop() {
 					response := handler(b.Context(), req)
-					wantDenied := scenario == "deny" || scenario == "missing-parent" || scenario == "forged-owner"
+					wantDenied := scenario == "deny" || scenario == "missing-parent" || scenario == "forged-owner" || scenario == "marker-add-deny" || scenario == "marker-add-cross-tenant"
 					if (response != nil) != wantDenied || (response != nil && response.Result.Code != 403) {
 						b.Fatal("unexpected admission decision")
 					}

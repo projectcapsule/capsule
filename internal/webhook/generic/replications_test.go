@@ -113,9 +113,14 @@ func replicationAdmissionFixture(t testing.TB, global, protected bool, tenants i
 			builder.WithObjects(&capsulev1beta2.TenantResource{Name: "parent", Namespace: namespace, Status: capsulev1beta2.TenantResourceStatus{TenantResourceCommonStatus: status}})
 		}
 	}
-	raw, err := json.Marshal(map[string]any{"apiVersion": "v1", "kind": "ConfigMap", "metadata": map[string]any{"name": "item", "namespace": "tenant-a"}})
+	parentName, parentNamespace := "parent", "tenant-a"
+	if global {
+		parentName, parentNamespace = "tenant-a", ""
+	}
+	owner := meta.ReplicationFieldOwnerPrefix(parentName, parentNamespace) + "/tenant-a/tenant-a/0/raw-0/"
+	raw, err := json.Marshal(map[string]any{"apiVersion": "v1", "kind": "ConfigMap", "metadata": map[string]any{"name": "item", "namespace": "tenant-a", "managedFields": []metav1.ManagedFieldsEntry{{Manager: owner}}}})
 	require.NoError(t, err)
-	return builder.Build(), admission.Request{OldObject: runtime.RawExtension{Raw: raw}, Kind: metav1.GroupVersionKind{Version: "v1", Kind: "ConfigMap"}, Name: "item", Namespace: "tenant-a", UserInfo: authenticationv1.UserInfo{Username: "tenant-owner"}}
+	return builder.Build(), admission.Request{OldObject: runtime.RawExtension{Raw: raw}, Object: runtime.RawExtension{Raw: raw}, Kind: metav1.GroupVersionKind{Version: "v1", Kind: "ConfigMap"}, Name: "item", Namespace: "tenant-a", UserInfo: authenticationv1.UserInfo{Username: "tenant-owner"}}
 }
 
 func TestReplicationProtectionWithoutIndexedParent(t *testing.T) {
@@ -256,7 +261,7 @@ func TestReplicationAdmissionControllerSkipsLookups(t *testing.T) {
 	t.Setenv(configuration.EnvironmentControllerNamespace, "capsule-system")
 	request := admission.Request{UserInfo: authenticationv1.UserInfo{Username: "system:serviceaccount:capsule-system:capsule-controller"}}
 	for _, handler := range []func(context.Context, admission.Request) *admission.Response{
-		ReplicaHandler().OnUpdate(nil, nil, nil, nil), ReplicaHandler().OnDelete(nil, nil, nil, nil),
+		ReplicaHandler().OnCreate(nil, nil, nil, nil), ReplicaHandler().OnUpdate(nil, nil, nil, nil), ReplicaHandler().OnDelete(nil, nil, nil, nil),
 	} {
 		require.Nil(t, handler(t.Context(), request))
 	}
@@ -434,19 +439,23 @@ func TestReplicationTrackingWithForgedManager(t *testing.T) {
 	}
 }
 
-func TestReplicationPruneUnprotectedAdoptedTarget(t *testing.T) {
+func TestReplicationPruneAdoptedTarget(t *testing.T) {
 	for _, tc := range []struct {
-		name    string
-		legacy  bool
-		failure types.PatchType
+		name      string
+		protected bool
+		legacy    bool
+		failure   types.PatchType
 	}{
 		{name: "explicit unprotected"},
+		{name: "protected", protected: true},
+		{name: "protected metadata failure retries", protected: true, failure: types.JSONPatchType},
+		{name: "protected prune failure retries", protected: true, failure: types.ApplyPatchType},
 		{name: "legacy adopted", legacy: true},
 		{name: "metadata failure retries", failure: types.JSONPatchType},
 		{name: "prune failure retries", failure: types.ApplyPatchType},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			c, req := replicationAdmissionFixture(t, false, false, 2)
+			c, req := replicationAdmissionFixture(t, false, tc.protected, 2)
 			parent := &capsulev1beta2.TenantResource{}
 			require.NoError(t, c.Get(t.Context(), client.ObjectKey{Namespace: "tenant-a", Name: "parent"}, parent))
 			if tc.legacy {
@@ -462,6 +471,9 @@ func TestReplicationPruneUnprotectedAdoptedTarget(t *testing.T) {
 			require.NoError(t, c.Patch(t.Context(), desired, client.Apply, client.FieldOwner(owner)))
 			require.NoError(t, c.Patch(t.Context(), desired, client.RawPatch(types.MergePatchType, []byte(`{"metadata":{"labels":{"projectcapsule.dev/managed-by":"replications"}}}`)), client.FieldOwner(meta.ResourceControllerFieldOwnerPrefix())))
 
+			if tc.protected {
+				require.NoError(t, c.Patch(t.Context(), desired, client.RawPatch(types.MergePatchType, []byte(`{"metadata":{"labels":{"protection.projectcapsule.dev/replications":"true"}}}`)), client.FieldOwner(meta.ResourceControllerFieldOwnerPrefix())))
+			}
 			req.UserInfo.Username = "system:serviceaccount:tenant-a:runner"
 			handler := ReplicaHandler().OnUpdate(c, c, admission.NewDecoder(c.Scheme()), nil)
 			failure := tc.failure
@@ -483,6 +495,15 @@ func TestReplicationPruneUnprotectedAdoptedTarget(t *testing.T) {
 					}
 					var err error
 					req.OldObject.Raw, err = json.Marshal(old)
+					if err != nil {
+						return err
+					}
+					preview := fake.NewClientBuilder().WithScheme(c.Scheme()).WithReturnManagedFields().WithObjects(old).Build()
+					next := obj.DeepCopyObject().(client.Object)
+					if err := preview.Patch(ctx, next, patch, opts...); err != nil {
+						return err
+					}
+					req.Object.Raw, err = json.Marshal(next)
 					if err != nil {
 						return err
 					}
@@ -517,6 +538,65 @@ func TestReplicationPruneUnprotectedAdoptedTarget(t *testing.T) {
 			require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(seed), actual))
 			require.Equal(t, map[string]string{"external": "retained"}, actual.Data)
 			require.NotContains(t, actual.Labels, meta.NewManagedByCapsuleLabel)
+		})
+	}
+}
+
+func TestReplicationRecreatedProtectedTarget(t *testing.T) {
+	for _, global := range []bool{false, true} {
+		t.Run(fmt.Sprintf("global=%t", global), func(t *testing.T) {
+			c, req := replicationAdmissionFixture(t, global, true, 1)
+			var peer client.Object
+			var id gvk.ResourceID
+			if global {
+				parent := &capsulev1beta2.GlobalTenantResource{}
+				require.NoError(t, c.Get(t.Context(), client.ObjectKey{Name: "tenant-a"}, parent))
+				id = parent.Status.ProcessedItems[0].ResourceID
+				parent.Name = "replacement-parent"
+				parent.ResourceVersion = ""
+				parent.UID = "replacement-parent-uid"
+				parent.Status.ServiceAccount.Name = "replacement-runner"
+				peer = parent
+			} else {
+				parent := &capsulev1beta2.TenantResource{}
+				require.NoError(t, c.Get(t.Context(), client.ObjectKey{Namespace: "tenant-a", Name: "parent"}, parent))
+				id = parent.Status.ProcessedItems[0].ResourceID
+				parent.Name = "replacement-parent"
+				parent.ResourceVersion = ""
+				parent.UID = "replacement-parent-uid"
+				parent.Status.ServiceAccount.Name = "replacement-runner"
+				peer = parent
+			}
+			require.NoError(t, c.Create(t.Context(), peer))
+			owner := meta.ReplicationFieldOwnerPrefix(peer.GetName(), peer.GetNamespace()) + "/" + id.FieldOwner("")
+			// The server supplies the replacement's current metadata. Only the new
+			// replication owns it; the former replication still has an old status item.
+			req.OldObject.Raw = []byte(fmt.Sprintf(`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"item","namespace":"tenant-a","uid":"replacement-target","labels":{%q:"true"},"managedFields":[{"manager":%q}]}}`, meta.ReplicationProtectionLabel, owner))
+			req.Object = req.OldObject
+			call := ReplicaHandler().OnUpdate(c, c, admission.NewDecoder(c.Scheme()), nil)
+			req.UserInfo.Username = "system:serviceaccount:tenant-a:replacement-runner"
+			require.Nil(t, call(t.Context(), req), "current owning replication must be allowed")
+			req.UserInfo.Username = "tenant-owner"
+			response := call(t.Context(), req)
+			require.NotNil(t, response, "ordinary users must be denied")
+			require.False(t, response.Allowed)
+			req.UserInfo.Username = "system:serviceaccount:tenant-a:runner"
+			response = call(t.Context(), req)
+			require.NotNil(t, response, "stale status must not authorize the former replication on the replacement")
+			require.EqualValues(t, 403, response.Result.Code)
+			forged := &metav1.PartialObjectMetadata{}
+			require.NoError(t, json.Unmarshal(req.Object.Raw, forged))
+			parentName, parentNamespace := "parent", "tenant-a"
+			if global {
+				parentName, parentNamespace = "tenant-a", ""
+			}
+			forged.ManagedFields = append(forged.ManagedFields, metav1.ManagedFieldsEntry{Manager: meta.ReplicationFieldOwnerPrefix(parentName, parentNamespace) + "/" + id.FieldOwner("")})
+			var err error
+			req.Object.Raw, err = json.Marshal(forged)
+			require.NoError(t, err)
+			response = call(t.Context(), req)
+			require.NotNil(t, response, "a forged new field manager must not restore the former identity's authority")
+			require.EqualValues(t, 403, response.Result.Code)
 		})
 	}
 }

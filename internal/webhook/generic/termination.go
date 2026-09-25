@@ -20,7 +20,7 @@ import (
 // The reader must be authoritative: a cached terminating namespace may have
 // been deleted and replaced by an active namespace with the same name.
 func allowTerminatingNamespaceDeletion(ctx context.Context, reader client.Reader, req admission.Request, response *admission.Response) *admission.Response {
-	if response == nil || response.Result == nil || response.Result.Code != http.StatusForbidden || req.Namespace == "" {
+	if response == nil || response.Result == nil || response.Result.Code != http.StatusForbidden || req.Namespace == "" || reader == nil {
 		return response
 	}
 
