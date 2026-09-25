@@ -62,7 +62,11 @@ var _ = Describe("ResourcePermit namespace cleanup", Label("resource-permit", "p
 		}
 		assertProtected := func(index int) {
 			for _, cm := range targets[index] {
-				Expect(actors[index].Delete(ctx, cm, client.DryRunAll)).To(MatchError(MatchRegexp("protected by a ResourcePermit|managed by a tenant capsule replication")))
+				err := actors[index].Delete(ctx, cm, client.DryRunAll)
+				Expect(apierrors.IsForbidden(err)).To(BeTrue())
+				// Either protection webhook may reject a shared target first.
+				// These fixtures have no live replication parent.
+				Expect(err).To(MatchError(MatchRegexp("protected by a ResourcePermit|protected by a capsule replication; its managing parent is not yet available")))
 				current := &corev1.ConfigMap{}
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cm), current)).To(Succeed())
 				Expect(current.DeletionTimestamp).To(BeNil())
