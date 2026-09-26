@@ -104,7 +104,7 @@ func TestManagedMetadataPatches(t *testing.T) {
 		assertNoPatchPath(t, patches, "/metadata/ownerReferences/-")
 	})
 
-	t.Run("an interrupted creation is recovered from managed fields", func(t *testing.T) {
+	t.Run("an adopted manager is not proof of creation", func(t *testing.T) {
 		existing := configMap("interrupted", map[string]any{"requested": "value"})
 		existing.SetManagedFields([]metav1.ManagedFieldsEntry{managedField(testFieldOwner)})
 		c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(existing).WithReturnManagedFields().Build()
@@ -118,12 +118,11 @@ func TestManagedMetadataPatches(t *testing.T) {
 		if err != nil {
 			t.Fatalf("managedMetadataPatches() recovery error = %v", err)
 		}
-		if !created {
-			t.Fatal("managedMetadataPatches() created = false, want recovered creation")
+		if created {
+			t.Fatal("adoption was promoted to creation")
 		}
-
-		assertPatchValue(t, patches, "/metadata/labels/projectcapsule.dev~1created-by", testCreatedBy)
-		assertPatchValue(t, patches, "/metadata/ownerReferences/-", &owner)
+		assertNoPatchPath(t, patches, "/metadata/labels/projectcapsule.dev~1created-by")
+		assertNoPatchPath(t, patches, "/metadata/ownerReferences/-")
 	})
 }
 
@@ -266,7 +265,7 @@ func TestApplyUsesServerSideApply(t *testing.T) {
 	if data, found, dataErr := unstructured.NestedStringMap(apply.object.Object, "data"); dataErr != nil || !found || data["requested"] != "value" {
 		t.Fatalf("Apply() data = %#v, found=%v, error=%v", data, found, dataErr)
 	}
-	if labels := apply.object.GetLabels(); labels[meta.CreatedByCapsuleLabel] != "" || labels[meta.NewManagedByCapsuleLabel] != "" {
+	if labels := apply.object.GetLabels(); labels[meta.CreatedByCapsuleLabel] != testCreatedBy || labels[meta.NewManagedByCapsuleLabel] != "" {
 		t.Fatalf("Apply() allowed rendered tracking labels: %#v", labels)
 	}
 	if value := apply.object.GetLabels()[meta.ProtectionLabelPrefix+testCreatedBy]; value != meta.ValueTrue {
@@ -311,11 +310,8 @@ func TestApplyDryRunUsesServerSideApplyWithoutPersisting(t *testing.T) {
 	if result.LastApply != nil {
 		t.Fatalf("Apply() dry-run lastApply = %v, want nil", result.LastApply)
 	}
-	if len(recording.patches) != 1 {
-		t.Fatalf("Apply() dry-run patches = %d, want only SSA preflight", len(recording.patches))
-	}
-	if got := recording.patches[0].options.DryRun; len(got) != 1 || got[0] != metav1.DryRunAll {
-		t.Fatalf("Apply() dry-run option = %#v, want [%q]", got, metav1.DryRunAll)
+	if len(recording.patches) != 0 {
+		t.Fatal("absent target dry run should use the atomic Create preflight")
 	}
 
 	persisted := &unstructured.Unstructured{}
@@ -465,7 +461,8 @@ func TestPrune(t *testing.T) {
 
 	t.Run("adopted resource is reduced to an identity apply patch", func(t *testing.T) {
 		existing := configMap("adopted", map[string]any{"existing": "value"})
-		base := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(ns.DeepCopy(), existing).Build()
+		existing.SetManagedFields([]metav1.ManagedFieldsEntry{managedField(testFieldOwner)})
+		base := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(ns.DeepCopy(), existing).WithReturnManagedFields().Build()
 		recording := &recordingClient{Client: base}
 		manager.Reader = base
 
@@ -692,7 +689,7 @@ func (c *applyingClient) Patch(
 		return nil
 	}
 
-	return c.Client.Create(ctx, unstructuredObject)
+	return c.Client.Update(ctx, unstructuredObject)
 }
 
 func (c *recordingClient) Patch(

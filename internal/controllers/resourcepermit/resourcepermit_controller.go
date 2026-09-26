@@ -559,6 +559,12 @@ func (r *ResourcePermitReconciler) reconcileNew(
 		)
 	}
 
+	// Publish the controller-owned snapshot before admission authenticates its
+	// execution identity and exact targets, including during preflight.
+	if err := r.updateStatus(ctx, log, br); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	if dryRunErr := r.dryRunItems(ctx, br, resourceClient); dryRunErr != nil {
 		return ctrl.Result{}, markRequestFailed(
 			br,
@@ -959,7 +965,7 @@ func (r *ResourcePermitReconciler) transitionRequestActivation(
 	return nil
 }
 
-// dryRunItems exercises the exact server-side apply request for every rendered
+// dryRunItems preflights creation or server-side apply for every rendered
 // target with the resolved execution identity. It does not persist resources,
 // tracking metadata, or processed-item status.
 func (r *ResourcePermitReconciler) dryRunItems(
@@ -1173,8 +1179,7 @@ func (r *ResourcePermitReconciler) pruneItems(
 					continue
 				}
 
-				item.Created = actual.GetLabels()[meta.CreatedByCapsuleLabel] == meta.ValueControllerResourcePermit ||
-					!resource.Policy.AllowsAdoption()
+				item.Created = actual.GetLabels()[meta.CreatedByCapsuleLabel] == meta.ValueControllerResourcePermit
 			}
 
 			if resource.Policy.ShouldOrphan() {
@@ -1219,18 +1224,6 @@ func (r *ResourcePermitReconciler) pruneItems(
 					br.Status.ProcessedItems.UpdateItem(item)
 
 					syncErr = errors.Join(syncErr, getErr)
-
-					continue
-				}
-			}
-
-			if !deleted {
-				if disownErr := manager.Disown(ctx, resourceClient, obj, fieldOwner, nil); disownErr != nil {
-					item.Status = metav1.ConditionFalse
-					item.Message = "disown failed: " + disownErr.Error()
-					br.Status.ProcessedItems.UpdateItem(item)
-
-					syncErr = errors.Join(syncErr, disownErr)
 
 					continue
 				}

@@ -72,9 +72,7 @@ func protectionWebhookMatcher(t testing.TB, hook string) func(map[string]any, ma
 	require.NoError(t, yaml.Unmarshal(raw, &values))
 	registration, exists := values.Webhooks.Hooks[hook]
 	require.True(t, exists)
-	if hook == "replications" {
-		require.Contains(t, registration.Rules[0].Operations, admissionregistrationv1.Create)
-	}
+	require.Contains(t, registration.Rules[0].Operations, admissionregistrationv1.Create)
 	selector := labels.Everything()
 	if registration.ObjectSelector != nil {
 		selector, err = metav1.LabelSelectorAsSelector(registration.ObjectSelector)

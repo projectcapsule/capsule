@@ -220,3 +220,83 @@ func TestMetadataFailureRetainsLegacyProtection(t *testing.T) {
 	parent := &capsulev1beta2.TenantResource{Status: capsulev1beta2.TenantResourceStatus{ProcessedItems: processed}}
 	require.Len(t, (tenantresource.ProtectedItems{}).Func()(parent), 1, "legacy protection must remain indexed")
 }
+
+func TestAdoptionSurvivesCreationPolicyTransition(t *testing.T) {
+	for _, skipped := range []bool{false, true} {
+		t.Run(fmt.Sprintf("skipped=%t", skipped), func(t *testing.T) {
+			p, _ := policyProcessor()
+			c := fake.NewClientBuilder().WithObjects(&corev1.Namespace{Name: "target"}).WithReturnManagedFields().Build()
+			p.GatherClient = c
+			existing := policyConfigMap("target", "adopted")
+			require.NoError(t, c.Patch(t.Context(), existing, client.Apply, client.FieldOwner("external")))
+			desired := policyConfigMap("target", "adopted")
+			desired.Object["data"] = map[string]any{"managed": "capsule"}
+			id := gvk.NewResourceID(desired, "tenant-a", "0/raw-0")
+			opts := ProcessorOptions{FieldOwnerPrefix: "2lclct9cwq6mg", Prune: true}
+			policy := &apiruntime.ResourceReplicationPolicy{Creation: apiruntime.ResourceCreationPolicyMerge, Protect: new(false), Deletion: apiruntime.ResourceDeletionPolicyRemove}
+			acc := Accumulator{}
+			AccumulatorAdd(acc, id, AccumulatorObject{Object: desired, Policy: policy})
+			processed := meta.ProcessedItems{}
+			require.NoError(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, acc, opts))
+			require.False(t, processed[0].Created)
+			if skipped {
+				p.Conditions, _ = cache.NewCELCache()
+				policy.Condition = "false"
+				require.NoError(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, acc, opts))
+			}
+			policy.Creation = apiruntime.ResourceCreationPolicyOwner
+			require.NoError(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, acc, opts))
+			policy.Condition = "true"
+			p.Conditions, _ = cache.NewCELCache()
+			require.NoError(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, acc, opts))
+			// Restart without processed status: live adoption must still remain adoption.
+			processed = nil
+			require.NoError(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, acc, opts))
+			incorrectlyCreated := processed[0].Created
+			actual := desired.DeepCopy()
+			require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(actual), actual))
+			t.Logf("after Merge->Owner: Created=%t, labels=%v", incorrectlyCreated, actual.GetLabels())
+			require.NoError(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, Accumulator{}, opts))
+			deleted := apierrors.IsNotFound(c.Get(t.Context(), client.ObjectKeyFromObject(actual), actual))
+			t.Logf("Remove cleanup deleted adopted target=%t", deleted)
+			require.False(t, incorrectlyCreated, "changing creation policy must not reclassify an adopted object as created")
+			require.False(t, deleted, "cleanup must not delete the external object")
+		})
+	}
+}
+
+func TestSkippedReplacementDoesNotInheritCreation(t *testing.T) {
+	p, _ := policyProcessor()
+	c := fake.NewClientBuilder().WithObjects(&corev1.Namespace{Name: "target"}).WithReturnManagedFields().Build()
+	p.GatherClient = c
+	var err error
+	p.Conditions, err = cache.NewCELCache()
+	require.NoError(t, err)
+	desired := policyConfigMap("target", "replaced")
+	id := gvk.NewResourceID(desired, "tenant-a", "0/raw-0")
+	opts := ProcessorOptions{FieldOwnerPrefix: "2lclct9cwq6mg", Prune: true}
+	policy := &apiruntime.ResourceReplicationPolicy{Protect: new(false), Deletion: apiruntime.ResourceDeletionPolicyRemove}
+	acc := Accumulator{}
+	AccumulatorAdd(acc, id, AccumulatorObject{Object: desired, Policy: policy})
+	processed := meta.ProcessedItems{}
+	require.NoError(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, acc, opts))
+	require.True(t, processed[0].Created)
+	require.NoError(t, c.Delete(t.Context(), desired))
+	foreign := policyConfigMap("target", "replaced")
+	foreign.SetUID("replacement-uid")
+	foreign.Object["data"] = map[string]any{"foreign": "retained"}
+	require.NoError(t, c.Create(t.Context(), foreign))
+	require.NoError(t, c.Patch(t.Context(), foreign, client.Apply, client.FieldOwner("external")))
+	for _, field := range foreign.GetManagedFields() {
+		require.NotEqual(t, opts.FieldOwnerPrefix+"/"+id.FieldOwner(""), field.Manager)
+	}
+	policy.Condition = "false"
+	require.NoError(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, acc, opts))
+	staleCreated := processed[0].Created
+	t.Logf("condition skipped unowned replacement: Created=%t, LastApply=%v", staleCreated, processed[0].LastApply)
+	require.NoError(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, Accumulator{}, opts))
+	deleted := apierrors.IsNotFound(c.Get(t.Context(), client.ObjectKeyFromObject(foreign), foreign))
+	t.Logf("Remove cleanup deleted replacement=%t", deleted)
+	require.False(t, staleCreated, "an existing unowned replacement must not inherit the old Created state")
+	require.False(t, deleted, "must retain the replacement object")
+}

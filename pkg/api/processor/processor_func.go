@@ -182,28 +182,14 @@ func (p *Processor) pruneProcessedItem(
 
 	fieldOwner := opts.FieldOwnerPrefix + "/" + item.FieldOwner("")
 
-	// An adopted target is authorized through its SSA ownership.
-	// Release lifecycle metadata before pruning removes that ownership proof.
-	disowned := !item.Created
-	if disowned {
-		err := p.resourceManager().Disown(ctx, c, obj, fieldOwner, opts.Owner)
-		if failAndRecord(processed, itemErrors, item, "disowning failed for item: ", err) {
-			return true
-		}
-	}
-
-	deleted, err := p.Prune(ctx, c, obj, fieldOwner, &item)
+	_, err := p.Prune(ctx, c, obj, fieldOwner, &item, opts.Owner)
 	if failAndRecord(processed, itemErrors, item, "pruning failed for item: ", err) {
 		return true
 	}
 
-	if deleted || disowned {
-		processed.RemoveItem(item)
+	processed.RemoveItem(item)
 
-		return true
-	}
-
-	return false
+	return true
 }
 
 func (p *Processor) disownProcessedItem(
@@ -453,12 +439,14 @@ func (p *Processor) Prune(
 	obj *unstructured.Unstructured,
 	fieldOwner string,
 	current *meta.ObjectReferenceStatus,
+	owner *metav1.OwnerReference,
 ) (deleted bool, err error) {
 	created := current != nil && current.Created
 
 	return p.resourceManager().Prune(ctx, c, obj, ssa.PruneOptions{
 		FieldOwner:        fieldOwner,
 		PreviouslyCreated: created,
+		OwnerReference:    owner,
 	})
 }
 

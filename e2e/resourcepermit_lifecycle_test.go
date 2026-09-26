@@ -10,20 +10,22 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	apimeta "github.com/projectcapsule/capsule/pkg/api/meta"
-	capsulerbac "github.com/projectcapsule/capsule/pkg/api/rbac"
-	resourcepermitapi "github.com/projectcapsule/capsule/pkg/api/resourcepermit"
-	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	apimeta "github.com/projectcapsule/capsule/pkg/api/meta"
+	capsulerbac "github.com/projectcapsule/capsule/pkg/api/rbac"
+	resourcepermitapi "github.com/projectcapsule/capsule/pkg/api/resourcepermit"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
 const (
@@ -94,13 +96,15 @@ var _ = Describe(
 			}}
 
 			By("rejecting controller-owned status changes when no transition was requested")
-			tampered := requested.DeepCopy()
-			tampered.Status.Request.Resources = injectedResources
-			err := reviewerClient.Status().Patch(
-				ctx,
-				tampered,
-				client.MergeFromWithOptions(requested, client.MergeFromWithOptimisticLock{}),
-			)
+			err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(request), requested); err != nil {
+					return err
+				}
+				tampered := requested.DeepCopy()
+				tampered.Status.Request.Resources = injectedResources
+				return reviewerClient.Status().Patch(ctx, tampered,
+					client.MergeFromWithOptions(requested, client.MergeFromWithOptimisticLock{}))
+			})
 			Expect(apierrors.IsForbidden(err)).To(BeTrue())
 			Expect(err).To(MatchError(ContainSubstring(
 				"rendered resources can only be changed by the Capsule controller",

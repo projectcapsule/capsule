@@ -207,7 +207,7 @@ func BenchmarkProcessorPolicy(b *testing.B) {
 						b.Fatal("metadata failure was ignored")
 					}
 					if len(processed) != items || len(c.applies) != items || c.metadataPatches != items {
-						b.Fatal("did not exercise each apply and metadata failure")
+						b.Fatalf("did not exercise each apply and metadata failure: applies=%d metadata=%d status=%+v", len(c.applies), c.metadataPatches, processed)
 					}
 				}
 				b.ReportMetric(float64(items), "applies/op")
@@ -243,6 +243,9 @@ type policyRecordingClient struct {
 
 func (c *policyRecordingClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
 	if patch.Type() != types.ApplyPatchType {
+		if (&client.PatchOptions{}).ApplyOptions(opts).FieldManager != meta.ResourceControllerFieldOwnerPrefix() {
+			return c.Client.Patch(ctx, obj, patch, opts...)
+		}
 		c.metadataPatches++
 		if c.metadataError != nil {
 			return c.metadataError
@@ -255,14 +258,5 @@ func (c *policyRecordingClient) Patch(ctx context.Context, obj client.Object, pa
 	if c.applyError != nil {
 		return c.applyError
 	}
-	actual := policyConfigMap(obj.GetNamespace(), obj.GetName())
-	err := c.Client.Get(ctx, client.ObjectKeyFromObject(obj), actual)
-	if apierrors.IsNotFound(err) {
-		return c.Client.Create(ctx, obj)
-	}
-	if err != nil {
-		return err
-	}
-	obj.SetResourceVersion(actual.GetResourceVersion())
-	return c.Client.Update(ctx, obj)
+	return c.Client.Patch(ctx, obj, patch, opts...)
 }

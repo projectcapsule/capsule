@@ -529,7 +529,7 @@ func TestReplicationPruneAdoptedTarget(t *testing.T) {
 			}
 			reads, writes = 0, 0
 			require.NoError(t, p.Reconcile(t.Context(), logr.Discard(), admitted, &items, processor.Accumulator{}, opts))
-			require.Equal(t, 2, reads, "cleanup order must not add target reads")
+			require.Equal(t, 1, reads, "cleanup reuses the authoritative ownership read")
 			if tc.failure == "" {
 				require.Equal(t, 2, writes, "cleanup needs one metadata patch and one SSA prune")
 			}

@@ -65,7 +65,7 @@ func (m Manager) checkCondition(ctx context.Context, c client.Client, desired *u
 }
 
 func (m Manager) skippedResult(existing *unstructured.Unstructured, opts ApplyOptions) ApplyResult {
-	result := ApplyResult{Skipped: true, Created: opts.PreviouslyCreated}
+	result := ApplyResult{Skipped: true}
 	if existing == nil {
 		return result
 	}
@@ -76,7 +76,7 @@ func (m Manager) skippedResult(existing *unstructured.Unstructured, opts ApplyOp
 	createdByUs := managedByUs && m.Metadata.CreatedByValue != "" && existing.GetLabels()[meta.CreatedByCapsuleLabel] == m.Metadata.CreatedByValue
 	// Creation policy can change after adoption. Field ownership alone does not
 	// prove that we created an object and must never authorize deleting it.
-	result.Created = result.Created || createdByUs
+	result.Created = managedByUs && opts.PreviouslyCreated || createdByUs
 
 	if result.LastApply == nil && createdByUs {
 		// Recover an initialization that succeeded before SSA or status failed.
@@ -267,7 +267,7 @@ func hasFieldManager(obj *unstructured.Unstructured, manager string) bool {
 	})
 }
 
-func (m Manager) createConditionalTarget(ctx context.Context, c client.Client, desired *unstructured.Unstructured, opts ApplyOptions) (*metav1.Time, error) {
+func (m Manager) createTarget(ctx context.Context, c client.Client, desired *unstructured.Unstructured, opts ApplyOptions) (*metav1.Time, error) {
 	initial := desired.DeepCopy()
 
 	labels := initial.GetLabels()
@@ -284,13 +284,13 @@ func (m Manager) createConditionalTarget(ctx context.Context, c client.Client, d
 	}
 
 	if err := c.Create(ctx, initial, options...); err != nil {
-		return nil, fmt.Errorf("creating conditional target: %w", err)
+		return nil, fmt.Errorf("creating target: %w", err)
 	}
 
 	created := initial.GetCreationTimestamp()
 
 	if !opts.DryRun {
-		if err := m.upgradeConditionalOwnership(ctx, c, initial, opts); err != nil {
+		if err := m.upgradeOwnership(ctx, c, initial, opts); err != nil {
 			return &created, err
 		}
 	}
@@ -304,14 +304,14 @@ func (m Manager) createConditionalTarget(ctx context.Context, c client.Client, d
 // Migrate only this controller's create-only initialization to Apply ownership.
 // The Kubernetes helper includes a resource-version precondition and preserves
 // other managers. Without migration, future rotations conflict with the create.
-func (m Manager) upgradeConditionalOwnership(ctx context.Context, c client.Client, existing *unstructured.Unstructured, opts ApplyOptions) error {
+func (m Manager) upgradeOwnership(ctx context.Context, c client.Client, existing *unstructured.Unstructured, opts ApplyOptions) error {
 	if m.Metadata.CreatedByValue == "" || existing.GetLabels()[meta.CreatedByCapsuleLabel] != m.Metadata.CreatedByValue {
 		return nil
 	}
 
 	patch, err := csaupgrade.UpgradeManagedFieldsPatch(existing, sets.New(opts.FieldOwner), opts.FieldOwner)
 	if err != nil {
-		return fmt.Errorf("preparing conditional SSA ownership: %w", err)
+		return fmt.Errorf("preparing SSA ownership: %w", err)
 	}
 
 	if patch == nil {
@@ -324,7 +324,7 @@ func (m Manager) upgradeConditionalOwnership(ctx context.Context, c client.Clien
 	}
 
 	if err := c.Patch(ctx, existing, client.RawPatch(types.JSONPatchType, patch), options...); err != nil {
-		return fmt.Errorf("initializing conditional SSA ownership: %w", err)
+		return fmt.Errorf("initializing SSA ownership: %w", err)
 	}
 
 	return nil

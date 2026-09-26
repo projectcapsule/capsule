@@ -15,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -88,9 +87,9 @@ func (m Manager) Apply(
 		return ApplyResult{}, fmt.Errorf("resolving object scope: %w", err)
 	}
 
-	// Tracking metadata belongs to the lifecycle manager, not to the rendered
-	// field manager. This also prevents templates from marking adopted objects
-	// as created by Capsule.
+	// Rendered input cannot assert lifecycle ownership. Creation provenance is
+	// added below only after checking the live target; other tracking metadata
+	// belongs to the lifecycle manager.
 	meta.SetFilteredLabels(desired, map[string]struct{}{
 		meta.CreatedByCapsuleLabel:         {},
 		meta.NewManagedByCapsuleLabel:      {},
@@ -140,16 +139,6 @@ func (m Manager) Apply(
 		}
 
 		snapshot = append(snapshot, existing)
-
-		if existing != nil {
-			err = m.upgradeConditionalOwnership(ctx, c, existing, opts)
-			desired.SetResourceVersion(existing.GetResourceVersion())
-			desired.SetUID(existing.GetUID())
-		}
-
-		if err != nil {
-			return result, err
-		}
 	}
 
 	snapshot, err = m.prepareProtection(ctx, c, desired, opts, snapshot)
@@ -162,12 +151,24 @@ func (m Manager) Apply(
 		return ApplyResult{Created: created}, fmt.Errorf("evaluating managed metadata: %w", err)
 	}
 
+	if created {
+		// Keep creation provenance across the content write too: status and
+		// lifecycle decoration can both fail after a successful apply.
+		labels := desired.GetLabels()
+		if labels == nil {
+			labels = map[string]string{}
+		}
+
+		labels[meta.CreatedByCapsuleLabel] = m.Metadata.CreatedByValue
+		desired.SetLabels(labels)
+	}
+
 	var initialized *metav1.Time
 
-	if opts.Condition != "" && snapshot[0] == nil {
-		// Create is the absent-object precondition: an SSA upsert could overwrite
-		// a concurrent creation. Establish SSA ownership immediately afterwards.
-		initialized, err = m.createConditionalTarget(ctx, c, desired, opts)
+	if snapshot[0] == nil {
+		// Creation and its provenance must be atomic. SSA upsert alone cannot
+		// distinguish creation from adoption or reject a concurrent creation.
+		initialized, err = m.createTarget(ctx, c, desired, opts)
 		if err != nil {
 			return ApplyResult{Created: initialized != nil, LastApply: initialized}, err
 		}
@@ -175,16 +176,18 @@ func (m Manager) Apply(
 		if opts.DryRun {
 			return ApplyResult{Created: true}, nil
 		}
-	}
-
-	apply := func() error { return clt.PatchApply(ctx, c, desired, opts.FieldOwner, opts.Force, opts.DryRun) }
-	if opts.Condition != "" {
-		// A conflict must restart evaluation and rendering from fresh state.
-		err = apply()
 	} else {
-		err = retry.OnError(retry.DefaultBackoff, apierrors.IsConflict, apply)
+		existing := snapshot[0]
+		if err := m.upgradeOwnership(ctx, c, existing, opts); err != nil {
+			return ApplyResult{Created: created}, err
+		}
+
+		desired.SetResourceVersion(existing.GetResourceVersion())
+		desired.SetUID(existing.GetUID())
 	}
 
+	// A conflict restarts reconciliation from fresh ownership and conditions.
+	err = clt.PatchApply(ctx, c, desired, opts.FieldOwner, opts.Force, opts.DryRun)
 	if err != nil {
 		return ApplyResult{Created: created, LastApply: initialized}, fmt.Errorf("applying object failed: %w", err)
 	}
@@ -272,8 +275,19 @@ func (m Manager) Prune(
 		return false, err
 	}
 
-	if m.isDeletable(actual, opts) {
-		err := c.Delete(ctx, actual)
+	if !ownsTarget(actual, opts.FieldOwner, opts.OwnerReference) {
+		return false, nil
+	}
+
+	owners, err := m.resourceFieldOwners(ctx, actual, opts.FieldOwner)
+	if err != nil {
+		return false, err
+	}
+
+	if m.isDeletable(actual, opts) && !hasOtherResourceOwners(owners, opts.FieldOwner) {
+		uid, version := actual.GetUID(), actual.GetResourceVersion()
+
+		err := c.Delete(ctx, actual, client.Preconditions{UID: &uid, ResourceVersion: &version})
 		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
@@ -281,9 +295,18 @@ func (m Manager) Prune(
 		return true, err
 	}
 
+	// Release lifecycle metadata while exact field ownership still authorizes
+	// this manager. Then prune against the metadata patch's resulting version.
+	if err := m.disown(ctx, c, actual, opts.FieldOwner, opts.OwnerReference, owners); err != nil {
+		return false, err
+	}
+
 	// Applying only the resource identity causes SSA to remove every field
 	// previously owned by this manager while preserving other managers' fields.
 	prunePatch := objectReference(actual)
+	prunePatch.SetResourceVersion(actual.GetResourceVersion())
+	prunePatch.SetUID(actual.GetUID())
+
 	if err := clt.PatchApply(ctx, c, prunePatch, opts.FieldOwner, false, false); err != nil {
 		if apierrors.IsNotFound(err) {
 			return true, nil
@@ -296,8 +319,8 @@ func (m Manager) Prune(
 }
 
 // Disown removes metadata which is not part of the caller's SSA field set.
-// This is used after pruning an adopted or shared resource. fieldOwner identifies
-// the departing manager, including legacy cleanup that retains its SSA fields.
+// This retains rendered fields and requires live ownership of the target.
+// Prune releases this metadata before relinquishing that ownership proof.
 func (m Manager) Disown(
 	ctx context.Context,
 	c client.Client,
@@ -318,50 +341,11 @@ func (m Manager) Disown(
 		return err
 	}
 
-	owners, err := m.resourceFieldOwners(ctx, actual, fieldOwner)
-	if err != nil {
-		return err
+	if !ownsTarget(actual, fieldOwner, ownerReference) {
+		return nil
 	}
 
-	patches := clt.RemoveOwnerReferencePatch(actual.GetOwnerReferences(), ownerReference)
-	// Legacy replication retention also releases admission protection. Leaving
-	// created-by behind would look like an active parent with a stale index.
-	if !hasOtherResourceOwners(owners, fieldOwner) {
-		if m.Metadata.CreatedByValue == meta.ValueControllerReplications {
-			patches = append(patches, m.orphanMetadataPatches(actual)...)
-		} else if actual.GetLabels()[meta.NewManagedByCapsuleLabel] == m.Metadata.ManagedByValue {
-			patches = append(patches, clt.PatchRemoveLabels(actual.GetLabels(), []string{meta.NewManagedByCapsuleLabel})...)
-		}
-	}
-	// Protection is composed per controller, independently of shared tracking.
-	// A skipped apply can leave it owned by the lifecycle manager after pruning.
-	protection, err := m.protectionPatches(ctx, actual, false, fieldOwner, owners)
-	if err != nil {
-		return err
-	}
-
-	patches = append(patches, protection...)
-
-	if len(patches) > 0 {
-		// Another resource manager may have acquired the target since the read.
-		patches = append([]clt.JSONPatch{{Operation: "test", Path: "/metadata/resourceVersion", Value: actual.GetResourceVersion()}}, patches...)
-	}
-
-	if err := clt.ApplyPatches(
-		ctx,
-		c,
-		actual,
-		patches,
-		meta.ResourceControllerFieldOwnerPrefix(),
-	); err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil
-		}
-
-		return err
-	}
-
-	return nil
+	return m.disown(ctx, c, actual, fieldOwner, ownerReference, nil)
 }
 
 // Orphan stops lifecycle management without removing the resource or
@@ -386,6 +370,10 @@ func (m Manager) Orphan(
 		}
 
 		return err
+	}
+
+	if !ownsTarget(actual, fieldOwner, ownerReference) {
+		return nil
 	}
 
 	owners, err := m.resourceFieldOwners(ctx, actual, fieldOwner)
@@ -461,6 +449,57 @@ func (m Manager) appliedMetadataPatches(ctx context.Context, c client.Client, de
 	return append(patches, protection...), created, nil
 }
 
+func (m Manager) disown(ctx context.Context, c client.Client, actual *unstructured.Unstructured, fieldOwner string, ownerReference *metav1.OwnerReference, owners map[string]struct{}) error {
+	if owners == nil {
+		var err error
+
+		owners, err = m.resourceFieldOwners(ctx, actual, fieldOwner)
+		if err != nil {
+			return err
+		}
+	}
+
+	patches := clt.RemoveOwnerReferencePatch(actual.GetOwnerReferences(), ownerReference)
+	// Legacy replication retention also releases admission protection. Leaving
+	// created-by behind would look like an active parent with a stale index.
+	if !hasOtherResourceOwners(owners, fieldOwner) {
+		if m.Metadata.CreatedByValue == meta.ValueControllerReplications {
+			patches = append(patches, m.orphanMetadataPatches(actual)...)
+		} else if actual.GetLabels()[meta.NewManagedByCapsuleLabel] == m.Metadata.ManagedByValue {
+			patches = append(patches, clt.PatchRemoveLabels(actual.GetLabels(), []string{meta.NewManagedByCapsuleLabel})...)
+		}
+	}
+	// Protection is composed per controller, independently of shared tracking.
+	// A skipped apply can leave it owned by the lifecycle manager after pruning.
+	protection, err := m.protectionPatches(ctx, actual, false, fieldOwner, owners)
+	if err != nil {
+		return err
+	}
+
+	patches = append(patches, protection...)
+
+	if len(patches) > 0 {
+		// Another resource manager may have acquired the target since the read.
+		patches = append([]clt.JSONPatch{{Operation: "test", Path: "/metadata/resourceVersion", Value: actual.GetResourceVersion()}}, patches...)
+	}
+
+	if err := clt.ApplyPatches(
+		ctx,
+		c,
+		actual,
+		patches,
+		meta.ResourceControllerFieldOwnerPrefix(),
+	); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+
+		return err
+	}
+
+	return nil
+}
+
 func (m Manager) orphanMetadataPatches(actual *unstructured.Unstructured) (patches []clt.JSONPatch) {
 	labels := actual.GetLabels()
 	removeLabels := make([]string, 0, 5)
@@ -518,7 +557,7 @@ func (m Manager) managedMetadataPatches(
 	case err != nil:
 		return nil, false, err
 	default:
-		created = opts.PreviouslyCreated
+		created = opts.PreviouslyCreated && ownsTarget(existing, opts.FieldOwner, opts.OwnerReference)
 
 		labels := existing.GetLabels()
 		if value, ok := labels[meta.CreatedByCapsuleLabel]; ok && value == m.Metadata.CreatedByValue {
@@ -534,16 +573,9 @@ func (m Manager) managedMetadataPatches(
 				})...)
 			}
 		}
-
-		// Recover when the initial SSA creation succeeded but the follow-up
-		// metadata patch or status update failed. With adoption disabled, this
-		// manager could only have acquired fields by creating the resource.
-		if !created && !opts.Adopt && hasApplyManager(existing, opts.FieldOwner) {
-			created = true
-		}
 	}
 
-	if !created && !opts.Adopt {
+	if !created && !opts.Adopt && !hasFieldManager(existing, opts.FieldOwner) {
 		return nil, false, fmt.Errorf(
 			"object %s/%s %s/%s exists and cannot be adopted",
 			existing.GetAPIVersion(),
@@ -622,7 +654,16 @@ func (m Manager) scopedObjectWithScope(
 	return scoped, clusterScoped, nil
 }
 
+func ownsTarget(actual *unstructured.Unstructured, fieldOwner string, ownerReference *metav1.OwnerReference) bool {
+	return hasFieldManager(actual, fieldOwner) ||
+		(ownerReference != nil && meta.HasLooseOwnerReference(actual, *ownerReference))
+}
+
 func (m Manager) isDeletable(actual *unstructured.Unstructured, opts PruneOptions) bool {
+	if !ownsTarget(actual, opts.FieldOwner, opts.OwnerReference) {
+		return false
+	}
+
 	if opts.PreviouslyCreated {
 		return true
 	}

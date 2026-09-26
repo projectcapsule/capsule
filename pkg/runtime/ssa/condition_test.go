@@ -73,15 +73,19 @@ func TestConditionalApply(t *testing.T) {
 }
 
 func TestConditionalCreateRace(t *testing.T) {
-	compiler, err := cache.NewCELCache()
-	if err != nil {
-		t.Fatal(err)
-	}
-	c := &conditionalClient{Client: fake.NewClientBuilder().Build(), createRace: true}
-	m := Manager{Conditions: compiler, Metadata: Metadata{CreatedByValue: testCreatedBy, ManagedByValue: testCreatedBy}}
-	_, err = m.Apply(t.Context(), c, configMap("guarded", nil), ApplyOptions{FieldOwner: testFieldOwner, Condition: "object == null"})
-	if !apierrors.IsAlreadyExists(err) || c.patches != 0 {
-		t.Fatalf("creation race was not stopped before apply: %v", err)
+	for _, condition := range []string{"", "object == null"} {
+		t.Run("condition="+condition, func(t *testing.T) {
+			compiler, err := cache.NewCELCache()
+			if err != nil {
+				t.Fatal(err)
+			}
+			c := &conditionalClient{Client: fake.NewClientBuilder().Build(), createRace: true}
+			m := Manager{Conditions: compiler, Metadata: Metadata{CreatedByValue: testCreatedBy, ManagedByValue: testCreatedBy}}
+			_, err = m.Apply(t.Context(), c, configMap("guarded", nil), ApplyOptions{FieldOwner: testFieldOwner, Condition: condition})
+			if !apierrors.IsAlreadyExists(err) || c.patches != 0 {
+				t.Fatalf("creation race was not stopped before apply: %v", err)
+			}
+		})
 	}
 }
 
