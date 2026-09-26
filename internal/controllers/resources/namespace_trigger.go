@@ -31,6 +31,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/processor"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
+	"github.com/projectcapsule/capsule/pkg/runtime/ssa"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
 )
 
@@ -44,6 +45,7 @@ type NamespaceTrigger struct {
 	log           logr.Logger
 	configuration configuration.Configuration
 	impersonation *cache.ImpersonationCache
+	conditions    *cache.CELCache
 	processor     processor.Processor
 	collector     Collector
 
@@ -94,6 +96,8 @@ func (r *NamespaceTrigger) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.C
 	r.reader = mgr.GetAPIReader()
 
 	r.processor = processor.Processor{
+		ReplicationOwners:            ssa.NewReplicationOwnerResolver(mgr.GetClient(), mgr.GetAPIReader()),
+		Conditions:                   r.conditions,
 		Configuration:                r.configuration,
 		GatherClient:                 mgr.GetAPIReader(),
 		AllowCrossNamespaceSelection: true,
@@ -286,7 +290,7 @@ func (r *NamespaceTrigger) replicateGlobal(
 		c,
 		tntResource.Status.ProcessedItems,
 		acc,
-		scopedProcessorOptions(tntResource, &tntResource.Spec.TenantResourceCommonSpec, &owner),
+		replicationProcessorOptions(tntResource, &tntResource.Spec.TenantResourceCommonSpec, &owner),
 		scope,
 	)
 
@@ -330,7 +334,7 @@ func (r *NamespaceTrigger) replicateNamespaced(
 		c,
 		tntResource.Status.ProcessedItems,
 		acc,
-		scopedProcessorOptions(tntResource, &tntResource.Spec.TenantResourceCommonSpec, nil),
+		replicationProcessorOptions(tntResource, &tntResource.Spec.TenantResourceCommonSpec, nil),
 		scope,
 	)
 

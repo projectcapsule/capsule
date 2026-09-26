@@ -6,6 +6,7 @@ package processor
 import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 )
 
@@ -22,6 +23,7 @@ type AccumulatorItem struct {
 type AccumulatorObject struct {
 	Origin gvk.TenantResourceIDWithOrigin
 	Object *unstructured.Unstructured
+	Policy *apiruntime.ResourceReplicationPolicy
 }
 
 func AccumulatorAdd(

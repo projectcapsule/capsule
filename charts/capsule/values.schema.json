@@ -2399,6 +2399,45 @@
                                 }
                             }
                         },
+                        "replicationDefaults": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "description": "Convert deprecated TenantResource and GlobalTenantResource settings to per-resource policies",
+                                    "type": "boolean"
+                                },
+                                "failurePolicy": {
+                                    "description": "Admission failure policy",
+                                    "type": "string"
+                                },
+                                "matchConditions": {
+                                    "description": "Additional admission match conditions",
+                                    "type": "array"
+                                },
+                                "matchPolicy": {
+                                    "description": "Admission match policy",
+                                    "type": "string"
+                                },
+                                "namespaceSelector": {
+                                    "description": "Namespace selector for replication policy conversion",
+                                    "type": "object",
+                                    "additionalProperties": true
+                                },
+                                "objectSelector": {
+                                    "description": "Object selector for replication policy conversion",
+                                    "type": "object",
+                                    "additionalProperties": true
+                                },
+                                "opts": {
+                                    "description": "Capsule Hook Options",
+                                    "type": "object"
+                                },
+                                "reinvocationPolicy": {
+                                    "description": "Admission reinvocation policy",
+                                    "type": "string"
+                                }
+                            }
+                        },
                         "replications": {
                             "type": "object",
                             "properties": {
@@ -2412,7 +2451,18 @@
                                 },
                                 "matchConditions": {
                                     "description": "[MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
-                                    "type": "array"
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "expression": {
+                                                "type": "string"
+                                            },
+                                            "name": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
                                 },
                                 "matchPolicy": {
                                     "description": "[MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
@@ -2424,30 +2474,8 @@
                                     "additionalProperties": true
                                 },
                                 "objectSelector": {
-                                    "description": "[ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)",
+                                    "description": "[ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) Match either legacy tracking marker or independent protection below. A LabelSelector cannot express OR across different label keys.",
                                     "type": "object",
-                                    "properties": {
-                                        "matchExpressions": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "key": {
-                                                        "type": "string"
-                                                    },
-                                                    "operator": {
-                                                        "type": "string"
-                                                    },
-                                                    "values": {
-                                                        "type": "array",
-                                                        "items": {
-                                                            "type": "string"
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    },
                                     "additionalProperties": true
                                 },
                                 "opts": {
@@ -2506,7 +2534,18 @@
                                 },
                                 "matchConditions": {
                                     "description": "[MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
-                                    "type": "array"
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "expression": {
+                                                "type": "string"
+                                            },
+                                            "name": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
                                 },
                                 "matchPolicy": {
                                     "description": "[MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
@@ -2520,28 +2559,6 @@
                                 "objectSelector": {
                                     "description": "[ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)",
                                     "type": "object",
-                                    "properties": {
-                                        "matchExpressions": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "key": {
-                                                        "type": "string"
-                                                    },
-                                                    "operator": {
-                                                        "type": "string"
-                                                    },
-                                                    "values": {
-                                                        "type": "array",
-                                                        "items": {
-                                                            "type": "string"
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    },
                                     "additionalProperties": true
                                 },
                                 "opts": {

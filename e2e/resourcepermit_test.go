@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -483,17 +484,26 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 				g.Expect(requested.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseRequested))
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
-			properties, err := requested.GenerateRequestStatus()
-			Expect(err).NotTo(HaveOccurred())
-			Expect(requested.ApprovePermit(&resourcepermit.AccessEntity{Name: "spoofed"}, properties, "")).To(Succeed())
-			err = bobClient.Status().Update(ctx, requested)
+			err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(br), requested); err != nil {
+					return err
+				}
+				properties, err := requested.GenerateRequestStatus()
+				if err != nil {
+					return err
+				}
+				if err := requested.ApprovePermit(&resourcepermit.AccessEntity{Name: "spoofed"}, properties, ""); err != nil {
+					return err
+				}
+				return bobClient.Status().Update(ctx, requested)
+			})
 			Expect(err).To(HaveOccurred())
 			Expect(err).To(MatchError(ContainSubstring("is not permitted to approve requests for template")))
 
 			charlieClient := impersonationClient("charlie", []string{"users", "admin"})
 			requested = &capsulev1beta2.ResourcePermit{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: br.Name, Namespace: br.Namespace}, requested)).To(Succeed())
-			properties, err = requested.GenerateRequestStatus()
+			properties, err := requested.GenerateRequestStatus()
 			Expect(err).NotTo(HaveOccurred())
 			Expect(requested.ApprovePermit(&resourcepermit.AccessEntity{Name: "spoofed"}, properties, "")).To(Succeed())
 			Expect(charlieClient.Status().Update(ctx, requested)).To(Succeed())

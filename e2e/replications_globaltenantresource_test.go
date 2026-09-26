@@ -11,13 +11,11 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -48,6 +46,30 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 		tenantBNamespaces []string
 		allNamespaces     []string
 	)
+
+	It("converts legacy settings and applies independent resource policies across tenant boundaries", Label("replication-policy"), func() {
+		exerciseReplicationPolicies(true, tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner)
+	})
+
+	It("composes replication and ResourcePermit protection", Label("protection-composition"), func() {
+		exerciseMixedProtection(true, tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner)
+	})
+
+	It("preserves explicit policies after a partial first apply", Label("policy-metadata-failure", "policy-first-apply-failure"), func() {
+		exerciseInitialReplicationPolicyFailure(true, tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner)
+	})
+
+	It("retains effective policy when protection metadata reconciliation fails", Label("policy-metadata-failure"), func() {
+		exerciseReplicationPolicyFailure(true, tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner)
+	})
+
+	It("keeps a shared adopted target protected until its last owner departs", Label("shared-protection", "protection-markers"), func() {
+		exerciseSharedReplicationProtection(true, tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner, false)
+	})
+
+	It("keeps shared protection when one parent switches to Orphan", Label("shared-orphan-protection"), func() {
+		exerciseSharedReplicationProtection(true, tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner, true)
+	})
 
 	BeforeEach(func() {
 		ctx = context.Background()
@@ -146,7 +168,6 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 
 			return nil
 		}, "30s", "5s").Should(Succeed())
-
 	})
 
 	Context("cluster-scoped objects", func() {
@@ -901,7 +922,8 @@ data:
 			By("protecting the ServiceAccount referenced by GlobalTenantResource status")
 			serviceAccount := &corev1.ServiceAccount{
 				Name:      saNoDelete,
-				Namespace: "capsule-system"}
+				Namespace: "capsule-system",
+			}
 			Eventually(func() bool {
 				err := k8sClient.Delete(ctx, serviceAccount, client.DryRunAll)
 
@@ -1222,9 +1244,7 @@ data:
 			for _, ns := range tenantANamespaces {
 				expectConfigMapData(ns, "gtr-kept", map[string]string{"mode": "keep"})
 			}
-
 		})
-
 	})
 
 	Context("namespace target enforcement", func() {
@@ -1325,7 +1345,6 @@ data:
 				})
 			}
 		})
-
 	})
 
 	Context("context loading", func() {

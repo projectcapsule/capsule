@@ -71,6 +71,12 @@ func TestResourcePermitActivationRetry(t *testing.T) {
 				WithObjects(template, permit).Build()
 			denyApply := true
 			cl := interceptor.NewClient(base, interceptor.Funcs{
+				Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+					if denyApply && obj.GetObjectKind().GroupVersionKind() == corev1.SchemeGroupVersion.WithKind("ConfigMap") {
+						return apierrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, obj.GetName(), fmt.Errorf("write access revoked"))
+					}
+					return c.Create(ctx, obj, opts...)
+				},
 				Patch: func(ctx context.Context, c client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
 					if denyApply && obj.GetObjectKind().GroupVersionKind() == corev1.SchemeGroupVersion.WithKind("ConfigMap") {
 						return apierrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, obj.GetName(), fmt.Errorf("write access revoked"))

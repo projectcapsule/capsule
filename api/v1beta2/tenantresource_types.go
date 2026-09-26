@@ -9,6 +9,7 @@ import (
 
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
 )
 
@@ -27,7 +28,10 @@ type TenantResourceCommonStatus struct {
 }
 
 type TenantResourceCommonSpec struct {
-	// Provide additional settings
+	// Deprecated: configure resources[].policy instead. Admission converts Settings
+	// into policies for blocks without one. Retained as a compatibility fallback
+	// for stored resources that have not passed through admission again.
+	//
 	// +kubebuilder:default={}
 	Settings TenantResourceCommonSpecSettings `json:"settings,omitzero"`
 	// DependsOn may contain a meta.NamespacedObjectReference slice
@@ -41,6 +45,9 @@ type TenantResourceCommonSpec struct {
 	ResyncPeriod metav1.Duration `json:"resyncPeriod"`
 	// When the replicated resource manifest is deleted, all the objects replicated so far will be automatically deleted.
 	// Disable this to keep replicated resources although the deletion of the replication manifest.
+	//
+	// Deprecated: use resources[].policy.deletion instead. Retained for blocks without a policy.
+	//
 	// +kubebuilder:default=true
 	PruningOnDelete *bool `json:"pruningOnDelete,omitempty"`
 	// When cordoning a replication it will no longer execute any applies or deletions (paused).
@@ -59,15 +66,28 @@ func (s *TenantResourceCommonSpec) IsCordoned() bool {
 
 type TenantResourceCommonSpecSettings struct {
 	// Enabling this allows TenanResources to interact with objects which were not created by a TenantResource. In this case on prune no deletion of the entire object is made.
+	//
+	// Deprecated: use resources[].policy.creation: Merge instead.
+	//
 	// +kubebuilder:default=false
 	Adopt *bool `json:"adopt,omitempty"`
 	// Force indicates that in case of conflicts with server-side apply, the client should acquire ownership of the conflicting field.
 	// You may create collisions with this.
+	//
+	// Deprecated: use resources[].policy.force instead.
+	//
 	// +kubebuilder:default=false
 	Force *bool `json:"force,omitempty"`
 }
 
 type ResourceSpec struct {
+	// Policy controls creation, admission protection, SSA conflict ownership,
+	// and deletion for every raw item, namespaced item, and generator in this block.
+	// An explicit policy replaces the deprecated spec.settings for this block.
+	// When omitted, admission converts legacy settings and pruningOnDelete into a policy.
+	// +optional
+	Policy *apiruntime.ResourceReplicationPolicy `json:"policy,omitempty"`
+
 	// Defines the Namespace selector to select the Tenant Namespaces on which the resources must be propagated.
 	// In case of nil value, all the Tenant Namespaces are targeted.
 	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty"`

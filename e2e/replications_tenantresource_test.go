@@ -23,9 +23,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/template"
 )
 
-var (
-	resyncPeriod = metav1.Duration{Duration: 10 * time.Second}
-)
+var resyncPeriod = metav1.Duration{Duration: 10 * time.Second}
 
 const tenantResourceTargetLabel = "e2e.projectcapsule.dev/tenantresource-target"
 
@@ -114,6 +112,10 @@ var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace
 		}
 	})
 
+	It("applies conditional targets without pruning skipped resources", Label("resource-condition"), func() {
+		exerciseTenantResourceConditions(tnt.Name, baseNamespace, targetNamespaces[0], targetNamespaces[1])
+	})
+
 	AfterEach(func() {
 		cleanupTenantResourcesWithDefaultServiceAccount(
 			ctx,
@@ -129,6 +131,30 @@ var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace
 		}
 
 		EventuallyDeletion(tnt)
+	})
+
+	It("converts legacy settings and applies independent resource policies", Label("replication-policy"), func() {
+		exerciseReplicationPolicies(false, tnt.Name, baseNamespace, targetNamespaces[0], targetNamespaces[1], tenantOwner)
+	})
+
+	It("composes replication and ResourcePermit protection", Label("protection-composition"), func() {
+		exerciseMixedProtection(false, tnt.Name, baseNamespace, targetNamespaces[0], targetNamespaces[1], tenantOwner)
+	})
+
+	It("preserves explicit policies after a partial first apply", Label("policy-metadata-failure", "policy-first-apply-failure"), func() {
+		exerciseInitialReplicationPolicyFailure(false, tnt.Name, baseNamespace, targetNamespaces[0], targetNamespaces[1], tenantOwner)
+	})
+
+	It("retains effective policy when protection metadata reconciliation fails", Label("policy-metadata-failure"), func() {
+		exerciseReplicationPolicyFailure(false, tnt.Name, baseNamespace, targetNamespaces[0], targetNamespaces[1], tenantOwner)
+	})
+
+	It("keeps a shared adopted target protected until its last owner departs", Label("shared-protection", "protection-markers"), func() {
+		exerciseSharedReplicationProtection(false, tnt.Name, baseNamespace, targetNamespaces[0], targetNamespaces[1], tenantOwner, false)
+	})
+
+	It("keeps shared protection when one parent switches to Orphan", Label("shared-orphan-protection"), func() {
+		exerciseSharedReplicationProtection(false, tnt.Name, baseNamespace, targetNamespaces[0], targetNamespaces[1], tenantOwner, true)
 	})
 
 	Context("cluster-scoped object protection", func() {
@@ -236,7 +262,7 @@ rules:
 		})
 	})
 
-	It("skips applying resources to terminating namespaces and removes them from processedItems", func() {
+	It("skips applying resources to terminating namespaces and removes them from processedItems", Label("protection-termination"), func() {
 		terminatingNamespace := targetNamespaces[2]
 
 		tr := &capsulev1beta2.TenantResource{
@@ -278,10 +304,14 @@ rules:
 		)
 
 		By("establishing the resource in every active namespace")
+		actor := impersonationClient(tenantOwner.Name, withDefaultGroups(nil))
 		for _, ns := range targetNamespaces {
 			expectConfigMapData(ns, "tr-skip-terminating", map[string]string{
 				"mode": "active",
 			})
+			Eventually(func() error {
+				return actor.Delete(ctx, &corev1.ConfigMap{Name: "tr-skip-terminating", Namespace: ns}, client.DryRunAll)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(MatchError(ContainSubstring("managed by a tenant capsule replication")))
 		}
 
 		releaseNamespace := holdNamespaceTerminating(ctx, terminatingNamespace)
@@ -314,21 +344,24 @@ rules:
 			expectConfigMapData(ns, "tr-skip-terminating", map[string]string{
 				"mode": "updated",
 			})
+			Eventually(func() error {
+				return actor.Delete(ctx, &corev1.ConfigMap{Name: "tr-skip-terminating", Namespace: ns}, client.DryRunAll)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(MatchError(ContainSubstring("managed by a tenant capsule replication")))
 		}
 
 		By("verifying the terminating namespace is skipped")
-		Eventually(func() error {
-			return k8sClient.Get(ctx, types.NamespacedName{
+		Eventually(func() bool {
+			return apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{
 				Name:      "tr-skip-terminating",
 				Namespace: terminatingNamespace,
-			}, &corev1.ConfigMap{})
-		}, defaultTimeoutInterval, defaultPollInterval).Should(HaveOccurred())
-		Consistently(func() error {
-			return k8sClient.Get(ctx, types.NamespacedName{
+			}, &corev1.ConfigMap{}))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
+		Consistently(func() bool {
+			return apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{
 				Name:      "tr-skip-terminating",
 				Namespace: terminatingNamespace,
-			}, &corev1.ConfigMap{})
-		}, 2*resyncPeriod.Duration, defaultPollInterval).Should(HaveOccurred())
+			}, &corev1.ConfigMap{}))
+		}, 2*resyncPeriod.Duration, defaultPollInterval).Should(BeTrue())
 
 		By("verifying the terminating namespace item is not kept in processedItems")
 		expectTenantResourceProcessedNamespaces(
@@ -340,7 +373,6 @@ rules:
 	})
 
 	Context("generators and template context", func() {
-
 		It("fails when a templated namespace resolves to a forbidden namespace", func() {
 			foreignSecret := &corev1.Secret{
 				Name:      "templated-foreign-secret",
@@ -811,7 +843,6 @@ data:
 				}, &corev1.ConfigMap{})
 			}, 5*time.Second, defaultPollInterval).Should(HaveOccurred())
 		})
-
 	})
 
 	Context("multiple TenantResources targeting the same object", func() {
@@ -1459,7 +1490,8 @@ data:
 			By("protecting the ServiceAccount referenced by TenantResource status")
 			serviceAccount := &corev1.ServiceAccount{
 				Name:      saNoDelete,
-				Namespace: baseNamespace}
+				Namespace: baseNamespace,
+			}
 			Eventually(func() bool {
 				err := k8sClient.Delete(ctx, serviceAccount, client.DryRunAll)
 
@@ -1487,7 +1519,6 @@ data:
 				}
 				return k8sClient.Update(ctx, current)
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-
 		})
 		It("fails to replicate namespacedItems when the impersonated service account cannot read source resources", func() {
 			saName := "restricted-source-reader"
@@ -1543,7 +1574,6 @@ data:
 				expectSecretAbsent(ns, "source-secret")
 			}
 		})
-
 	})
 
 	Context("advanced TenantResource ownership and namespace behavior", func() {
@@ -1677,7 +1707,7 @@ data:
 				Eventually(func(g Gomega) {
 					cm := &corev1.ConfigMap{}
 					g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "shared-config", Namespace: ns}, cm)).To(Succeed())
-					g.Expect(cm.Labels).To(HaveKeyWithValue(apimeta.CreatedByCapsuleLabel, apimeta.ValueControllerReplications))
+					g.Expect(cm.Labels).ToNot(HaveKey(apimeta.CreatedByCapsuleLabel))
 					g.Expect(cm.Labels).ToNot(HaveKey(apimeta.NewManagedByCapsuleLabel))
 					g.Expect(cm.Data).To(HaveKeyWithValue("mode", "keep"))
 				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
@@ -1777,7 +1807,6 @@ data:
 			}
 		})
 	})
-
 })
 
 func newRawConfigMapTenantResource(namespace, name string, data map[string]string) *capsulev1beta2.TenantResource {

@@ -115,3 +115,22 @@ type RenderedResource struct {
 	// +kubebuilder:validation:MinItems=1
 	Targets []k8sruntime.RawExtension `json:"targets"`
 }
+
+// ResourceReplicationPolicy extends the shared lifecycle policy with a condition
+// evaluated on each TR/GTR reconciliation.
+// +kubebuilder:object:generate=true
+type ResourceReplicationPolicy struct {
+	ResourceTemplatePolicy `json:",inline"`
+
+	// Condition is an optional CEL boolean expression checked before each target
+	// is applied. object is the existing destination object, or null when absent;
+	// now is the evaluation timestamp. False skips rendered content without
+	// pruning or releasing an already managed object. Policy and protection are
+	// still reconciled for managed objects. Evaluation errors prevent writes.
+	// Rendering still occurs before evaluation. Omitting Condition preserves the
+	// existing apply behavior. Conditions do not affect deletion or orphaning.
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=4096
+	Condition string `json:"condition,omitempty"`
+}

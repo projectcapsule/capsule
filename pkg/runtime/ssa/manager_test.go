@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	clt "github.com/projectcapsule/capsule/pkg/runtime/client"
@@ -103,7 +104,7 @@ func TestManagedMetadataPatches(t *testing.T) {
 		assertNoPatchPath(t, patches, "/metadata/ownerReferences/-")
 	})
 
-	t.Run("an interrupted creation is recovered from managed fields", func(t *testing.T) {
+	t.Run("an adopted manager is not proof of creation", func(t *testing.T) {
 		existing := configMap("interrupted", map[string]any{"requested": "value"})
 		existing.SetManagedFields([]metav1.ManagedFieldsEntry{managedField(testFieldOwner)})
 		c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(existing).WithReturnManagedFields().Build()
@@ -117,13 +118,94 @@ func TestManagedMetadataPatches(t *testing.T) {
 		if err != nil {
 			t.Fatalf("managedMetadataPatches() recovery error = %v", err)
 		}
-		if !created {
-			t.Fatal("managedMetadataPatches() created = false, want recovered creation")
+		if created {
+			t.Fatal("adoption was promoted to creation")
 		}
-
-		assertPatchValue(t, patches, "/metadata/labels/projectcapsule.dev~1created-by", testCreatedBy)
-		assertPatchValue(t, patches, "/metadata/ownerReferences/-", &owner)
+		assertNoPatchPath(t, patches, "/metadata/labels/projectcapsule.dev~1created-by")
+		assertNoPatchPath(t, patches, "/metadata/ownerReferences/-")
 	})
+}
+
+func TestApplyUsesResponseWhenCacheLags(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		exists     bool
+		concurrent bool
+	}{
+		{name: "created object is absent from cache"},
+		{name: "adopted object has stale cached version", exists: true},
+		{name: "concurrent metadata change remains guarded", exists: true, concurrent: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := t.Context()
+			base := fake.NewClientBuilder().WithReturnManagedFields().Build()
+			existing := configMap("lagging", map[string]any{"external": "retained"})
+			if tc.exists {
+				if err := base.Create(ctx, existing); err != nil {
+					t.Fatal(err)
+				}
+			}
+			reads, writes := 0, 0
+			c := interceptor.NewClient(base, interceptor.Funcs{
+				Get: func(_ context.Context, _ client.WithWatch, _ client.ObjectKey, obj client.Object, _ ...client.GetOption) error {
+					reads++
+					if !tc.exists {
+						return apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, existing.GetName())
+					}
+					obj.(*unstructured.Unstructured).Object = existing.DeepCopy().Object
+					return nil
+				},
+				Patch: func(ctx context.Context, c client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+					writes++
+					if tc.concurrent && patch.Type() == types.JSONPatchType {
+						current := configMap("lagging", nil)
+						if err := c.Get(ctx, client.ObjectKeyFromObject(current), current); err != nil {
+							return err
+						}
+						current.SetAnnotations(map[string]string{"example.org/concurrent": "retained"})
+						if err := c.Update(ctx, current); err != nil {
+							return err
+						}
+					}
+					return c.Patch(ctx, obj, patch, opts...)
+				},
+			})
+			m := Manager{Metadata: Metadata{CreatedByValue: testCreatedBy, ManagedByValue: testCreatedBy, ProtectedByValue: testCreatedBy}}
+			desired := configMap("lagging", map[string]any{"requested": "applied"})
+			result, err := m.Apply(ctx, c, desired, ApplyOptions{FieldOwner: testFieldOwner, Adopt: tc.exists, Protect: true})
+			if tc.concurrent {
+				if err == nil {
+					t.Fatal("concurrent write must fail the metadata precondition")
+				}
+			} else if err != nil {
+				t.Fatalf("Apply() with stale cache: %v", err)
+			}
+			if reads != 1 || writes != 2 {
+				t.Fatalf("reads=%d, writes=%d; want one preflight read and two writes", reads, writes)
+			}
+			if result.LastApply == nil || result.Created == tc.exists {
+				t.Fatalf("unexpected lifecycle result: %+v", result)
+			}
+			actual := configMap("lagging", nil)
+			if err := base.Get(ctx, client.ObjectKeyFromObject(actual), actual); err != nil {
+				t.Fatal(err)
+			}
+			if tc.concurrent {
+				if actual.GetAnnotations()["example.org/concurrent"] != "retained" || actual.GetLabels()[meta.NewManagedByCapsuleLabel] != "" {
+					t.Fatalf("concurrent metadata was overwritten: %#v", actual.Object)
+				}
+			} else if actual.GetLabels()[meta.NewManagedByCapsuleLabel] != testCreatedBy {
+				t.Fatalf("missing lifecycle metadata: %#v", actual.GetLabels())
+			}
+			data, _, _ := unstructured.NestedStringMap(actual.Object, "data")
+			if data["requested"] != "applied" || (tc.exists && data["external"] != "retained") {
+				t.Fatalf("unexpected applied data: %#v", data)
+			}
+			if desired.GetResourceVersion() != "" || desired.GetLabels() != nil {
+				t.Fatal("Apply mutated its input")
+			}
+		})
+	}
 }
 
 func TestApplyUsesServerSideApply(t *testing.T) {
@@ -145,9 +227,11 @@ func TestApplyUsesServerSideApply(t *testing.T) {
 	}}
 	desired := configMap("applied", map[string]any{"requested": "value"})
 	desired.SetLabels(map[string]string{
-		meta.CreatedByCapsuleLabel:    "template-value",
-		meta.NewManagedByCapsuleLabel: "template-value",
-		meta.ProtectedByCapsuleLabel:  "template-value",
+		meta.CreatedByCapsuleLabel:         "template-value",
+		meta.NewManagedByCapsuleLabel:      "template-value",
+		meta.ProtectedByCapsuleLabel:       "template-value",
+		meta.ReplicationProtectionLabel:    "true",
+		meta.ResourcePermitProtectionLabel: "true",
 	})
 	desired.SetAnnotations(map[string]string{
 		meta.ResourcePermitServiceAccountAnnotation: "system:serviceaccount:spoofed:runner",
@@ -181,11 +265,14 @@ func TestApplyUsesServerSideApply(t *testing.T) {
 	if data, found, dataErr := unstructured.NestedStringMap(apply.object.Object, "data"); dataErr != nil || !found || data["requested"] != "value" {
 		t.Fatalf("Apply() data = %#v, found=%v, error=%v", data, found, dataErr)
 	}
-	if labels := apply.object.GetLabels(); labels[meta.CreatedByCapsuleLabel] != "" || labels[meta.NewManagedByCapsuleLabel] != "" {
+	if labels := apply.object.GetLabels(); labels[meta.CreatedByCapsuleLabel] != testCreatedBy || labels[meta.NewManagedByCapsuleLabel] != "" {
 		t.Fatalf("Apply() allowed rendered tracking labels: %#v", labels)
 	}
-	if value := apply.object.GetLabels()[meta.ProtectedByCapsuleLabel]; value != testCreatedBy {
-		t.Fatalf("Apply() protection label = %q, want %q", value, testCreatedBy)
+	if value := apply.object.GetLabels()[meta.ProtectionLabelPrefix+testCreatedBy]; value != meta.ValueTrue {
+		t.Fatalf("Apply() independent protection label = %q, want true", value)
+	}
+	if labels := apply.object.GetLabels(); labels[meta.ReplicationProtectionLabel] != "" || labels[meta.ResourcePermitProtectionLabel] != "" {
+		t.Fatalf("Apply() allowed rendered protection identities: %#v", labels)
 	}
 	if value := apply.object.GetAnnotations()[meta.ResourcePermitServiceAccountAnnotation]; value != "system:serviceaccount:test:runner" {
 		t.Fatalf("Apply() protection ServiceAccount = %q, want resolved identity", value)
@@ -223,11 +310,8 @@ func TestApplyDryRunUsesServerSideApplyWithoutPersisting(t *testing.T) {
 	if result.LastApply != nil {
 		t.Fatalf("Apply() dry-run lastApply = %v, want nil", result.LastApply)
 	}
-	if len(recording.patches) != 1 {
-		t.Fatalf("Apply() dry-run patches = %d, want only SSA preflight", len(recording.patches))
-	}
-	if got := recording.patches[0].options.DryRun; len(got) != 1 || got[0] != metav1.DryRunAll {
-		t.Fatalf("Apply() dry-run option = %#v, want [%q]", got, metav1.DryRunAll)
+	if len(recording.patches) != 0 {
+		t.Fatal("absent target dry run should use the atomic Create preflight")
 	}
 
 	persisted := &unstructured.Unstructured{}
@@ -377,7 +461,8 @@ func TestPrune(t *testing.T) {
 
 	t.Run("adopted resource is reduced to an identity apply patch", func(t *testing.T) {
 		existing := configMap("adopted", map[string]any{"existing": "value"})
-		base := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(ns.DeepCopy(), existing).Build()
+		existing.SetManagedFields([]metav1.ManagedFieldsEntry{managedField(testFieldOwner)})
+		base := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(ns.DeepCopy(), existing).WithReturnManagedFields().Build()
 		recording := &recordingClient{Client: base}
 		manager.Reader = base
 
@@ -497,6 +582,7 @@ func TestOrphan(t *testing.T) {
 		UID:        types.UID("request-uid"),
 	}
 	existing := configMap("orphaned", map[string]any{"requested": "value"})
+	existing.SetManagedFields([]metav1.ManagedFieldsEntry{managedField(testFieldOwner), managedField("external")})
 	existing.SetOwnerReferences([]metav1.OwnerReference{owner})
 	existing.SetLabels(map[string]string{
 		meta.CreatedByCapsuleLabel:    testCreatedBy,
@@ -513,6 +599,7 @@ func TestOrphan(t *testing.T) {
 	c := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithRuntimeObjects(existing).
+		WithReturnManagedFields().
 		Build()
 	manager := Manager{Metadata: Metadata{
 		CreatedByValue:                      testCreatedBy,
@@ -523,7 +610,7 @@ func TestOrphan(t *testing.T) {
 		AppManagedByValue:                   "test-app-manager",
 	}}
 
-	if err := manager.Orphan(context.Background(), c, existing, &owner); err != nil {
+	if err := manager.Orphan(context.Background(), c, existing, testFieldOwner, &owner); err != nil {
 		t.Fatalf("Orphan() error = %v", err)
 	}
 
@@ -602,7 +689,7 @@ func (c *applyingClient) Patch(
 		return nil
 	}
 
-	return c.Client.Create(ctx, unstructuredObject.DeepCopy())
+	return c.Client.Update(ctx, unstructuredObject)
 }
 
 func (c *recordingClient) Patch(
