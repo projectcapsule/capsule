@@ -405,6 +405,16 @@ Test implementation requirements:
 - Wait for tenant, namespace, ruleset, and policy readiness before testing a
   decision. Use `Eventually`/`Consistently` and existing timeout/poll constants;
   do not add arbitrary sleeps to hide races.
+- Perform e2e updates and status mutations inside `Eventually` with the existing
+  timeout/poll constants. Fetch the latest object at the start of **every attempt**,
+  then apply the intended mutation and issue `Update` or construct the patch from
+  that fresh object (including its optimistic-lock base). A readiness check or a
+  fetch outside the retry closure does not protect the subsequent write from a
+  controller race. Retry conflicts with a new fetch, never the stale payload.
+  For negative cases, require the intended admission denial and re-read persisted
+  state; a `409 Conflict` is not a successful rejection. Fail immediately if an
+  unauthorized write succeeds so a later denial cannot hide it. Keep deliberate
+  stale-version/conflict tests explicit exceptions to this pattern.
 - Negative assertions must identify the expected denial/reason. A timeout,
   transport error, unrelated RBAC rejection, or malformed fixture is not evidence
   that the intended Capsule rule works. Re-read state after rejected mutations.
