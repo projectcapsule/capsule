@@ -9,5 +9,6 @@ const (
 	ServiceAccountIndexerFieldName string = serviceaccount.ReferenceFieldName
 	ProcessedIndexerFieldName      string = "status.items"
 	CreatedIndexerFieldName        string = "status.items.created"
+	ProtectedIndexerFieldName      string = "status.items.protected"
 	NamespaceIndexerFieldName      string = "metadata.namespace"
 )

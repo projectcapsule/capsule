@@ -309,6 +309,48 @@ spec:
                             This may be an empty string.
                           maxLength: 32768
                           type: string
+                        policy:
+                          description: |-
+                            Policy is a lifecycle snapshot for protection and cleanup. Conditions are
+                            evaluated from the source block and omitted here. Failed updates retain the
+                            previous snapshot; a first successful content write records its policy even
+                            if metadata reconciliation fails, so cleanup respects explicit retention.
+                            An absent policy on an already applied item preserves legacy behavior.
+                          properties:
+                            creation:
+                              default: Owner
+                              description: |-
+                                Creation controls how an existing target is handled. Owner requires the
+                                resource to have been created by the applying controller and otherwise
+                                returns an error. Merge adopts an existing resource when possible and
+                                creates the resource when it does not exist.
+                              enum:
+                              - Owner
+                              - Merge
+                              type: string
+                            deletion:
+                              default: Remove
+                              description: |-
+                                Deletion controls what happens when the parent stops managing the target.
+                                Remove deletes resources created for the parent and relinquishes adopted
+                                resources. Orphan keeps the resource and removes Capsule's lifecycle
+                                metadata. Removal is the default.
+                              enum:
+                              - Remove
+                              - Orphan
+                              type: string
+                            force:
+                              default: false
+                              description: Force allows server-side apply to acquire
+                                conflicting field ownership.
+                              type: boolean
+                            protect:
+                              default: true
+                              description: |-
+                                Protect prevents users from changing or deleting the target through
+                                admission while it is managed. Protection is enabled by default.
+                              type: boolean
+                          type: object
                         status:
                           description: status of the condition, one of True, False,
                             Unknown.

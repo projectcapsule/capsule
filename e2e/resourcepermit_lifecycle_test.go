@@ -10,12 +10,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	apimeta "github.com/projectcapsule/capsule/pkg/api/meta"
-	capsulerbac "github.com/projectcapsule/capsule/pkg/api/rbac"
-	resourcepermitapi "github.com/projectcapsule/capsule/pkg/api/resourcepermit"
-	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
@@ -24,6 +18,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	apimeta "github.com/projectcapsule/capsule/pkg/api/meta"
+	capsulerbac "github.com/projectcapsule/capsule/pkg/api/rbac"
+	resourcepermitapi "github.com/projectcapsule/capsule/pkg/api/resourcepermit"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
 const (
@@ -63,7 +64,7 @@ var _ = Describe(
 		})
 
 		BeforeEach(func() {
-			namespace = createResourcePermitTestNamespace(ctx)
+			namespace = createResourcePermitTenantNamespace(ctx)
 			grantResourcePermitNamespaceAdmin(ctx, namespace.Name, resourcePermitLifecycleReviewer)
 		})
 
@@ -94,34 +95,45 @@ var _ = Describe(
 			}}
 
 			By("rejecting controller-owned status changes when no transition was requested")
-			tampered := requested.DeepCopy()
-			tampered.Status.Request.Resources = injectedResources
-			err := reviewerClient.Status().Patch(
-				ctx,
-				tampered,
-				client.MergeFromWithOptions(requested, client.MergeFromWithOptimisticLock{}),
-			)
-			Expect(apierrors.IsForbidden(err)).To(BeTrue())
-			Expect(err).To(MatchError(ContainSubstring(
-				"rendered resources can only be changed by the Capsule controller",
-			)))
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(request), requested)).To(Succeed())
+				g.Expect(requested.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseRequested))
+				tampered := requested.DeepCopy()
+				tampered.Status.Request.Resources = injectedResources
+				err := reviewerClient.Status().Patch(ctx, tampered,
+					client.MergeFromWithOptions(requested, client.MergeFromWithOptimisticLock{}))
+				if err == nil {
+					StopTrying("controller-owned status update unexpectedly succeeded").Now()
+				}
+				g.Expect(apierrors.IsForbidden(err)).To(BeTrue(), "expected admission denial, got: %v", err)
+				g.Expect(err).To(MatchError(ContainSubstring(
+					"rendered resources can only be changed by the Capsule controller",
+				)))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 			By("rejecting a shortcut from Requested directly to Active")
-			invalidTransition := waitForResourcePermitPhase(ctx, request, capsulev1beta2.ResourcePermitPhaseRequested)
-			invalidTransitionBefore := invalidTransition.DeepCopy()
-			invalidTransition.Status.Phase = capsulev1beta2.ResourcePermitPhaseActive
-			err = reviewerClient.Status().Patch(
-				ctx,
-				invalidTransition,
-				client.MergeFromWithOptions(
-					invalidTransitionBefore,
-					client.MergeFromWithOptimisticLock{},
-				),
-			)
-			Expect(apierrors.IsForbidden(err)).To(BeTrue())
-			Expect(err).To(MatchError(ContainSubstring(
-				"invalid ResourcePermit transition: can only activate an approved request",
-			)))
+			Eventually(func(g Gomega) {
+				invalidTransition := &capsulev1beta2.ResourcePermit{}
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(request), invalidTransition)).To(Succeed())
+				g.Expect(invalidTransition.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseRequested))
+				invalidTransitionBefore := invalidTransition.DeepCopy()
+				invalidTransition.Status.Phase = capsulev1beta2.ResourcePermitPhaseActive
+				err := reviewerClient.Status().Patch(
+					ctx,
+					invalidTransition,
+					client.MergeFromWithOptions(
+						invalidTransitionBefore,
+						client.MergeFromWithOptimisticLock{},
+					),
+				)
+				if err == nil {
+					StopTrying("invalid activation unexpectedly succeeded").Now()
+				}
+				g.Expect(apierrors.IsForbidden(err)).To(BeTrue(), "expected admission denial, got: %v", err)
+				g.Expect(err).To(MatchError(ContainSubstring(
+					"invalid ResourcePermit transition: can only activate an approved request",
+				)))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 			By("discarding injected status while applying an authenticated phase transition")
 			requested = waitForResourcePermitPhase(ctx, request, capsulev1beta2.ResourcePermitPhaseRequested)
@@ -129,42 +141,46 @@ var _ = Describe(
 			expectedServiceAccount := requested.Status.Request.Impersonation.DeepCopy()
 			expectedTemplate := requested.Status.Request.Template.DeepCopy()
 
-			hijacked := requested.DeepCopy()
-			hijacked.Status.Phase = capsulev1beta2.ResourcePermitPhaseApproved
-			hijacked.Status.Request.Resources = injectedResources
-			hijacked.Status.Request.Impersonation = &apimeta.NamespacedRFC1123ObjectReferenceWithNamespace{
-				Name:      "injected-runner",
-				Namespace: apimeta.RFC1123SubdomainName(namespace.Name),
-			}
-			hijacked.Status.Request.Template = &capsulev1beta2.ResolvedResourcePermitTemplateReference{
-				ResourcePermitTemplateReference: globalResourcePermitTemplateReference("injected-template"),
-				ResourceVersion:                 "injected-version",
-			}
-			hijacked.Status.Request.Approvals = &resourcepermitapi.ApprovalSpec{
-				Auto:       true,
-				Conditions: []string{"false"},
-			}
-			hijacked.Status.Review = &capsulev1beta2.ReviewInfo{
-				Reviewer: &resourcepermitapi.AccessEntity{
-					Name: "mallory",
-					Type: resourcepermitapi.AccessEntityTypeSystem,
-				},
-				Verdict: capsulev1beta2.ResourcePermitVerdictDenied,
-				Message: "reviewed from an untrusted payload",
-			}
-			hijacked.Status.Transitions = append(hijacked.Status.Transitions, capsulev1beta2.ResourcePermitTransition{
-				Type:      capsulev1beta2.ResourcePermitPhaseApproved,
-				Timestamp: metav1.Now(),
-				Actor:     capsulev1beta2.ResourcePermitTransitionActor{Name: "mallory", Type: resourcepermitapi.AccessEntityTypeSystem},
-				Reason:    "InjectedTransition",
-			})
-			hijacked.Status.Size = 999
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(request), requested)).To(Succeed())
+				g.Expect(requested.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseRequested))
+				hijacked := requested.DeepCopy()
+				hijacked.Status.Phase = capsulev1beta2.ResourcePermitPhaseApproved
+				hijacked.Status.Request.Resources = injectedResources
+				hijacked.Status.Request.Impersonation = &apimeta.NamespacedRFC1123ObjectReferenceWithNamespace{
+					Name:      "injected-runner",
+					Namespace: apimeta.RFC1123SubdomainName(namespace.Name),
+				}
+				hijacked.Status.Request.Template = &capsulev1beta2.ResolvedResourcePermitTemplateReference{
+					ResourcePermitTemplateReference: globalResourcePermitTemplateReference("injected-template"),
+					ResourceVersion:                 "injected-version",
+				}
+				hijacked.Status.Request.Approvals = &resourcepermitapi.ApprovalSpec{
+					Auto:       true,
+					Conditions: []string{"false"},
+				}
+				hijacked.Status.Review = &capsulev1beta2.ReviewInfo{
+					Reviewer: &resourcepermitapi.AccessEntity{
+						Name: "mallory",
+						Type: resourcepermitapi.AccessEntityTypeSystem,
+					},
+					Verdict: capsulev1beta2.ResourcePermitVerdictDenied,
+					Message: "reviewed from an untrusted payload",
+				}
+				hijacked.Status.Transitions = append(hijacked.Status.Transitions, capsulev1beta2.ResourcePermitTransition{
+					Type:      capsulev1beta2.ResourcePermitPhaseApproved,
+					Timestamp: metav1.Now(),
+					Actor:     capsulev1beta2.ResourcePermitTransitionActor{Name: "mallory", Type: resourcepermitapi.AccessEntityTypeSystem},
+					Reason:    "InjectedTransition",
+				})
+				hijacked.Status.Size = 999
 
-			Expect(reviewerClient.Status().Patch(
-				ctx,
-				hijacked,
-				client.MergeFromWithOptions(requested, client.MergeFromWithOptimisticLock{}),
-			)).To(Succeed())
+				g.Expect(reviewerClient.Status().Patch(
+					ctx,
+					hijacked,
+					client.MergeFromWithOptions(requested, client.MergeFromWithOptimisticLock{}),
+				)).To(Succeed())
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 			active := waitForResourcePermitPhase(ctx, request, capsulev1beta2.ResourcePermitPhaseActive)
 			Expect(active.Status.Request).To(Equal(expectedApproved))
@@ -209,7 +225,7 @@ var _ = Describe(
 			}, original)).To(Succeed())
 
 			injected := &corev1.Secret{}
-			err = k8sClient.Get(ctx, types.NamespacedName{
+			err := k8sClient.Get(ctx, types.NamespacedName{
 				Name: "e2e-resourcepermit-transition-injected", Namespace: request.Namespace,
 			}, injected)
 			Expect(apierrors.IsNotFound(err)).To(BeTrue())
@@ -246,21 +262,25 @@ var _ = Describe(
 				EventuallyCreation(func() error { return k8sClient.Create(ctx, request) }).Should(Succeed())
 				DeferCleanup(func() { cleanupLifecycleResourcePermit(ctx, request) })
 
-				requested := waitForResourcePermitPhase(ctx, request, capsulev1beta2.ResourcePermitPhaseRequested)
-				before := requested.DeepCopy()
-				Expect(requested.SetPending()).To(Succeed())
 				controllerClient := impersonationClient(
 					ControllerServiceAccountFull,
 					serviceAccountGroups(ControllerNamespace),
 				)
-				Expect(controllerClient.Status().Patch(
-					ctx,
-					requested,
-					client.MergeFromWithOptions(
-						before,
-						client.MergeFromWithOptimisticLock{},
-					),
-				)).To(Succeed())
+				Eventually(func(g Gomega) {
+					requested := &capsulev1beta2.ResourcePermit{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(request), requested)).To(Succeed())
+					g.Expect(requested.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseRequested))
+					before := requested.DeepCopy()
+					g.Expect(requested.SetPending()).To(Succeed())
+					g.Expect(controllerClient.Status().Patch(
+						ctx,
+						requested,
+						client.MergeFromWithOptions(
+							before,
+							client.MergeFromWithOptimisticLock{},
+						),
+					)).To(Succeed())
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 				pending := waitForResourcePermitPhase(ctx, request, capsulev1beta2.ResourcePermitPhasePending)
 				Expect(k8sClient.Delete(ctx, pending)).To(Succeed())
@@ -456,16 +476,20 @@ var _ = Describe(
 				EventuallyCreation(func() error { return k8sClient.Create(ctx, request) }).Should(Succeed())
 				DeferCleanup(func() { cleanupLifecycleResourcePermit(ctx, request) })
 
-				requested := waitForResourcePermitPhase(ctx, request, capsulev1beta2.ResourcePermitPhaseRequested)
-				before := requested.DeepCopy()
-				keepFor := resourcepermitapi.ExtendedDuration(8 * time.Second)
-				requested.Status.Request.KeepFor = &keepFor
-				requested.Status.Phase = capsulev1beta2.ResourcePermitPhaseApproved
-				Expect(reviewerClient.Status().Patch(
-					ctx,
-					requested,
-					client.MergeFromWithOptions(before, client.MergeFromWithOptimisticLock{}),
-				)).To(Succeed())
+				Eventually(func(g Gomega) {
+					requested := &capsulev1beta2.ResourcePermit{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(request), requested)).To(Succeed())
+					g.Expect(requested.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseRequested))
+					before := requested.DeepCopy()
+					keepFor := resourcepermitapi.ExtendedDuration(8 * time.Second)
+					requested.Status.Request.KeepFor = &keepFor
+					requested.Status.Phase = capsulev1beta2.ResourcePermitPhaseApproved
+					g.Expect(reviewerClient.Status().Patch(
+						ctx,
+						requested,
+						client.MergeFromWithOptions(before, client.MergeFromWithOptimisticLock{}),
+					)).To(Succeed())
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 				waitForResourcePermitPhase(ctx, request, capsulev1beta2.ResourcePermitPhaseActive)
 				expireActiveResourcePermit(ctx, request)
@@ -694,14 +718,18 @@ func patchLifecyclePhase(
 	request *capsulev1beta2.ResourcePermit,
 	phase capsulev1beta2.ResourcePermitPhase,
 ) {
-	current := waitForResourcePermitPhase(ctx, request, capsulev1beta2.ResourcePermitPhaseRequested)
-	before := current.DeepCopy()
-	current.Status.Phase = phase
-	Expect(actor.Status().Patch(
-		ctx,
-		current,
-		client.MergeFromWithOptions(before, client.MergeFromWithOptimisticLock{}),
-	)).To(Succeed())
+	Eventually(func(g Gomega) {
+		current := &capsulev1beta2.ResourcePermit{}
+		g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(request), current)).To(Succeed())
+		g.Expect(current.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseRequested))
+		before := current.DeepCopy()
+		current.Status.Phase = phase
+		g.Expect(actor.Status().Patch(
+			ctx,
+			current,
+			client.MergeFromWithOptions(before, client.MergeFromWithOptimisticLock{}),
+		)).To(Succeed())
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 }
 
 func expectResourcePermitDeletionDenied(
