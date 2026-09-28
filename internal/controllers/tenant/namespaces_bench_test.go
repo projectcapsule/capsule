@@ -66,7 +66,7 @@ func BenchmarkTenantNamespaceChurn(b *testing.B) {
 					for i := 0; i < resources; i++ {
 						name, kind := fmt.Sprintf("objects%d", i), fmt.Sprintf("Object%d", i)
 						listKinds[schema.GroupVersionResource{Group: "example.com", Version: "v1", Resource: name}] = kind + "List"
-						resourceList.APIResources = append(resourceList.APIResources, metav1.APIResource{Name: name, Kind: kind, Namespaced: true, Verbs: metav1.Verbs{"list", "patch"}})
+						resourceList.APIResources = append(resourceList.APIResources, metav1.APIResource{Name: name, Kind: kind, Namespaced: true, Verbs: metav1.Verbs{"get", "list", "delete", "patch"}})
 					}
 					discovery.Resources = []*metav1.APIResourceList{resourceList}
 					dyn := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, listKinds)

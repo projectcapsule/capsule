@@ -6,6 +6,8 @@ package tenant
 import (
 	"context"
 	"errors"
+	"reflect"
+	"slices"
 	"testing"
 	"time"
 
@@ -13,6 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -57,7 +60,7 @@ func namespaceCleanupFixture(t testing.TB, objects ...client.Object) (*Manager, 
 			return nil
 		}).Build()
 	discovery := &benchmarkDiscovery{FakeDiscovery: &discoveryfake.FakeDiscovery{Fake: &ktesting.Fake{}}}
-	discovery.Resources = []*metav1.APIResourceList{{GroupVersion: "v1", APIResources: []metav1.APIResource{{Name: "configmaps", Kind: "ConfigMap", Namespaced: true, Verbs: metav1.Verbs{"list", "patch"}}}}}
+	discovery.Resources = []*metav1.APIResourceList{{GroupVersion: "v1", APIResources: []metav1.APIResource{{Name: "configmaps", Kind: "ConfigMap", Namespaced: true, Verbs: metav1.Verbs{"get", "list", "delete", "patch"}}}}}
 	dyn := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, map[schema.GroupVersionResource]string{{Group: "example.com", Version: "v1", Resource: "widgets"}: "WidgetList"})
 	return &Manager{Client: cl, reader: cl, DynamicClient: dyn, DiscoveryClient: discovery, Metrics: metrics.NewTenantRecorder(), Configuration: cleanupTestConfiguration{}, Log: logr.Discard()}, dyn
 }
@@ -112,6 +115,93 @@ func TestNamespaceCleanupControllerScopeAndLifecycle(t *testing.T) {
 			wantRetry := mode == "grace" || mode == "pods" || mode == "cleanup"
 			if (result.RequeueAfter > 0) != wantRetry {
 				t.Fatalf("requeue=%s", result.RequeueAfter)
+			}
+		})
+	}
+}
+
+func TestNamespaceCleanupControllerDiscoveryVerbs(t *testing.T) {
+	for _, tt := range []struct {
+		name  string
+		verbs metav1.Verbs
+		clean bool
+	}{
+		{name: "supported", verbs: metav1.Verbs{"get", "list", "delete", "patch"}, clean: true},
+		{name: "missing delete", verbs: metav1.Verbs{"get", "list", "patch", "update"}},
+		{name: "missing get", verbs: metav1.Verbs{"list", "delete", "patch"}},
+		{name: "update without patch", verbs: metav1.Verbs{"get", "list", "delete", "update"}},
+		{name: "missing list", verbs: metav1.Verbs{"get", "delete", "patch"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			tnt := &capsulev1beta2.Tenant{Name: "tenant-a", UID: "tenant-a-uid"}
+			other := &capsulev1beta2.Tenant{Name: "tenant-b", UID: "tenant-b-uid"}
+			ns := cleanupOwnedNamespace(tnt, "cleanup", true)
+			foreign := cleanupOwnedNamespace(other, "preserved", false)
+			manager, dyn := namespaceCleanupFixture(t, tnt, other, ns, foreign)
+			gvr := schema.GroupVersionResource{Group: "example.com", Version: "v1", Resource: "widgets"}
+			discovery := manager.DiscoveryClient.(*benchmarkDiscovery)
+			discovery.Resources = append(discovery.Resources, &metav1.APIResourceList{
+				GroupVersion: "example.com/v1",
+				APIResources: []metav1.APIResource{{Name: "widgets", Kind: "Widget", Namespaced: true, Verbs: tt.verbs}},
+			})
+			widget := &unstructured.Unstructured{Object: map[string]any{
+				"apiVersion": "example.com/v1", "kind": "Widget",
+				"metadata": map[string]any{"name": "held", "namespace": ns.Name, "uid": "held-uid", "resourceVersion": "1", "finalizers": []any{"example.com/hold"}},
+			}}
+			preserved := widget.DeepCopy()
+			preserved.SetNamespace(foreign.Name)
+			preserved.SetUID("foreign-uid")
+			for _, obj := range []runtime.Object{widget, preserved, &corev1.ConfigMap{Name: "supported", Namespace: ns.Name, UID: "configmap-uid"}} {
+				if err := dyn.Tracker().Add(obj); err != nil {
+					t.Fatal(err)
+				}
+			}
+			// Emulate verb support and deletion that waits for finalizers; the fake
+			// dynamic client otherwise accepts unsupported operations and deletes immediately.
+			dyn.PrependReactor("*", "widgets", func(action ktesting.Action) (bool, runtime.Object, error) {
+				if !slices.Contains(tt.verbs, action.GetVerb()) {
+					return true, nil, apierrors.NewMethodNotSupported(gvr.GroupResource(), action.GetVerb())
+				}
+				if action.GetVerb() == "delete" {
+					current := widget.DeepCopy()
+					stamp := metav1.Now()
+					current.SetDeletionTimestamp(&stamp)
+					current.SetResourceVersion("2")
+					return true, nil, dyn.Tracker().Update(gvr, current, ns.Name)
+				}
+				return false, nil, nil
+			})
+			// Exercise discovery and its cached result; unsupported resources must
+			// not cause either reconciliation to fail or prevent supported cleanup.
+			for range 2 {
+				if _, err := manager.reconcileNamespaceCleanup(t.Context(), reconcile.Request{NamespacedName: client.ObjectKeyFromObject(ns)}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for _, action := range dyn.Actions() {
+				if action.GetNamespace() != ns.Name || (!tt.clean && action.GetResource() == gvr) {
+					t.Fatalf("unexpected cleanup request: %v", action)
+				}
+			}
+			configmaps := schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}
+			if _, err := dyn.Tracker().Get(configmaps, ns.Name, "supported"); !apierrors.IsNotFound(err) {
+				t.Fatalf("supported resource was not deleted: %v", err)
+			}
+			current, err := dyn.Tracker().Get(gvr, ns.Name, widget.GetName())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tt.clean {
+				obj := current.(*unstructured.Unstructured)
+				if obj.GetDeletionTimestamp() == nil || len(obj.GetFinalizers()) != 0 {
+					t.Fatalf("supported resource was not cleaned: %v", obj)
+				}
+			} else if !reflect.DeepEqual(current, widget) {
+				t.Fatalf("unsupported resource changed: %v", current)
+			}
+			current, err = dyn.Tracker().Get(gvr, foreign.Name, preserved.GetName())
+			if err != nil || !reflect.DeepEqual(current, preserved) {
+				t.Fatalf("other tenant's resource changed: %v, %v", current, err)
 			}
 		})
 	}

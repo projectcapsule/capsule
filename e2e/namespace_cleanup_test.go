@@ -12,8 +12,10 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -28,6 +30,37 @@ var _ = Describe("namespace cleanup and provisioning", Label("namespace-cleanup"
 		ctx := context.Background()
 		name := "e2e-cleanup-" + rand.String(6)
 		readerName := name + "-reader"
+		By("registering a namespaced API supporting deletion and finalizer patches")
+		Expect(apiextensionsv1.AddToScheme(k8sClient.Scheme())).To(Succeed())
+		group := name + ".example.com"
+		crd := &apiextensionsv1.CustomResourceDefinition{
+			Name: "cleanupitems." + group,
+			Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+				Group: group, Scope: apiextensionsv1.NamespaceScoped,
+				Names: apiextensionsv1.CustomResourceDefinitionNames{Plural: "cleanupitems", Singular: "cleanupitem", Kind: "CleanupItem", ListKind: "CleanupItemList"},
+				Versions: []apiextensionsv1.CustomResourceDefinitionVersion{{
+					Name: "v1", Served: true, Storage: true,
+					Schema: &apiextensionsv1.CustomResourceValidation{OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{Type: "object"}},
+				}},
+			},
+		}
+		Expect(k8sClient.Create(ctx, crd)).To(Succeed())
+		DeferCleanup(func() { EventuallyDeletion(crd) })
+		cleanupRole := &rbacv1.ClusterRole{
+			Name: name, Labels: map[string]string{"projectcapsule.dev/aggregate-to-controller": "true"},
+			Rules: []rbacv1.PolicyRule{{APIGroups: []string{group}, Resources: []string{"cleanupitems"}, Verbs: []string{"get", "list", "delete", "patch"}}},
+		}
+		Expect(k8sClient.Create(ctx, cleanupRole)).To(Succeed())
+		DeferCleanup(func() { EventuallyDeletion(cleanupRole) })
+		newCustomResource := func(namespace string) *unstructured.Unstructured {
+			return &unstructured.Unstructured{Object: map[string]any{
+				"apiVersion": group + "/v1", "kind": "CleanupItem",
+				"metadata": map[string]any{
+					"name": "held", "namespace": namespace,
+					"finalizers": []any{"e2e.projectcapsule.dev/cleanup"},
+				},
+			}}
+		}
 		tenantA := &capsulev1beta2.Tenant{Name: name, Labels: map[string]string{"env": "e2e"}, Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{{Name: name, Kind: rbac.UserOwner}},
 			Rules: []*rules.NamespaceRuleBodyTenant{{
@@ -75,6 +108,8 @@ var _ = Describe("namespace cleanup and provisioning", Label("namespace-cleanup"
 		assertProfiles()
 		foreignObject := &corev1.ConfigMap{Name: "preserved", Namespace: foreign.Name, Finalizers: []string{"e2e.projectcapsule.dev/preserve"}}
 		Expect(k8sClient.Create(ctx, foreignObject)).To(Succeed())
+		foreignCustomResource := newCustomResource(foreign.Name)
+		EventuallyCreation(func() error { return k8sClient.Create(ctx, foreignCustomResource) }).Should(Succeed())
 		var previousUID string
 		for cycle := 0; cycle < 3; cycle++ {
 			By(fmt.Sprintf("recreating a namespace, cycle %d", cycle+1))
@@ -87,6 +122,8 @@ var _ = Describe("namespace cleanup and provisioning", Label("namespace-cleanup"
 				_, err := owner.CoreV1().ConfigMaps(churn.Name).Create(ctx, held, metav1.CreateOptions{})
 				return err
 			}).Should(Succeed())
+			heldCustomResource := newCustomResource(churn.Name)
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, heldCustomResource) }).Should(Succeed())
 			release := holdNamespaceTerminating(ctx, churn.Name)
 			DeferCleanup(release)
 			start := time.Now()
@@ -99,6 +136,9 @@ var _ = Describe("namespace cleanup and provisioning", Label("namespace-cleanup"
 			Eventually(func() bool {
 				return apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(held), &corev1.ConfigMap{}))
 			}, defaultTerminationTimeoutInterval, defaultPollInterval).Should(BeTrue(), "cleanup must remove the resource finalizer")
+			Eventually(func() bool {
+				return apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(heldCustomResource), newCustomResource(churn.Name)))
+			}, defaultTerminationTimeoutInterval, defaultPollInterval).Should(BeTrue(), "discovery must retain custom APIs supporting all cleanup verbs")
 			current := &corev1.Namespace{}
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(churn), current)).To(Succeed())
 			Expect(current.DeletionTimestamp).NotTo(BeNil(), "namespace must still be held while new permissions are installed")
@@ -108,6 +148,11 @@ var _ = Describe("namespace cleanup and provisioning", Label("namespace-cleanup"
 			Expect(preserved.UID).To(Equal(foreignObject.UID))
 			Expect(preserved.Finalizers).To(Equal(foreignObject.Finalizers))
 			Expect(preserved.DeletionTimestamp).To(BeNil())
+			preservedCustomResource := newCustomResource(foreign.Name)
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(foreignCustomResource), preservedCustomResource)).To(Succeed())
+			Expect(preservedCustomResource.GetUID()).To(Equal(foreignCustomResource.GetUID()))
+			Expect(preservedCustomResource.GetFinalizers()).To(Equal(foreignCustomResource.GetFinalizers()))
+			Expect(preservedCustomResource.GetDeletionTimestamp()).To(BeNil())
 			release()
 			EventuallyDeletion(churn)
 		}
