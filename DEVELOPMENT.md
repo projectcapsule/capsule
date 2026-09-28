@@ -95,7 +95,12 @@ least ten seconds. It verifies namespace identity and ownership using direct API
 reads and protects object deletion and finalizer patches with preconditions.
 Discovery selects resources advertising all four required verbs: `list`, `delete`,
 `get`, and `patch`. Other APIs are left to their own lifecycle handling; `update`
-does not substitute for finalizer patch support.
+does not substitute for finalizer patch support. Capsule's current and legacy
+lifecycle finalizers on Capsule API resources are retained for their owning
+controllers; this prevents namespace cleanup from abandoning resources outside
+the terminating namespace. Other finalizers remain eligible for forced cleanup.
+Namespace identity reads occur before DELETE/PATCH, not for already-terminating
+objects that need no finalizer changes.
 Namespace profiling and policy installation remain in the Tenant controller;
 RoleBindings are installed before the custom resource usage recount.
 Cleanup failures are logged and retried by `capsule/namespace-cleanup`; inspect

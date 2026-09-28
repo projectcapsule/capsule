@@ -28,6 +28,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
@@ -387,6 +389,220 @@ func BenchmarkNamespaceCleanup(b *testing.B) {
 			}
 			b.ReportMetric(float64(count), "dynamic-LIST/op")
 			b.ReportMetric(1, "namespace-GET/op")
+		})
+	}
+}
+
+// Measure the real cleanup loop with populated LISTs.
+// In-memory responses omit network latency and server-side processing.
+type populatedCleanupDynamic struct {
+	dynamic.Interface
+	resources *populatedCleanupResource
+}
+
+func (d populatedCleanupDynamic) Resource(schema.GroupVersionResource) dynamic.NamespaceableResourceInterface {
+	return populatedCleanupNamespaceable{resources: d.resources}
+}
+
+type populatedCleanupNamespaceable struct {
+	dynamic.NamespaceableResourceInterface
+	resources *populatedCleanupResource
+}
+
+func (d populatedCleanupNamespaceable) Namespace(namespace string) dynamic.ResourceInterface {
+	if namespace != "tenant-a-ns" {
+		panic("unexpected namespace")
+	}
+	return d.resources
+}
+
+type populatedCleanupResource struct {
+	dynamic.ResourceInterface
+	list                   *unstructured.UnstructuredList
+	objects                map[string]*unstructured.Unstructured
+	gets, deletes, patches int
+}
+
+func (r *populatedCleanupResource) List(context.Context, metav1.ListOptions) (*unstructured.UnstructuredList, error) {
+	return r.list.DeepCopy(), nil
+}
+func (r *populatedCleanupResource) Get(_ context.Context, name string, _ metav1.GetOptions, _ ...string) (*unstructured.Unstructured, error) {
+	r.gets++
+	return r.objects[name].DeepCopy(), nil
+}
+func (r *populatedCleanupResource) Delete(_ context.Context, name string, opts metav1.DeleteOptions, _ ...string) error {
+	if opts.Preconditions == nil || opts.Preconditions.UID == nil || *opts.Preconditions.UID != r.objects[name].GetUID() {
+		return errors.New("missing UID precondition")
+	}
+	r.deletes++
+	return nil
+}
+func (r *populatedCleanupResource) Patch(_ context.Context, name string, _ types.PatchType, _ []byte, _ metav1.PatchOptions, _ ...string) (*unstructured.Unstructured, error) {
+	r.patches++
+	return r.objects[name].DeepCopy(), nil
+}
+func BenchmarkNamespaceCleanupPopulated(b *testing.B) {
+	for _, mode := range []string{"already-deleting-no-finalizers", "already-deleting-with-finalizers", "needs-delete", "capsule-lifecycle"} {
+		for _, count := range []int{1, 100, 1000} {
+			b.Run(fmt.Sprintf("%s/objects=%d", mode, count), func(b *testing.B) {
+				ns := cleanupNamespace()
+				gvr := cleanupGVR
+				if mode == "capsule-lifecycle" {
+					gvr = capsulev1beta2.GroupVersion.WithResource("resourcepermits")
+				}
+				reader := &cleanupReader{current: ns}
+				resources := &populatedCleanupResource{list: &unstructured.UnstructuredList{}, objects: map[string]*unstructured.Unstructured{}}
+				for i := 0; i < count; i++ {
+					obj := cleanupObject(ns.Name, fmt.Sprintf("object-%d", i))
+					obj.SetUID(types.UID(obj.GetName()))
+					if mode != "needs-delete" {
+						stamp := metav1.Now()
+						obj.SetDeletionTimestamp(&stamp)
+					}
+					if mode != "already-deleting-with-finalizers" {
+						obj.SetFinalizers(nil)
+					}
+					if mode == "capsule-lifecycle" {
+						obj.SetAPIVersion(gvr.GroupVersion().String())
+						obj.SetKind("ResourcePermit")
+						obj.SetFinalizers([]string{meta.ControllerFinalizer})
+					}
+					resources.list.Items = append(resources.list.Items, *obj)
+					resources.objects[obj.GetName()] = obj
+				}
+				dyn := populatedCleanupDynamic{resources: resources}
+				cache := &cleanupCache{gvrs: []schema.GroupVersionResource{gvr}}
+				b.ReportAllocs()
+				for b.Loop() {
+					// Responses are immutable snapshots, so every iteration has the same work.
+					changed, err := tenant.NamespacedCascadingCleanup(b.Context(), reader, nil, cache, dyn, ns)
+					if err != nil || changed != (mode == "needs-delete" || mode == "already-deleting-with-finalizers") {
+						b.Fatalf("changed=%v err=%v", changed, err)
+					}
+				}
+				if mode == "needs-delete" && resources.deletes != count*b.N {
+					b.Fatal("missing DELETEs")
+				}
+				if mode == "already-deleting-with-finalizers" && resources.patches != count*b.N {
+					b.Fatal("missing PATCHes")
+				}
+				b.ReportMetric(float64(reader.calls)/float64(b.N), "namespace-GET/op")
+				b.ReportMetric(float64(resources.gets)/float64(b.N), "object-GET/op")
+				b.ReportMetric(float64(resources.deletes)/float64(b.N), "DELETE/op")
+				b.ReportMetric(float64(resources.patches)/float64(b.N), "PATCH/op")
+			})
+		}
+	}
+}
+
+func TestCleanupPreservesCapsuleLifecycleFinalizers(t *testing.T) {
+	for _, mode := range []string{"permit", "permit-mixed", "legacy-resource", "added-after-list", "foreign-api"} {
+		t.Run(mode, func(t *testing.T) {
+			ns := cleanupNamespace()
+			gvr := capsulev1beta2.GroupVersion.WithResource("resourcepermits")
+			obj := cleanupObject(ns.Name, "held")
+			obj.SetAPIVersion(gvr.GroupVersion().String())
+			obj.SetKind("ResourcePermit")
+			obj.SetDeletionTimestamp(ns.DeletionTimestamp)
+			obj.SetFinalizers([]string{meta.ControllerFinalizer})
+			want := []string{meta.ControllerFinalizer}
+			switch mode {
+			case "permit-mixed":
+				obj.SetFinalizers([]string{meta.ControllerFinalizer, "example.com/hold"})
+			case "legacy-resource":
+				gvr.Resource = "tenantresources"
+				obj.SetKind("TenantResource")
+				obj.SetFinalizers([]string{meta.LegacyResourceFinalizer, "example.com/hold"})
+				want = []string{meta.LegacyResourceFinalizer}
+			case "added-after-list":
+				obj.SetFinalizers([]string{"example.com/hold"})
+			case "foreign-api":
+				gvr = cleanupGVR
+				obj.SetAPIVersion("v1")
+				obj.SetKind("ConfigMap")
+				want = nil
+			}
+			foreign := obj.DeepCopy()
+			foreign.SetNamespace("tenant-b-ns")
+			dyn := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{gvr: obj.GetKind() + "List"}, obj, foreign)
+			if mode == "added-after-list" {
+				dyn.PrependReactor("get", gvr.Resource, func(ktesting.Action) (bool, runtime.Object, error) {
+					current := obj.DeepCopy()
+					current.SetFinalizers([]string{meta.ControllerFinalizer, "example.com/hold"})
+					return true, current, nil
+				})
+			}
+			patches := 0
+			dyn.PrependReactor("patch", gvr.Resource, func(a ktesting.Action) (bool, runtime.Object, error) {
+				patches++
+				var patch struct {
+					Metadata struct {
+						Finalizers []string `json:"finalizers"`
+					} `json:"metadata"`
+				}
+				if err := json.Unmarshal(a.(ktesting.PatchAction).GetPatch(), &patch); err != nil {
+					return true, nil, err
+				}
+				if !reflect.DeepEqual(patch.Metadata.Finalizers, want) && !(len(want) == 0 && len(patch.Metadata.Finalizers) == 0) {
+					return true, nil, fmt.Errorf("finalizers=%v, want=%v", patch.Metadata.Finalizers, want)
+				}
+				return false, nil, nil
+			})
+			reader := &cleanupReader{current: ns}
+			changed, err := tenant.NamespacedCascadingCleanup(t.Context(), reader, nil, &cleanupCache{gvrs: []schema.GroupVersionResource{gvr}}, dyn, ns)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if mode == "permit" {
+				if changed || patches != 0 || reader.calls != 1 {
+					t.Fatalf("unchanged permit: changed=%v patches=%d namespace GETs=%d", changed, patches, reader.calls)
+				}
+			} else if !changed || patches != 1 {
+				t.Fatalf("changed=%v patches=%d", changed, patches)
+			}
+			remaining, err := dyn.Tracker().Get(gvr, foreign.GetNamespace(), foreign.GetName())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(remaining.(*unstructured.Unstructured).GetFinalizers(), foreign.GetFinalizers()) {
+				t.Fatal("changed another tenant's finalizers")
+			}
+		})
+	}
+}
+
+func TestCleanupChecksNamespaceOnlyForWrites(t *testing.T) {
+	for _, mode := range []string{"no-finalizers", "foreign-finalizer", "capsule-finalizer", "delete"} {
+		t.Run(mode, func(t *testing.T) {
+			ns := cleanupNamespace()
+			reader := &cleanupReader{current: ns}
+			gvr := cleanupGVR
+			obj := cleanupObject(ns.Name, "held")
+			obj.SetDeletionTimestamp(ns.DeletionTimestamp)
+			expectedReads := 1
+			switch mode {
+			case "no-finalizers":
+				obj.SetFinalizers(nil)
+			case "foreign-finalizer":
+				expectedReads = 2
+			case "delete":
+				obj.SetDeletionTimestamp(nil)
+				obj.SetFinalizers(nil)
+				expectedReads = 2
+			case "capsule-finalizer":
+				gvr = capsulev1beta2.GroupVersion.WithResource("resourcepermits")
+				obj.SetAPIVersion(gvr.GroupVersion().String())
+				obj.SetKind("ResourcePermit")
+				obj.SetFinalizers([]string{meta.ControllerFinalizer})
+			}
+			dyn := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{gvr: obj.GetKind() + "List"}, obj)
+			_, err := tenant.NamespacedCascadingCleanup(t.Context(), reader, nil, &cleanupCache{gvrs: []schema.GroupVersionResource{gvr}}, dyn, ns)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if reader.calls != expectedReads {
+				t.Fatalf("namespace GETs=%d, want=%d", reader.calls, expectedReads)
+			}
 		})
 	}
 }

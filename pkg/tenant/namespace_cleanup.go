@@ -21,14 +21,17 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 var errCleanupNamespaceChanged = errors.New("cleanup namespace disappeared or changed identity")
 
 // NamespacedCascadingCleanup completes cleanup of a terminating namespace after
 // Pods have gone. The reader must bypass the informer cache. Namespace identity
-// is checked after each nonempty LIST and before destructive writes; object preconditions
-// protect replacements between those checks and the writes themselves.
+// is checked immediately before destructive writes; object preconditions protect
+// replacements between those checks and the writes themselves.
 func NamespacedCascadingCleanup(ctx context.Context, reader client.Reader, disco discovery.DiscoveryInterface, resourceCache NamespacedResourceCache, dyn dynamic.Interface, ns *corev1.Namespace) (bool, error) {
 	if ns == nil || ns.UID == "" || ns.DeletionTimestamp == nil {
 		return false, nil
@@ -131,10 +134,13 @@ func cleanupResourceType(ctx context.Context, dyn dynamic.Interface, gvr schema.
 	if len(list.Items) == 0 {
 		return false, nil
 	}
-	// A LIST can return objects from a replacement namespace, even if the
-	// namespace existed with the expected UID before the request.
-	if err := check(ctx); err != nil {
-		return false, err
+	// Capsule lifecycle controllers must finish their own cleanup, including
+	// targets outside this namespace, before their resources can disappear.
+	var retainedFinalizers map[string]struct{}
+	if gvr.Group == capsulev1beta2.GroupVersion.Group {
+		retainedFinalizers = map[string]struct{}{
+			meta.ControllerFinalizer: {}, meta.LegacyResourceFinalizer: {},
+		}
 	}
 
 	cleaned := false
@@ -142,13 +148,7 @@ func cleanupResourceType(ctx context.Context, dyn dynamic.Interface, gvr schema.
 	var errs []error
 
 	for i := range list.Items {
-		if i > 0 {
-			if err := check(ctx); err != nil {
-				return cleaned, err
-			}
-		}
-
-		changed, err := cleanupNamespacedObject(ctx, resources, &list.Items[i], check)
+		changed, err := cleanupNamespacedObject(ctx, resources, &list.Items[i], check, retainedFinalizers)
 		cleaned = cleaned || changed
 
 		if err != nil {
@@ -163,7 +163,7 @@ func cleanupResourceType(ctx context.Context, dyn dynamic.Interface, gvr schema.
 	return cleaned, errors.Join(errs...)
 }
 
-func cleanupNamespacedObject(ctx context.Context, resources dynamic.ResourceInterface, obj *unstructured.Unstructured, check func(context.Context) error) (bool, error) {
+func cleanupNamespacedObject(ctx context.Context, resources dynamic.ResourceInterface, obj *unstructured.Unstructured, check func(context.Context) error, retainedFinalizers map[string]struct{}) (bool, error) {
 	uid := obj.GetUID()
 	if uid == "" {
 		return false, fmt.Errorf("refusing cleanup of %q without UID", obj.GetName())
@@ -172,6 +172,12 @@ func cleanupNamespacedObject(ctx context.Context, resources dynamic.ResourceInte
 	changed := false
 
 	if obj.GetDeletionTimestamp() == nil {
+		// A LIST may return objects from a replacement namespace. Check at the
+		// write boundary, avoiding extra reads for objects needing no action.
+		if err := check(ctx); err != nil {
+			return false, err
+		}
+
 		if err := resources.Delete(ctx, obj.GetName(), metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &uid}}); err != nil {
 			if apierrors.IsNotFound(err) {
 				return false, nil
@@ -183,7 +189,7 @@ func cleanupNamespacedObject(ctx context.Context, resources dynamic.ResourceInte
 		changed = true
 	}
 
-	if len(obj.GetFinalizers()) == 0 {
+	if _, removable := meta.FilterFinalizers(obj.GetFinalizers(), retainedFinalizers); !removable {
 		return changed, nil
 	}
 	// Deletion changes resourceVersion. Read the exact object again, and only
@@ -197,7 +203,8 @@ func cleanupNamespacedObject(ctx context.Context, resources dynamic.ResourceInte
 		return changed, fmt.Errorf("get %q before clearing finalizers: %w", obj.GetName(), err)
 	}
 
-	if current.GetUID() != uid || len(current.GetFinalizers()) == 0 {
+	remaining, removable := meta.FilterFinalizers(current.GetFinalizers(), retainedFinalizers)
+	if current.GetUID() != uid || !removable {
 		return changed, nil
 	}
 
@@ -209,8 +216,12 @@ func cleanupNamespacedObject(ctx context.Context, resources dynamic.ResourceInte
 		return changed, err
 	}
 
+	if remaining == nil {
+		remaining = []string{}
+	}
+
 	patch, err := json.Marshal(map[string]any{"metadata": map[string]any{
-		"uid": uid, "resourceVersion": current.GetResourceVersion(), "finalizers": []string{},
+		"uid": uid, "resourceVersion": current.GetResourceVersion(), "finalizers": remaining,
 	}})
 	if err != nil {
 		return changed, err
