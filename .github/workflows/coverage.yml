@@ -68,6 +68,9 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: 'go.mod'
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+      - name: Prepare chart tests
+        run: helm dependency build charts/capsule
       - name: Unit Test
         run: make test
       - name: Check controller benchmark fixtures

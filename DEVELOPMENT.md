@@ -22,8 +22,11 @@ This will push the build to your local docker images.
 Execute unit testing:
 
 ```bash
+helm dependency build charts/capsule
 make test
 ```
+
+Chart rendering unit tests require Helm on `PATH` and the chart dependencies above.
 
 ## E2E Test
 
@@ -101,6 +104,16 @@ controllers; this prevents namespace cleanup from abandoning resources outside
 the terminating namespace. Other finalizers remain eligible for forced cleanup.
 Namespace identity reads occur before DELETE/PATCH, not for already-terminating
 objects that need no finalizer changes.
+
+The chart's strict RBAC role (also enabled by the deprecated `minimal` option)
+grants `get`, `list`, `watch`, `delete`, `deletecollection`, and `patch` across all
+API groups and resources so cleanup can handle newly discovered custom APIs.
+Kubernetes RBAC cannot limit `patch` to finalizers, terminating namespaces, or
+namespaced resources: this grants cluster-wide access to all patchable fields.
+The controller's namespace ownership and lifecycle checks constrain its cleanup
+behavior; they do not narrow the RBAC grant. Resource creation and update may
+still need explicit extra or aggregated permissions for features such as replication.
+
 Namespace profiling and policy installation remain in the Tenant controller;
 RoleBindings are installed before the custom resource usage recount.
 Cleanup failures are logged and retried by `capsule/namespace-cleanup`; inspect
