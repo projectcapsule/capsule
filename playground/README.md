@@ -177,3 +177,97 @@ make capsule-stable
 If root `make dev-setup` deleted the Capsule HelmRelease, `capsule-stable`
 recreates it from the playground installation manifests before asking Flux to
 reconcile it.
+
+## Resource permit examples
+
+The platform Kustomization includes two additional `GlobalResourcePermitTemplate`
+examples. Their sample requests live in `user/solar/resourcepermits/` and are
+submitted as `alice` by `make apply-user`. Use a development build with the CRDs
+from this checkout (`make dev-capsule`) when trying these APIs.
+
+| Template | Result after approval | Lifetime |
+| --- | --- | --- |
+| `gateway-api` | RoleBindings grant all current solar owners CRUD access to namespaced Gateway API resources in every solar namespace. | Permanent: the distributor is retained after the provisioning permit expires, and continues updating owners and namespaces. |
+| `grafana` | Creates `solar-grafana-main` and distributes a Flux HelmRepository, HelmRelease, and namespace-scoped deployment identity into it. | No automatic expiry by default; explicitly expiring the permit removes the instance and its namespace. |
+
+The sample permits are named `gateway-api-access` and `managed-grafana`.
+Neither has an automatic expiry; an approver can expire them explicitly.
+
+Both templates derive tenant ownership from the request namespace's Capsule
+label. Neither accepts a tenant name or arbitrary RBAC subjects as parameters.
+The default ServiceAccount must exist in the namespace submitting the request;
+it supplies the trusted namespace name when loading template context. Grafana
+explicitly executes as the playground's `capsule-system/capsule` controller
+ServiceAccount so namespace admission adds the Tenant owner reference. The
+generated GlobalTenantResources use `capsule-system/permit-example-reconciler` with the
+permissions declared in `platform/globalresourcepermittemplates/rbac.yaml`.
+
+To install just these templates and submit the requests to an existing
+playground, run from this directory:
+
+```console
+kubectl --context kind-capsule apply -k platform/globalresourcepermittemplates
+kubectl --context kind-capsule get globalresourcepermittemplates
+kubectl --context kind-capsule --as alice --as-group projectcapsule.dev apply -f user/solar/resourcepermits/gateway-api-access.yaml
+kubectl --context kind-capsule --as alice --as-group projectcapsule.dev apply -f user/solar/resourcepermits/managed-grafana.yaml
+kubectl --context kind-capsule -n solar-system get resourcepermits
+```
+
+Wait until `solar-system` appears in each template's `status.namespaces` before
+submitting requests. The requests require approval by `kubernetes-admin` or
+`admin`. Once their phase is `Requested`, inspect `status.request.resources`
+and approve them through Headlamp or the status subresource:
+
+```console
+kubectl --context kind-capsule -n solar-system get resourcepermit gateway-api-access managed-grafana -o yaml
+kubectl --context kind-capsule --as admin -n solar-system patch resourcepermit gateway-api-access --subresource=status --type=merge -p '{"status":{"phase":"Approved"}}'
+kubectl --context kind-capsule --as admin -n solar-system patch resourcepermit managed-grafana --subresource=status --type=merge -p '{"status":{"phase":"Approved"}}'
+```
+
+The Gateway API example installs RBAC only. Install the
+[Gateway API CRDs and a compatible controller](https://gateway-api.sigs.k8s.io/guides/getting-started/introduction/)
+to create working routes. GatewayClasses and CRD definitions remain under
+platform control. Inspect the resulting bindings with:
+
+```console
+kubectl --context kind-capsule get globaltenantresource solar-gateway-api-access
+kubectl --context kind-capsule -n solar-test get rolebinding gateway-api-editors -o yaml
+kubectl --context kind-capsule --as alice -n solar-test auth can-i create httproutes.gateway.networking.k8s.io
+```
+
+The Grafana example uses the
+[Grafana community chart](https://grafana-community.github.io/helm-charts/) and
+[Flux HelmRelease API](https://fluxcd.io/flux/components/helm/helmreleases/).
+Its distributor places the HelmRelease in the new namespace after creation;
+this avoids dry-running a namespaced resource before its namespace exists.
+Flux runs Helm as `grafana-reconciler`, which has deployment permissions only
+in that namespace. A permit becoming `Active` means its namespace and distributor
+have been applied; wait separately for the HelmRelease to become ready:
+
+```console
+kubectl --context kind-capsule get globaltenantresource solar-grafana-main
+kubectl --context kind-capsule -n solar-grafana-main get helmrepository,helmrelease
+kubectl --context kind-capsule -n solar-grafana-main wait --for=condition=Ready helmrelease/grafana --timeout=10m
+kubectl --context kind-capsule --as alice -n solar-grafana-main get secret grafana -o jsonpath='{.data.admin-password}' | base64 --decode
+kubectl --context kind-capsule --as alice -n solar-grafana-main port-forward service/grafana 3000:80
+```
+
+Open <http://localhost:3000> and log in as `admin` with the generated password.
+Storage is ephemeral for the local playground: dashboards and other data are
+lost when the Grafana Pod is replaced. To request another instance, use a new
+ResourcePermit name and change `params.instance`; the generated namespace is
+`<tenant>-grafana-<instance>` and must fit in 63 characters.
+
+To remove Grafana, expire its permit as an approver. To revoke permanent Gateway
+API access, expire its provisioning permit and wait for it to be removed, then
+delete the retained distributor; its RoleBindings are pruned on deletion:
+
+```console
+kubectl --context kind-capsule --as admin -n solar-system patch resourcepermit managed-grafana --subresource=status --type=merge -p '{"status":{"phase":"Expired"}}'
+kubectl --context kind-capsule --as admin -n solar-system patch resourcepermit gateway-api-access --subresource=status --type=merge -p '{"status":{"phase":"Expired"}}'
+kubectl --context kind-capsule -n solar-system wait --for=delete resourcepermit/gateway-api-access --timeout=2m
+kubectl --context kind-capsule delete globaltenantresource solar-gateway-api-access
+```
+
+These templates do not retain expired requests. Grafana cleanup deletes the
+dedicated namespace and everything in it.

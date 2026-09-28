@@ -12,7 +12,6 @@ import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/ptr"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
@@ -23,36 +22,24 @@ import (
 
 var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", Ordered, Label("tenant", "networking", "ingress"), func() {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-ingress-class-extensions-v1beta1",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-ingress-class-extensions-v1beta1",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-ingress-class-extensions-v1beta1",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-ingress-class-extensions-v1beta1",
+					Kind: "User",
 				},
 			},
 			IngressOptions: capsulev1beta2.IngressOptions{
 				AllowedClasses: &api.DefaultAllowedListSpec{
 					Default: "tenant-default",
-					SelectorAllowedListSpec: api.SelectorAllowedListSpec{
-						AllowedListSpec: api.AllowedListSpec{
-							Exact: []string{"nginx", "haproxy"},
-							Regex: "^oil-.*$",
-						},
-						LabelSelector: metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								"env": "customers",
-							},
-						},
+					Exact:   []string{"nginx", "haproxy"},
+					Regex:   "^oil-.*$",
+					MatchLabels: map[string]string{
+						"env": "customers",
 					},
 				},
 			},
@@ -88,9 +75,7 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 
 			Eventually(func() (err error) {
 				i := &extensionsv1beta1.Ingress{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "denied-ingress",
-					},
+					Name: "denied-ingress",
 					Spec: extensionsv1beta1.IngressSpec{
 						Backend: &extensionsv1beta1.IngressBackend{
 							ServiceName: "foo",
@@ -111,11 +96,9 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 
 			Eventually(func() (err error) {
 				i := &extensionsv1beta1.Ingress{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "denied-ingress",
-						Annotations: map[string]string{
-							"kubernetes.io/ingress.class": "the-worst-ingress-available",
-						},
+					Name: "denied-ingress",
+					Annotations: map[string]string{
+						"kubernetes.io/ingress.class": "the-worst-ingress-available",
 					},
 					Spec: extensionsv1beta1.IngressSpec{
 						Backend: &extensionsv1beta1.IngressBackend{
@@ -137,11 +120,9 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 
 			Eventually(func() (err error) {
 				i := &extensionsv1beta1.Ingress{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "denied-ingress",
-					},
+					Name: "denied-ingress",
 					Spec: extensionsv1beta1.IngressSpec{
-						IngressClassName: ptr.To("the-worst-ingress-available"),
+						IngressClassName: new("the-worst-ingress-available"),
 						Backend: &extensionsv1beta1.IngressBackend{
 							ServiceName: "foo",
 							ServicePort: intstr.FromInt(8080),
@@ -172,11 +153,9 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 				}
 
 				i := &extensionsv1beta1.Ingress{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: c,
-						Annotations: map[string]string{
-							"kubernetes.io/ingress.class": c,
-						},
+					Name: c,
+					Annotations: map[string]string{
+						"kubernetes.io/ingress.class": c,
 					},
 					Spec: extensionsv1beta1.IngressSpec{
 						Backend: &extensionsv1beta1.IngressBackend{
@@ -213,9 +192,7 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 		for _, c := range tnt.Spec.IngressOptions.AllowedClasses.Exact {
 			Eventually(func() (err error) {
 				i := &extensionsv1beta1.Ingress{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: c,
-					},
+					Name: c,
 					Spec: extensionsv1beta1.IngressSpec{
 						IngressClassName: &c,
 						Backend: &extensionsv1beta1.IngressBackend{
@@ -248,11 +225,9 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 			}
 
 			i := &extensionsv1beta1.Ingress{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: ingressClass,
-					Annotations: map[string]string{
-						"kubernetes.io/ingress.class": ingressClass,
-					},
+				Name: ingressClass,
+				Annotations: map[string]string{
+					"kubernetes.io/ingress.class": ingressClass,
 				},
 				Spec: extensionsv1beta1.IngressSpec{
 					Backend: &extensionsv1beta1.IngressBackend{
@@ -288,9 +263,7 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 			}
 
 			i := &extensionsv1beta1.Ingress{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: ingressClass,
-				},
+				Name: ingressClass,
 				Spec: extensionsv1beta1.IngressSpec{
 					IngressClassName: &ingressClass,
 					Backend: &extensionsv1beta1.IngressBackend{

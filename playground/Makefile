@@ -61,7 +61,7 @@ help: ## Show the available playground targets.
 	@awk 'BEGIN {FS = ":.*## "; print "Capsule local playground\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 check: ## Check required local tools and the Docker daemon.
-	@for tool in curl docker envsubst flux jq kind kubectl openssl; do \
+	@for tool in curl docker envsubst flux jq kind kubectl openssl yq; do \
 		command -v "$$tool" >/dev/null || { echo "Missing required tool: $$tool" >&2; exit 1; }; \
 	done
 	@[[ '$(DEX_HOST)' =~ ^[a-zA-Z0-9.-]+$$ ]] || { echo "DEX_HOST is not a valid DNS hostname" >&2; exit 1; }

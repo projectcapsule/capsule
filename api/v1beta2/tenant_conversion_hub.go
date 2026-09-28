@@ -47,13 +47,9 @@ func (in *Tenant) ConvertFrom(raw conversion.Hub) error {
 		}
 
 		in.Spec.Owners = append(in.Spec.Owners, rbac.OwnerSpec{
-			CoreOwnerSpec: rbac.CoreOwnerSpec{
-				UserSpec: rbac.UserSpec{
-					Kind: rbac.OwnerKind(owner.Kind),
-					Name: owner.Name,
-				},
-				ClusterRoles: owner.GetRoles(*src, index),
-			},
+			Kind:            rbac.OwnerKind(owner.Kind),
+			Name:            owner.Name,
+			ClusterRoles:    owner.GetRoles(*src, index),
 			ProxyOperations: proxySettings,
 		})
 	}
@@ -93,9 +89,7 @@ func (in *Tenant) ConvertFrom(raw conversion.Hub) error {
 	in.Spec.ServiceOptions = src.Spec.ServiceOptions
 	if src.Spec.StorageClasses != nil {
 		in.Spec.StorageClasses = &api.DefaultAllowedListSpec{
-			SelectorAllowedListSpec: api.SelectorAllowedListSpec{
-				AllowedListSpec: *src.Spec.StorageClasses,
-			},
+			AllowedListSpec: *src.Spec.StorageClasses,
 		}
 	}
 
@@ -115,9 +109,7 @@ func (in *Tenant) ConvertFrom(raw conversion.Hub) error {
 
 	if ingressClass := src.Spec.IngressOptions.AllowedClasses; ingressClass != nil {
 		in.Spec.IngressOptions.AllowedClasses = &api.DefaultAllowedListSpec{
-			SelectorAllowedListSpec: api.SelectorAllowedListSpec{
-				AllowedListSpec: *ingressClass,
-			},
+			AllowedListSpec: *ingressClass,
 		}
 	}
 
@@ -135,9 +127,7 @@ func (in *Tenant) ConvertFrom(raw conversion.Hub) error {
 
 	if src.Spec.PriorityClasses != nil {
 		in.Spec.PriorityClasses = &api.DefaultAllowedListSpec{
-			SelectorAllowedListSpec: api.SelectorAllowedListSpec{
-				AllowedListSpec: *src.Spec.PriorityClasses,
-			},
+			AllowedListSpec: *src.Spec.PriorityClasses,
 		}
 	}
 

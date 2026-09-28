@@ -4,6 +4,7 @@
 package utils_test
 
 import (
+	"maps"
 	"reflect"
 	"testing"
 
@@ -46,9 +47,7 @@ func TestMapMergeNoOverrite_EmptySrc_NoChange(t *testing.T) {
 	src := map[string]string{} // empty
 
 	before := make(map[string]string, len(dst))
-	for k, v := range dst {
-		before[k] = v
-	}
+	maps.Copy(before, dst)
 
 	utils.MapMergeNoOverrite(dst, src)
 
@@ -62,9 +61,7 @@ func TestMapMergeNoOverrite_NilSrc_NoChange(t *testing.T) {
 	var src map[string]string // nil
 
 	before := make(map[string]string, len(dst))
-	for k, v := range dst {
-		before[k] = v
-	}
+	maps.Copy(before, dst)
 
 	utils.MapMergeNoOverrite(dst, src)
 
@@ -79,9 +76,7 @@ func TestMapMergeNoOverrite_Idempotent(t *testing.T) {
 
 	utils.MapMergeNoOverrite(dst, src)
 	first := map[string]string{}
-	for k, v := range dst {
-		first[k] = v
-	}
+	maps.Copy(first, dst)
 
 	// Call again; result should be identical
 	utils.MapMergeNoOverrite(dst, src)
@@ -175,7 +170,6 @@ func TestMapEqual(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
 			g.Expect(utils.MapEqual(tt.a, tt.b)).To(Equal(tt.want))

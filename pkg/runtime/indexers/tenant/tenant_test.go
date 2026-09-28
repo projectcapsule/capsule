@@ -28,7 +28,7 @@ func TestTenantIndexers(t *testing.T) {
 		t.Fatalf("unexpected owner indexer object/field")
 	}
 	if got := owners.Func()(&capsulev1beta2.Tenant{Status: capsulev1beta2.TenantStatus{Owners: rbac.OwnerStatusListSpec{{
-		UserSpec: rbac.UserSpec{Kind: rbac.UserOwner, Name: "alice"},
+		Kind: rbac.UserOwner, Name: "alice",
 	}}}}); !reflect.DeepEqual(got, []string{"User:alice"}) {
 		t.Fatalf("OwnerReference.Func() = %#v", got)
 	}

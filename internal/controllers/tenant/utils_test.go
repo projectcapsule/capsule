@@ -68,31 +68,31 @@ func TestRunGarbageCollection(t *testing.T) {
 		{
 			name: "LimitRange",
 			new: func(name, namespace string, labels map[string]string) client.Object {
-				return &corev1.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace, Labels: labels}}
+				return &corev1.LimitRange{Name: name, Namespace: namespace, Labels: labels}
 			},
 		},
 		{
 			name: "NetworkPolicy",
 			new: func(name, namespace string, labels map[string]string) client.Object {
-				return &networkingv1.NetworkPolicy{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace, Labels: labels}}
+				return &networkingv1.NetworkPolicy{Name: name, Namespace: namespace, Labels: labels}
 			},
 		},
 		{
 			name: "ResourceQuota",
 			new: func(name, namespace string, labels map[string]string) client.Object {
-				return &corev1.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace, Labels: labels}}
+				return &corev1.ResourceQuota{Name: name, Namespace: namespace, Labels: labels}
 			},
 		},
 		{
 			name: "RoleBinding",
 			new: func(name, namespace string, labels map[string]string) client.Object {
-				return &rbacv1.RoleBinding{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace, Labels: labels}}
+				return &rbacv1.RoleBinding{Name: name, Namespace: namespace, Labels: labels}
 			},
 		},
 		{
 			name: "RuleStatus",
 			new: func(name, namespace string, labels map[string]string) client.Object {
-				return &capsulev1beta2.RuleStatus{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace, Labels: labels}}
+				return &capsulev1beta2.RuleStatus{Name: name, Namespace: namespace, Labels: labels}
 			},
 		},
 	}
@@ -120,13 +120,12 @@ func TestRunGarbageCollection(t *testing.T) {
 
 			now := metav1.Now()
 			namespaces := []client.Object{
-				&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "current"}},
-				&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "departed"}},
-				&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+				&corev1.Namespace{Name: "current"},
+				&corev1.Namespace{Name: "departed"},
+				&corev1.Namespace{
 					Name:              "terminating",
 					DeletionTimestamp: &now,
-					Finalizers:        []string{"test.projectcapsule.dev/finalizer"},
-				}},
+					Finalizers:        []string{"test.projectcapsule.dev/finalizer"}},
 			}
 
 			managedLabels := map[string]string{
@@ -148,7 +147,7 @@ func TestRunGarbageCollection(t *testing.T) {
 			cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(allObjects...).Build()
 			manager := &Manager{Client: cl, reader: cl}
 			tenant := &capsulev1beta2.Tenant{
-				ObjectMeta: metav1.ObjectMeta{Name: "green"},
+				Name: "green",
 				Status: capsulev1beta2.TenantStatus{Spaces: []*capsulev1beta2.TenantStatusNamespaceItem{{
 					Name: "current",
 					Conditions: meta.ConditionList{{

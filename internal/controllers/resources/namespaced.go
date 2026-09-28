@@ -37,6 +37,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	tenantresourceindexer "github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
+	"github.com/projectcapsule/capsule/pkg/runtime/ssa"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
@@ -53,6 +54,7 @@ type namespacedResourceController struct {
 	clients       impersonatedClientLoader[*capsulev1beta2.TenantResource]
 
 	impersonation *cache.ImpersonationCache
+	conditions    *cache.CELCache
 }
 
 func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager, ctrlConfig cutils.ControllerOptions) error {
@@ -60,6 +62,8 @@ func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager, ctrlCo
 	r.reader = mgr.GetAPIReader()
 
 	r.processor = processor.Processor{
+		ReplicationOwners:            ssa.NewReplicationOwnerResolver(mgr.GetClient(), mgr.GetAPIReader()),
+		Conditions:                   r.conditions,
 		Configuration:                r.configuration,
 		AllowCrossNamespaceSelection: false,
 		GatherClient:                 mgr.GetAPIReader(),
@@ -388,10 +392,8 @@ func (r *namespacedResourceController) enqueueAllResources(ctx context.Context, 
 	reqs := make([]reconcile.Request, 0, len(list.Items))
 	for i := range list.Items {
 		reqs = append(reqs, reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name:      list.Items[i].Name,
-				Namespace: list.Items[i].Namespace,
-			},
+			Name:      list.Items[i].Name,
+			Namespace: list.Items[i].Namespace,
 		})
 	}
 
@@ -453,13 +455,8 @@ func (r *namespacedResourceController) reconcile(
 		c,
 		&tntResource.Status.ProcessedItems,
 		acc,
-		processor.ProcessorOptions{
-			FieldOwnerPrefix: getFieldOwner(tntResource.GetName(), tntResource.GetNamespace()),
-			Prune:            *tntResource.Spec.PruningOnDelete,
-			Adopt:            *tntResource.Spec.Settings.Adopt,
-			Force:            *tntResource.Spec.Settings.Force,
-			Owner:            nil,
-		})
+		replicationProcessorOptions(tntResource, &tntResource.Spec.TenantResourceCommonSpec, nil),
+	)
 }
 
 func (r *namespacedResourceController) gatherResources(
@@ -484,7 +481,7 @@ func (r *namespacedResourceController) gatherResources(
 	}
 
 	for resourceIndex, resource := range tntResource.Spec.Resources {
-		objs, err := r.collector.CollectNamespacedItems(ctx, c, opts, resource, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: tntResource.GetNamespace()}}, tnt)
+		objs, err := r.collector.CollectNamespacedItems(ctx, c, opts, resource, &corev1.Namespace{Name: tntResource.GetNamespace()}, tnt)
 		if err != nil {
 			return err
 		}
@@ -680,7 +677,7 @@ func ForeachNamespace(
 			resourceClient,
 			opts,
 			&tnt,
-			strconv.Itoa((resourceIndex)),
+			strconv.Itoa(resourceIndex),
 			resource,
 			&ns,
 		)

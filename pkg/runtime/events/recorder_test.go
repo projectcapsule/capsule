@@ -12,11 +12,9 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
-	admissionv1 "k8s.io/api/admission/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
@@ -37,13 +35,12 @@ func TestLabeledEventAccessorsAndCopies(t *testing.T) {
 		WithRelated(related).
 		WithLabels(map[string]string{"existing": "label"}).
 		WithAnnotations(map[string]string{"existing": "annotation"}).
-		WithTenantLabel(&capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: "tenant-a"}}).
-		WithRequestAnnotations(admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+		WithTenantLabel(&capsulev1beta2.Tenant{Name: "tenant-a"}).
+		WithRequestAnnotations(admission.Request{
 			UID: types.UID("request-uid"),
 			UserInfo: authenticationv1.UserInfo{
 				Username: "alice",
-			},
-		}})
+			}})
 
 	if event.Reason() != events.ReasonForbiddenMetadata || event.Action() != events.ActionValidationDenied {
 		t.Fatalf("unexpected reason/action: %s/%s", event.Reason(), event.Action())
@@ -80,7 +77,7 @@ func TestLabeledEventEmitCreatesEvent(t *testing.T) {
 	ctx := context.Background()
 	cl := eventsFakeClient(t,
 		&capsulev1beta2.CapsuleConfiguration{
-			ObjectMeta: metav1.ObjectMeta{Name: "capsule"},
+			Name: "capsule",
 			Spec: capsulev1beta2.CapsuleConfigurationSpec{
 				Events: capsulev1beta2.EventsConfiguration{ClusterEventNamespace: "audit"},
 			},
@@ -158,14 +155,10 @@ func eventsFakeClient(t *testing.T, objects ...client.Object) client.Client {
 
 func podObject(namespace, name string) *corev1.Pod {
 	return &corev1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Pod",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      name,
-			UID:       types.UID(name + "-uid"),
-		},
+		APIVersion: "v1",
+		Kind:       "Pod",
+		Namespace:  namespace,
+		Name:       name,
+		UID:        types.UID(name + "-uid"),
 	}
 }

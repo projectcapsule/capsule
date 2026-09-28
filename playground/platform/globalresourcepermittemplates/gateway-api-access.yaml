@@ -1,0 +1,97 @@
+# A provisioning permit permanently enables Gateway API access for all
+# owners of the requesting Tenant, including owners and namespaces added later.
+apiVersion: capsule.clastix.io/v1beta2
+kind: GlobalResourcePermitTemplate
+metadata:
+  name: gateway-api
+  labels:
+    company.com/consumer: "tenants"
+  annotations:
+    info.projectcapsule.dev/description: "Permanently grant tenant owners access to namespaced Gateway API resources."
+    info.projectcapsule.dev/tags: "rbac,gateway-api"
+    info.projectcapsule.dev/icon: "https://www.svgrepo.com/show/375342/cloud-api-gateway.svg"
+spec:
+  namespaceSelectors:
+    - matchExpressions:
+        - key: capsule.clastix.io/tenant
+          operator: Exists
+  approvals:
+    auto: false
+    approvers:
+      - kind: User
+        name: kubernetes-admin
+      - kind: User
+        name: admin
+  paramSchema:
+    type: object
+    additionalProperties: false
+  context:
+    resources:
+      # An omitted namespace resolves to the ResourcePermit's namespace. Read
+      # its default ServiceAccount to obtain the namespace without user input.
+      - apiVersion: v1
+        kind: ServiceAccount
+        name: default
+        index: localServiceAccount
+        optional: false
+      - apiVersion: v1
+        kind: Namespace
+        index: tenantNamespaces
+        selector:
+          matchExpressions:
+            - key: capsule.clastix.io/tenant
+              operator: Exists
+  resources:
+    - policy:
+        creation: Owner
+        protect: true
+        force: false
+        # Keep the distributor, and therefore its RoleBindings, after expiry.
+        deletion: Orphan
+      template: |
+        {{- $source := (index $.context.resources.localServiceAccount 0).metadata.namespace }}
+        {{- $namespace := mustGetResourceByName $source $.context.resources.tenantNamespaces }}
+        {{- $tenant := index $namespace.metadata.labels "capsule.clastix.io/tenant" }}
+        ---
+        apiVersion: capsule.clastix.io/v1beta2
+        kind: GlobalTenantResource
+        metadata:
+          name: {{ printf "%s-gateway-api-access" $tenant | quote }}
+        spec:
+          scope: Namespace
+          resyncPeriod: 60s
+          pruningOnDelete: true
+          serviceAccount:
+            name: permit-example-reconciler
+            namespace: capsule-system
+          tenantSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $tenant | quote }}
+          resources:
+            - generators:
+                - missingKey: error
+                  # This inner template is evaluated by GlobalTenantResource,
+                  # so the subjects follow the Tenant's current owners.
+                  template: |
+                    {{`{{- if $.tenant.status.owners }}`}}
+                    apiVersion: rbac.authorization.k8s.io/v1
+                    kind: RoleBinding
+                    metadata:
+                      name: gateway-api-editors
+                      namespace: {{`{{ $.namespace.metadata.name | quote }}`}}
+                    roleRef:
+                      apiGroup: rbac.authorization.k8s.io
+                      kind: ClusterRole
+                      name: playground-gateway-api-editor
+                    subjects:
+                    {{`{{- range $.tenant.status.owners }}`}}
+                      - kind: {{`{{ .kind }}`}}
+                    {{`{{- if eq .kind "ServiceAccount" }}`}}
+                        name: {{`{{ last (splitList ":" .name) | quote }}`}}
+                        namespace: {{`{{ index (splitList ":" .name) 2 | quote }}`}}
+                    {{`{{- else }}`}}
+                        apiGroup: rbac.authorization.k8s.io
+                        name: {{`{{ .name | quote }}`}}
+                    {{`{{- end }}`}}
+                    {{`{{- end }}`}}
+                    {{`{{- end }}`}}

@@ -43,7 +43,7 @@ func TestNamespaceHandlerDoesNotInterceptUnlabelledAdministratorCreate(t *testin
 	)
 
 	configurationObject := &capsulev1beta2.CapsuleConfiguration{
-		ObjectMeta: metav1.ObjectMeta{Name: configurationName},
+		Name: configurationName,
 		Spec: capsulev1beta2.CapsuleConfigurationSpec{
 			Administrators: rbac.UserListSpec{{
 				Name: administratorName,
@@ -57,10 +57,9 @@ func TestNamespaceHandlerDoesNotInterceptUnlabelledAdministratorCreate(t *testin
 		Build()
 	cfg := configuration.NewCapsuleConfiguration(ctx, cl, cl, nil, configurationName)
 
-	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+	ns := &corev1.Namespace{
 		Name:   "unassigned",
-		Labels: map[string]string{"example.com/label": "value"},
-	}}
+		Labels: map[string]string{"example.com/label": "value"}}
 	raw, err := json.Marshal(ns)
 	if err != nil {
 		t.Fatal(err)
@@ -71,12 +70,11 @@ func TestNamespaceHandlerDoesNotInterceptUnlabelledAdministratorCreate(t *testin
 		cl,
 		admission.NewDecoder(scheme),
 		nil,
-	)(ctx, admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+	)(ctx, admission.Request{
 		Object: runtime.RawExtension{Raw: raw},
 		UserInfo: authenticationv1.UserInfo{
 			Username: administratorName,
-		},
-	}})
+		}})
 
 	if response != nil {
 		t.Fatalf("expected unlabelled administrator create not to be intercepted, got %#v", response)
@@ -93,11 +91,9 @@ func TestNamespaceHandlerDoesNotInterceptFinalize(t *testing.T) {
 
 	now := metav1.Now()
 	oldNs := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "terminating",
-			DeletionTimestamp: &now,
-		},
-		Status: corev1.NamespaceStatus{Phase: corev1.NamespaceTerminating},
+		Name:              "terminating",
+		DeletionTimestamp: &now,
+		Status:            corev1.NamespaceStatus{Phase: corev1.NamespaceTerminating},
 	}
 	newNs := oldNs.DeepCopy()
 	newNs.Spec.Finalizers = nil
@@ -116,12 +112,11 @@ func TestNamespaceHandlerDoesNotInterceptFinalize(t *testing.T) {
 		nil,
 		admission.NewDecoder(scheme),
 		nil,
-	)(context.Background(), admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+	)(context.Background(), admission.Request{
 		Operation:   admissionv1.Update,
 		SubResource: "finalize",
 		Object:      runtime.RawExtension{Raw: newRaw},
-		OldObject:   runtime.RawExtension{Raw: oldRaw},
-	}})
+		OldObject:   runtime.RawExtension{Raw: oldRaw}})
 
 	if response != nil {
 		t.Fatalf("finalize response = %#v, want no interception", response)
@@ -133,12 +128,12 @@ func TestNamespaceHandlerRejectsTenantOwnerLabelMigrationWithEmptyOwnerReference
 
 	ctx := context.Background()
 	scheme := testScheme(t)
-	owner := rbac.CoreOwnerSpec{UserSpec: rbac.UserSpec{Name: "alice", Kind: rbac.UserOwner}}
+	owner := rbac.CoreOwnerSpec{Name: "alice", Kind: rbac.UserOwner}
 	green := testTenant("green", "green-uid")
 	green.Status.Owners = rbac.OwnerStatusListSpec{owner}
 	blue := testTenant("blue", "blue-uid")
 	configurationObject := &capsulev1beta2.CapsuleConfiguration{
-		ObjectMeta: metav1.ObjectMeta{Name: "capsule"},
+		Name: "capsule",
 		Status: capsulev1beta2.CapsuleConfigurationStatus{
 			Users: rbac.UserListSpec{owner.UserSpec},
 		},
@@ -151,10 +146,9 @@ func TestNamespaceHandlerRejectsTenantOwnerLabelMigrationWithEmptyOwnerReference
 	recorder := capevents.NewEventRecorder(nil, logr.Discard(), nil, nil)
 
 	oldNs := testTenantNamespace("workloads", green)
-	newNs := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+	newNs := &corev1.Namespace{
 		Name:   oldNs.Name,
-		Labels: map[string]string{meta.TenantLabel: blue.Name},
-	}}
+		Labels: map[string]string{meta.TenantLabel: blue.Name}}
 	oldRaw, err := json.Marshal(oldNs)
 	if err != nil {
 		t.Fatal(err)
@@ -169,15 +163,129 @@ func TestNamespaceHandlerRejectsTenantOwnerLabelMigrationWithEmptyOwnerReference
 		cl,
 		admission.NewDecoder(scheme),
 		recorder,
-	)(ctx, admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+	)(ctx, admission.Request{
 		Object:    runtime.RawExtension{Raw: newRaw},
 		OldObject: runtime.RawExtension{Raw: oldRaw},
 		UserInfo: authenticationv1.UserInfo{
 			Username: owner.Name,
-		},
-	}})
+		}})
 
 	if response == nil || response.Allowed {
 		t.Fatalf("expected label migration patch to be denied, got %#v", response)
+	}
+}
+
+func TestNamespaceHandlerRejectsSubresourceOnUnownedNamespace(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	scheme := testScheme(t)
+	owner := rbac.CoreOwnerSpec{Name: "alice", Kind: rbac.UserOwner}
+	configurationObject := &capsulev1beta2.CapsuleConfiguration{
+		Name: "capsule",
+		Status: capsulev1beta2.CapsuleConfigurationStatus{
+			Users: rbac.UserListSpec{owner.UserSpec},
+		},
+	}
+	cl := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(configurationObject).
+		Build()
+	cfg := configuration.NewCapsuleConfiguration(ctx, cl, cl, nil, configurationObject.Name)
+	recorder := capevents.NewEventRecorder(nil, logr.Discard(), nil, nil)
+
+	oldNs := &corev1.Namespace{Name: "kube-system"}
+	newNs := oldNs.DeepCopy()
+
+	oldRaw, err := json.Marshal(oldNs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newRaw, err := json.Marshal(newNs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, subresource := range []string{"status", "finalize"} {
+		response := NamespaceHandler(cfg, OwnerReferenceHandler(cfg)).OnUpdate(
+			cl,
+			cl,
+			admission.NewDecoder(scheme),
+			recorder,
+		)(ctx, admission.Request{
+			Operation:   admissionv1.Update,
+			SubResource: subresource,
+			Object:      runtime.RawExtension{Raw: newRaw},
+			OldObject:   runtime.RawExtension{Raw: oldRaw},
+			UserInfo: authenticationv1.UserInfo{
+				Username: owner.Name,
+			}})
+
+		if response == nil || response.Allowed {
+			t.Fatalf("subresource %q: expected unowned namespace update to be denied, got %#v", subresource, response)
+		}
+		if response.Result.Message != "namespace is not owned by any tenant" {
+			t.Fatalf("subresource %q: expected 'namespace is not owned by any tenant', got %q", subresource, response.Result.Message)
+		}
+	}
+}
+
+func TestNamespaceHandlerRejectsSubresourceOnOtherTenantNamespace(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	scheme := testScheme(t)
+	alice := rbac.CoreOwnerSpec{Name: "alice", Kind: rbac.UserOwner}
+	bob := rbac.CoreOwnerSpec{Name: "bob", Kind: rbac.UserOwner}
+	oil := testTenant("oil", "oil-uid")
+	oil.Status.Owners = rbac.OwnerStatusListSpec{alice}
+	gas := testTenant("gas", "gas-uid")
+	gas.Status.Owners = rbac.OwnerStatusListSpec{bob}
+	configurationObject := &capsulev1beta2.CapsuleConfiguration{
+		Name: "capsule",
+		Status: capsulev1beta2.CapsuleConfigurationStatus{
+			Users: rbac.UserListSpec{alice.UserSpec, bob.UserSpec},
+		},
+	}
+	cl := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(configurationObject, oil, gas).
+		Build()
+	cfg := configuration.NewCapsuleConfiguration(ctx, cl, cl, nil, configurationObject.Name)
+	recorder := capevents.NewEventRecorder(nil, logr.Discard(), nil, nil)
+
+	oldNs := testTenantNamespace("gas-prod", gas)
+	newNs := oldNs.DeepCopy()
+
+	oldRaw, err := json.Marshal(oldNs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newRaw, err := json.Marshal(newNs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, subresource := range []string{"status", "finalize"} {
+		response := NamespaceHandler(cfg, OwnerReferenceHandler(cfg)).OnUpdate(
+			cl,
+			cl,
+			admission.NewDecoder(scheme),
+			recorder,
+		)(ctx, admission.Request{
+			Operation:   admissionv1.Update,
+			SubResource: subresource,
+			Object:      runtime.RawExtension{Raw: newRaw},
+			OldObject:   runtime.RawExtension{Raw: oldRaw},
+			UserInfo: authenticationv1.UserInfo{
+				Username: alice.Name,
+			}})
+
+		if response == nil || response.Allowed {
+			t.Fatalf("subresource %q: expected cross-tenant update to be denied, got %#v", subresource, response)
+		}
+		if response.Result.Message != "denied patch request for this namespace" {
+			t.Fatalf("subresource %q: expected 'denied patch request for this namespace', got %q", subresource, response.Result.Message)
+		}
 	}
 }

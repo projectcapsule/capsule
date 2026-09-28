@@ -49,7 +49,7 @@ all: manager
 
 # Run tests
 .PHONY: test
-test: gotestsum test-clean generate manifests test-clean
+test: gotestsum test-clean generate manifests mocks test-clean
 	@GO111MODULE=on $(GOTEST) \
 		--format pkgname-and-test-fails \
 		--packages="$(shell go list ./... | grep -v "e2e")" \
@@ -64,6 +64,15 @@ test-clean: ## Clean tests cache
 # Build manager binary
 manager: generate golint
 	go build -o bin/manager
+
+# Build kubectl Capsule plugin binary
+.PHONY: kubectl-capsule
+kubectl-capsule:
+	@mkdir -p bin
+	go build -o bin/kubectl-capsule ./cmd/cli
+	@echo ""
+	@echo "Run the kubectl plugin with:"
+	@echo '  PATH="$(CURDIR)/bin:$$PATH" kubectl capsule --help'
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate manifests
@@ -122,8 +131,14 @@ dev-build: kind
 dev-destroy: kind
 	$(KIND) delete cluster --name capsule
 
-dev-install-deps: dev-setup-fluxcd dev-setup-cert-manager dev-install-gw-api-crds dev-install-prometheus-crds wait-for-helmreleases
-dev-install-deps-openshift: dev-setup-fluxcd-openshift dev-setup-cert-manager dev-install-gw-api-crds dev-install-prometheus-crds wait-for-helmreleases
+# Target used to install Flux. Overridden on OpenShift so that dependents (e.g. cert-manager)
+# never re-apply the vanilla Flux manifests over the SCC-compatible overlay.
+FLUX_SETUP_TARGET ?= dev-setup-fluxcd
+
+.PHONY: dev-install-deps dev-install-deps-openshift dev-setup-cert-manager dev-setup-fluxcd dev-setup-fluxcd-openshift
+dev-install-deps: $(FLUX_SETUP_TARGET) dev-setup-cert-manager dev-install-gw-api-crds dev-install-prometheus-crds wait-for-helmreleases
+dev-install-deps-openshift:
+	$(MAKE) dev-install-deps FLUX_SETUP_TARGET=dev-setup-fluxcd-openshift
 
 API_GW         := none
 API_GW_VERSION := v1.3.0
@@ -205,6 +220,8 @@ dev-setup: dev-setup-flux-handoff
 		--set 'certManager.generateCertificates=false' \
 		--set 'tls.enableController=false' \
 		--set 'tls.create=false' \
+		--set rbac.resourcepermits.create=true \
+		--set-string 'rbac.resourcepermits.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set rbac.resources.create=true \
 		--set-string 'rbac.resources.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set rbac.resourcepoolclaims.create=true \
@@ -263,7 +280,7 @@ dev-setup-argocd: dev-setup-fluxcd
 	@printf "  \033[1mkubectl get secret -n argocd argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d\033[0m\n\n"
 	@printf "  \033[1mkubectl port-forward svc/argocd-server 9091:80 -n argocd\033[0m\n\n"
 
-dev-setup-cert-manager: dev-setup-fluxcd
+dev-setup-cert-manager: $(FLUX_SETUP_TARGET)
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/cert-manager | envsubst | kubectl apply -f -
 
 dev-setup-fluxcd:
@@ -281,10 +298,28 @@ dev-setup-capsule:
 	@$(MAKE) -C playground dev-capsule
 
 
+HELM_RELEASES_WAIT_TIMEOUT_SECONDS ?= 900
+
 wait-for-helmreleases:
 	@ echo "Waiting for all HelmReleases to have observedGeneration >= 0..."
-	@while [ "$$($(KUBECTL) get helmrelease -A -o jsonpath='{range .items[?(@.status.observedGeneration<0)]}{.metadata.namespace}{" "}{.metadata.name}{"\n"}{end}' | wc -l)" -ne 0 ]; do \
-	  sleep 5; \
+	@timeout=$(HELM_RELEASES_WAIT_TIMEOUT_SECONDS); \
+	interval=5; \
+	elapsed=0; \
+	while [ "$$($(KUBECTL) get helmrelease -A -o jsonpath='{range .items[?(@.status.observedGeneration<0)]}{.metadata.namespace}{" "}{.metadata.name}{"\n"}{end}' | wc -l)" -ne 0 ]; do \
+	  if [ $$elapsed -ge $$timeout ]; then \
+	    echo "Timeout of $${timeout}s reached waiting for HelmReleases to have observedGeneration >= 0" >&2; \
+	    echo "=== HelmReleases overview ===" >&2; \
+	    $(KUBECTL) get helmrelease -A >&2 || true; \
+	    echo "=== HelmReleases details ===" >&2; \
+	    $(KUBECTL) describe helmrelease -A >&2 || true; \
+	    echo "=== pods overview ===" >&2; \
+	    $(KUBECTL) get pods -A>&2 || true; \
+	    echo "=== pods details ===" >&2; \
+	    $(KUBECTL) describe pods -A >&2 || true; \
+	    exit 1; \
+	  fi; \
+	  sleep $$interval; \
+	  elapsed=$$((elapsed + interval)); \
 	done
 
 ####################
@@ -435,6 +470,11 @@ golint: golangci-lint
 golint-fix: golangci-lint
 	$(GOLANGCI_LINT) run -c .golangci.yaml --verbose --fix
 
+# generate mocks
+.PHONY: mocks
+mocks: mockgen
+	$(MOCKGEN) -destination internal/mocks/client/mock.go sigs.k8s.io/controller-runtime/pkg/client Client,SubResourceWriter,Reader
+
 .PHONY: e2e-openshift
 e2e-openshift: ginkgo
 	$(MAKE) e2e-build-openshift && $(MAKE) e2e-exec FILTER='&& !skip && !skip-on-openshift' && $(MAKE) e2e-destroy-openshift
@@ -486,6 +526,8 @@ e2e-install: helm-controller-version ko-build-all dev-install-gw-api-crds
 		--set 'manager.options.leaderElection.leaseDuration=60s' \
 		--set 'manager.options.leaderElection.renewDeadline=40s' \
 		--set 'manager.rbac.minimal=true' \
+		--set rbac.resourcepermits.create=true \
+		--set-string 'rbac.resourcepermits.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set rbac.resources.create=true \
 		--set-string 'rbac.resources.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set rbac.resourcepoolclaims.create=true \
@@ -666,7 +708,7 @@ nwa:
 	$(call go-install-tool,$(NWA),github.com/$(NWA_LOOKUP)@$(NWA_VERSION))
 
 GOLANGCI_LINT          := $(LOCALBIN)/golangci-lint
-GOLANGCI_LINT_VERSION  := v2.12.2
+GOLANGCI_LINT_VERSION  := v2.13.2
 GOLANGCI_LINT_LOOKUP   := golangci/golangci-lint
 golangci-lint: ## Download golangci-lint locally if necessary.
 	@test -s $(GOLANGCI_LINT) && $(GOLANGCI_LINT) -h | grep -q $(GOLANGCI_LINT_VERSION) || \
@@ -678,6 +720,13 @@ APIDOCS_GEN_LOOKUP  := fybrik/crdoc
 apidocs-gen: ## Download crdoc locally if necessary.
 	@test -s $(APIDOCS_GEN) && $(APIDOCS_GEN) --version | grep -q $(APIDOCS_GEN_VERSION) || \
 	$(call go-install-tool,$(APIDOCS_GEN),fybrik.io/crdoc@$(APIDOCS_GEN_VERSION))
+
+MOCKGEN         := $(LOCALBIN)/mockgen
+MOCKGEN_VERSION := v0.6.0
+MOCKGEN_LOOKUP  := go.uber.org/mock/mockgen
+mockgen:
+	@test -s $(MOCKGEN) && $(MOCKGEN) -version | grep -q $(MOCKGEN_VERSION) || \
+	$(call go-install-tool,$(MOCKGEN),$(MOCKGEN_LOOKUP)@$(MOCKGEN_VERSION))
 
 GORELEASER          := $(LOCALBIN)/goreleaser
 GORELEASER_VERSION  := 2.18.0

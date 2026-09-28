@@ -23,21 +23,15 @@ import (
 
 var _ = Describe("cordoning a Tenant", Ordered, Label("tenant", "operations", "cordoning"), func() {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-cordoning",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-cordoning",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-cordoning",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-cordoning",
+					Kind: "User",
 				},
 			},
 		},
@@ -214,9 +208,7 @@ var _ = Describe("cordoning a Tenant", Ordered, Label("tenant", "operations", "c
 		expectNamespaceCordonedLabel(ns.GetName(), true)
 
 		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "blocked-create",
-			},
+			Name: "blocked-create",
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
@@ -249,9 +241,7 @@ var _ = Describe("cordoning a Tenant", Ordered, Label("tenant", "operations", "c
 		})
 
 		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "container",
-			},
+			Name: "container",
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{

@@ -195,7 +195,7 @@ func BenchmarkAdmissionConditions(b *testing.B) {
 			})
 		}
 	}
-	for _, mode := range []string{"cold", "warm", "invalidated", "parallel"} {
+	for _, mode := range []string{"cold", "warm", "invalidated", "quota-reset", "parallel"} {
 		b.Run("cache/"+mode, func(b *testing.B) {
 			c := conditionCache(b)
 			expression := `request.namespace == 'tenant-a' && !has(object.spec.nodeSelector)`
@@ -225,6 +225,9 @@ func BenchmarkAdmissionConditions(b *testing.B) {
 				}
 				if mode == "invalidated" {
 					c.PruneConditions(nil)
+				}
+				if mode == "quota-reset" {
+					c.ResetQuotaExpressions()
 				}
 				run()
 			}

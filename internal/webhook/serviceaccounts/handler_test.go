@@ -66,11 +66,10 @@ func serviceAccountAdmissionRequest(t *testing.T, sa *corev1.ServiceAccount) adm
 		t.Fatal(err)
 	}
 
-	return admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+	return admission.Request{
 		Operation: admissionv1.Create,
 		Namespace: "solar",
 		Object: runtime.RawExtension{
 			Raw: raw,
-		},
-	}}
+		}}
 }

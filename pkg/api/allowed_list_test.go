@@ -33,6 +33,13 @@ func TestAllowedListSpec_ExactMatch(t *testing.T) {
 			[]string{"a", "b", "c"},
 		},
 		{
+			// Entries differing only by case must all be found, while the
+			// match itself stays case-sensitive.
+			[]string{"nginx", "NGINX", "traefik"},
+			[]string{"nginx", "NGINX", "traefik"},
+			[]string{"Nginx", "haproxy"},
+		},
+		{
 			nil,
 			nil,
 			[]string{"any", "value"},
@@ -62,6 +69,7 @@ func TestAllowedListSpec_RegexMatch(t *testing.T) {
 	for _, tc := range []tc{
 		{`first-\w+-pattern`, []string{"first-date-pattern", "first-year-pattern"}, []string{"broken", "first-year", "second-date-pattern"}},
 		{``, nil, []string{"any", "value"}},
+		{`[`, nil, []string{"any", "value"}},
 	} {
 		a := api.AllowedListSpec{
 			Regex: tc.Regex,
@@ -102,26 +110,23 @@ func TestDefaultAllowedListSpec_MatchDefault(t *testing.T) {
 func TestSelectorAllowedListSpec(t *testing.T) {
 	t.Parallel()
 
-	obj := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+	obj := &corev1.ConfigMap{
 		Name:   "by-name",
-		Labels: map[string]string{"tier": "backend"},
-	}}
+		Labels: map[string]string{"tier": "backend"}}
 
 	byName := api.SelectorAllowedListSpec{
-		AllowedListSpec: api.AllowedListSpec{Exact: []string{"by-name"}},
+		Exact: []string{"by-name"},
 	}
 	assert.True(t, byName.MatchSelectByName(obj))
 
 	bySelector := api.SelectorAllowedListSpec{
-		LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"tier": "backend"}},
+		MatchLabels: map[string]string{"tier": "backend"},
 	}
 	assert.True(t, bySelector.SelectorMatch(obj))
 	assert.True(t, bySelector.MatchSelectByName(obj))
 
 	invalidSelector := api.SelectorAllowedListSpec{
-		LabelSelector: metav1.LabelSelector{
-			MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "tier", Operator: "invalid"}},
-		},
+		MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "tier", Operator: "invalid"}},
 	}
 	assert.False(t, invalidSelector.SelectorMatch(obj))
 	assert.False(t, invalidSelector.MatchSelectByName(nil))
@@ -134,12 +139,11 @@ func TestSelectionListWithDefaultSpec(t *testing.T) {
 	assert.True(t, spec.MatchDefault("standard"))
 	assert.False(t, spec.MatchDefault("premium"))
 
-	obj := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
-		Labels: map[string]string{"class": "gold"},
-	}}
+	obj := &corev1.ConfigMap{
+		Labels: map[string]string{"class": "gold"}}
 
 	selector := api.SelectionListWithSpec{
-		LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"class": "gold"}},
+		MatchLabels: map[string]string{"class": "gold"},
 	}
 	assert.True(t, selector.SelectorMatch(obj))
 	assert.False(t, selector.SelectorMatch(nil))

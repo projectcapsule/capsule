@@ -9,6 +9,9 @@ This is a list of companies that have adopted Capsule, feel free to open a Pull-
 ### [Bedag Informatik AG](https://www.bedag.ch/)
 <img src="https://www.bedag.ch/wGlobal/wGlobal/layout/images/logo.svg" alt="Bedag" width="350" />
 
+### [Bison Schweiz AG](https://www.bison-group.com)
+<img src="https://raw.githubusercontent.com/BisonSchweizAG/bisonschweizag.github.io/refs/heads/main/logo/BISON_Logo_Claim_rgb.png" alt="Bedag" width="350" />
+
 ### [Department of Defense](https://www.defense.gov/)
 <img src="https://www.access-board.gov/images/dod-seal.png" alt="United States Department of Defense" width="350" />
 

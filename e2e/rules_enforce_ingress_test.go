@@ -46,25 +46,21 @@ var _ = Describe("enforcing ingress hostname namespace rules", Ordered, Label("t
 
 	hostnameByExpression := func(expression string) runtime.ExpressionMatch {
 		return runtime.ExpressionMatch{
-			ExpressionRegex: runtime.ExpressionRegex{Expression: expression},
+			Expression: expression,
 		}
 	}
 
 	hostnameByMatch := func(exact []string, expression string) runtime.ExpressionMatch {
 		return runtime.ExpressionMatch{
-			Exact: exact,
-			ExpressionRegex: runtime.ExpressionRegex{
-				Expression: expression,
-			},
+			Exact:      exact,
+			Expression: expression,
 		}
 	}
 
 	hostnameByNegatedExpression := func(expression string) runtime.ExpressionMatch {
 		return runtime.ExpressionMatch{
-			ExpressionRegex: runtime.ExpressionRegex{
-				Expression: expression,
-				Negate:     true,
-			},
+			Expression: expression,
+			Negate:     true,
 		}
 	}
 
@@ -157,21 +153,15 @@ var _ = Describe("enforcing ingress hostname namespace rules", Ordered, Label("t
 
 	newTenant := func() *capsulev1beta2.Tenant {
 		return &capsulev1beta2.Tenant{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "e2e-rule-ingress",
-				Labels: map[string]string{
-					"env": "e2e",
-				},
+			Name: "e2e-rule-ingress",
+			Labels: map[string]string{
+				"env": "e2e",
 			},
 			Spec: capsulev1beta2.TenantSpec{
 				Owners: rbac.OwnerListSpec{
 					{
-						CoreOwnerSpec: rbac.CoreOwnerSpec{
-							UserSpec: rbac.UserSpec{
-								Name: ownerName,
-								Kind: "User",
-							},
-						},
+						Name: ownerName,
+						Kind: "User",
 					},
 				},
 				AdditionalRoleBindings: []rbac.AdditionalRoleBindingsSpec{
@@ -280,23 +270,21 @@ var _ = Describe("enforcing ingress hostname namespace rules", Ordered, Label("t
 
 	ingress := func(name string, hostnames ...string) *networkingv1.Ingress {
 		obj := &networkingv1.Ingress{
-			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Name: name,
 		}
 
 		for _, hostname := range hostnames {
 			obj.Spec.Rules = append(obj.Spec.Rules, networkingv1.IngressRule{
 				Host: hostname,
-				IngressRuleValue: networkingv1.IngressRuleValue{
-					HTTP: &networkingv1.HTTPIngressRuleValue{
-						Paths: []networkingv1.HTTPIngressPath{
-							{
-								Path:     "/",
-								PathType: ptr.To(networkingv1.PathTypePrefix),
-								Backend: networkingv1.IngressBackend{
-									Service: &networkingv1.IngressServiceBackend{
-										Name: "tenant-api",
-										Port: networkingv1.ServiceBackendPort{Number: 8080},
-									},
+				HTTP: &networkingv1.HTTPIngressRuleValue{
+					Paths: []networkingv1.HTTPIngressPath{
+						{
+							Path:     "/",
+							PathType: ptr.To(networkingv1.PathTypePrefix),
+							Backend: networkingv1.IngressBackend{
+								Service: &networkingv1.IngressServiceBackend{
+									Name: "tenant-api",
+									Port: networkingv1.ServiceBackendPort{Number: 8080},
 								},
 							},
 						},
@@ -406,7 +394,7 @@ var _ = Describe("enforcing ingress hostname namespace rules", Ordered, Label("t
 		utilruntime.Must(gatewayv1.Install(scheme.Scheme))
 
 		role := &rbacv1.ClusterRole{
-			ObjectMeta: metav1.ObjectMeta{Name: gatewayAPIClusterRole},
+			Name: gatewayAPIClusterRole,
 			Rules: []rbacv1.PolicyRule{
 				{
 					APIGroups: []string{"gateway.networking.k8s.io"},
@@ -433,7 +421,7 @@ var _ = Describe("enforcing ingress hostname namespace rules", Ordered, Label("t
 
 	AfterAll(func() {
 		err := k8sClient.Delete(context.Background(), &rbacv1.ClusterRole{
-			ObjectMeta: metav1.ObjectMeta{Name: gatewayAPIClusterRole},
+			Name: gatewayAPIClusterRole,
 		})
 		if !apierrors.IsNotFound(err) {
 			Expect(err).NotTo(HaveOccurred())
@@ -753,7 +741,7 @@ var _ = Describe("enforcing ingress hostname namespace rules", Ordered, Label("t
 
 		owner := impersonationClient(ownerName, withDefaultGroups(nil))
 		allowed := &gatewayv1.HTTPRoute{
-			ObjectMeta: metav1.ObjectMeta{Name: "route-hostnames-allowed", Namespace: ns.Name},
+			Name: "route-hostnames-allowed", Namespace: ns.Name,
 			Spec: gatewayv1.HTTPRouteSpec{
 				Hostnames: []gatewayv1.Hostname{"api.example.com", "internal.example.com"},
 			},
@@ -764,10 +752,8 @@ var _ = Describe("enforcing ingress hostname namespace rules", Ordered, Label("t
 
 		Eventually(func() error {
 			denied := &gatewayv1.HTTPRoute{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      fmt.Sprintf("route-hostnames-denied-%d", time.Now().UnixNano()%1e6),
-					Namespace: ns.Name,
-				},
+				Name:      fmt.Sprintf("route-hostnames-denied-%d", time.Now().UnixNano()%1e6),
+				Namespace: ns.Name,
 				Spec: gatewayv1.HTTPRouteSpec{
 					Hostnames: []gatewayv1.Hostname{"api.example.com", "api.example.net"},
 				},
@@ -801,7 +787,7 @@ var _ = Describe("enforcing ingress hostname namespace rules", Ordered, Label("t
 
 		owner := impersonationClient(ownerName, withDefaultGroups(nil))
 		audited := &gatewayv1.HTTPRoute{
-			ObjectMeta: metav1.ObjectMeta{Name: "route-empty-hostnames-audited", Namespace: auditNS.Name},
+			Name: "route-empty-hostnames-audited", Namespace: auditNS.Name,
 		}
 		EventuallyCreation(func() error {
 			return owner.Create(context.Background(), audited)
@@ -813,7 +799,7 @@ var _ = Describe("enforcing ingress hostname namespace rules", Ordered, Label("t
 		)
 
 		denied := &gatewayv1.HTTPRoute{
-			ObjectMeta: metav1.ObjectMeta{Name: "route-empty-hostnames-denied", Namespace: enforceNS.Name},
+			Name: "route-empty-hostnames-denied", Namespace: enforceNS.Name,
 		}
 		err := owner.Create(context.Background(), denied)
 		Expect(err).To(HaveOccurred())
@@ -833,7 +819,7 @@ var _ = Describe("enforcing ingress hostname namespace rules", Ordered, Label("t
 
 		owner := impersonationClient(ownerName, withDefaultGroups(nil))
 		allowed := &gatewayv1.Gateway{
-			ObjectMeta: metav1.ObjectMeta{Name: "gateway-hostnames-allowed", Namespace: ns.Name},
+			Name: "gateway-hostnames-allowed", Namespace: ns.Name,
 			Spec: gatewayv1.GatewaySpec{
 				GatewayClassName: "unmanaged-e2e-class",
 				Listeners: []gatewayv1.Listener{
@@ -884,7 +870,7 @@ var _ = Describe("enforcing ingress hostname namespace rules", Ordered, Label("t
 
 		owner := impersonationClient(ownerName, withDefaultGroups(nil))
 		obj := &gatewayv1.Gateway{
-			ObjectMeta: metav1.ObjectMeta{Name: "gateway-empty-hostname-audited", Namespace: ns.Name},
+			Name: "gateway-empty-hostname-audited", Namespace: ns.Name,
 			Spec: gatewayv1.GatewaySpec{
 				GatewayClassName: "unmanaged-e2e-class",
 				Listeners: []gatewayv1.Listener{

@@ -21,36 +21,28 @@ var _ = Describe("NamespaceStatus objects", Ordered, Label("tenant", "rules", "s
 
 	// Two tenants, each with one owner (reuse your existing ownerClient/NamespaceCreation helpers)
 	tntA := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-rule-status-a",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-rule-status-a",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{Name: "e2e-rule-status-a", Kind: "User"},
-					},
+					Name: "e2e-rule-status-a", Kind: "User",
 				},
 			},
 		},
 	}
 
 	tntB := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-rule-status-b",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-rule-status-b",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{Name: "e2e-rule-status-b", Kind: "User"},
-					},
+					Name: "e2e-rule-status-b", Kind: "User",
 				},
 			},
 		},

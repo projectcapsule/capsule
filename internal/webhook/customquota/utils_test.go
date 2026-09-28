@@ -23,7 +23,6 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	caprunt "github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/quota"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
@@ -47,11 +46,10 @@ func TestReserveCreateOnLedgerDryRunDoesNotMutate(t *testing.T) {
 		ctx,
 		cl,
 		cl,
-		evaluatedQuota{MatchedQuota: quota.MatchedQuota{
+		evaluatedQuota{
 			Name:      key.Name,
 			Namespace: key.Namespace,
-			Limit:     resource.MustParse("3"),
-		}},
+			Limit:     resource.MustParse("3")},
 		&reservation,
 		true,
 	)
@@ -107,11 +105,10 @@ func TestReserveCreateOnLedgerReleasesExpiredReservation(t *testing.T) {
 		ctx,
 		cl,
 		cl,
-		evaluatedQuota{MatchedQuota: quota.MatchedQuota{
+		evaluatedQuota{
 			Name:      key.Name,
 			Namespace: key.Namespace,
-			Limit:     resource.MustParse("2"),
-		}},
+			Limit:     resource.MustParse("2")},
 		&reservation,
 		false,
 	)
@@ -154,11 +151,10 @@ func TestReplaceUsageOnLedgerDoesNotReleaseDecreaseBeforePersistence(t *testing.
 		ctx,
 		cl,
 		cl,
-		evaluatedQuota{MatchedQuota: quota.MatchedQuota{
+		evaluatedQuota{
 			Name:      key.Name,
 			Namespace: key.Namespace,
-			Limit:     resource.MustParse("10"),
-		}},
+			Limit:     resource.MustParse("10")},
 		resource.MustParse("10"),
 		newUsage,
 		&reservation,
@@ -208,11 +204,10 @@ func TestReplaceUsageOnLedgerReservesOnlyPositiveDelta(t *testing.T) {
 		ctx,
 		cl,
 		cl,
-		evaluatedQuota{MatchedQuota: quota.MatchedQuota{
+		evaluatedQuota{
 			Name:      key.Name,
 			Namespace: key.Namespace,
-			Limit:     resource.MustParse("8"),
-		}},
+			Limit:     resource.MustParse("8")},
 		resource.MustParse("5"),
 		newUsage,
 		&reservation,
@@ -314,29 +309,25 @@ func TestStatusSubresourceUpdateQueuesQuotaReconciliation(t *testing.T) {
 
 	key := types.NamespacedName{Namespace: "tenant-a", Name: "active-pod-cpu"}
 	namespace := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{Name: key.Namespace},
+		Name: key.Namespace,
 	}
 	customQuota := &capsulev1beta2.CustomQuota{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:       key.Name,
-			Namespace:  key.Namespace,
-			Generation: 1,
-		},
+		Name:       key.Name,
+		Namespace:  key.Namespace,
+		Generation: 1,
 		Spec: capsulev1beta2.CustomQuotaSpec{
 			Limit: resource.MustParse("2"),
 			Sources: []capsulev1beta2.CustomQuotaSpecSource{
 				{
-					VersionKind: caprunt.VersionKind{APIVersion: "v1", Kind: "Pod"},
-					CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-						Operation: quota.OpAdd,
-						Path:      ".spec.containers[*].resources.limits.cpu",
-						Selectors: []selectors.SelectorWithFields{
-							{
-								FieldSelectors: []string{
-									".status.phase!=Succeeded",
-									".status.phase!=Failed",
-									".status.phase!=Unknown",
-								},
+					APIVersion: "v1", Kind: "Pod",
+					Operation: quota.OpAdd,
+					Path:      ".spec.containers[*].resources.limits.cpu",
+					Selectors: []selectors.SelectorWithFields{
+						{
+							FieldSelectors: []string{
+								".status.phase!=Succeeded",
+								".status.phase!=Failed",
+								".status.phase!=Unknown",
 							},
 						},
 					},
@@ -363,11 +354,9 @@ func TestStatusSubresourceUpdateQueuesQuotaReconciliation(t *testing.T) {
 		Build()
 
 	oldPod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "completed",
-			Namespace: key.Namespace,
-			UID:       "pod-uid",
-		},
+		Name:      "completed",
+		Namespace: key.Namespace,
+		UID:       "pod-uid",
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
@@ -389,7 +378,7 @@ func TestStatusSubresourceUpdateQueuesQuotaReconciliation(t *testing.T) {
 		targetsCache:  cache.NewCompiledTargetsCache[string](),
 		jsonPathCache: cache.NewJSONPathCache(),
 	}
-	req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+	req := admission.Request{
 		UID:         "status-request",
 		Operation:   admissionv1.Update,
 		Kind:        metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
@@ -397,8 +386,7 @@ func TestStatusSubresourceUpdateQueuesQuotaReconciliation(t *testing.T) {
 		Name:        oldPod.Name,
 		SubResource: "status",
 		OldObject:   runtime.RawExtension{Object: oldPod},
-		Object:      runtime.RawExtension{Object: newPod},
-	}}
+		Object:      runtime.RawExtension{Object: newPod}}
 
 	if resp := handler.OnUpdate(cl, cl, nil, nil)(ctx, req); resp != nil {
 		t.Fatalf("status update response = %#v, want allowed", resp)
@@ -432,21 +420,17 @@ func TestStatusSubresourceUpdateSkipsNotReadyQuota(t *testing.T) {
 		t.Fatalf("add core scheme: %v", err)
 	}
 
-	namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "tenant-a"}}
+	namespace := &corev1.Namespace{Name: "tenant-a"}
 	customQuota := &capsulev1beta2.CustomQuota{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:       "not-ready",
-			Namespace:  namespace.Name,
-			Generation: 1,
-		},
+		Name:       "not-ready",
+		Namespace:  namespace.Name,
+		Generation: 1,
 		Spec: capsulev1beta2.CustomQuotaSpec{
 			Limit: resource.MustParse("1"),
 			Sources: []capsulev1beta2.CustomQuotaSpecSource{
 				{
-					VersionKind: caprunt.VersionKind{APIVersion: "v1", Kind: "Pod"},
-					CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-						Operation: quota.OpCount,
-					},
+					APIVersion: "v1", Kind: "Pod",
+					Operation: quota.OpCount,
 				},
 			},
 		},
@@ -463,8 +447,8 @@ func TestStatusSubresourceUpdateSkipsNotReadyQuota(t *testing.T) {
 		Build()
 
 	oldPod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "pod-a", Namespace: namespace.Name, UID: "pod-uid"},
-		Status:     corev1.PodStatus{Phase: corev1.PodPending},
+		Name: "pod-a", Namespace: namespace.Name, UID: "pod-uid",
+		Status: corev1.PodStatus{Phase: corev1.PodPending},
 	}
 	newPod := oldPod.DeepCopy()
 	newPod.Status.Phase = corev1.PodRunning
@@ -493,25 +477,21 @@ func TestStatusSubresourceUpdateUsesOnePolicySnapshot(t *testing.T) {
 	}
 
 	key := types.NamespacedName{Namespace: "tenant-a", Name: "tracked-pods"}
-	namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: key.Namespace}}
+	namespace := &corev1.Namespace{Name: key.Namespace}
 	customQuota := &capsulev1beta2.CustomQuota{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:       key.Name,
-			Namespace:  key.Namespace,
-			Generation: 1,
-		},
+		Name:       key.Name,
+		Namespace:  key.Namespace,
+		Generation: 1,
 		Spec: capsulev1beta2.CustomQuotaSpec{
 			Limit: resource.MustParse("10"),
 			Sources: []capsulev1beta2.CustomQuotaSpecSource{
 				{
-					VersionKind: caprunt.VersionKind{APIVersion: "v1", Kind: "Pod"},
-					CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-						Operation: quota.OpCount,
-						Selectors: []selectors.SelectorWithFields{
-							{
-								LabelSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{"track": "yes"},
-								},
+					APIVersion: "v1", Kind: "Pod",
+					Operation: quota.OpCount,
+					Selectors: []selectors.SelectorWithFields{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{"track": "yes"},
 							},
 						},
 					},
@@ -538,13 +518,11 @@ func TestStatusSubresourceUpdateUsesOnePolicySnapshot(t *testing.T) {
 	reader := &readinessFlappingReader{Reader: cl}
 
 	oldPod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "pod-a",
-			Namespace: key.Namespace,
-			UID:       "pod-uid",
-			Labels:    map[string]string{"track": "yes"},
-		},
-		Status: corev1.PodStatus{Phase: corev1.PodPending},
+		Name:      "pod-a",
+		Namespace: key.Namespace,
+		UID:       "pod-uid",
+		Labels:    map[string]string{"track": "yes"},
+		Status:    corev1.PodStatus{Phase: corev1.PodPending},
 	}
 	newPod := oldPod.DeepCopy()
 	newPod.Status.Phase = corev1.PodRunning
@@ -591,23 +569,19 @@ func TestStatusSubresourceIncreaseQueuesZeroDeltaWithoutEnforcement(t *testing.T
 	}
 
 	key := types.NamespacedName{Namespace: "tenant-a", Name: "running-pods"}
-	namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: key.Namespace}}
+	namespace := &corev1.Namespace{Name: key.Namespace}
 	customQuota := &capsulev1beta2.CustomQuota{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:       key.Name,
-			Namespace:  key.Namespace,
-			Generation: 1,
-		},
+		Name:       key.Name,
+		Namespace:  key.Namespace,
+		Generation: 1,
 		Spec: capsulev1beta2.CustomQuotaSpec{
 			Limit: resource.MustParse("2"),
 			Sources: []capsulev1beta2.CustomQuotaSpecSource{
 				{
-					VersionKind: caprunt.VersionKind{APIVersion: "v1", Kind: "Pod"},
-					CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-						Operation: quota.OpCount,
-						Selectors: []selectors.SelectorWithFields{
-							{FieldSelectors: []string{".status.phase=Running"}},
-						},
+					APIVersion: "v1", Kind: "Pod",
+					Operation: quota.OpCount,
+					Selectors: []selectors.SelectorWithFields{
+						{FieldSelectors: []string{".status.phase=Running"}},
 					},
 				},
 			},
@@ -631,8 +605,8 @@ func TestStatusSubresourceIncreaseQueuesZeroDeltaWithoutEnforcement(t *testing.T
 		Build()
 
 	oldPod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "pod-a", Namespace: key.Namespace, UID: "pod-uid"},
-		Status:     corev1.PodStatus{Phase: corev1.PodPending},
+		Name: "pod-a", Namespace: key.Namespace, UID: "pod-uid",
+		Status: corev1.PodStatus{Phase: corev1.PodPending},
 	}
 	newPod := oldPod.DeepCopy()
 	newPod.Status.Phase = corev1.PodRunning
@@ -673,11 +647,9 @@ func TestTerminatingNamespaceBypassesQuotaProcessing(t *testing.T) {
 
 	now := metav1.Now()
 	namespace := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "terminating",
-			DeletionTimestamp: &now,
-			Finalizers:        []string{"kubernetes"},
-		},
+		Name:              "terminating",
+		DeletionTimestamp: &now,
+		Finalizers:        []string{"kubernetes"},
 	}
 	cl := fake.NewClientBuilder().
 		WithScheme(scheme).
@@ -687,14 +659,13 @@ func TestTerminatingNamespaceBypassesQuotaProcessing(t *testing.T) {
 		targetsCache:  cache.NewCompiledTargetsCache[string](),
 		jsonPathCache: cache.NewJSONPathCache(),
 	}
-	req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+	req := admission.Request{
 		UID:         "terminating-status",
 		Operation:   admissionv1.Update,
 		Kind:        metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
 		Namespace:   namespace.Name,
 		Name:        "pod-a",
-		SubResource: "status",
-	}}
+		SubResource: "status"}
 
 	if resp := handler.OnUpdate(cl, cl, nil, nil)(ctx, req); resp != nil {
 		t.Fatalf("terminating namespace status response = %#v, want allowed", resp)
@@ -743,19 +714,15 @@ func TestMatchAllQuotasFailsClosedUntilCurrentGenerationIsReady(t *testing.T) {
 	}
 
 	customQuota := &capsulev1beta2.CustomQuota{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:       "pods",
-			Namespace:  "tenant-a",
-			Generation: 2,
-		},
+		Name:       "pods",
+		Namespace:  "tenant-a",
+		Generation: 2,
 		Spec: capsulev1beta2.CustomQuotaSpec{
 			Limit: resource.MustParse("10"),
 			Sources: []capsulev1beta2.CustomQuotaSpecSource{
 				{
-					VersionKind: caprunt.VersionKind{APIVersion: "v1", Kind: "Pod"},
-					CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-						Operation: quota.OpCount,
-					},
+					APIVersion: "v1", Kind: "Pod",
+					Operation: quota.OpCount,
 				},
 			},
 		},
@@ -772,10 +739,9 @@ func TestMatchAllQuotasFailsClosedUntilCurrentGenerationIsReady(t *testing.T) {
 		targetsCache:  cache.NewCompiledTargetsCache[string](),
 		jsonPathCache: cache.NewJSONPathCache(),
 	}
-	request := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+	request := admission.Request{
 		Namespace: "tenant-a",
-		Kind:      metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
-	}}
+		Kind:      metav1.GroupVersionKind{Version: "v1", Kind: "Pod"}}
 	object := unstructured.Unstructured{}
 	object.SetAPIVersion("v1")
 	object.SetKind("Pod")
@@ -814,14 +780,12 @@ func TestCompiledTargetsCacheRefreshesInPlace(t *testing.T) {
 		jsonPathCache: cache.NewJSONPathCache(),
 	}
 	customQuota := &capsulev1beta2.CustomQuota{
-		ObjectMeta: metav1.ObjectMeta{Name: "objects", Namespace: "tenant-a"},
+		Name: "objects", Namespace: "tenant-a",
 		Spec: capsulev1beta2.CustomQuotaSpec{
 			Sources: []capsulev1beta2.CustomQuotaSpecSource{
 				{
-					VersionKind: caprunt.VersionKind{APIVersion: "v1", Kind: "Pod"},
-					CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-						Operation: quota.OpCount,
-					},
+					APIVersion: "v1", Kind: "Pod",
+					Operation: quota.OpCount,
 				},
 			},
 		},
@@ -829,9 +793,7 @@ func TestCompiledTargetsCacheRefreshesInPlace(t *testing.T) {
 	key := "tenant-a/objects"
 	targetsCache.Set(key, []cache.CompiledTarget{
 		{
-			CustomQuotaStatusTarget: capsulev1beta2.CustomQuotaStatusTarget{
-				GroupVersionKind: metav1.GroupVersionKind{Version: "v1", Kind: "Service"},
-			},
+			Version: "v1", Kind: "Service",
 		},
 	})
 
@@ -849,10 +811,8 @@ func TestCompiledTargetsCacheRefreshesInPlace(t *testing.T) {
 
 func ledgerForTest(key types.NamespacedName, allocated string) *capsulev1beta2.QuantityLedger {
 	return &capsulev1beta2.QuantityLedger{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      key.Name,
-			Namespace: key.Namespace,
-		},
+		Name:      key.Name,
+		Namespace: key.Namespace,
 		Status: capsulev1beta2.QuantityLedgerStatus{
 			Allocated: resource.MustParse(allocated),
 		},
@@ -864,7 +824,7 @@ func statusUpdateRequest(
 	oldPod *corev1.Pod,
 	newPod *corev1.Pod,
 ) admission.Request {
-	return admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+	return admission.Request{
 		UID:         uid,
 		Operation:   admissionv1.Update,
 		Kind:        metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
@@ -872,8 +832,7 @@ func statusUpdateRequest(
 		Name:        oldPod.Name,
 		SubResource: "status",
 		OldObject:   runtime.RawExtension{Object: oldPod},
-		Object:      runtime.RawExtension{Object: newPod},
-	}}
+		Object:      runtime.RawExtension{Object: newPod}}
 }
 
 func ledgerClientForTest(t *testing.T, ledger *capsulev1beta2.QuantityLedger) client.Client {

@@ -151,7 +151,9 @@ func (h *handler) OnUpdate(
 			return response
 		}
 
-		reader = webhookutils.NewTenantCachingReader(reader)
+		if reader != nil {
+			reader = webhookutils.NewTenantCachingReader(reader)
+		}
 
 		user := handlers.ResolveAdmissionUser(ctx, c, req, h.cfg)
 
@@ -169,8 +171,13 @@ func (h *handler) OnUpdate(
 			return ad.ErroredResponse(err)
 		}
 
+		//nolint:nestif
 		if !user.IsAdmin() {
 			if oldTenant == nil || newTenant == nil {
+				if isTerminatingNamespaceUpdate(oldNs, ns) {
+					return nil
+				}
+
 				return ad.Deny("namespace tenant ownership is incomplete")
 			}
 
@@ -231,11 +238,9 @@ func namespaceTenantChanged(oldTenant, newTenant *capsulev1beta2.Tenant) bool {
 }
 
 func isTerminatingNamespaceUpdate(
-	req admission.Request,
 	oldNs, newNs *corev1.Namespace,
 ) bool {
-	return req.SubResource == "finalize" ||
-		newNs.DeletionTimestamp != nil ||
+	return newNs.DeletionTimestamp != nil ||
 		oldNs.DeletionTimestamp != nil ||
 		newNs.Status.Phase == corev1.NamespaceTerminating ||
 		oldNs.Status.Phase == corev1.NamespaceTerminating
@@ -245,7 +250,9 @@ func validateTerminatingNamespaceUpdate(
 	req admission.Request,
 	oldNs, newNs *corev1.Namespace,
 ) (*admission.Response, bool) {
-	if !isTerminatingNamespaceUpdate(req, oldNs, newNs) {
+	terminating := isTerminatingNamespaceUpdate(oldNs, newNs)
+
+	if !terminating && req.SubResource != "finalize" {
 		return nil, false
 	}
 
@@ -253,7 +260,7 @@ func validateTerminatingNamespaceUpdate(
 		return ad.Deny("namespace tenant ownership can not change during termination"), true
 	}
 
-	return nil, true
+	return nil, false
 }
 
 func validateNamespaceTenantReferenceTransition(
@@ -277,6 +284,10 @@ func validateNamespaceTenantReferenceTransition(
 	case oldHasTenantReference && !newHasTenantReference:
 		return ad.Deny("namespace can not remove tenant ownership"), true
 	case !oldHasTenantReference && !newHasTenantReference:
+		if user.IsCapsule() {
+			return ad.Deny("namespace is not owned by any tenant"), true
+		}
+
 		return nil, true
 	default:
 		return nil, false

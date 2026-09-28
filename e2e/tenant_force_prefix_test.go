@@ -17,40 +17,28 @@ import (
 
 var _ = Describe("creating a Namespace with Tenant name prefix enforcement at Tenant scope", Ordered, Label("config", "tenant", "prefix"), func() {
 	t1 := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-tenant-force-prefix",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-tenant-force-prefix",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			ForceTenantPrefix: &[]bool{true}[0],
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-tenant-force-prefix",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-tenant-force-prefix",
+					Kind: "User",
 				},
 			},
 		},
 	}
 	t2 := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-tenant-force-prefix-tenant",
-		},
+		Name: "e2e-tenant-force-prefix-tenant",
 		Spec: capsulev1beta2.TenantSpec{
 			ForceTenantPrefix: &[]bool{false}[0],
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-tenant-force-prefix",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-tenant-force-prefix",
+					Kind: "User",
 				},
 			},
 		},

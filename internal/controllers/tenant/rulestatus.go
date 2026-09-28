@@ -55,10 +55,8 @@ func (r *Manager) ensureRuleStatus(
 	body []*rules.NamespaceRuleBodyNamespace,
 ) error {
 	rule := &capsulev1beta2.RuleStatus{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      meta.NameForManagedRuleStatus(),
-			Namespace: namespace.GetName(),
-		},
+		Name:      meta.NameForManagedRuleStatus(),
+		Namespace: namespace.GetName(),
 	}
 
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, rule, func() error {

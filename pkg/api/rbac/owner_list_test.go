@@ -13,12 +13,8 @@ import (
 
 func TestOwnerListSpec_FindOwner(t *testing.T) {
 	bla := rbac.OwnerSpec{
-		CoreOwnerSpec: rbac.CoreOwnerSpec{
-			UserSpec: rbac.UserSpec{
-				Kind: rbac.UserOwner,
-				Name: "bla",
-			},
-		},
+		Kind: rbac.UserOwner,
+		Name: "bla",
 		ProxyOperations: []rbac.ProxySettings{
 			{
 				Kind:       rbac.IngressClassesProxy,
@@ -27,12 +23,8 @@ func TestOwnerListSpec_FindOwner(t *testing.T) {
 		},
 	}
 	bar := rbac.OwnerSpec{
-		CoreOwnerSpec: rbac.CoreOwnerSpec{
-			UserSpec: rbac.UserSpec{
-				Kind: rbac.GroupOwner,
-				Name: "bar",
-			},
-		},
+		Kind: rbac.GroupOwner,
+		Name: "bar",
 		ProxyOperations: []rbac.ProxySettings{
 			{
 				Kind:       rbac.StorageClassesProxy,
@@ -41,12 +33,8 @@ func TestOwnerListSpec_FindOwner(t *testing.T) {
 		},
 	}
 	baz := rbac.OwnerSpec{
-		CoreOwnerSpec: rbac.CoreOwnerSpec{
-			UserSpec: rbac.UserSpec{
-				Kind: rbac.UserOwner,
-				Name: "baz",
-			},
-		},
+		Kind: rbac.UserOwner,
+		Name: "baz",
 		ProxyOperations: []rbac.ProxySettings{
 			{
 				Kind:       rbac.StorageClassesProxy,
@@ -55,12 +43,8 @@ func TestOwnerListSpec_FindOwner(t *testing.T) {
 		},
 	}
 	fim := rbac.OwnerSpec{
-		CoreOwnerSpec: rbac.CoreOwnerSpec{
-			UserSpec: rbac.UserSpec{
-				Kind: rbac.ServiceAccountOwner,
-				Name: "fim",
-			},
-		},
+		Kind: rbac.ServiceAccountOwner,
+		Name: "fim",
 		ProxyOperations: []rbac.ProxySettings{
 			{
 				Kind:       rbac.NodesProxy,
@@ -69,12 +53,8 @@ func TestOwnerListSpec_FindOwner(t *testing.T) {
 		},
 	}
 	bom := rbac.OwnerSpec{
-		CoreOwnerSpec: rbac.CoreOwnerSpec{
-			UserSpec: rbac.UserSpec{
-				Kind: rbac.GroupOwner,
-				Name: "bom",
-			},
-		},
+		Kind: rbac.GroupOwner,
+		Name: "bom",
 		ProxyOperations: []rbac.ProxySettings{
 			{
 				Kind:       rbac.StorageClassesProxy,
@@ -87,12 +67,8 @@ func TestOwnerListSpec_FindOwner(t *testing.T) {
 		},
 	}
 	qip := rbac.OwnerSpec{
-		CoreOwnerSpec: rbac.CoreOwnerSpec{
-			UserSpec: rbac.UserSpec{
-				Kind: rbac.ServiceAccountOwner,
-				Name: "qip",
-			},
-		},
+		Kind: rbac.ServiceAccountOwner,
+		Name: "qip",
 		ProxyOperations: []rbac.ProxySettings{
 			{
 				Kind:       rbac.StorageClassesProxy,

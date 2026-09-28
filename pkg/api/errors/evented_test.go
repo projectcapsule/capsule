@@ -25,7 +25,7 @@ type recordedEvent struct {
 	reason    string
 	action    string
 	note      string
-	args      []interface{}
+	args      []any
 }
 
 func (f *fakeEventRecorder) Eventf(
@@ -35,7 +35,7 @@ func (f *fakeEventRecorder) Eventf(
 	reason string,
 	action string,
 	note string,
-	args ...interface{},
+	args ...any,
 ) {
 	if f.panic {
 		panic("recorder failed")

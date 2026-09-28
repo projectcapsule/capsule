@@ -46,10 +46,8 @@ func CollectOwners(
 
 			for _, sa := range saList.Items {
 				owners.Upsert(rbac.CoreOwnerSpec{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.ServiceAccountOwner,
-						Name: serviceaccount.ServiceAccountUsernamePrefix + sa.Namespace + ":" + sa.Name,
-					},
+					Kind:         rbac.ServiceAccountOwner,
+					Name:         serviceaccount.ServiceAccountUsernamePrefix + sa.Namespace + ":" + sa.Name,
 					ClusterRoles: cfg.RBAC().PromotionClusterRoles,
 				})
 			}

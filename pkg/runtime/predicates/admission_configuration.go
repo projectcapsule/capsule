@@ -26,7 +26,9 @@ type admissionState struct {
 type ValidatingAdmissionConfigurationChangedPredicate struct{ predicate.Funcs }
 
 func (ValidatingAdmissionConfigurationChangedPredicate) Create(event.CreateEvent) bool { return true }
+
 func (ValidatingAdmissionConfigurationChangedPredicate) Delete(event.DeleteEvent) bool { return true }
+
 func (ValidatingAdmissionConfigurationChangedPredicate) Generic(event.GenericEvent) bool {
 	return false
 }
@@ -45,9 +47,12 @@ func (ValidatingAdmissionConfigurationChangedPredicate) Update(e event.UpdateEve
 
 type MutatingAdmissionConfigurationChangedPredicate struct{ predicate.Funcs }
 
-func (MutatingAdmissionConfigurationChangedPredicate) Create(event.CreateEvent) bool   { return true }
-func (MutatingAdmissionConfigurationChangedPredicate) Delete(event.DeleteEvent) bool   { return true }
+func (MutatingAdmissionConfigurationChangedPredicate) Create(event.CreateEvent) bool { return true }
+
+func (MutatingAdmissionConfigurationChangedPredicate) Delete(event.DeleteEvent) bool { return true }
+
 func (MutatingAdmissionConfigurationChangedPredicate) Generic(event.GenericEvent) bool { return false }
+
 func (MutatingAdmissionConfigurationChangedPredicate) Update(e event.UpdateEvent) bool {
 	oldObj, oldOK := e.ObjectOld.(*admissionv1.MutatingWebhookConfiguration)
 

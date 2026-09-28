@@ -1,0 +1,60 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: capsule-proxy
+  namespace: flux-system
+spec:
+  serviceAccountName: kustomize-controller
+  interval: 30s
+  timeout: 10m
+  targetNamespace: capsule-system
+  releaseName: "capsule-proxy"
+  chart:
+    spec:
+      chart: capsule-proxy
+      version: "0.13.9"
+      sourceRef:
+        kind: HelmRepository
+        name: capsule-proxy
+      interval: 24h
+  install:
+    createNamespace: true
+    remediation:
+      retries: -1
+  upgrade:
+    remediation:
+      remediateLastFailure: true
+      retries: -1
+  driftDetection:
+    mode: enabled
+    ignore:
+      - paths: ["/spec/replicas"]
+  values:
+    certManager:
+      generateCertificates: false
+    options:
+      additionalSANs:
+        - "localhost"
+      generateCertificates: true
+      leaderElection: true
+      roleBindingReflector: true
+      extraArgs:
+        - "--feature-gates=ProxyClusterScoped=true"
+    service:
+      type: NodePort
+    kind: DaemonSet
+    daemonset:
+      hostNetwork: true
+    serviceMonitor:
+      enabled: false
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: capsule-proxy
+  namespace: flux-system
+spec:
+  type: "oci"
+  interval: 12h0m0s
+  url: oci://ghcr.io/projectcapsule/charts

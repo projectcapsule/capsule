@@ -224,10 +224,8 @@ func (r *customQuotaClaimController) ensureQuotaLedger(
 	instance *capsulev1beta2.CustomQuota,
 ) (*capsulev1beta2.QuantityLedger, error) {
 	ledger := &capsulev1beta2.QuantityLedger{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      instance.GetName(),
-			Namespace: instance.GetNamespace(),
-		},
+		Name:      instance.GetName(),
+		Namespace: instance.GetNamespace(),
 	}
 
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, ledger, func() error {

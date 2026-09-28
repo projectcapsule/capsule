@@ -8,10 +8,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/utils/ptr"
 
 	"github.com/projectcapsule/capsule/pkg/api/rules"
-	"github.com/projectcapsule/capsule/pkg/api/runtime"
 )
 
 func TestMutateMetadataDefaultsAndManaged(t *testing.T) {
@@ -26,11 +24,11 @@ func TestMutateMetadataDefaultsAndManaged(t *testing.T) {
 	obj.Object["subjects"] = []any{map[string]any{"kind": "User", "name": "alice"}}
 	bodies := []*rules.NamespaceRuleBodyNamespace{{Enforce: &rules.NamespaceRuleEnforceBody{
 		Metadata: []rules.MetadataRule{{
-			VersionKinds: runtime.VersionKinds{APIGroups: []string{"v1"}, Kinds: []string{"ConfigMap"}},
+			APIGroups: []string{"v1"}, Kinds: []string{"ConfigMap"},
 			Labels: map[string]rules.MetadataValueRule{
-				"default-missing": {Default: ptr.To("fallback")},
-				"default-present": {Default: ptr.To("fallback")},
-				"managed":         {Default: ptr.To("fallback"), Managed: ptr.To("controlled")},
+				"default-missing": {Default: new("fallback")},
+				"default-present": {Default: new("fallback")},
+				"managed":         {Default: new("fallback"), Managed: new("controlled")},
 			},
 		}},
 	}}}
@@ -79,9 +77,9 @@ func TestMutateMetadataAddsEmptyManagedValues(t *testing.T) {
 	bodies := []*rules.NamespaceRuleBodyNamespace{{Enforce: &rules.NamespaceRuleEnforceBody{
 		Action: rules.ActionTypeAllow,
 		Metadata: []rules.MetadataRule{{
-			VersionKinds: runtime.VersionKinds{Kinds: []string{"Namespace"}},
-			Labels:       map[string]rules.MetadataValueRule{"example.corp/empty": {Managed: ptr.To("")}},
-			Annotations:  map[string]rules.MetadataValueRule{"example.corp/empty": {Managed: ptr.To("")}},
+			Kinds:       []string{"Namespace"},
+			Labels:      map[string]rules.MetadataValueRule{"example.corp/empty": {Managed: new("")}},
+			Annotations: map[string]rules.MetadataValueRule{"example.corp/empty": {Managed: new("")}},
 		}},
 	}}}
 	if !MutateMetadata(obj, gvk, bodies) {

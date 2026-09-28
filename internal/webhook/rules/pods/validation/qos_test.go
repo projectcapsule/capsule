@@ -443,8 +443,7 @@ func guaranteedPodForQoSTest() *corev1.Pod {
 	}
 }
 
-func decisionMessageForQoSTest(evaluation interface {
-}) string {
+func decisionMessageForQoSTest(evaluation any) string {
 	e, ok := evaluation.(*ruleengine.Evaluation)
 	if !ok || e == nil {
 		return ""

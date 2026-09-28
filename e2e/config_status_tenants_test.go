@@ -31,21 +31,15 @@ func configTenantStatus(g Gomega) []string {
 
 var _ = Describe("CapsuleConfiguration status tenants", Ordered, Label("config", "status", "tenants"), func() {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-cfg-tenants-tnt",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-cfg-tenants-tnt",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-cfg-tenants-owner",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-cfg-tenants-owner",
+					Kind: "User",
 				},
 			},
 		},

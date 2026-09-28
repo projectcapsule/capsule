@@ -11,7 +11,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
@@ -35,11 +34,9 @@ func gatewayAdmissionClient(user string) client.Client {
 
 var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant", "classes", "gatewayclass"), func() {
 	authorized := &gatewayv1.GatewayClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "customer-class",
-			Labels: map[string]string{
-				"env": "production",
-			},
+		Name: "customer-class",
+		Labels: map[string]string{
+			"env": "production",
 		},
 		Spec: gatewayv1.GatewayClassSpec{
 			ControllerName: "projectcapsule.dev/customer-controller",
@@ -47,11 +44,9 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 	}
 
 	exact := &gatewayv1.GatewayClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "legacy",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "legacy",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: gatewayv1.GatewayClassSpec{
 			ControllerName: "projectcapsule.dev/customer-controller",
@@ -59,11 +54,9 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 	}
 
 	exactU := &gatewayv1.GatewayClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "legacy-2",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "legacy-2",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: gatewayv1.GatewayClassSpec{
 			ControllerName: "projectcapsule.dev/customer-controller",
@@ -71,11 +64,9 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 	}
 
 	unauthorized := &gatewayv1.GatewayClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "unauthorized-class",
-			Labels: map[string]string{
-				"env": "production55",
-			},
+		Name: "unauthorized-class",
+		Labels: map[string]string{
+			"env": "production55",
 		},
 		Spec: gatewayv1.GatewayClassSpec{
 			ControllerName: "projectcapsule.dev/customer-controller",
@@ -83,35 +74,23 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 	}
 
 	tntWithDefault := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-gateway-default-and-label-selector",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-gateway-default-and-label-selector",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: []rbac.OwnerSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "gateway-default-and-label-selector",
-							Kind: "User",
-						},
-					},
+					Name: "gateway-default-and-label-selector",
+					Kind: "User",
 				},
 			},
 			GatewayOptions: capsulev1beta2.GatewayOptions{
 				AllowedClasses: &api.DefaultAllowedListSpec{
 					Default: "customer-class",
-					SelectorAllowedListSpec: api.SelectorAllowedListSpec{
-						AllowedListSpec: api.AllowedListSpec{
-							Exact: []string{"legacy-2"},
-						},
-						LabelSelector: v1.LabelSelector{
-							MatchLabels: map[string]string{
-								"env": "production",
-							},
-						},
+					Exact:   []string{"legacy-2"},
+					MatchLabels: map[string]string{
+						"env": "production",
 					},
 				},
 			},
@@ -119,34 +98,22 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 	}
 
 	tntWithoutDefault := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-gateway-label-selector-only",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-gateway-label-selector-only",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: []rbac.OwnerSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "gateway-with-label-selector-only",
-							Kind: "User",
-						},
-					},
+					Name: "gateway-with-label-selector-only",
+					Kind: "User",
 				},
 			},
 			GatewayOptions: capsulev1beta2.GatewayOptions{
 				AllowedClasses: &api.DefaultAllowedListSpec{
-					SelectorAllowedListSpec: api.SelectorAllowedListSpec{
-						AllowedListSpec: api.AllowedListSpec{
-							Exact: []string{"legacy"},
-						},
-						LabelSelector: v1.LabelSelector{
-							MatchLabels: map[string]string{
-								"env": "production",
-							},
-						},
+					Exact: []string{"legacy"},
+					MatchLabels: map[string]string{
+						"env": "production",
 					},
 				},
 			},
@@ -154,18 +121,12 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 	}
 
 	tntNoRestrictions := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-gateway-no-restrictions",
-		},
+		Name: "e2e-gateway-no-restrictions",
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: []rbac.OwnerSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-gateway-no-restrictions",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-gateway-no-restrictions",
+					Kind: "User",
 				},
 			},
 		},
@@ -211,9 +172,7 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 			req, _ := labels.NewRequirement("env", selection.Exists, nil)
 
 			return k8sClient.DeleteAllOf(context.TODO(), &gatewayv1.GatewayClass{}, &client.DeleteAllOfOptions{
-				ListOptions: client.ListOptions{
-					LabelSelector: labels.NewSelector().Add(*req),
-				},
+				LabelSelector: labels.NewSelector().Add(*req),
 			})
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
@@ -253,10 +212,8 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 				c := class.GetName()
 				Eventually(func() (err error) {
 					g := &gatewayv1.Gateway{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      class.GetName() + "-gateway",
-							Namespace: ns.GetName(),
-						},
+						Name:      class.GetName() + "-gateway",
+						Namespace: ns.GetName(),
 						Spec: gatewayv1.GatewaySpec{
 							Listeners: []gatewayv1.Listener{
 								{
@@ -278,10 +235,8 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 		By("providing nonexistent gatewayClassName", func() {
 			Eventually(func() (err error) {
 				g := &gatewayv1.Gateway{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "nonexistent-gateway",
-						Namespace: ns.GetName(),
-					},
+					Name:      "nonexistent-gateway",
+					Namespace: ns.GetName(),
 					Spec: gatewayv1.GatewaySpec{
 						Listeners: []gatewayv1.Listener{
 							{
@@ -355,10 +310,8 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 		By("providing unauthorized gatewayClassName", func() {
 			Eventually(func() (err error) {
 				g := &gatewayv1.Gateway{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "denied-gateway",
-						Namespace: ns.GetName(),
-					},
+					Name:      "denied-gateway",
+					Namespace: ns.GetName(),
 					Spec: gatewayv1.GatewaySpec{
 						Listeners: []gatewayv1.Listener{
 							{
@@ -378,10 +331,8 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 		By("providing nonexistent gatewayClassName", func() {
 			Eventually(func() (err error) {
 				g := &gatewayv1.Gateway{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "nonexistent-gateway",
-						Namespace: ns.GetName(),
-					},
+					Name:      "nonexistent-gateway",
+					Namespace: ns.GetName(),
 					Spec: gatewayv1.GatewaySpec{
 						Listeners: []gatewayv1.Listener{
 							{
@@ -475,10 +426,8 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 		By("providing authorized class", func() {
 			Eventually(func() (err error) {
 				g := &gatewayv1.Gateway{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "authorized-gateway",
-						Namespace: ns.GetName(),
-					},
+					Name:      "authorized-gateway",
+					Namespace: ns.GetName(),
 					Spec: gatewayv1.GatewaySpec{
 						Listeners: []gatewayv1.Listener{
 							{
@@ -498,10 +447,8 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 		By("providing authorized class (exact)", func() {
 			Eventually(func() (err error) {
 				g := &gatewayv1.Gateway{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "authorized-gateway-exact",
-						Namespace: ns.GetName(),
-					},
+					Name:      "authorized-gateway-exact",
+					Namespace: ns.GetName(),
 					Spec: gatewayv1.GatewaySpec{
 						Listeners: []gatewayv1.Listener{
 							{
@@ -520,10 +467,8 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 
 		By("providing no gatewayClassName", func() {
 			g := &gatewayv1.Gateway{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "mutated-gateway",
-					Namespace: ns.GetName(),
-				},
+				Name:      "mutated-gateway",
+				Namespace: ns.GetName(),
 				Spec: gatewayv1.GatewaySpec{
 					Listeners: []gatewayv1.Listener{
 						{
@@ -578,10 +523,8 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 		By("providing empty GatewayClassName", func() {
 			Eventually(func() (err error) {
 				g := &gatewayv1.Gateway{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "empty-gateway",
-						Namespace: ns.GetName(),
-					},
+					Name:      "empty-gateway",
+					Namespace: ns.GetName(),
 					Spec: gatewayv1.GatewaySpec{
 						Listeners: []gatewayv1.Listener{
 							{

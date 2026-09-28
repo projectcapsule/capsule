@@ -16,7 +16,6 @@ import (
 	admissionv1 "k8s.io/api/admission/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/rest"
@@ -123,10 +122,10 @@ func TestResolveServiceAccountActor(t *testing.T) {
 
 	ctx := context.Background()
 	cl := usersFakeClient(t,
-		&corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Namespace: "tenant-a", Name: "builder"}},
+		&corev1.ServiceAccount{Namespace: "tenant-a", Name: "builder"},
 		&capsulev1beta2.Tenant{
-			ObjectMeta: metav1.ObjectMeta{Name: "tenant-a"},
-			Status:     capsulev1beta2.TenantStatus{Namespaces: []string{"tenant-a"}},
+			Name:   "tenant-a",
+			Status: capsulev1beta2.TenantStatus{Namespaces: []string{"tenant-a"}},
 		},
 	)
 	cfg := configuration.NewCapsuleConfiguration(ctx, cl, cl, &rest.Config{}, "capsule")
@@ -134,7 +133,7 @@ func TestResolveServiceAccountActor(t *testing.T) {
 	got, err := users.ResolveServiceAccountActor(
 		ctx,
 		cl,
-		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "target"}},
+		&corev1.Namespace{Name: "target"},
 		users.ServiceAccountUsername("tenant-a", "builder"),
 		cfg,
 	)
@@ -148,10 +147,9 @@ func TestResolveServiceAccountActor(t *testing.T) {
 	got, err = users.ResolveServiceAccountActor(
 		ctx,
 		cl,
-		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+		&corev1.Namespace{
 			Name:   "target",
-			Labels: map[string]string{meta.OwnerPromotionLabel: meta.ValueTrue},
-		}},
+			Labels: map[string]string{meta.OwnerPromotionLabel: meta.ValueTrue}},
 		users.ServiceAccountUsername("tenant-a", "builder"),
 		cfg,
 	)
@@ -165,7 +163,7 @@ func TestResolveServiceAccountActor(t *testing.T) {
 	got, err = users.ResolveServiceAccountActor(
 		ctx,
 		cl,
-		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "target"}},
+		&corev1.Namespace{Name: "target"},
 		users.ServiceAccountUsername("tenant-a", "missing"),
 		cfg,
 	)
@@ -187,10 +185,8 @@ func TestIsTenantOwnerByStatus(t *testing.T) {
 	tnt := &capsulev1beta2.Tenant{
 		Status: capsulev1beta2.TenantStatus{
 			Owners: rbac.OwnerStatusListSpec{{
-				UserSpec: rbac.UserSpec{
-					Name: "alice",
-					Kind: rbac.UserOwner,
-				},
+				Name: "alice",
+				Kind: rbac.UserOwner,
 			}},
 		},
 	}

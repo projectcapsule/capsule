@@ -35,6 +35,9 @@ design and follow the conventions of the package you are changing.
   compilation, redundant reads, and full-list filtering when these facilities apply.
 - A change is not fully validated until its required checks pass. Report missing
   coverage, unavailable environments, and unrun checks explicitly.
+- **Every change requires a self-review of scalability, performance, and security.**
+  Explain the impact in each area, address findings and feedback, and repeat the
+  review and relevant validation until the completion criteria below are met.
 
 ## Primary design direction: namespace profiling through rules
 
@@ -340,7 +343,7 @@ using a fake client, or running against an old controller image is not an e2e pa
   includes the intended new tests and affected regressions; zero selected tests
   is not a successful validation. Avoid broad labels that unnecessarily select
   unrelated components.
-- The full e2e suite runs in GitHub Actions. Do not run an unfiltered full suite
+- When the e2e workflow is triggered by a matching pull-request path, the full e2e suite runs in GitHub Actions. Do not run an unfiltered full suite
   locally as a completion step or broaden a local run merely for extra confidence.
   A passing scoped run satisfies local e2e execution requirements; report GitHub
   full-suite results separately, including when they are pending or unavailable.
@@ -391,6 +394,7 @@ for missing-tenant rejection, keep another valid tenant present.
 
 Test implementation requirements:
 
+
 - Reuse helpers from `e2e/suite_test.go` and `e2e/utils_test.go`, such as
   `ownerClient`, `impersonationClient`, `NewNamespace`, `TenantReady`, and
   `TenantNamespaceReady`, plus existing cleanup helpers.
@@ -401,6 +405,16 @@ Test implementation requirements:
 - Wait for tenant, namespace, ruleset, and policy readiness before testing a
   decision. Use `Eventually`/`Consistently` and existing timeout/poll constants;
   do not add arbitrary sleeps to hide races.
+- Perform e2e updates and status mutations inside `Eventually` with the existing
+  timeout/poll constants. Fetch the latest object at the start of **every attempt**,
+  then apply the intended mutation and issue `Update` or construct the patch from
+  that fresh object (including its optimistic-lock base). A readiness check or a
+  fetch outside the retry closure does not protect the subsequent write from a
+  controller race. Retry conflicts with a new fetch, never the stale payload.
+  For negative cases, require the intended admission denial and re-read persisted
+  state; a `409 Conflict` is not a successful rejection. Fail immediately if an
+  unauthorized write succeeds so a later denial cannot hide it. Keep deliberate
+  stale-version/conflict tests explicit exceptions to this pattern.
 - Negative assertions must identify the expected denial/reason. A timeout,
   transport error, unrelated RBAC rejection, or malformed fixture is not evidence
   that the intended Capsule rule works. Re-read state after rejected mutations.
@@ -484,6 +498,48 @@ environment supplements unit benchmarks and functional e2e tests; seeding a work
 alone is not performance evidence. Record the workload, controller version, resource
 usage, request latency/throughput, and errors for any reported comparison.
 
+
+## Mandatory self-review and iteration
+
+Every change, including documentation, configuration, tests, and generated changes,
+must receive a self-review before completion. Review the final diff and affected
+callers against the requested behavior and this repository's requirements. Provide
+a concise assessment supported by code inspection, tests, or measurements for each
+area; if no impact is expected, explain why rather than omitting the area.
+
+- **Scalability:** Assess how work and retained state grow with tenants, namespaces,
+  rules, resources, and concurrent requests. Look for full-list scans, per-item API
+  calls, unbounded caches or queues, reconciliation fan-out, and contention. Explain
+  relevant bounds and behavior as unrelated tenants or resources are added.
+- **Performance:** Assess admission and reconciliation latency, CPU, allocations,
+  memory, API round trips, repeated compilation/serialization, and cache reuse.
+  Follow the benchmark and real-cluster evidence requirements above for affected
+  paths; distinguish measured results from expectations and identify regressions.
+- **Security:** Assess tenant and namespace isolation, authorization and ownership,
+  privilege boundaries, untrusted input, resource/reference scoping, cache freshness,
+  failure behavior, sensitive data exposure, and denial-of-service risks. Check
+  negative cases and ensure optimizations do not bypass enforcement.
+
+Use the following loop for the initial change and every subsequent revision:
+
+1. Review the current diff and available validation evidence. Identify concrete
+   findings, assumptions, missing coverage, and feedback from the user or reviewers.
+2. Revise the change to address actionable findings and feedback. Add or update
+   regression coverage and performance evidence where required. If feedback does
+   not warrant a change, explain the decision with evidence.
+3. Rerun checks affected by the revision and inspect the resulting diff. Keep local
+   e2e runs scoped to the affected components and complete planned suites before
+   analyzing failures, as required above.
+4. Repeat the self-review across all three areas until no actionable findings remain
+   unresolved, feedback has been addressed, and required checks pass. Review fixes
+   for new regressions; do not stop at identifying issues or rely on passing tests
+   alone as evidence that the review is complete.
+
+In the handoff or PR, summarize the scalability, performance, and security
+assessments, findings addressed, validation evidence, and remaining risks or
+limitations. Disclose blocked checks and unresolved findings explicitly; do not
+declare the change fully validated while required evidence is missing.
+
 ## Generated files, charts, and completion
 
 - Edit API source and Kubebuilder markers, then regenerate. Do not hand-edit
@@ -511,4 +567,5 @@ structure, reuses available code, includes unit and tenant-aware positive/negati
 e2e coverage, includes benchmarks for new or materially changed performance-sensitive
 execution paths, and preserves isolation/API contracts. Assess performance impact
 for every admission change and supply the required evidence. Explain any necessary
-departure from the rules API approach.
+departure from the rules API approach. Complete the self-review and iteration loop
+above, including the scalability, performance, and security assessments.

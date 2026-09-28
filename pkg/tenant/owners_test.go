@@ -28,10 +28,8 @@ func TestGetOwnersWithKinds_SingleOwner(t *testing.T) {
 		Status: capsulev1beta2.TenantStatus{
 			Owners: []rbac.CoreOwnerSpec{
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.UserOwner,
-						Name: "alice",
-					},
+					Kind: rbac.UserOwner,
+					Name: "alice",
 				},
 			},
 		},
@@ -50,16 +48,12 @@ func TestGetOwnersWithKinds_MultipleOwners_PreservesOrder(t *testing.T) {
 		Status: capsulev1beta2.TenantStatus{
 			Owners: []rbac.CoreOwnerSpec{
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.GroupOwner,
-						Name: "admins",
-					},
+					Kind: rbac.GroupOwner,
+					Name: "admins",
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.UserOwner,
-						Name: "bob",
-					},
+					Kind: rbac.UserOwner,
+					Name: "bob",
 				},
 			},
 		},
@@ -81,10 +75,8 @@ func TestGetOwnersWithKinds_EmptyNameStillIncluded(t *testing.T) {
 		Status: capsulev1beta2.TenantStatus{
 			Owners: []rbac.CoreOwnerSpec{
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.UserOwner,
-						Name: "",
-					},
+					Kind: rbac.UserOwner,
+					Name: "",
 				},
 			},
 		},
@@ -210,7 +202,6 @@ func TestValidateTenantOwner(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()

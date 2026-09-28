@@ -18,7 +18,6 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/users"
-	admissionv1 "k8s.io/api/admission/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,7 +49,7 @@ func TestResolveAdmissionUser(t *testing.T) {
 	ctx := context.Background()
 	cl := handlersFakeClient(t,
 		&capsulev1beta2.CapsuleConfiguration{
-			ObjectMeta: metav1.ObjectMeta{Name: "capsule"},
+			Name: "capsule",
 			Spec: capsulev1beta2.CapsuleConfigurationSpec{
 				Administrators:       rbac.UserListSpec{{Kind: rbac.UserOwner, Name: "admin"}},
 				IgnoreUserWithGroups: []string{"ignored"},
@@ -99,18 +98,17 @@ func TestAdmissionUserAndCapsuleAudienceAgreeForTenantServiceAccounts(t *testing
 	t.Setenv(configuration.EnvironmentControllerNamespace, "capsule-system")
 
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{Name: "tenant-a"},
+		Name: "tenant-a",
 		Status: capsulev1beta2.TenantStatus{
 			Namespaces: []string{"team-a"},
-			Owners: rbac.OwnerStatusListSpec{{UserSpec: rbac.UserSpec{
+			Owners: rbac.OwnerStatusListSpec{{
 				Kind: rbac.ServiceAccountOwner,
-				Name: users.ServiceAccountUsername("team-a", "promoted"),
-			}}},
+				Name: users.ServiceAccountUsername("team-a", "promoted")}},
 		},
 	}
 	cl := handlersFakeClient(t, tnt, &capsulev1beta2.CapsuleConfiguration{
-		ObjectMeta: metav1.ObjectMeta{Name: "capsule"},
-		Spec:       capsulev1beta2.CapsuleConfigurationSpec{IgnoreUserWithGroups: []string{"ignored"}},
+		Name: "capsule",
+		Spec: capsulev1beta2.CapsuleConfigurationSpec{IgnoreUserWithGroups: []string{"ignored"}},
 	})
 	cfg := configuration.NewCapsuleConfiguration(t.Context(), cl, cl, &rest.Config{}, "capsule")
 	body := &rules.NamespaceRuleBodyNamespace{
@@ -141,7 +139,7 @@ func TestAdmissionUserAndCapsuleAudienceAgreeForTenantServiceAccounts(t *testing
 			if tt.ignored {
 				info.Groups = append(info.Groups, "ignored")
 			}
-			req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{UserInfo: info}}
+			req := admission.Request{UserInfo: info}
 			user := handlers.ResolveAdmissionUser(t.Context(), cl, req, cfg)
 			if user.Type != tt.wantType {
 				t.Fatalf("AdmissionUser.Type = %q, want %q", user.Type, tt.wantType)
@@ -168,7 +166,7 @@ func TestInCapsuleGroupsWrapper(t *testing.T) {
 
 	ctx := context.Background()
 	cl := handlersFakeClient(t, &capsulev1beta2.CapsuleConfiguration{
-		ObjectMeta: metav1.ObjectMeta{Name: "capsule"},
+		Name: "capsule",
 		Status: capsulev1beta2.CapsuleConfigurationStatus{
 			Users: rbac.UserListSpec{{Kind: rbac.GroupOwner, Name: "capsule-users"}},
 		},
@@ -198,7 +196,7 @@ func TestIsNotPrivilegedWrapper(t *testing.T) {
 
 	ctx := context.Background()
 	cl := handlersFakeClient(t, &capsulev1beta2.CapsuleConfiguration{
-		ObjectMeta: metav1.ObjectMeta{Name: "capsule"},
+		Name: "capsule",
 		Spec: capsulev1beta2.CapsuleConfigurationSpec{
 			Administrators: rbac.UserListSpec{{Kind: rbac.UserOwner, Name: "admin"}},
 		},
@@ -229,16 +227,15 @@ func TestTypedTenantHandlerOnCreate(t *testing.T) {
 	ctx := context.Background()
 	scheme := handlersScheme(t)
 	cl := handlersFakeClientWithScheme(t, scheme,
-		&capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: "tenant-a", UID: types.UID("tenant-uid")}},
-		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+		&capsulev1beta2.Tenant{Name: "tenant-a", UID: types.UID("tenant-uid")},
+		&corev1.Namespace{
 			Name: "tenant-a-ns",
 			OwnerReferences: []metav1.OwnerReference{{
 				APIVersion: capsulev1beta2.GroupVersion.String(),
 				Kind:       "Tenant",
 				Name:       "tenant-a",
 				UID:        types.UID("tenant-uid"),
-			}},
-		}},
+			}}},
 	)
 	decoder := admission.NewDecoder(scheme)
 	spy := &typedTenantSpy{}
@@ -248,10 +245,8 @@ func TestTypedTenantHandlerOnCreate(t *testing.T) {
 	}
 
 	resp := handler.OnCreate(cl, cl, decoder, nil)(ctx, admission.Request{
-		AdmissionRequest: admissionv1.AdmissionRequest{
-			Namespace: "tenant-a-ns",
-			Object:    rawExtension(t, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "settings", Namespace: "tenant-a-ns"}}),
-		},
+		Namespace: "tenant-a-ns",
+		Object:    rawExtension(t, &corev1.ConfigMap{Name: "settings", Namespace: "tenant-a-ns"}),
 	})
 	if resp != nil {
 		t.Fatalf("OnCreate() = %#v, want nil", resp)
@@ -261,9 +256,7 @@ func TestTypedTenantHandlerOnCreate(t *testing.T) {
 	}
 
 	resp = handler.OnCreate(cl, cl, decoder, nil)(ctx, admission.Request{
-		AdmissionRequest: admissionv1.AdmissionRequest{
-			Object: rawExtension(t, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "settings"}}),
-		},
+		Object: rawExtension(t, &corev1.ConfigMap{Name: "settings"}),
 	})
 	if resp != nil {
 		t.Fatalf("OnCreate() without namespace = %#v, want nil", resp)
@@ -335,9 +328,8 @@ func (s *typedTenantSpy) OnDelete(client.Client, client.Reader, *corev1.ConfigMa
 }
 
 func requestFor(username string, groups []string) admission.Request {
-	return admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
-		UserInfo: authenticationv1.UserInfo{Username: username, Groups: groups},
-	}}
+	return admission.Request{
+		UserInfo: authenticationv1.UserInfo{Username: username, Groups: groups}}
 }
 
 func deniedResponse() *admission.Response {
@@ -357,10 +349,8 @@ func rawExtension(t *testing.T, obj client.Object) runtime.RawExtension {
 	return runtime.RawExtension{
 		Raw: data,
 		Object: &metav1.PartialObjectMetadata{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: schema.GroupVersion{Version: "v1"}.String(),
-				Kind:       "ConfigMap",
-			},
+			APIVersion: schema.GroupVersion{Version: "v1"}.String(),
+			Kind:       "ConfigMap",
 		},
 	}
 }

@@ -12,6 +12,8 @@ kubeadmConfigPatches:
     apiServer:
       extraArgs:
         authentication-config: /etc/kubernetes/pki/playground-authentication-config.yaml
+        feature-gates: MutatingAdmissionPolicy=true
+        runtime-config: admissionregistration.k8s.io/v1beta1=true
 nodes:
   - role: control-plane
     extraMounts:

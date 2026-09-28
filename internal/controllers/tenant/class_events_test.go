@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	storagev1 "k8s.io/api/storage/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -30,7 +29,7 @@ func TestTenantClassEventHandlerUpdatesClassStatusDirectly(t *testing.T) {
 	}
 
 	tenant := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{Name: "tenant"},
+		Name: "tenant",
 		Status: capsulev1beta2.TenantStatus{
 			TenantAvailableStatus: capsulev1beta2.TenantAvailableStatus{
 				Classes: capsulev1beta2.TenantAvailableClassesStatus{
@@ -39,7 +38,7 @@ func TestTenantClassEventHandlerUpdatesClassStatusDirectly(t *testing.T) {
 			},
 		},
 	}
-	storageClass := &storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: "fast"}}
+	storageClass := &storagev1.StorageClass{Name: "fast"}
 	cl := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithStatusSubresource(&capsulev1beta2.Tenant{}).

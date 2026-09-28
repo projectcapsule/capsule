@@ -18,7 +18,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
@@ -350,10 +349,8 @@ func (r *Manager) syncResourceQuota(ctx context.Context, log logr.Logger, tenant
 
 	for index, resQuota := range tenant.Spec.ResourceQuota.Items {
 		target := &corev1.ResourceQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("capsule-%s-%d", tenant.Name, index),
-				Namespace: namespace,
-			},
+			Name:      fmt.Sprintf("capsule-%s-%d", tenant.Name, index),
+			Namespace: namespace,
 		}
 
 		var result controllerutil.OperationResult

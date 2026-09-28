@@ -113,7 +113,6 @@ func TestIsTenantOwnerReference(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt // capture
 		t.Run(tt.name, func(t *testing.T) {
 			got := tenant.IsTenantOwnerReference(tt.or)
 			if got != tt.want {
@@ -140,9 +139,7 @@ func TestIsTenantOwnerReferenceForTenant(t *testing.T) {
 				Name:       "my-tenant",
 			},
 			tenant: &capsulev1beta2.Tenant{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-tenant",
-				},
+				Name: "my-tenant",
 			},
 			want: true,
 		},
@@ -154,9 +151,7 @@ func TestIsTenantOwnerReferenceForTenant(t *testing.T) {
 				Name:       "my-tenant",
 			},
 			tenant: &capsulev1beta2.Tenant{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-tenant-2",
-				},
+				Name: "my-tenant-2",
 			},
 			want: false,
 		},
@@ -168,9 +163,7 @@ func TestIsTenantOwnerReferenceForTenant(t *testing.T) {
 				Name:       "my-tenant",
 			},
 			tenant: &capsulev1beta2.Tenant{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-tenant",
-				},
+				Name: "my-tenant",
 			},
 			want: true, // we intentionally only check the group, not the version
 		},
@@ -182,9 +175,7 @@ func TestIsTenantOwnerReferenceForTenant(t *testing.T) {
 				Name:       "my-tenant",
 			},
 			tenant: &capsulev1beta2.Tenant{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-tenant-2",
-				},
+				Name: "my-tenant-2",
 			},
 			want: false, // we intentionally only check the group, not the version
 		},
@@ -196,9 +187,7 @@ func TestIsTenantOwnerReferenceForTenant(t *testing.T) {
 				Name:       "my-tenant",
 			},
 			tenant: &capsulev1beta2.Tenant{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-tenant",
-				},
+				Name: "my-tenant",
 			},
 			want: false,
 		},
@@ -210,9 +199,7 @@ func TestIsTenantOwnerReferenceForTenant(t *testing.T) {
 				Name:       "my-tenant",
 			},
 			tenant: &capsulev1beta2.Tenant{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-tenant",
-				},
+				Name: "my-tenant",
 			},
 			want: false,
 		},
@@ -224,9 +211,7 @@ func TestIsTenantOwnerReferenceForTenant(t *testing.T) {
 				Name:       "my-tenant",
 			},
 			tenant: &capsulev1beta2.Tenant{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-tenant",
-				},
+				Name: "my-tenant",
 			},
 			want: false,
 		},
@@ -248,9 +233,7 @@ func TestIsTenantOwnerReferenceForTenant(t *testing.T) {
 				Name:       "my-tenant",
 			},
 			tenant: &capsulev1beta2.Tenant{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-tenant",
-				},
+				Name: "my-tenant",
 			},
 			want: false,
 		},
@@ -262,9 +245,7 @@ func TestIsTenantOwnerReferenceForTenant(t *testing.T) {
 				Name:       "my-tenant",
 			},
 			tenant: &capsulev1beta2.Tenant{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-tenant",
-				},
+				Name: "my-tenant",
 			},
 			want: false,
 		},
@@ -276,9 +257,7 @@ func TestIsTenantOwnerReferenceForTenant(t *testing.T) {
 				Name:       "my-tenant",
 			},
 			tenant: &capsulev1beta2.Tenant{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-tenant",
-				},
+				Name: "my-tenant",
 			},
 			want: false,
 		},
@@ -290,9 +269,7 @@ func TestIsTenantOwnerReferenceForTenant(t *testing.T) {
 				Name:       "my-tenant",
 			},
 			tenant: &capsulev1beta2.Tenant{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-tenant",
-				},
+				Name: "my-tenant",
 			},
 			want: false,
 		},
@@ -304,16 +281,13 @@ func TestIsTenantOwnerReferenceForTenant(t *testing.T) {
 				Name:       "my-tenant",
 			},
 			tenant: &capsulev1beta2.Tenant{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-tenant",
-				},
+				Name: "my-tenant",
 			},
 			want: false,
 		},
 	}
 
 	for _, tt := range tests {
-		tt := tt // capture
 		t.Run(tt.name, func(t *testing.T) {
 			got := tenant.IsTenantOwnerReferenceForTenant(tt.or, tt.tenant)
 			if got != tt.want {

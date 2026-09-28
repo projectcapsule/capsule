@@ -6,6 +6,7 @@ package validation
 import (
 	"context"
 	"errors"
+	"maps"
 	"strings"
 	"testing"
 
@@ -235,9 +236,7 @@ func TestValidateGenericRules(t *testing.T) {
 		}
 
 		labels := map[string]string{}
-		for key, value := range skipRules[0].Labels {
-			labels[key] = value
-		}
+		maps.Copy(labels, skipRules[0].Labels)
 
 		if len(labels) == 0 {
 			t.Fatalf("expected default object skip rule to contain labels")
@@ -270,9 +269,7 @@ func TestValidateGenericRules(t *testing.T) {
 			obj,
 			coreGVK("ConfigMap"),
 			&capsulev1beta2.Tenant{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "tenant-a",
-				},
+				Name: "tenant-a",
 			},
 			testEventRecorder{},
 			[]*apirules.NamespaceRuleEnforceBody{
@@ -625,11 +622,9 @@ func TestGenericRulesOnCreate(t *testing.T) {
 		)
 
 		resp := fn(context.Background(), admission.Request{
-			AdmissionRequest: admissionv1.AdmissionRequest{
-				Kind: metav1.GroupVersionKind{
-					Version: "",
-					Kind:    "ConfigMap",
-				},
+			Kind: metav1.GroupVersionKind{
+				Version: "",
+				Kind:    "ConfigMap",
 			},
 		})
 		if resp == nil {
@@ -742,12 +737,10 @@ func TestGenericRulesOnUpdate(t *testing.T) {
 		)
 
 		resp := fn(context.Background(), admission.Request{
-			AdmissionRequest: admissionv1.AdmissionRequest{
-				Kind: metav1.GroupVersionKind{
-					Group:   "apps",
-					Version: "v1",
-					Kind:    "",
-				},
+			Kind: metav1.GroupVersionKind{
+				Group:   "apps",
+				Version: "v1",
+				Kind:    "",
 			},
 		})
 		if resp == nil {
@@ -883,12 +876,10 @@ func genericMetadataObject(
 	annotations map[string]string,
 ) genericObject {
 	return &metav1.PartialObjectMetadata{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        "object",
-			Namespace:   "tenant-a",
-			Labels:      labels,
-			Annotations: annotations,
-		},
+		Name:        "object",
+		Namespace:   "tenant-a",
+		Labels:      labels,
+		Annotations: annotations,
 	}
 }
 
@@ -906,7 +897,7 @@ func (testEventRecorder) Eventf(
 	string,
 	string,
 	string,
-	...interface{},
+	...any,
 ) {
 }
 
@@ -950,17 +941,13 @@ func (e *testLabeledEvent) WithRelated(obj k8sruntime.Object) events.LabeledEven
 }
 
 func (e *testLabeledEvent) WithLabels(labels map[string]string) events.LabeledEvent {
-	for key, value := range labels {
-		e.labels[key] = value
-	}
+	maps.Copy(e.labels, labels)
 
 	return e
 }
 
 func (e *testLabeledEvent) WithAnnotations(annotations map[string]string) events.LabeledEvent {
-	for key, value := range annotations {
-		e.annotations[key] = value
-	}
+	maps.Copy(e.annotations, annotations)
 
 	return e
 }
@@ -1027,21 +1014,17 @@ func admissionRequest(
 	}
 
 	return admission.Request{
-		AdmissionRequest: admissionv1.AdmissionRequest{
-			Kind: metav1.GroupVersionKind{
-				Group:   gv.Group,
-				Version: gv.Version,
-				Kind:    kind,
-			},
+		Kind: metav1.GroupVersionKind{
+			Group:   gv.Group,
+			Version: gv.Version,
+			Kind:    kind,
 		},
 	}
 }
 
 func testTenant() *capsulev1beta2.Tenant {
 	return &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenant-a",
-		},
+		Name: "tenant-a",
 	}
 }
 

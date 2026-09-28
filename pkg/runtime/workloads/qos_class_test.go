@@ -216,10 +216,8 @@ func TestGetPodQoSClass(t *testing.T) {
 					},
 					EphemeralContainers: []corev1.EphemeralContainer{
 						{
-							EphemeralContainerCommon: corev1.EphemeralContainerCommon{
-								Name:      "debug",
-								Resources: requestOnlyRequirements("100m", "128Mi"),
-							},
+							Name:      "debug",
+							Resources: requestOnlyRequirements("100m", "128Mi"),
 						},
 					},
 				},
@@ -235,10 +233,8 @@ func TestGetPodQoSClass(t *testing.T) {
 					},
 					EphemeralContainers: []corev1.EphemeralContainer{
 						{
-							EphemeralContainerCommon: corev1.EphemeralContainerCommon{
-								Name:      "debug",
-								Resources: guaranteedRequirements("100m", "128Mi"),
-							},
+							Name:      "debug",
+							Resources: guaranteedRequirements("100m", "128Mi"),
 						},
 					},
 				},

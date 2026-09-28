@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
@@ -32,11 +31,9 @@ func TestLabelPresentPredicate_Create(t *testing.T) {
 			name: "label present",
 			event: event.CreateEvent{
 				Object: &corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "test",
-						Labels: map[string]string{
-							"example.com/watch": "true",
-						},
+					Name: "test",
+					Labels: map[string]string{
+						"example.com/watch": "true",
 					},
 				},
 			},
@@ -46,10 +43,8 @@ func TestLabelPresentPredicate_Create(t *testing.T) {
 			name: "label missing",
 			event: event.CreateEvent{
 				Object: &corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:   "test",
-						Labels: map[string]string{"other": "value"},
-					},
+					Name:   "test",
+					Labels: map[string]string{"other": "value"},
 				},
 			},
 			want: false,
@@ -64,7 +59,6 @@ func TestLabelPresentPredicate_Create(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -95,11 +89,9 @@ func TestLabelPresentPredicate_Delete(t *testing.T) {
 			name: "label present",
 			event: event.DeleteEvent{
 				Object: &corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "test",
-						Labels: map[string]string{
-							"example.com/watch": "true",
-						},
+					Name: "test",
+					Labels: map[string]string{
+						"example.com/watch": "true",
 					},
 				},
 			},
@@ -109,10 +101,8 @@ func TestLabelPresentPredicate_Delete(t *testing.T) {
 			name: "label missing",
 			event: event.DeleteEvent{
 				Object: &corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:   "test",
-						Labels: map[string]string{"other": "value"},
-					},
+					Name:   "test",
+					Labels: map[string]string{"other": "value"},
 				},
 			},
 			want: false,
@@ -127,7 +117,6 @@ func TestLabelPresentPredicate_Delete(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -168,17 +157,13 @@ func TestLabelPresentPredicate_Update(t *testing.T) {
 			name: "label unchanged and present",
 			event: event.UpdateEvent{
 				ObjectOld: &corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: map[string]string{
-							"example.com/watch": "true",
-						},
+					Labels: map[string]string{
+						"example.com/watch": "true",
 					},
 				},
 				ObjectNew: &corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: map[string]string{
-							"example.com/watch": "true",
-						},
+					Labels: map[string]string{
+						"example.com/watch": "true",
 					},
 				},
 			},
@@ -188,17 +173,13 @@ func TestLabelPresentPredicate_Update(t *testing.T) {
 			name: "label changed value",
 			event: event.UpdateEvent{
 				ObjectOld: &corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: map[string]string{
-							"example.com/watch": "old",
-						},
+					Labels: map[string]string{
+						"example.com/watch": "old",
 					},
 				},
 				ObjectNew: &corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: map[string]string{
-							"example.com/watch": "new",
-						},
+					Labels: map[string]string{
+						"example.com/watch": "new",
 					},
 				},
 			},
@@ -208,17 +189,13 @@ func TestLabelPresentPredicate_Update(t *testing.T) {
 			name: "label added",
 			event: event.UpdateEvent{
 				ObjectOld: &corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: map[string]string{
-							"other": "value",
-						},
+					Labels: map[string]string{
+						"other": "value",
 					},
 				},
 				ObjectNew: &corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: map[string]string{
-							"example.com/watch": "true",
-						},
+					Labels: map[string]string{
+						"example.com/watch": "true",
 					},
 				},
 			},
@@ -228,17 +205,13 @@ func TestLabelPresentPredicate_Update(t *testing.T) {
 			name: "label removed",
 			event: event.UpdateEvent{
 				ObjectOld: &corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: map[string]string{
-							"example.com/watch": "true",
-						},
+					Labels: map[string]string{
+						"example.com/watch": "true",
 					},
 				},
 				ObjectNew: &corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: map[string]string{
-							"other": "value",
-						},
+					Labels: map[string]string{
+						"other": "value",
 					},
 				},
 			},
@@ -248,17 +221,13 @@ func TestLabelPresentPredicate_Update(t *testing.T) {
 			name: "label absent in both",
 			event: event.UpdateEvent{
 				ObjectOld: &corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: map[string]string{
-							"other": "one",
-						},
+					Labels: map[string]string{
+						"other": "one",
 					},
 				},
 				ObjectNew: &corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: map[string]string{
-							"other": "two",
-						},
+					Labels: map[string]string{
+						"other": "two",
 					},
 				},
 			},
@@ -275,7 +244,6 @@ func TestLabelPresentPredicate_Update(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 

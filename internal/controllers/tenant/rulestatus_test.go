@@ -29,8 +29,8 @@ func TestRuleStatusEventsPreserveDriftRepair(t *testing.T) {
 	if err := capsulev1beta2.AddToScheme(scheme); err != nil {
 		t.Fatal(err)
 	}
-	tnt := &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: "team", UID: "tenant-uid"}}
-	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "team-test"}}
+	tnt := &capsulev1beta2.Tenant{Name: "team", UID: "tenant-uid"}
+	ns := &corev1.Namespace{Name: "team-test"}
 	body := []*rules.NamespaceRuleBodyNamespace{{Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeDeny}}}
 	r := &Manager{ruleStatusWrites: lru.New(2)}
 	p := r.ruleStatusChangedPredicate()

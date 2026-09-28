@@ -393,7 +393,6 @@ func TestExpressionMatch_Matches(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -477,7 +476,6 @@ func TestExpressionMatch_MatchesWithExpressionMatcher_NilMatcherFallback(t *test
 	}
 
 	for _, tt := range tests {
-		tt := tt
 
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -514,9 +512,7 @@ func TestExpressionMatch_MatchesWithExpressionMatcher_UsesMatcherForRegex(t *tes
 	}
 
 	match := ExpressionMatch{
-		ExpressionRegex: ExpressionRegex{
-			Expression: "^team-.*",
-		},
+		Expression: "^team-.*",
 	}
 
 	got, err := match.MatchesWithExpressionMatcher(matcher, "team-a")
@@ -556,10 +552,8 @@ func TestExpressionMatch_MatchesWithExpressionMatcher_PassesNegateToMatcher(t *t
 	}
 
 	match := ExpressionMatch{
-		ExpressionRegex: ExpressionRegex{
-			Expression: "^trusted/.*",
-			Negate:     true,
-		},
+		Expression: "^trusted/.*",
+		Negate:     true,
 	}
 
 	got, err := match.MatchesWithExpressionMatcher(matcher, "docker.io/library/nginx:latest")
@@ -593,10 +587,8 @@ func TestExpressionMatch_MatchesWithExpressionMatcher_DoesNotUseMatcherWhenExact
 	}
 
 	match := ExpressionMatch{
-		Exact: []string{"default-scheduler"},
-		ExpressionRegex: ExpressionRegex{
-			Expression: "[",
-		},
+		Exact:      []string{"default-scheduler"},
+		Expression: "[",
 	}
 
 	got, err := match.MatchesWithExpressionMatcher(matcher, "default-scheduler")
@@ -624,10 +616,8 @@ func TestExpressionMatch_MatchesWithExpressionMatcher_UsesMatcherWhenExactDoesNo
 	}
 
 	match := ExpressionMatch{
-		Exact: []string{"default-scheduler"},
-		ExpressionRegex: ExpressionRegex{
-			Expression: "^team-.*",
-		},
+		Exact:      []string{"default-scheduler"},
+		Expression: "^team-.*",
 	}
 
 	got, err := match.MatchesWithExpressionMatcher(matcher, "team-a")
@@ -655,9 +645,7 @@ func TestExpressionMatch_MatchesWithExpressionMatcher_ReturnsMatcherError(t *tes
 	}
 
 	match := ExpressionMatch{
-		ExpressionRegex: ExpressionRegex{
-			Expression: "^team-.*",
-		},
+		Expression: "^team-.*",
 	}
 
 	got, err := match.MatchesWithExpressionMatcher(matcher, "team-a")
@@ -759,7 +747,6 @@ func TestExpressionMatch_MatchesAndMatchesWithExpressionMatcher_AgreeForNilMatch
 	}
 
 	for _, tt := range tests {
-		tt := tt
 
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -846,7 +833,6 @@ func TestContainsExact(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -903,7 +889,6 @@ func TestExpressionMatch_applyNegate(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()

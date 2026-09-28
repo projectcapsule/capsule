@@ -10,7 +10,6 @@ import (
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -22,11 +21,9 @@ var _ = Describe("Owners", Ordered, Label("config", "tenantowner", "tenant", "pe
 	originConfig := &capsulev1beta2.CapsuleConfiguration{}
 
 	tnt1 := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-owners-1",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-owners-1",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Permissions: capsulev1beta2.Permissions{
@@ -47,39 +44,25 @@ var _ = Describe("Owners", Ordered, Label("config", "tenantowner", "tenant", "pe
 			},
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-owners-1",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-owners-1",
+					Kind: "User",
 				},
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-owners-1-group",
-							Kind: "Group",
-						},
-					},
+					Name: "e2e-owners-1-group",
+					Kind: "Group",
 				},
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "system:serviceaccount:capsule-system:capsule",
-							Kind: "ServiceAccount",
-						},
-					},
+					Name: "system:serviceaccount:capsule-system:capsule",
+					Kind: "ServiceAccount",
 				},
 			},
 		},
 	}
 
 	tnt2 := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-owners-2",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-owners-2",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Permissions: capsulev1beta2.Permissions{
@@ -100,43 +83,29 @@ var _ = Describe("Owners", Ordered, Label("config", "tenantowner", "tenant", "pe
 			},
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-owners-2",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-owners-2",
+					Kind: "User",
 				},
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-owners-2-group",
-							Kind: "Group",
-						},
-					},
+					Name: "e2e-owners-2-group",
+					Kind: "Group",
 				},
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "system:serviceaccount:capsule-system:capsule",
-							Kind: "ServiceAccount",
-						},
-					},
+					Name: "system:serviceaccount:capsule-system:capsule",
+					Kind: "ServiceAccount",
 				},
 			},
 		},
 	}
 
 	ownersInfra := &capsulev1beta2.TenantOwner{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-owners-infra",
-			Labels: map[string]string{
-				"team":                   "infrastructure",
-				"e2e.suite.capsule/name": "owner_test",
-			},
+		Name: "e2e-owners-infra",
+		Labels: map[string]string{
+			"team":                   "infrastructure",
+			"e2e.suite.capsule/name": "owner_test",
 		},
 		Spec: capsulev1beta2.TenantOwnerSpec{
-			Aggregate: ptr.To(true),
+			Aggregate: new(true),
 			CoreOwnerSpec: rbac.CoreOwnerSpec{
 				UserSpec: rbac.UserSpec{
 					Kind: rbac.GroupOwner,
@@ -150,15 +119,13 @@ var _ = Describe("Owners", Ordered, Label("config", "tenantowner", "tenant", "pe
 	}
 
 	ownersDevops := &capsulev1beta2.TenantOwner{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-owners-devops",
-			Labels: map[string]string{
-				"team":                   "devops",
-				"e2e.suite.capsule/name": "owner_test",
-			},
+		Name: "e2e-owners-devops",
+		Labels: map[string]string{
+			"team":                   "devops",
+			"e2e.suite.capsule/name": "owner_test",
 		},
 		Spec: capsulev1beta2.TenantOwnerSpec{
-			Aggregate: ptr.To(true),
+			Aggregate: new(true),
 			CoreOwnerSpec: rbac.CoreOwnerSpec{
 				UserSpec: rbac.UserSpec{
 					Kind: rbac.GroupOwner,
@@ -172,16 +139,14 @@ var _ = Describe("Owners", Ordered, Label("config", "tenantowner", "tenant", "pe
 	}
 
 	ownersCommon := &capsulev1beta2.TenantOwner{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-owners-common",
-			Labels: map[string]string{
-				"team":                   "infrastructure",
-				"customer":               "x",
-				"e2e.suite.capsule/name": "owner_test",
-			},
+		Name: "e2e-owners-common",
+		Labels: map[string]string{
+			"team":                   "infrastructure",
+			"customer":               "x",
+			"e2e.suite.capsule/name": "owner_test",
 		},
 		Spec: capsulev1beta2.TenantOwnerSpec{
-			Aggregate: ptr.To(true),
+			Aggregate: new(true),
 			CoreOwnerSpec: rbac.CoreOwnerSpec{
 				UserSpec: rbac.UserSpec{
 					Kind: rbac.ServiceAccountOwner,
@@ -195,14 +160,12 @@ var _ = Describe("Owners", Ordered, Label("config", "tenantowner", "tenant", "pe
 	}
 
 	tnt1Owner := &capsulev1beta2.TenantOwner{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-owners-tnt",
-			Labels: map[string]string{
-				meta.NewTenantLabel: tnt1.GetName(),
-			},
+		Name: "e2e-owners-tnt",
+		Labels: map[string]string{
+			meta.NewTenantLabel: tnt1.GetName(),
 		},
 		Spec: capsulev1beta2.TenantOwnerSpec{
-			Aggregate: ptr.To(true),
+			Aggregate: new(true),
 			CoreOwnerSpec: rbac.CoreOwnerSpec{
 				UserSpec: rbac.UserSpec{
 					Kind: rbac.UserOwner,
@@ -216,16 +179,14 @@ var _ = Describe("Owners", Ordered, Label("config", "tenantowner", "tenant", "pe
 	}
 
 	userOwnersCommon := &capsulev1beta2.TenantOwner{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-owners-common-user",
-			Labels: map[string]string{
-				"team":                   "infrastructure",
-				"customer":               "x",
-				"e2e.suite.capsule/name": "owner_test",
-			},
+		Name: "e2e-owners-common-user",
+		Labels: map[string]string{
+			"team":                   "infrastructure",
+			"customer":               "x",
+			"e2e.suite.capsule/name": "owner_test",
 		},
 		Spec: capsulev1beta2.TenantOwnerSpec{
-			Aggregate: ptr.To(false),
+			Aggregate: new(false),
 			CoreOwnerSpec: rbac.CoreOwnerSpec{
 				UserSpec: rbac.UserSpec{
 					Kind: rbac.UserOwner,
@@ -300,45 +261,33 @@ var _ = Describe("Owners", Ordered, Label("config", "tenantowner", "tenant", "pe
 		By("checking owners (e2e-owners-1)", func() {
 			expectedOwners := rbac.OwnerStatusListSpec{
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.GroupOwner,
-						Name: "e2e-owners-1-group",
-					},
+					Kind:         rbac.GroupOwner,
+					Name:         "e2e-owners-1-group",
 					ClusterRoles: []string{"admin", "capsule-namespace-deleter"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.GroupOwner,
-						Name: "oidc:comp:devops",
-					},
+					Kind:         rbac.GroupOwner,
+					Name:         "oidc:comp:devops",
 					ClusterRoles: []string{"view"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.ServiceAccountOwner,
-						Name: "system:serviceaccount:capsule-system:capsule",
-					},
+					Kind:         rbac.ServiceAccountOwner,
+					Name:         "system:serviceaccount:capsule-system:capsule",
 					ClusterRoles: []string{"admin", "capsule-namespace-deleter", "edit"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.UserOwner,
-						Name: "e2e-owners-1",
-					},
+					Kind:         rbac.UserOwner,
+					Name:         "e2e-owners-1",
 					ClusterRoles: []string{"admin", "capsule-namespace-deleter"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: userOwnersCommon.Spec.Kind,
-						Name: userOwnersCommon.Spec.Name,
-					},
+					Kind:         userOwnersCommon.Spec.Kind,
+					Name:         userOwnersCommon.Spec.Name,
 					ClusterRoles: []string{"view"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: tnt1Owner.Spec.Kind,
-						Name: tnt1Owner.Spec.Name,
-					},
+					Kind:         tnt1Owner.Spec.Kind,
+					Name:         tnt1Owner.Spec.Name,
 					ClusterRoles: []string{"edit"},
 				},
 			}
@@ -391,39 +340,29 @@ var _ = Describe("Owners", Ordered, Label("config", "tenantowner", "tenant", "pe
 
 			expectedOwners := rbac.OwnerStatusListSpec{
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.GroupOwner,
-						Name: "e2e-owners-2-group",
-					},
+					Kind:         rbac.GroupOwner,
+					Name:         "e2e-owners-2-group",
 					ClusterRoles: []string{"admin", "capsule-namespace-deleter"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.GroupOwner,
-						Name: "oidc:comp:administrators",
-					},
+					Kind:         rbac.GroupOwner,
+					Name:         "oidc:comp:administrators",
 					ClusterRoles: []string{"admin"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.ServiceAccountOwner,
-						Name: "system:serviceaccount:capsule-system:capsule",
-					},
+					Kind:         rbac.ServiceAccountOwner,
+					Name:         "system:serviceaccount:capsule-system:capsule",
 					ClusterRoles: []string{"admin", "capsule-namespace-deleter", "edit"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.UserOwner,
-						Name: "e2e-owners-2",
-					},
+					Kind:         rbac.UserOwner,
+					Name:         "e2e-owners-2",
 					ClusterRoles: []string{"admin", "capsule-namespace-deleter"},
 				},
 
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: userOwnersCommon.Spec.Kind,
-						Name: userOwnersCommon.Spec.Name,
-					},
+					Kind:         userOwnersCommon.Spec.Kind,
+					Name:         userOwnersCommon.Spec.Name,
 					ClusterRoles: []string{"view"},
 				},
 			}
@@ -494,45 +433,33 @@ var _ = Describe("Owners", Ordered, Label("config", "tenantowner", "tenant", "pe
 
 			expectedOwners := rbac.OwnerStatusListSpec{
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.GroupOwner,
-						Name: "e2e-owners-1-group",
-					},
+					Kind:         rbac.GroupOwner,
+					Name:         "e2e-owners-1-group",
 					ClusterRoles: []string{"admin", "capsule-namespace-deleter"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.GroupOwner,
-						Name: "oidc:comp:devops",
-					},
+					Kind:         rbac.GroupOwner,
+					Name:         "oidc:comp:devops",
 					ClusterRoles: []string{"view"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.ServiceAccountOwner,
-						Name: "system:serviceaccount:capsule-system:capsule",
-					},
+					Kind:         rbac.ServiceAccountOwner,
+					Name:         "system:serviceaccount:capsule-system:capsule",
 					ClusterRoles: []string{"admin", "capsule-namespace-deleter"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.UserOwner,
-						Name: "e2e-owners-1",
-					},
+					Kind:         rbac.UserOwner,
+					Name:         "e2e-owners-1",
 					ClusterRoles: []string{"admin", "capsule-namespace-deleter"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: userOwnersCommon.Spec.Kind,
-						Name: userOwnersCommon.Spec.Name,
-					},
+					Kind:         userOwnersCommon.Spec.Kind,
+					Name:         userOwnersCommon.Spec.Name,
 					ClusterRoles: []string{"view"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: tnt1Owner.Spec.Kind,
-						Name: tnt1Owner.Spec.Name,
-					},
+					Kind:         tnt1Owner.Spec.Kind,
+					Name:         tnt1Owner.Spec.Name,
 					ClusterRoles: []string{"edit"},
 				},
 			}
@@ -547,38 +474,28 @@ var _ = Describe("Owners", Ordered, Label("config", "tenantowner", "tenant", "pe
 
 			expectedOwners := rbac.OwnerStatusListSpec{
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.GroupOwner,
-						Name: "e2e-owners-2-group",
-					},
+					Kind:         rbac.GroupOwner,
+					Name:         "e2e-owners-2-group",
 					ClusterRoles: []string{"admin", "capsule-namespace-deleter"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.GroupOwner,
-						Name: "oidc:comp:administrators",
-					},
+					Kind:         rbac.GroupOwner,
+					Name:         "oidc:comp:administrators",
 					ClusterRoles: []string{"admin"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.ServiceAccountOwner,
-						Name: "system:serviceaccount:capsule-system:capsule",
-					},
+					Kind:         rbac.ServiceAccountOwner,
+					Name:         "system:serviceaccount:capsule-system:capsule",
 					ClusterRoles: []string{"admin", "capsule-namespace-deleter"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.UserOwner,
-						Name: "e2e-owners-2",
-					},
+					Kind:         rbac.UserOwner,
+					Name:         "e2e-owners-2",
 					ClusterRoles: []string{"admin", "capsule-namespace-deleter"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: userOwnersCommon.Spec.Kind,
-						Name: userOwnersCommon.Spec.Name,
-					},
+					Kind:         userOwnersCommon.Spec.Kind,
+					Name:         userOwnersCommon.Spec.Name,
 					ClusterRoles: []string{"view"},
 				},
 			}
@@ -617,45 +534,33 @@ var _ = Describe("Owners", Ordered, Label("config", "tenantowner", "tenant", "pe
 
 			expectedOwners := rbac.OwnerStatusListSpec{
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.GroupOwner,
-						Name: "e2e-owners-1-group",
-					},
+					Kind:         rbac.GroupOwner,
+					Name:         "e2e-owners-1-group",
 					ClusterRoles: []string{"admin", "capsule-namespace-deleter"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.GroupOwner,
-						Name: "oidc:comp:devops",
-					},
+					Kind:         rbac.GroupOwner,
+					Name:         "oidc:comp:devops",
 					ClusterRoles: []string{"view"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.ServiceAccountOwner,
-						Name: "system:serviceaccount:capsule-system:capsule",
-					},
+					Kind:         rbac.ServiceAccountOwner,
+					Name:         "system:serviceaccount:capsule-system:capsule",
 					ClusterRoles: []string{"admin", "capsule-namespace-deleter"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.UserOwner,
-						Name: "e2e-owners-1",
-					},
+					Kind:         rbac.UserOwner,
+					Name:         "e2e-owners-1",
 					ClusterRoles: []string{"admin", "capsule-namespace-deleter"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: userOwnersCommon.Spec.Kind,
-						Name: userOwnersCommon.Spec.Name,
-					},
+					Kind:         userOwnersCommon.Spec.Kind,
+					Name:         userOwnersCommon.Spec.Name,
 					ClusterRoles: []string{"view"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: tnt1Owner.Spec.Kind,
-						Name: tnt1Owner.Spec.Name,
-					},
+					Kind:         tnt1Owner.Spec.Kind,
+					Name:         tnt1Owner.Spec.Name,
 					ClusterRoles: []string{"edit"},
 				},
 			}
@@ -670,31 +575,23 @@ var _ = Describe("Owners", Ordered, Label("config", "tenantowner", "tenant", "pe
 
 			expectedOwners := rbac.OwnerStatusListSpec{
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.GroupOwner,
-						Name: "e2e-owners-2-group",
-					},
+					Kind:         rbac.GroupOwner,
+					Name:         "e2e-owners-2-group",
 					ClusterRoles: []string{"admin", "capsule-namespace-deleter"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.ServiceAccountOwner,
-						Name: "system:serviceaccount:capsule-system:capsule",
-					},
+					Kind:         rbac.ServiceAccountOwner,
+					Name:         "system:serviceaccount:capsule-system:capsule",
 					ClusterRoles: []string{"admin", "capsule-namespace-deleter"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.UserOwner,
-						Name: "e2e-owners-2",
-					},
+					Kind:         rbac.UserOwner,
+					Name:         "e2e-owners-2",
 					ClusterRoles: []string{"admin", "capsule-namespace-deleter"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: userOwnersCommon.Spec.Kind,
-						Name: userOwnersCommon.Spec.Name,
-					},
+					Kind:         userOwnersCommon.Spec.Kind,
+					Name:         userOwnersCommon.Spec.Name,
 					ClusterRoles: []string{"view"},
 				},
 			}
@@ -732,38 +629,28 @@ var _ = Describe("Owners", Ordered, Label("config", "tenantowner", "tenant", "pe
 
 			expectedOwners := rbac.OwnerStatusListSpec{
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.GroupOwner,
-						Name: "e2e-owners-1-group",
-					},
+					Kind:         rbac.GroupOwner,
+					Name:         "e2e-owners-1-group",
 					ClusterRoles: []string{"admin", "capsule-namespace-deleter"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.ServiceAccountOwner,
-						Name: "system:serviceaccount:capsule-system:capsule",
-					},
+					Kind:         rbac.ServiceAccountOwner,
+					Name:         "system:serviceaccount:capsule-system:capsule",
 					ClusterRoles: []string{"admin", "capsule-namespace-deleter"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.UserOwner,
-						Name: "e2e-owners-1",
-					},
+					Kind:         rbac.UserOwner,
+					Name:         "e2e-owners-1",
 					ClusterRoles: []string{"admin", "capsule-namespace-deleter"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: userOwnersCommon.Spec.Kind,
-						Name: userOwnersCommon.Spec.Name,
-					},
+					Kind:         userOwnersCommon.Spec.Kind,
+					Name:         userOwnersCommon.Spec.Name,
 					ClusterRoles: []string{"view"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: tnt1Owner.Spec.Kind,
-						Name: tnt1Owner.Spec.Name,
-					},
+					Kind:         tnt1Owner.Spec.Kind,
+					Name:         tnt1Owner.Spec.Name,
 					ClusterRoles: []string{"edit"},
 				},
 			}
@@ -778,31 +665,23 @@ var _ = Describe("Owners", Ordered, Label("config", "tenantowner", "tenant", "pe
 
 			expectedOwners := rbac.OwnerStatusListSpec{
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.GroupOwner,
-						Name: "e2e-owners-2-group",
-					},
+					Kind:         rbac.GroupOwner,
+					Name:         "e2e-owners-2-group",
 					ClusterRoles: []string{"admin", "capsule-namespace-deleter"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.ServiceAccountOwner,
-						Name: "system:serviceaccount:capsule-system:capsule",
-					},
+					Kind:         rbac.ServiceAccountOwner,
+					Name:         "system:serviceaccount:capsule-system:capsule",
 					ClusterRoles: []string{"admin", "capsule-namespace-deleter"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.UserOwner,
-						Name: "e2e-owners-2",
-					},
+					Kind:         rbac.UserOwner,
+					Name:         "e2e-owners-2",
 					ClusterRoles: []string{"admin", "capsule-namespace-deleter"},
 				},
 				{
-					UserSpec: rbac.UserSpec{
-						Kind: userOwnersCommon.Spec.Kind,
-						Name: userOwnersCommon.Spec.Name,
-					},
+					Kind:         userOwnersCommon.Spec.Kind,
+					Name:         userOwnersCommon.Spec.Name,
 					ClusterRoles: []string{"view"},
 				},
 			}

@@ -19,7 +19,7 @@ func TestEnsureMetadataKeepsFinalizerForRuleGlobalResourceQuotas(t *testing.T) {
 	t.Parallel()
 
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{Name: "tenant-a"},
+		Name: "tenant-a",
 		Spec: capsulev1beta2.TenantSpec{Rules: []*rules.NamespaceRuleBodyTenant{{
 			NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
 				Quota: []rules.ResourceQuotaRule{{Name: "compute"}},

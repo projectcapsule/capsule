@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	"k8s.io/utils/ptr"
 )
 
 func TestCertificateSANsEmpty(t *testing.T) {
@@ -43,7 +42,6 @@ func TestCertificateSANsEmpty(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -170,7 +168,6 @@ func TestCertificateSANsAddServiceReference(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -201,42 +198,41 @@ func TestCertificateSANsAddURL(t *testing.T) {
 		},
 		{
 			name:   "blank URL is ignored",
-			rawURL: ptr.To("   "),
+			rawURL: new("   "),
 		},
 		{
 			name:             "adds dns hostname",
-			rawURL:           ptr.To("https://webhook.example.com/mutate"),
+			rawURL:           new("https://webhook.example.com/mutate"),
 			expectedDNSNames: []string{"webhook.example.com"},
 		},
 		{
 			name:             "adds dns hostname without port",
-			rawURL:           ptr.To("https://webhook.example.com:9443/mutate"),
+			rawURL:           new("https://webhook.example.com:9443/mutate"),
 			expectedDNSNames: []string{"webhook.example.com"},
 		},
 		{
 			name:            "adds ipv4 address",
-			rawURL:          ptr.To("https://10.96.0.10:9443/mutate"),
+			rawURL:          new("https://10.96.0.10:9443/mutate"),
 			expectedIPAddrs: []net.IP{net.ParseIP("10.96.0.10")},
 		},
 		{
 			name:            "adds ipv6 address",
-			rawURL:          ptr.To("https://[fd00::1]:9443/mutate"),
+			rawURL:          new("https://[fd00::1]:9443/mutate"),
 			expectedIPAddrs: []net.IP{net.ParseIP("fd00::1")},
 		},
 		{
 			name:    "rejects invalid URL",
-			rawURL:  ptr.To("://bad-url"),
+			rawURL:  new("://bad-url"),
 			wantErr: true,
 		},
 		{
 			name:    "rejects URL without host",
-			rawURL:  ptr.To("https:///mutate"),
+			rawURL:  new("https:///mutate"),
 			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
-		tt := tt
 
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -368,7 +364,6 @@ func TestCertificateSANsMatchesCertificate(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()

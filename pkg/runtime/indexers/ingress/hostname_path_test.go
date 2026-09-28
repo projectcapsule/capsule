@@ -30,9 +30,9 @@ func TestHostnamePathIndexers(t *testing.T) {
 			idx:  ingress.HostnamePath{Obj: &networkingv1.Ingress{}},
 			obj: &networkingv1.Ingress{Spec: networkingv1.IngressSpec{Rules: []networkingv1.IngressRule{{
 				Host: "example.com",
-				IngressRuleValue: networkingv1.IngressRuleValue{HTTP: &networkingv1.HTTPIngressRuleValue{Paths: []networkingv1.HTTPIngressPath{
+				HTTP: &networkingv1.HTTPIngressRuleValue{Paths: []networkingv1.HTTPIngressPath{
 					{Path: "/"}, {Path: "/api"},
-				}}},
+				}},
 			}}}},
 		},
 		{
@@ -40,9 +40,9 @@ func TestHostnamePathIndexers(t *testing.T) {
 			idx:  ingress.HostnamePath{Obj: &networkingv1beta1.Ingress{}},
 			obj: &networkingv1beta1.Ingress{Spec: networkingv1beta1.IngressSpec{Rules: []networkingv1beta1.IngressRule{{
 				Host: "example.com",
-				IngressRuleValue: networkingv1beta1.IngressRuleValue{HTTP: &networkingv1beta1.HTTPIngressRuleValue{Paths: []networkingv1beta1.HTTPIngressPath{
+				HTTP: &networkingv1beta1.HTTPIngressRuleValue{Paths: []networkingv1beta1.HTTPIngressPath{
 					{Path: "/"}, {Path: "/api"},
-				}}},
+				}},
 			}}}},
 		},
 		{
@@ -50,9 +50,9 @@ func TestHostnamePathIndexers(t *testing.T) {
 			idx:  ingress.HostnamePath{Obj: &extensionsv1beta1.Ingress{}},
 			obj: &extensionsv1beta1.Ingress{Spec: extensionsv1beta1.IngressSpec{Rules: []extensionsv1beta1.IngressRule{{
 				Host: "example.com",
-				IngressRuleValue: extensionsv1beta1.IngressRuleValue{HTTP: &extensionsv1beta1.HTTPIngressRuleValue{Paths: []extensionsv1beta1.HTTPIngressPath{
+				HTTP: &extensionsv1beta1.HTTPIngressRuleValue{Paths: []extensionsv1beta1.HTTPIngressPath{
 					{Path: "/"}, {Path: "/api"},
-				}}},
+				}},
 			}}}},
 		},
 	}

@@ -16,81 +16,57 @@ import (
 
 var _ = Describe("creating a Namespace without a Tenant selector when user owns multiple Tenants", Ordered, Label("config", "tenant", "assignment"), func() {
 	t1 := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-tenant-fail-one",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-tenant-fail-one",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-tenant-fail",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-tenant-fail",
+					Kind: "User",
 				},
 			},
 		},
 	}
 	t2 := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-tenant-fail-two",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-tenant-fail-two",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-tenant-fail",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-tenant-fail",
+					Kind: "User",
 				},
 			},
 		},
 	}
 	t3 := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-tenant-fail-three",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-tenant-fail-three",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-tenant-fail",
-							Kind: "Group",
-						},
-					},
+					Name: "e2e-tenant-fail",
+					Kind: "Group",
 				},
 			},
 		},
 	}
 	t4 := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-tenant-fail-four",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-tenant-fail-four",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-tenant-fail",
-							Kind: "Group",
-						},
-					},
+					Name: "e2e-tenant-fail",
+					Kind: "Group",
 				},
 			},
 		},

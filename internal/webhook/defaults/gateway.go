@@ -53,7 +53,7 @@ func mutateGatewayDefaults(
 	gatewayClass, err := utils.GetGatewayClassClassByObjectName(ctx, c, gatewayObj.Spec.GatewayClassName)
 
 	if gatewayClass == nil {
-		if gatewayObj.Spec.GatewayClassName == ("") {
+		if gatewayObj.Spec.GatewayClassName == "" {
 			mutate = true
 		} else {
 			return ad.Deny(caperrors.NewGatewayError(gatewayObj.Spec.GatewayClassName, err).Error())

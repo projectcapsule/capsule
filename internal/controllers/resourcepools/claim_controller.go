@@ -134,10 +134,8 @@ func (r *resourceClaimController) claimsWithoutPoolFromNamespaces(ctx context.Co
 		for _, claim := range claimList.Items {
 			if claim.Status.Pool.UID == "" {
 				requests = append(requests, reconcile.Request{
-					NamespacedName: types.NamespacedName{
-						Namespace: claim.Namespace,
-						Name:      claim.Name,
-					},
+					Namespace: claim.Namespace,
+					Name:      claim.Name,
 				})
 			}
 		}

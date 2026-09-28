@@ -880,8 +880,7 @@ func clusterIPServiceForLoadBalancerTest(name string) *corev1.Service {
 	}
 }
 
-func decisionMessageForLoadBalancerTest(evaluation interface {
-}) string {
+func decisionMessageForLoadBalancerTest(evaluation any) string {
 	e, ok := evaluation.(*ruleengine.Evaluation)
 	if !ok || e == nil {
 		return ""

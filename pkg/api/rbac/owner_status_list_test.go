@@ -6,6 +6,7 @@ package rbac_test
 import (
 	"math/rand"
 	"reflect"
+	"slices"
 	"sort"
 	"testing"
 	"time"
@@ -21,10 +22,8 @@ func slowIsOwner(o rbac.OwnerStatusListSpec, name string, groups []string) bool 
 				return true
 			}
 		case rbac.GroupOwner:
-			for _, group := range groups {
-				if group == owner.Name {
-					return true
-				}
+			if slices.Contains(groups, owner.Name) {
+				return true
 			}
 		}
 	}
@@ -55,10 +54,8 @@ func TestUpsert_AddsNewOwnerToEmptyList(t *testing.T) {
 	var list rbac.OwnerStatusListSpec
 
 	list.Upsert(rbac.CoreOwnerSpec{
-		UserSpec: rbac.UserSpec{
-			Kind: rbac.UserOwner,
-			Name: "alice",
-		},
+		Kind:         rbac.UserOwner,
+		Name:         "alice",
 		ClusterRoles: []string{"admin"},
 	})
 
@@ -77,19 +74,15 @@ func TestUpsert_AddsNewOwnerToEmptyList(t *testing.T) {
 func TestUpsert_MergesClusterRolesForExistingOwner(t *testing.T) {
 	list := rbac.OwnerStatusListSpec{
 		{
-			UserSpec: rbac.UserSpec{
-				Kind: rbac.UserOwner,
-				Name: "alice",
-			},
+			Kind:         rbac.UserOwner,
+			Name:         "alice",
 			ClusterRoles: []string{"admin", "capsule-namespace-deleter"},
 		},
 	}
 
 	list.Upsert(rbac.CoreOwnerSpec{
-		UserSpec: rbac.UserSpec{
-			Kind: rbac.UserOwner,
-			Name: "alice",
-		},
+		Kind:         rbac.UserOwner,
+		Name:         "alice",
 		ClusterRoles: []string{"extra-sad"},
 	})
 
@@ -111,19 +104,15 @@ func TestUpsert_MergesClusterRolesForExistingOwner(t *testing.T) {
 func TestUpsert_DeduplicatesClusterRoles(t *testing.T) {
 	list := rbac.OwnerStatusListSpec{
 		{
-			UserSpec: rbac.UserSpec{
-				Kind: rbac.UserOwner,
-				Name: "alice",
-			},
+			Kind:         rbac.UserOwner,
+			Name:         "alice",
 			ClusterRoles: []string{"admin", "viewer"},
 		},
 	}
 
 	list.Upsert(rbac.CoreOwnerSpec{
-		UserSpec: rbac.UserSpec{
-			Kind: rbac.UserOwner,
-			Name: "alice",
-		},
+		Kind:         rbac.UserOwner,
+		Name:         "alice",
 		ClusterRoles: []string{"viewer", "editor"},
 	})
 
@@ -142,27 +131,21 @@ func TestUpsert_KeepsListSortedAndMergesIntoExistingInUnsortedInitialSlice(t *te
 	// Start with an unsorted slice, as could come from rbac/server
 	list := rbac.OwnerStatusListSpec{
 		{
-			UserSpec: rbac.UserSpec{
-				Kind: rbac.UserOwner,
-				Name: "bob",
-			},
+			Kind:         rbac.UserOwner,
+			Name:         "bob",
 			ClusterRoles: []string{"bob-role"},
 		},
 		{
-			UserSpec: rbac.UserSpec{
-				Kind: rbac.UserOwner,
-				Name: "alice",
-			},
+			Kind:         rbac.UserOwner,
+			Name:         "alice",
 			ClusterRoles: []string{"admin"},
 		},
 	}
 
 	// Upsert another alice
 	list.Upsert(rbac.CoreOwnerSpec{
-		UserSpec: rbac.UserSpec{
-			Kind: rbac.UserOwner,
-			Name: "alice",
-		},
+		Kind:         rbac.UserOwner,
+		Name:         "alice",
 		ClusterRoles: []string{"extra"},
 	})
 
@@ -200,10 +183,10 @@ func TestUpsert_KeepsListSortedAndMergesIntoExistingInUnsortedInitialSlice(t *te
 
 func TestGetByKindAndNameOrdering(t *testing.T) {
 	o := rbac.OwnerStatusListSpec{
-		rbac.CoreOwnerSpec{UserSpec: rbac.UserSpec{Name: "b", Kind: rbac.ServiceAccountOwner}},
-		rbac.CoreOwnerSpec{UserSpec: rbac.UserSpec{Name: "z", Kind: rbac.UserOwner}},
-		rbac.CoreOwnerSpec{UserSpec: rbac.UserSpec{Name: "a", Kind: rbac.GroupOwner}},
-		rbac.CoreOwnerSpec{UserSpec: rbac.UserSpec{Name: "a", Kind: rbac.UserOwner}},
+		rbac.CoreOwnerSpec{Name: "b", Kind: rbac.ServiceAccountOwner},
+		rbac.CoreOwnerSpec{Name: "z", Kind: rbac.UserOwner},
+		rbac.CoreOwnerSpec{Name: "a", Kind: rbac.GroupOwner},
+		rbac.CoreOwnerSpec{Name: "a", Kind: rbac.UserOwner},
 	}
 
 	// Sort using production ordering
@@ -244,20 +227,18 @@ func TestFindOwner_Randomized(t *testing.T) {
 		numLookupsPerList = 80
 	)
 
-	for listIdx := 0; listIdx < numLists; listIdx++ {
+	for listIdx := range numLists {
 		var list rbac.OwnerStatusListSpec
 		n := rnd.Intn(maxLength)
-		for i := 0; i < n; i++ {
+		for range n {
 			k := ownerKinds[rnd.Intn(len(ownerKinds))]
 			list = append(list, rbac.CoreOwnerSpec{
-				UserSpec: rbac.UserSpec{
-					Name: randomName(rnd, 3+rnd.Intn(4)), // length 3–6
-					Kind: k,
-				},
+				Name: randomName(rnd, 3+rnd.Intn(4)), // length 3–6
+				Kind: k,
 			})
 		}
 
-		for lookupIdx := 0; lookupIdx < numLookupsPerList; lookupIdx++ {
+		for lookupIdx := range numLookupsPerList {
 			var qName string
 			var qKind rbac.OwnerKind
 
@@ -290,9 +271,9 @@ func TestFindOwner_Randomized(t *testing.T) {
 
 func TestFindOwnerDoesNotMutateList(t *testing.T) {
 	list := rbac.OwnerStatusListSpec{
-		{UserSpec: rbac.UserSpec{Kind: rbac.UserOwner, Name: "zoe"}},
-		{UserSpec: rbac.UserSpec{Kind: rbac.GroupOwner, Name: "developers"}},
-		{UserSpec: rbac.UserSpec{Kind: rbac.UserOwner, Name: "alice"}},
+		{Kind: rbac.UserOwner, Name: "zoe"},
+		{Kind: rbac.GroupOwner, Name: "developers"},
+		{Kind: rbac.UserOwner, Name: "alice"},
 	}
 	want := list.DeepCopy()
 
@@ -320,21 +301,19 @@ func TestIsOwner_RandomizedMatchesSlowImplementation(t *testing.T) {
 		maxGroupsPerUser  = 10
 	)
 
-	for listIdx := 0; listIdx < numLists; listIdx++ {
+	for listIdx := range numLists {
 		// Generate a random owner list (possibly with duplicates).
 		var owners rbac.OwnerStatusListSpec
 		nOwners := rnd.Intn(maxOwnersPerList)
-		for i := 0; i < nOwners; i++ {
+		for range nOwners {
 			kind := ownerKinds[rnd.Intn(len(ownerKinds))]
 			owners = append(owners, rbac.CoreOwnerSpec{
-				UserSpec: rbac.UserSpec{
-					Name: randomName(rnd, 3+rnd.Intn(4)), // length 3–6
-					Kind: kind,
-				},
+				Name: randomName(rnd, 3+rnd.Intn(4)), // length 3–6
+				Kind: kind,
 			})
 		}
 
-		for lookupIdx := 0; lookupIdx < numLookupsPerList; lookupIdx++ {
+		for lookupIdx := range numLookupsPerList {
 			// Generate a random userName and groups,
 			// sometimes biased to hit existing owners/groups.
 			var userName string
@@ -350,7 +329,7 @@ func TestIsOwner_RandomizedMatchesSlowImplementation(t *testing.T) {
 
 			// Random groups, sometimes including owner names
 			nGroups := rnd.Intn(maxGroupsPerUser)
-			for i := 0; i < nGroups; i++ {
+			for range nGroups {
 				if len(owners) > 0 && rnd.Float64() < 0.5 {
 					pick := owners[rnd.Intn(len(owners))]
 					groups = append(groups, pick.Name)

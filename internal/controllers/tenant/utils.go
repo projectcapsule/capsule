@@ -148,10 +148,8 @@ func (r *Manager) runGarbageCollection(
 		}
 
 		err := r.DeleteAllOf(ctx, deleteTarget, &client.DeleteAllOfOptions{
-			ListOptions: client.ListOptions{
-				LabelSelector: selector,
-				Namespace:     namespace,
-			},
+			LabelSelector: selector,
+			Namespace:     namespace,
 		})
 		if apierrors.IsNotFound(err) || apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
 			return nil
@@ -211,10 +209,8 @@ func (r *Manager) pruningResources(ctx context.Context, ns string, keys []string
 
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		err := r.DeleteAllOf(ctx, obj, &client.DeleteAllOfOptions{
-			ListOptions: client.ListOptions{
-				LabelSelector: selector,
-				Namespace:     ns,
-			},
+			LabelSelector: selector,
+			Namespace:     ns,
 			DeleteOptions: client.DeleteOptions{},
 		})
 		if err != nil {

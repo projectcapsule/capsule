@@ -42,24 +42,18 @@ func testTenant() *capsulev1beta2.Tenant {
 		Status: capsulev1beta2.TenantStatus{
 			Owners: capsulerbac.OwnerStatusListSpec{
 				{
-					UserSpec: capsulerbac.UserSpec{
-						Kind: capsulerbac.UserOwner,
-						Name: "user1",
-					},
+					Kind:         capsulerbac.UserOwner,
+					Name:         "user1",
 					ClusterRoles: []string{"cluster-admin", "read-only"},
 				},
 				{
-					UserSpec: capsulerbac.UserSpec{
-						Kind: capsulerbac.GroupOwner,
-						Name: "group1",
-					},
+					Kind:         capsulerbac.GroupOwner,
+					Name:         "group1",
 					ClusterRoles: []string{"edit"},
 				},
 				{
-					UserSpec: capsulerbac.UserSpec{
-						Kind: capsulerbac.ServiceAccountOwner,
-						Name: "service",
-					},
+					Kind:         capsulerbac.ServiceAccountOwner,
+					Name:         "service",
 					ClusterRoles: []string{"read-only"},
 				},
 			},
@@ -153,38 +147,28 @@ func TestGetClusterRolesBySubjectSorted(t *testing.T) {
 		Status: capsulev1beta2.TenantStatus{
 			Owners: capsulerbac.OwnerStatusListSpec{
 				{
-					UserSpec: capsulerbac.UserSpec{
-						Kind: capsulerbac.UserOwner,
-						Name: "user1",
-					},
+					Kind:         capsulerbac.UserOwner,
+					Name:         "user1",
 					ClusterRoles: []string{"cluster-admin", "read-only"},
 				},
 				{
-					UserSpec: capsulerbac.UserSpec{
-						Kind: capsulerbac.UserOwner,
-						Name: "user2",
-					},
+					Kind:         capsulerbac.UserOwner,
+					Name:         "user2",
 					ClusterRoles: []string{"developer"},
 				},
 				{
-					UserSpec: capsulerbac.UserSpec{
-						Kind: capsulerbac.UserOwner,
-						Name: "user3",
-					},
+					Kind:         capsulerbac.UserOwner,
+					Name:         "user3",
 					ClusterRoles: []string{"cluster-admin"},
 				},
 				{
-					UserSpec: capsulerbac.UserSpec{
-						Kind: capsulerbac.GroupOwner,
-						Name: "group1",
-					},
+					Kind:         capsulerbac.GroupOwner,
+					Name:         "group1",
 					ClusterRoles: []string{"edit", "developer", "cluster-admin"},
 				},
 				{
-					UserSpec: capsulerbac.UserSpec{
-						Kind: capsulerbac.ServiceAccountOwner,
-						Name: "service",
-					},
+					Kind:         capsulerbac.ServiceAccountOwner,
+					Name:         "service",
 					ClusterRoles: []string{"read-only"},
 				},
 			},

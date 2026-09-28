@@ -9,7 +9,6 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -30,7 +29,7 @@ func TestActiveTenantReconcilePrunesMissingNamespacesFromStatus(t *testing.T) {
 	}
 
 	tenant := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{Name: "tenant-a"},
+		Name: "tenant-a",
 		Status: capsulev1beta2.TenantStatus{
 			Namespaces: []string{"gone"},
 			Spaces: []*capsulev1beta2.TenantStatusNamespaceItem{{

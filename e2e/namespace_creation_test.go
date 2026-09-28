@@ -17,37 +17,23 @@ import (
 
 var _ = Describe("creating a Namespaces as different type of Tenant owners", Ordered, Label("namespace", "permissions", "owners"), func() {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-ns-creation",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-ns-creation",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-ns-creation-1",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-ns-creation-1",
+					Kind: "User",
 				},
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-ns-creation-2",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-ns-creation-2",
+					Kind: "User",
 				},
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "system:serviceaccount:new-namespace-sa:default",
-							Kind: "ServiceAccount",
-						},
-					},
+					Name: "system:serviceaccount:new-namespace-sa:default",
+					Kind: "ServiceAccount",
 				},
 			},
 		},

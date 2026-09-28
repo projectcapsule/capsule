@@ -13,7 +13,6 @@ import (
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -21,7 +20,6 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/processor"
-	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/sanitize"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
 	"github.com/projectcapsule/capsule/pkg/tenant"
@@ -47,20 +45,17 @@ func TestCollectorOnlyLoadsContextForGenerators(t *testing.T) {
 			mapper.Add(schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"}, k8smeta.RESTScopeNamespace)
 			c := fake.NewClientBuilder().Build()
 			collector := NewCollector(c, mapper)
-			tnt := &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: "tenant"}}
-			ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "target"}}
+			tnt := &capsulev1beta2.Tenant{Name: "tenant"}
+			ns := &corev1.Namespace{Name: "target"}
 			spec := capsulev1beta2.ResourceSpec{
 				Context: &tpl.TemplateContext{Resources: []*tpl.TemplateResourceReference{{
-					ResourceReference: tpl.ResourceReference{
-						VersionKind: apiruntime.VersionKind{APIVersion: "v1", Kind: "ConfigMap"},
-						Name:        "missing-context",
-					},
+					APIVersion: "v1", Kind: "ConfigMap",
+					Name: "missing-context",
 				}}},
 			}
 			if test.raw {
-				spec.RawItems = []capsulev1beta2.RawExtension{{RawExtension: runtime.RawExtension{
-					Raw: []byte(`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"{{tenant.name}}-{{namespace}}"}}`),
-				}}}
+				spec.RawItems = []capsulev1beta2.RawExtension{{
+					Raw: []byte(`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"{{tenant.name}}-{{namespace}}"}}`)}}
 			}
 			if test.generator {
 				spec.Generators = []capsulev1beta2.TemplateItemSpec{{
@@ -173,12 +168,12 @@ func TestCollectorReplicasAreSanitizedAndIndependent(t *testing.T) {
 		t.Fatal(err)
 	}
 	collector := NewCollector(c, mapper)
-	tnt := capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: "tenant"}}
+	tnt := capsulev1beta2.Tenant{Name: "tenant"}
 	ref := tpl.ResourceReference{
-		VersionKind: apiruntime.VersionKind{APIVersion: "v1", Kind: "ConfigMap"},
-		Name:        source.GetName(),
-		Namespace:   source.GetNamespace(),
-		Selector:    &metav1.LabelSelector{MatchLabels: map[string]string{"selected": "true"}},
+		APIVersion: "v1", Kind: "ConfigMap",
+		Name:      source.GetName(),
+		Namespace: source.GetNamespace(),
+		Selector:  &metav1.LabelSelector{MatchLabels: map[string]string{"selected": "true"}},
 	}
 	spec := capsulev1beta2.ResourceSpec{
 		NamespacedItems: []tpl.ResourceReference{ref, ref},
@@ -204,7 +199,7 @@ func TestCollectorReplicasAreSanitizedAndIndependent(t *testing.T) {
 	opts.AllowCrossNamespaceSelection = false
 	for _, name := range []string{"source", "target-a", "target-b"} {
 		if err := collector.CollectForNamespace(t.Context(), c, opts, tnt, "0", spec, sources,
-			&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}); err != nil {
+			&corev1.Namespace{Name: name}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -350,7 +345,7 @@ func TestCollectorAddToAccumulationClusterScopedObjects(t *testing.T) {
 			AllowClusterScopedObjects: true,
 		}
 
-		target := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "tenant-a"}}
+		target := &corev1.Namespace{Name: "tenant-a"}
 
 		if err := collector.AddToAccumulation(nil, target, opts, capsuleResourceSpec(), obj, "test", true); err != nil {
 			t.Fatalf("expected no error, got %v", err)
@@ -369,10 +364,8 @@ func TestCollectorAddsReplicationMetadataToGeneratorContext(t *testing.T) {
 	mapper.Add(schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"}, k8smeta.RESTScopeNamespace)
 
 	replicationContext, err := newReplicationContext(&capsulev1beta2.TenantResource{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "tenant-distribution",
-			Namespace: "solar-system",
-		},
+		Name:      "tenant-distribution",
+		Namespace: "solar-system",
 	})
 	if err != nil {
 		t.Fatalf("newReplicationContext() error = %v", err)
@@ -448,7 +441,7 @@ metadata:
 
 	spec := capsulev1beta2.ResourceSpec{
 		RawItems: []capsulev1beta2.RawExtension{{
-			RawExtension: runtime.RawExtension{Raw: []byte(`{
+			Raw: []byte(`{
   "apiVersion": "v1",
   "kind": "ConfigMap",
   "metadata": {
@@ -462,7 +455,7 @@ metadata:
       "blockOwnerDeletion": true
     }]
   }
-}`)},
+}`),
 		}},
 		Generators: []capsulev1beta2.TemplateItemSpec{{
 			MissingKey: "error",

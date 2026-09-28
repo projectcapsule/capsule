@@ -26,6 +26,10 @@ type tenantCachingReader struct {
 // request while preserving the API reader's fresh snapshot for all other
 // objects and list operations.
 func NewTenantCachingReader(reader client.Reader) client.Reader {
+	if reader == nil {
+		return nil
+	}
+
 	return &tenantCachingReader{
 		Reader:  reader,
 		results: make(map[client.ObjectKey]tenantReadResult),

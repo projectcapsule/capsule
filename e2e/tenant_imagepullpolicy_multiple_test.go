@@ -20,21 +20,15 @@ import (
 
 var _ = Describe("enforcing some defined ImagePullPolicy", Ordered, Label("tenant", "pods", "images", "policy"), func() {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-image-pull-policies",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-image-pull-policies",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-image-pull-policies",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-image-pull-policies",
+					Kind: "User",
 				},
 			},
 			ImagePullPolicies: []rules.ImagePullPolicySpec{"Always", "IfNotPresent"},
@@ -64,10 +58,8 @@ var _ = Describe("enforcing some defined ImagePullPolicy", Ordered, Label("tenan
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		role := &rbacv1.Role{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "ephemeralcontainers-editor",
-				Namespace: ns.GetName(),
-			},
+			Name:      "ephemeralcontainers-editor",
+			Namespace: ns.GetName(),
 			Rules: []rbacv1.PolicyRule{
 				{
 					APIGroups: []string{""}, // core API group
@@ -78,10 +70,8 @@ var _ = Describe("enforcing some defined ImagePullPolicy", Ordered, Label("tenan
 		}
 
 		rb := &rbacv1.RoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "ephemeralcontainers-editor-binding",
-				Namespace: ns.GetName(),
-			},
+			Name:      "ephemeralcontainers-editor-binding",
+			Namespace: ns.GetName(),
 			Subjects: []rbacv1.Subject{
 				{
 					Kind: rbacv1.UserKind,
@@ -101,9 +91,7 @@ var _ = Describe("enforcing some defined ImagePullPolicy", Ordered, Label("tenan
 
 		By("allowing Always", func() {
 			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "pull-always",
-				},
+				Name: "pull-always",
 				Spec: corev1.PodSpec{
 					SecurityContext: nobodyPodSecurityContext(),
 					Containers: []corev1.Container{
@@ -126,12 +114,10 @@ var _ = Describe("enforcing some defined ImagePullPolicy", Ordered, Label("tenan
 			Eventually(func() error {
 				pod.Spec.EphemeralContainers = []corev1.EphemeralContainer{
 					{
-						EphemeralContainerCommon: corev1.EphemeralContainerCommon{
-							Name:            "dbg",
-							Image:           "registry.k8s.io/pause:3.10",
-							ImagePullPolicy: corev1.PullAlways,
-							SecurityContext: restrictedContainerSecurityContext(),
-						},
+						Name:            "dbg",
+						Image:           "registry.k8s.io/pause:3.10",
+						ImagePullPolicy: corev1.PullAlways,
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				}
 
@@ -146,9 +132,7 @@ var _ = Describe("enforcing some defined ImagePullPolicy", Ordered, Label("tenan
 
 		By("allowing IfNotPresent", func() {
 			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "if-not-present",
-				},
+				Name: "if-not-present",
 				Spec: corev1.PodSpec{
 					SecurityContext: nobodyPodSecurityContext(),
 					Containers: []corev1.Container{
@@ -171,12 +155,10 @@ var _ = Describe("enforcing some defined ImagePullPolicy", Ordered, Label("tenan
 			Eventually(func() error {
 				pod.Spec.EphemeralContainers = []corev1.EphemeralContainer{
 					{
-						EphemeralContainerCommon: corev1.EphemeralContainerCommon{
-							Name:            "dbg",
-							Image:           "registry.k8s.io/pause:3.10",
-							ImagePullPolicy: corev1.PullIfNotPresent,
-							SecurityContext: restrictedContainerSecurityContext(),
-						},
+						Name:            "dbg",
+						Image:           "registry.k8s.io/pause:3.10",
+						ImagePullPolicy: corev1.PullIfNotPresent,
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				}
 
@@ -190,9 +172,7 @@ var _ = Describe("enforcing some defined ImagePullPolicy", Ordered, Label("tenan
 
 		By("blocking Never", func() {
 			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "never",
-				},
+				Name: "never",
 				Spec: corev1.PodSpec{
 					SecurityContext: nobodyPodSecurityContext(),
 					Containers: []corev1.Container{
@@ -215,12 +195,10 @@ var _ = Describe("enforcing some defined ImagePullPolicy", Ordered, Label("tenan
 			Eventually(func() error {
 				pod.Spec.EphemeralContainers = []corev1.EphemeralContainer{
 					{
-						EphemeralContainerCommon: corev1.EphemeralContainerCommon{
-							Name:            "dbg",
-							Image:           "registry.k8s.io/pause:3.10",
-							ImagePullPolicy: corev1.PullNever,
-							SecurityContext: restrictedContainerSecurityContext(),
-						},
+						Name:            "dbg",
+						Image:           "registry.k8s.io/pause:3.10",
+						ImagePullPolicy: corev1.PullNever,
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				}
 

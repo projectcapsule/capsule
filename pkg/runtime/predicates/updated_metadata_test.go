@@ -8,7 +8,6 @@ import (
 
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
@@ -34,12 +33,10 @@ func TestUpdatedMetadataPredicate_Update(t *testing.T) {
 	// Helper to build pods with labels/annotations
 	pod := func(labels, ann map[string]string) *corev1.Pod {
 		return &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:   "default",
-				Name:        "p",
-				Labels:      labels,
-				Annotations: ann,
-			},
+			Namespace:   "default",
+			Name:        "p",
+			Labels:      labels,
+			Annotations: ann,
 		}
 	}
 

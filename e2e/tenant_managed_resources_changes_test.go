@@ -27,21 +27,15 @@ import (
 
 var _ = Describe("changing Tenant managed Kubernetes resources", Ordered, Label("tenant", "managed"), func() {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-tenant-managed-changes",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-tenant-managed-changes",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-tenant-managed-changes",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-tenant-managed-changes",
+					Kind: "User",
 				},
 			},
 			LimitRanges: api.LimitRangesSpec{Items: []corev1.LimitRangeSpec{
@@ -216,7 +210,7 @@ var _ = Describe("changing Tenant managed Kubernetes resources", Ordered, Label(
 					cs := impersonationClient(tnt.Spec.Owners[0].UserSpec.Name, withDefaultGroups(nil))
 
 					By(fmt.Sprintf("owner cannot delete limitrange"), func() {
-						obj := &corev1.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: n, Namespace: ns}}
+						obj := &corev1.LimitRange{Name: n, Namespace: ns}
 						err := cs.Delete(context.TODO(), obj)
 						Expect(err).To(HaveOccurred())
 					})
@@ -257,7 +251,7 @@ var _ = Describe("changing Tenant managed Kubernetes resources", Ordered, Label(
 					cs := impersonationClient(tnt.Spec.Owners[0].UserSpec.Name, withDefaultGroups(nil))
 
 					By(fmt.Sprintf("owner cannot delete netpol"), func() {
-						obj := &networkingv1.NetworkPolicy{ObjectMeta: metav1.ObjectMeta{Name: n, Namespace: ns}}
+						obj := &networkingv1.NetworkPolicy{Name: n, Namespace: ns}
 						err := cs.Delete(context.TODO(), obj)
 						Expect(err).To(HaveOccurred())
 					})
@@ -302,7 +296,7 @@ var _ = Describe("changing Tenant managed Kubernetes resources", Ordered, Label(
 					cs := impersonationClient(tnt.Spec.Owners[0].UserSpec.Name, withDefaultGroups(nil))
 
 					By(fmt.Sprintf("owner cannot delete resourcequota"), func() {
-						obj := &corev1.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: n, Namespace: ns}}
+						obj := &corev1.ResourceQuota{Name: n, Namespace: ns}
 						err := cs.Delete(context.TODO(), obj)
 						Expect(err).To(HaveOccurred())
 					})
@@ -347,10 +341,8 @@ func ensureTamperRoleBinding(
 	resource string,
 ) {
 	role := &rbacv1.Role{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      roleName,
-			Namespace: ns,
-		},
+		Name:      roleName,
+		Namespace: ns,
 		Rules: []rbacv1.PolicyRule{
 			{
 				APIGroups: []string{apiGroup},
@@ -363,10 +355,8 @@ func ensureTamperRoleBinding(
 	Expect(k8sClient.Create(ctx, role)).To(SatisfyAny(Succeed(), WithTransform(apierrors.IsAlreadyExists, BeTrue())))
 
 	rb := &rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      roleName,
-			Namespace: ns,
-		},
+		Name:      roleName,
+		Namespace: ns,
 		RoleRef: rbacv1.RoleRef{
 			APIGroup: rbacv1.GroupName,
 			Kind:     "Role",

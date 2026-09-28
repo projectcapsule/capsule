@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -112,7 +111,7 @@ func TestGetNamespaceTenantResolvesMatchingPrefix(t *testing.T) {
 				ctx,
 				cl,
 				cl,
-				&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: tt.namespace}},
+				&corev1.Namespace{Name: tt.namespace},
 				tt.user,
 				cfg,
 				nil,
@@ -232,7 +231,7 @@ func TestGetNamespaceTenantResponses(t *testing.T) {
 				ctx,
 				cl,
 				cl,
-				&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: tt.namespace}},
+				&corev1.Namespace{Name: tt.namespace},
 				tt.user,
 				cfg,
 				nil,
@@ -316,7 +315,7 @@ func TestResolveTenantByClosestNamespacePrefix(t *testing.T) {
 			tenants := make([]capsulev1beta2.Tenant, 0, len(tt.tenantNames))
 			for _, name := range tt.tenantNames {
 				tenants = append(tenants, capsulev1beta2.Tenant{
-					ObjectMeta: metav1.ObjectMeta{Name: name},
+					Name: name,
 				})
 			}
 
@@ -368,13 +367,13 @@ func TestValidateNamespacePrefix(t *testing.T) {
 		{
 			name:        "tenant disables configuration",
 			forcePrefix: true,
-			override:    boolPointer(false),
+			override:    new(false),
 			namespace:   "workloads",
 			want:        true,
 		},
 		{
 			name:      "tenant enables prefix",
-			override:  boolPointer(true),
+			override:  new(true),
 			namespace: "workloads",
 			want:      false,
 		},
@@ -386,7 +385,7 @@ func TestValidateNamespacePrefix(t *testing.T) {
 
 			_, cfg := tenantGetTestClient(t, tt.forcePrefix)
 			tenant := &capsulev1beta2.Tenant{
-				ObjectMeta: metav1.ObjectMeta{Name: "team"},
+				Name: "team",
 				Spec: capsulev1beta2.TenantSpec{
 					ForceTenantPrefix: tt.override,
 				},
@@ -394,7 +393,7 @@ func TestValidateNamespacePrefix(t *testing.T) {
 
 			got := validateNamespacePrefix(
 				cfg,
-				&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: tt.namespace}},
+				&corev1.Namespace{Name: tt.namespace},
 				tenant,
 			)
 			if got != tt.want {
@@ -423,7 +422,7 @@ func tenantGetTestClient(
 
 	objects := make([]client.Object, 0, len(tenants)+1)
 	objects = append(objects, &capsulev1beta2.CapsuleConfiguration{
-		ObjectMeta: metav1.ObjectMeta{Name: configurationName},
+		Name: configurationName,
 		Spec: capsulev1beta2.CapsuleConfigurationSpec{
 			ForceTenantPrefix: forcePrefix,
 		},
@@ -450,7 +449,7 @@ func tenantGetTestClient(
 }
 
 func tenantGetTestTenant(name string, opts ...func(*capsulev1beta2.Tenant)) *capsulev1beta2.Tenant {
-	tenant := &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: name}}
+	tenant := &capsulev1beta2.Tenant{Name: name}
 	for _, opt := range opts {
 		opt(tenant)
 	}
@@ -460,14 +459,14 @@ func tenantGetTestTenant(name string, opts ...func(*capsulev1beta2.Tenant)) *cap
 
 func tenantGetTestOwner(kind rbac.OwnerKind, name string) func(*capsulev1beta2.Tenant) {
 	return func(tenant *capsulev1beta2.Tenant) {
-		owner := rbac.CoreOwnerSpec{UserSpec: rbac.UserSpec{Kind: kind, Name: name}}
+		owner := rbac.CoreOwnerSpec{Kind: kind, Name: name}
 		tenant.Status.Owners = append(tenant.Status.Owners, owner)
 	}
 }
 
 func tenantGetTestPrefixOverride(value bool) func(*capsulev1beta2.Tenant) {
 	return func(tenant *capsulev1beta2.Tenant) {
-		tenant.Spec.ForceTenantPrefix = boolPointer(value)
+		tenant.Spec.ForceTenantPrefix = new(value)
 	}
 }
 
@@ -480,6 +479,7 @@ func tenantGetTestOwnerKeys(owners rbac.OwnerStatusListSpec) []string {
 	return keys
 }
 
+//go:fix inline
 func boolPointer(value bool) *bool {
-	return &value
+	return new(value)
 }

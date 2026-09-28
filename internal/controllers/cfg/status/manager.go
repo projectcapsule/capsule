@@ -76,9 +76,7 @@ func (r *Manager) SetupWithManager(
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 				return []reconcile.Request{
 					{
-						NamespacedName: types.NamespacedName{
-							Name: ctrlConfig.ConfigurationName,
-						},
+						Name: ctrlConfig.ConfigurationName,
 					},
 				}
 			}),
@@ -91,10 +89,8 @@ func (r *Manager) SetupWithManager(
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 				return []reconcile.Request{
 					{
-						NamespacedName: types.NamespacedName{
-							Name:      ctrlConfig.ConfigurationName,
-							Namespace: tenantEventMarker,
-						},
+						Name:      ctrlConfig.ConfigurationName,
+						Namespace: tenantEventMarker,
 					},
 				}
 			}),
@@ -107,9 +103,7 @@ func (r *Manager) SetupWithManager(
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 				return []reconcile.Request{
 					{
-						NamespacedName: types.NamespacedName{
-							Name: ctrlConfig.ConfigurationName,
-						},
+						Name: ctrlConfig.ConfigurationName,
 					},
 				}
 			}),

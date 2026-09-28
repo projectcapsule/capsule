@@ -25,14 +25,14 @@ func TestGetManagedRuleStatus(t *testing.T) {
 
 	ctx := context.Background()
 	rs := &capsulev1beta2.RuleStatus{
-		ObjectMeta: metav1.ObjectMeta{Name: meta.NameForManagedRuleStatus(), Namespace: "tenant-a"},
+		Name: meta.NameForManagedRuleStatus(), Namespace: "tenant-a",
 		Status: capsulev1beta2.RuleStatusStatus{
 			Rules: []*rules.NamespaceRuleBodyNamespace{{Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeAudit}}},
 		},
 	}
 	cl := tenantFakeClient(t, rs)
 
-	got, err := tenant.GetManagedRuleStatus(ctx, cl, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "tenant-a"}})
+	got, err := tenant.GetManagedRuleStatus(ctx, cl, &corev1.Namespace{Name: "tenant-a"})
 	if err != nil {
 		t.Fatalf("GetManagedRuleStatus() unexpected error: %v", err)
 	}
@@ -82,8 +82,8 @@ func TestBuildNamespaceRuleBodyStatus(t *testing.T) {
 		{},
 	}
 	ns := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{Name: "tenant-a-prod", Labels: map[string]string{"env": "prod"}},
-		Status:     corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
+		Name: "tenant-a-prod", Labels: map[string]string{"env": "prod"},
+		Status: corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
 	}
 
 	got, err := tenant.BuildNamespaceRuleBodyStatus(scheme, ns, tnt)
@@ -145,22 +145,22 @@ func TestCollectPromotions(t *testing.T) {
 	}}
 
 	cl := tenantFakeClient(t,
-		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns-a", Labels: map[string]string{
+		&corev1.Namespace{Name: "ns-a", Labels: map[string]string{
 			corev1.LabelMetadataName: "ns-a",
 			"env":                    "prod",
-		}}},
-		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns-b", Labels: map[string]string{
+		}},
+		&corev1.Namespace{Name: "ns-b", Labels: map[string]string{
 			corev1.LabelMetadataName: "ns-b",
 			"env":                    "dev",
-		}}},
-		&corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Namespace: "ns-a", Name: "builder", Labels: map[string]string{
+		}},
+		&corev1.ServiceAccount{Namespace: "ns-a", Name: "builder", Labels: map[string]string{
 			meta.ServiceAccountPromotionLabel: meta.ValueTrue,
 			"team":                            "platform",
-		}}},
-		&corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Namespace: "ns-a", Name: "ignored", Labels: map[string]string{
+		}},
+		&corev1.ServiceAccount{Namespace: "ns-a", Name: "ignored", Labels: map[string]string{
 			meta.ServiceAccountPromotionLabel: meta.ValueTrue,
 			"team":                            "other",
-		}}},
+		}},
 	)
 
 	got, err := tenant.CollectPromotions(ctx, cl, tnt, nil)
@@ -168,10 +168,8 @@ func TestCollectPromotions(t *testing.T) {
 		t.Fatalf("CollectPromotions() unexpected error: %v", err)
 	}
 	want := rbac.PromotionStatusListSpec{{
-		UserSpec: rbac.UserSpec{
-			Kind: rbac.ServiceAccountOwner,
-			Name: users.ServiceAccountUsername("ns-a", "builder"),
-		},
+		Kind:         rbac.ServiceAccountOwner,
+		Name:         users.ServiceAccountUsername("ns-a", "builder"),
 		ClusterRoles: []string{"admin"},
 		Targets:      []string{"ns-a"},
 	}}

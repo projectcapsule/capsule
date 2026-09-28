@@ -220,7 +220,7 @@ func metadataValueMatchers(action apirules.ActionType, policy apirules.MetadataV
 	if len(policy.Values) == 0 && (action.OrDefault() == apirules.ActionTypeDeny || action.OrDefault() == apirules.ActionTypeAudit) {
 		// Without value constraints, deny and audit match the presence of the
 		// key, including an empty value. Missing keys are skipped by validation.
-		return []runtime.ExpressionMatch{{ExpressionRegex: runtime.ExpressionRegex{Expression: ".*"}}}
+		return []runtime.ExpressionMatch{{Expression: ".*"}}
 	}
 
 	return policy.Values

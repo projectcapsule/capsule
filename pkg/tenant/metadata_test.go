@@ -102,43 +102,38 @@ func TestHasConsistentTenantReference(t *testing.T) {
 		{name: "unmanaged namespace", ns: &corev1.Namespace{}, want: true},
 		{
 			name: "matching label and owner reference",
-			ns: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+			ns: &corev1.Namespace{
 				Labels:          map[string]string{meta.TenantLabel: "green"},
-				OwnerReferences: []metav1.OwnerReference{tenantRef("green")},
-			}},
+				OwnerReferences: []metav1.OwnerReference{tenantRef("green")}},
 			want: true,
 		},
 		{
 			name: "label only",
-			ns: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{meta.TenantLabel: "green"},
-			}},
+			ns: &corev1.Namespace{
+				Labels: map[string]string{meta.TenantLabel: "green"}},
 			want: false,
 		},
 		{
 			name: "owner reference only",
-			ns: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
-				OwnerReferences: []metav1.OwnerReference{tenantRef("green")},
-			}},
+			ns: &corev1.Namespace{
+				OwnerReferences: []metav1.OwnerReference{tenantRef("green")}},
 			want: false,
 		},
 		{
 			name: "mismatched label and owner reference",
-			ns: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+			ns: &corev1.Namespace{
 				Labels:          map[string]string{meta.TenantLabel: "green"},
-				OwnerReferences: []metav1.OwnerReference{tenantRef("blue")},
-			}},
+				OwnerReferences: []metav1.OwnerReference{tenantRef("blue")}},
 			want: false,
 		},
 		{
 			name: "multiple tenant owner references",
-			ns: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+			ns: &corev1.Namespace{
 				Labels: map[string]string{meta.TenantLabel: "green"},
 				OwnerReferences: []metav1.OwnerReference{
 					tenantRef("green"),
 					tenantRef("blue"),
-				},
-			}},
+				}},
 			want: false,
 		},
 	}
@@ -253,18 +248,10 @@ func TestBuildNamespaceAnnotationsForTenant(t *testing.T) {
 
 		tt := tenantWithName("t1")
 		tt.Spec.IngressOptions.AllowedClasses = &api.DefaultAllowedListSpec{
-			SelectorAllowedListSpec: api.SelectorAllowedListSpec{
-				AllowedListSpec: api.AllowedListSpec{
-					Exact: []string{"nginx", "traefik"},
-				},
-			},
+			Exact: []string{"nginx", "traefik"},
 		}
 		tt.Spec.StorageClasses = &api.DefaultAllowedListSpec{
-			SelectorAllowedListSpec: api.SelectorAllowedListSpec{
-				AllowedListSpec: api.AllowedListSpec{
-					Exact: []string{"fast", "slow"},
-				},
-			},
+			Exact: []string{"fast", "slow"},
 		}
 		tt.Spec.ContainerRegistries = &api.AllowedListSpec{
 			Exact: []string{"docker.io", "ghcr.io"},
@@ -386,11 +373,11 @@ func TestBuildNamespaceMetadataForTenant_Concurrency_NoConcurrentMapWrites(t *te
 
 	errCh := make(chan error, goroutines)
 
-	for i := 0; i < goroutines; i++ {
+	for range goroutines {
 		go func() {
 			defer wg.Done()
 
-			for j := 0; j < iterations; j++ {
+			for range iterations {
 				_, _, err := tenant.BuildNamespaceMetadataForTenant(n, tt)
 				if err != nil {
 					errCh <- err

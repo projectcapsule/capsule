@@ -26,86 +26,58 @@ import (
 
 var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", "priorityclass"), func() {
 	tntWithDefaults := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-priority-class-defaults",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-priority-class-defaults",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-pod-priority-1",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-pod-priority-1",
+					Kind: "User",
 				},
 			},
 			PriorityClasses: &api.DefaultAllowedListSpec{
 				Default: "tenant-default",
-				SelectorAllowedListSpec: api.SelectorAllowedListSpec{
-					LabelSelector: metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"environment": "customer",
-						},
-					},
+				MatchLabels: map[string]string{
+					"environment": "customer",
 				},
 			},
 		},
 	}
 
 	tntNoDefaults := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-priority-class-no-defaults",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-priority-class-no-defaults",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-pod-priority-2",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-pod-priority-2",
+					Kind: "User",
 				},
 			},
 			PriorityClasses: &api.DefaultAllowedListSpec{
-				SelectorAllowedListSpec: api.SelectorAllowedListSpec{
-					AllowedListSpec: api.AllowedListSpec{
-						Exact: []string{"customer-gold"},
-						Regex: "customer\\-\\w+",
-					},
-					LabelSelector: metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"environment": "customer",
-						},
-					},
+				Exact: []string{"customer-gold"},
+				Regex: "customer\\-\\w+",
+				MatchLabels: map[string]string{
+					"environment": "customer",
 				},
 			},
 		},
 	}
 
 	tntNoRestrictions := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-priority-class-no-restrictions",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-priority-class-no-restrictions",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: []rbac.OwnerSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-priority-class-no-restrictions",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-priority-class-no-restrictions",
+					Kind: "User",
 				},
 			},
 		},
@@ -113,12 +85,10 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 
 	pcTenantPreemption := corev1.PreemptionPolicy("PreemptLowerPriority")
 	tenantDefault := schedulingv1.PriorityClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenant-default",
-			Labels: map[string]string{
-				"environment": "shared",
-				"env":         "e2e",
-			},
+		Name: "tenant-default",
+		Labels: map[string]string{
+			"environment": "shared",
+			"env":         "e2e",
 		},
 		Description:      "tenant default priorityclass",
 		Value:            1212,
@@ -127,12 +97,10 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 	}
 
 	globalDefault := schedulingv1.PriorityClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "global-default",
-			Labels: map[string]string{
-				"environment": "customer",
-				"env":         "e2e",
-			},
+		Name: "global-default",
+		Labels: map[string]string{
+			"environment": "customer",
+			"env":         "e2e",
 		},
 		Description:   "global default priorityclass",
 		Value:         100000,
@@ -140,12 +108,10 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 	}
 
 	disallowedGlobalDefault := schedulingv1.PriorityClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "disallowed-global-default",
-			Labels: map[string]string{
-				"environment": "internal",
-				"env":         "e2e",
-			},
+		Name: "disallowed-global-default",
+		Labels: map[string]string{
+			"environment": "internal",
+			"env":         "e2e",
 		},
 		Description:   "global default priorityclass",
 		Value:         100000,
@@ -153,36 +119,30 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 	}
 
 	customerBronze := &schedulingv1.PriorityClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "customer-bronze",
-			Labels: map[string]string{
-				"environment": "customer",
-				"env":         "e2e",
-			},
+		Name: "customer-bronze",
+		Labels: map[string]string{
+			"environment": "customer",
+			"env":         "e2e",
 		},
 		Description: "fake PriorityClass for e2e",
 		Value:       100000,
 	}
 
 	customerSilver := &schedulingv1.PriorityClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "customer-silver",
-			Labels: map[string]string{
-				"environment": "internal",
-				"env":         "e2e",
-			},
+		Name: "customer-silver",
+		Labels: map[string]string{
+			"environment": "internal",
+			"env":         "e2e",
 		},
 		Description: "fake PriorityClass for e2e",
 		Value:       100000,
 	}
 
 	customerGold := &schedulingv1.PriorityClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "customer-gold",
-			Labels: map[string]string{
-				"environment": "internal",
-				"env":         "e2e",
-			},
+		Name: "customer-gold",
+		Labels: map[string]string{
+			"environment": "internal",
+			"env":         "e2e",
 		},
 		Description: "fake PriorityClass for e2e",
 		Value:       100000,
@@ -259,10 +219,8 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 				Eventually(func() (err error) {
 
 					g := &corev1.Pod{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      class + "-container",
-							Namespace: ns.GetName(),
-						},
+						Name:      class + "-container",
+						Namespace: ns.GetName(),
 						Spec: corev1.PodSpec{
 							SecurityContext:   nobodyPodSecurityContext(),
 							PriorityClassName: class,
@@ -326,9 +284,7 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 		})
 
 		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "container",
-			},
+			Name: "container",
 			Spec: corev1.PodSpec{
 				SecurityContext:   nobodyPodSecurityContext(),
 				PriorityClassName: "system-node-critical",
@@ -354,12 +310,10 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 		for i, pc := range []string{"internal-bronze", "internal-silver", "internal-gold"} {
 			priorityName := strings.Join([]string{pc, "-", strconv.Itoa(i)}, "")
 			class := &schedulingv1.PriorityClass{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: priorityName,
-					Labels: map[string]string{
-						"environment": "internal",
-						"env":         "e2e",
-					},
+				Name: priorityName,
+				Labels: map[string]string{
+					"environment": "internal",
+					"env":         "e2e",
 				},
 				Description: "fake PriorityClass for e2e",
 				Value:       int32(10000 * (i + 2)),
@@ -367,9 +321,7 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 			Expect(k8sClient.Create(context.TODO(), class)).Should(Succeed())
 
 			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: pc,
-				},
+				Name: pc,
 				Spec: corev1.PodSpec{
 					SecurityContext:   nobodyPodSecurityContext(),
 					PriorityClassName: class.GetName(),
@@ -439,9 +391,7 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 		})
 
 		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "container",
-			},
+			Name: "container",
 			Spec: corev1.PodSpec{
 				SecurityContext:   nobodyPodSecurityContext(),
 				PriorityClassName: "customer-gold",
@@ -489,10 +439,8 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 		for _, class := range []string{customerBronze.GetName(), customerSilver.GetName(), customerGold.GetName()} {
 			EventuallyCreation(func() error {
 				pod := &corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      class,
-						Namespace: ns.GetName(),
-					},
+					Name:      class,
+					Namespace: ns.GetName(),
 					Spec: corev1.PodSpec{
 						SecurityContext:   nobodyPodSecurityContext(),
 						PriorityClassName: class,
@@ -517,12 +465,10 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 			for i, pc := range []string{"internal-bronze-new", "internal-silver-new", "internal-gold-new"} {
 				priorityName := strings.Join([]string{pc, "-", strconv.Itoa(i)}, "")
 				class := &schedulingv1.PriorityClass{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: priorityName,
-						Labels: map[string]string{
-							"environment": "customer",
-							"env":         "e2e",
-						},
+					Name: priorityName,
+					Labels: map[string]string{
+						"environment": "customer",
+						"env":         "e2e",
 					},
 					Description: "fake PriorityClass for e2e",
 					Value:       int32(10000 * (i + 2)),
@@ -553,9 +499,7 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 				})
 
 				pod := &corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: pc,
-					},
+					Name: pc,
 					Spec: corev1.PodSpec{
 						SecurityContext:   nobodyPodSecurityContext(),
 						PriorityClassName: class.GetName(),
@@ -599,9 +543,7 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 	It("fail if default tenant PriorityClass is absent", func() {
 		By("rejecting default", func() {
 			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "tenant-default",
-				},
+				Name: "tenant-default",
 				Spec: corev1.PodSpec{
 					SecurityContext: nobodyPodSecurityContext(),
 					Containers: []corev1.Container{
@@ -676,10 +618,8 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 			})
 
 			pod := corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "tenant-default-present",
-					Namespace: ns.GetName(),
-				},
+				Name:      "tenant-default-present",
+				Namespace: ns.GetName(),
 				Spec: corev1.PodSpec{
 					SecurityContext: nobodyPodSecurityContext(),
 					Containers: []corev1.Container{
@@ -736,10 +676,8 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 		})
 
 		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "tenant-default-global-default",
-				Namespace: ns.GetName(),
-			},
+			Name:      "tenant-default-global-default",
+			Namespace: ns.GetName(),
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
@@ -795,10 +733,8 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 		})
 
 		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "tenant-default-allowed",
-				Namespace: ns.GetName(),
-			},
+			Name:      "tenant-default-allowed",
+			Namespace: ns.GetName(),
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{

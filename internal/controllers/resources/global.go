@@ -38,6 +38,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	tenantresourceindexer "github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
+	"github.com/projectcapsule/capsule/pkg/runtime/ssa"
 )
 
 type globalResourceController struct {
@@ -52,6 +53,7 @@ type globalResourceController struct {
 	clients       impersonatedClientLoader[*capsulev1beta2.GlobalTenantResource]
 
 	impersonation *cache.ImpersonationCache
+	conditions    *cache.CELCache
 }
 
 func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
@@ -59,6 +61,8 @@ func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, ctrlConfig
 	r.reader = mgr.GetAPIReader()
 
 	r.processor = processor.Processor{
+		ReplicationOwners:            ssa.NewReplicationOwnerResolver(mgr.GetClient(), mgr.GetAPIReader()),
+		Conditions:                   r.conditions,
 		Configuration:                r.configuration,
 		GatherClient:                 mgr.GetAPIReader(),
 		AllowCrossNamespaceSelection: true,
@@ -292,9 +296,7 @@ func (r *globalResourceController) enqueueRequestFromTenant(ctx context.Context,
 	// No need of ordered value here
 	for res := range set {
 		reqs = append(reqs, reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name: res,
-			},
+			Name: res,
 		})
 	}
 
@@ -313,10 +315,8 @@ func (r *globalResourceController) enqueueAllResources(ctx context.Context, _ cl
 	reqs := make([]reconcile.Request, 0, len(list.Items))
 	for i := range list.Items {
 		reqs = append(reqs, reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name:      list.Items[i].Name,
-				Namespace: list.Items[i].Namespace,
-			},
+			Name:      list.Items[i].Name,
+			Namespace: list.Items[i].Namespace,
 		})
 	}
 
@@ -389,13 +389,8 @@ func (r *globalResourceController) reconcile(
 		c,
 		&tntResource.Status.ProcessedItems,
 		acc,
-		processor.ProcessorOptions{
-			FieldOwnerPrefix: getFieldOwner(tntResource.GetName(), tntResource.GetNamespace()),
-			Prune:            *tntResource.Spec.PruningOnDelete,
-			Adopt:            *tntResource.Spec.Settings.Adopt,
-			Force:            *tntResource.Spec.Settings.Force,
-			Owner:            &owner,
-		})
+		replicationProcessorOptions(tntResource, &tntResource.Spec.TenantResourceCommonSpec, &owner),
+	)
 }
 
 func (r *globalResourceController) gatherResources(
@@ -426,9 +421,7 @@ func (r *globalResourceController) gatherResources(
 			ilog.V(5).Info("replicating once for cluster scope")
 
 			clusterTenant := &capsulev1beta2.Tenant{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "None",
-				},
+				Name: "None",
 			}
 
 			opts.Iterator = NewCollectorIteratorOptions(clusterTenant, nil, resource)

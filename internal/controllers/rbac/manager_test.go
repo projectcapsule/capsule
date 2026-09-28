@@ -10,7 +10,6 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -43,7 +42,7 @@ func TestEnsureClusterRoleBindingsProvisionerUsesAuthoritativePromotionState(t *
 	}
 
 	configurationObject := &capsulev1beta2.CapsuleConfiguration{
-		ObjectMeta: metav1.ObjectMeta{Name: configurationName},
+		Name: configurationName,
 		Spec: capsulev1beta2.CapsuleConfigurationSpec{
 			AllowServiceAccountPromotion: true,
 			RBAC: &capsulev1beta2.RBACConfiguration{
@@ -52,12 +51,10 @@ func TestEnsureClusterRoleBindingsProvisionerUsesAuthoritativePromotionState(t *
 		},
 	}
 	promoted := &corev1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceAccount,
-			Namespace: namespace,
-			Labels: map[string]string{
-				meta.OwnerPromotionLabel: meta.ValueTrue,
-			},
+		Name:      serviceAccount,
+		Namespace: namespace,
+		Labels: map[string]string{
+			meta.OwnerPromotionLabel: meta.ValueTrue,
 		},
 	}
 

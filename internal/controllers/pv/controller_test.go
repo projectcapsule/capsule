@@ -68,7 +68,7 @@ func TestReconcileRepairsPersistentVolumeTenantLabelFromNamespace(t *testing.T) 
 			}
 
 			if _, err := controller.Reconcile(context.Background(), reconcile.Request{
-				NamespacedName: types.NamespacedName{Name: pv.Name},
+				Name: pv.Name,
 			}); err != nil {
 				t.Fatalf("Reconcile() error = %v", err)
 			}
@@ -98,9 +98,8 @@ func TestReconcileSkipsPersistentVolumeFromUnmanagedOrDeletedNamespace(t *testin
 	}{
 		{
 			name: "unmanaged namespace",
-			namespace: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
-				Name: "unmanaged",
-			}},
+			namespace: &corev1.Namespace{
+				Name: "unmanaged"},
 		},
 		{
 			name: "deleted namespace",
@@ -126,7 +125,7 @@ func TestReconcileSkipsPersistentVolumeFromUnmanagedOrDeletedNamespace(t *testin
 			controller := &Controller{client: counting, reader: base, label: meta.TenantLabel}
 
 			if _, err := controller.Reconcile(context.Background(), reconcile.Request{
-				NamespacedName: types.NamespacedName{Name: pv.Name},
+				Name: pv.Name,
 			}); err != nil {
 				t.Fatalf("Reconcile() error = %v", err)
 			}
@@ -153,7 +152,7 @@ func TestReconcileRetriesInconsistentOrFailedNamespaceResolution(t *testing.T) {
 		controller := &Controller{client: base, reader: base, label: meta.TenantLabel}
 
 		_, err := controller.Reconcile(context.Background(), reconcile.Request{
-			NamespacedName: types.NamespacedName{Name: pv.Name},
+			Name: pv.Name,
 		})
 		if err == nil {
 			t.Fatal("Reconcile() error = nil, want inconsistent ownership error")
@@ -176,7 +175,7 @@ func TestReconcileRetriesInconsistentOrFailedNamespaceResolution(t *testing.T) {
 		}
 
 		_, err := controller.Reconcile(context.Background(), reconcile.Request{
-			NamespacedName: types.NamespacedName{Name: pv.Name},
+			Name: pv.Name,
 		})
 		if err == nil || !errors.Is(err, controller.reader.(*namespaceFailingReader).err) {
 			t.Fatalf("Reconcile() error = %v, want temporary API failure", err)
@@ -257,14 +256,13 @@ func persistentVolumeTestScheme(t *testing.T) *runtime.Scheme {
 }
 
 func persistentVolumeTestTenant() *capsulev1beta2.Tenant {
-	return &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{
+	return &capsulev1beta2.Tenant{
 		Name: "tenant-a",
-		UID:  types.UID("tenant-a-uid"),
-	}}
+		UID:  types.UID("tenant-a-uid")}
 }
 
 func persistentVolumeTestNamespace(tnt *capsulev1beta2.Tenant) *corev1.Namespace {
-	return &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+	return &corev1.Namespace{
 		Name:   "tenant-a-ns",
 		Labels: map[string]string{meta.TenantLabel: tnt.Name},
 		OwnerReferences: []metav1.OwnerReference{{
@@ -272,16 +270,13 @@ func persistentVolumeTestNamespace(tnt *capsulev1beta2.Tenant) *corev1.Namespace
 			Kind:       "Tenant",
 			Name:       tnt.Name,
 			UID:        tnt.UID,
-		}},
-	}}
+		}}}
 }
 
 func persistentVolumeTestVolume(namespace string, labels map[string]string) *corev1.PersistentVolume {
 	return &corev1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "pv-" + namespace,
-			Labels: labels,
-		},
+		Name:   "pv-" + namespace,
+		Labels: labels,
 		Spec: corev1.PersistentVolumeSpec{ClaimRef: &corev1.ObjectReference{
 			Namespace: namespace,
 			Name:      "claim",

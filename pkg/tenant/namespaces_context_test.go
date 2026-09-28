@@ -26,10 +26,10 @@ func TestNamespaceTerminationHelpers(t *testing.T) {
 
 	ctx := context.Background()
 	cl := tenantFakeClient(t,
-		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "busy", Name: "pod-a"}},
+		&corev1.Pod{Namespace: "busy", Name: "pod-a"},
 	)
 
-	pending, err := tenant.NamespaceIsPendingPodTerminating(ctx, cl, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "busy"}})
+	pending, err := tenant.NamespaceIsPendingPodTerminating(ctx, cl, &corev1.Namespace{Name: "busy"})
 	if err != nil {
 		t.Fatalf("NamespaceIsPendingPodTerminating() unexpected error: %v", err)
 	}
@@ -37,7 +37,7 @@ func TestNamespaceTerminationHelpers(t *testing.T) {
 		t.Fatalf("NamespaceIsPendingPodTerminating() = false, want true")
 	}
 
-	pending, err = tenant.NamespaceIsPendingPodTerminating(ctx, cl, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "empty"}})
+	pending, err = tenant.NamespaceIsPendingPodTerminating(ctx, cl, &corev1.Namespace{Name: "empty"})
 	if err != nil {
 		t.Fatalf("NamespaceIsPendingPodTerminating(empty) unexpected error: %v", err)
 	}
@@ -58,10 +58,9 @@ func TestNamespaceIsPendingUnmanagedTerminationByStatus(t *testing.T) {
 			Status: metav1.ConditionTrue,
 		}},
 	})
-	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+	ns := &corev1.Namespace{
 		Name:            "tenant-a-ns",
-		OwnerReferences: []metav1.OwnerReference{tenantOwnerReference("tenant-a", types.UID("tenant-uid"))},
-	}}
+		OwnerReferences: []metav1.OwnerReference{tenantOwnerReference("tenant-a", types.UID("tenant-uid"))}}
 	cl := tenantFakeClient(t, tnt, ns)
 
 	pending, err := tenant.NamespaceIsPendingUnmanagedTerminationByStatus(ctx, cl, ns)
@@ -72,7 +71,7 @@ func TestNamespaceIsPendingUnmanagedTerminationByStatus(t *testing.T) {
 		t.Fatalf("NamespaceIsPendingUnmanagedTerminationByStatus() = false, want true")
 	}
 
-	pending, err = tenant.NamespaceIsPendingUnmanagedTerminationByStatus(ctx, cl, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "unowned"}})
+	pending, err = tenant.NamespaceIsPendingUnmanagedTerminationByStatus(ctx, cl, &corev1.Namespace{Name: "unowned"})
 	if err != nil {
 		t.Fatalf("NamespaceIsPendingUnmanagedTerminationByStatus(unowned) unexpected error: %v", err)
 	}
@@ -88,13 +87,12 @@ func TestResolveNamespaceTenant(t *testing.T) {
 	tnt := tenantObject("tenant-a", withUID(types.UID("tenant-uid")))
 	cl := tenantFakeClient(t, tnt)
 
-	valid := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+	valid := &corev1.Namespace{
 		Name:   "tenant-a-ns",
 		Labels: map[string]string{meta.TenantLabel: "tenant-a"},
 		OwnerReferences: []metav1.OwnerReference{
 			tenantOwnerReference("tenant-a", types.UID("tenant-uid")),
-		},
-	}}
+		}}
 	got, err := tenant.ResolveNamespaceTenant(ctx, cl, valid)
 	if err != nil {
 		t.Fatalf("ResolveNamespaceTenant() unexpected error: %v", err)
@@ -114,24 +112,21 @@ func TestResolveNamespaceTenant(t *testing.T) {
 	}{
 		{
 			name: "label without owner reference",
-			ns: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{meta.TenantLabel: "tenant-a"},
-			}},
+			ns: &corev1.Namespace{
+				Labels: map[string]string{meta.TenantLabel: "tenant-a"}},
 			want: "no Tenant ownerReference",
 		},
 		{
 			name: "owner reference without label",
-			ns: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
-				OwnerReferences: []metav1.OwnerReference{tenantOwnerReference("tenant-a", types.UID("tenant-uid"))},
-			}},
+			ns: &corev1.Namespace{
+				OwnerReferences: []metav1.OwnerReference{tenantOwnerReference("tenant-a", types.UID("tenant-uid"))}},
 			want: "but no tenant label",
 		},
 		{
 			name: "mismatched label",
-			ns: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+			ns: &corev1.Namespace{
 				Labels:          map[string]string{meta.TenantLabel: "other"},
-				OwnerReferences: []metav1.OwnerReference{tenantOwnerReference("tenant-a", types.UID("tenant-uid"))},
-			}},
+				OwnerReferences: []metav1.OwnerReference{tenantOwnerReference("tenant-a", types.UID("tenant-uid"))}},
 			want: "does not match owner reference",
 		},
 	}
@@ -149,9 +144,9 @@ func TestCollectTenantNamespaceByLabel(t *testing.T) {
 
 	ctx := context.Background()
 	cl := tenantFakeClient(t,
-		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "a", Labels: map[string]string{meta.TenantLabel: "tenant-a", "env": "prod"}}},
-		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "b", Labels: map[string]string{meta.TenantLabel: "tenant-a", "env": "dev"}}},
-		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "c", Labels: map[string]string{meta.TenantLabel: "tenant-b", "env": "prod"}}},
+		&corev1.Namespace{Name: "a", Labels: map[string]string{meta.TenantLabel: "tenant-a", "env": "prod"}},
+		&corev1.Namespace{Name: "b", Labels: map[string]string{meta.TenantLabel: "tenant-a", "env": "dev"}},
+		&corev1.Namespace{Name: "c", Labels: map[string]string{meta.TenantLabel: "tenant-b", "env": "prod"}},
 	)
 
 	namespaces, err := tenant.CollectTenantNamespaceByLabel(ctx, cl, *tenantObject("tenant-a"), &metav1.LabelSelector{
@@ -169,10 +164,9 @@ func TestNamespaceOwnershipAndContexts(t *testing.T) {
 	t.Parallel()
 
 	tnt := tenantObject("tenant-a", withUID(types.UID("tenant-uid")), withStatusOwner(rbac.UserOwner, "alice"))
-	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+	ns := &corev1.Namespace{
 		Name:            "tenant-a-ns",
-		OwnerReferences: []metav1.OwnerReference{tenantOwnerReference("tenant-a", types.UID("tenant-uid"))},
-	}}
+		OwnerReferences: []metav1.OwnerReference{tenantOwnerReference("tenant-a", types.UID("tenant-uid"))}}
 
 	if !tenant.NamespaceIsOwned(context.Background(), nil, nil, ns, tnt, users.AdmissionUser{Username: "alice"}) {
 		t.Fatalf("NamespaceIsOwned() = false, want true for status owner")
@@ -215,12 +209,12 @@ func TestTenantNamespaceContextIncludesStatusWhenRetained(t *testing.T) {
 	}
 
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{Name: "tenant-a"},
-		Status:     capsulev1beta2.TenantStatus{State: capsulev1beta2.TenantStateActive},
+		Name:   "tenant-a",
+		Status: capsulev1beta2.TenantStatus{State: capsulev1beta2.TenantStateActive},
 	}
 	ns := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{Name: "tenant-a-ns"},
-		Status:     corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
+		Name:   "tenant-a-ns",
+		Status: corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
 	}
 
 	opts := sanitize.DefaultSanitizeOptions()

@@ -14,7 +14,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -26,7 +25,6 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
-	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/users"
@@ -48,53 +46,51 @@ func TestManagedMetadataAdmissionRespectsAudience(t *testing.T) {
 			Enforce: &rules.NamespaceRuleEnforceBody{
 				Action: rules.ActionTypeAllow,
 				Metadata: []rules.MetadataRule{{
-					VersionKinds: apiruntime.VersionKinds{Kinds: []string{"Namespace", "ConfigMap"}},
-					Labels:       policies, Annotations: policies,
+					Kinds:  []string{"Namespace", "ConfigMap"},
+					Labels: policies, Annotations: policies,
 				}},
 			},
 		}
 	}
 	bodies := []*rules.NamespaceRuleBodyNamespace{
 		managedRule(rules.Audience{Kind: rules.AudienceKindUser, Name: "alice"}, map[string]rules.MetadataValueRule{
-			"example.corp/alice": {Managed: ptr.To("alice")}, "example.corp/shared": {Managed: ptr.To("alice")},
+			"example.corp/alice": {Managed: new("alice")}, "example.corp/shared": {Managed: new("alice")},
 		}),
 		managedRule(rules.Audience{Kind: rules.AudienceKindUser, Name: "bob"}, map[string]rules.MetadataValueRule{
-			"example.corp/shared": {Managed: ptr.To("bob")},
+			"example.corp/shared": {Managed: new("bob")},
 		}),
 		managedRule(rules.Audience{Kind: rules.AudienceKindCustom, Name: string(rules.CustomAudienceCapsuleUser)}, map[string]rules.MetadataValueRule{
-			"example.corp/common": {Managed: ptr.To("capsule")},
+			"example.corp/common": {Managed: new("capsule")},
 		}),
 		{
 			Audience: []rules.Audience{{Kind: rules.AudienceKindCustom, Name: string(rules.CustomAudienceCapsuleUser)}},
 			Enforce: &rules.NamespaceRuleEnforceBody{
 				Action: rules.ActionTypeDeny,
 				Metadata: []rules.MetadataRule{{
-					VersionKinds: apiruntime.VersionKinds{Kinds: []string{"Namespace", "ConfigMap"}},
-					Labels:       map[string]rules.MetadataValueRule{"example.corp/.*": {}},
-					Annotations:  map[string]rules.MetadataValueRule{"example.corp/.*": {}},
+					Kinds:       []string{"Namespace", "ConfigMap"},
+					Labels:      map[string]rules.MetadataValueRule{"example.corp/.*": {}},
+					Annotations: map[string]rules.MetadataValueRule{"example.corp/.*": {}},
 				}},
 			},
 		},
 	}
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{Name: "tenant", UID: "tenant-uid"},
+		Name: "tenant", UID: "tenant-uid",
 		Status: capsulev1beta2.TenantStatus{
 			Namespaces: []string{"tenant-ns"},
-			Owners: rbac.OwnerStatusListSpec{{UserSpec: rbac.UserSpec{
-				Kind: rbac.ServiceAccountOwner, Name: users.ServiceAccountUsername("tenant-ns", "promoted"),
-			}}},
+			Owners: rbac.OwnerStatusListSpec{{
+				Kind: rbac.ServiceAccountOwner, Name: users.ServiceAccountUsername("tenant-ns", "promoted")}},
 		},
 	}
 	for _, body := range bodies {
 		tnt.Spec.Rules = append(tnt.Spec.Rules, &rules.NamespaceRuleBodyTenant{NamespaceRuleBodyNamespace: body})
 	}
-	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+	ns := &corev1.Namespace{
 		Name: "tenant-ns", Labels: map[string]string{meta.TenantLabel: tnt.Name},
-		OwnerReferences: []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: tnt.Name, UID: tnt.UID}},
-	}}
-	rs := &capsulev1beta2.RuleStatus{ObjectMeta: metav1.ObjectMeta{Name: meta.NameForManagedRuleStatus(), Namespace: ns.Name}}
+		OwnerReferences: []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: tnt.Name, UID: tnt.UID}}}
+	rs := &capsulev1beta2.RuleStatus{Name: meta.NameForManagedRuleStatus(), Namespace: ns.Name}
 	rs.Status.Rules = bodies
-	config := &capsulev1beta2.CapsuleConfiguration{ObjectMeta: metav1.ObjectMeta{Name: "capsule"}}
+	config := &capsulev1beta2.CapsuleConfiguration{Name: "capsule"}
 	config.Status.Users = rbac.UserListSpec{{Kind: rbac.GroupOwner, Name: "capsule-users"}}
 	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(tnt, ns, rs, config).
 		WithIndex(&capsulev1beta2.Tenant{}, ".status.namespaces", func(obj client.Object) []string {
@@ -135,9 +131,8 @@ func TestManagedMetadataAdmissionRespectsAudience(t *testing.T) {
 						} else {
 							obj.Annotations = map[string]string{tt.key: tt.value}
 						}
-						req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
-							Kind: metav1.GroupVersionKind{Version: "v1", Kind: kind}, Operation: operation, UserInfo: tt.user,
-						}}
+						req := admission.Request{
+							Kind: metav1.GroupVersionKind{Version: "v1", Kind: kind}, Operation: operation, UserInfo: tt.user}
 						var response *admission.Response
 						if kind == "Namespace" {
 							handler := namespacevalidation.RulesMetadataHandler(cache.NewRegexCache(), cfg)

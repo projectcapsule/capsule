@@ -1,0 +1,169 @@
+# Creates a tenant namespace, then uses GlobalTenantResource to place Flux
+# resources in it. Directly creating a HelmRelease in a nonexistent namespace
+# would fail the ResourcePermit's server-side dry run.
+apiVersion: capsule.clastix.io/v1beta2
+kind: GlobalResourcePermitTemplate
+metadata:
+  name: grafana
+  labels:
+    company.com/consumer: "tenants"
+  annotations:
+    info.projectcapsule.dev/description: "Provision a managed Grafana instance in a new namespace belonging to the requesting tenant."
+    info.projectcapsule.dev/tags: "grafana,monitoring,flux"
+    info.projectcapsule.dev/icon: "https://p1.hiclipart.com/preview/950/813/299/github-logo-grafana-influxdb-dashboard-visualization-web-application-installation-data-plugin-png-clipart.jpg"
+spec:
+  # Capsule recognizes its controller as an administrator and adds the Tenant
+  # ownerReference during namespace admission. A generic execution SA cannot.
+  impersonation:
+    name: capsule
+    namespace: capsule-system
+  namespaceSelectors:
+    - matchExpressions:
+        - key: capsule.clastix.io/tenant
+          operator: Exists
+  # No default duration: the instance stays managed until the permit is expired.
+  approvals:
+    auto: false
+    approvers:
+      - kind: User
+        name: kubernetes-admin
+      - kind: User
+        name: admin
+  paramSchema:
+    type: object
+    additionalProperties: false
+    required:
+      - instance
+    properties:
+      instance:
+        type: string
+        title: Instance name
+        description: "Creates <tenant>-grafana-<instance>; choose a new name for each instance."
+        pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+        maxLength: 20
+  context:
+    resources:
+      - apiVersion: v1
+        kind: ServiceAccount
+        name: default
+        index: localServiceAccount
+        optional: false
+      - apiVersion: v1
+        kind: Namespace
+        index: tenantNamespaces
+        selector:
+          matchExpressions:
+            - key: capsule.clastix.io/tenant
+              operator: Exists
+  resources:
+    - policy:
+        creation: Owner
+        # Capsule must be able to update the namespace's tenant metadata.
+        protect: false
+        force: false
+        deletion: Remove
+      template: |
+        {{- $source := (index $.context.resources.localServiceAccount 0).metadata.namespace }}
+        {{- $sourceNamespace := mustGetResourceByName $source $.context.resources.tenantNamespaces }}
+        {{- $tenant := index $sourceNamespace.metadata.labels "capsule.clastix.io/tenant" }}
+        {{- $namespace := printf "%s-grafana-%s" $tenant $.params.instance }}
+        {{- if gt (len $namespace) 63 }}
+        {{- fail "the tenant name plus '-grafana-' plus instance must fit in 63 characters" }}
+        {{- end }}
+        ---
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: {{ $namespace | quote }}
+          labels:
+            capsule.clastix.io/tenant: {{ $tenant | quote }}
+        ---
+        apiVersion: capsule.clastix.io/v1beta2
+        kind: GlobalTenantResource
+        metadata:
+          name: {{ $namespace | quote }}
+        spec:
+          scope: Namespace
+          resyncPeriod: 60s
+          pruningOnDelete: true
+          serviceAccount:
+            name: permit-example-reconciler
+            namespace: capsule-system
+          tenantSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $tenant | quote }}
+          resources:
+            - namespaceSelector:
+                matchLabels:
+                  kubernetes.io/metadata.name: {{ $namespace | quote }}
+              rawItems:
+                - apiVersion: v1
+                  kind: ServiceAccount
+                  metadata:
+                    name: grafana-reconciler
+                    namespace: {{ $namespace | quote }}
+                - apiVersion: rbac.authorization.k8s.io/v1
+                  kind: RoleBinding
+                  metadata:
+                    name: grafana-reconciler
+                    namespace: {{ $namespace | quote }}
+                  roleRef:
+                    apiGroup: rbac.authorization.k8s.io
+                    kind: ClusterRole
+                    name: playground-grafana-reconciler
+                  subjects:
+                    - kind: ServiceAccount
+                      name: grafana-reconciler
+                      namespace: {{ $namespace | quote }}
+                - apiVersion: source.toolkit.fluxcd.io/v1
+                  kind: HelmRepository
+                  metadata:
+                    name: grafana
+                    namespace: {{ $namespace | quote }}
+                  spec:
+                    interval: 24h
+                    url: https://grafana-community.github.io/helm-charts
+                - apiVersion: helm.toolkit.fluxcd.io/v2
+                  kind: HelmRelease
+                  metadata:
+                    name: grafana
+                    namespace: {{ $namespace | quote }}
+                  spec:
+                    interval: 10m
+                    timeout: 5m
+                    releaseName: grafana
+                    targetNamespace: {{ $namespace | quote }}
+                    serviceAccountName: grafana-reconciler
+                    chart:
+                      spec:
+                        chart: grafana
+                        version: "13.2.2"
+                        sourceRef:
+                          kind: HelmRepository
+                          name: grafana
+                        interval: 24h
+                    install:
+                      remediation:
+                        retries: -1
+                    upgrade:
+                      remediation:
+                        retries: 3
+                    driftDetection:
+                      mode: enabled
+                    values:
+                      fullnameOverride: grafana
+                      replicas: 1
+                      rbac:
+                        create: false
+                      automountServiceAccountToken: false
+                      service:
+                        type: ClusterIP
+                      persistence:
+                        enabled: false
+                      resources:
+                        requests:
+                          cpu: 100m
+                          memory: 128Mi
+                        limits:
+                          cpu: 500m
+                          memory: 512Mi

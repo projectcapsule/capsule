@@ -22,11 +22,9 @@ func TestAllowedValuesErrorMessages(t *testing.T) {
 	t.Parallel()
 
 	allowed := api.SelectorAllowedListSpec{
-		AllowedListSpec: api.AllowedListSpec{
-			Exact: []string{"fast", "slow"},
-			Regex: "premium-.*",
-		},
-		LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"class": "gold"}},
+		Exact:       []string{"fast", "slow"},
+		Regex:       "premium-.*",
+		MatchLabels: map[string]string{"class": "gold"},
 	}
 
 	got := apierrors.AllowedValuesErrorMessage(allowed, "prefix: ")
@@ -41,9 +39,7 @@ func TestAllowedValuesErrorMessages(t *testing.T) {
 	}
 
 	selectionMsg := apierrors.SelectionListWithDefaultErrorMessage(api.SelectionListWithDefaultSpec{
-		SelectionListWithSpec: api.SelectionListWithSpec{
-			LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"class": "gold"}},
-		},
+		MatchLabels: map[string]string{"class": "gold"},
 	}, "selection: ")
 	if !strings.Contains(selectionMsg, "matching the tenant's label selector") {
 		t.Fatalf("SelectionListWithDefaultErrorMessage() = %q", selectionMsg)
@@ -58,7 +54,7 @@ func TestAllowedValuesErrorMessageWithoutChoices(t *testing.T) {
 			t.Fatalf("message without choices = %q", got)
 		}
 	}
-	allowed := api.SelectorAllowedListSpec{AllowedListSpec: api.AllowedListSpec{Exact: []string{"fast"}}}
+	allowed := api.SelectorAllowedListSpec{Exact: []string{"fast"}}
 	if got := apierrors.AllowedValuesErrorMessage(allowed, ""); got != "Allowed values: fast" {
 		t.Fatalf("message without prefix = %q", got)
 	}
@@ -67,10 +63,9 @@ func TestAllowedValuesErrorMessageWithoutChoices(t *testing.T) {
 func TestErrorConstructors(t *testing.T) {
 	t.Parallel()
 
-	allowed := api.DefaultAllowedListSpec{SelectorAllowedListSpec: api.SelectorAllowedListSpec{
-		AllowedListSpec: api.AllowedListSpec{Exact: []string{"allowed"}, Regex: "allowed-.*"},
-	}}
-	selectorAllowed := api.SelectorAllowedListSpec{AllowedListSpec: api.AllowedListSpec{Exact: []string{"allowed"}}}
+	allowed := api.DefaultAllowedListSpec{
+		Exact: []string{"allowed"}, Regex: "allowed-.*"}
+	selectorAllowed := api.SelectorAllowedListSpec{Exact: []string{"allowed"}}
 
 	tests := []struct {
 		name string

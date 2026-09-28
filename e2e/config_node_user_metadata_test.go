@@ -24,30 +24,22 @@ var _ = Describe("modifying node labels and annotations", Ordered, Label("config
 	originConfig := &capsulev1beta2.CapsuleConfiguration{}
 
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-node-user-metadata-forbidden",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-node-user-metadata-forbidden",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-node-user-metadata-forbidden",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-node-user-metadata-forbidden",
+					Kind: "User",
 				},
 			},
 		},
 	}
 
 	cr := &rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "node-modifier",
-		},
+		Name: "node-modifier",
 		Rules: []rbacv1.PolicyRule{
 			{
 				APIGroups: []string{""},
@@ -58,9 +50,7 @@ var _ = Describe("modifying node labels and annotations", Ordered, Label("config
 	}
 
 	crb := &rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "node-modifier",
-		},
+		Name: "node-modifier",
 		RoleRef: rbacv1.RoleRef{
 			Kind:     "ClusterRole",
 			Name:     "node-modifier",

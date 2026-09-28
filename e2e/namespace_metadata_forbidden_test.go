@@ -24,11 +24,9 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 	originConfig := &capsulev1beta2.CapsuleConfiguration{}
 
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-user-metadata-forbidden",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-user-metadata-forbidden",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			NamespaceOptions: &capsulev1beta2.NamespaceOptions{
@@ -54,12 +52,8 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 			},
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-user-metadata-forbidden",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-user-metadata-forbidden",
+					Kind: "User",
 				},
 			},
 		},
@@ -259,9 +253,7 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 
 	It("should fail when updating a Namespace", Label("skip-on-openshift"), func() {
 		role := &rbacv1.Role{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "ns-patch",
-			},
+			Name: "ns-patch",
 			Rules: []rbacv1.PolicyRule{
 				{
 					Verbs:     []string{"patch", "update"},
@@ -272,9 +264,7 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 		}
 
 		roleBinding := &rbacv1.RoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "ns-patch",
-			},
+			Name: "ns-patch",
 			Subjects: []rbacv1.Subject{
 				{
 					APIGroup: "rbac.authorization.k8s.io",

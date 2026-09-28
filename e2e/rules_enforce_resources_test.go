@@ -50,15 +50,12 @@ var _ = Describe("enforcing workload resource namespace rules", Ordered, Label("
 
 	newTenant := func() *capsulev1beta2.Tenant {
 		tenant := &capsulev1beta2.Tenant{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   "e2e-rule-resources",
-				Labels: map[string]string{"env": "e2e"},
-			},
+			Name:   "e2e-rule-resources",
+			Labels: map[string]string{"env": "e2e"},
 			Spec: capsulev1beta2.TenantSpec{
-				Owners: rbac.OwnerListSpec{{CoreOwnerSpec: rbac.CoreOwnerSpec{UserSpec: rbac.UserSpec{
+				Owners: rbac.OwnerListSpec{{
 					Name: ownerName,
-					Kind: rbac.UserOwner,
-				}}}},
+					Kind: rbac.UserOwner}},
 				Rules: []*rules.NamespaceRuleBodyTenant{
 					{
 						NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"resource-policy": "managed"}},
@@ -247,7 +244,7 @@ var _ = Describe("enforcing workload resource namespace rules", Ordered, Label("
 		}
 
 		return &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Name: name,
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{{
@@ -472,7 +469,7 @@ var _ = Describe("enforcing workload resource namespace rules", Ordered, Label("
 
 			ns := createNamespace("target-matrix-" + targetCase.name)
 			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "target-matrix-" + targetCase.name},
+				Name: "target-matrix-" + targetCase.name,
 				Spec: corev1.PodSpec{
 					SecurityContext: nobodyPodSecurityContext(),
 					Containers: []corev1.Container{{

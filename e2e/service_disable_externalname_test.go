@@ -11,7 +11,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/ptr"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
@@ -21,26 +20,20 @@ import (
 
 var _ = Describe("creating an ExternalName service when it is disabled for Tenant", Ordered, Label("tenant", "networking", "service"), func() {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "disable-external-service",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "disable-external-service",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "disable-external-service",
-							Kind: "User",
-						},
-					},
+					Name: "disable-external-service",
+					Kind: "User",
 				},
 			},
 			ServiceOptions: &api.ServiceOptions{
 				AllowedServices: &api.AllowedServices{
-					ExternalName: ptr.To(false),
+					ExternalName: new(false),
 				},
 			},
 		},
@@ -68,10 +61,8 @@ var _ = Describe("creating an ExternalName service when it is disabled for Tenan
 
 		EventuallyCreation(func() error {
 			svc := &corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "cluster-ip",
-					Namespace: ns.GetName(),
-				},
+				Name:      "cluster-ip",
+				Namespace: ns.GetName(),
 				Spec: corev1.ServiceSpec{
 					Type: corev1.ServiceTypeClusterIP,
 					Ports: []corev1.ServicePort{
@@ -94,10 +85,8 @@ var _ = Describe("creating an ExternalName service when it is disabled for Tenan
 
 		EventuallyCreation(func() error {
 			svc := &corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "disable-external-service",
-					Namespace: ns.GetName(),
-				},
+				Name:      "disable-external-service",
+				Namespace: ns.GetName(),
 				Spec: corev1.ServiceSpec{
 					Type: corev1.ServiceTypeExternalName,
 					Ports: []corev1.ServicePort{

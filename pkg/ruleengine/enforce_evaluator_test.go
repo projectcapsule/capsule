@@ -82,7 +82,6 @@ func TestEvaluateEnforce_ValidationErrors(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -231,7 +230,6 @@ func TestEvaluateEnforce_EmptyInputs(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -362,7 +360,6 @@ func TestEvaluateEnforce_LastMatchingAllowDenyWins(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -506,7 +503,7 @@ func TestEvaluateEnforce_AllowMissDescriptionsAreLimited(t *testing.T) {
 	fixture := newTestFixture()
 
 	items := make([]testRule, 0, 12)
-	for i := 0; i < 12; i++ {
+	for i := range 12 {
 		items = append(items, testRule{
 			Name:        "rule-" + string(rune('a'+i)),
 			ShouldMatch: false,
@@ -858,7 +855,6 @@ func TestDecisionError_ErrorFallback(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()

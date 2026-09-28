@@ -293,8 +293,7 @@ func shouldIgnoreLedgerEnsureError(err error) bool {
 		return true
 	}
 
-	var statusErr *apierrors.StatusError
-	if errors.As(err, &statusErr) {
+	if statusErr, ok := errors.AsType[*apierrors.StatusError](err); ok {
 		if statusErr.ErrStatus.Reason == metav1.StatusReasonForbidden &&
 			strings.Contains(statusErr.ErrStatus.Message, "because it is being terminated") {
 			return true

@@ -22,7 +22,6 @@ func newReplicationContext(object metav1.Object) (map[string]any, error) {
 		Name:                       object.GetName(),
 		GenerateName:               object.GetGenerateName(),
 		Namespace:                  object.GetNamespace(),
-		SelfLink:                   object.GetSelfLink(),
 		UID:                        object.GetUID(),
 		ResourceVersion:            object.GetResourceVersion(),
 		Generation:                 object.GetGeneration(),

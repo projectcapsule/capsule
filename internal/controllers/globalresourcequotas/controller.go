@@ -169,10 +169,8 @@ func (r *Controller) syncResourceQuotas(
 		selected[namespace.Name] = struct{}{}
 
 		target := &corev1.ResourceQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      instance.GetResourceQuotaName(),
-				Namespace: namespace.Name,
-			},
+			Name:      instance.GetResourceQuotaName(),
+			Namespace: namespace.Name,
 		}
 
 		if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {

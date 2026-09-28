@@ -50,9 +50,7 @@ func RuleGlobalResourceQuota(
 	selector.MatchLabels[meta.TenantLabel] = tnt.Name
 
 	return &capsulev1beta2.GlobalResourceQuota{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: RuleGlobalResourceQuotaName(tnt, quota.Name),
-		},
+		Name: RuleGlobalResourceQuotaName(tnt, quota.Name),
 		Spec: capsulev1beta2.GlobalResourceQuotaSpec{
 			NamespaceSelectors: []selectors.NamespaceSelector{{LabelSelector: selector}},
 			Quota:              *quota.ResourceQuotaSpec.DeepCopy(),

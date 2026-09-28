@@ -31,9 +31,9 @@ func TestOwnerListSpecOwnershipAndStatusConversion(t *testing.T) {
 	t.Parallel()
 
 	owners := rbac.OwnerListSpec{
-		{CoreOwnerSpec: rbac.CoreOwnerSpec{UserSpec: rbac.UserSpec{Kind: rbac.UserOwner, Name: "alice"}}},
-		{CoreOwnerSpec: rbac.CoreOwnerSpec{UserSpec: rbac.UserSpec{Kind: rbac.GroupOwner, Name: "team-a"}}},
-		{CoreOwnerSpec: rbac.CoreOwnerSpec{UserSpec: rbac.UserSpec{Kind: rbac.ServiceAccountOwner, Name: "system:serviceaccount:tenant-a:builder"}}},
+		{Kind: rbac.UserOwner, Name: "alice"},
+		{Kind: rbac.GroupOwner, Name: "team-a"},
+		{Kind: rbac.ServiceAccountOwner, Name: "system:serviceaccount:tenant-a:builder"},
 	}
 
 	for _, tt := range []struct {
@@ -57,9 +57,9 @@ func TestOwnerListSpecOwnershipAndStatusConversion(t *testing.T) {
 	}
 
 	wantStatus := rbac.OwnerStatusListSpec{
-		{UserSpec: rbac.UserSpec{Kind: rbac.UserOwner, Name: "alice"}},
-		{UserSpec: rbac.UserSpec{Kind: rbac.GroupOwner, Name: "team-a"}},
-		{UserSpec: rbac.UserSpec{Kind: rbac.ServiceAccountOwner, Name: "system:serviceaccount:tenant-a:builder"}},
+		{Kind: rbac.UserOwner, Name: "alice"},
+		{Kind: rbac.GroupOwner, Name: "team-a"},
+		{Kind: rbac.ServiceAccountOwner, Name: "system:serviceaccount:tenant-a:builder"},
 	}
 	if got := owners.ToStatusOwners(); !reflect.DeepEqual(got, wantStatus) {
 		t.Fatalf("ToStatusOwners() = %#v, want %#v", got, wantStatus)

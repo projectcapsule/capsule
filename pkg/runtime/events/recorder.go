@@ -115,12 +115,10 @@ func (r *eventRecorder) Emit(ctx context.Context, e LabeledEvent) {
 	}
 
 	event := &eventsv1.Event{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: metaObj.GetName(),
-			Namespace:    namespace,
-			Labels:       e.Labels(),
-			Annotations:  e.Annotations(),
-		},
+		GenerateName:        metaObj.GetName(),
+		Namespace:           namespace,
+		Labels:              e.Labels(),
+		Annotations:         e.Annotations(),
 		EventTime:           metav1.MicroTime{Time: time.Now()},
 		ReportingController: ReportingController,
 		ReportingInstance:   ReportingInstance,

@@ -203,9 +203,7 @@ func (r *clusterCustomQuotaClaimController) mapNamespaceToGlobalCustomQuotas(
 
 		if shouldReconcile {
 			requests = append(requests, reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name: gcq.Name,
-				},
+				Name: gcq.Name,
 			})
 		}
 	}
@@ -326,10 +324,8 @@ func (r *clusterCustomQuotaClaimController) ensureQuotaLedger(
 	instance *capsulev1beta2.GlobalCustomQuota,
 ) (*capsulev1beta2.QuantityLedger, error) {
 	ledger := &capsulev1beta2.QuantityLedger{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      instance.GetName(),
-			Namespace: configuration.ControllerNamespace(),
-		},
+		Name:      instance.GetName(),
+		Namespace: configuration.ControllerNamespace(),
 	}
 
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, ledger, func() error {

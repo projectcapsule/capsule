@@ -9,7 +9,6 @@ import (
 	"github.com/go-logr/logr"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -50,8 +49,8 @@ func TestNodeSelectorAnnotationProtection(t *testing.T) {
 				{"unchanged selector", map[string]string{utils.NodeSelectorAnnotation: "node-type=compute"}, map[string]string{utils.NodeSelectorAnnotation: "node-type=compute", "example.com/unrelated": "changed"}, false},
 			} {
 				t.Run(change.name, func(t *testing.T) {
-					oldNs := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "team-test", Annotations: change.old}}
-					newNs := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "team-test", Annotations: change.new}}
+					oldNs := &corev1.Namespace{Name: "team-test", Annotations: change.old}
+					newNs := &corev1.Namespace{Name: "team-test", Annotations: change.new}
 					response := UserMetadataHandler().OnUpdate(nil, nil, actor.user, newNs, oldNs, nil, recorder, tnt)(t.Context(), admission.Request{})
 					wantDenied := change.changed && !actor.controller
 					if denied := response != nil && !response.Allowed; denied != wantDenied {
@@ -69,8 +68,8 @@ func TestNamespaceHandlerAllowsControllerNodeSelectorReconciliation(t *testing.T
 
 	scheme := namespaceValidationScheme(t)
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{Name: "team", UID: "team-uid"},
-		Spec:       capsulev1beta2.TenantSpec{NodeSelector: map[string]string{"node-type": "compute"}},
+		Name: "team", UID: "team-uid",
+		Spec: capsulev1beta2.TenantSpec{NodeSelector: map[string]string{"node-type": "compute"}},
 	}
 	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(tnt).Build()
 	oldNs := namespaceWithTenantReference("team-test", tnt.Name, string(tnt.UID))

@@ -13,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -23,42 +22,30 @@ import (
 
 var _ = Describe("preventing PersistentVolume cross-tenant mount", Ordered, Label("tenant", "storage", "persistentvolumeclaim"), func() {
 	tnt1 := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-pv-cross-one",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-pv-cross-one",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-pv-cross-one",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-pv-cross-one",
+					Kind: "User",
 				},
 			},
 		},
 	}
 
 	tnt2 := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-pv-cross-two",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-pv-cross-two",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-pv-cross-two",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-pv-cross-two",
+					Kind: "User",
 				},
 			},
 		},
@@ -90,10 +77,8 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Ordered, Labe
 		NamespaceIsPartOfTenant(tnt1, ns).Should(Succeed())
 
 		pvc := corev1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "arrakis",
-				Namespace: ns.Name,
-			},
+			Name:      "arrakis",
+			Namespace: ns.Name,
 			Spec: corev1.PersistentVolumeClaimSpec{
 				AccessModes: []corev1.PersistentVolumeAccessMode{
 					corev1.ReadWriteOnce,
@@ -103,7 +88,7 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Ordered, Labe
 						corev1.ResourceStorage: resource.MustParse("1Gi"),
 					},
 				},
-				StorageClassName: ptr.To("standard"),
+				StorageClassName: new("standard"),
 			},
 		}
 
@@ -112,10 +97,8 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Ordered, Labe
 		}).Should(Succeed())
 
 		pod := corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "arrakis-pod",
-				Namespace: ns.Name,
-			},
+			Name:      "arrakis-pod",
+			Namespace: ns.Name,
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
@@ -135,10 +118,8 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Ordered, Labe
 				Volumes: []corev1.Volume{
 					{
 						Name: "data",
-						VolumeSource: corev1.VolumeSource{
-							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-								ClaimName: pvc.Name,
-							},
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: pvc.Name,
 						},
 					},
 				},
@@ -188,7 +169,7 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Ordered, Labe
 			return k8sClient.Update(context.Background(), &pv)
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
-		Expect(k8sClient.Delete(context.Background(), &pod, &client.DeleteOptions{GracePeriodSeconds: ptr.To(int64(0))})).ToNot(HaveOccurred())
+		Expect(k8sClient.Delete(context.Background(), &pod, &client.DeleteOptions{GracePeriodSeconds: new(int64(0))})).ToNot(HaveOccurred())
 
 		ns2 := NewNamespace("", map[string]string{
 			meta.TenantLabel: tnt2.GetName(),
@@ -198,10 +179,8 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Ordered, Labe
 
 		Consistently(func() error {
 			pvc := corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "caladan",
-					Namespace: ns2.Name,
-				},
+				Name:      "caladan",
+				Namespace: ns2.Name,
 				Spec: corev1.PersistentVolumeClaimSpec{
 					AccessModes: []corev1.PersistentVolumeAccessMode{
 						corev1.ReadWriteOnce,
@@ -211,7 +190,7 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Ordered, Labe
 							corev1.ResourceStorage: resource.MustParse("1Gi"),
 						},
 					},
-					StorageClassName: ptr.To("standard"),
+					StorageClassName: new("standard"),
 					VolumeName:       pv.Name,
 				},
 			}
@@ -235,11 +214,9 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Ordered, Labe
 
 		for index, value := range []string{"", tnt2.Name} {
 			pv := &corev1.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: fmt.Sprintf("repair-tenant-label-%d", index),
-					Labels: map[string]string{
-						meta.TenantLabel: value,
-					},
+				Name: fmt.Sprintf("repair-tenant-label-%d", index),
+				Labels: map[string]string{
+					meta.TenantLabel: value,
 				},
 				Spec: corev1.PersistentVolumeSpec{
 					Capacity: corev1.ResourceList{
@@ -289,10 +266,8 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Ordered, Labe
 		NamespaceIsPartOfTenant(tnt1, ns).Should(Succeed())
 
 		pvc := corev1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "dynamic-pvc",
-				Namespace: ns.Name,
-			},
+			Name:      "dynamic-pvc",
+			Namespace: ns.Name,
 			Spec: corev1.PersistentVolumeClaimSpec{
 				AccessModes: []corev1.PersistentVolumeAccessMode{
 					corev1.ReadWriteOnce,
@@ -302,7 +277,7 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Ordered, Labe
 						corev1.ResourceStorage: resource.MustParse("1Gi"),
 					},
 				},
-				StorageClassName: ptr.To("standard"),
+				StorageClassName: new("standard"),
 			},
 		}
 
@@ -350,10 +325,8 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Ordered, Labe
 		NamespaceIsPartOfTenant(tnt1, ns).Should(Succeed())
 
 		pvc := corev1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "selector-pvc",
-				Namespace: ns.Name,
-			},
+			Name:      "selector-pvc",
+			Namespace: ns.Name,
 			Spec: corev1.PersistentVolumeClaimSpec{
 				AccessModes: []corev1.PersistentVolumeAccessMode{
 					corev1.ReadWriteOnce,
@@ -363,7 +336,7 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Ordered, Labe
 						corev1.ResourceStorage: resource.MustParse("1Gi"),
 					},
 				},
-				StorageClassName: ptr.To("standard"),
+				StorageClassName: new("standard"),
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						"storage-tier": "gold",
@@ -404,10 +377,8 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Ordered, Labe
 		NamespaceIsPartOfTenant(tnt1, ns).Should(Succeed())
 
 		pvc := corev1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "conflicting-selector-pvc",
-				Namespace: ns.Name,
-			},
+			Name:      "conflicting-selector-pvc",
+			Namespace: ns.Name,
 			Spec: corev1.PersistentVolumeClaimSpec{
 				AccessModes: []corev1.PersistentVolumeAccessMode{
 					corev1.ReadWriteOnce,
@@ -417,7 +388,7 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Ordered, Labe
 						corev1.ResourceStorage: resource.MustParse("1Gi"),
 					},
 				},
-				StorageClassName: ptr.To("standard"),
+				StorageClassName: new("standard"),
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						meta.TenantLabel: tnt2.Name,
@@ -489,11 +460,9 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Ordered, Labe
 		NamespaceIsPartOfTenant(tnt1, ns).Should(Succeed())
 
 		pv := corev1.PersistentVolume{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "prebound-pv",
-				Labels: map[string]string{
-					meta.TenantLabel: tnt1.Name,
-				},
+			Name: "prebound-pv",
+			Labels: map[string]string{
+				meta.TenantLabel: tnt1.Name,
 			},
 			Spec: corev1.PersistentVolumeSpec{
 				Capacity: corev1.ResourceList{
@@ -521,10 +490,8 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Ordered, Labe
 		}()
 
 		pvc := corev1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "prebound-pvc",
-				Namespace: ns.Name,
-			},
+			Name:      "prebound-pvc",
+			Namespace: ns.Name,
 			Spec: corev1.PersistentVolumeClaimSpec{
 				AccessModes: []corev1.PersistentVolumeAccessMode{
 					corev1.ReadWriteOnce,
@@ -534,7 +501,7 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Ordered, Labe
 						corev1.ResourceStorage: resource.MustParse("1Gi"),
 					},
 				},
-				StorageClassName: ptr.To("manual"),
+				StorageClassName: new("manual"),
 				VolumeName:       pv.Name,
 			},
 		}

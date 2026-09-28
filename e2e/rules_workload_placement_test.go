@@ -451,7 +451,13 @@ var _ = Describe("workload placement namespace profiles", Label("tenant", "rules
 		for _, test := range []struct {
 			expression string
 			action     rules.MutationAction
-		}{{expression: "object.spec."}, {expression: "'not-a-boolean'"}, {expression: "true", action: "append"}} {
+		}{
+			{expression: "object.spec."},
+			{expression: "'not-a-boolean'"},
+			{expression: "now >= timestamp('2026-01-01T00:00:00Z')"},
+			{expression: "requestor.name == 'alice'"},
+			{expression: "true", action: "append"},
+		} {
 			before, err := updatePlacementTenant(current, func(invalid *capsulev1beta2.Tenant) {
 				invalid.Spec.Rules[0].Mutate[0].Action = test.action
 				invalid.Spec.Rules[0].Mutate[0].Workloads.Conditions = []rules.AdmissionCondition{{Name: "invalid", Expression: test.expression}}

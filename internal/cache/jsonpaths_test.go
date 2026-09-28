@@ -161,7 +161,7 @@ var _ = Describe("JSONPathCache", func() {
 		var wg sync.WaitGroup
 		wg.Add(workers)
 
-		for i := 0; i < workers; i++ {
+		for range workers {
 			go func() {
 				defer GinkgoRecover()
 				defer wg.Done()

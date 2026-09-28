@@ -19,21 +19,15 @@ import (
 
 var _ = Describe("creating a nodePort service when it is enabled for Tenant", Ordered, Label("tenant", "networking", "service"), func() {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-enable-node-ports",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-enable-node-ports",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-enable-node-ports",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-enable-node-ports",
+					Kind: "User",
 				},
 			},
 		},
@@ -59,10 +53,8 @@ var _ = Describe("creating a nodePort service when it is enabled for Tenant", Or
 		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		svc := &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "enable-node-ports",
-				Namespace: ns.GetName(),
-			},
+			Name:      "enable-node-ports",
+			Namespace: ns.GetName(),
 			Spec: corev1.ServiceSpec{
 				Type: corev1.ServiceTypeNodePort,
 				Ports: []corev1.ServicePort{

@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/tenant"
@@ -26,9 +25,7 @@ func TestContextForTenantAndNamespace_BothNil(t *testing.T) {
 
 func TestContextForTenantAndNamespace_OnlyTenant(t *testing.T) {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "wind",
-		},
+		Name: "wind",
 	}
 
 	ctx := tenant.FastContextForTenantAndNamespace(tnt, nil)
@@ -46,9 +43,7 @@ func TestContextForTenantAndNamespace_OnlyTenant(t *testing.T) {
 
 func TestContextForTenantAndNamespace_OnlyNamespace(t *testing.T) {
 	ns := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "wind-prod",
-		},
+		Name: "wind-prod",
 	}
 
 	ctx := tenant.FastContextForTenantAndNamespace(nil, ns)
@@ -66,14 +61,10 @@ func TestContextForTenantAndNamespace_OnlyNamespace(t *testing.T) {
 
 func TestContextForTenantAndNamespace_BothSet(t *testing.T) {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "wind",
-		},
+		Name: "wind",
 	}
 	ns := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "wind-prod",
-		},
+		Name: "wind-prod",
 	}
 
 	ctx := tenant.FastContextForTenantAndNamespace(tnt, ns)

@@ -56,11 +56,9 @@ func TestValidatingHandlerSkipsTerminatingClaimWithUnchangedSpec(t *testing.T) {
 
 	now := metav1.Now()
 	oldPVC := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			DeletionTimestamp: &now,
-			Finalizers:        []string{"kubernetes.io/pvc-protection"},
-		},
-		Spec: corev1.PersistentVolumeClaimSpec{VolumeName: "caladan"},
+		DeletionTimestamp: &now,
+		Finalizers:        []string{"kubernetes.io/pvc-protection"},
+		Spec:              corev1.PersistentVolumeClaimSpec{VolumeName: "caladan"},
 	}
 	newPVC := oldPVC.DeepCopy()
 	newPVC.Finalizers = nil
@@ -91,7 +89,7 @@ func TestHandlersSkipBoundClaimsBeforeTenantLookup(t *testing.T) {
 	}
 
 	oldPVC := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{Name: "nginx-logs"},
+		Name: "nginx-logs",
 		Spec: corev1.PersistentVolumeClaimSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{
 				"velero.io/dynamic-pv-restore": "test.nginx-logs.sg75p",
@@ -146,7 +144,7 @@ func TestVolumeHooksSkipBoundClaimUpdates(t *testing.T) {
 	}
 
 	oldPVC := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{Name: "nginx-logs"},
+		Name: "nginx-logs",
 		Spec: corev1.PersistentVolumeClaimSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{
 				"velero.io/dynamic-pv-restore": "test.nginx-logs.sg75p",
@@ -157,7 +155,7 @@ func TestVolumeHooksSkipBoundClaimUpdates(t *testing.T) {
 	}
 	newPVC := oldPVC.DeepCopy()
 	newPVC.Labels = map[string]string{"test": "test"}
-	tnt := &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: "test"}}
+	tnt := &capsulev1beta2.Tenant{Name: "test"}
 	request := pvcUpdateAdmissionRequest(t, oldPVC, newPVC)
 	decoder := admission.NewDecoder(scheme)
 
@@ -195,8 +193,8 @@ func TestRequiresPVCSpecValidation(t *testing.T) {
 
 	now := metav1.Now()
 	terminating := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: &now},
-		Spec:       corev1.PersistentVolumeClaimSpec{VolumeName: "caladan"},
+		DeletionTimestamp: &now,
+		Spec:              corev1.PersistentVolumeClaimSpec{VolumeName: "caladan"},
 	}
 	changed := terminating.DeepCopy()
 	changed.Spec.VolumeName = "salusa"
@@ -261,9 +259,8 @@ func TestRequiresPVCSpecValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
-				Operation: tt.operation,
-			}}
+			req := admission.Request{
+				Operation: tt.operation}
 
 			if got := requiresPVCSpecValidation(req, tt.pvc, tt.oldPVC); got != tt.want {
 				t.Fatalf("requiresPVCSpecValidation() = %t, want %t", got, tt.want)
@@ -297,13 +294,12 @@ func pvcAdmissionRequest(t *testing.T, pvc *corev1.PersistentVolumeClaim) admiss
 		t.Fatal(err)
 	}
 
-	return admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+	return admission.Request{
 		Operation: admissionv1.Create,
 		Namespace: "solar",
 		Object: runtime.RawExtension{
 			Raw: raw,
-		},
-	}}
+		}}
 }
 
 func pvcUpdateAdmissionRequest(

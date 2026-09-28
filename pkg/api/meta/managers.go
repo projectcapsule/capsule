@@ -4,8 +4,11 @@
 package meta
 
 import (
+	"hash/fnv"
+	"strconv"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -23,7 +26,26 @@ func ControllerFieldOwner() string {
 }
 
 func ResourceControllerFieldOwnerPrefix() string {
-	return FieldManagerCapsulePrefix + "/resource/controller"
+	return ResourceFieldOwner("controller")
+}
+
+// ResourceFieldOwner returns a Capsule field manager for an applied resource.
+func ResourceFieldOwner(fieldowner string) string {
+	return FieldManagerCapsulePrefix + "/resource/" + fieldowner
+}
+
+// ResourcePermitFieldOwner returns a stable field manager for a ResourcePermit.
+func ResourcePermitFieldOwner(obj metav1.Object) string {
+	identity := string(obj.GetUID())
+	if identity == "" {
+		hash := fnv.New64a()
+		_, _ = hash.Write([]byte(obj.GetNamespace()))
+		_, _ = hash.Write([]byte{0})
+		_, _ = hash.Write([]byte(obj.GetName()))
+		identity = strconv.FormatUint(hash.Sum64(), 36)
+	}
+
+	return ResourceFieldOwner("resourcepermit/" + identity)
 }
 
 // CapsuleFieldOwners returns the set of managers that start with the Capsule prefix.
@@ -45,6 +67,35 @@ func CapsuleFieldOwners(obj *unstructured.Unstructured, prefix string) map[strin
 	}
 
 	return out
+}
+
+// ReplicationFieldOwnerPrefix preserves the established parent identity used by
+// replication SSA managers, including managers created before policy support.
+func ReplicationFieldOwnerPrefix(name, namespace string) string {
+	if namespace == "" {
+		namespace = "Cluster"
+	}
+
+	hash := fnv.New64a()
+	_, _ = hash.Write([]byte(namespace))
+	_, _ = hash.Write([]byte{0})
+	_, _ = hash.Write([]byte(name))
+
+	return strconv.FormatUint(hash.Sum64(), 36)
+}
+
+// CapsuleResourceFieldOwners includes established replication managers only
+// when they match a known processed item. Manager names alone are user input.
+func CapsuleResourceFieldOwners(fields []metav1.ManagedFieldsEntry, replicationOwners map[string]struct{}) map[string]struct{} {
+	owners := map[string]struct{}{}
+
+	for _, field := range fields {
+		if _, known := replicationOwners[field.Manager]; known || strings.HasPrefix(field.Manager, ResourceFieldOwner("")) {
+			owners[field.Manager] = struct{}{}
+		}
+	}
+
+	return owners
 }
 
 func HasExactlyCapsuleOwners(obj *unstructured.Unstructured, prefix string, allowed []string) bool {

@@ -31,14 +31,14 @@ func TestSyncGlobalResourceQuotasGeneratesAndPrunesRuleQuotas(t *testing.T) {
 	}
 
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{Name: "tenant-a", UID: types.UID("tenant-uid")},
+		Name: "tenant-a", UID: types.UID("tenant-uid"),
 		Spec: capsulev1beta2.TenantSpec{Rules: []*rules.NamespaceRuleBodyTenant{{
 			NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
 				Quota: []rules.ResourceQuotaRule{{
 					Name: "shared-compute",
-					ResourceQuotaSpec: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{
+					Hard: corev1.ResourceList{
 						corev1.ResourceRequestsCPU: resource.MustParse("8"),
-					}},
+					},
 				}},
 			},
 			NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"tier": "paid"}},
@@ -87,9 +87,9 @@ func TestSyncGlobalResourceQuotasGeneratesAndPrunesRuleQuotas(t *testing.T) {
 			NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
 				Quota: []rules.ResourceQuotaRule{{
 					Name: "service-count",
-					ResourceQuotaSpec: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{
+					Hard: corev1.ResourceList{
 						corev1.ResourceServices: resource.MustParse("5"),
-					}},
+					},
 				}},
 			},
 		},

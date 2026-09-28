@@ -23,7 +23,6 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
-	"github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/users"
 )
 
@@ -31,11 +30,9 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Ordered, Label("config",
 	originConfig := &capsulev1beta2.CapsuleConfiguration{}
 
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-tenant-owner-promotion",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-tenant-owner-promotion",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Permissions: capsulev1beta2.Permissions{
@@ -43,12 +40,8 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Ordered, Label("config",
 			},
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-sa-owner-promotion",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-sa-owner-promotion",
+					Kind: "User",
 				},
 			},
 			AdditionalRoleBindings: []rbac.AdditionalRoleBindingsSpec{
@@ -107,10 +100,8 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Ordered, Label("config",
 
 		// Create a ServiceAccount inside the tenant namespace
 		sa := &corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-sa",
-				Namespace: ns.Name,
-			},
+			Name:      "test-sa",
+			Namespace: ns.Name,
 		}
 		Expect(k8sClient.Create(context.TODO(), sa)).Should(Succeed())
 
@@ -207,10 +198,8 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Ordered, Label("config",
 
 		// Create a ServiceAccount inside the tenant namespace
 		sa := &corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-sa",
-				Namespace: ns.Name,
-			},
+			Name:      "test-sa",
+			Namespace: ns.Name,
 		}
 		Expect(k8sClient.Create(context.TODO(), sa)).Should(Succeed())
 
@@ -302,10 +291,8 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Ordered, Label("config",
 
 		// Create a ServiceAccount inside the tenant namespace
 		sa := &corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-sa",
-				Namespace: ns.Name,
-			},
+			Name:      "test-sa",
+			Namespace: ns.Name,
 		}
 		Expect(k8sClient.Create(context.TODO(), sa)).Should(Succeed())
 
@@ -369,7 +356,7 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Ordered, Label("config",
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
-		sa := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "audience-sa", Namespace: ns.Name}}
+		sa := &corev1.ServiceAccount{Name: "audience-sa", Namespace: ns.Name}
 		Expect(k8sClient.Create(ctx, sa)).To(Succeed())
 		info := users.ServiceAccountUserInfo(ns.Name, sa.Name)
 		// Use only Kubernetes service account groups. Adding the test suite's
@@ -402,9 +389,9 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Ordered, Label("config",
 		// Grant resource access independently of promotion so the unpromoted
 		// account exercises admission, not an RBAC rejection.
 		Expect(k8sClient.Create(ctx, &rbacv1.RoleBinding{
-			ObjectMeta: metav1.ObjectMeta{Name: "audience-sa", Namespace: ns.Name},
-			RoleRef:    rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "ClusterRole", Name: "admin"},
-			Subjects:   []rbacv1.Subject{{Kind: rbacv1.ServiceAccountKind, Name: sa.Name, Namespace: ns.Name}},
+			Name: "audience-sa", Namespace: ns.Name,
+			RoleRef:  rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "ClusterRole", Name: "admin"},
+			Subjects: []rbacv1.Subject{{Kind: rbacv1.ServiceAccountKind, Name: sa.Name, Namespace: ns.Name}},
 		})).To(Succeed())
 
 		audience := []rules.Audience{{Kind: rules.AudienceKindCustom, Name: string(rules.CustomAudienceCapsuleUser)}}
@@ -415,9 +402,9 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Ordered, Label("config",
 					Enforce: &rules.NamespaceRuleEnforceBody{
 						Action: rules.ActionTypeDeny,
 						Metadata: []rules.MetadataRule{{
-							VersionKinds: runtime.VersionKinds{Kinds: []string{"*", "Namespace"}},
-							Labels:       map[string]rules.MetadataValueRule{policyKey: {}},
-							Annotations:  map[string]rules.MetadataValueRule{policyKey: {}},
+							Kinds:       []string{"*", "Namespace"},
+							Labels:      map[string]rules.MetadataValueRule{policyKey: {}},
+							Annotations: map[string]rules.MetadataValueRule{policyKey: {}},
 						}},
 					},
 				}},
@@ -426,8 +413,8 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Ordered, Label("config",
 					Enforce: &rules.NamespaceRuleEnforceBody{
 						Action: rules.ActionTypeAllow,
 						Metadata: []rules.MetadataRule{{
-							VersionKinds: runtime.VersionKinds{Kinds: []string{"ConfigMap", "Namespace"}},
-							Labels:       map[string]rules.MetadataValueRule{defaultKey: {Default: &defaultValue}},
+							Kinds:  []string{"ConfigMap", "Namespace"},
+							Labels: map[string]rules.MetadataValueRule{defaultKey: {Default: &defaultValue}},
 						}},
 					},
 				}},
@@ -449,7 +436,7 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Ordered, Label("config",
 				if kind == "Namespace" {
 					return NewNamespace("", map[string]string{meta.TenantLabel: tnt.Name})
 				}
-				return &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{GenerateName: "sa-audience-", Namespace: ns.Name}}
+				return &corev1.ConfigMap{GenerateName: "sa-audience-", Namespace: ns.Name}
 			}
 
 			By(fmt.Sprintf("allowing %s creation without denied metadata and applying the CapsuleUser default", kind))
@@ -510,10 +497,8 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Ordered, Label("config",
 
 		// Create a ServiceAccount inside the tenant namespace
 		sa := &corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-sa",
-				Namespace: ns.Name,
-			},
+			Name:      "test-sa",
+			Namespace: ns.Name,
 		}
 		Expect(k8sClient.Create(context.TODO(), sa)).Should(Succeed())
 

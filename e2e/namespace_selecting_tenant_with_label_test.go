@@ -20,41 +20,29 @@ import (
 
 var _ = Describe("creating a Namespace with Tenant selector when user owns multiple tenants", Ordered, Label("tenant", "assignment"), func() {
 	t1 := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-tenant-label-one",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-tenant-label-one",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-tenant-label",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-tenant-label",
+					Kind: "User",
 				},
 			},
 		},
 	}
 	t2 := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-tenant-label-two",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-tenant-label-two",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-tenant-label",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-tenant-label",
+					Kind: "User",
 				},
 			},
 		},
@@ -99,8 +87,8 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 		})
 
 		By("assigning to the Namespace the Capsule Tenant label (Attempt Label Patch)", func() {
-			patch := map[string]interface{}{
-				"metadata": map[string]interface{}{
+			patch := map[string]any{
+				"metadata": map[string]any{
 					"labels": map[string]string{
 						meta.TenantLabel: t2.Name,
 					},
@@ -120,12 +108,12 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 			ref, err := GetTenantOwnerReferenceAsPatch(t2)
 			Expect(err).NotTo(HaveOccurred())
 
-			patch := map[string]interface{}{
-				"metadata": map[string]interface{}{
+			patch := map[string]any{
+				"metadata": map[string]any{
 					"labels": map[string]string{
 						meta.TenantLabel: t1.Name,
 					},
-					"ownerReferences": []map[string]interface{}{ref},
+					"ownerReferences": []map[string]any{ref},
 				},
 			}
 
@@ -142,12 +130,12 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 			ref, err := GetTenantOwnerReferenceAsPatch(t2)
 			Expect(err).NotTo(HaveOccurred())
 
-			patch := map[string]interface{}{
-				"metadata": map[string]interface{}{
-					"labels": map[string]interface{}{
+			patch := map[string]any{
+				"metadata": map[string]any{
+					"labels": map[string]any{
 						meta.TenantLabel: nil,
 					},
-					"ownerReferences": []map[string]interface{}{ref},
+					"ownerReferences": []map[string]any{ref},
 				},
 			}
 
@@ -161,8 +149,8 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 		})
 
 		By("assigning to the Namespace the Capsule Tenant label (Empty Ownerreferences)", func() {
-			patch := map[string]interface{}{
-				"metadata": map[string]interface{}{
+			patch := map[string]any{
+				"metadata": map[string]any{
 					"labels": map[string]string{
 						meta.TenantLabel: t2.Name,
 					},
@@ -180,9 +168,9 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 		})
 
 		By("assigning to the Namespace the Capsule Tenant label (Empty Ownerreferences) - Without Label", func() {
-			patch := map[string]interface{}{
-				"metadata": map[string]interface{}{
-					"labels": map[string]interface{}{
+			patch := map[string]any{
+				"metadata": map[string]any{
+					"labels": map[string]any{
 						meta.TenantLabel: nil,
 					},
 					"ownerReferences": []string{},
@@ -202,12 +190,12 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 			ref, err := GetTenantOwnerReferenceAsPatch(t2)
 			Expect(err).NotTo(HaveOccurred())
 
-			patch := map[string]interface{}{
-				"metadata": map[string]interface{}{
+			patch := map[string]any{
+				"metadata": map[string]any{
 					"labels": map[string]string{
 						meta.TenantLabel: t2.Name,
 					},
-					"ownerReferences": []map[string]interface{}{ref},
+					"ownerReferences": []map[string]any{ref},
 				},
 			}
 

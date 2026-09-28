@@ -9,7 +9,12 @@ spec:
     name: gtr-reconciler
     namespace: capsule-system
   resources:
-    - additionalMetadata:
+    - policy:
+        creation: Owner
+        force: false
+        protect: true
+        deletion: Remove
+      additionalMetadata:
         labels:
           "replicated-by": "capsule"
       rawItems:

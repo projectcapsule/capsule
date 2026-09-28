@@ -17,31 +17,21 @@ import (
 
 var _ = Describe("defining dynamic Tenant Owner Cluster Roles", Ordered, Label("tenant", "permissions", "owners", "rolebindings"), func() {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-dynamic-to-clusterroles",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-dynamic-to-clusterroles",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Kind: "User",
-							Name: "e2e-dynamic-to-clusterroles",
-						},
-						ClusterRoles: []string{"edit", "admin"},
-					},
+					Kind:         "User",
+					Name:         "e2e-dynamic-to-clusterroles",
+					ClusterRoles: []string{"edit", "admin"},
 				},
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "group:e2e-dynamic-to-clusterroles",
-							Kind: "Group",
-						},
-						ClusterRoles: []string{"view"},
-					},
+					Name:         "group:e2e-dynamic-to-clusterroles",
+					Kind:         "Group",
+					ClusterRoles: []string{"view"},
 				},
 			},
 		},

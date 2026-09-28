@@ -11,7 +11,6 @@ import (
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capmeta "github.com/projectcapsule/capsule/pkg/api/meta"
@@ -58,15 +57,13 @@ var _ = Describe("TenantOwner status tracks matched Tenants", Ordered, Label("te
 	// to is a shared TenantOwner used across the sub-tests in this Ordered block.
 	// Two Tenants are created/deleted to verify count changes.
 	to := &capsulev1beta2.TenantOwner{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-to-status",
-			Labels: map[string]string{
-				"e2e-to-status":          "true",
-				"e2e.suite.capsule/name": "owner_status_test",
-			},
+		Name: "e2e-to-status",
+		Labels: map[string]string{
+			"e2e-to-status":          "true",
+			"e2e.suite.capsule/name": "owner_status_test",
 		},
 		Spec: capsulev1beta2.TenantOwnerSpec{
-			Aggregate: ptr.To(true),
+			Aggregate: new(true),
 			CoreOwnerSpec: rbac.CoreOwnerSpec{
 				UserSpec: rbac.UserSpec{
 					Kind: rbac.UserOwner,
@@ -78,9 +75,7 @@ var _ = Describe("TenantOwner status tracks matched Tenants", Ordered, Label("te
 	}
 
 	tnt1 := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-to-status-tnt1",
-		},
+		Name: "e2e-to-status-tnt1",
 		Spec: capsulev1beta2.TenantSpec{
 			Permissions: capsulev1beta2.Permissions{
 				MatchOwners: []*metav1.LabelSelector{
@@ -91,9 +86,7 @@ var _ = Describe("TenantOwner status tracks matched Tenants", Ordered, Label("te
 	}
 
 	tnt2 := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-to-status-tnt2",
-		},
+		Name: "e2e-to-status-tnt2",
 		Spec: capsulev1beta2.TenantSpec{
 			Permissions: capsulev1beta2.Permissions{
 				MatchOwners: []*metav1.LabelSelector{
@@ -209,15 +202,13 @@ var _ = Describe("TenantOwner status with 10 matched Tenants", Ordered, Label("t
 	const tenantCount = 10
 
 	to := &capsulev1beta2.TenantOwner{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-to-status-10match",
-			Labels: map[string]string{
-				"e2e-to-status-10match":  "true",
-				"e2e.suite.capsule/name": "owner_status_test",
-			},
+		Name: "e2e-to-status-10match",
+		Labels: map[string]string{
+			"e2e-to-status-10match":  "true",
+			"e2e.suite.capsule/name": "owner_status_test",
 		},
 		Spec: capsulev1beta2.TenantOwnerSpec{
-			Aggregate: ptr.To(true),
+			Aggregate: new(true),
 			CoreOwnerSpec: rbac.CoreOwnerSpec{
 				UserSpec: rbac.UserSpec{
 					Kind: rbac.UserOwner,
@@ -232,11 +223,9 @@ var _ = Describe("TenantOwner status with 10 matched Tenants", Ordered, Label("t
 		tnts := make([]*capsulev1beta2.Tenant, tenantCount)
 		for i := range tnts {
 			tnts[i] = &capsulev1beta2.Tenant{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: fmt.Sprintf("e2e-to-status-10match-tnt-%d", i),
-					Labels: map[string]string{
-						"e2e.suite.capsule/name": "owner_status_test",
-					},
+				Name: fmt.Sprintf("e2e-to-status-10match-tnt-%d", i),
+				Labels: map[string]string{
+					"e2e.suite.capsule/name": "owner_status_test",
 				},
 				Spec: capsulev1beta2.TenantSpec{
 					Permissions: capsulev1beta2.Permissions{
@@ -259,7 +248,6 @@ var _ = Describe("TenantOwner status with 10 matched Tenants", Ordered, Label("t
 		}).Should(Succeed())
 
 		for _, tnt := range tenants() {
-			tnt := tnt
 
 			EventuallyCreation(func() error {
 				tnt.ResourceVersion = ""
@@ -294,15 +282,13 @@ var _ = Describe("TenantOwner status fan-out: 10 TenantOwners matched by 1 Tenan
 		tos := make([]*capsulev1beta2.TenantOwner, ownerCount)
 		for i := range tos {
 			tos[i] = &capsulev1beta2.TenantOwner{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: fmt.Sprintf("e2e-to-fanout-%d", i),
-					Labels: map[string]string{
-						"e2e-to-fanout":          "true",
-						"e2e.suite.capsule/name": "owner_status_test",
-					},
+				Name: fmt.Sprintf("e2e-to-fanout-%d", i),
+				Labels: map[string]string{
+					"e2e-to-fanout":          "true",
+					"e2e.suite.capsule/name": "owner_status_test",
 				},
 				Spec: capsulev1beta2.TenantOwnerSpec{
-					Aggregate: ptr.To(true),
+					Aggregate: new(true),
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
 							Kind: rbac.UserOwner,
@@ -318,11 +304,9 @@ var _ = Describe("TenantOwner status fan-out: 10 TenantOwners matched by 1 Tenan
 	}
 
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-tnt-fanout-single",
-			Labels: map[string]string{
-				"e2e.suite.capsule/name": "owner_status_test",
-			},
+		Name: "e2e-tnt-fanout-single",
+		Labels: map[string]string{
+			"e2e.suite.capsule/name": "owner_status_test",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Permissions: capsulev1beta2.Permissions{
@@ -338,7 +322,6 @@ var _ = Describe("TenantOwner status fan-out: 10 TenantOwners matched by 1 Tenan
 
 	JustBeforeEach(func() {
 		for _, to := range owners() {
-			to := to
 
 			EventuallyCreation(func() error {
 				to.ResourceVersion = ""
@@ -364,7 +347,6 @@ var _ = Describe("TenantOwner status fan-out: 10 TenantOwners matched by 1 Tenan
 	It("updates all 10 TenantOwners when 1 Tenant is created", func() {
 		// All 10 TenantOwners should each report matchedTenants=1 and tenants=[tnt.Name].
 		for _, to := range owners() {
-			to := to
 
 			tenantOwnerReady(to, metav1.ConditionTrue)
 			tenantOwnerMatchedTenants(to, []string{tnt.Name})

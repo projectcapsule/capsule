@@ -6,6 +6,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"maps"
 	"sort"
 	"time"
 
@@ -51,10 +52,8 @@ func expectPromotionTargets(
 		return t.Status.Promotions
 	}, defaultTimeoutInterval, defaultPollInterval).Should(
 		ContainElement(rbac.PromotionSpec{
-			UserSpec: rbac.UserSpec{
-				Kind: rbac.ServiceAccountOwner,
-				Name: "system:serviceaccount:" + serviceAccount.GetNamespace() + ":" + serviceAccount.GetName(),
-			},
+			Kind:         rbac.ServiceAccountOwner,
+			Name:         "system:serviceaccount:" + serviceAccount.GetNamespace() + ":" + serviceAccount.GetName(),
 			ClusterRoles: expectedClusterRoles,
 			Targets:      expectedTargets,
 		}),
@@ -86,10 +85,8 @@ func expectNoPromotionTargets(
 		return t.Status.Promotions
 	}, 2*time.Second, defaultPollInterval).ShouldNot(
 		ContainElement(rbac.PromotionSpec{
-			UserSpec: rbac.UserSpec{
-				Kind: rbac.ServiceAccountOwner,
-				Name: "system:serviceaccount:" + serviceAccount.GetNamespace() + ":" + serviceAccount.GetName(),
-			},
+			Kind:         rbac.ServiceAccountOwner,
+			Name:         "system:serviceaccount:" + serviceAccount.GetNamespace() + ":" + serviceAccount.GetName(),
 			ClusterRoles: expectedClusterRoles,
 			Targets:      expectedTargets,
 		}),
@@ -173,9 +170,7 @@ func promoteServiceAccount(
 
 	saCopy.Labels[meta.ServiceAccountPromotionLabel] = meta.ValueTrue
 
-	for key, value := range labels {
-		saCopy.Labels[key] = value
-	}
+	maps.Copy(saCopy.Labels, labels)
 
 	return actor.Update(context.TODO(), saCopy)
 }
@@ -259,11 +254,9 @@ var _ = Describe("Promoting ServiceAccounts", Ordered, Label("config", "permissi
 	originConfig := &capsulev1beta2.CapsuleConfiguration{}
 
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-sa-promotion",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-sa-promotion",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Rules: []*rules.NamespaceRuleBodyTenant{
@@ -323,12 +316,8 @@ var _ = Describe("Promoting ServiceAccounts", Ordered, Label("config", "permissi
 			},
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-sa-promotion",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-sa-promotion",
+					Kind: "User",
 				},
 			},
 			AdditionalRoleBindings: []rbac.AdditionalRoleBindingsSpec{
@@ -352,9 +341,7 @@ var _ = Describe("Promoting ServiceAccounts", Ordered, Label("config", "permissi
 	BeforeEach(func() {
 		for _, name := range serviceAccountPromotionClusterRoles {
 			clusterRole := &rbacv1.ClusterRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: name,
-				},
+				Name: name,
 				Rules: []rbacv1.PolicyRule{
 					{
 						APIGroups: []string{""},
@@ -388,9 +375,7 @@ var _ = Describe("Promoting ServiceAccounts", Ordered, Label("config", "permissi
 	AfterEach(func() {
 		for _, name := range serviceAccountPromotionClusterRoles {
 			clusterRole := &rbacv1.ClusterRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: name,
-				},
+				Name: name,
 			}
 
 			err := k8sClient.Delete(context.TODO(), clusterRole)
@@ -440,10 +425,8 @@ var _ = Describe("Promoting ServiceAccounts", Ordered, Label("config", "permissi
 		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		sa := &corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-sa",
-				Namespace: ns.Name,
-			},
+			Name:      "test-sa",
+			Namespace: ns.Name,
 		}
 		Expect(k8sClient.Create(context.TODO(), sa)).Should(Succeed())
 
@@ -510,10 +493,8 @@ var _ = Describe("Promoting ServiceAccounts", Ordered, Label("config", "permissi
 		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		sa := &corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-sa",
-				Namespace: ns.Name,
-			},
+			Name:      "test-sa",
+			Namespace: ns.Name,
 		}
 		Expect(k8sClient.Create(context.TODO(), sa)).Should(Succeed())
 
@@ -565,10 +546,8 @@ var _ = Describe("Promoting ServiceAccounts", Ordered, Label("config", "permissi
 		NamespaceIsPartOfTenant(tnt, test).Should(Succeed())
 
 		sa := &corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "dev-sa",
-				Namespace: dev.Name,
-			},
+			Name:      "dev-sa",
+			Namespace: dev.Name,
 		}
 		Expect(k8sClient.Create(context.TODO(), sa)).Should(Succeed())
 
@@ -609,10 +588,8 @@ var _ = Describe("Promoting ServiceAccounts", Ordered, Label("config", "permissi
 		NamespaceIsPartOfTenant(tnt, stage).Should(Succeed())
 
 		sa := &corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-sa",
-				Namespace: dev.Name,
-			},
+			Name:      "test-sa",
+			Namespace: dev.Name,
 		}
 		Expect(k8sClient.Create(context.TODO(), sa)).Should(Succeed())
 
@@ -652,10 +629,8 @@ var _ = Describe("Promoting ServiceAccounts", Ordered, Label("config", "permissi
 		NamespaceIsPartOfTenant(tnt, stage).Should(Succeed())
 
 		sa := &corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "selective-sa",
-				Namespace: dev.Name,
-			},
+			Name:      "selective-sa",
+			Namespace: dev.Name,
 		}
 		Expect(k8sClient.Create(context.TODO(), sa)).Should(Succeed())
 
@@ -690,10 +665,8 @@ var _ = Describe("Promoting ServiceAccounts", Ordered, Label("config", "permissi
 		NamespaceIsPartOfTenant(tnt, prod).Should(Succeed())
 
 		sa := &corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "normal-sa",
-				Namespace: dev.Name,
-			},
+			Name:      "normal-sa",
+			Namespace: dev.Name,
 		}
 		Expect(k8sClient.Create(context.TODO(), sa)).Should(Succeed())
 
@@ -734,18 +707,14 @@ var _ = Describe("Promoting ServiceAccounts", Ordered, Label("config", "permissi
 		NamespaceIsPartOfTenant(tnt, stage).Should(Succeed())
 
 		saTest := &corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-sa",
-				Namespace: dev.Name,
-			},
+			Name:      "test-sa",
+			Namespace: dev.Name,
 		}
 		Expect(k8sClient.Create(context.TODO(), saTest)).Should(Succeed())
 
 		saProd := &corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-prod",
-				Namespace: prod.Name,
-			},
+			Name:      "test-prod",
+			Namespace: prod.Name,
 		}
 		Expect(k8sClient.Create(context.TODO(), saProd)).Should(Succeed())
 
@@ -799,18 +768,14 @@ var _ = Describe("Promoting ServiceAccounts", Ordered, Label("config", "permissi
 		NamespaceCreation(stage, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
 		saDev := &corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "super-sa",
-				Namespace: dev.Name,
-			},
+			Name:      "super-sa",
+			Namespace: dev.Name,
 		}
 		Expect(k8sClient.Create(context.TODO(), saDev)).Should(Succeed())
 
 		saProd := &corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "super-sa",
-				Namespace: prodA.Name,
-			},
+			Name:      "super-sa",
+			Namespace: prodA.Name,
 		}
 		Expect(k8sClient.Create(context.TODO(), saProd)).Should(Succeed())
 
@@ -855,10 +820,8 @@ var _ = Describe("Promoting ServiceAccounts", Ordered, Label("config", "permissi
 		NamespaceIsPartOfTenant(tnt, prod).Should(Succeed())
 
 		sa := &corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "not-super-sa",
-				Namespace: prod.Name,
-			},
+			Name:      "not-super-sa",
+			Namespace: prod.Name,
 		}
 		Expect(k8sClient.Create(context.TODO(), sa)).Should(Succeed())
 
@@ -899,10 +862,8 @@ var _ = Describe("Promoting ServiceAccounts", Ordered, Label("config", "permissi
 		NamespaceIsPartOfTenant(tnt, stage).Should(Succeed())
 
 		sa := &corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "super-sa",
-				Namespace: prod.Name,
-			},
+			Name:      "super-sa",
+			Namespace: prod.Name,
 		}
 		Expect(k8sClient.Create(context.TODO(), sa)).Should(Succeed())
 

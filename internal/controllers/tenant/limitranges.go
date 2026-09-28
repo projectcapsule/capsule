@@ -12,7 +12,6 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -55,10 +54,8 @@ func (r *Manager) syncLimitRange(
 	//nolint:staticcheck
 	for i, spec := range tenant.Spec.LimitRanges.Items {
 		target := &corev1.LimitRange{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("capsule-%s-%d", tenant.Name, i),
-				Namespace: namespace,
-			},
+			Name:      fmt.Sprintf("capsule-%s-%d", tenant.Name, i),
+			Namespace: namespace,
 		}
 
 		var result controllerutil.OperationResult

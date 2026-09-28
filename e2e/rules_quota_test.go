@@ -94,8 +94,8 @@ var _ = Describe("rule-generated GlobalResourceQuota", Ordered, Label("resourceq
 		ruleBodies = append(ruleBodies, &rules.NamespaceRuleBodyTenant{
 			NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
 				Quota: []rules.ResourceQuotaRule{{
-					Name:              scope.quotaName,
-					ResourceQuotaSpec: corev1.ResourceQuotaSpec{Hard: scope.hard},
+					Name: scope.quotaName,
+					Hard: scope.hard,
 				}},
 			},
 			NamespaceSelector: &metav1.LabelSelector{
@@ -105,12 +105,10 @@ var _ = Describe("rule-generated GlobalResourceQuota", Ordered, Label("resourceq
 	}
 
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   tenantName,
-			Labels: map[string]string{"env": "e2e"},
-		},
+		Name:   tenantName,
+		Labels: map[string]string{"env": "e2e"},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: rbac.OwnerListSpec{{CoreOwnerSpec: rbac.CoreOwnerSpec{UserSpec: owner}}},
+			Owners: rbac.OwnerListSpec{{UserSpec: owner}},
 			Rules:  ruleBodies,
 		},
 	}
@@ -195,7 +193,7 @@ var _ = Describe("rule-generated GlobalResourceQuota", Ordered, Label("resourceq
 		cs := ownerClient(owner)
 		results := make(chan error, total)
 
-		for i := 0; i < total; i++ {
+		for i := range total {
 			go func(index int) {
 				namespace := sharedCPUA
 				if index%2 == 1 {
@@ -217,7 +215,7 @@ var _ = Describe("rule-generated GlobalResourceQuota", Ordered, Label("resourceq
 		}
 
 		var succeeded, failed int
-		for i := 0; i < total; i++ {
+		for range total {
 			if err := <-results; err == nil {
 				succeeded++
 			} else {
@@ -280,7 +278,7 @@ var _ = Describe("rule-generated GlobalResourceQuota", Ordered, Label("resourceq
 		cs := ownerClient(owner)
 		makeHPA := func(namespace, name string) *autoscalingv2.HorizontalPodAutoscaler {
 			return &autoscalingv2.HorizontalPodAutoscaler{
-				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+				Name: name, Namespace: namespace,
 				Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
 						APIVersion: "apps/v1",
@@ -354,7 +352,7 @@ var _ = Describe("rule-generated GlobalResourceQuota", Ordered, Label("resourceq
 		cs := ownerClient(owner)
 		results := make(chan error, total)
 
-		for i := 0; i < total; i++ {
+		for i := range total {
 			go func(index int) {
 				namespace := serviceA
 				if index%2 == 1 {
@@ -362,10 +360,8 @@ var _ = Describe("rule-generated GlobalResourceQuota", Ordered, Label("resourceq
 				}
 
 				service := &corev1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: namespace,
-						Name:      fmt.Sprintf("rule-quota-service-%02d", index),
-					},
+					Namespace: namespace,
+					Name:      fmt.Sprintf("rule-quota-service-%02d", index),
 					Spec: corev1.ServiceSpec{
 						Ports: []corev1.ServicePort{{Port: 80}},
 					},
@@ -376,7 +372,7 @@ var _ = Describe("rule-generated GlobalResourceQuota", Ordered, Label("resourceq
 		}
 
 		var succeeded, failed int
-		for i := 0; i < total; i++ {
+		for range total {
 			if err := <-results; err == nil {
 				succeeded++
 			} else {

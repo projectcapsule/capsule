@@ -11,14 +11,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/processor"
-	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
 )
 
@@ -41,9 +39,8 @@ func BenchmarkCollectorCollect(b *testing.B) {
 		{
 			name: "raw",
 			spec: capsulev1beta2.ResourceSpec{
-				RawItems: []capsulev1beta2.RawExtension{{RawExtension: runtime.RawExtension{
-					Raw: []byte(`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"example"},"data":{"tenant":"{{tenant.name}}"}}`),
-				}}},
+				RawItems: []capsulev1beta2.RawExtension{{
+					Raw: []byte(`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"example"},"data":{"tenant":"{{tenant.name}}"}}`)}},
 				AdditionalMetadata: &api.AdditionalMetadataSpec{
 					Labels:      map[string]string{"tenant": "{{tenant.name}}"},
 					Annotations: map[string]string{"target": "{{namespace}}"},
@@ -90,9 +87,9 @@ func BenchmarkCollectorReplicate(b *testing.B) {
 	tnt := capsulev1beta2.Tenant{ObjectMeta: collectorBenchmarkMetadata("tenant")}
 	spec := capsulev1beta2.ResourceSpec{
 		NamespacedItems: []tpl.ResourceReference{{
-			VersionKind: apiruntime.VersionKind{APIVersion: "v1", Kind: "ConfigMap"},
-			Name:        source.Name,
-			Namespace:   source.Namespace,
+			APIVersion: "v1", Kind: "ConfigMap",
+			Name:      source.Name,
+			Namespace: source.Namespace,
 		}},
 	}
 	targets := make([]corev1.Namespace, 10)

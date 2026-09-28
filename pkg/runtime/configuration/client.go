@@ -90,9 +90,7 @@ func NewCapsuleConfiguration(ctx context.Context, c client.Client, reader client
 			// The direct reader is authoritative and reported NotFound.
 			// Ignore the failed cached read and create the default configuration.
 			cfg = &capsulev1beta2.CapsuleConfiguration{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: name,
-				},
+				Name: name,
 				Spec: DefaultCapsuleConfiguration(),
 			}
 

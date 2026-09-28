@@ -405,7 +405,6 @@ func TestRemoveOwnerReferencePatch(t *testing.T) {
 		}
 
 		for i := range refs {
-			i := i
 			t.Run(fmt.Sprintf("match index %d", i), func(t *testing.T) {
 				t.Parallel()
 

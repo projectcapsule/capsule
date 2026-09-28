@@ -15,24 +15,18 @@ import (
 
 func mkItem(tenant, namespace, name, kind string, status metav1.ConditionStatus, condType, msg string, created bool, lastApply metav1.Time) meta.ObjectReferenceStatus {
 	return meta.ObjectReferenceStatus{
-		ResourceID: gvk.ResourceID{
-			TenantResourceIDWithOrigin: gvk.TenantResourceIDWithOrigin{
-				TenantResourceID: gvk.TenantResourceID{Tenant: tenant},
-				Origin:           "",
-			},
-			Group:     "",
-			Version:   "",
-			Kind:      kind,
-			Name:      name,
-			Namespace: namespace,
-		},
-		ObjectReferenceStatusCondition: meta.ObjectReferenceStatusCondition{
-			Status:    status,
-			Type:      condType,
-			Message:   msg,
-			LastApply: lastApply,
-			Created:   created,
-		},
+		Tenant:    tenant,
+		Origin:    "",
+		Group:     "",
+		Version:   "",
+		Kind:      kind,
+		Name:      name,
+		Namespace: namespace,
+		Status:    status,
+		Type:      condType,
+		Message:   msg,
+		LastApply: lastApply,
+		Created:   created,
 	}
 }
 
@@ -52,6 +46,23 @@ func TestProcessedItems_UpdateItem_AppendsNew(t *testing.T) {
 	}
 	if p[0].ObjectReferenceStatusCondition != item.ObjectReferenceStatusCondition {
 		t.Fatalf("expected condition %+v, got %+v", item.ObjectReferenceStatusCondition, p[0].ObjectReferenceStatusCondition)
+	}
+}
+
+func TestManagedResourcesStatusUpdateStats(t *testing.T) {
+	t.Parallel()
+
+	status := meta.ManagedResourcesStatus{
+		ProcessedItems: meta.ProcessedItems{
+			mkItem("", "ns1", "first", "ConfigMap", metav1.ConditionTrue, meta.ReadyCondition, "", true, metav1.Time{}),
+			mkItem("", "", "second", "ClusterRole", metav1.ConditionTrue, meta.ReadyCondition, "", false, metav1.Time{}),
+		},
+	}
+
+	status.UpdateStats()
+
+	if status.Size != 2 {
+		t.Fatalf("ManagedResourcesStatus.Size = %d, want 2", status.Size)
 	}
 }
 

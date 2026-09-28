@@ -52,24 +52,20 @@ var _ = Describe("GlobalResourceQuota", Ordered, Label("globalresourcequota", "r
 	tenantAOwner := rbac.UserSpec{Name: tenantAName, Kind: rbac.OwnerKind("User")}
 	tenantBOwner := rbac.UserSpec{Name: tenantBName, Kind: rbac.OwnerKind("User")}
 	tenantA := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   tenantAName,
-			Labels: map[string]string{"env": "e2e"},
-		},
+		Name:   tenantAName,
+		Labels: map[string]string{"env": "e2e"},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{{
-				CoreOwnerSpec: rbac.CoreOwnerSpec{UserSpec: tenantAOwner},
+				UserSpec: tenantAOwner,
 			}},
 		},
 	}
 	tenantB := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   tenantBName,
-			Labels: map[string]string{"env": "e2e"},
-		},
+		Name:   tenantBName,
+		Labels: map[string]string{"env": "e2e"},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{{
-				CoreOwnerSpec: rbac.CoreOwnerSpec{UserSpec: tenantBOwner},
+				UserSpec: tenantBOwner,
 			}},
 		},
 	}
@@ -94,10 +90,8 @@ var _ = Describe("GlobalResourceQuota", Ordered, Label("globalresourcequota", "r
 		corev1.ResourceLimitsEphemeralStorage:   resource.MustParse("2Gi"),
 	}
 	computeQuota := &capsulev1beta2.GlobalResourceQuota{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   computeQuotaName,
-			Labels: map[string]string{"env": "e2e"},
-		},
+		Name:   computeQuotaName,
+		Labels: map[string]string{"env": "e2e"},
 		Spec: capsulev1beta2.GlobalResourceQuotaSpec{
 			NamespaceSelectors: []selectors.NamespaceSelector{{
 				LabelSelector: &metav1.LabelSelector{
@@ -108,10 +102,8 @@ var _ = Describe("GlobalResourceQuota", Ordered, Label("globalresourcequota", "r
 		},
 	}
 	serviceQuota := &capsulev1beta2.GlobalResourceQuota{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   serviceQuotaName,
-			Labels: map[string]string{"env": "e2e"},
-		},
+		Name:   serviceQuotaName,
+		Labels: map[string]string{"env": "e2e"},
 		Spec: capsulev1beta2.GlobalResourceQuotaSpec{
 			NamespaceSelectors: []selectors.NamespaceSelector{{
 				LabelSelector: &metav1.LabelSelector{
@@ -122,10 +114,8 @@ var _ = Describe("GlobalResourceQuota", Ordered, Label("globalresourcequota", "r
 		},
 	}
 	countQuota := &capsulev1beta2.GlobalResourceQuota{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   countQuotaName,
-			Labels: map[string]string{"env": "e2e"},
-		},
+		Name:   countQuotaName,
+		Labels: map[string]string{"env": "e2e"},
 		Spec: capsulev1beta2.GlobalResourceQuotaSpec{
 			NamespaceSelectors: []selectors.NamespaceSelector{{
 				LabelSelector: &metav1.LabelSelector{
@@ -136,10 +126,8 @@ var _ = Describe("GlobalResourceQuota", Ordered, Label("globalresourcequota", "r
 		},
 	}
 	ephemeralQuota := &capsulev1beta2.GlobalResourceQuota{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   ephemeralQuotaName,
-			Labels: map[string]string{"env": "e2e"},
-		},
+		Name:   ephemeralQuotaName,
+		Labels: map[string]string{"env": "e2e"},
 		Spec: capsulev1beta2.GlobalResourceQuotaSpec{
 			NamespaceSelectors: []selectors.NamespaceSelector{{
 				LabelSelector: &metav1.LabelSelector{
@@ -331,7 +319,7 @@ var _ = Describe("GlobalResourceQuota", Ordered, Label("globalresourcequota", "r
 		cs := clusterAdminClient()
 		results := make(chan error, total)
 
-		for index := 0; index < total; index++ {
+		for index := range total {
 			go func(index int) {
 				namespace := serviceA
 				if index%2 == 1 {
@@ -339,10 +327,8 @@ var _ = Describe("GlobalResourceQuota", Ordered, Label("globalresourcequota", "r
 				}
 
 				service := &corev1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: namespace,
-						Name:      fmt.Sprintf("global-quota-service-%02d", index),
-					},
+					Namespace: namespace,
+					Name:      fmt.Sprintf("global-quota-service-%02d", index),
 					Spec: corev1.ServiceSpec{
 						Ports: []corev1.ServicePort{{Port: 80}},
 					},
@@ -357,7 +343,7 @@ var _ = Describe("GlobalResourceQuota", Ordered, Label("globalresourcequota", "r
 		}
 
 		var succeeded, failed int
-		for index := 0; index < total; index++ {
+		for range total {
 			if createErr := <-results; createErr == nil {
 				succeeded++
 			} else {
@@ -376,7 +362,7 @@ var _ = Describe("GlobalResourceQuota", Ordered, Label("globalresourcequota", "r
 		cs := clusterAdminClient()
 		results := make(chan error, total)
 
-		for index := 0; index < total; index++ {
+		for index := range total {
 			go func(index int) {
 				namespace := countA
 				if index%2 == 1 {
@@ -384,11 +370,9 @@ var _ = Describe("GlobalResourceQuota", Ordered, Label("globalresourcequota", "r
 				}
 
 				secret := &corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: namespace,
-						Name:      fmt.Sprintf("global-quota-secret-%02d", index),
-					},
-					Type: corev1.SecretTypeOpaque,
+					Namespace: namespace,
+					Name:      fmt.Sprintf("global-quota-secret-%02d", index),
+					Type:      corev1.SecretTypeOpaque,
 				}
 				_, createErr := cs.CoreV1().Secrets(namespace).Create(
 					ctx,
@@ -408,7 +392,7 @@ var _ = Describe("GlobalResourceQuota", Ordered, Label("globalresourcequota", "r
 		cs := clusterAdminClient()
 		results := make(chan error, total)
 
-		for index := 0; index < total; index++ {
+		for index := range total {
 			go func(index int) {
 				namespace := countA
 				if index%2 == 1 {
@@ -438,7 +422,7 @@ var _ = Describe("GlobalResourceQuota", Ordered, Label("globalresourcequota", "r
 		cs := clusterAdminClient()
 		makeHPA := func(namespace, name string) *autoscalingv2.HorizontalPodAutoscaler {
 			return &autoscalingv2.HorizontalPodAutoscaler{
-				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+				Name: name, Namespace: namespace,
 				Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
 						APIVersion: "apps/v1",
@@ -610,7 +594,7 @@ func replicaSetFailureForDeployment(
 
 func expectConcurrentAdmissions(results <-chan error, total, expectedSuccess int) {
 	var succeeded, failed int
-	for index := 0; index < total; index++ {
+	for range total {
 		if createErr := <-results; createErr == nil {
 			succeeded++
 		} else {

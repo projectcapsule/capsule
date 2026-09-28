@@ -21,7 +21,6 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
-	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 )
 
 func TestManagedMetadataSkipsOnlyAlreadyOwnedValues(t *testing.T) {
@@ -260,12 +259,12 @@ func TestManagedMetadataTargetsOnlyReferencedGVKs(t *testing.T) {
 		Enforce: &rules.NamespaceRuleEnforceBody{
 			Metadata: []rules.MetadataRule{
 				{
-					VersionKinds: apiruntime.VersionKinds{APIGroups: []string{"v1"}, Kinds: []string{"Namespace", "ConfigMap"}},
-					Labels:       map[string]rules.MetadataValueRule{"example.com/managed": {Managed: &managed}},
+					APIGroups: []string{"v1"}, Kinds: []string{"Namespace", "ConfigMap"},
+					Labels: map[string]rules.MetadataValueRule{"example.com/managed": {Managed: &managed}},
 				},
 				{
-					VersionKinds: apiruntime.VersionKinds{APIGroups: []string{"apps/v1"}, Kinds: []string{"Deployment"}},
-					Annotations:  map[string]rules.MetadataValueRule{"example.com/managed": {Managed: &managed}},
+					APIGroups: []string{"apps/v1"}, Kinds: []string{"Deployment"},
+					Annotations: map[string]rules.MetadataValueRule{"example.com/managed": {Managed: &managed}},
 				},
 			},
 		},
@@ -304,8 +303,8 @@ func TestManagedMetadataTargetsRejectWildcards(t *testing.T) {
 	bodies := []*rules.NamespaceRuleBodyNamespace{{
 		Enforce: &rules.NamespaceRuleEnforceBody{
 			Metadata: []rules.MetadataRule{{
-				VersionKinds: apiruntime.VersionKinds{APIGroups: []string{"*"}, Kinds: []string{"ConfigMap"}},
-				Labels:       map[string]rules.MetadataValueRule{"example.com/managed": {Managed: &managed}},
+				APIGroups: []string{"*"}, Kinds: []string{"ConfigMap"},
+				Labels: map[string]rules.MetadataValueRule{"example.com/managed": {Managed: &managed}},
 			}},
 		},
 	}}

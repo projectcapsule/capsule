@@ -30,12 +30,10 @@ func TestObjectForProcessedItem(t *testing.T) {
 		t.Parallel()
 
 		obj, err := p.objectForProcessedItem(meta.ObjectReferenceStatus{
-			ResourceID: gvk.ResourceID{
-				Version:   "v1",
-				Kind:      "Secret",
-				Namespace: "tenant-a",
-				Name:      "example",
-			},
+			Version:   "v1",
+			Kind:      "Secret",
+			Namespace: "tenant-a",
+			Name:      "example",
 		})
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
@@ -50,12 +48,10 @@ func TestObjectForProcessedItem(t *testing.T) {
 		t.Parallel()
 
 		obj, err := p.objectForProcessedItem(meta.ObjectReferenceStatus{
-			ResourceID: gvk.ResourceID{
-				Version:   "v1",
-				Kind:      "Namespace",
-				Namespace: "tenant-a",
-				Name:      "example",
-			},
+			Version:   "v1",
+			Kind:      "Namespace",
+			Namespace: "tenant-a",
+			Name:      "example",
 		})
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
@@ -70,15 +66,11 @@ func TestObjectForProcessedItem(t *testing.T) {
 		t.Parallel()
 
 		obj, err := (&Processor{}).objectForProcessedItem(meta.ObjectReferenceStatus{
-			ResourceID: gvk.ResourceID{
-				Version:   "v1",
-				Kind:      "UnknownClusterKind",
-				Namespace: "tenant-a",
-				Name:      "example",
-			},
-			ObjectReferenceStatusCondition: meta.ObjectReferenceStatusCondition{
-				ClusterScoped: true,
-			},
+			Version:       "v1",
+			Kind:          "UnknownClusterKind",
+			Namespace:     "tenant-a",
+			Name:          "example",
+			ClusterScoped: true,
 		})
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
@@ -96,14 +88,10 @@ func TestFailAndRecord(t *testing.T) {
 	processed := meta.ProcessedItems{}
 	itemErrors := 0
 	item := meta.ObjectReferenceStatus{
-		ResourceID: gvk.ResourceID{
-			Version: "v1",
-			Kind:    "Secret",
-			Name:    "example",
-		},
-		ObjectReferenceStatusCondition: meta.ObjectReferenceStatusCondition{
-			Status: metav1.ConditionTrue,
-		},
+		Version: "v1",
+		Kind:    "Secret",
+		Name:    "example",
+		Status:  metav1.ConditionTrue,
 	}
 
 	if failAndRecord(&processed, &itemErrors, item, "prefix: ", nil) {
@@ -235,8 +223,8 @@ func TestReconcileNamespaceSeedsScopeOnly(t *testing.T) {
 	otherNs := resourceID("tenant-a", "ns-b", "settings")
 
 	current := meta.ProcessedItems{
-		{ResourceID: otherNs, ObjectReferenceStatusCondition: meta.ObjectReferenceStatusCondition{Created: true}},
-		{ResourceID: inScope, ObjectReferenceStatusCondition: meta.ObjectReferenceStatusCondition{Created: true}},
+		{ResourceID: otherNs, Created: true},
+		{ResourceID: inScope, Created: true},
 	}
 
 	// An empty Accumulator reaches out to no client at all: the outcome is only made
@@ -269,9 +257,7 @@ func TestReconcileNamespaceSeedsScopeOnly(t *testing.T) {
 
 func resourceID(tenant, namespace, name string) gvk.ResourceID {
 	return gvk.ResourceID{
-		TenantResourceIDWithOrigin: gvk.TenantResourceIDWithOrigin{
-			TenantResourceID: gvk.TenantResourceID{Tenant: tenant},
-		},
+		Tenant:    tenant,
 		Version:   "v1",
 		Kind:      "ConfigMap",
 		Name:      name,

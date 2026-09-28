@@ -20,7 +20,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -31,132 +30,96 @@ import (
 
 var _ = Describe("when Tenant handles Storage classes", Ordered, Label("tenant", "storage", "classes", "storageclass"), func() {
 	tntNoDefaults := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-storage-class-selector",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-storage-class-selector",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-storage-class-selector",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-storage-class-selector",
+					Kind: "User",
 				},
 			},
 			StorageClasses: &api.DefaultAllowedListSpec{
-				SelectorAllowedListSpec: api.SelectorAllowedListSpec{
-					AllowedListSpec: api.AllowedListSpec{
-						Exact: []string{"cephfs", "glusterfs"},
-						Regex: "^oil-.*$",
-					},
-					LabelSelector: metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"environment": "customer",
-						},
-					},
+				Exact: []string{"cephfs", "glusterfs"},
+				Regex: "^oil-.*$",
+				MatchLabels: map[string]string{
+					"environment": "customer",
 				},
 			},
 		},
 	}
 
 	tntWithDefault := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-storage-class-default",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-storage-class-default",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-storage-class-default",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-storage-class-default",
+					Kind: "User",
 				},
 			},
 			StorageClasses: &api.DefaultAllowedListSpec{
 				Default: "tenant-default",
-				SelectorAllowedListSpec: api.SelectorAllowedListSpec{
-					LabelSelector: metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"name": "tenant-default",
-						},
-					},
+				MatchLabels: map[string]string{
+					"name": "tenant-default",
 				},
 			},
 		},
 	}
 
 	tntNoRestrictions := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-storage-no-restrictions",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-storage-no-restrictions",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-storage-no-restrictions",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-storage-no-restrictions",
+					Kind: "User",
 				},
 			},
 		},
 	}
 
 	exact := storagev1.StorageClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "cephfs",
-			Labels: map[string]string{
-				"name":        "cephfs",
-				"environment": "internal",
-				"env":         "e2e",
-			},
+		Name: "cephfs",
+		Labels: map[string]string{
+			"name":        "cephfs",
+			"environment": "internal",
+			"env":         "e2e",
 		},
 		Provisioner: "kubernetes.io/no-provisioner",
 	}
 
 	tenantDefault := storagev1.StorageClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenant-default",
-			Labels: map[string]string{
-				"name":        "tenant-default",
-				"environment": "internal",
-				"env":         "e2e",
-			},
+		Name: "tenant-default",
+		Labels: map[string]string{
+			"name":        "tenant-default",
+			"environment": "internal",
+			"env":         "e2e",
 		},
 		Provisioner: "kubernetes.io/no-provisioner",
 	}
 	globalDefault := storagev1.StorageClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "global-default",
-			Labels: map[string]string{
-				"environment": "customer",
-				"env":         "e2e",
-			},
+		Name: "global-default",
+		Labels: map[string]string{
+			"environment": "customer",
+			"env":         "e2e",
 		},
 		Provisioner: "kubernetes.io/no-provisioner",
 	}
 	disallowedGlobalDefault := storagev1.StorageClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "disallowed-global-default",
-			Labels: map[string]string{
-				"name":        "disallowed-global-default",
-				"environment": "internal",
-				"env":         "e2e",
-			},
+		Name: "disallowed-global-default",
+		Labels: map[string]string{
+			"name":        "disallowed-global-default",
+			"environment": "internal",
+			"env":         "e2e",
 		},
 		Provisioner: "kubernetes.io/no-provisioner",
 	}
@@ -230,9 +193,7 @@ var _ = Describe("when Tenant handles Storage classes", Ordered, Label("tenant",
 				Eventually(func() (err error) {
 					cs := ownerClient(tntNoRestrictions.Spec.Owners[0].UserSpec)
 					p := &corev1.PersistentVolumeClaim{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: class.GetName() + "-pvc",
-						},
+						Name: class.GetName() + "-pvc",
 						Spec: corev1.PersistentVolumeClaimSpec{
 							StorageClassName: &c,
 							AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
@@ -298,9 +259,7 @@ var _ = Describe("when Tenant handles Storage classes", Ordered, Label("tenant",
 			Eventually(func() (err error) {
 				cs := ownerClient(tntNoDefaults.Spec.Owners[0].UserSpec)
 				p := &corev1.PersistentVolumeClaim{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "denied-pvc",
-					},
+					Name: "denied-pvc",
 					Spec: corev1.PersistentVolumeClaimSpec{
 						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 						Resources: corev1.VolumeResourceRequirements{
@@ -318,9 +277,7 @@ var _ = Describe("when Tenant handles Storage classes", Ordered, Label("tenant",
 			Eventually(func() (err error) {
 				cs := ownerClient(tntNoDefaults.Spec.Owners[0].UserSpec)
 				p := &corev1.PersistentVolumeClaim{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "mighty-storage",
-					},
+					Name: "mighty-storage",
 					Spec: corev1.PersistentVolumeClaimSpec{
 						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 						Resources: corev1.VolumeResourceRequirements{
@@ -338,12 +295,10 @@ var _ = Describe("when Tenant handles Storage classes", Ordered, Label("tenant",
 			for i, sc := range []string{"internal-hdd", "internal-ssd"} {
 				storageName := strings.Join([]string{sc, "-", strconv.Itoa(i)}, "")
 				class := &storagev1.StorageClass{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: fmt.Sprintf("sc-%s", storageName),
-						Labels: map[string]string{
-							"environment": "internal",
-							"env":         "e2e",
-						},
+					Name: fmt.Sprintf("sc-%s", storageName),
+					Labels: map[string]string{
+						"environment": "internal",
+						"env":         "e2e",
 					},
 					Provisioner: "kubernetes.io/no-provisioner",
 				}
@@ -366,9 +321,7 @@ var _ = Describe("when Tenant handles Storage classes", Ordered, Label("tenant",
 				})
 
 				p := &corev1.PersistentVolumeClaim{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: storageName,
-					},
+					Name: storageName,
 					Spec: corev1.PersistentVolumeClaimSpec{
 						StorageClassName: &storageName,
 						AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
@@ -423,11 +376,9 @@ var _ = Describe("when Tenant handles Storage classes", Ordered, Label("tenant",
 
 				Eventually(func() (err error) {
 					p := &corev1.PersistentVolumeClaim{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: c,
-						},
+						Name: c,
 						Spec: corev1.PersistentVolumeClaimSpec{
-							StorageClassName: ptr.To(c),
+							StorageClassName: new(c),
 							AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 							Resources: corev1.VolumeResourceRequirements{
 								Requests: map[corev1.ResourceName]resource.Quantity{
@@ -445,9 +396,7 @@ var _ = Describe("when Tenant handles Storage classes", Ordered, Label("tenant",
 			allowedClass := "oil-storage"
 			Eventually(func() (err error) {
 				p := &corev1.PersistentVolumeClaim{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: allowedClass,
-					},
+					Name: allowedClass,
 					Spec: corev1.PersistentVolumeClaimSpec{
 						StorageClassName: &allowedClass,
 						AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
@@ -466,12 +415,10 @@ var _ = Describe("when Tenant handles Storage classes", Ordered, Label("tenant",
 			for i, sc := range []string{"customer-hdd", "customer-ssd"} {
 				storageName := strings.Join([]string{sc, "-", strconv.Itoa(i)}, "")
 				class := &storagev1.StorageClass{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: storageName,
-						Labels: map[string]string{
-							"environment": "customer",
-							"env":         "e2e",
-						},
+					Name: storageName,
+					Labels: map[string]string{
+						"environment": "customer",
+						"env":         "e2e",
 					},
 					Provisioner: "kubernetes.io/no-provisioner",
 				}
@@ -495,10 +442,8 @@ var _ = Describe("when Tenant handles Storage classes", Ordered, Label("tenant",
 
 				EventuallyCreation(func() error {
 					p := &corev1.PersistentVolumeClaim{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      storageName,
-							Namespace: ns.GetName(),
-						},
+						Name:      storageName,
+						Namespace: ns.GetName(),
 						Spec: corev1.PersistentVolumeClaimSpec{
 							StorageClassName: &storageName,
 							AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
@@ -559,10 +504,8 @@ var _ = Describe("when Tenant handles Storage classes", Ordered, Label("tenant",
 
 		By("Patch Tenant Default", func() {
 			p := &corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pvc-default-sc",
-					Namespace: ns.GetName(),
-				},
+				Name:      "pvc-default-sc",
+				Namespace: ns.GetName(),
 				Spec: corev1.PersistentVolumeClaimSpec{
 					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 					Resources: corev1.VolumeResourceRequirements{
@@ -603,10 +546,8 @@ var _ = Describe("when Tenant handles Storage classes", Ordered, Label("tenant",
 		})
 
 		p := &corev1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pvc-default-sc-present",
-				Namespace: ns.GetName(),
-			},
+			Name:      "pvc-default-sc-present",
+			Namespace: ns.GetName(),
 			Spec: corev1.PersistentVolumeClaimSpec{
 				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 				Resources: corev1.VolumeResourceRequirements{
@@ -647,10 +588,8 @@ var _ = Describe("when Tenant handles Storage classes", Ordered, Label("tenant",
 		})
 
 		p := &corev1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pvc-default-sc-present",
-				Namespace: ns.GetName(),
-			},
+			Name:      "pvc-default-sc-present",
+			Namespace: ns.GetName(),
 			Spec: corev1.PersistentVolumeClaimSpec{
 				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 				Resources: corev1.VolumeResourceRequirements{
@@ -690,10 +629,8 @@ var _ = Describe("when Tenant handles Storage classes", Ordered, Label("tenant",
 		})
 
 		p := &corev1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pvc-default-sc-present",
-				Namespace: ns.GetName(),
-			},
+			Name:      "pvc-default-sc-present",
+			Namespace: ns.GetName(),
 			Spec: corev1.PersistentVolumeClaimSpec{
 				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 				Resources: corev1.VolumeResourceRequirements{

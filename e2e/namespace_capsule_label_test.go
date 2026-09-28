@@ -19,21 +19,15 @@ import (
 
 var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("namespace"), func() {
 	tnt := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-managed-labels",
-			Labels: map[string]string{
-				"env": "e2e",
-			},
+		Name: "e2e-managed-labels",
+		Labels: map[string]string{
+			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{
-							Name: "e2e-managed-labels",
-							Kind: "User",
-						},
-					},
+					Name: "e2e-managed-labels",
+					Kind: "User",
 				},
 			},
 		},

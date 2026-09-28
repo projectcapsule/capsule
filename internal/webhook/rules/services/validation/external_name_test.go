@@ -102,9 +102,7 @@ func TestServiceRulesValidateExternalNames(t *testing.T) {
 						Exact: []string{
 							"combined.internal.git.com",
 						},
-						ExpressionRegex: runtime.ExpressionRegex{
-							Expression: "combined\\..*\\.example\\.com",
-						},
+						Expression: "combined\\..*\\.example\\.com",
 					},
 				),
 			},
@@ -493,23 +491,18 @@ func exactMatchForTest(values ...string) runtime.ExpressionMatch {
 
 func expressionMatchForTest(expression string) runtime.ExpressionMatch {
 	return runtime.ExpressionMatch{
-		ExpressionRegex: runtime.ExpressionRegex{
-			Expression: expression,
-		},
+		Expression: expression,
 	}
 }
 
 func negatedExpressionMatchForTest(expression string) runtime.ExpressionMatch {
 	return runtime.ExpressionMatch{
-		ExpressionRegex: runtime.ExpressionRegex{
-			Expression: expression,
-			Negate:     true,
-		},
+		Expression: expression,
+		Negate:     true,
 	}
 }
 
-func decisionMessageForExternalNameTest(evaluation interface {
-}) string {
+func decisionMessageForExternalNameTest(evaluation any) string {
 	e, ok := evaluation.(*ruleengine.Evaluation)
 	if !ok || e == nil {
 		return ""
