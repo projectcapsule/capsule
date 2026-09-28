@@ -61,6 +61,14 @@ test: gotestsum test-clean generate manifests mocks test-clean
 test-clean: ## Clean tests cache
 	@go clean -testcache
 
+# Reconciliation benchmarks use populated fake clients; no cluster is required.
+BENCH_FILTER ?= ^BenchmarkController
+BENCH_TIME ?= 1s
+BENCH_COUNT ?= 5
+.PHONY: bench-controllers
+bench-controllers:
+	go test -p 1 ./internal/controllers/... -run '^$$' -bench '$(BENCH_FILTER)' -benchmem -benchtime '$(BENCH_TIME)' -count '$(BENCH_COUNT)'
+
 # Build manager binary
 manager: generate golint
 	go build -o bin/manager

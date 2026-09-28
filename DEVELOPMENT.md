@@ -75,6 +75,94 @@ $ LAPTOP_HOST_IP="<YOUR_LAPTOP_IP>" make dev-setup
 $ LAPTOP_HOST_IP="<YOUR_LAPTOP_IP>" make dev-setup-monitoring
 ```
 
+### Tenant reconciliation diagnostics
+
+Tenant reconciliation phase durations are exposed as
+`capsule_tenant_reconcile_phase_duration_seconds`, with `phase` and `result`
+(`success` or `error`) labels. For example, average phase duration over five minutes:
+
+```promql
+sum by (phase) (rate(capsule_tenant_reconcile_phase_duration_seconds_sum[5m]))
+/
+sum by (phase) (rate(capsule_tenant_reconcile_phase_duration_seconds_count[5m]))
+```
+
+Namespace cleanup runs in the separate `capsule/namespace-cleanup` controller,
+with one worker and at most four resource types processed concurrently. Its
+`namespace_cleanup` phase is separate from the Tenant reconciliation duration.
+Cleanup waits until Pods are gone and the namespace has been terminating for at
+least ten seconds. It verifies namespace identity and ownership using direct API
+reads and protects object deletion and finalizer patches with preconditions.
+Namespace profiling and policy installation remain in the Tenant controller;
+RoleBindings are installed before the custom resource usage recount.
+Cleanup failures are logged and retried by `capsule/namespace-cleanup`; inspect
+that controller's reconcile errors and queue metrics separately from
+`capsule/tenants`.
+
+### Controller benchmarks
+
+Run the reconciliation benchmarks with the Go toolchain declared in `go.mod`:
+
+```bash
+GOMAXPROCS=2 make bench-controllers > controllers.txt
+# Quickly check every benchmark fixture and its assertions:
+GOMAXPROCS=2 make bench-controllers BENCH_TIME=1x BENCH_COUNT=1
+# Limit measurements to a controller:
+GOMAXPROCS=2 make bench-controllers BENCH_FILTER='^BenchmarkControllerTenant/'
+```
+
+The adjacent `controller_bench_test.go` files cover all 27 controller entry
+points. Each fixture warms reconciliation outside the timed loop, checks the
+resulting resources or status, and varies namespace, tenant, rule, or resource
+counts. Publication and permit preflight cases reset their input outside the
+timed region on every iteration. Steady-state cases measure reconciliation of
+already provisioned objects; they can still expose redundant writes.
+The unit-test CI job executes each benchmark once with race detection to check
+fixture correctness; it does not enforce machine-dependent timing thresholds.
+
+| Benchmark | Controllers and workload |
+| --- | --- |
+| `Tenant` | Tenant profiling and RBAC; Tenant ResourceQuota updates; terminating namespace cleanup |
+| `TenantOwner` | Indexed owner matching with matching and unrelated tenants |
+| `RBAC` | ClusterRole and ClusterRoleBinding reconciliation with promoted ServiceAccounts |
+| `Pod`, `ServiceMetadata`, `PersistentVolume` | Pod, Service, EndpointSlice metadata and PV tenant labels |
+| `Configuration`, `CacheInvalidator` | Tenant/owner status aggregation and populated cache rebuilds |
+| `RuleStatus` | Unchanged rules and publication after generation changes |
+| `Admission` | Mutating and validating webhook configuration construction |
+| `Replication` | GlobalTenantResource, TenantResource, and NamespaceWatcher applying resources with tenant isolation |
+| `GlobalResourceQuota`, `CustomQuota` | Global ResourceQuota aggregation; namespaced and global CustomQuota usage |
+| `ResourcePool` | ResourcePool allocation and ResourcePoolClaim assignment |
+| `PermitTemplate`, `ResourcePermit` | Local/global template validation and selection; permit preflight and requested state |
+| `TLS` | Valid certificate checks and webhook CA synchronization |
+
+All benchmark names above have the `BenchmarkController` prefix. Results include
+`ns/op`, `B/op`, `allocs/op`, and injected-client `GET/op`, `LIST/op`, and
+`write/op` counts. Writes include status operations and dry-run requests.
+Cleanup also reports dynamic-client LIST calls. Counters are shared by cached
+and authoritative reader roles in these fixtures: they count method calls,
+not network round trips.
+
+These benchmarks measure controller work plus fake-client copying,
+serialization, selection, and simulated apply. They exclude informer delivery,
+queue delays, event delivery, client throttling, API-server latency, admission,
+and etcd. Fake
+client field selection does not model informer index complexity. Use the existing
+scoped e2e/stress environment and controller-runtime metrics to validate
+production latency, concurrency, and namespace recreation.
+
+Compare repeated runs on the same machine, Go version, `GOMAXPROCS`, and workload;
+keep both raw outputs and use `benchstat` to compare them. Use race detection for
+fixture correctness separately, never for timing comparisons:
+
+```bash
+GOMAXPROCS=2 go test -race ./internal/controllers/... -run '^$' \
+  -bench '^BenchmarkController' -benchtime=1x
+```
+
+Add a populated reconciliation benchmark when adding a controller, and extend its
+fixtures when changing a performance-sensitive path. The existing collector and
+namespace-cleanup helper benchmarks remain available for deeper investigations.
+
 ### Setup
 
 We recommend to setup the development environment with the make `dev-setup` target. However here is a step by step guide to setup the development environment for understanding.

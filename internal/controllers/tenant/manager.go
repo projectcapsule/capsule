@@ -251,7 +251,11 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 		return err
 	}
 
-	return r.setupResourceQuotaController(mgr, ctrlConfig)
+	if err := r.setupResourceQuotaController(mgr, ctrlConfig); err != nil {
+		return err
+	}
+
+	return r.setupNamespaceCleanupController(mgr, ctrlConfig)
 }
 
 func (r *Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ctrl.Result, err error) {
@@ -293,7 +297,7 @@ func (r *Manager) Reconcile(ctx context.Context, request ctrl.Request) (result c
 	reconcileError := r.reconcile(ctx, log, instance)
 
 	defer func() {
-		if statusErr := r.updateTenantStatus(ctx, instance, reconcileError); statusErr != nil {
+		if statusErr := r.runPhase(log, "status", func() error { return r.updateTenantStatus(ctx, instance, reconcileError) }); statusErr != nil {
 			statusErr = fmt.Errorf("cannot update tenant status: %w", statusErr)
 
 			if err == nil {
@@ -332,7 +336,7 @@ func (r *Manager) Reconcile(ctx context.Context, request ctrl.Request) (result c
 	// several cluster-wide lists. Keep the termination path focused on namespace
 	// cleanup and finalizer removal.
 	if instance.DeletionTimestamp == nil {
-		if err = r.collectAvailableResources(ctx, log, instance); err != nil {
+		if err = r.runPhase(log, "available_classes", func() error { return r.collectAvailableResources(ctx, log, instance) }); err != nil {
 			err = fmt.Errorf("cannot collect available resources: %w", err)
 
 			return reconcile.Result{}, err
@@ -351,7 +355,7 @@ func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *caps
 	var errs []error
 
 	if instance.DeletionTimestamp != nil {
-		if err = r.reconcileNamespaces(ctx, log, instance); err != nil {
+		if err = r.runPhase(log, "namespaces", func() error { return r.reconcileNamespaces(ctx, log, instance) }); err != nil {
 			errs = append(errs, fmt.Errorf("namespace(s) had reconciliation errors: %w", err))
 		}
 
@@ -364,7 +368,7 @@ func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *caps
 			return errors.Join(errs...)
 		}
 
-		if err = r.ensureMetadata(ctx, instance); err != nil {
+		if err = r.runPhase(log, "metadata", func() error { return r.ensureMetadata(ctx, instance) }); err != nil {
 			errs = append(errs, fmt.Errorf("cannot ensure metadata: %w", err))
 		}
 
@@ -372,57 +376,57 @@ func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *caps
 	}
 
 	// Collect Ownership/Promotions for Status
-	if err = r.collectRBAC(ctx, instance); err != nil {
+	if err = r.runPhase(log, "owners", func() error { return r.collectRBAC(ctx, instance) }); err != nil {
 		errs = append(errs, fmt.Errorf("cannot collect available rbac: %w", err))
 	}
 
 	log.V(4).Info("starting processing of Namespaces", "items", len(instance.Status.Namespaces))
 
-	if err = r.reconcileNamespaces(ctx, log, instance); err != nil {
+	if err = r.runPhase(log, "namespaces", func() error { return r.reconcileNamespaces(ctx, log, instance) }); err != nil {
 		errs = append(errs, fmt.Errorf("namespace(s) had reconciliation errors: %w", err))
 	}
 
 	// Ensuring Metadata.
-	err = r.ensureMetadata(ctx, instance)
+	err = r.runPhase(log, "metadata", func() error { return r.ensureMetadata(ctx, instance) })
 	if err != nil {
 		errs = append(errs, fmt.Errorf("cannot ensure metadata: %w", err))
 	}
 
-	log.V(4).Info("ensuring limit resources count is updated")
-
-	if err = r.syncCustomResourceQuotaUsages(ctx, instance); err != nil {
-		errs = append(errs, fmt.Errorf("cannot count limited resources: %w", err))
-	}
-
 	log.V(4).Info("starting processing of Network Policies")
 
-	if err = r.syncNetworkPolicies(ctx, log, instance); err != nil {
+	if err = r.runPhase(log, "network_policies", func() error { return r.syncNetworkPolicies(ctx, log, instance) }); err != nil {
 		errs = append(errs, fmt.Errorf("cannot sync networkPolicy items: %w", err))
 	}
 
 	//nolint:staticcheck
 	log.V(4).Info("starting processing of Limit Ranges", "items", len(instance.Spec.LimitRanges.Items))
 
-	if err = r.syncLimitRanges(ctx, log, instance); err != nil {
+	if err = r.runPhase(log, "limit_ranges", func() error { return r.syncLimitRanges(ctx, log, instance) }); err != nil {
 		errs = append(errs, fmt.Errorf("cannot sync limitrange items: %w", err))
 	}
 
 	log.V(4).Info("starting processing of Resource Quotas", "items", len(instance.Spec.ResourceQuota.Items))
 
-	if err = r.syncResourceQuotas(ctx, log, instance); err != nil {
+	if err = r.runPhase(log, "resource_quotas", func() error { return r.syncResourceQuotas(ctx, log, instance) }); err != nil {
 		errs = append(errs, fmt.Errorf("cannot sync resourcequota items: %w", err))
 	}
 
 	log.V(4).Info("starting processing of rule GlobalResourceQuotas")
 
-	if err = r.syncGlobalResourceQuotas(ctx, instance); err != nil {
+	if err = r.runPhase(log, "global_resource_quotas", func() error { return r.syncGlobalResourceQuotas(ctx, instance) }); err != nil {
 		errs = append(errs, fmt.Errorf("cannot sync rule global resource quotas: %w", err))
 	}
 
 	log.V(4).Info("ensuring RoleBindings for Owners and Tenant")
 
-	if err = r.syncRoleBindings(ctx, log, instance); err != nil {
+	if err = r.runPhase(log, "role_bindings", func() error { return r.syncRoleBindings(ctx, log, instance) }); err != nil {
 		errs = append(errs, fmt.Errorf("cannot sync rolebindings items: %w", err))
+	}
+
+	log.V(4).Info("ensuring limit resources count is updated")
+
+	if err = r.runPhase(log, "custom_quota_usage", func() error { return r.syncCustomResourceQuotaUsages(ctx, instance) }); err != nil {
+		errs = append(errs, fmt.Errorf("cannot count limited resources: %w", err))
 	}
 
 	if err = errors.Join(errs...); err != nil {
@@ -430,6 +434,22 @@ func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *caps
 	}
 
 	log.V(4).Info("Tenant reconciling completed")
+
+	return err
+}
+
+// Fixed phase labels expose blocking work without per-Tenant metric cardinality.
+func (r *Manager) runPhase(log logr.Logger, phase string, run func() error) error {
+	start := time.Now()
+	err := run()
+
+	duration := time.Since(start)
+
+	if r.Metrics != nil {
+		r.Metrics.ObserveReconcilePhase(phase, duration, err)
+	}
+
+	log.V(4).Info("Tenant reconciliation phase completed", "phase", phase, "duration", duration.String(), "failed", err != nil)
 
 	return err
 }

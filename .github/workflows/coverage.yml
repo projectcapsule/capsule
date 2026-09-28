@@ -70,6 +70,8 @@ jobs:
           go-version-file: 'go.mod'
       - name: Unit Test
         run: make test
+      - name: Check controller benchmark fixtures
+        run: go test -race ./internal/controllers/... -run '^$' -bench '^BenchmarkController' -benchtime=1x
       - name: Check secret
         id: checksecret
         uses: ./.github/actions/exists
