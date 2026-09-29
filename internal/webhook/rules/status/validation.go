@@ -21,11 +21,13 @@ import (
 type ruleStatusHandler struct {
 	configuration configuration.Configuration
 	mapper        k8smeta.RESTMapper
+	compiler      ruleengine.ConditionCompiler
 }
 
-func RuleStatusValidationHandler(mapper k8smeta.RESTMapper, configuration configuration.Configuration) handlers.Handler {
+func RuleStatusValidationHandler(mapper k8smeta.RESTMapper, configuration configuration.Configuration, compiler ruleengine.ConditionCompiler) handlers.Handler {
 	return &ruleStatusHandler{
 		configuration: configuration,
+		compiler:      compiler,
 	}
 }
 
@@ -73,7 +75,7 @@ func (r *ruleStatusHandler) OnUpdate(
 }
 
 func (r *ruleStatusHandler) handle(rs *capsulev1beta2.RuleStatus) *admission.Response {
-	err := ruleengine.ValidateRuleStatusBody(r.mapper, rs.Spec)
+	err := ruleengine.ValidateRuleStatusBody(r.mapper, rs.Spec, r.compiler)
 	if err != nil {
 		return ad.Deny(err.Error())
 	}

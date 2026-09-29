@@ -4,9 +4,6 @@
 package resources
 
 import (
-	"hash/fnv"
-	"strconv"
-
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 
@@ -14,16 +11,7 @@ import (
 )
 
 func getFieldOwner(name string, namespace string) string {
-	if namespace == "" {
-		namespace = "Cluster"
-	}
-
-	h := fnv.New64a()
-	_, _ = h.Write([]byte(namespace))
-	_, _ = h.Write([]byte{0})
-	_, _ = h.Write([]byte(name))
-
-	return strconv.FormatUint(h.Sum64(), 36)
+	return meta.ReplicationFieldOwnerPrefix(name, namespace)
 }
 
 func getSelectorForCreatedResourcesExclusion() (labels.Selector, error) {

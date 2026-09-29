@@ -4,6 +4,7 @@
 package mutation
 
 import (
+	"context"
 	"fmt"
 	"slices"
 
@@ -15,6 +16,7 @@ import (
 	resourcehelper "k8s.io/component-helpers/resource"
 
 	apirules "github.com/projectcapsule/capsule/pkg/api/rules"
+	"github.com/projectcapsule/capsule/pkg/ruleengine"
 	"github.com/projectcapsule/capsule/pkg/runtime/workloads"
 )
 
@@ -24,11 +26,41 @@ type workloadResourcePolicies struct {
 }
 
 func MutateWorkloadResources(
+	ctx context.Context,
 	obj *unstructured.Unstructured,
 	gvk schema.GroupVersionKind,
 	bodies []*apirules.NamespaceRuleBodyNamespace,
+	conditions *ruleengine.ConditionEvaluator,
 ) (bool, error) {
 	if obj == nil || gvk != corev1.SchemeGroupVersion.WithKind("Pod") {
+		return false, nil
+	}
+
+	filtered, err := ruleengine.FilterNamespaceEnforcementConditions(ctx, conditions, obj, bodies,
+		func(body *apirules.NamespaceRuleEnforceBody) bool { return body.Workloads.Resources != nil })
+	if err != nil {
+		return false, err
+	}
+
+	return mutateWorkloadResources(ctx, obj, gvk, filtered, conditions)
+}
+
+// mutateWorkloadResources consumes rules whose enforcement gates have already run.
+func mutateWorkloadResources(
+	ctx context.Context,
+	obj *unstructured.Unstructured,
+	gvk schema.GroupVersionKind,
+	bodies []*apirules.NamespaceRuleBodyNamespace,
+	conditions *ruleengine.ConditionEvaluator,
+) (bool, error) {
+	if obj == nil || gvk != corev1.SchemeGroupVersion.WithKind("Pod") {
+		return false, nil
+	}
+
+	// Skip decoding when neither legacy resource policies nor mutation applies.
+	if !slices.ContainsFunc(bodies, func(body *apirules.NamespaceRuleBodyNamespace) bool {
+		return body != nil && (len(body.Mutate) > 0 || (body.Enforce != nil && body.Enforce.Workloads.Resources != nil))
+	}) {
 		return false, nil
 	}
 
@@ -38,8 +70,13 @@ func MutateWorkloadResources(
 	}
 
 	changed, err := MutatePodResources(pod, bodies)
-	if err != nil || !changed {
-		return changed, err
+	if err != nil {
+		return false, err
+	}
+
+	placementChanged, err := MutatePodPlacement(ctx, pod, bodies, conditions)
+	if err != nil || (!changed && !placementChanged) {
+		return false, err
 	}
 
 	mutated, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pod)

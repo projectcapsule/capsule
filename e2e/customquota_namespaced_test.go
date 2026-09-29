@@ -206,7 +206,6 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 		results := make(chan result, total)
 
 		for i := range total {
-			i := i
 			go func() {
 				name := fmt.Sprintf("cq-concurrent-pod-%02d", i)
 				pod := MakePod(

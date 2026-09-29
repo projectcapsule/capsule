@@ -4,11 +4,14 @@
 package metrics
 
 import (
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 	crtlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
 type TenantRecorder struct {
+	ReconcilePhaseDuration           *prometheus.HistogramVec
 	TenantNamespaceRelationshipGauge *prometheus.GaugeVec
 	TenantNamespaceConditionGauge    *prometheus.GaugeVec
 	TenantConditionGauge             *prometheus.GaugeVec
@@ -26,6 +29,14 @@ func MustMakeTenantRecorder() *TenantRecorder {
 
 func NewTenantRecorder() *TenantRecorder {
 	return &TenantRecorder{
+		ReconcilePhaseDuration: prometheus.NewHistogramVec(
+			prometheus.HistogramOpts{
+				Namespace: metricsPrefix,
+				Name:      "tenant_reconcile_phase_duration_seconds",
+				Help:      "Duration of Tenant reconciliation phases, including namespace cleanup.",
+				Buckets:   []float64{0.001, 0.01, 0.1, 0.5, 1, 5, 10, 30, 60, 120},
+			}, []string{"phase", "result"},
+		),
 		TenantNamespaceRelationshipGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: metricsPrefix,
@@ -74,6 +85,7 @@ func NewTenantRecorder() *TenantRecorder {
 
 func (r *TenantRecorder) Collectors() []prometheus.Collector {
 	return []prometheus.Collector{
+		r.ReconcilePhaseDuration,
 		r.TenantNamespaceRelationshipGauge,
 		r.TenantNamespaceConditionGauge,
 		r.TenantConditionGauge,
@@ -149,4 +161,13 @@ func (r *TenantRecorder) DeleteTenantStatusMetrics(tenant string) {
 	r.TenantNamespaceConditionGauge.DeletePartialMatch(map[string]string{
 		"tenant": tenant,
 	})
+}
+
+func (r *TenantRecorder) ObserveReconcilePhase(phase string, duration time.Duration, err error) {
+	result := "success"
+	if err != nil {
+		result = "error"
+	}
+
+	r.ReconcilePhaseDuration.WithLabelValues(phase, result).Observe(duration.Seconds())
 }

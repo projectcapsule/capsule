@@ -4,3 +4,4 @@ resources:
   - claims.yaml
   - resourcepermits/
   - tenantresources/
+  - placement/

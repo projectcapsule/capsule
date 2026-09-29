@@ -405,9 +405,28 @@ Test implementation requirements:
 - Wait for tenant, namespace, ruleset, and policy readiness before testing a
   decision. Use `Eventually`/`Consistently` and existing timeout/poll constants;
   do not add arbitrary sleeps to hide races.
+- Perform e2e updates and status mutations inside `Eventually`, bounded by the
+  existing timeout and poll interval. Put the entire read-modify-write sequence
+  inside the callback: every attempt must GET a fresh object with its latest
+  `resourceVersion`, reapply an idempotent mutation of the intended fields, then
+  issue `Update` or construct the patch from that fresh object (including its
+  optimistic-lock base), and assert or return the write error. A readiness check
+  or fetch outside the callback does not protect the subsequent write from a
+  controller race. Retry conflicts with a new fetch, never the stale payload.
+  Preserve unrelated fields and the actor whose authorization is under test;
+  do not clear `resourceVersion` or switch to an administrator to avoid a conflict.
+  Keep deliberate stale-version/conflict tests explicit exceptions to this pattern.
+- Verify successful mutations and asynchronous reconciliation with fresh GETs
+  inside `Eventually`. Check the desired persisted state and, where the API
+  exposes it, `observedGeneration` for the generation being tested; a Ready
+  condition from an older revision is insufficient. Do not compare
+  `resourceVersion` numerically or lexicographically: it is an opaque value.
 - Negative assertions must identify the expected denial/reason. A timeout,
-  transport error, unrelated RBAC rejection, or malformed fixture is not evidence
-  that the intended Capsule rule works. Re-read state after rejected mutations.
+  transport error, update conflict, unrelated RBAC rejection, or malformed fixture
+  is not evidence that the intended Capsule rule works. Retry a conflict using a
+  fresh read within the same bounded assertion, and require the intended denial.
+  Fail immediately if an unauthorized write succeeds so a later denial cannot hide
+  it. Re-read state after rejected mutations.
 - Preserve descriptive Ginkgo labels. Tests changing shared CapsuleConfiguration
   must use the `config` label and restore configuration; those tests run serially.
   Ordinary tests must remain safe under parallel execution.

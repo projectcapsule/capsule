@@ -10,6 +10,7 @@ import (
 	"net/http"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -18,14 +19,15 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	apirules "github.com/projectcapsule/capsule/pkg/api/rules"
+	"github.com/projectcapsule/capsule/pkg/ruleengine"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
-type metadataRules struct{}
+type metadataRules struct{ compiler ruleengine.ConditionCompiler }
 
-func MetadataRules() handlers.TypedHandlerWithTenantWithRuleset[*unstructured.Unstructured] {
-	return &metadataRules{}
+func MetadataRules(compiler ruleengine.ConditionCompiler) handlers.TypedHandlerWithTenantWithRuleset[*unstructured.Unstructured] {
+	return &metadataRules{compiler: compiler}
 }
 
 func (h *metadataRules) OnCreate(_ client.Client, _ client.Reader, obj *unstructured.Unstructured, _ admission.Decoder, _ events.EventRecorder, _ *capsulev1beta2.Tenant, bodies []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
@@ -40,8 +42,8 @@ func (*metadataRules) OnDelete(client.Client, client.Reader, *unstructured.Unstr
 	return func(context.Context, admission.Request) *admission.Response { return nil }
 }
 
-func (*metadataRules) mutate(obj *unstructured.Unstructured, bodies []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
+func (h *metadataRules) mutate(obj *unstructured.Unstructured, bodies []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
+	return func(ctx context.Context, req admission.Request) *admission.Response {
 		gvk := schema.GroupVersionKind{Group: req.Kind.Group, Version: req.Kind.Version, Kind: req.Kind.Kind}
 		if gvk.Version == "" || gvk.Kind == "" {
 			response := admission.Errored(http.StatusBadRequest, fmt.Errorf("admission request kind is incomplete: %s", gvk.String()))
@@ -49,14 +51,27 @@ func (*metadataRules) mutate(obj *unstructured.Unstructured, bodies []*apirules.
 			return &response
 		}
 
-		metadataMutated := MutateMetadata(obj, gvk, bodies)
+		conditions := ruleengine.NewConditionEvaluator(h.compiler, req.AdmissionRequest)
+		mutateResources := req.Operation == admissionv1.Create && req.SubResource == "" && gvk == corev1.SchemeGroupVersion.WithKind("Pod")
+
+		filtered, err := ruleengine.FilterNamespaceEnforcementConditions(ctx, conditions, obj, bodies,
+			func(body *apirules.NamespaceRuleEnforceBody) bool {
+				return hasMetadataMutation(gvk, body) || (mutateResources && body.Workloads.Resources != nil)
+			})
+		if err != nil {
+			response := admission.Errored(http.StatusInternalServerError, err)
+
+			return &response
+		}
+
+		metadataMutated := MutateMetadata(obj, gvk, filtered)
+
+		conditions.ResetObject()
 
 		resourcesMutated := false
 
-		if req.Operation == admissionv1.Create {
-			var err error
-
-			resourcesMutated, err = MutateWorkloadResources(obj, gvk, bodies)
+		if mutateResources {
+			resourcesMutated, err = mutateWorkloadResources(ctx, obj, gvk, filtered, conditions)
 			if err != nil {
 				response := admission.Errored(http.StatusInternalServerError, err)
 
@@ -85,26 +100,46 @@ func (*metadataRules) mutate(obj *unstructured.Unstructured, bodies []*apirules.
 // for gvk. Evaluate rendered rules, since templates can supply these fields.
 func HasMetadataMutation(gvk schema.GroupVersionKind, bodies []*apirules.NamespaceRuleBodyNamespace) bool {
 	for _, body := range bodies {
-		if body == nil || body.Enforce == nil {
+		if body != nil && hasMetadataMutation(gvk, body.Enforce) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func hasMetadataMutation(gvk schema.GroupVersionKind, body *apirules.NamespaceRuleEnforceBody) bool {
+	if body == nil {
+		return false
+	}
+
+	for _, rule := range body.Metadata {
+		if !rule.MatchesGroupVersionKind(gvk) {
 			continue
 		}
 
-		for _, rule := range body.Enforce.Metadata {
-			if !rule.MatchesGroupVersionKind(gvk) {
-				continue
-			}
-
-			for _, policies := range []map[string]apirules.MetadataValueRule{rule.Labels, rule.Annotations} {
-				for _, policy := range policies {
-					if policy.Default != nil || policy.Managed != nil {
-						return true
-					}
+		for _, policies := range []map[string]apirules.MetadataValueRule{rule.Labels, rule.Annotations} {
+			for _, policy := range policies {
+				if policy.Default != nil || policy.Managed != nil {
+					return true
 				}
 			}
 		}
 	}
 
 	return false
+}
+
+// MutateMetadataConditional applies the enclosing enforcement gate before any
+// metadata defaults or managed values. Pure validation rules are not evaluated here.
+func MutateMetadataConditional(ctx context.Context, obj metav1.Object, gvk schema.GroupVersionKind, bodies []*apirules.NamespaceRuleBodyNamespace, conditions *ruleengine.ConditionEvaluator) (bool, error) {
+	filtered, err := ruleengine.FilterNamespaceEnforcementConditions(ctx, conditions, obj, bodies,
+		func(body *apirules.NamespaceRuleEnforceBody) bool { return hasMetadataMutation(gvk, body) })
+	if err != nil {
+		return false, err
+	}
+
+	return MutateMetadata(obj, gvk, filtered), nil
 }
 
 func MutateMetadata(

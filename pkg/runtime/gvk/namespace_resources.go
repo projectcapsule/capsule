@@ -12,6 +12,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+// NamespacedListableResources selects resources supported by namespace cleanup.
+// Cleanup lists and deletes objects, then gets and patches objects with finalizers.
 func NamespacedListableResources(resourceLists []*metav1.APIResourceList) ([]schema.GroupVersionResource, error) {
 	gvrs := make([]schema.GroupVersionResource, 0, 64)
 	seen := make(map[schema.GroupVersionResource]struct{})
@@ -31,11 +33,11 @@ func NamespacedListableResources(resourceLists []*metav1.APIResourceList) ([]sch
 				continue
 			}
 
-			if !SupportsVerb(r.Verbs, "list") {
+			if !SupportsVerb(r.Verbs, "list") || !SupportsVerb(r.Verbs, "delete") {
 				continue
 			}
 
-			if !SupportsVerb(r.Verbs, "patch") && !SupportsVerb(r.Verbs, "update") {
+			if !SupportsVerb(r.Verbs, "get") || !SupportsVerb(r.Verbs, "patch") {
 				continue
 			}
 

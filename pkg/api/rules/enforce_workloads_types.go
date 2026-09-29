@@ -30,6 +30,23 @@ type NamespaceRuleEnforceWorkloadsBody struct {
 	// +optional
 	Targets []WorkloadValidationTarget `json:"targets,omitempty"`
 
+	// NodeSelector matches each node selector entry. Empty matchers match any entry.
+	// Placement rules apply to the pod target; allowing an entry does not require it.
+	// +optional
+	NodeSelector []WorkloadNodeSelectorMatch `json:"nodeSelector,omitempty"`
+
+	// Tolerations matches each toleration, including injected and wildcard tolerations.
+	// +optional
+	Tolerations []WorkloadTolerationMatch `json:"tolerations,omitempty"`
+
+	// TopologySpreadConstraints matches each complete spread constraint.
+	// +optional
+	TopologySpreadConstraints []WorkloadTopologySpreadMatch `json:"topologySpreadConstraints,omitempty"`
+
+	// Affinity matches each complete required or preferred affinity term.
+	// +optional
+	Affinity []WorkloadAffinityMatch `json:"affinity,omitempty"`
+
 	// Resources defines mutation and enforcement policies for Pod and container
 	// resource requests and limits. The workload targets select where the
 	// policies apply. With no targets, resource policies apply to all compatible

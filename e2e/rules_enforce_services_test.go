@@ -336,7 +336,7 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 				g.Expect(got.Enforce.Services.ExternalNames).NotTo(BeNil())
 				g.Expect(got.Enforce.Services.ExternalNames.Hostnames).To(HaveLen(wantHostnames))
 
-				for j := 0; j < wantHostnames; j++ {
+				for j := range wantHostnames {
 					match := got.Enforce.Services.ExternalNames.Hostnames[j]
 
 					if len(expected.externalExpressions) > j {

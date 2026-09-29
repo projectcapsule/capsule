@@ -27,14 +27,20 @@ import (
 
 type ingressRules struct {
 	regexCache *cache.RegexCache
+	compiler   ruleengine.ConditionCompiler
 }
 
-func IngressRules(regexCache *cache.RegexCache) handlers.TypedHandlerWithTenantWithRuleset[*unstructured.Unstructured] {
+func IngressRules(regexCache *cache.RegexCache, compilers ...ruleengine.ConditionCompiler) handlers.TypedHandlerWithTenantWithRuleset[*unstructured.Unstructured] {
 	if regexCache == nil {
 		regexCache = cache.NewRegexCache()
 	}
 
-	return &ingressRules{regexCache: regexCache}
+	h := &ingressRules{regexCache: regexCache}
+	if len(compilers) > 0 {
+		h.compiler = compilers[0]
+	}
+
+	return h
 }
 
 func (h *ingressRules) OnCreate(
@@ -89,6 +95,15 @@ func (h *ingressRules) validate(
 		}
 
 		enforceBodies := ruleengine.EnforceBodiesFromNamespaceRules(bodies)
+
+		enforceBodies, err := ruleengine.FilterEnforcementConditions(ctx,
+			ruleengine.NewConditionEvaluator(h.compiler, req.AdmissionRequest), obj, enforceBodies,
+			func(body *apirules.NamespaceRuleEnforceBody) bool {
+				return len(body.Ingress.Hostnames) > 0 && containsIngressType(body.Ingress.Types, resourceType)
+			})
+		if err != nil {
+			return ad.Deny(fmt.Errorf("enforce: %w", err).Error())
+		}
 
 		evaluation, err := h.evaluate(obj, resourceType, enforceBodies)
 		if err != nil {

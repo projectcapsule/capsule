@@ -17,6 +17,62 @@ spec:
     - matchLabels:
         customer: renewable
   rules:
+    # Placement applies to test namespaces; production keeps its own profile.
+    - namespaceSelector:
+        matchLabels:
+          env: test
+      mutate:
+        - conditions:
+            - name: linux-default
+              expression: "!has(object.spec.nodeSelector) || !('kubernetes.io/os' in object.spec.nodeSelector)"
+          workloads:
+            nodeSelector:
+              kubernetes.io/os: linux
+        - conditions:
+            - name: shared-pool
+              expression: "has(object.metadata.labels) && 'placement.example.com/pool' in object.metadata.labels && object.metadata.labels['placement.example.com/pool'] == 'shared'"
+          workloads:
+            nodeSelector:
+              placement.example.com/pool: shared
+            tolerations:
+              - key: infrastructure.example.com/dedicated
+                operator: Equal
+                value: shared
+                effect: NoSchedule
+
+      enforce:
+        conditions:
+          - name: pod-request
+            expression: "request.kind.kind == 'Pod' && (!has(request.kind.group) || request.kind.group == '')"
+        action: allow
+        workloads:
+          nodeSelector:
+            - key:
+                exact: [kubernetes.io/os]
+              values:
+                exact: [linux]
+            - key:
+                exp: '^placement\.example\.com/[a-z0-9-]+$'
+              values:
+                exact: [shared, batch]
+
+          affinity:
+            - types: [nodeAffinity]
+              modes: [required, preferred]
+              requirements:
+                - key:
+                    exact: [topology.kubernetes.io/zone]
+                  operators: [In]
+                  values:
+                    exact: [zone-a, zone-b]
+            - types: [podAffinity, podAntiAffinity]
+              modes: [preferred]
+              topologyKey:
+                exact: [kubernetes.io/hostname]
+              namespaceScope: SameNamespace
+              weight:
+                min: 1
+                max: 100
 
     # Promote only the dedicated TenantResource ServiceAccount. Capsule binds
     # this distributor role in every solar namespace so the TenantResource can

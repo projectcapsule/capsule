@@ -21,6 +21,13 @@ type NamespaceRuleBodyNamespace struct {
 	// +listMapKey=name
 	Quota []ResourceQuotaRule `json:"quota,omitempty"`
 
+	// Mutate applies ordered typed mutations before enforcement. It shares the
+	// rule's namespace selection and audience. Workload mutations apply on Pod creation.
+	// +optional
+	// +kubebuilder:validation:MaxItems=64
+	// +listType=atomic
+	Mutate []NamespaceRuleMutation `json:"mutate,omitempty"`
+
 	// Enforcement for given rule
 	//+optional
 	Enforce *NamespaceRuleEnforceBody `json:"enforce,omitzero"`
