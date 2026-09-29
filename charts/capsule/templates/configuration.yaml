@@ -314,6 +314,7 @@ spec:
               - resource.k8s.io
             apiVersions:
               - v1
+              - v1beta2
             operations:
               - CREATE
               - UPDATE
