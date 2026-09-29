@@ -6,20 +6,24 @@ package mutation
 import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/projectcapsule/capsule/pkg/ruleengine"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 const Path = "/rules/generic/mutating"
 
-type genericMutating struct{ configuration configuration.Configuration }
+type genericMutating struct {
+	configuration configuration.Configuration
+	compiler      ruleengine.ConditionCompiler
+}
 
-func Register(cfg configuration.Configuration) handlers.Webhook {
-	return &genericMutating{configuration: cfg}
+func Register(cfg configuration.Configuration, compiler ruleengine.ConditionCompiler) handlers.Webhook {
+	return &genericMutating{configuration: cfg, compiler: compiler}
 }
 
 func (g genericMutating) GetHandlers() []handlers.Handler {
-	return []handlers.Handler{genericHandler(g.configuration, MetadataRules())}
+	return []handlers.Handler{genericHandler(g.configuration, MetadataRules(g.compiler))}
 }
 
 func (genericMutating) GetPath() string { return Path }

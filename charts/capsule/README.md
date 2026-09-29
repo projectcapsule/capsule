@@ -23,6 +23,10 @@ The following Values have changed key or Value:
 
 ## Values
 
+For resource policies, CEL apply conditions, and compatibility guidance, see the
+[managed-resource reference](https://projectcapsule.dev/docs/operating/concepts/managed-resources/)
+and [replication documentation](https://projectcapsule.dev/docs/replications/).
+
 ### CustomResourceDefinition Lifecycle
 
 | Key | Type | Default | Description |
@@ -387,23 +391,31 @@ The following Values have changed key or Value:
 | webhooks.hooks.pods.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
 | webhooks.hooks.pods.opts | object | `{}` | Capsule Hook Options |
 | webhooks.hooks.pods.reinvocationPolicy | string | `"Never"` | [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy) |
+| webhooks.hooks.replicationDefaults.enabled | bool | `true` | Convert deprecated TenantResource and GlobalTenantResource settings to per-resource policies |
+| webhooks.hooks.replicationDefaults.failurePolicy | string | `"Fail"` | Admission failure policy |
+| webhooks.hooks.replicationDefaults.matchConditions | list | `[]` | Additional admission match conditions |
+| webhooks.hooks.replicationDefaults.matchPolicy | string | `"Equivalent"` | Admission match policy |
+| webhooks.hooks.replicationDefaults.namespaceSelector | object | `{}` | Namespace selector for replication policy conversion |
+| webhooks.hooks.replicationDefaults.objectSelector | object | `{}` | Object selector for replication policy conversion |
+| webhooks.hooks.replicationDefaults.opts | object | `{}` | Capsule Hook Options |
+| webhooks.hooks.replicationDefaults.reinvocationPolicy | string | `"IfNeeded"` | Admission reinvocation policy |
 | webhooks.hooks.replications.enabled | bool | `true` | Enable the Hook |
 | webhooks.hooks.replications.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
-| webhooks.hooks.replications.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.replications.matchConditions | list | `[{"expression":"[object, oldObject].exists(o, o != null && has(o.metadata.labels) && (\n  ('projectcapsule.dev/created-by' in o.metadata.labels && o.metadata.labels['projectcapsule.dev/created-by'] == 'replications') ||\n  ('projectcapsule.dev/managed-by' in o.metadata.labels && o.metadata.labels['projectcapsule.dev/managed-by'] == 'replications') ||\n  ('projectcapsule.dev/protected-by' in o.metadata.labels && o.metadata.labels['projectcapsule.dev/protected-by'] == 'replications') ||\n  ('protection.projectcapsule.dev/replications' in o.metadata.labels && o.metadata.labels['protection.projectcapsule.dev/replications'] == 'true')\n))","name":"replication-markers"}]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
 | webhooks.hooks.replications.matchPolicy | string | `"Equivalent"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
 | webhooks.hooks.replications.namespaceSelector | object | `{}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
-| webhooks.hooks.replications.objectSelector | object | `{"matchExpressions":[{"key":"projectcapsule.dev/created-by","operator":"In","values":["replications"]}]}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
+| webhooks.hooks.replications.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) Match either legacy tracking marker or independent protection below. A LabelSelector cannot express OR across different label keys. |
 | webhooks.hooks.replications.opts | object | `{}` | Capsule Hook Options |
-| webhooks.hooks.replications.rules | list | `[{"apiGroups":["*"],"apiVersions":["*"],"operations":["UPDATE","DELETE"],"resources":["*"],"scope":"*"}]` | [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules) |
-| webhooks.hooks.resourcePermit | object | `{"enabled":true,"failurePolicy":"Fail","matchConditions":[],"matchPolicy":"Equivalent","namespaceSelector":{},"objectSelector":{"matchExpressions":[{"key":"projectcapsule.dev/protected-by","operator":"In","values":["resource-permit"]}]},"opts":{},"rules":[{"apiGroups":["*"],"apiVersions":["*"],"operations":["UPDATE","DELETE"],"resources":["*"],"scope":"*"}]}` | Protect resources managed by ResourcePermits from changes outside the Capsule controller |
+| webhooks.hooks.replications.rules | list | `[{"apiGroups":["*"],"apiVersions":["*"],"operations":["CREATE","UPDATE","DELETE"],"resources":["*"],"scope":"*"}]` | [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules) |
+| webhooks.hooks.resourcePermit | object | `{"enabled":true,"failurePolicy":"Fail","matchConditions":[{"expression":"[object, oldObject].exists(o, o != null && has(o.metadata.labels) && (\n  ('projectcapsule.dev/protected-by' in o.metadata.labels && o.metadata.labels['projectcapsule.dev/protected-by'] == 'resource-permit') ||\n  ('protection.projectcapsule.dev/resource-permit' in o.metadata.labels && o.metadata.labels['protection.projectcapsule.dev/resource-permit'] == 'true')\n))","name":"resource-permit-protection"}],"matchPolicy":"Equivalent","namespaceSelector":{},"objectSelector":{},"opts":{},"rules":[{"apiGroups":["*"],"apiVersions":["*"],"operations":["CREATE","UPDATE","DELETE"],"resources":["*"],"scope":"*"}]}` | Protect resources managed by ResourcePermits from changes outside the Capsule controller |
 | webhooks.hooks.resourcePermit.enabled | bool | `true` | Enable the Hook |
 | webhooks.hooks.resourcePermit.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
-| webhooks.hooks.resourcePermit.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.resourcePermit.matchConditions | list | `[{"expression":"[object, oldObject].exists(o, o != null && has(o.metadata.labels) && (\n  ('projectcapsule.dev/protected-by' in o.metadata.labels && o.metadata.labels['projectcapsule.dev/protected-by'] == 'resource-permit') ||\n  ('protection.projectcapsule.dev/resource-permit' in o.metadata.labels && o.metadata.labels['protection.projectcapsule.dev/resource-permit'] == 'true')\n))","name":"resource-permit-protection"}]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
 | webhooks.hooks.resourcePermit.matchPolicy | string | `"Equivalent"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
 | webhooks.hooks.resourcePermit.namespaceSelector | object | `{}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
-| webhooks.hooks.resourcePermit.objectSelector | object | `{"matchExpressions":[{"key":"projectcapsule.dev/protected-by","operator":"In","values":["resource-permit"]}]}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
+| webhooks.hooks.resourcePermit.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
 | webhooks.hooks.resourcePermit.opts | object | `{}` | Capsule Hook Options |
-| webhooks.hooks.resourcePermit.rules | list | `[{"apiGroups":["*"],"apiVersions":["*"],"operations":["UPDATE","DELETE"],"resources":["*"],"scope":"*"}]` | [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules) |
+| webhooks.hooks.resourcePermit.rules | list | `[{"apiGroups":["*"],"apiVersions":["*"],"operations":["CREATE","UPDATE","DELETE"],"resources":["*"],"scope":"*"}]` | [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules) |
 | webhooks.hooks.resourcepermits | object | `{"enabled":true,"failurePolicy":"Fail","matchConditions":[],"matchPolicy":"Equivalent","namespaceSelector":{},"objectSelector":{},"opts":{},"reinvocationPolicy":"Never","rules":[{"apiGroups":["capsule.clastix.io"],"apiVersions":["v1beta2"],"operations":["CREATE","UPDATE","DELETE"],"resources":["resourcepermits","resourcepermits/status"],"scope":"Namespaced"}]}` | Validate namespaced ResourcePermits and their referenced templates |
 | webhooks.hooks.resourcepermits.enabled | bool | `true` | Enable the Hook |
 | webhooks.hooks.resourcepermits.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |

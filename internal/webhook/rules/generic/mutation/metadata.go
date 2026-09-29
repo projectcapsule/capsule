@@ -18,14 +18,15 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	apirules "github.com/projectcapsule/capsule/pkg/api/rules"
+	"github.com/projectcapsule/capsule/pkg/ruleengine"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
-type metadataRules struct{}
+type metadataRules struct{ compiler ruleengine.ConditionCompiler }
 
-func MetadataRules() handlers.TypedHandlerWithTenantWithRuleset[*unstructured.Unstructured] {
-	return &metadataRules{}
+func MetadataRules(compiler ruleengine.ConditionCompiler) handlers.TypedHandlerWithTenantWithRuleset[*unstructured.Unstructured] {
+	return &metadataRules{compiler: compiler}
 }
 
 func (h *metadataRules) OnCreate(_ client.Client, _ client.Reader, obj *unstructured.Unstructured, _ admission.Decoder, _ events.EventRecorder, _ *capsulev1beta2.Tenant, bodies []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
@@ -40,8 +41,8 @@ func (*metadataRules) OnDelete(client.Client, client.Reader, *unstructured.Unstr
 	return func(context.Context, admission.Request) *admission.Response { return nil }
 }
 
-func (*metadataRules) mutate(obj *unstructured.Unstructured, bodies []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
+func (h *metadataRules) mutate(obj *unstructured.Unstructured, bodies []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
+	return func(ctx context.Context, req admission.Request) *admission.Response {
 		gvk := schema.GroupVersionKind{Group: req.Kind.Group, Version: req.Kind.Version, Kind: req.Kind.Kind}
 		if gvk.Version == "" || gvk.Kind == "" {
 			response := admission.Errored(http.StatusBadRequest, fmt.Errorf("admission request kind is incomplete: %s", gvk.String()))
@@ -53,10 +54,10 @@ func (*metadataRules) mutate(obj *unstructured.Unstructured, bodies []*apirules.
 
 		resourcesMutated := false
 
-		if req.Operation == admissionv1.Create {
+		if req.Operation == admissionv1.Create && req.SubResource == "" {
 			var err error
 
-			resourcesMutated, err = MutateWorkloadResources(obj, gvk, bodies)
+			resourcesMutated, err = MutateWorkloadResources(ctx, obj, gvk, bodies, ruleengine.NewConditionEvaluator(h.compiler, req.AdmissionRequest))
 			if err != nil {
 				response := admission.Errored(http.StatusInternalServerError, err)
 
