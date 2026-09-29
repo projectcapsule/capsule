@@ -347,7 +347,21 @@ var _ = Describe(
 				expectResourcePermitDeletionDenied(ctx, request, capsulev1beta2.ResourcePermitPhaseActive)
 			})
 
-			It("keeps its finalizer until managed resources are deleted during namespace termination", func() {
+			It("keeps its finalizer until managed resources are deleted during unmanaged namespace termination", func() {
+				// The shared fixture creates a real Tenant and namespace. Keep them
+				// present, but exercise ordinary namespace termination separately:
+				// tenant cleanup intentionally clears ConfigMap finalizers after its
+				// grace period. The next scenario covers that cleanup path.
+				tenantNamespace := namespace
+				namespace := createResourcePermitTestNamespace(ctx)
+				grantResourcePermitNamespaceAdmin(ctx, namespace.Name, resourcePermitLifecycleReviewer)
+				Eventually(func(g Gomega) {
+					current := &corev1.Namespace{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(namespace), current)).To(Succeed())
+					g.Expect(current.OwnerReferences).To(BeEmpty())
+					g.Expect(current.Labels).NotTo(HaveKey(apimeta.TenantLabel))
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
 				request := newLifecycleResourcePermit(
 					namespace.Name,
 					"e2e-resourcepermit-delete-with-namespace",
@@ -396,6 +410,10 @@ var _ = Describe(
 					g.Expect(target.DeletionTimestamp.IsZero()).To(BeFalse())
 				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 				Consistently(func(g Gomega) {
+					target := &corev1.ConfigMap{}
+					g.Expect(k8sClient.Get(ctx, targetKey, target)).To(Succeed())
+					g.Expect(target.DeletionTimestamp.IsZero()).To(BeFalse())
+					g.Expect(target.Finalizers).To(ContainElement(holdFinalizer))
 					current := &capsulev1beta2.ResourcePermit{}
 					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(request), current)).To(Succeed())
 					g.Expect(current.Finalizers).To(ContainElement(apimeta.ControllerFinalizer))
@@ -421,6 +439,17 @@ var _ = Describe(
 
 					return apierrors.IsNotFound(err)
 				}, defaultTerminationTimeoutInterval, defaultPollInterval).Should(BeTrue())
+
+				By("preserving the unrelated Tenant and its namespace")
+				Eventually(func(g Gomega) {
+					current := &corev1.Namespace{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(tenantNamespace), current)).To(Succeed())
+					g.Expect(current.DeletionTimestamp.IsZero()).To(BeTrue())
+					g.Expect(current.Labels).To(HaveKeyWithValue(apimeta.TenantLabel, tenantNamespace.Name))
+					tnt := &capsulev1beta2.Tenant{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: tenantNamespace.Name}, tnt)).To(Succeed())
+					g.Expect(tnt.DeletionTimestamp.IsZero()).To(BeTrue())
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			})
 
 			It("preserves its lifecycle finalizer through tenant namespace cleanup", func() {
