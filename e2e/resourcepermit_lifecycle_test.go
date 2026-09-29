@@ -10,12 +10,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	apimeta "github.com/projectcapsule/capsule/pkg/api/meta"
-	capsulerbac "github.com/projectcapsule/capsule/pkg/api/rbac"
-	resourcepermitapi "github.com/projectcapsule/capsule/pkg/api/resourcepermit"
-	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -25,6 +19,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	apimeta "github.com/projectcapsule/capsule/pkg/api/meta"
+	capsulerbac "github.com/projectcapsule/capsule/pkg/api/rbac"
+	resourcepermitapi "github.com/projectcapsule/capsule/pkg/api/resourcepermit"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
 const (
@@ -404,18 +405,15 @@ var _ = Describe(
 			})
 
 			It("preserves its lifecycle finalizer through tenant namespace cleanup", func() {
-				tnt := &capsulev1beta2.Tenant{
-					Name: namespace.Name, Labels: map[string]string{"env": "e2e"},
-					Spec: capsulev1beta2.TenantSpec{Owners: capsulerbac.OwnerListSpec{{Name: resourcePermitLifecycleReviewer, Kind: capsulerbac.UserOwner}}},
-				}
+				tnt := newResourcePermitCleanupTenant(namespace.Name)
 				EventuallyCreation(func() error { return k8sClient.Create(ctx, tnt) }).Should(Succeed())
 				DeferCleanup(func() { EventuallyDeletion(tnt) })
 				TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 				namespace := NewNamespace(tnt.Name+"-managed", map[string]string{apimeta.TenantLabel: tnt.Name})
-					NamespaceCreation(namespace, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-					DeferCleanup(func() { ForceDeleteNamespace(ctx, namespace.Name) })
-					grantResourcePermitNamespaceAdmin(ctx, namespace.Name, resourcePermitLifecycleReviewer)
-				NamespaceIsPartOfTenant(tnt, namespace).Should(Succeed())
+				NamespaceCreation(namespace, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+				DeferCleanup(func() { ForceDeleteNamespace(ctx, namespace.Name) })
+				grantResourcePermitNamespaceAdmin(ctx, namespace.Name, resourcePermitLifecycleReviewer)
+				TenantNamespaceReady(tnt, namespace, 1)
 				// A cluster-scoped target cannot be force-finalized by namespace
 				// cleanup. Its finalizer must keep the permit (and namespace) alive.
 				template := lifecycleResourcePermitTemplate()
