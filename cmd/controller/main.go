@@ -707,21 +707,21 @@ func main() {
 	// webhooks: the order matters, don't change it and just append
 	webhooksList := append(
 		make([]handlers.Webhook, 0),
-		rulesgenericmutation.Register(cfg),
+		rulesgenericmutation.Register(cfg, celCache),
 		rulesgenericvalidation.Register(
 			regexCache,
 			cfg,
 			rulesgenericvalidation.ForKind(
 				corev1.SchemeGroupVersion.WithKind("Pod").GroupKind(),
 				pod.Handler(cfg,
-					podrules.PodRules(regexCache, registryCache),
+					podrules.PodRules(regexCache, registryCache, celCache),
 				),
 				"ephemeralcontainers",
 			),
 			rulesgenericvalidation.ForKind(
 				corev1.SchemeGroupVersion.WithKind("Service").GroupKind(),
 				service.Handler(cfg,
-					servicerules.ServiceRules(regexCache),
+					servicerules.ServiceRules(regexCache, celCache),
 				),
 			),
 		),
@@ -765,7 +765,7 @@ func main() {
 		route.GenericCustomResources(generic.ResourceCounterHandler(manager.GetClient())),
 		route.Gateway(gateway.Class(cfg)),
 		route.DeviceClass(dra.DeviceClass()),
-		route.Defaults(defaults.Handler(cfg, kubeVersion)),
+		route.Defaults(defaults.Handler(cfg, kubeVersion, celCache)),
 		route.TenantMutation(
 			tenantmutation.MetaHandler(),
 		),
@@ -777,7 +777,11 @@ func main() {
 				tenantvalidation.IngressClassRegexHandler(),
 				tenantvalidation.StorageClassRegexHandler(),
 				tenantvalidation.ContainerRegistryRegexHandler(),
-				tenantvalidation.RuleHandler(manager.GetRESTMapper()),
+				tenantvalidation.PriorityClassRegexHandler(),
+				tenantvalidation.RuntimeClassRegexHandler(),
+				tenantvalidation.GatewayClassRegexHandler(),
+				tenantvalidation.DeviceClassRegexHandler(),
+				tenantvalidation.RuleHandler(manager.GetRESTMapper(), celCache),
 				tenantvalidation.HostnameRegexHandler(),
 				tenantvalidation.FreezedEmitter(),
 				tenantvalidation.OwnersHandler(),
@@ -845,7 +849,7 @@ func main() {
 				cfgvalidation.WarningHandler(),
 			),
 		),
-		route.RulesValidating(manager.GetRESTMapper(), cfg),
+		route.RulesValidating(manager.GetRESTMapper(), cfg, celCache),
 		route.ResourcePermitMutation(resourcepermit.ResourcePermitMutationHandler(
 			ctrl.Log.WithName("webhooks").WithName("resourcepermits"),
 		)),
@@ -1002,6 +1006,7 @@ func main() {
 		cfg,
 		controllerConfig,
 		impersonationCache,
+		celCache,
 	); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "tenantresources")
 		os.Exit(1)

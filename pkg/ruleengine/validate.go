@@ -23,6 +23,7 @@ import (
 func ValidateRuleStatusBody(
 	mapper k8smeta.RESTMapper,
 	bodies []*rules.NamespaceRuleBodyNamespace,
+	compilers ...ConditionCompiler,
 ) error {
 	quotaNames := make(map[string]string)
 
@@ -36,6 +37,14 @@ func ValidateRuleStatusBody(
 		}
 
 		if err := validateQuotaRules(i, rule.Quota, quotaNames); err != nil {
+			return err
+		}
+
+		if err := validateMutations(i, rule.Mutate); err != nil {
+			return err
+		}
+
+		if err := validateRuleConditions(i, rule, compilers); err != nil {
 			return err
 		}
 
@@ -194,6 +203,10 @@ func validateWorkloadRules(
 	}
 
 	if err := validateWorkloadResourceRules(ruleIndex, workloads); err != nil {
+		return err
+	}
+
+	if err := validatePlacementRules(ruleIndex, workloads); err != nil {
 		return err
 	}
 

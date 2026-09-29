@@ -5,18 +5,10 @@ package e2e
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	apimeta "github.com/projectcapsule/capsule/pkg/api/meta"
-	capsulerbac "github.com/projectcapsule/capsule/pkg/api/rbac"
-	"github.com/projectcapsule/capsule/pkg/api/resourcepermit"
-	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
-	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
-	tpl "github.com/projectcapsule/capsule/pkg/template"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -24,6 +16,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	apimeta "github.com/projectcapsule/capsule/pkg/api/meta"
+	capsulerbac "github.com/projectcapsule/capsule/pkg/api/rbac"
+	"github.com/projectcapsule/capsule/pkg/api/resourcepermit"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
+	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
+	tpl "github.com/projectcapsule/capsule/pkg/template"
 )
 
 const globalResourcePermitTemplateSelectorLabel = "e2e.projectcapsule.dev/resourcepermit-template"
@@ -46,7 +46,7 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 
 	BeforeEach(func() {
 		ctx = context.TODO()
-		namespace = createResourcePermitTestNamespace(ctx)
+		namespace = createResourcePermitTenantNamespace(ctx)
 		brt = &capsulev1beta2.GlobalResourcePermitTemplate{
 			Name: "e2e-resourcepermit",
 			Spec: capsulev1beta2.GlobalResourcePermitTemplateSpec{
@@ -126,10 +126,18 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 				g.Expect(cm.Labels).To(HaveKeyWithValue(apimeta.ProtectedByCapsuleLabel, apimeta.ValueControllerResourcePermit))
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
-			cm.Data["key"] = "tampered"
-			err := k8sClient.Update(ctx, cm)
-			Expect(apierrors.IsForbidden(err)).To(BeTrue())
-			Expect(err).To(MatchError(ContainSubstring("can only be changed by the Capsule controller")))
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cm), cm)).To(Succeed())
+				cm.Data["key"] = "tampered"
+				err := k8sClient.Update(ctx, cm)
+				if err == nil {
+					StopTrying("protected ConfigMap update unexpectedly succeeded").Now()
+				}
+				g.Expect(apierrors.IsForbidden(err)).To(BeTrue(), "expected admission denial, got: %v", err)
+				g.Expect(err).To(MatchError(ContainSubstring("can only be changed by the Capsule controller")))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cm), cm)).To(Succeed())
+			Expect(cm.Data).To(HaveKeyWithValue("key", "value"))
 
 			By("waiting for natural expiry to delete both the ConfigMap and its ResourcePermit")
 			expectResourcePermitAndConfigMapDeleted(ctx, br, cm)
@@ -254,8 +262,11 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 				g.Expect(cm.Annotations).NotTo(HaveKey(apimeta.ResourcePermitServiceAccountAnnotation))
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
-			cm.Data["key"] = "managed-after-orphaning"
-			Expect(k8sClient.Update(ctx, cm)).To(Succeed())
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cm), cm)).To(Succeed())
+				cm.Data["key"] = "managed-after-orphaning"
+				g.Expect(k8sClient.Update(ctx, cm)).To(Succeed())
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 	})
 
@@ -483,20 +494,31 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 				g.Expect(requested.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseRequested))
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
-			properties, err := requested.GenerateRequestStatus()
-			Expect(err).NotTo(HaveOccurred())
-			Expect(requested.ApprovePermit(&resourcepermit.AccessEntity{Name: "spoofed"}, properties, "")).To(Succeed())
-			err = bobClient.Status().Update(ctx, requested)
-			Expect(err).To(HaveOccurred())
-			Expect(err).To(MatchError(ContainSubstring("is not permitted to approve requests for template")))
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(br), requested)).To(Succeed())
+				g.Expect(requested.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseRequested))
+				properties, err := requested.GenerateRequestStatus()
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(requested.ApprovePermit(&resourcepermit.AccessEntity{Name: "spoofed"}, properties, "")).To(Succeed())
+				err = bobClient.Status().Update(ctx, requested)
+				if err == nil {
+					StopTrying("unauthorized approval unexpectedly succeeded").Now()
+				}
+				g.Expect(apierrors.IsForbidden(err)).To(BeTrue(), "expected admission denial, got: %v", err)
+				g.Expect(err).To(MatchError(ContainSubstring("is not permitted to approve requests for template")))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(br), requested)).To(Succeed())
+			Expect(requested.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseRequested))
 
 			charlieClient := impersonationClient("charlie", []string{"users", "admin"})
-			requested = &capsulev1beta2.ResourcePermit{}
-			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: br.Name, Namespace: br.Namespace}, requested)).To(Succeed())
-			properties, err = requested.GenerateRequestStatus()
-			Expect(err).NotTo(HaveOccurred())
-			Expect(requested.ApprovePermit(&resourcepermit.AccessEntity{Name: "spoofed"}, properties, "")).To(Succeed())
-			Expect(charlieClient.Status().Update(ctx, requested)).To(Succeed())
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(br), requested)).To(Succeed())
+				g.Expect(requested.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseRequested))
+				properties, err := requested.GenerateRequestStatus()
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(requested.ApprovePermit(&resourcepermit.AccessEntity{Name: "spoofed"}, properties, "")).To(Succeed())
+				g.Expect(charlieClient.Status().Update(ctx, requested)).To(Succeed())
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 			cm := &corev1.ConfigMap{}
 			Eventually(func() error {
@@ -530,18 +552,35 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 					g.Expect(requested.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseRequested))
 				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
-				properties, err := requested.GenerateRequestStatus()
-				Expect(err).NotTo(HaveOccurred())
-				Expect(requested.ApprovePermit(&resourcepermit.AccessEntity{Name: "spoofed"}, properties, "")).To(Succeed())
-				err = impersonationClient("alice", []string{"developers"}).Status().Update(ctx, requested)
-				Expect(err).To(MatchError(ContainSubstring("is not permitted to approve requests for template")))
+				aliceClient := impersonationClient("alice", []string{"developers"})
+				Eventually(func(g Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(br), requested)).To(Succeed())
+					g.Expect(requested.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseRequested))
+					properties, err := requested.GenerateRequestStatus()
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(requested.ApprovePermit(&resourcepermit.AccessEntity{Name: "spoofed"}, properties, "")).To(Succeed())
+					err = aliceClient.Status().Update(ctx, requested)
+					if err == nil {
+						StopTrying("non-member approval unexpectedly succeeded").Now()
+					}
+					g.Expect(apierrors.IsForbidden(err)).To(BeTrue(), "expected admission denial, got: %v", err)
+					g.Expect(err).To(MatchError(ContainSubstring("is not permitted to approve requests for template")))
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(br), requested)).To(Succeed())
+				Expect(requested.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseRequested))
 
-				requested = &capsulev1beta2.ResourcePermit{}
-				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: br.Name, Namespace: br.Namespace}, requested)).To(Succeed())
-				properties, err = requested.GenerateRequestStatus()
-				Expect(err).NotTo(HaveOccurred())
-				Expect(requested.ApprovePermit(&resourcepermit.AccessEntity{Name: "spoofed"}, properties, "")).To(Succeed())
-				Expect(impersonationClient("bob", []string{"developers", "on-call"}).Status().Update(ctx, requested)).To(Succeed())
+				bobClient := impersonationClient("bob", []string{"developers", "on-call"})
+				Eventually(func(g Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(br), requested)).To(Succeed())
+					g.Expect(requested.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseRequested))
+					properties, err := requested.GenerateRequestStatus()
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(requested.ApprovePermit(&resourcepermit.AccessEntity{Name: "spoofed"}, properties, "")).To(Succeed())
+					g.Expect(bobClient.Status().Update(ctx, requested)).To(Succeed())
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+				active := waitForResourcePermitPhase(ctx, br, capsulev1beta2.ResourcePermitPhaseActive)
+				Expect(active.Status.Review.Reviewer.Name).To(Equal("bob"))
+				Expect(active.Status.Review.Verdict).To(Equal(capsulev1beta2.ResourcePermitVerdictApproved))
 			})
 		})
 	})
@@ -554,8 +593,11 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 
 		BeforeEach(func() {
 			allowedNamespace = namespace
-			allowedNamespace.Labels[globalResourcePermitTemplateSelectorLabel] = allowedNamespace.Name
-			Expect(k8sClient.Update(ctx, allowedNamespace)).To(Succeed())
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(allowedNamespace), allowedNamespace)).To(Succeed())
+				allowedNamespace.Labels[globalResourcePermitTemplateSelectorLabel] = allowedNamespace.Name
+				g.Expect(k8sClient.Update(ctx, allowedNamespace)).To(Succeed())
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			deniedNamespace = createResourcePermitTestNamespace(ctx)
 
 			brt.Spec.Approvals.Auto = false
@@ -569,12 +611,18 @@ var _ = Describe("creating a GlobalResourcePermitTemplate", Ordered, Label("reso
 		It("reconciles namespace label changes into template status", func() {
 			expectGlobalResourcePermitTemplateNamespaces(ctx, brt.Name, allowedNamespace.Name)
 
-			deniedNamespace.Labels[globalResourcePermitTemplateSelectorLabel] = allowedNamespace.Name
-			Expect(k8sClient.Update(ctx, deniedNamespace)).To(Succeed())
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(deniedNamespace), deniedNamespace)).To(Succeed())
+				deniedNamespace.Labels[globalResourcePermitTemplateSelectorLabel] = allowedNamespace.Name
+				g.Expect(k8sClient.Update(ctx, deniedNamespace)).To(Succeed())
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			expectGlobalResourcePermitTemplateNamespaces(ctx, brt.Name, allowedNamespace.Name, deniedNamespace.Name)
 
-			delete(allowedNamespace.Labels, globalResourcePermitTemplateSelectorLabel)
-			Expect(k8sClient.Update(ctx, allowedNamespace)).To(Succeed())
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(allowedNamespace), allowedNamespace)).To(Succeed())
+				delete(allowedNamespace.Labels, globalResourcePermitTemplateSelectorLabel)
+				g.Expect(k8sClient.Update(ctx, allowedNamespace)).To(Succeed())
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			expectGlobalResourcePermitTemplateNamespaces(ctx, brt.Name, deniedNamespace.Name)
 		})
 
@@ -857,24 +905,18 @@ func grantResourcePermitNamespaceAdmin(ctx context.Context, namespace, username 
 }
 
 func approveResourcePermit(ctx context.Context, br *capsulev1beta2.ResourcePermit) {
-	br2 := &capsulev1beta2.ResourcePermit{}
-	Eventually(func() (err error) {
-		err = k8sClient.Get(ctx, types.NamespacedName{Name: br.GetName(), Namespace: br.Namespace}, br2)
-		if err != nil {
-			return err
-		}
-		if br2.Status.Phase != capsulev1beta2.ResourcePermitPhaseRequested {
-			return errors.New("resource permit not in requested phase")
-		}
-		return nil
-	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-	Expect(br2.Status.Request).ShouldNot(BeNil())
+	Eventually(func(g Gomega) {
+		current := &capsulev1beta2.ResourcePermit{}
+		g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(br), current)).To(Succeed())
+		g.Expect(current.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseRequested))
+		g.Expect(current.Status.Request).NotTo(BeNil())
 
-	before := br2.DeepCopy()
-	br2.Status.Phase = capsulev1beta2.ResourcePermitPhaseApproved
-	Expect(k8sClient.Status().Patch(
-		ctx,
-		br2,
-		client.MergeFromWithOptions(before, client.MergeFromWithOptimisticLock{}),
-	)).Should(Succeed())
+		before := current.DeepCopy()
+		current.Status.Phase = capsulev1beta2.ResourcePermitPhaseApproved
+		g.Expect(k8sClient.Status().Patch(
+			ctx,
+			current,
+			client.MergeFromWithOptions(before, client.MergeFromWithOptimisticLock{}),
+		)).To(Succeed())
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 }

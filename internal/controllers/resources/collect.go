@@ -240,6 +240,7 @@ func (co *Collector) AddToAccumulation(
 
 	processor.AccumulatorAdd(opts.Accumulator, resource, processor.AccumulatorObject{
 		Object: obj,
+		Policy: spec.Policy,
 		Origin: gvk.TenantResourceIDWithOrigin{
 			TenantResourceID: gvk.TenantResourceID{
 				Tenant: tntName,

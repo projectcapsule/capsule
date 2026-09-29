@@ -6,8 +6,10 @@ package validation
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -44,17 +46,20 @@ type podRuleValidator struct {
 		[]*apirules.NamespaceRuleEnforceBody,
 	) (*ruleengine.Evaluation, error)
 	includeSubresources bool
+	changed             func(old, pod *corev1.Pod) bool
 }
 
 type podRules struct {
 	rules         []podRuleValidator
 	regexCache    *cache.RegexCache
 	registryCache *cache.RegistryRuleSetCache
+	compiler      ruleengine.ConditionCompiler
 }
 
 func PodRules(
 	regexCache *cache.RegexCache,
 	registryCache *cache.RegistryRuleSetCache,
+	compiler ruleengine.ConditionCompiler,
 ) handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod] {
 	if regexCache == nil {
 		regexCache = cache.NewRegexCache()
@@ -67,9 +72,22 @@ func PodRules(
 	h := &podRules{
 		regexCache:    regexCache,
 		registryCache: registryCache,
+		compiler:      compiler,
 	}
 
 	h.rules = []podRuleValidator{
+		{evaluate: h.validateNodeSelectors, changed: func(old, pod *corev1.Pod) bool {
+			return !equality.Semantic.DeepEqual(old.Spec.NodeSelector, pod.Spec.NodeSelector)
+		}},
+		{evaluate: h.validateTolerations, changed: func(old, pod *corev1.Pod) bool {
+			return !equality.Semantic.DeepEqual(old.Spec.Tolerations, pod.Spec.Tolerations)
+		}},
+		{evaluate: h.validateTopologySpread, changed: func(old, pod *corev1.Pod) bool {
+			return !equality.Semantic.DeepEqual(old.Spec.TopologySpreadConstraints, pod.Spec.TopologySpreadConstraints) || !equality.Semantic.DeepEqual(old.Labels, pod.Labels)
+		}},
+		{evaluate: h.validateAffinity, changed: func(old, pod *corev1.Pod) bool {
+			return !equality.Semantic.DeepEqual(old.Spec.Affinity, pod.Spec.Affinity) || !equality.Semantic.DeepEqual(old.Labels, pod.Labels)
+		}},
 		{evaluate: h.validateResources},
 		{evaluate: h.validateSchedulers, includeSubresources: true},
 		{evaluate: h.validateQoSClasses, includeSubresources: true},
@@ -102,7 +120,7 @@ func (h *podRules) OnCreate(
 func (h *podRules) OnUpdate(
 	_ client.Client,
 	_ client.Reader,
-	_ *corev1.Pod,
+	old *corev1.Pod,
 	pod *corev1.Pod,
 	_ admission.Decoder,
 	recorder events.EventRecorder,
@@ -112,7 +130,7 @@ func (h *podRules) OnUpdate(
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		enforceBodies := ruleengine.EnforceBodiesFromNamespaceRules(bodies)
 
-		if err := h.validatePodRules(ctx, req, pod, tnt, recorder, enforceBodies); err != nil {
+		if err := h.validatePodRules(ctx, req, pod, tnt, recorder, enforceBodies, old); err != nil {
 			return ad.Deny(err.Error())
 		}
 
@@ -141,8 +159,42 @@ func (h *podRules) validatePodRules(
 	tnt *capsulev1beta2.Tenant,
 	recorder events.EventRecorder,
 	enforceBodies []*apirules.NamespaceRuleEnforceBody,
+	old ...*corev1.Pod,
 ) error {
+	conditional := false
+
+	for _, body := range enforceBodies {
+		if body != nil && len(body.Workloads.Conditions) > 0 {
+			conditional = true
+
+			break
+		}
+	}
+
+	evaluator := ruleengine.NewConditionEvaluator(h.compiler, req.AdmissionRequest)
+
+	var err error
+
+	enforceBodies, err = ruleengine.FilterEnforcementConditions(ctx, evaluator, pod, enforceBodies,
+		func(body *apirules.NamespaceRuleEnforceBody) []apirules.AdmissionCondition {
+			// Placement and resource policies do not run on subresources. Avoid
+			// evaluating their gates when no legacy subresource policy applies.
+			if req.SubResource != "" && len(body.Workloads.Schedulers) == 0 &&
+				len(body.Workloads.QoSClasses) == 0 && len(body.Workloads.Registries) == 0 {
+				return nil
+			}
+
+			return body.Workloads.Conditions
+		})
+	if err != nil {
+		return fmt.Errorf("enforce.workloads: %w", err)
+	}
+
 	for _, rule := range h.rules {
+		if !conditional && len(old) > 0 && old[0] != nil && rule.changed != nil && !rule.changed(old[0], pod) {
+			continue
+		}
+
 		if req.SubResource != "" && !rule.includeSubresources {
 			continue
 		}

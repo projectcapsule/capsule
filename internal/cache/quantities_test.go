@@ -347,7 +347,6 @@ var _ = Describe("QuantityCache", func() {
 		wg.Add(workers)
 
 		for i := range workers {
-			i := i
 			go func() {
 				defer GinkgoRecover()
 				defer wg.Done()
@@ -389,7 +388,6 @@ var _ = Describe("QuantityCache", func() {
 		wg.Add(workers)
 
 		for i := range workers {
-			i := i
 			go func() {
 				defer GinkgoRecover()
 				defer wg.Done()

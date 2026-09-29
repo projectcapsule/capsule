@@ -7,6 +7,13 @@ import "github.com/projectcapsule/capsule/pkg/api/runtime"
 
 // +kubebuilder:object:generate=true
 type NamespaceRuleEnforceServicesBody struct {
+	// Conditions gate only this resource block; other blocks and rules still run.
+	// All conditions must evaluate to true. Empty conditions always apply.
+	// +optional
+	// +kubebuilder:validation:MaxItems=64
+	// +listType=atomic
+	Conditions []AdmissionCondition `json:"conditions,omitempty"`
+
 	// Types defines the Service types matched by this rule.
 	//
 	// Supported values:

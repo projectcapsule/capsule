@@ -6,6 +6,7 @@ package validation
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,10 +47,12 @@ type serviceRuleValidator func(
 type serviceRules struct {
 	rules      []serviceRuleValidator
 	regexCache *cache.RegexCache
+	compiler   ruleengine.ConditionCompiler
 }
 
 func ServiceRules(
 	regexCache *cache.RegexCache,
+	compiler ruleengine.ConditionCompiler,
 ) handlers.TypedHandlerWithTenantWithRuleset[*corev1.Service] {
 	if regexCache == nil {
 		regexCache = cache.NewRegexCache()
@@ -57,6 +60,7 @@ func ServiceRules(
 
 	h := &serviceRules{
 		regexCache: regexCache,
+		compiler:   compiler,
 	}
 
 	h.rules = []serviceRuleValidator{
@@ -133,6 +137,18 @@ func (h *serviceRules) validateServiceRules(
 	recorder events.EventRecorder,
 	enforceBodies []*apirules.NamespaceRuleEnforceBody,
 ) error {
+	evaluator := ruleengine.NewConditionEvaluator(h.compiler, req.AdmissionRequest)
+
+	var err error
+
+	enforceBodies, err = ruleengine.FilterEnforcementConditions(ctx, evaluator, svc, enforceBodies,
+		func(body *apirules.NamespaceRuleEnforceBody) []apirules.AdmissionCondition {
+			return body.Services.Conditions
+		})
+	if err != nil {
+		return fmt.Errorf("enforce.services: %w", err)
+	}
+
 	for _, evaluate := range h.rules {
 		evaluation, err := evaluate(svc, enforceBodies)
 		if err != nil {

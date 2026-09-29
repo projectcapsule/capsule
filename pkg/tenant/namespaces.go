@@ -71,7 +71,7 @@ func ResolveNamespaceTenant(
 	reader client.Reader,
 	ns *corev1.Namespace,
 ) (*capsulev1beta2.Tenant, error) {
-	if ns == nil {
+	if ns == nil || reader == nil {
 		return nil, nil
 	}
 

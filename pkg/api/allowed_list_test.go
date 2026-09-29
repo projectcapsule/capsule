@@ -69,6 +69,7 @@ func TestAllowedListSpec_RegexMatch(t *testing.T) {
 	for _, tc := range []tc{
 		{`first-\w+-pattern`, []string{"first-date-pattern", "first-year-pattern"}, []string{"broken", "first-year", "second-date-pattern"}},
 		{``, nil, []string{"any", "value"}},
+		{`[`, nil, []string{"any", "value"}},
 	} {
 		a := api.AllowedListSpec{
 			Regex: tc.Regex,

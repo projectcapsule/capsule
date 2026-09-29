@@ -69,6 +69,35 @@ func CapsuleFieldOwners(obj *unstructured.Unstructured, prefix string) map[strin
 	return out
 }
 
+// ReplicationFieldOwnerPrefix preserves the established parent identity used by
+// replication SSA managers, including managers created before policy support.
+func ReplicationFieldOwnerPrefix(name, namespace string) string {
+	if namespace == "" {
+		namespace = "Cluster"
+	}
+
+	hash := fnv.New64a()
+	_, _ = hash.Write([]byte(namespace))
+	_, _ = hash.Write([]byte{0})
+	_, _ = hash.Write([]byte(name))
+
+	return strconv.FormatUint(hash.Sum64(), 36)
+}
+
+// CapsuleResourceFieldOwners includes established replication managers only
+// when they match a known processed item. Manager names alone are user input.
+func CapsuleResourceFieldOwners(fields []metav1.ManagedFieldsEntry, replicationOwners map[string]struct{}) map[string]struct{} {
+	owners := map[string]struct{}{}
+
+	for _, field := range fields {
+		if _, known := replicationOwners[field.Manager]; known || strings.HasPrefix(field.Manager, ResourceFieldOwner("")) {
+			owners[field.Manager] = struct{}{}
+		}
+	}
+
+	return owners
+}
+
 func HasExactlyCapsuleOwners(obj *unstructured.Unstructured, prefix string, allowed []string) bool {
 	owners := CapsuleFieldOwners(obj, prefix)
 
