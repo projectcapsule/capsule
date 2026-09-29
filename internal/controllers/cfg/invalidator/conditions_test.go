@@ -27,7 +27,7 @@ func TestConditionCacheRebuildRetainsSharedProfilesAndQuotaExpressions(t *testin
 		t.Fatal(err)
 	}
 	expressions := []string{`request.operation == 'CREATE'`, `has(object.spec.containers)`, `object.spec.type == 'ClusterIP'`}
-	body := &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{{Workloads: rules.WorkloadMutation{Conditions: []rules.AdmissionCondition{{Expression: expressions[0]}}}}}, Enforce: &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Conditions: []rules.AdmissionCondition{{Expression: expressions[1]}}}, Services: rules.NamespaceRuleEnforceServicesBody{Conditions: []rules.AdmissionCondition{{Expression: expressions[2]}}}}}
+	body := &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{{Conditions: []rules.AdmissionCondition{{Expression: expressions[0]}}, Workloads: rules.WorkloadMutation{}}}, Enforce: &rules.NamespaceRuleEnforceBody{Conditions: []rules.AdmissionCondition{{Expression: expressions[1]}, {Expression: expressions[2]}}, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{}, Services: rules.NamespaceRuleEnforceServicesBody{}}}
 	a := &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: "tenant-a"}, Spec: capsulev1beta2.TenantSpec{Rules: []*rules.NamespaceRuleBodyTenant{{NamespaceRuleBodyNamespace: body}}}}
 	b := a.DeepCopy()
 	b.Name = "tenant-b"

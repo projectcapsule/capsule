@@ -17,6 +17,13 @@ const (
 // Mutated values remain subject to all applicable enforcement rules.
 // +kubebuilder:object:generate=true
 type NamespaceRuleMutation struct {
+	// Conditions gate this entire mutation entry and inspect the object after
+	// preceding mutations. All conditions must be true; empty means apply.
+	// +optional
+	// +kubebuilder:validation:MaxItems=64
+	// +listType=atomic
+	Conditions []AdmissionCondition `json:"conditions,omitempty"`
+
 	// Action chooses how explicitly supplied properties are applied.
 	// Merge sets scalar values and map keys, upserts lists, and conjoins required affinity.
 	// Replace replaces each supplied property in full: hostUsers, nodeSelector,
@@ -38,13 +45,6 @@ type NamespaceRuleMutation struct {
 // On merge, required affinity restrictions from applicable entries are ANDed.
 // +kubebuilder:object:generate=true
 type WorkloadMutation struct {
-	// Conditions gate this workload block and are evaluated against the Pod after
-	// preceding mutation entries. All conditions must be true; empty means apply.
-	// +optional
-	// +kubebuilder:validation:MaxItems=64
-	// +listType=atomic
-	Conditions []AdmissionCondition `json:"conditions,omitempty"`
-
 	// HostUsers sets spec.hostUsers on both merge and replace. False requests a
 	// separate user namespace; true uses the host user namespace. Omitted or null
 	// leaves the Pod value unchanged. Requires Kubernetes/runtime support.

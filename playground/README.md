@@ -124,11 +124,12 @@ make down            # delete the kind cluster
 
 ## Developing Capsule in the playground
 
-`make dev` first performs the normal playground setup, including the platform
-and user examples, and then builds the Capsule controller with `ko`. The image
+`make dev` first installs the playground infrastructure, then builds the Capsule
+controller with `ko` before applying the platform and user examples. The image
 is loaded directly into the kind nodes and the release is upgraded from the
 local `../charts/capsule` chart. Local chart templates and CRDs are therefore
-deployed together with the controller code.
+deployed together with the controller code, before examples that use the current
+rules API are created.
 
 While a development build is installed, reconciliation of the `capsule`
 HelmRelease is suspended so Flux cannot replace it with the pinned chart. The
@@ -271,3 +272,56 @@ kubectl --context kind-capsule delete globaltenantresource solar-gateway-api-acc
 
 These templates do not retain expired requests. Grafana cleanup deletes the
 dedicated namespace and everything in it.
+
+## Conditional Pod placement
+
+Use `make dev` to install the current controller and CRDs for these examples.
+When upgrading an existing playground, run `make dev-capsule apply-platform apply-user`
+so the Tenant rules are reapplied with the new schema before the Pods.
+
+`make apply-user` creates two Pods in `solar-test` using the placement rule in
+[`platform/tenants/solar.yaml`](platform/tenants/solar.yaml). The rule selects
+namespaces labelled `env: test`; `solar-prod` is outside this profile. The setup
+waits for the effective placement rule before creating the example Pods.
+
+- `placement-default` receives `kubernetes.io/os: linux` when that selector is absent.
+- `placement-shared` also receives the shared pool selector and toleration because
+  its `placement.example.com/pool` label is `shared`. A scheduling gate keeps this
+  demonstration Pod pending without requiring specially labelled nodes.
+
+Inspect the admission result:
+
+```console
+kubectl --context kind-capsule --as alice -n solar-test get pod placement-default placement-shared -o yaml
+```
+
+An explicitly forbidden selector is rejected rather than overwritten by the default:
+
+```console
+kubectl --context kind-capsule --as alice -n solar-test run placement-denied --image=registry.k8s.io/pause:3.10 --restart=Never --overrides='{"spec":{"nodeSelector":{"kubernetes.io/os":"windows"}}}' --dry-run=server
+```
+
+Conditions use `{name, expression}` entries. `mutate[].conditions` gates one
+mutation entry; later entries see earlier mutations. `enforce.conditions` gates
+all enforcement blocks in that rule: workloads, services, metadata and ingress.
+A false gate skips only its entry or enforcement rule. Conditions are ANDed;
+use `||` within an expression for alternatives. An evaluation error rejects the
+request unless another condition is false. Use separate rules when resource
+kinds need different conditions, and guard optional fields with `has()`.
+
+Enforcement conditions are checked before metadata/resource defaults during
+mutation, then against the final object during validation. Metadata `managed`
+values under a conditional enforcement rule apply only on matching admission
+requests; background reconciliation cannot evaluate request-dependent conditions.
+Unconditional managed metadata retains its existing reconciliation behavior.
+
+When migrating manifests from the initial placement API, move
+`mutate[].workloads.conditions` to `mutate[].conditions`. Move either
+`enforce.workloads.conditions` or `enforce.services.conditions` to
+`enforce.conditions`. If both exist with different gates, split them into separate
+rules, retaining their namespace selectors, audience and action. Keep blocks that
+need unconditional behavior in separate ungated rules. Export existing rules
+before replacing the CRDs so the old conditions remain available for migration.
+Update stored rules and manifests alongside the controller and CRDs; removed
+nested fields may be pruned by Kubernetes, which would otherwise make those rules
+unconditional.

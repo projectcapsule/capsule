@@ -21,6 +21,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 )
 
 func TestManagedMetadataSkipsOnlyAlreadyOwnedValues(t *testing.T) {
@@ -379,5 +380,24 @@ func TestReconcileManagedMetadataTargetUsesPagination(t *testing.T) {
 	}
 	if patchCalls != 2 {
 		t.Fatalf("patch calls = %d, want 2", patchCalls)
+	}
+}
+
+func TestConditionalManagedMetadataIsAdmissionOnly(t *testing.T) {
+	value := "conditional"
+	bodies := []*rules.NamespaceRuleBodyNamespace{{Enforce: &rules.NamespaceRuleEnforceBody{
+		Conditions: []rules.AdmissionCondition{{Expression: "request.operation == 'CREATE'"}},
+		Metadata:   []rules.MetadataRule{{VersionKinds: apiruntime.VersionKinds{APIGroups: []string{"v1"}, Kinds: []string{"ConfigMap"}}, Labels: map[string]rules.MetadataValueRule{"example.com/managed": {Managed: &value}}}},
+	}}}
+	if hasManagedMetadata(bodies) {
+		t.Fatal("request-dependent metadata scheduled for background reconciliation")
+	}
+	labels, annotations := managedMetadataForGVK(schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"}, bodies)
+	if len(labels) != 0 || len(annotations) != 0 {
+		t.Fatalf("conditional metadata escaped admission: %v %v", labels, annotations)
+	}
+	targets, err := managedMetadataTargets(nil, bodies)
+	if err != nil || len(targets) != 0 {
+		t.Fatalf("conditional metadata triggered discovery: %v %v", targets, err)
 	}
 }

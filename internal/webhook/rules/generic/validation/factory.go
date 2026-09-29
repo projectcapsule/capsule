@@ -56,10 +56,12 @@ type genericRules struct {
 	regexCache      *cache.RegexCache
 	managedMetadata meta.ManagedMetadata
 	objectSkipRules []meta.ObjectSkipRule
+	compiler        ruleengine.ConditionCompiler
 }
 
 func GenericRules(
 	regexCache *cache.RegexCache,
+	compilers ...ruleengine.ConditionCompiler,
 ) handlers.TypedHandlerWithTenantWithRuleset[genericObject] {
 	if regexCache == nil {
 		regexCache = cache.NewRegexCache()
@@ -73,6 +75,9 @@ func GenericRules(
 
 	h.rules = []genericRuleValidator{
 		h.validateMetadata,
+	}
+	if len(compilers) > 0 {
+		h.compiler = compilers[0]
 	}
 
 	return h
@@ -161,6 +166,23 @@ func (h *genericRules) validateGenericRules(
 
 	if meta.ShouldSkipObjectByRules(obj, h.objectSkipRules) {
 		return nil
+	}
+
+	var err error
+
+	enforceBodies, err = ruleengine.FilterEnforcementConditions(ctx,
+		ruleengine.NewConditionEvaluator(h.compiler, req.AdmissionRequest), nil, enforceBodies,
+		func(body *apirules.NamespaceRuleEnforceBody) bool {
+			for _, metadata := range body.Metadata {
+				if metadata.MatchesGroupVersionKind(gvk) {
+					return true
+				}
+			}
+
+			return false
+		})
+	if err != nil {
+		return fmt.Errorf("enforce: %w", err)
 	}
 
 	for _, evaluate := range h.rules {

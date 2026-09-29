@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"time"
 
 	"github.com/go-logr/logr"
 	"golang.org/x/sync/errgroup"
@@ -24,8 +23,6 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
-
-const namespaceCascadingCleanupGracePeriod = 10 * time.Second
 
 // Ensuring all annotations are applied to each Namespace handled by the Tenant.
 func (r *Manager) reconcileNamespaces(
@@ -311,7 +308,6 @@ func (r *Manager) reconcileNamespace(
 	}()
 
 	// Verify if namespace is still active or terminating.
-	//nolint:nestif
 	if namespace.DeletionTimestamp != nil {
 		terminating = true
 
@@ -336,38 +332,8 @@ func (r *Manager) reconcileNamespace(
 			return stat, nil
 		}
 
-		// Give Kubernetes' namespace controller time to perform its normal
-		// deletion before issuing a discovery-wide forced cleanup. Most namespaces
-		// disappear during this window, avoiding hundreds of list requests and
-		// substantial API pressure during Tenant teardown. Stuck namespaces still
-		// receive the existing finalizer cleanup after the grace period.
-		if time.Since(namespace.DeletionTimestamp.Time) < namespaceCascadingCleanupGracePeriod {
-			terminatingState.Reason = meta.TerminatingReason
-			terminatingState.Status = metav1.ConditionFalse
-			terminatingState.Message = "waiting for namespace finalization"
-			stat.Conditions.UpdateConditionByType(terminatingState)
-
-			return stat, nil
-		}
-
-		cleaned, err := tenant.NamespacedCascadingCleanup(ctx, r.Client, r.DiscoveryClient, &r.discoveryCache, r.DynamicClient, namespace)
-		if err != nil {
-			terminatingState.Reason = meta.FailedReason
-			terminatingState.Status = metav1.ConditionFalse
-			terminatingState.Message = err.Error()
-			stat.Conditions.UpdateConditionByType(terminatingState)
-
-			return stat, err
-		}
-
-		if cleaned {
-			terminatingState.Reason = meta.PendingUnmanagedContentReason
-			terminatingState.Status = metav1.ConditionFalse
-			terminatingState.Message = "performing cascading deletion"
-			stat.Conditions.UpdateConditionByType(terminatingState)
-
-			return stat, nil
-		}
+		// Forced cleanup runs on the namespace cleanup queue. Provisioning other
+		// namespaces must not wait for discovery or deletion of arbitrary resources.
 
 		terminatingState.Reason = meta.TerminatingReason
 		terminatingState.Status = metav1.ConditionFalse

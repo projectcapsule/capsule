@@ -142,11 +142,14 @@ func (h *serviceRules) validateServiceRules(
 	var err error
 
 	enforceBodies, err = ruleengine.FilterEnforcementConditions(ctx, evaluator, svc, enforceBodies,
-		func(body *apirules.NamespaceRuleEnforceBody) []apirules.AdmissionCondition {
-			return body.Services.Conditions
+		func(body *apirules.NamespaceRuleEnforceBody) bool {
+			services := body.Services
+
+			return len(services.Types) > 0 || services.LoadBalancers != nil || services.ExternalIPs != nil ||
+				services.ExternalNames != nil || services.NodePorts != nil
 		})
 	if err != nil {
-		return fmt.Errorf("enforce.services: %w", err)
+		return fmt.Errorf("enforce: %w", err)
 	}
 
 	for _, evaluate := range h.rules {

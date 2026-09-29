@@ -44,6 +44,8 @@ annotations:
       description: preserve controller startup when optional DeviceClass discovery fails
     - kind: fixed
       description: support DeviceClass admission and status with resource.k8s.io/v1beta2 on Kubernetes 1.33 while retaining v1
+    - kind: changed
+      description: consolidate admission conditions at mutate entry and enforce level; migrate nested workload and service conditions before upgrading
     - kind: security
       description: validate replication tracking and protection markers on resource creation
     - kind: fixed

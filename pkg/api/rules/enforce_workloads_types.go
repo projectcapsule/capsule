@@ -25,13 +25,6 @@ const (
 
 // +kubebuilder:object:generate=true
 type NamespaceRuleEnforceWorkloadsBody struct {
-	// Conditions gate only this resource block; other blocks and rules still run.
-	// All conditions must evaluate to true. Empty conditions always apply.
-	// +optional
-	// +kubebuilder:validation:MaxItems=64
-	// +listType=atomic
-	Conditions []AdmissionCondition `json:"conditions,omitempty"`
-
 	// Define the enforcement targets this rule applies to.
 	// If empty, each webhook applies its own backwards-compatible default.
 	// +optional

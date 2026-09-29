@@ -30,6 +30,15 @@ type Audience struct {
 
 // +kubebuilder:object:generate=true
 type NamespaceRuleEnforceBody struct {
+	// Conditions gate this entire enforcement rule, including workloads, services,
+	// metadata and ingress. All conditions must be true; empty means apply.
+	// Conditions run during admission; managed metadata in a conditional rule
+	// is applied on matching requests only and is not reconciled in the background.
+	// +optional
+	// +kubebuilder:validation:MaxItems=64
+	// +listType=atomic
+	Conditions []AdmissionCondition `json:"conditions,omitempty"`
+
 	// Declare the action being performed on the enforcement rule:
 	// deny: On match, deny admission request
 	// allow: On match, allowed admission request

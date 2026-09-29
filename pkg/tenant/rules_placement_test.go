@@ -94,7 +94,7 @@ func TestMutationProjectionRetainsActionsConditionsAndEmptyProperties(t *testing
 		t.Fatal(err)
 	}
 	tnt := placementTenant("tenant-a")
-	tnt.Spec.Rules[0].Mutate = append(tnt.Spec.Rules[0].Mutate, rules.NamespaceRuleMutation{Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{Conditions: []rules.AdmissionCondition{{Name: "tenant", Expression: `request.namespace == '{{ .namespace.metadata.name }}'`}}, HostUsers: ptr.To(false), NodeSelector: map[string]string{}, Tolerations: []corev1.Toleration{}, TopologySpreadConstraints: []corev1.TopologySpreadConstraint{}, Affinity: &corev1.Affinity{}}})
+	tnt.Spec.Rules[0].Mutate = append(tnt.Spec.Rules[0].Mutate, rules.NamespaceRuleMutation{Conditions: []rules.AdmissionCondition{{Name: "tenant", Expression: `request.namespace == '{{ .namespace.metadata.name }}'`}}, Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{HostUsers: ptr.To(false), NodeSelector: map[string]string{}, Tolerations: []corev1.Toleration{}, TopologySpreadConstraints: []corev1.TopologySpreadConstraint{}, Affinity: &corev1.Affinity{}}})
 	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "work-a", Labels: map[string]string{"profile": "placement"}}}
 	result, err := tenant.BuildNamespaceRuleBodyStatus(scheme, ns, tnt)
 	if err != nil {
@@ -104,15 +104,15 @@ func TestMutationProjectionRetainsActionsConditionsAndEmptyProperties(t *testing
 		t.Fatalf("wrong ordered projection: %+v", result)
 	}
 	block := result[0].Mutate[1]
-	if block.Workloads.HostUsers == nil || *block.Workloads.HostUsers || block.Action != rules.MutationActionReplace || block.Workloads.Conditions[0].Expression != `request.namespace == 'work-a'` || block.Workloads.NodeSelector == nil || block.Workloads.Tolerations == nil || block.Workloads.TopologySpreadConstraints == nil || block.Workloads.Affinity == nil {
+	if block.Workloads.HostUsers == nil || *block.Workloads.HostUsers || block.Action != rules.MutationActionReplace || block.Conditions[0].Expression != `request.namespace == 'work-a'` || block.Workloads.NodeSelector == nil || block.Workloads.Tolerations == nil || block.Workloads.TopologySpreadConstraints == nil || block.Workloads.Affinity == nil {
 		t.Fatalf("lost fields: %+v", block)
 	}
 	*block.Workloads.HostUsers = true
 	if *tnt.Spec.Rules[0].Mutate[1].Workloads.HostUsers {
 		t.Fatal("hostUsers aliases Tenant")
 	}
-	block.Workloads.Conditions[0].Expression = "false"
-	if tnt.Spec.Rules[0].Mutate[1].Workloads.Conditions[0].Expression == "false" {
+	block.Conditions[0].Expression = "false"
+	if tnt.Spec.Rules[0].Mutate[1].Conditions[0].Expression == "false" {
 		t.Fatal("conditions alias Tenant")
 	}
 }
