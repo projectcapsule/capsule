@@ -723,7 +723,7 @@
                             }
                         },
                         "strict": {
-                            "description": "Strongly restrict the RBAC assigned to Capsule Controller. The default owner ClusterRoles (admin, provisioner and deleter) can be bound to tenant owners out of the box; add custom owner ClusterRoles via bindableClusterRoles. Permissions beyond binding (e.g. TenantResource replication) must be aggregated by yourself via ClusterRoles labeled projectcapsule.dev/aggregate-to-controller: \"true\".",
+                            "description": "Use explicit controller permissions instead of cluster-admin. Generic namespace cleanup requires get/list/watch/delete/deletecollection/patch on all API groups and resources, including custom resources. Kubernetes RBAC cannot limit patch to finalizers or terminating namespaces; this permission applies cluster-wide to all patchable fields. The default owner ClusterRoles (admin, provisioner and deleter) can be bound to tenant owners out of the box; add custom owner ClusterRoles via bindableClusterRoles. Additional permissions such as create/update for replicated resources must be aggregated via ClusterRoles labeled projectcapsule.dev/aggregate-to-controller: \"true\".",
                             "type": "boolean"
                         }
                     }

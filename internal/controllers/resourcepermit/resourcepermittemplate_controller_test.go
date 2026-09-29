@@ -221,7 +221,7 @@ func setReadinessTemplateResources(object client.Object, template string) {
 	}
 }
 
-func permitTemplateTestClient(t *testing.T, objects ...client.Object) client.WithWatch {
+func permitTemplateTestClient(t testing.TB, objects ...client.Object) client.WithWatch {
 	t.Helper()
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))

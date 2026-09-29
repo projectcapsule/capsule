@@ -199,7 +199,7 @@ func TestReconcileCertificatesPatchesEveryAdmissionCABundle(t *testing.T) {
 	}
 }
 
-func newTestTLSReconciler(t *testing.T, objects ...client.Object) (*Reconciler, client.Client) {
+func newTestTLSReconciler(t testing.TB, objects ...client.Object) (*Reconciler, client.Client) {
 	t.Helper()
 
 	configurationObject := &capsulev1beta2.CapsuleConfiguration{

@@ -240,7 +240,7 @@ func TestPersistentVolumePredicate(t *testing.T) {
 	}
 }
 
-func persistentVolumeTestScheme(t *testing.T) *runtime.Scheme {
+func persistentVolumeTestScheme(t testing.TB) *runtime.Scheme {
 	t.Helper()
 
 	scheme := runtime.NewScheme()
