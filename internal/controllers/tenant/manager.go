@@ -16,7 +16,6 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	nodev1 "k8s.io/api/node/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	resourcesv1 "k8s.io/api/resource/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -72,8 +71,8 @@ type Manager struct {
 }
 
 type supportedClasses struct {
-	device  bool
-	gateway bool
+	deviceVersion string
+	gateway       bool
 }
 
 func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
@@ -232,16 +231,9 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 		)
 	}
 
-	// DeviceClass is Optional
-	r.classes.device = gvk.HasGVK(mgr.GetRESTMapper(), schema.GroupVersionKind{
-		Group:   "resource.k8s.io",
-		Version: "v1",
-		Kind:    "DeviceClass",
-	})
-
-	if r.classes.device {
+	if deviceClass := r.discoverDeviceClass(mgr.GetRESTMapper()); deviceClass != nil {
 		ctrlBuilder = ctrlBuilder.Watches(
-			&resourcesv1.DeviceClass{},
+			deviceClass,
 			r.tenantClassEventHandler(r.collectAvailableDeviceClasses),
 			builder.WithPredicates(predicates.ClassChanged()),
 		)
