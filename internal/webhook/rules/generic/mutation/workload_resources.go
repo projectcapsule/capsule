@@ -36,6 +36,27 @@ func MutateWorkloadResources(
 		return false, nil
 	}
 
+	filtered, err := ruleengine.FilterNamespaceEnforcementConditions(ctx, conditions, obj, bodies,
+		func(body *apirules.NamespaceRuleEnforceBody) bool { return body.Workloads.Resources != nil })
+	if err != nil {
+		return false, err
+	}
+
+	return mutateWorkloadResources(ctx, obj, gvk, filtered, conditions)
+}
+
+// mutateWorkloadResources consumes rules whose enforcement gates have already run.
+func mutateWorkloadResources(
+	ctx context.Context,
+	obj *unstructured.Unstructured,
+	gvk schema.GroupVersionKind,
+	bodies []*apirules.NamespaceRuleBodyNamespace,
+	conditions *ruleengine.ConditionEvaluator,
+) (bool, error) {
+	if obj == nil || gvk != corev1.SchemeGroupVersion.WithKind("Pod") {
+		return false, nil
+	}
+
 	// Skip decoding when neither legacy resource policies nor mutation applies.
 	if !slices.ContainsFunc(bodies, func(body *apirules.NamespaceRuleBodyNamespace) bool {
 		return body != nil && (len(body.Mutate) > 0 || (body.Enforce != nil && body.Enforce.Workloads.Resources != nil))
@@ -48,12 +69,7 @@ func MutateWorkloadResources(
 		return false, fmt.Errorf("decode Pod resource policies: %w", err)
 	}
 
-	resourceBodies, err := filterResourceMutationConditions(ctx, conditions, pod, bodies)
-	if err != nil {
-		return false, err
-	}
-
-	changed, err := MutatePodResources(pod, resourceBodies)
+	changed, err := MutatePodResources(pod, bodies)
 	if err != nil {
 		return false, err
 	}
@@ -404,34 +420,4 @@ func defaultResourceRatio(
 	resources.Limits[name] = limit
 
 	return true, nil
-}
-
-// Legacy resource policies share the enclosing workload condition gate.
-func filterResourceMutationConditions(ctx context.Context, conditions *ruleengine.ConditionEvaluator, pod *corev1.Pod, bodies []*apirules.NamespaceRuleBodyNamespace) ([]*apirules.NamespaceRuleBodyNamespace, error) {
-	var filtered []*apirules.NamespaceRuleBodyNamespace
-
-	for i, body := range bodies {
-		if body == nil || body.Enforce == nil || body.Enforce.Workloads.Resources == nil {
-			continue
-		}
-
-		matched, err := conditions.Matches(ctx, pod, body.Enforce.Workloads.Conditions)
-		if err != nil {
-			return nil, fmt.Errorf("rules[%d].enforce.workloads: %w", i, err)
-		}
-
-		if !matched {
-			if filtered == nil {
-				filtered = slices.Clone(bodies)
-			}
-
-			filtered[i] = nil
-		}
-	}
-
-	if filtered == nil {
-		return bodies, nil
-	}
-
-	return filtered, nil
 }

@@ -9,6 +9,7 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apiserver/pkg/cel/environment"
 
 	"github.com/projectcapsule/capsule/pkg/api/rules"
@@ -40,7 +41,8 @@ func (e *ConditionEvaluator) ResetObject() {
 }
 
 // Matches evaluates a block against its current object. A false condition takes
-// precedence over errors, independently of condition order.
+// precedence over errors, independently of condition order. A nil object uses
+// the full admission request object, for callers that decode only metadata.
 func (e *ConditionEvaluator) Matches(ctx context.Context, object any, conditions []rules.AdmissionCondition) (bool, error) {
 	if len(conditions) == 0 {
 		return true, nil
@@ -68,12 +70,16 @@ func (e *ConditionEvaluator) Matches(ctx context.Context, object any, conditions
 	}
 
 	if e.object == nil {
-		values, err := runtime.DefaultUnstructuredConverter.ToUnstructured(object)
+		values, err := e.decodeObject(object)
 		if err != nil {
 			return false, fmt.Errorf("decode condition object: %w", err)
 		}
 
 		e.object = values
+	}
+
+	if e.object == nil {
+		return false, fmt.Errorf("condition object must be an object")
 	}
 
 	var firstError error
@@ -99,14 +105,27 @@ func (e *ConditionEvaluator) Matches(ctx context.Context, object any, conditions
 	return firstError == nil, firstError
 }
 
-// FilterEnforcementConditions filters only the caller's resource family. It
+func (e *ConditionEvaluator) decodeObject(object any) (map[string]any, error) {
+	if object != nil {
+		return runtime.DefaultUnstructuredConverter.ToUnstructured(object)
+	}
+
+	var values map[string]any
+	if err := json.Unmarshal(e.request.Object.Raw, &values); err != nil {
+		return nil, err
+	}
+
+	return values, nil
+}
+
+// FilterEnforcementConditions filters the applicable enforcement rules. It
 // preserves rule order and cache-owned bodies, with no allocation when ungated.
 func FilterEnforcementConditions(
 	ctx context.Context,
 	evaluator *ConditionEvaluator,
 	object any,
 	bodies []*rules.NamespaceRuleEnforceBody,
-	conditions func(*rules.NamespaceRuleEnforceBody) []rules.AdmissionCondition,
+	applies func(*rules.NamespaceRuleEnforceBody) bool,
 ) ([]*rules.NamespaceRuleEnforceBody, error) {
 	var filtered []*rules.NamespaceRuleEnforceBody
 
@@ -115,7 +134,12 @@ func FilterEnforcementConditions(
 			continue
 		}
 
-		matched, err := evaluator.Matches(ctx, object, conditions(body))
+		var conditions []rules.AdmissionCondition
+		if len(body.Conditions) > 0 && applies(body) {
+			conditions = body.Conditions
+		}
+
+		matched, err := evaluator.Matches(ctx, object, conditions)
 		if err != nil {
 			return nil, fmt.Errorf("enforcement rule[%d]: %w", i, err)
 		}
@@ -127,6 +151,45 @@ func FilterEnforcementConditions(
 
 		if matched && filtered != nil {
 			filtered = append(filtered, body)
+		}
+	}
+
+	if filtered == nil {
+		return bodies, nil
+	}
+
+	return filtered, nil
+}
+
+// FilterNamespaceEnforcementConditions gates enforcement-derived mutations while
+// retaining independent mutate entries. It copies only bodies whose gate is false.
+func FilterNamespaceEnforcementConditions(
+	ctx context.Context,
+	evaluator *ConditionEvaluator,
+	object any,
+	bodies []*rules.NamespaceRuleBodyNamespace,
+	applies func(*rules.NamespaceRuleEnforceBody) bool,
+) ([]*rules.NamespaceRuleBodyNamespace, error) {
+	var filtered []*rules.NamespaceRuleBodyNamespace
+
+	for i, body := range bodies {
+		if body == nil || body.Enforce == nil || len(body.Enforce.Conditions) == 0 || !applies(body.Enforce) {
+			continue
+		}
+
+		matched, err := evaluator.Matches(ctx, object, body.Enforce.Conditions)
+		if err != nil {
+			return nil, fmt.Errorf("rules[%d].enforce: %w", i, err)
+		}
+
+		if !matched {
+			if filtered == nil {
+				filtered = append([]*rules.NamespaceRuleBodyNamespace(nil), bodies...)
+			}
+
+			filteredBody := *body
+			filteredBody.Enforce = nil
+			filtered[i] = &filteredBody
 		}
 	}
 

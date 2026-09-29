@@ -5,7 +5,7 @@ package rules
 
 import "fmt"
 
-// AdmissionCondition is a Boolean CEL gate for a typed resource block. It can
+// AdmissionCondition is a Boolean CEL gate for a mutation entry or enforcement rule. It can
 // inspect object and request metadata, but cannot generate mutation values.
 // +kubebuilder:object:generate=true
 type AdmissionCondition struct {
@@ -21,18 +21,18 @@ type AdmissionCondition struct {
 	Expression string `json:"expression"`
 }
 
-// VisitConditions traverses only the resource blocks that support conditions.
+// VisitConditions traverses mutation-entry and enforcement-rule conditions.
 func (r *NamespaceRuleBodyNamespace) VisitConditions(visit func(string, []AdmissionCondition) error) error {
 	if r == nil {
 		return nil
 	}
 
 	for i := range r.Mutate {
-		if len(r.Mutate[i].Workloads.Conditions) == 0 {
+		if len(r.Mutate[i].Conditions) == 0 {
 			continue
 		}
 
-		if err := visit(fmt.Sprintf("mutate[%d].workloads.conditions", i), r.Mutate[i].Workloads.Conditions); err != nil {
+		if err := visit(fmt.Sprintf("mutate[%d].conditions", i), r.Mutate[i].Conditions); err != nil {
 			return err
 		}
 	}
@@ -41,14 +41,8 @@ func (r *NamespaceRuleBodyNamespace) VisitConditions(visit func(string, []Admiss
 		return nil
 	}
 
-	if len(r.Enforce.Workloads.Conditions) > 0 {
-		if err := visit("enforce.workloads.conditions", r.Enforce.Workloads.Conditions); err != nil {
-			return err
-		}
-	}
-
-	if len(r.Enforce.Services.Conditions) > 0 {
-		return visit("enforce.services.conditions", r.Enforce.Services.Conditions)
+	if len(r.Enforce.Conditions) > 0 {
+		return visit("enforce.conditions", r.Enforce.Conditions)
 	}
 
 	return nil

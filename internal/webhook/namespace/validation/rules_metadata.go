@@ -29,8 +29,8 @@ type rulesMetadataHandler struct {
 	configuration configuration.Configuration
 }
 
-func RulesMetadataHandler(regexCache *cache.RegexCache, cfg configuration.Configuration) handlers.TypedHandlerWithTenantUser[*corev1.Namespace] {
-	return &rulesMetadataHandler{generic: genericvalidation.GenericRules(regexCache), configuration: cfg}
+func RulesMetadataHandler(regexCache *cache.RegexCache, cfg configuration.Configuration, compilers ...ruleengine.ConditionCompiler) handlers.TypedHandlerWithTenantUser[*corev1.Namespace] {
+	return &rulesMetadataHandler{generic: genericvalidation.GenericRules(regexCache, compilers...), configuration: cfg}
 }
 
 func (h *rulesMetadataHandler) OnCreate(

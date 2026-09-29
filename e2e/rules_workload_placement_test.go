@@ -6,12 +6,14 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -20,6 +22,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/yaml"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
@@ -270,15 +273,16 @@ var _ = Describe("workload placement namespace profiles", Label("tenant", "rules
 		}
 		_, updateErr := updatePlacementTenant(a, func(current *capsulev1beta2.Tenant) {
 			current.Spec.Rules[0].Mutate = append(current.Spec.Rules[0].Mutate,
-				rules.NamespaceRuleMutation{Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{
-					Conditions: mode("replace"), NodeSelector: map[string]string{"replacement": "yes"},
-					Tolerations:               []corev1.Toleration{{Key: "replacement", Operator: corev1.TolerationOpExists}},
-					TopologySpreadConstraints: []corev1.TopologySpreadConstraint{{TopologyKey: "kubernetes.io/hostname", MaxSkew: 2, WhenUnsatisfiable: corev1.ScheduleAnyway, LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "checkout"}}}},
-					Affinity:                  &corev1.Affinity{NodeAffinity: &corev1.NodeAffinity{RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{NodeSelectorTerms: []corev1.NodeSelectorTerm{{MatchExpressions: []corev1.NodeSelectorRequirement{{Key: "disk", Operator: corev1.NodeSelectorOpIn, Values: []string{"ssd"}}}}}}}},
-				}},
-				rules.NamespaceRuleMutation{Workloads: rules.WorkloadMutation{Conditions: []rules.AdmissionCondition{{Name: "after-replace", Expression: "has(object.spec.nodeSelector) && 'replacement' in object.spec.nodeSelector"}}, NodeSelector: map[string]string{"ordered": "yes"}}},
-				rules.NamespaceRuleMutation{Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{Conditions: mode("clear"), NodeSelector: map[string]string{}, Tolerations: []corev1.Toleration{}, TopologySpreadConstraints: []corev1.TopologySpreadConstraint{}, Affinity: &corev1.Affinity{}}},
-				rules.NamespaceRuleMutation{Workloads: rules.WorkloadMutation{Conditions: append(mode("error"), rules.AdmissionCondition{Name: "runtime-error", Expression: "object.spec.missing == 'x'"}), NodeSelector: map[string]string{"error": "never"}}},
+				rules.NamespaceRuleMutation{
+					Conditions: mode("replace"), Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{
+						NodeSelector:              map[string]string{"replacement": "yes"},
+						Tolerations:               []corev1.Toleration{{Key: "replacement", Operator: corev1.TolerationOpExists}},
+						TopologySpreadConstraints: []corev1.TopologySpreadConstraint{{TopologyKey: "kubernetes.io/hostname", MaxSkew: 2, WhenUnsatisfiable: corev1.ScheduleAnyway, LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "checkout"}}}},
+						Affinity:                  &corev1.Affinity{NodeAffinity: &corev1.NodeAffinity{RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{NodeSelectorTerms: []corev1.NodeSelectorTerm{{MatchExpressions: []corev1.NodeSelectorRequirement{{Key: "disk", Operator: corev1.NodeSelectorOpIn, Values: []string{"ssd"}}}}}}}},
+					}},
+				rules.NamespaceRuleMutation{Conditions: []rules.AdmissionCondition{{Name: "after-replace", Expression: "has(object.spec.nodeSelector) && 'replacement' in object.spec.nodeSelector"}}, Workloads: rules.WorkloadMutation{NodeSelector: map[string]string{"ordered": "yes"}}},
+				rules.NamespaceRuleMutation{Conditions: mode("clear"), Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{NodeSelector: map[string]string{}, Tolerations: []corev1.Toleration{}, TopologySpreadConstraints: []corev1.TopologySpreadConstraint{}, Affinity: &corev1.Affinity{}}},
+				rules.NamespaceRuleMutation{Conditions: append(mode("error"), rules.AdmissionCondition{Name: "runtime-error", Expression: "object.spec.missing == 'x'"}), Workloads: rules.WorkloadMutation{NodeSelector: map[string]string{"error": "never"}}},
 			)
 		})
 		Expect(updateErr).To(Succeed())
@@ -313,7 +317,7 @@ var _ = Describe("workload placement namespace profiles", Label("tenant", "rules
 		}
 		skipped := createPod(ownerA, ns.Name, podWithMode("skip"))
 		Expect(skipped.Spec.NodeSelector["placement.example.com/pool"]).To(Equal(a.Name))
-		expectDenied(ownerA, ns.Name, podWithMode("error"), `rules[0].mutate[4].workloads: conditions[1] ("runtime-error")`)
+		expectDenied(ownerA, ns.Name, podWithMode("error"), `rules[0].mutate[4]: conditions[1] ("runtime-error")`)
 		unselected := createPod(ownerA, plain.Name, podWithMode("replace"))
 		Expect(unselected.Spec.NodeSelector).To(BeEmpty())
 		isolated := createPod(ownerB, other.Name, podWithMode("replace"))
@@ -321,43 +325,161 @@ var _ = Describe("workload placement namespace profiles", Label("tenant", "rules
 		Expect(isolated.Spec.NodeSelector).NotTo(HaveKey("replacement"))
 	})
 
-	It("gates workload and service enforcement independently and rechecks conditions on updates", func() {
+	It("admits the playground placement examples and rejects an explicit forbidden selector", func() {
+		a, b := tenants[0], tenants[1]
+		ns, plain, other := createNamespace(a, "placement"), createNamespace(a, "plain"), createNamespace(b, "placement")
+		ownerA, ownerB := ownerClient(a.Spec.Owners[0].UserSpec), ownerClient(b.Spec.Owners[0].UserSpec)
+		data, err := os.ReadFile("../playground/platform/tenants/solar.yaml")
+		Expect(err).NotTo(HaveOccurred())
+		fixture := &capsulev1beta2.Tenant{}
+		Expect(yaml.UnmarshalStrict(data, fixture)).To(Succeed())
+		_, err = updatePlacementTenant(a, func(current *capsulev1beta2.Tenant) {
+			current.Spec.Rules[0].NamespaceRuleBodyNamespace = fixture.Spec.Rules[0].NamespaceRuleBodyNamespace.DeepCopy()
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Eventually(func(g Gomega) {
+			status := &capsulev1beta2.RuleStatus{}
+			g.Expect(k8sClient.Get(context.Background(), client.ObjectKey{Namespace: ns.Name, Name: meta.NameForManagedRuleStatus()}, status)).To(Succeed())
+			g.Expect(status.Status.Rules[0].Mutate[0].Conditions).To(HaveLen(1))
+			g.Expect(status.Status.Rules[0].Mutate[0].Conditions[0].Name).To(Equal("linux-default"))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		for _, name := range []string{"default", "shared"} {
+			data, err := os.ReadFile("../playground/user/solar/placement/" + name + ".yaml")
+			Expect(err).NotTo(HaveOccurred())
+			pod := &corev1.Pod{}
+			Expect(yaml.UnmarshalStrict(data, pod)).To(Succeed())
+			pod.Namespace = ""
+			created := createPod(ownerA, ns.Name, pod)
+			Expect(created.Spec.NodeSelector).To(HaveKeyWithValue("kubernetes.io/os", "linux"))
+			if name == "shared" {
+				Expect(created.Spec.NodeSelector).To(HaveKeyWithValue("placement.example.com/pool", "shared"))
+				Expect(created.Spec.Tolerations).To(ContainElement(corev1.Toleration{Key: "infrastructure.example.com/dedicated", Operator: corev1.TolerationOpEqual, Value: "shared", Effect: corev1.TaintEffectNoSchedule}))
+			}
+		}
+		bad := newPod("playground-denied")
+		bad.Spec.NodeSelector = map[string]string{"kubernetes.io/os": "windows"}
+		expectDenied(ownerA, ns.Name, bad, "spec.nodeSelector")
+		Expect(createPod(ownerA, plain.Name, bad.DeepCopy()).Spec.NodeSelector).To(HaveKeyWithValue("kubernetes.io/os", "windows"))
+		Expect(createPod(ownerB, other.Name, bad.DeepCopy()).Spec.NodeSelector).To(HaveKeyWithValue("kubernetes.io/os", "windows"))
+	})
+
+	It("gates workload and service enforcement together and rechecks conditions on updates", func() {
 		a := tenants[0]
 		ns := createNamespace(a, "placement")
 		owner := ownerClient(a.Spec.Owners[0].UserSpec)
 		_, updateErr := updatePlacementTenant(a, func(current *capsulev1beta2.Tenant) {
-			current.Spec.Rules[1].Enforce.Workloads.Conditions = []rules.AdmissionCondition{{Name: "pod-gate", Expression: "object.spec.containers.size() > 0 && has(object.metadata.labels) && 'restricted' in object.metadata.labels && object.metadata.labels['restricted'] == 'yes'"}}
-			current.Spec.Rules[1].Enforce.Services = rules.NamespaceRuleEnforceServicesBody{Conditions: []rules.AdmissionCondition{{Name: "service-gate", Expression: "object.spec.type == 'NodePort'"}}, Types: []rules.ServiceType{rules.ServiceTypeNodePort}}
+			current.Spec.Rules[1].Enforce.Conditions = []rules.AdmissionCondition{{Name: "restricted", Expression: "has(object.metadata.labels) && 'restricted' in object.metadata.labels && object.metadata.labels['restricted'] == 'yes'"}}
+			current.Spec.Rules[1].Enforce.Services = rules.NamespaceRuleEnforceServicesBody{Types: []rules.ServiceType{rules.ServiceTypeNodePort}}
 		})
 		Expect(updateErr).To(Succeed())
 		Eventually(func(g Gomega) {
 			status := &capsulev1beta2.RuleStatus{}
 			g.Expect(k8sClient.Get(context.Background(), client.ObjectKey{Namespace: ns.Name, Name: meta.NameForManagedRuleStatus()}, status)).To(Succeed())
-			g.Expect(status.Status.Rules[1].Enforce.Services.Conditions).To(HaveLen(1))
+			g.Expect(status.Status.Rules[1].Enforce.Conditions).To(HaveLen(1))
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		pod := newPod("gated-enforcement")
 		pod.Spec.NodeSelector = map[string]string{"forbidden.example.com/pool": "private"}
 		created := createPod(owner, ns.Name, pod)
-		created.Labels["restricted"] = "yes"
-		_, err := owner.CoreV1().Pods(ns.Name).Update(context.Background(), created, metav1.UpdateOptions{})
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("spec.nodeSelector"))
+		Eventually(func(g Gomega) {
+			fresh, err := owner.CoreV1().Pods(ns.Name).Get(context.Background(), created.Name, metav1.GetOptions{})
+			g.Expect(err).NotTo(HaveOccurred())
+			fresh.Labels["restricted"] = "yes"
+			_, err = owner.CoreV1().Pods(ns.Name).Update(context.Background(), fresh, metav1.UpdateOptions{})
+			if err == nil {
+				Fail("restricted Pod update unexpectedly succeeded")
+			}
+			g.Expect(err).To(MatchError(ContainSubstring("spec.nodeSelector")))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		stored, err := owner.CoreV1().Pods(ns.Name).Get(context.Background(), created.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(stored.Labels).NotTo(HaveKey("restricted"))
 		pod.Name = "gated-create-denied"
 		pod.Labels["restricted"] = "yes"
 		expectDenied(owner, ns.Name, pod, "spec.nodeSelector")
-		service := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "conditional-service"}, Spec: corev1.ServiceSpec{Type: corev1.ServiceTypeClusterIP, Ports: []corev1.ServicePort{{Port: 80}}}}
+		service := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "conditional-service"}, Spec: corev1.ServiceSpec{Type: corev1.ServiceTypeNodePort, Ports: []corev1.ServicePort{{Port: 80}}}}
 		allowed, err := owner.CoreV1().Services(ns.Name).Create(context.Background(), service, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
-		allowed.Spec.Type = corev1.ServiceTypeNodePort
-		_, err = owner.CoreV1().Services(ns.Name).Update(context.Background(), allowed, metav1.UpdateOptions{})
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("spec.type"))
+		Eventually(func(g Gomega) {
+			fresh, err := owner.CoreV1().Services(ns.Name).Get(context.Background(), allowed.Name, metav1.GetOptions{})
+			g.Expect(err).NotTo(HaveOccurred())
+			fresh.Labels = map[string]string{"restricted": "yes"}
+			_, err = owner.CoreV1().Services(ns.Name).Update(context.Background(), fresh, metav1.UpdateOptions{})
+			if err == nil {
+				Fail("restricted Service update unexpectedly succeeded")
+			}
+			g.Expect(err).To(MatchError(ContainSubstring("spec.type")))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		storedService, err := owner.CoreV1().Services(ns.Name).Get(context.Background(), allowed.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
-		Expect(storedService.Spec.Type).To(Equal(corev1.ServiceTypeClusterIP))
+		Expect(storedService.Spec.Type).To(Equal(corev1.ServiceTypeNodePort))
+		Expect(storedService.Labels).NotTo(HaveKey("restricted"))
+	})
+
+	It("gates metadata mutation, metadata validation and ingress across namespace profiles", func() {
+		a, b := tenants[0], tenants[1]
+		ns, plain, other := createNamespace(a, "placement"), createNamespace(a, "plain"), createNamespace(b, "placement")
+		ownerA, ownerB := ownerClient(a.Spec.Owners[0].UserSpec), ownerClient(b.Spec.Owners[0].UserSpec)
+		newConfig := func(name string, restricted bool) *corev1.ConfigMap {
+			labels := map[string]string{"env": "e2e", "blocked": "yes"}
+			if restricted {
+				labels["restricted"] = "yes"
+			}
+			return &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels}}
+		}
+		_, err := ownerA.CoreV1().ConfigMaps(ns.Name).Create(context.Background(), newConfig("before-policy", false), metav1.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		_, err = updatePlacementTenant(a, func(current *capsulev1beta2.Tenant) {
+			conditions := []rules.AdmissionCondition{{Name: "restricted", Expression: "has(object.metadata.labels) && 'restricted' in object.metadata.labels && object.metadata.labels['restricted'] == 'yes'"}}
+			current.Spec.Rules[0].Enforce = &rules.NamespaceRuleEnforceBody{Conditions: conditions, Action: rules.ActionTypeAllow, Metadata: []rules.MetadataRule{{VersionKinds: apiruntime.VersionKinds{APIGroups: []string{"v1"}, Kinds: []string{"ConfigMap"}}, Labels: map[string]rules.MetadataValueRule{"conditional": {Managed: ptr.To("yes")}}}}}
+			current.Spec.Rules[1].Enforce.Conditions = conditions
+			current.Spec.Rules[1].Enforce.Metadata = []rules.MetadataRule{{VersionKinds: apiruntime.VersionKinds{APIGroups: []string{"v1"}, Kinds: []string{"ConfigMap"}}, Labels: map[string]rules.MetadataValueRule{"blocked": {}}}}
+			current.Spec.Rules[1].Enforce.Ingress = rules.NamespaceRuleEnforceIngressBody{Types: []rules.IngressType{rules.IngressTypeIngress}, Hostnames: []apiruntime.ExpressionMatch{{Exact: []string{"blocked.example.com"}}}}
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Eventually(func(g Gomega) {
+			status := &capsulev1beta2.RuleStatus{}
+			g.Expect(k8sClient.Get(context.Background(), client.ObjectKey{Namespace: ns.Name, Name: meta.NameForManagedRuleStatus()}, status)).To(Succeed())
+			g.Expect(status.Status.Rules[0].Enforce).NotTo(BeNil())
+			g.Expect(status.Status.Rules[1].Enforce.Ingress.Types).To(ContainElement(rules.IngressTypeIngress))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		before, err := ownerA.CoreV1().ConfigMaps(ns.Name).Get(context.Background(), "before-policy", metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(before.Labels).NotTo(HaveKey("conditional"))
+		good := newConfig("restricted-valid", true)
+		delete(good.Labels, "blocked")
+		created, err := ownerA.CoreV1().ConfigMaps(ns.Name).Create(context.Background(), good, metav1.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(created.Labels).To(HaveKeyWithValue("conditional", "yes"))
+		_, err = ownerA.CoreV1().ConfigMaps(ns.Name).Create(context.Background(), newConfig("restricted-denied", true), metav1.CreateOptions{})
+		Expect(err).To(MatchError(ContainSubstring("blocked")))
+		_, err = ownerA.CoreV1().ConfigMaps(ns.Name).Get(context.Background(), "restricted-denied", metav1.GetOptions{})
+		Expect(apierrors.IsNotFound(err)).To(BeTrue())
+		for _, scope := range []struct {
+			owner      kubernetes.Interface
+			namespace  string
+			restricted bool
+		}{{ownerA, ns.Name, false}, {ownerA, plain.Name, true}, {ownerB, other.Name, true}} {
+			created, err := scope.owner.CoreV1().ConfigMaps(scope.namespace).Create(context.Background(), newConfig("unaffected", scope.restricted), metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(created.Labels).NotTo(HaveKey("conditional"))
+		}
+		for _, restricted := range []bool{false, true} {
+			labels := map[string]string{"env": "e2e"}
+			if restricted {
+				labels["restricted"] = "yes"
+			}
+			ingress := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("conditional-%t", restricted), Labels: labels}, Spec: networkingv1.IngressSpec{Rules: []networkingv1.IngressRule{{Host: "blocked.example.com", IngressRuleValue: networkingv1.IngressRuleValue{HTTP: &networkingv1.HTTPIngressRuleValue{Paths: []networkingv1.HTTPIngressPath{{Path: "/", PathType: ptr.To(networkingv1.PathTypePrefix), Backend: networkingv1.IngressBackend{Service: &networkingv1.IngressServiceBackend{Name: "backend", Port: networkingv1.ServiceBackendPort{Number: 80}}}}}}}}}}}
+			_, err := ownerA.NetworkingV1().Ingresses(ns.Name).Create(context.Background(), ingress, metav1.CreateOptions{})
+			if restricted {
+				Expect(err).To(MatchError(ContainSubstring("blocked.example.com")))
+				_, err = ownerA.NetworkingV1().Ingresses(ns.Name).Get(context.Background(), ingress.Name, metav1.GetOptions{})
+				Expect(apierrors.IsNotFound(err)).To(BeTrue())
+			} else {
+				Expect(err).NotTo(HaveOccurred())
+			}
+			_, err = ownerB.NetworkingV1().Ingresses(other.Name).Create(context.Background(), ingress.DeepCopy(), metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+		}
 	})
 
 	It("mutates hostUsers with explicit Booleans and preserves namespace and tenant isolation", Label("hostusers"), func() {
@@ -367,12 +489,14 @@ var _ = Describe("workload placement namespace profiles", Label("tenant", "rules
 		_, err := updatePlacementTenant(a, func(current *capsulev1beta2.Tenant) {
 			current.Spec.Rules[0].Mutate = append(current.Spec.Rules[0].Mutate,
 				rules.NamespaceRuleMutation{Workloads: rules.WorkloadMutation{HostUsers: ptr.To(false)}},
-				rules.NamespaceRuleMutation{Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{
-					Conditions: []rules.AdmissionCondition{{Name: "host-users", Expression: "'host-users' in object.metadata.labels && object.metadata.labels['host-users'] == 'true'"}}, HostUsers: ptr.To(true),
-				}},
-				rules.NamespaceRuleMutation{Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{
-					Conditions: []rules.AdmissionCondition{{Name: "after-host-users", Expression: "object.spec.hostUsers == false"}}, NodeSelector: map[string]string{"user-namespace": "yes"},
-				}},
+				rules.NamespaceRuleMutation{
+					Conditions: []rules.AdmissionCondition{{Name: "host-users", Expression: "'host-users' in object.metadata.labels && object.metadata.labels['host-users'] == 'true'"}}, Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{
+						HostUsers: ptr.To(true),
+					}},
+				rules.NamespaceRuleMutation{
+					Conditions: []rules.AdmissionCondition{{Name: "after-host-users", Expression: "object.spec.hostUsers == false"}}, Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{
+						NodeSelector: map[string]string{"user-namespace": "yes"},
+					}},
 			)
 		})
 		Expect(err).NotTo(HaveOccurred())
@@ -460,7 +584,7 @@ var _ = Describe("workload placement namespace profiles", Label("tenant", "rules
 		} {
 			before, err := updatePlacementTenant(current, func(invalid *capsulev1beta2.Tenant) {
 				invalid.Spec.Rules[0].Mutate[0].Action = test.action
-				invalid.Spec.Rules[0].Mutate[0].Workloads.Conditions = []rules.AdmissionCondition{{Name: "invalid", Expression: test.expression}}
+				invalid.Spec.Rules[0].Mutate[0].Conditions = []rules.AdmissionCondition{{Name: "invalid", Expression: test.expression}}
 			})
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("mutate"))
