@@ -231,12 +231,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 		)
 	}
 
-	deviceClass, err := r.discoverDeviceClass(mgr.GetRESTMapper())
-	if err != nil {
-		return err
-	}
-
-	if deviceClass != nil {
+	if deviceClass := r.discoverDeviceClass(mgr.GetRESTMapper()); deviceClass != nil {
 		ctrlBuilder = ctrlBuilder.Watches(
 			deviceClass,
 			r.tenantClassEventHandler(r.collectAvailableDeviceClasses),

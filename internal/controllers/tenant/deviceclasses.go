@@ -4,8 +4,6 @@
 package tenant
 
 import (
-	"fmt"
-
 	resourcesv1 "k8s.io/api/resource/v1"
 	resourcesv1beta2 "k8s.io/api/resource/v1beta2"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -16,23 +14,27 @@ import (
 
 // discoverDeviceClass selects the optional class API once, before starting the
 // watch. Kubernetes 1.33 serves v1beta2; prefer v1 when the server supports it.
-func (r *Manager) discoverDeviceClass(mapper meta.RESTMapper) (client.Object, error) {
+// Discovery failures disable status tracking until restart, as for other optional
+// class APIs. Admission continues to authorize classes independently of this watch.
+func (r *Manager) discoverDeviceClass(mapper meta.RESTMapper) client.Object {
 	mapping, err := gvk.PreferredRESTMapping(mapper,
 		resourcesv1.SchemeGroupVersion.WithKind("DeviceClass").GroupKind(),
 		resourcesv1.SchemeGroupVersion.Version, resourcesv1beta2.SchemeGroupVersion.Version,
 	)
 	if meta.IsNoMatchError(err) {
-		return nil, nil
+		return nil
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("discover DeviceClass API: %w", err)
+		r.Log.Error(err, "unable to discover optional DeviceClass API; DeviceClass status tracking disabled until restart")
+
+		return nil
 	}
 
 	r.classes.deviceVersion = mapping.GroupVersionKind.Version
 	if r.classes.deviceVersion == resourcesv1beta2.SchemeGroupVersion.Version {
-		return &resourcesv1beta2.DeviceClass{}, nil
+		return &resourcesv1beta2.DeviceClass{}
 	}
 
-	return &resourcesv1.DeviceClass{}, nil
+	return &resourcesv1.DeviceClass{}
 }

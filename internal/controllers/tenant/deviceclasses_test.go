@@ -7,6 +7,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/go-logr/logr/funcr"
 	"github.com/stretchr/testify/require"
 	resourcesv1 "k8s.io/api/resource/v1"
 	resourcesv1beta2 "k8s.io/api/resource/v1beta2"
@@ -44,8 +45,7 @@ func TestDiscoverDeviceClass(t *testing.T) {
 				mapper.Add(schema.GroupVersionKind{Group: resourcesv1.GroupName, Version: version, Kind: "DeviceClass"}, meta.RESTScopeRoot)
 			}
 			manager := &Manager{}
-			obj, err := manager.discoverDeviceClass(mapper)
-			require.NoError(t, err)
+			obj := manager.discoverDeviceClass(mapper)
 			require.Equal(t, tc.want, manager.classes.deviceVersion)
 			switch tc.want {
 			case "v1":
@@ -57,10 +57,20 @@ func TestDiscoverDeviceClass(t *testing.T) {
 			}
 		})
 	}
-	err := errors.New("discovery unavailable")
-	manager := &Manager{}
-	_, got := manager.discoverDeviceClass(deviceClassErrorMapper{err: err})
-	require.ErrorIs(t, got, err)
+}
+
+func TestDeviceClassDiscoveryFailureIsOptional(t *testing.T) {
+	t.Parallel()
+	var logs []string
+	manager := &Manager{Log: funcr.New(func(_, message string) {
+		logs = append(logs, message)
+	}, funcr.Options{})}
+	obj := manager.discoverDeviceClass(deviceClassErrorMapper{err: errors.New("discovery unavailable")})
+	require.Nil(t, obj, "optional discovery failure must not prevent controller setup")
+	require.Empty(t, manager.classes.deviceVersion, "do not collect status through an undiscovered API")
+	require.Len(t, logs, 1)
+	require.Contains(t, logs[0], "discovery unavailable")
+	require.Contains(t, logs[0], "status tracking disabled until restart")
 }
 
 type deviceClassErrorMapper struct {
@@ -83,8 +93,7 @@ func TestDeviceClassStatusAcrossVersions(t *testing.T) {
 			mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{{Group: resourcesv1.GroupName, Version: version}})
 			mapper.Add(schema.GroupVersionKind{Group: resourcesv1.GroupName, Version: version, Kind: "DeviceClass"}, meta.RESTScopeRoot)
 			manager := &Manager{}
-			class, err := manager.discoverDeviceClass(mapper)
-			require.NoError(t, err)
+			class := manager.discoverDeviceClass(mapper)
 			class.SetName("gpu")
 			class.SetLabels(map[string]string{"tenant": "a"})
 			var objects []client.Object

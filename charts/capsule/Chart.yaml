@@ -41,6 +41,8 @@ annotations:
       url: https://projectcapsule.dev/
   artifacthub.io/changes: |
     - kind: fixed
+      description: preserve controller startup when optional DeviceClass discovery fails
+    - kind: fixed
       description: support DeviceClass admission and status with resource.k8s.io/v1beta2 on Kubernetes 1.33 while retaining v1
     - kind: security
       description: validate replication tracking and protection markers on resource creation

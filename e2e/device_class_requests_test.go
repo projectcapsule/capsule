@@ -9,6 +9,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	rbacv1 "k8s.io/api/rbac/v1"
 	resources "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -157,10 +158,33 @@ var _ = Describe("DeviceClass request authorization", Label("tenant", "classes",
 			}
 		}
 
-		By("rejecting claims in another tenant's namespace")
+		By("rejecting cross-tenant namespace access through RBAC")
 		crossTenant := draClaimObject(version, kind, "cross-tenant", namespaces[1], draExactRequests(classes[2]))
 		Expect(apierrors.IsForbidden(owners[0].Create(ctx, crossTenant))).To(BeTrue())
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(crossTenant), crossTenant))).To(BeTrue())
+
+		By("enforcing the destination tenant's classes even when another tenant's owner has namespace access")
+		role := &rbacv1.Role{
+			ObjectMeta: metav1.ObjectMeta{Name: "dra-cross-tenant", Namespace: namespaces[1], Labels: map[string]string{"env": "e2e"}},
+			Rules:      []rbacv1.PolicyRule{{APIGroups: []string{resources.GroupName}, Resources: []string{"resourceclaims", "resourceclaimtemplates"}, Verbs: []string{"create"}}},
+		}
+		Expect(k8sClient.Create(ctx, role)).To(Succeed())
+		DeferCleanup(EventuallyDeletion, role)
+		binding := &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{Name: role.Name, Namespace: role.Namespace, Labels: map[string]string{"env": "e2e"}},
+			RoleRef:    rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "Role", Name: role.Name},
+			Subjects:   []rbacv1.Subject{{APIGroup: rbacv1.GroupName, Kind: "User", Name: prefix + "-0"}},
+		}
+		Expect(k8sClient.Create(ctx, binding)).To(Succeed())
+		DeferCleanup(EventuallyDeletion, binding)
+		allowedCrossTenant := draClaimObject(version, kind, "cross-tenant-allowed", namespaces[1], draExactRequests(classes[2]))
+		Eventually(func() error {
+			return owners[0].Create(ctx, allowedCrossTenant)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(allowedCrossTenant), allowedCrossTenant)).To(Succeed())
+		forbiddenCrossTenant := draClaimObject(version, kind, "cross-tenant-forbidden", namespaces[1], draExactRequests(classes[0]))
+		Expect(owners[0].Create(ctx, forbiddenCrossTenant)).To(MatchError(ContainSubstring("Device Class " + classes[0] + " is forbidden")))
+		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(forbiddenCrossTenant), forbiddenCrossTenant))).To(BeTrue())
 
 		By("honoring changed class labels on subsequent admissions")
 		if policyType == "labels" {
