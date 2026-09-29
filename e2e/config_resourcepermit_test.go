@@ -8,12 +8,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	apimeta "github.com/projectcapsule/capsule/pkg/api/meta"
-	capsulerbac "github.com/projectcapsule/capsule/pkg/api/rbac"
-	"github.com/projectcapsule/capsule/pkg/api/resourcepermit"
-	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
-	tpl "github.com/projectcapsule/capsule/pkg/template"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -21,6 +15,13 @@ import (
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	apimeta "github.com/projectcapsule/capsule/pkg/api/meta"
+	capsulerbac "github.com/projectcapsule/capsule/pkg/api/rbac"
+	"github.com/projectcapsule/capsule/pkg/api/resourcepermit"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
+	tpl "github.com/projectcapsule/capsule/pkg/template"
 )
 
 const (
@@ -83,6 +84,20 @@ data:
 
 		Context("with an explicit template ServiceAccount", func() {
 			BeforeEach(func() {
+				tnt := &capsulev1beta2.Tenant{
+					Name: namespace.Name + "-impersonation", Labels: map[string]string{"env": "e2e"},
+					Spec: capsulev1beta2.TenantSpec{Owners: capsulerbac.OwnerListSpec{{
+						Name: namespace.Name + "-owner", Kind: capsulerbac.UserOwner,
+					}}},
+				}
+				EventuallyCreation(func() error { return k8sClient.Create(ctx, tnt) }).Should(Succeed())
+				DeferCleanup(func() { EventuallyDeletion(tnt) })
+				TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
+				namespace = NewNamespace(tnt.Name, map[string]string{apimeta.TenantLabel: tnt.Name})
+				NamespaceCreation(namespace, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+				NamespaceIsPartOfTenant(tnt, namespace).Should(Succeed())
+				TenantNamespaceReady(tnt, namespace, 1)
+
 				brt.Spec.Impersonation = resourcePermitServiceAccountReference(
 					serviceAccountNamespace,
 					resourcePermitTemplateServiceAccount,
@@ -133,6 +148,7 @@ data:
 				Eventually(func(g Gomega) {
 					current := &capsulev1beta2.ResourcePermit{}
 					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(br), current)).To(Succeed())
+					g.Expect(current.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseActive))
 					expectResourcePermitServiceAccount(
 						g,
 						current,
@@ -152,18 +168,38 @@ data:
 					expectedUsername,
 					serviceAccountGroups(serviceAccountNamespace),
 				)
-				cm.Data["updated"] = "by-template-service-account"
-				Expect(templateClient.Update(ctx, cm)).To(Succeed())
+				By("advancing the target revision before the protected data update")
+				Eventually(func(g Gomega) {
+					current := &corev1.ConfigMap{}
+					g.Expect(templateClient.Get(ctx, client.ObjectKeyFromObject(cm), current)).To(Succeed())
+					current.Annotations["e2e.projectcapsule.dev/concurrent-update"] = "preserved"
+					g.Expect(templateClient.Update(ctx, current)).To(Succeed())
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+				By("updating the protected target with a fresh revision on each attempt")
+				Eventually(func(g Gomega) {
+					current := &corev1.ConfigMap{}
+					g.Expect(templateClient.Get(ctx, client.ObjectKeyFromObject(cm), current)).To(Succeed())
+					current.Data["updated"] = "by-template-service-account"
+					g.Expect(templateClient.Update(ctx, current)).To(Succeed())
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+				Eventually(func(g Gomega) {
+					current := &corev1.ConfigMap{}
+					g.Expect(templateClient.Get(ctx, client.ObjectKeyFromObject(cm), current)).To(Succeed())
+					g.Expect(current.Data).To(HaveKeyWithValue("updated", "by-template-service-account"))
+					g.Expect(current.Data).To(HaveKeyWithValue("loaded", "loaded-by-template-service-account"))
+					g.Expect(current.Annotations).To(HaveKeyWithValue("e2e.projectcapsule.dev/concurrent-update", "preserved"))
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 				By("protecting the template ServiceAccount copied to ResourcePermit status")
 				executionServiceAccount := &corev1.ServiceAccount{
 					Name:      resourcePermitTemplateServiceAccount,
 					Namespace: serviceAccountNamespace}
-				Eventually(func() bool {
+				Eventually(func(g Gomega) {
 					err := k8sClient.Delete(ctx, executionServiceAccount, client.DryRunAll)
-
-					return apierrors.IsForbidden(err)
-				}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
+					g.Expect(apierrors.IsForbidden(err)).To(BeTrue(), "expected protection of the active execution identity: %v", err)
+					g.Expect(err).To(MatchError(ContainSubstring("used by unexpired ResourcePermit " + br.Namespace + "/" + br.Name)))
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 				expireActiveResourcePermit(ctx, br)
 				expectResourcePermitAndConfigMapDeleted(ctx, br, cm)
