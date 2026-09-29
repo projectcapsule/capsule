@@ -242,7 +242,7 @@ func managedMetadataTargets(
 
 	for _, bodies := range ruleSets {
 		for _, body := range bodies {
-			if body == nil || body.Enforce == nil {
+			if body == nil || body.Enforce == nil || len(body.Enforce.Conditions) > 0 {
 				continue
 			}
 
@@ -399,7 +399,7 @@ func managedMetadataForGVK(gvk schema.GroupVersionKind, bodies []*rules.Namespac
 	labels, annotations := map[string]string{}, map[string]string{}
 
 	for _, body := range bodies {
-		if body == nil || body.Enforce == nil {
+		if body == nil || body.Enforce == nil || len(body.Enforce.Conditions) > 0 {
 			continue
 		}
 
@@ -427,7 +427,7 @@ func managedMetadataForGVK(gvk schema.GroupVersionKind, bodies []*rules.Namespac
 
 func hasManagedMetadata(bodies []*rules.NamespaceRuleBodyNamespace) bool {
 	for _, body := range bodies {
-		if body == nil || body.Enforce == nil {
+		if body == nil || body.Enforce == nil || len(body.Enforce.Conditions) > 0 {
 			continue
 		}
 

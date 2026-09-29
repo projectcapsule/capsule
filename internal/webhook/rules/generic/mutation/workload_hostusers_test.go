@@ -58,8 +58,8 @@ func TestHostUsersOrderedConditionsAndUnstructuredOutput(t *testing.T) {
 			t.Run(fmt.Sprintf("%s/%v", action, desired), func(t *testing.T) {
 				body := &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{
 					{Action: action, Workloads: rules.WorkloadMutation{HostUsers: ptr.To(desired)}},
-					{Workloads: rules.WorkloadMutation{Conditions: []rules.AdmissionCondition{{Name: "after-host-users", Expression: fmt.Sprintf("object.spec.hostUsers == %v", desired)}}, NodeSelector: map[string]string{"observed": "yes"}}},
-					{Workloads: rules.WorkloadMutation{Conditions: []rules.AdmissionCondition{{Expression: "false"}}, HostUsers: ptr.To(!desired)}},
+					{Conditions: []rules.AdmissionCondition{{Name: "after-host-users", Expression: fmt.Sprintf("object.spec.hostUsers == %v", desired)}}, Workloads: rules.WorkloadMutation{NodeSelector: map[string]string{"observed": "yes"}}},
+					{Conditions: []rules.AdmissionCondition{{Expression: "false"}}, Workloads: rules.WorkloadMutation{HostUsers: ptr.To(!desired)}},
 				}}
 				obj := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "v1", "kind": "Pod", "spec": map[string]any{"hostUsers": !desired}}}
 				for pass := 0; pass < 2; pass++ {

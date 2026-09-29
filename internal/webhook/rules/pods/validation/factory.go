@@ -164,7 +164,7 @@ func (h *podRules) validatePodRules(
 	conditional := false
 
 	for _, body := range enforceBodies {
-		if body != nil && len(body.Workloads.Conditions) > 0 {
+		if body != nil && len(body.Conditions) > 0 && hasWorkloadPolicy(body.Workloads, req.SubResource) {
 			conditional = true
 
 			break
@@ -176,18 +176,11 @@ func (h *podRules) validatePodRules(
 	var err error
 
 	enforceBodies, err = ruleengine.FilterEnforcementConditions(ctx, evaluator, pod, enforceBodies,
-		func(body *apirules.NamespaceRuleEnforceBody) []apirules.AdmissionCondition {
-			// Placement and resource policies do not run on subresources. Avoid
-			// evaluating their gates when no legacy subresource policy applies.
-			if req.SubResource != "" && len(body.Workloads.Schedulers) == 0 &&
-				len(body.Workloads.QoSClasses) == 0 && len(body.Workloads.Registries) == 0 {
-				return nil
-			}
-
-			return body.Workloads.Conditions
+		func(body *apirules.NamespaceRuleEnforceBody) bool {
+			return hasWorkloadPolicy(body.Workloads, req.SubResource)
 		})
 	if err != nil {
-		return fmt.Errorf("enforce.workloads: %w", err)
+		return fmt.Errorf("enforce: %w", err)
 	}
 
 	for _, rule := range h.rules {
@@ -246,4 +239,14 @@ func (h *podRules) validatePodRules(
 	}
 
 	return nil
+}
+
+// Placement and resource policies do not run on subresources.
+func hasWorkloadPolicy(body apirules.NamespaceRuleEnforceWorkloadsBody, subresource string) bool {
+	if len(body.Schedulers) > 0 || len(body.QoSClasses) > 0 || len(body.Registries) > 0 {
+		return true
+	}
+
+	return subresource == "" && (len(body.NodeSelector) > 0 || len(body.Tolerations) > 0 ||
+		len(body.TopologySpreadConstraints) > 0 || len(body.Affinity) > 0 || body.Resources != nil)
 }
