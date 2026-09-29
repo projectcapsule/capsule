@@ -9,17 +9,17 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	resources "k8s.io/api/resource/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/utils"
-	resources "k8s.io/api/resource/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = Describe("when Tenant handles Device classes", Ordered, Label("tenant", "classes", "deviceclass"), func() {
@@ -130,38 +130,31 @@ var _ = Describe("when Tenant handles Device classes", Ordered, Label("tenant", 
 			}
 		}
 
+		// A different spec can own another env=e2e class while this suite runs.
+		// Register its check first so it runs after this suite's fixture cleanup.
+		unrelated := &resources.DeviceClass{
+			ObjectMeta: metav1.ObjectMeta{Name: "e2e-deviceclass-unrelated-" + rand.String(8), Labels: map[string]string{"env": "e2e"}},
+			Spec:       *unauthorized.Spec.DeepCopy(),
+		}
+		Expect(k8sClient.Create(context.Background(), unrelated)).To(Succeed())
+		DeferCleanup(func() {
+			defer EventuallyDeletion(unrelated)
+			current := &resources.DeviceClass{}
+			Expect(k8sClient.Get(context.Background(), client.ObjectKeyFromObject(unrelated), current)).To(Succeed(), "cleanup must preserve another spec's DeviceClass")
+			Expect(current.UID).To(Equal(unrelated.UID))
+		})
+
 		for _, crd := range []*resources.DeviceClass{authorized, authorized2, unauthorized} {
 			crd.ResourceVersion = ""
 			EventuallyCreation(func() error {
 				return k8sClient.Create(context.TODO(), crd)
 			}).Should(Succeed())
+			DeferCleanup(EventuallyDeletion, crd.DeepCopy())
 		}
 	})
 	JustAfterEach(func() {
 		for _, tnt := range []*capsulev1beta2.Tenant{tntWithAuthorized, tntWithUnauthorized} {
 			EventuallyDeletion(tnt)
-		}
-
-		if err := k8sClient.List(context.Background(), &resources.DeviceClassList{}); err != nil {
-			if utils.IsUnsupportedAPI(err) {
-				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
-			}
-		}
-
-		req, err := labels.NewRequirement("env", selection.Equals, []string{"e2e"})
-		Expect(err).NotTo(HaveOccurred())
-
-		var list resources.DeviceClassList
-		Expect(k8sClient.List(
-			context.TODO(),
-			&list,
-			client.MatchingLabelsSelector{
-				Selector: labels.NewSelector().Add(*req),
-			},
-		)).Should(Succeed())
-
-		for i := range list.Items {
-			EventuallyDeletion(&list.Items[i])
 		}
 	})
 
