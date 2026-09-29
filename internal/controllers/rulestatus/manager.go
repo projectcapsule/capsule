@@ -132,7 +132,7 @@ func (r Manager) reconcile(ctx context.Context, instance *capsulev1beta2.RuleSta
 	var ruleStatus []*rules.NamespaceRuleBodyNamespace
 
 	for _, rule := range instance.Spec {
-		if rule == nil || rule.Enforce == nil {
+		if rule == nil || (rule.Enforce == nil && len(rule.Mutate) == 0) {
 			continue
 		}
 
@@ -142,8 +142,10 @@ func (r Manager) reconcile(ctx context.Context, instance *capsulev1beta2.RuleSta
 		// which predate stable quota names.
 		statusRule.Quota = nil
 
-		for i := range statusRule.Enforce.Metadata {
-			statusRule.Enforce.Metadata[i].APIGroups = statusRule.Enforce.Metadata[i].StatusAPIGroups()
+		if statusRule.Enforce != nil {
+			for i := range statusRule.Enforce.Metadata {
+				statusRule.Enforce.Metadata[i].APIGroups = statusRule.Enforce.Metadata[i].StatusAPIGroups()
+			}
 		}
 
 		ruleStatus = append(ruleStatus, statusRule)

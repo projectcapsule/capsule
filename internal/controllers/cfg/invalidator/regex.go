@@ -72,6 +72,15 @@ func collectRegexExpressionsFromNamespaceRule(
 		return
 	}
 
+	// This visitor only collects immutable expressions and never returns an error.
+	_ = rule.Enforce.Workloads.VisitPlacementExpressions(func(_ string, match *runtime.ExpressionMatch) error {
+		if match != nil && match.Expression != "" {
+			set[cache.HashRegex(match.ExpressionRegex)] = match.ExpressionRegex
+		}
+
+		return nil
+	})
+
 	for _, registry := range rule.Enforce.Workloads.Registries {
 		expr := registry.ExpressionRegex
 		if expr.Expression == "" {

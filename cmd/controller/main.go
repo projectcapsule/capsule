@@ -707,21 +707,21 @@ func main() {
 	// webhooks: the order matters, don't change it and just append
 	webhooksList := append(
 		make([]handlers.Webhook, 0),
-		rulesgenericmutation.Register(cfg),
+		rulesgenericmutation.Register(cfg, celCache),
 		rulesgenericvalidation.Register(
 			regexCache,
 			cfg,
 			rulesgenericvalidation.ForKind(
 				corev1.SchemeGroupVersion.WithKind("Pod").GroupKind(),
 				pod.Handler(cfg,
-					podrules.PodRules(regexCache, registryCache),
+					podrules.PodRules(regexCache, registryCache, celCache),
 				),
 				"ephemeralcontainers",
 			),
 			rulesgenericvalidation.ForKind(
 				corev1.SchemeGroupVersion.WithKind("Service").GroupKind(),
 				service.Handler(cfg,
-					servicerules.ServiceRules(regexCache),
+					servicerules.ServiceRules(regexCache, celCache),
 				),
 			),
 		),
@@ -781,7 +781,7 @@ func main() {
 				tenantvalidation.RuntimeClassRegexHandler(),
 				tenantvalidation.GatewayClassRegexHandler(),
 				tenantvalidation.DeviceClassRegexHandler(),
-				tenantvalidation.RuleHandler(manager.GetRESTMapper()),
+				tenantvalidation.RuleHandler(manager.GetRESTMapper(), celCache),
 				tenantvalidation.HostnameRegexHandler(),
 				tenantvalidation.FreezedEmitter(),
 				tenantvalidation.OwnersHandler(),
@@ -849,7 +849,7 @@ func main() {
 				cfgvalidation.WarningHandler(),
 			),
 		),
-		route.RulesValidating(manager.GetRESTMapper(), cfg),
+		route.RulesValidating(manager.GetRESTMapper(), cfg, celCache),
 		route.ResourcePermitMutation(resourcepermit.ResourcePermitMutationHandler(
 			ctrl.Log.WithName("webhooks").WithName("resourcepermits"),
 		)),

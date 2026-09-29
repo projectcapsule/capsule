@@ -50,6 +50,10 @@ const (
 	ReasonForbiddenPodQoSClass       string = "ForbiddenQoSClass"
 	ReasonForbiddenPodScheduler      string = "ForbiddenScheduler"
 	ReasonForbiddenPodResources      string = "ForbiddenPodResources"
+	ReasonForbiddenPodNodeSelector   string = "ForbiddenPodNodeSelector"
+	ReasonForbiddenPodToleration     string = "ForbiddenPodToleration"
+	ReasonForbiddenPodTopologySpread string = "ForbiddenPodTopologySpread"
+	ReasonForbiddenPodAffinity       string = "ForbiddenPodAffinity"
 
 	// Ingress.
 	ReasonWildcardDenied           string = "WildcardDenied"

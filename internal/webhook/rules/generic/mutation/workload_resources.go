@@ -4,6 +4,7 @@
 package mutation
 
 import (
+	"context"
 	"fmt"
 	"slices"
 
@@ -15,6 +16,7 @@ import (
 	resourcehelper "k8s.io/component-helpers/resource"
 
 	apirules "github.com/projectcapsule/capsule/pkg/api/rules"
+	"github.com/projectcapsule/capsule/pkg/ruleengine"
 	"github.com/projectcapsule/capsule/pkg/runtime/workloads"
 )
 
@@ -24,11 +26,20 @@ type workloadResourcePolicies struct {
 }
 
 func MutateWorkloadResources(
+	ctx context.Context,
 	obj *unstructured.Unstructured,
 	gvk schema.GroupVersionKind,
 	bodies []*apirules.NamespaceRuleBodyNamespace,
+	conditions *ruleengine.ConditionEvaluator,
 ) (bool, error) {
 	if obj == nil || gvk != corev1.SchemeGroupVersion.WithKind("Pod") {
+		return false, nil
+	}
+
+	// Skip decoding when neither legacy resource policies nor mutation applies.
+	if !slices.ContainsFunc(bodies, func(body *apirules.NamespaceRuleBodyNamespace) bool {
+		return body != nil && (len(body.Mutate) > 0 || (body.Enforce != nil && body.Enforce.Workloads.Resources != nil))
+	}) {
 		return false, nil
 	}
 
@@ -37,9 +48,19 @@ func MutateWorkloadResources(
 		return false, fmt.Errorf("decode Pod resource policies: %w", err)
 	}
 
-	changed, err := MutatePodResources(pod, bodies)
-	if err != nil || !changed {
-		return changed, err
+	resourceBodies, err := filterResourceMutationConditions(ctx, conditions, pod, bodies)
+	if err != nil {
+		return false, err
+	}
+
+	changed, err := MutatePodResources(pod, resourceBodies)
+	if err != nil {
+		return false, err
+	}
+
+	placementChanged, err := MutatePodPlacement(ctx, pod, bodies, conditions)
+	if err != nil || (!changed && !placementChanged) {
+		return false, err
 	}
 
 	mutated, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pod)
@@ -383,4 +404,34 @@ func defaultResourceRatio(
 	resources.Limits[name] = limit
 
 	return true, nil
+}
+
+// Legacy resource policies share the enclosing workload condition gate.
+func filterResourceMutationConditions(ctx context.Context, conditions *ruleengine.ConditionEvaluator, pod *corev1.Pod, bodies []*apirules.NamespaceRuleBodyNamespace) ([]*apirules.NamespaceRuleBodyNamespace, error) {
+	var filtered []*apirules.NamespaceRuleBodyNamespace
+
+	for i, body := range bodies {
+		if body == nil || body.Enforce == nil || body.Enforce.Workloads.Resources == nil {
+			continue
+		}
+
+		matched, err := conditions.Matches(ctx, pod, body.Enforce.Workloads.Conditions)
+		if err != nil {
+			return nil, fmt.Errorf("rules[%d].enforce.workloads: %w", i, err)
+		}
+
+		if !matched {
+			if filtered == nil {
+				filtered = slices.Clone(bodies)
+			}
+
+			filtered[i] = nil
+		}
+	}
+
+	if filtered == nil {
+		return bodies, nil
+	}
+
+	return filtered, nil
 }

@@ -182,6 +182,10 @@ func (r *CacheInvalidator) rebuildCaches(
 ) error {
 	var errs []error
 
+	if err := r.rebuildConditionCache(ctx); err != nil {
+		errs = append(errs, err)
+	}
+
 	if err := r.rebuildRegexCache(ctx, log); err != nil {
 		errs = append(errs, fmt.Errorf("rebuild Regex cache: %w", err))
 	}

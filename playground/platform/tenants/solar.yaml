@@ -17,6 +17,63 @@ spec:
     - matchLabels:
         customer: renewable
   rules:
+    - mutate:
+        - workloads:
+            nodeSelector:
+              kubernetes.io/os: linux
+        - conditions:
+            - apiGroup: ""
+              kind: "Pod"
+              expressions:
+                - "request (Admission)"
+                - "self.spec.containers.nodeSelector == nil"
+          workloads:
+            tolerations:
+              - key: infrastructure.example.com/dedicated
+                operator: Equal
+                value: shared
+                effect: NoSchedule
+
+
+      validate:
+        - action: "deny"
+          conditons:
+            - apiGroup: ""
+              kind: "Pod"
+              conditions:
+                - "request (Admission)"
+                - "self.spec.containers.nodeSelector == nil"
+
+      enforce:
+        action: allow
+        workloads:
+          nodeSelector:
+            - key:
+                exact: [kubernetes.io/os]
+              values:
+                exp: ".*"
+            - key:
+                exp: '^placement\.example\.com/[a-z0-9-]+$'
+              values:
+                exact: [shared, batch]
+
+          affinity:
+            - types: [nodeAffinity]
+              modes: [required, preferred]
+              requirements:
+                - key:
+                    exact: [topology.kubernetes.io/zone]
+                  operators: [In]
+                  values:
+                    exact: [zone-a, zone-b]
+            - types: [podAffinity, podAntiAffinity]
+              modes: [preferred]
+              topologyKey:
+                exact: [kubernetes.io/hostname]
+              namespaceScope: SameNamespace
+              weight:
+                min: 1
+                max: 100
 
     # Promote only the dedicated TenantResource ServiceAccount. Capsule binds
     # this distributor role in every solar namespace so the TenantResource can

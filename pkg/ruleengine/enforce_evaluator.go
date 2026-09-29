@@ -13,6 +13,8 @@ import (
 type Value struct {
 	Value string
 	Path  string
+	// Data optionally carries a structured value without serializing it for matching.
+	Data any
 }
 
 type Match struct {
