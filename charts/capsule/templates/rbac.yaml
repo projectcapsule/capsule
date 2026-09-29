@@ -138,6 +138,8 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 rules:
+# Namespace cleanup discovers arbitrary APIs, including custom resources.
+# RBAC cannot restrict patch permission to metadata.finalizers.
 - apiGroups:
     - "*"
   resources:
@@ -145,6 +147,7 @@ rules:
   verbs:
     - delete
     - deletecollection
+    - patch
 - apiGroups: [""]
   resources: ["serviceaccounts"]
   verbs: ["impersonate"]

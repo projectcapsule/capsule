@@ -11,6 +11,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -346,7 +347,21 @@ var _ = Describe(
 				expectResourcePermitDeletionDenied(ctx, request, capsulev1beta2.ResourcePermitPhaseActive)
 			})
 
-			It("keeps its finalizer until managed resources are deleted during namespace termination", func() {
+			It("keeps its finalizer until managed resources are deleted during unmanaged namespace termination", func() {
+				// The shared fixture creates a real Tenant and namespace. Keep them
+				// present, but exercise ordinary namespace termination separately:
+				// tenant cleanup intentionally clears ConfigMap finalizers after its
+				// grace period. The next scenario covers that cleanup path.
+				tenantNamespace := namespace
+				namespace := createResourcePermitTestNamespace(ctx)
+				grantResourcePermitNamespaceAdmin(ctx, namespace.Name, resourcePermitLifecycleReviewer)
+				Eventually(func(g Gomega) {
+					current := &corev1.Namespace{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(namespace), current)).To(Succeed())
+					g.Expect(current.OwnerReferences).To(BeEmpty())
+					g.Expect(current.Labels).NotTo(HaveKey(apimeta.TenantLabel))
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
 				request := newLifecycleResourcePermit(
 					namespace.Name,
 					"e2e-resourcepermit-delete-with-namespace",
@@ -395,6 +410,10 @@ var _ = Describe(
 					g.Expect(target.DeletionTimestamp.IsZero()).To(BeFalse())
 				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 				Consistently(func(g Gomega) {
+					target := &corev1.ConfigMap{}
+					g.Expect(k8sClient.Get(ctx, targetKey, target)).To(Succeed())
+					g.Expect(target.DeletionTimestamp.IsZero()).To(BeFalse())
+					g.Expect(target.Finalizers).To(ContainElement(holdFinalizer))
 					current := &capsulev1beta2.ResourcePermit{}
 					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(request), current)).To(Succeed())
 					g.Expect(current.Finalizers).To(ContainElement(apimeta.ControllerFinalizer))
@@ -405,6 +424,130 @@ var _ = Describe(
 				releaseTarget()
 				Eventually(func() bool {
 					return apierrors.IsNotFound(k8sClient.Get(ctx, targetKey, &corev1.ConfigMap{}))
+				}, defaultTerminationTimeoutInterval, defaultPollInterval).Should(BeTrue())
+
+				Eventually(func() bool {
+					current := &capsulev1beta2.ResourcePermit{}
+					err := k8sClient.Get(ctx, client.ObjectKeyFromObject(request), current)
+
+					return apierrors.IsNotFound(err)
+				}, defaultTerminationTimeoutInterval, defaultPollInterval).Should(BeTrue())
+
+				Eventually(func() bool {
+					current := &corev1.Namespace{}
+					err := k8sClient.Get(ctx, client.ObjectKeyFromObject(namespace), current)
+
+					return apierrors.IsNotFound(err)
+				}, defaultTerminationTimeoutInterval, defaultPollInterval).Should(BeTrue())
+
+				By("preserving the unrelated Tenant and its namespace")
+				Eventually(func(g Gomega) {
+					current := &corev1.Namespace{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(tenantNamespace), current)).To(Succeed())
+					g.Expect(current.DeletionTimestamp.IsZero()).To(BeTrue())
+					g.Expect(current.Labels).To(HaveKeyWithValue(apimeta.TenantLabel, tenantNamespace.Name))
+					tnt := &capsulev1beta2.Tenant{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: tenantNamespace.Name}, tnt)).To(Succeed())
+					g.Expect(tnt.DeletionTimestamp.IsZero()).To(BeTrue())
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			})
+
+			It("preserves its lifecycle finalizer through tenant namespace cleanup", func() {
+				tnt := newResourcePermitCleanupTenant(namespace.Name)
+				EventuallyCreation(func() error { return k8sClient.Create(ctx, tnt) }).Should(Succeed())
+				DeferCleanup(func() { EventuallyDeletion(tnt) })
+				TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
+				namespace := NewNamespace(tnt.Name+"-managed", map[string]string{apimeta.TenantLabel: tnt.Name})
+				NamespaceCreation(namespace, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+				DeferCleanup(func() { ForceDeleteNamespace(ctx, namespace.Name) })
+				grantResourcePermitNamespaceAdmin(ctx, namespace.Name, resourcePermitLifecycleReviewer)
+				TenantNamespaceReady(tnt, namespace, 1)
+				// A cluster-scoped target cannot be force-finalized by namespace
+				// cleanup. Its finalizer must keep the permit (and namespace) alive.
+				template := lifecycleResourcePermitTemplate()
+				template.Name = namespace.Name + "-lifecycle"
+				template.Spec.Resources = []apiruntime.ResourceTemplate{{
+					Targets: []runtime.RawExtension{{Object: &rbacv1.ClusterRole{
+						APIVersion: rbacv1.SchemeGroupVersion.String(), Kind: "ClusterRole",
+						Name:  namespace.Name + "-target",
+						Rules: []rbacv1.PolicyRule{{APIGroups: []string{""}, Resources: []string{"configmaps"}, Verbs: []string{"get"}}},
+					}}},
+				}}
+				EventuallyCreation(func() error { return k8sClient.Create(ctx, template) }).Should(Succeed())
+				DeferCleanup(func() { EventuallyDeletion(template) })
+
+				// This unrelated finalizer proves the cleanup controller ran; waiting
+				// only a fixed interval can miss its ten-second grace period.
+				witness := &corev1.ConfigMap{
+					Name: "cleanup-witness", Namespace: namespace.Name,
+					Finalizers: []string{"e2e.projectcapsule.dev/cleanup-witness"},
+				}
+				EventuallyCreation(func() error { return k8sClient.Create(ctx, witness) }).Should(Succeed())
+				request := newLifecycleResourcePermit(
+					namespace.Name,
+					"e2e-resourcepermit-delete-with-namespace",
+					template.Name,
+					"e2e-resourcepermit-delete-with-namespace-target",
+				)
+				EventuallyCreation(func() error { return k8sClient.Create(ctx, request) }).Should(Succeed())
+				DeferCleanup(func() { cleanupLifecycleResourcePermit(ctx, request) })
+
+				patchLifecyclePhase(ctx, reviewerClient, request, capsulev1beta2.ResourcePermitPhaseApproved)
+				waitForResourcePermitPhase(ctx, request, capsulev1beta2.ResourcePermitPhaseActive)
+				expectResourcePermitDeletionDenied(ctx, request, capsulev1beta2.ResourcePermitPhaseActive)
+
+				const holdFinalizer = "e2e.projectcapsule.dev/hold-resourcepermit-target"
+				controllerClient := impersonationClient(ControllerServiceAccountFull, serviceAccountGroups(ControllerNamespace))
+				targetKey := client.ObjectKey{Name: namespace.Name + "-target"}
+				releaseTarget := func() {
+					Eventually(func(g Gomega) {
+						target := &rbacv1.ClusterRole{}
+						err := k8sClient.Get(ctx, targetKey, target)
+						if apierrors.IsNotFound(err) {
+							return
+						}
+						g.Expect(err).NotTo(HaveOccurred())
+						before := target.DeepCopy()
+						controllerutil.RemoveFinalizer(target, holdFinalizer)
+						g.Expect(controllerClient.Patch(ctx, target, client.MergeFrom(before))).To(Succeed())
+					}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+				}
+				DeferCleanup(releaseTarget)
+				Eventually(func(g Gomega) {
+					target := &rbacv1.ClusterRole{}
+					g.Expect(k8sClient.Get(ctx, targetKey, target)).To(Succeed())
+					before := target.DeepCopy()
+					controllerutil.AddFinalizer(target, holdFinalizer)
+					g.Expect(controllerClient.Patch(ctx, target, client.MergeFrom(before))).To(Succeed())
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+				By("allowing namespace termination to override lifecycle and archive retention")
+				Expect(k8sClient.Delete(ctx, namespace)).To(Succeed())
+
+				By("retaining the permit while its protected ClusterRole is still terminating")
+				Eventually(func(g Gomega) {
+					target := &rbacv1.ClusterRole{}
+					g.Expect(k8sClient.Get(ctx, targetKey, target)).To(Succeed())
+					g.Expect(target.DeletionTimestamp.IsZero()).To(BeFalse())
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+				By("retaining the permit after namespace cleanup removes unrelated finalizers")
+				Eventually(func() bool {
+					return apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(witness), &corev1.ConfigMap{}))
+				}, defaultTerminationTimeoutInterval, defaultPollInterval).Should(BeTrue())
+				Consistently(func(g Gomega) {
+					target := &rbacv1.ClusterRole{}
+					g.Expect(k8sClient.Get(ctx, targetKey, target)).To(Succeed())
+					g.Expect(target.Finalizers).To(ContainElement(holdFinalizer))
+					current := &capsulev1beta2.ResourcePermit{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(request), current)).To(Succeed())
+					g.Expect(current.Finalizers).To(ContainElement(apimeta.ControllerFinalizer))
+					g.Expect(current.Status.ProcessedItems).NotTo(BeEmpty())
+				}, 4*time.Second, 500*time.Millisecond).Should(Succeed())
+
+				By("finishing permit and namespace deletion after the ClusterRole finalizer completes")
+				releaseTarget()
+				Eventually(func() bool {
+					return apierrors.IsNotFound(k8sClient.Get(ctx, targetKey, &rbacv1.ClusterRole{}))
 				}, defaultTerminationTimeoutInterval, defaultPollInterval).Should(BeTrue())
 
 				Eventually(func() bool {

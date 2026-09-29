@@ -17,7 +17,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/ruleengine"
 )
 
-func TestServiceConditionsDoNotEvaluateWorkloadExpressions(t *testing.T) {
+func TestServiceConditionsGateEnforcement(t *testing.T) {
 	c, err := cache.NewCELCache()
 	if err != nil {
 		t.Fatal(err)
@@ -35,7 +35,7 @@ func TestServiceConditionsDoNotEvaluateWorkloadExpressions(t *testing.T) {
 			}
 			return nil, nil
 		}}}
-		bodies := []*rules.NamespaceRuleEnforceBody{{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Conditions: []rules.AdmissionCondition{{Expression: `object.spec.containers.size() > 0`}}}, Services: rules.NamespaceRuleEnforceServicesBody{Conditions: []rules.AdmissionCondition{{Expression: expression}}}}, {}}
+		bodies := []*rules.NamespaceRuleEnforceBody{{Conditions: []rules.AdmissionCondition{{Expression: expression}}, Services: rules.NamespaceRuleEnforceServicesBody{Types: []rules.ServiceType{rules.ServiceTypeNodePort}}}, {}}
 		err := h.validateServiceRules(context.Background(), admission.Request{}, &corev1.Service{Spec: corev1.ServiceSpec{Type: corev1.ServiceTypeClusterIP}}, nil, nil, bodies)
 		if err != nil || !called {
 			t.Fatalf("called=%v err=%v", called, err)
@@ -49,9 +49,21 @@ func TestServiceConditionErrorLocation(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := &serviceRules{compiler: c}
-	bodies := []*rules.NamespaceRuleEnforceBody{{Services: rules.NamespaceRuleEnforceServicesBody{Conditions: []rules.AdmissionCondition{{Name: "service-gate", Expression: "object.spec.missing == 'x'"}}}}}
+	bodies := []*rules.NamespaceRuleEnforceBody{{Conditions: []rules.AdmissionCondition{{Name: "service-gate", Expression: "object.spec.missing == 'x'"}}, Services: rules.NamespaceRuleEnforceServicesBody{Types: []rules.ServiceType{rules.ServiceTypeNodePort}}}}
 	err = h.validateServiceRules(context.Background(), admission.Request{}, &corev1.Service{}, nil, nil, bodies)
-	if err == nil || !strings.Contains(err.Error(), `enforce.services: enforcement rule[0]: conditions[0] ("service-gate")`) {
+	if err == nil || !strings.Contains(err.Error(), `enforce: enforcement rule[0]: conditions[0] ("service-gate")`) {
 		t.Fatalf("missing condition location: %v", err)
+	}
+}
+
+func TestServiceSkipsConditionsForWorkloadOnlyRule(t *testing.T) {
+	compiler, err := cache.NewCELCache()
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := &rules.NamespaceRuleEnforceBody{Conditions: []rules.AdmissionCondition{{Expression: "object.spec.containers.size() > 0"}}, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Tolerations: []rules.WorkloadTolerationMatch{{}}}}
+	err = ServiceRules(nil, compiler).(*serviceRules).validateServiceRules(t.Context(), admission.Request{}, &corev1.Service{}, nil, nil, []*rules.NamespaceRuleEnforceBody{body})
+	if err != nil || compiler.Stats() != 0 {
+		t.Fatalf("unrelated gate evaluated: err=%v compiled=%d", err, compiler.Stats())
 	}
 }

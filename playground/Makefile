@@ -55,7 +55,7 @@ export OIDC_GROUPS_CLAIM OIDC_GROUPS_PREFIX
 
 SUBSTITUTION_VARIABLES := '$${CLUSTER_NAME} $${PROXY_PORT} $${DEX_HOST} $${HEADLAMP_HOST} $${PROXY_HOST} $${GANGPLANK_HOST} $${DEX_URL} $${HEADLAMP_URL} $${PROXY_URL} $${GANGPLANK_URL} $${DEX_CA_FILE} $${AUTHENTICATION_CONFIG_FILE} $${PLAYGROUND_CA_SHA256} $${PLAYGROUND_CA_BUNDLE} $${CAPSULE_TLS_CERT_BUNDLE} $${CAPSULE_TLS_KEY_BUNDLE} $${OIDC_CLIENT_ID} $${OIDC_CLIENT_SECRET} $${OIDC_USERNAME_CLAIM} $${OIDC_USERNAME_PREFIX} $${OIDC_GROUPS_CLAIM} $${OIDC_GROUPS_PREFIX}'
 
-.PHONY: help check check-dev hosts certificates render-kind render-authentication cluster node-hosts flux apply render apply-platform apply-user wait-oidc configure-oidc wait status dev-image dev-capsule dev capsule-stable up down
+.PHONY: help check check-dev hosts certificates render-kind render-authentication cluster node-hosts flux apply render apply-platform apply-user wait-oidc configure-oidc wait status dev-image dev-capsule dev capsule-stable bootstrap up down
 
 help: ## Show the available playground targets.
 	@awk 'BEGIN {FS = ":.*## "; print "Capsule local playground\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -204,6 +204,8 @@ apply-user:
 	@$(KUBECTL) get ns solar-prod >/dev/null 2>&1 || $(KUBECTL) create ns solar-prod --as alice --as-group projectcapsule.dev
 	@$(KUBECTL) label ns solar-prod env=prod --overwrite
 	@$(KUBECTL) label ns solar-prod team=team-b --overwrite
+	@$(KUBECTL) -n solar-test wait --for=create rulestatus/capsule-managed-rules --timeout=$(TIMEOUT)
+	@$(KUBECTL) -n solar-test wait --for=jsonpath='{.status.rules[0].mutate[0].conditions[0].name}'=linux-default rulestatus/capsule-managed-rules --timeout=$(TIMEOUT)
 	@$(KUBECTL) kustomize user/solar | envsubst $(SUBSTITUTION_VARIABLES) | $(KUBECTL) apply --as alice --as-group projectcapsule.dev -f -
 
 wait-oidc: certificates ## Wait for ingress and Dex before enabling API-server OIDC.
@@ -277,8 +279,10 @@ dev-capsule: check-dev certificates ## Deploy the current Capsule source and cha
 	@$(KUBECTL) rollout status deployment/capsule-controller-manager --namespace capsule-system --timeout='$(TIMEOUT)'
 	@echo "Deployed local Capsule image $(DEV_IMAGE):$(DEV_VERSION)"
 
-dev: up ## Bring up the playground and deploy Capsule from the current checkout.
+dev: bootstrap ## Bring up the playground and deploy Capsule from the current checkout.
 	@$(MAKE) --no-print-directory dev-capsule
+	@$(MAKE) apply-platform
+	@$(MAKE) apply-user
 
 capsule-stable: check ## Restore the Flux-managed Capsule release.
 	@if ! $(KUBECTL) get helmrelease capsule --namespace flux-system >/dev/null 2>&1; then \
@@ -290,12 +294,14 @@ capsule-stable: check ## Restore the Flux-managed Capsule release.
 	@$(KUBECTL) rollout status deployment/capsule-controller-manager --namespace capsule-system --timeout='$(TIMEOUT)'
 	@echo "Restored the Flux-managed Capsule release"
 
-up: cluster ## Install Flux and bring up the local playground.
+bootstrap: cluster
 	@$(MAKE) flux
 	@$(MAKE) apply
 	@$(MAKE) wait-oidc
 	@$(MAKE) configure-oidc
 	@$(MAKE) wait
+
+up: bootstrap ## Install Flux and bring up the local playground.
 	@$(MAKE) apply-platform
 	@$(MAKE) apply-user
 	@echo

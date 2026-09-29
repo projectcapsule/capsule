@@ -30,7 +30,7 @@ func TestPodConditionsScopeAndUpdateReevaluation(t *testing.T) {
 	}{
 		{"false skips only gated body", "false", 1, ""},
 		{"true includes gated body", "true", 2, ""},
-		{"runtime error fails", "object.spec.missing == 'x'", 0, `enforce.workloads: enforcement rule[0]: conditions[0] ("condition")`},
+		{"runtime error fails", "object.spec.missing == 'x'", 0, `enforce: enforcement rule[0]: conditions[0] ("condition")`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			evaluated := false
@@ -42,7 +42,7 @@ func TestPodConditionsScopeAndUpdateReevaluation(t *testing.T) {
 				return nil, nil
 			}}}}
 			bodies := []*rules.NamespaceRuleEnforceBody{
-				{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Conditions: []rules.AdmissionCondition{{Name: "condition", Expression: tc.expression}}}, Services: rules.NamespaceRuleEnforceServicesBody{Conditions: []rules.AdmissionCondition{{Expression: `object.spec.type == 'ClusterIP'`}}}},
+				{Conditions: []rules.AdmissionCondition{{Name: "condition", Expression: tc.expression}}, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Tolerations: []rules.WorkloadTolerationMatch{{}}}},
 				{},
 			}
 			original := bodies[0].DeepCopy()
@@ -55,7 +55,7 @@ func TestPodConditionsScopeAndUpdateReevaluation(t *testing.T) {
 			} else if err == nil || !strings.Contains(err.Error(), tc.failure) {
 				t.Fatalf("error=%v", err)
 			}
-			if bodies[0].Workloads.Conditions[0] != original.Workloads.Conditions[0] {
+			if bodies[0].Conditions[0] != original.Conditions[0] {
 				t.Fatal("mutated rule")
 			}
 		})
@@ -68,10 +68,11 @@ func TestPlacementOnlyConditionsSkipSubresources(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := PodRules(nil, nil, c).(*podRules)
-	bodies := []*rules.NamespaceRuleEnforceBody{{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
-		Conditions:  []rules.AdmissionCondition{{Expression: `object.spec.missing == 'x'`}},
-		Tolerations: []rules.WorkloadTolerationMatch{{}},
-	}}}
+	bodies := []*rules.NamespaceRuleEnforceBody{{
+		Conditions: []rules.AdmissionCondition{{Expression: `object.spec.missing == 'x'`}}, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
+
+			Tolerations: []rules.WorkloadTolerationMatch{{}},
+		}}}
 	for _, subresource := range []string{"status", "ephemeralcontainers"} {
 		req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{SubResource: subresource}}
 		if err := h.validatePodRules(context.Background(), req, &corev1.Pod{}, nil, nil, bodies); err != nil {
@@ -80,5 +81,17 @@ func TestPlacementOnlyConditionsSkipSubresources(t *testing.T) {
 	}
 	if c.Stats() != 0 {
 		t.Fatal("irrelevant condition was compiled")
+	}
+}
+
+func TestPodSkipsConditionsForServiceOnlyRule(t *testing.T) {
+	compiler, err := cache.NewCELCache()
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := &rules.NamespaceRuleEnforceBody{Conditions: []rules.AdmissionCondition{{Expression: "object.spec.type == 'NodePort'"}}, Services: rules.NamespaceRuleEnforceServicesBody{Types: []rules.ServiceType{rules.ServiceTypeNodePort}}}
+	err = PodRules(nil, nil, compiler).(*podRules).validatePodRules(t.Context(), admission.Request{}, &corev1.Pod{}, nil, nil, []*rules.NamespaceRuleEnforceBody{body})
+	if err != nil || compiler.Stats() != 0 {
+		t.Fatalf("unrelated gate evaluated: err=%v compiled=%d", err, compiler.Stats())
 	}
 }

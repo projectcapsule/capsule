@@ -104,14 +104,14 @@ func TestValidateMutationAndConditions(t *testing.T) {
 		{"empty mutation", `mutate: [{}]`, "workload mutation property"},
 		{"invalid action", `mutate: [{action: append, workloads: {tolerations: []}}]`, "action"},
 		{"clear all", `mutate: [{action: replace, workloads: {nodeSelector: {}, tolerations: [], topologySpreadConstraints: [], affinity: {}}}]`, ""},
-		{"conditional mutation", `mutate: [{workloads: {conditions: [{name: create, expression: "request.operation == 'CREATE'"}], nodeSelector: {pool: shared}}}]`, ""},
-		{"invalid mutation expression", `mutate: [{workloads: {conditions: [{expression: "object.spec."}], tolerations: []}}]`, "mutate[0].workloads.conditions[0]"},
-		{"workload bool required", `enforce: {workloads: {conditions: [{expression: "'x'"}]}}`, "must evaluate to bool"},
-		{"service bool required", `enforce: {services: {conditions: [{expression: "1"}]}}`, "enforce.services.conditions[0]"},
-		{"duplicate names", `enforce: {services: {conditions: [{name: same, expression: "true"}, {name: same, expression: "false"}]}}`, "duplicate condition name"},
-		{"invalid name", `enforce: {workloads: {conditions: [{name: 'not valid', expression: "true"}]}}`, ".name"},
-		{"empty expression", `enforce: {services: {conditions: [{expression: ""}]}}`, "must not be empty"},
-		{"families independent", `enforce: {workloads: {conditions: [{expression: "object.spec.containers.size() > 0"}]}, services: {conditions: [{expression: "object.spec.type == 'ClusterIP'"}]}}`, ""},
+		{"conditional mutation", `mutate: [{conditions: [{name: create, expression: "request.operation == 'CREATE'"}], workloads: {nodeSelector: {pool: shared}}}]`, ""},
+		{"invalid mutation expression", `mutate: [{conditions: [{expression: "object.spec."}], workloads: {tolerations: []}}]`, "mutate[0].conditions[0]"},
+		{"Boolean required", `enforce: {conditions: [{expression: "'x'"}]}`, "must evaluate to bool"},
+		{"invalid enforcement expression", `enforce: {conditions: [{expression: "1"}]}`, "enforce.conditions[0]"},
+		{"duplicate names", `enforce: {conditions: [{name: same, expression: "true"}, {name: same, expression: "false"}]}`, "duplicate condition name"},
+		{"invalid name", `enforce: {conditions: [{name: 'not valid', expression: "true"}]}`, ".name"},
+		{"empty expression", `enforce: {conditions: [{expression: ""}]}`, "must not be empty"},
+		{"shared gate", `enforce: {conditions: [{expression: "has(object.metadata.labels)"}], workloads: {tolerations: [{}]}, services: {types: [NodePort]}}`, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var body rules.NamespaceRuleBodyNamespace
@@ -165,7 +165,7 @@ func BenchmarkAdmissionConditions(b *testing.B) {
 				}
 				bodies := make([]*rules.NamespaceRuleEnforceBody, count)
 				for i := range bodies {
-					bodies[i] = &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Conditions: []rules.AdmissionCondition{{Expression: expression}}}}
+					bodies[i] = &rules.NamespaceRuleEnforceBody{Conditions: []rules.AdmissionCondition{{Expression: expression}}, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{}}
 				}
 				_, err := c.GetOrCompileCondition(expression, environment.StoredExpressions)
 				if err != nil {
@@ -175,9 +175,7 @@ func BenchmarkAdmissionConditions(b *testing.B) {
 				b.ResetTimer()
 				for b.Loop() {
 					evaluator := ruleengine.NewConditionEvaluator(c, admissionv1.AdmissionRequest{Namespace: "tenant-a"})
-					result, err := ruleengine.FilterEnforcementConditions(context.Background(), evaluator, pod, bodies, func(body *rules.NamespaceRuleEnforceBody) []rules.AdmissionCondition {
-						return body.Workloads.Conditions
-					})
+					result, err := ruleengine.FilterEnforcementConditions(context.Background(), evaluator, pod, bodies, func(*rules.NamespaceRuleEnforceBody) bool { return true })
 					if mode == "error" && count > 0 {
 						if err == nil {
 							b.Fatal("missing error")
@@ -232,5 +230,68 @@ func BenchmarkAdmissionConditions(b *testing.B) {
 				run()
 			}
 		})
+	}
+}
+
+func TestConditionsOnlyAtActionLevel(t *testing.T) {
+	for _, input := range []string{
+		`mutate: [{workloads: {conditions: [{expression: "false"}], nodeSelector: {pool: shared}}}]`,
+		`enforce: {workloads: {conditions: [{expression: "false"}]}}`,
+		`enforce: {services: {conditions: [{expression: "false"}]}}`,
+	} {
+		var body rules.NamespaceRuleBodyNamespace
+		if err := yaml.UnmarshalStrict([]byte(input), &body); err == nil {
+			t.Fatalf("obsolete nested conditions accepted: %s", input)
+		}
+	}
+}
+
+func TestConditionRawObjectDecoding(t *testing.T) {
+	c := conditionCache(t)
+	for _, tc := range []struct {
+		raw  string
+		fail bool
+	}{
+		{`{"spec":{"enabled":true}}`, false}, {`null`, true}, {`[]`, true}, {`{`, true}, {``, true},
+	} {
+		req := admissionv1.AdmissionRequest{}
+		req.Object.Raw = []byte(tc.raw)
+		evaluator := ruleengine.NewConditionEvaluator(c, req)
+		got, err := evaluator.Matches(t.Context(), nil, []rules.AdmissionCondition{{Expression: "object.spec.enabled == true"}})
+		if (err != nil) != tc.fail || got == tc.fail {
+			t.Fatalf("raw=%q result=%v error=%v", tc.raw, got, err)
+		}
+		if got, err := evaluator.Matches(t.Context(), nil, nil); err != nil || !got {
+			t.Fatalf("ungated rules attempted decoding: %v", err)
+		}
+	}
+}
+
+func TestNamespaceEnforcementGatePreservesMutationAndOrder(t *testing.T) {
+	c := conditionCache(t)
+	body := &rules.NamespaceRuleBodyNamespace{
+		Mutate:  []rules.NamespaceRuleMutation{{Workloads: rules.WorkloadMutation{NodeSelector: map[string]string{"pool": "shared"}}}},
+		Enforce: &rules.NamespaceRuleEnforceBody{Conditions: []rules.AdmissionCondition{{Expression: "false"}}},
+	}
+	original := body.DeepCopy()
+	bodies := []*rules.NamespaceRuleBodyNamespace{nil, body, {}, body}
+	filtered, err := ruleengine.FilterNamespaceEnforcementConditions(t.Context(), ruleengine.NewConditionEvaluator(c, admissionv1.AdmissionRequest{}), &corev1.Pod{}, bodies, func(*rules.NamespaceRuleEnforceBody) bool { return true })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(filtered) != 4 || filtered[0] != nil || filtered[1].Enforce != nil || filtered[2] != bodies[2] || filtered[3].Enforce != nil {
+		t.Fatalf("incorrect filtered order: %#v", filtered)
+	}
+	if filtered[1].Mutate[0].Workloads.NodeSelector["pool"] != "shared" || body.Enforce.Conditions[0] != original.Enforce.Conditions[0] {
+		t.Fatal("lost independent mutation or modified cached input")
+	}
+}
+
+func TestRawConditionsPreserveIntegerValues(t *testing.T) {
+	request := admissionv1.AdmissionRequest{}
+	request.Object.Raw = []byte(`{"spec":{"replicas":3,"large":9007199254740993}}`)
+	matched, err := ruleengine.NewConditionEvaluator(conditionCache(t), request).Matches(t.Context(), nil, []rules.AdmissionCondition{{Expression: "object.spec.replicas % 2 == 1 && object.spec.large == 9007199254740993"}})
+	if err != nil || !matched {
+		t.Fatalf("numeric values changed during request decoding: %v %v", matched, err)
 	}
 }

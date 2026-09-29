@@ -4,13 +4,15 @@
 package gvk_test
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
-	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 )
 
 func TestNamespacedListableResources(t *testing.T) {
@@ -19,12 +21,12 @@ func TestNamespacedListableResources(t *testing.T) {
 	got, err := gvk.NamespacedListableResources([]*metav1.APIResourceList{{
 		GroupVersion: "apps/v1",
 		APIResources: []metav1.APIResource{
-			{Name: "deployments", Namespaced: true, Verbs: metav1.Verbs{"list", "patch"}},
-			{Name: "deployments/status", Namespaced: true, Verbs: metav1.Verbs{"list", "patch"}},
+			{Name: "deployments", Namespaced: true, Verbs: metav1.Verbs{"get", "list", "delete", "patch"}},
+			{Name: "deployments/status", Namespaced: true, Verbs: metav1.Verbs{"get", "list", "delete", "patch"}},
 			{Name: "daemonsets", Namespaced: true, Verbs: metav1.Verbs{"list"}},
-			{Name: "statefulsets", Namespaced: true, Verbs: metav1.Verbs{"list", "update"}},
-			{Name: "clusterthings", Namespaced: false, Verbs: metav1.Verbs{"list", "patch"}},
-			{Name: "deployments", Namespaced: true, Verbs: metav1.Verbs{"list", "patch"}},
+			{Name: "statefulsets", Namespaced: true, Verbs: metav1.Verbs{"get", "list", "delete", "patch", "update"}},
+			{Name: "clusterthings", Namespaced: false, Verbs: metav1.Verbs{"get", "list", "delete", "patch"}},
+			{Name: "deployments", Namespaced: true, Verbs: metav1.Verbs{"get", "list", "delete", "patch"}},
 		},
 	}})
 	if err != nil {
@@ -41,6 +43,60 @@ func TestNamespacedListableResources(t *testing.T) {
 
 	if _, err := gvk.NamespacedListableResources([]*metav1.APIResourceList{{GroupVersion: "not/a/group/version"}}); err == nil {
 		t.Fatalf("NamespacedListableResources() expected parse error")
+	}
+}
+
+func TestNamespacedListableResourcesRequiresCleanupVerbs(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name  string
+		verbs metav1.Verbs
+		want  bool
+	}{
+		{name: "supported", verbs: metav1.Verbs{"get", "list", "delete", "patch"}, want: true},
+		{name: "missing list", verbs: metav1.Verbs{"get", "delete", "patch"}},
+		{name: "missing get", verbs: metav1.Verbs{"list", "delete", "patch"}},
+		{name: "missing delete", verbs: metav1.Verbs{"get", "list", "patch", "update"}},
+		{name: "deletecollection is not delete", verbs: metav1.Verbs{"get", "list", "deletecollection", "patch"}},
+		{name: "update is not patch", verbs: metav1.Verbs{"get", "list", "delete", "update"}},
+		{name: "empty verbs", verbs: metav1.Verbs{}},
+		{name: "nil verbs"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := gvk.NamespacedListableResources([]*metav1.APIResourceList{{
+				GroupVersion: "example.com/v1",
+				APIResources: []metav1.APIResource{{Name: "widgets", Namespaced: true, Verbs: tt.verbs}},
+			}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if (len(got) == 1) != tt.want || len(got) > 1 {
+				t.Fatalf("selected resources = %v, want selected = %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func BenchmarkNamespacedListableResources(b *testing.B) {
+	for _, count := range []int{30, 300} {
+		b.Run(fmt.Sprintf("resources=%d", count), func(b *testing.B) {
+			resources := &metav1.APIResourceList{GroupVersion: "example.com/v1"}
+			for i := range count {
+				resources.APIResources = append(resources.APIResources, metav1.APIResource{
+					Name: fmt.Sprintf("objects%d", i), Namespaced: true,
+					Verbs: metav1.Verbs{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				})
+			}
+			input := []*metav1.APIResourceList{resources}
+			b.ReportAllocs()
+			for b.Loop() {
+				got, err := gvk.NamespacedListableResources(input)
+				if err != nil || len(got) != count {
+					b.Fatalf("selected %d resources, want %d: %v", len(got), count, err)
+				}
+			}
+		})
 	}
 }
 

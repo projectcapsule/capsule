@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/projectcapsule/capsule/internal/cache"
+	"github.com/projectcapsule/capsule/pkg/ruleengine"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -25,17 +26,20 @@ type genericValidating struct {
 	regexCache    *cache.RegexCache
 	configuration configuration.Configuration
 	resourceRules []handlers.Handler
+	compiler      ruleengine.ConditionCompiler
 }
 
 func Register(
 	regexCache *cache.RegexCache,
 	cfg configuration.Configuration,
+	compiler ruleengine.ConditionCompiler,
 	resourceRules ...handlers.Handler,
 ) handlers.Webhook {
 	return &genericValidating{
 		regexCache:    regexCache,
 		configuration: cfg,
 		resourceRules: resourceRules,
+		compiler:      compiler,
 	}
 }
 
@@ -44,7 +48,7 @@ func (w *genericValidating) GetHandlers() []handlers.Handler {
 	out = append(out, matchingRequest(
 		matchesGenericMetadataRequest,
 		genericHandler(w.configuration,
-			GenericRules(w.regexCache),
+			GenericRules(w.regexCache, w.compiler),
 		),
 	))
 	out = append(out, w.resourceRules...)
@@ -55,7 +59,7 @@ func (w *genericValidating) GetHandlers() []handlers.Handler {
 			return supported && req.SubResource == ""
 		},
 		ingressHandler(w.configuration,
-			IngressRules(w.regexCache),
+			IngressRules(w.regexCache, w.compiler),
 		),
 	))
 

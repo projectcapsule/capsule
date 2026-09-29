@@ -711,6 +711,7 @@ func main() {
 		rulesgenericvalidation.Register(
 			regexCache,
 			cfg,
+			celCache,
 			rulesgenericvalidation.ForKind(
 				corev1.SchemeGroupVersion.WithKind("Pod").GroupKind(),
 				pod.Handler(cfg,
@@ -801,7 +802,7 @@ func main() {
 				namespacevalidation.CordoningHandler(cfg),
 				namespacevalidation.QuotaHandler(),
 				namespacevalidation.PrefixHandler(cfg),
-				namespacevalidation.RulesMetadataHandler(regexCache, cfg),
+				namespacevalidation.RulesMetadataHandler(regexCache, cfg, celCache),
 				namespacevalidation.UserMetadataHandler(),
 				namespacevalidation.RequiredMetadataHandler(),
 			),
@@ -812,7 +813,7 @@ func main() {
 				namespacemutation.OwnerReferenceHandler(cfg),
 				namespacemutation.MetadataHandler(cfg),
 				// Tenant metadata must be resolved before applying namespace rules.
-				namespacemutation.RulesMetadataHandler(cfg),
+				namespacemutation.RulesMetadataHandler(cfg, celCache),
 			),
 		),
 		route.ResourcePoolMutation(resourcepool.PoolMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool"))),

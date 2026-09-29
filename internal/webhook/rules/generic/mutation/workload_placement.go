@@ -35,9 +35,9 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 		for j := range body.Mutate {
 			mutation := &body.Mutate[j]
 
-			matched, err := matchesMutationConditions(ctx, conditions, pod, mutation.Workloads.Conditions)
+			matched, err := matchesMutationConditions(ctx, conditions, pod, mutation.Conditions)
 			if err != nil {
-				return false, fmt.Errorf("rules[%d].mutate[%d].workloads: %w", i, j, err)
+				return false, fmt.Errorf("rules[%d].mutate[%d]: %w", i, j, err)
 			}
 
 			if !matched {

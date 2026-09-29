@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 	"github.com/projectcapsule/capsule/pkg/users"
@@ -147,6 +148,40 @@ func TestMutateNamespaceRules(t *testing.T) {
 			}
 			if _, ok := old.Labels["rules.example.com/managed"]; ok {
 				t.Fatal("metadata mutation modified the old namespace")
+			}
+		})
+	}
+}
+
+func TestNamespaceMetadataConditions(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := capsulev1beta2.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	compiler, err := cache.NewCELCache()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expression := range []string{"true", "false", "object.spec.missing == 'x'"} {
+		t.Run(expression, func(t *testing.T) {
+			tnt := &capsulev1beta2.Tenant{Name: "team", Spec: capsulev1beta2.TenantSpec{Rules: []*rules.NamespaceRuleBodyTenant{{NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{
+				Conditions: []rules.AdmissionCondition{{Expression: expression}},
+				Metadata:   []rules.MetadataRule{{APIGroups: []string{"v1"}, Kinds: []string{"Namespace"}, Labels: map[string]rules.MetadataValueRule{"example.com/managed": {Managed: new("yes")}}}},
+			}}}}}}
+			cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(tnt).Build()
+			for _, operation := range []admissionv1.Operation{admissionv1.Create, admissionv1.Update} {
+				ns := &corev1.Namespace{Name: "team-test", Labels: map[string]string{meta.TenantLabel: "team"}}
+				response := mutateNamespaceRules(cl, cl, nil, ns, compiler)(t.Context(), admission.Request{Operation: operation})
+				if expression == "object.spec.missing == 'x'" {
+					if response == nil || response.Allowed {
+						t.Fatal("invalid condition allowed")
+					}
+				} else if response != nil || (ns.Labels["example.com/managed"] == "yes") != (expression == "true") {
+					t.Fatalf("incorrect conditional namespace mutation: labels=%v response=%#v", ns.Labels, response)
+				}
 			}
 		})
 	}

@@ -88,6 +88,35 @@ spec:
                       - deny
                       - audit
                       type: string
+                    conditions:
+                      description: |-
+                        Conditions gate this entire enforcement rule, including workloads, services,
+                        metadata and ingress. All conditions must be true; empty means apply.
+                        Conditions run during admission; managed metadata in a conditional rule
+                        is applied on matching requests only and is not reconciled in the background.
+                      items:
+                        description: |-
+                          AdmissionCondition is a Boolean CEL gate for a mutation entry or enforcement rule. It can
+                          inspect object and request metadata, but cannot generate mutation values.
+                        properties:
+                          expression:
+                            description: |-
+                              Expression must evaluate to bool. Any false condition skips this block.
+                              An evaluation error rejects the request unless another condition is false.
+                            maxLength: 4096
+                            minLength: 1
+                            type: string
+                          name:
+                            description: Name identifies a condition in admission
+                              errors. Names must be unique within a block.
+                            maxLength: 63
+                            type: string
+                        required:
+                        - expression
+                        type: object
+                      maxItems: 64
+                      type: array
+                      x-kubernetes-list-type: atomic
                     ingress:
                       description: Enforcement for Ingress and Gateway API resource
                         hostnames.
@@ -309,33 +338,6 @@ spec:
                     services:
                       description: Enforcement for Services.
                       properties:
-                        conditions:
-                          description: |-
-                            Conditions gate only this resource block; other blocks and rules still run.
-                            All conditions must evaluate to true. Empty conditions always apply.
-                          items:
-                            description: |-
-                              AdmissionCondition is a Boolean CEL gate for a typed resource block. It can
-                              inspect object and request metadata, but cannot generate mutation values.
-                            properties:
-                              expression:
-                                description: |-
-                                  Expression must evaluate to bool. Any false condition skips this block.
-                                  An evaluation error rejects the request unless another condition is false.
-                                maxLength: 4096
-                                minLength: 1
-                                type: string
-                              name:
-                                description: Name identifies a condition in admission
-                                  errors. Names must be unique within a block.
-                                maxLength: 63
-                                type: string
-                            required:
-                            - expression
-                            type: object
-                          maxItems: 64
-                          type: array
-                          x-kubernetes-list-type: atomic
                         externalIPs:
                           description: ExternalIPs defines constraints for spec.externalIPs.
                           properties:
@@ -850,33 +852,6 @@ spec:
                                 type: object
                             type: object
                           type: array
-                        conditions:
-                          description: |-
-                            Conditions gate only this resource block; other blocks and rules still run.
-                            All conditions must evaluate to true. Empty conditions always apply.
-                          items:
-                            description: |-
-                              AdmissionCondition is a Boolean CEL gate for a typed resource block. It can
-                              inspect object and request metadata, but cannot generate mutation values.
-                            properties:
-                              expression:
-                                description: |-
-                                  Expression must evaluate to bool. Any false condition skips this block.
-                                  An evaluation error rejects the request unless another condition is false.
-                                maxLength: 4096
-                                minLength: 1
-                                type: string
-                              name:
-                                description: Name identifies a condition in admission
-                                  errors. Names must be unique within a block.
-                                maxLength: 63
-                                type: string
-                            required:
-                            - expression
-                            type: object
-                          maxItems: 64
-                          type: array
-                          x-kubernetes-list-type: atomic
                         nodeSelector:
                           description: |-
                             NodeSelector matches each node selector entry. Empty matchers match any entry.
@@ -1396,6 +1371,33 @@ spec:
                         - merge
                         - replace
                         type: string
+                      conditions:
+                        description: |-
+                          Conditions gate this entire mutation entry and inspect the object after
+                          preceding mutations. All conditions must be true; empty means apply.
+                        items:
+                          description: |-
+                            AdmissionCondition is a Boolean CEL gate for a mutation entry or enforcement rule. It can
+                            inspect object and request metadata, but cannot generate mutation values.
+                          properties:
+                            expression:
+                              description: |-
+                                Expression must evaluate to bool. Any false condition skips this block.
+                                An evaluation error rejects the request unless another condition is false.
+                              maxLength: 4096
+                              minLength: 1
+                              type: string
+                            name:
+                              description: Name identifies a condition in admission
+                                errors. Names must be unique within a block.
+                              maxLength: 63
+                              type: string
+                          required:
+                          - expression
+                          type: object
+                        maxItems: 64
+                        type: array
+                        x-kubernetes-list-type: atomic
                       workloads:
                         description: |-
                           WorkloadMutation contains typed native Pod values. Empty maps/lists are
@@ -2338,33 +2340,6 @@ spec:
                                     x-kubernetes-list-type: atomic
                                 type: object
                             type: object
-                          conditions:
-                            description: |-
-                              Conditions gate this workload block and are evaluated against the Pod after
-                              preceding mutation entries. All conditions must be true; empty means apply.
-                            items:
-                              description: |-
-                                AdmissionCondition is a Boolean CEL gate for a typed resource block. It can
-                                inspect object and request metadata, but cannot generate mutation values.
-                              properties:
-                                expression:
-                                  description: |-
-                                    Expression must evaluate to bool. Any false condition skips this block.
-                                    An evaluation error rejects the request unless another condition is false.
-                                  maxLength: 4096
-                                  minLength: 1
-                                  type: string
-                                name:
-                                  description: Name identifies a condition in admission
-                                    errors. Names must be unique within a block.
-                                  maxLength: 63
-                                  type: string
-                              required:
-                              - expression
-                              type: object
-                            maxItems: 64
-                            type: array
-                            x-kubernetes-list-type: atomic
                           hostUsers:
                             description: |-
                               HostUsers sets spec.hostUsers on both merge and replace. False requests a
@@ -2805,6 +2780,35 @@ spec:
                         - deny
                         - audit
                         type: string
+                      conditions:
+                        description: |-
+                          Conditions gate this entire enforcement rule, including workloads, services,
+                          metadata and ingress. All conditions must be true; empty means apply.
+                          Conditions run during admission; managed metadata in a conditional rule
+                          is applied on matching requests only and is not reconciled in the background.
+                        items:
+                          description: |-
+                            AdmissionCondition is a Boolean CEL gate for a mutation entry or enforcement rule. It can
+                            inspect object and request metadata, but cannot generate mutation values.
+                          properties:
+                            expression:
+                              description: |-
+                                Expression must evaluate to bool. Any false condition skips this block.
+                                An evaluation error rejects the request unless another condition is false.
+                              maxLength: 4096
+                              minLength: 1
+                              type: string
+                            name:
+                              description: Name identifies a condition in admission
+                                errors. Names must be unique within a block.
+                              maxLength: 63
+                              type: string
+                          required:
+                          - expression
+                          type: object
+                        maxItems: 64
+                        type: array
+                        x-kubernetes-list-type: atomic
                       ingress:
                         description: Enforcement for Ingress and Gateway API resource
                           hostnames.
@@ -3028,33 +3032,6 @@ spec:
                       services:
                         description: Enforcement for Services.
                         properties:
-                          conditions:
-                            description: |-
-                              Conditions gate only this resource block; other blocks and rules still run.
-                              All conditions must evaluate to true. Empty conditions always apply.
-                            items:
-                              description: |-
-                                AdmissionCondition is a Boolean CEL gate for a typed resource block. It can
-                                inspect object and request metadata, but cannot generate mutation values.
-                              properties:
-                                expression:
-                                  description: |-
-                                    Expression must evaluate to bool. Any false condition skips this block.
-                                    An evaluation error rejects the request unless another condition is false.
-                                  maxLength: 4096
-                                  minLength: 1
-                                  type: string
-                                name:
-                                  description: Name identifies a condition in admission
-                                    errors. Names must be unique within a block.
-                                  maxLength: 63
-                                  type: string
-                              required:
-                              - expression
-                              type: object
-                            maxItems: 64
-                            type: array
-                            x-kubernetes-list-type: atomic
                           externalIPs:
                             description: ExternalIPs defines constraints for spec.externalIPs.
                             properties:
@@ -3570,33 +3547,6 @@ spec:
                                   type: object
                               type: object
                             type: array
-                          conditions:
-                            description: |-
-                              Conditions gate only this resource block; other blocks and rules still run.
-                              All conditions must evaluate to true. Empty conditions always apply.
-                            items:
-                              description: |-
-                                AdmissionCondition is a Boolean CEL gate for a typed resource block. It can
-                                inspect object and request metadata, but cannot generate mutation values.
-                              properties:
-                                expression:
-                                  description: |-
-                                    Expression must evaluate to bool. Any false condition skips this block.
-                                    An evaluation error rejects the request unless another condition is false.
-                                  maxLength: 4096
-                                  minLength: 1
-                                  type: string
-                                name:
-                                  description: Name identifies a condition in admission
-                                    errors. Names must be unique within a block.
-                                  maxLength: 63
-                                  type: string
-                              required:
-                              - expression
-                              type: object
-                            maxItems: 64
-                            type: array
-                            x-kubernetes-list-type: atomic
                           nodeSelector:
                             description: |-
                               NodeSelector matches each node selector entry. Empty matchers match any entry.
@@ -4118,6 +4068,33 @@ spec:
                           - merge
                           - replace
                           type: string
+                        conditions:
+                          description: |-
+                            Conditions gate this entire mutation entry and inspect the object after
+                            preceding mutations. All conditions must be true; empty means apply.
+                          items:
+                            description: |-
+                              AdmissionCondition is a Boolean CEL gate for a mutation entry or enforcement rule. It can
+                              inspect object and request metadata, but cannot generate mutation values.
+                            properties:
+                              expression:
+                                description: |-
+                                  Expression must evaluate to bool. Any false condition skips this block.
+                                  An evaluation error rejects the request unless another condition is false.
+                                maxLength: 4096
+                                minLength: 1
+                                type: string
+                              name:
+                                description: Name identifies a condition in admission
+                                  errors. Names must be unique within a block.
+                                maxLength: 63
+                                type: string
+                            required:
+                            - expression
+                            type: object
+                          maxItems: 64
+                          type: array
+                          x-kubernetes-list-type: atomic
                         workloads:
                           description: |-
                             WorkloadMutation contains typed native Pod values. Empty maps/lists are
@@ -5066,33 +5043,6 @@ spec:
                                       x-kubernetes-list-type: atomic
                                   type: object
                               type: object
-                            conditions:
-                              description: |-
-                                Conditions gate this workload block and are evaluated against the Pod after
-                                preceding mutation entries. All conditions must be true; empty means apply.
-                              items:
-                                description: |-
-                                  AdmissionCondition is a Boolean CEL gate for a typed resource block. It can
-                                  inspect object and request metadata, but cannot generate mutation values.
-                                properties:
-                                  expression:
-                                    description: |-
-                                      Expression must evaluate to bool. Any false condition skips this block.
-                                      An evaluation error rejects the request unless another condition is false.
-                                    maxLength: 4096
-                                    minLength: 1
-                                    type: string
-                                  name:
-                                    description: Name identifies a condition in admission
-                                      errors. Names must be unique within a block.
-                                    maxLength: 63
-                                    type: string
-                                required:
-                                - expression
-                                type: object
-                              maxItems: 64
-                              type: array
-                              x-kubernetes-list-type: atomic
                             hostUsers:
                               description: |-
                                 HostUsers sets spec.hostUsers on both merge and replace. False requests a
@@ -5469,6 +5419,35 @@ spec:
                           - deny
                           - audit
                           type: string
+                        conditions:
+                          description: |-
+                            Conditions gate this entire enforcement rule, including workloads, services,
+                            metadata and ingress. All conditions must be true; empty means apply.
+                            Conditions run during admission; managed metadata in a conditional rule
+                            is applied on matching requests only and is not reconciled in the background.
+                          items:
+                            description: |-
+                              AdmissionCondition is a Boolean CEL gate for a mutation entry or enforcement rule. It can
+                              inspect object and request metadata, but cannot generate mutation values.
+                            properties:
+                              expression:
+                                description: |-
+                                  Expression must evaluate to bool. Any false condition skips this block.
+                                  An evaluation error rejects the request unless another condition is false.
+                                maxLength: 4096
+                                minLength: 1
+                                type: string
+                              name:
+                                description: Name identifies a condition in admission
+                                  errors. Names must be unique within a block.
+                                maxLength: 63
+                                type: string
+                            required:
+                            - expression
+                            type: object
+                          maxItems: 64
+                          type: array
+                          x-kubernetes-list-type: atomic
                         ingress:
                           description: Enforcement for Ingress and Gateway API resource
                             hostnames.
@@ -5692,33 +5671,6 @@ spec:
                         services:
                           description: Enforcement for Services.
                           properties:
-                            conditions:
-                              description: |-
-                                Conditions gate only this resource block; other blocks and rules still run.
-                                All conditions must evaluate to true. Empty conditions always apply.
-                              items:
-                                description: |-
-                                  AdmissionCondition is a Boolean CEL gate for a typed resource block. It can
-                                  inspect object and request metadata, but cannot generate mutation values.
-                                properties:
-                                  expression:
-                                    description: |-
-                                      Expression must evaluate to bool. Any false condition skips this block.
-                                      An evaluation error rejects the request unless another condition is false.
-                                    maxLength: 4096
-                                    minLength: 1
-                                    type: string
-                                  name:
-                                    description: Name identifies a condition in admission
-                                      errors. Names must be unique within a block.
-                                    maxLength: 63
-                                    type: string
-                                required:
-                                - expression
-                                type: object
-                              maxItems: 64
-                              type: array
-                              x-kubernetes-list-type: atomic
                             externalIPs:
                               description: ExternalIPs defines constraints for spec.externalIPs.
                               properties:
@@ -6238,33 +6190,6 @@ spec:
                                     type: object
                                 type: object
                               type: array
-                            conditions:
-                              description: |-
-                                Conditions gate only this resource block; other blocks and rules still run.
-                                All conditions must evaluate to true. Empty conditions always apply.
-                              items:
-                                description: |-
-                                  AdmissionCondition is a Boolean CEL gate for a typed resource block. It can
-                                  inspect object and request metadata, but cannot generate mutation values.
-                                properties:
-                                  expression:
-                                    description: |-
-                                      Expression must evaluate to bool. Any false condition skips this block.
-                                      An evaluation error rejects the request unless another condition is false.
-                                    maxLength: 4096
-                                    minLength: 1
-                                    type: string
-                                  name:
-                                    description: Name identifies a condition in admission
-                                      errors. Names must be unique within a block.
-                                    maxLength: 63
-                                    type: string
-                                required:
-                                - expression
-                                type: object
-                              maxItems: 64
-                              type: array
-                              x-kubernetes-list-type: atomic
                             nodeSelector:
                               description: |-
                                 NodeSelector matches each node selector entry. Empty matchers match any entry.
@@ -6788,6 +6713,33 @@ spec:
                             - merge
                             - replace
                             type: string
+                          conditions:
+                            description: |-
+                              Conditions gate this entire mutation entry and inspect the object after
+                              preceding mutations. All conditions must be true; empty means apply.
+                            items:
+                              description: |-
+                                AdmissionCondition is a Boolean CEL gate for a mutation entry or enforcement rule. It can
+                                inspect object and request metadata, but cannot generate mutation values.
+                              properties:
+                                expression:
+                                  description: |-
+                                    Expression must evaluate to bool. Any false condition skips this block.
+                                    An evaluation error rejects the request unless another condition is false.
+                                  maxLength: 4096
+                                  minLength: 1
+                                  type: string
+                                name:
+                                  description: Name identifies a condition in admission
+                                    errors. Names must be unique within a block.
+                                  maxLength: 63
+                                  type: string
+                              required:
+                              - expression
+                              type: object
+                            maxItems: 64
+                            type: array
+                            x-kubernetes-list-type: atomic
                           workloads:
                             description: |-
                               WorkloadMutation contains typed native Pod values. Empty maps/lists are
@@ -7740,34 +7692,6 @@ spec:
                                         x-kubernetes-list-type: atomic
                                     type: object
                                 type: object
-                              conditions:
-                                description: |-
-                                  Conditions gate this workload block and are evaluated against the Pod after
-                                  preceding mutation entries. All conditions must be true; empty means apply.
-                                items:
-                                  description: |-
-                                    AdmissionCondition is a Boolean CEL gate for a typed resource block. It can
-                                    inspect object and request metadata, but cannot generate mutation values.
-                                  properties:
-                                    expression:
-                                      description: |-
-                                        Expression must evaluate to bool. Any false condition skips this block.
-                                        An evaluation error rejects the request unless another condition is false.
-                                      maxLength: 4096
-                                      minLength: 1
-                                      type: string
-                                    name:
-                                      description: Name identifies a condition in
-                                        admission errors. Names must be unique within
-                                        a block.
-                                      maxLength: 63
-                                      type: string
-                                  required:
-                                  - expression
-                                  type: object
-                                maxItems: 64
-                                type: array
-                                x-kubernetes-list-type: atomic
                               hostUsers:
                                 description: |-
                                   HostUsers sets spec.hostUsers on both merge and replace. False requests a
