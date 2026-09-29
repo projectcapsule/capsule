@@ -179,6 +179,9 @@ func (s *ObjectSkipRule) ShouldSkip(
 	return len(s.Labels) > 0 || len(s.Annotations) > 0
 }
 
+// DefaultObjectSkipRules identifies controller-managed metadata. These labels
+// alone do not establish trust: admission callers must also authenticate the
+// controller identity before exempting a request from enforcement.
 func DefaultObjectSkipRules() []ObjectSkipRule {
 	return []ObjectSkipRule{
 		{

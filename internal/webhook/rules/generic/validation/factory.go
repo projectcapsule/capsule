@@ -22,6 +22,7 @@ import (
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 type genericObject = *metav1.PartialObjectMetadata
@@ -164,7 +165,10 @@ func (h *genericRules) validateGenericRules(
 
 	obj.SetGroupVersionKind(gvk)
 
-	if meta.ShouldSkipObjectByRules(obj, h.objectSkipRules) {
+	// Managed labels are bookkeeping, not proof of who submitted the object.
+	// Only the authenticated Capsule controller may use this exemption, even
+	// when the separate managed-label protection webhook is disabled.
+	if meta.ShouldSkipObjectByRules(obj, h.objectSkipRules) && users.IsControllerServiceAccount(req.UserInfo.Username) {
 		return nil
 	}
 

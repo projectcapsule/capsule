@@ -27,6 +27,20 @@ For resource policies, CEL apply conditions, and compatibility guidance, see the
 [managed-resource reference](https://projectcapsule.dev/docs/operating/concepts/managed-resources/)
 and [replication documentation](https://projectcapsule.dev/docs/replications/).
 
+Generic metadata enforcement exempts objects labelled
+`projectcapsule.dev/managed-by: controller` or `resources` only when the request
+comes from Capsule's own controller ServiceAccount. Administrators may manage
+these labels, but the labels do not exempt their requests from metadata rules.
+The managed webhook protects both values on namespaced resources, Namespaces,
+and GlobalResourceQuotas. When upgrading, update any custom managed webhook
+selectors and rules to retain this coverage; the identity check remains effective
+even if that hook is disabled.
+
+ResourcePermit and GlobalTenantResource targets use the `resource-permit` and
+`replications` managed values, respectively. Neither value exempts requests from
+metadata rules. Their protection webhooks cover both cluster-scoped and namespaced
+targets and check the previous object when protection labels are removed.
+
 ### CustomResourceDefinition Lifecycle
 
 | Key | Type | Default | Description |
@@ -338,9 +352,9 @@ and [replication documentation](https://projectcapsule.dev/docs/replications/).
 | webhooks.hooks.managed.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
 | webhooks.hooks.managed.matchPolicy | string | `"Equivalent"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
 | webhooks.hooks.managed.namespaceSelector | object | `{}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
-| webhooks.hooks.managed.objectSelector | object | `{"matchExpressions":[{"key":"projectcapsule.dev/managed-by","operator":"In","values":["controller"]}]}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
+| webhooks.hooks.managed.objectSelector | object | `{"matchExpressions":[{"key":"projectcapsule.dev/managed-by","operator":"In","values":["controller","resources"]}]}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
 | webhooks.hooks.managed.opts | object | `{}` | Capsule Hook Options |
-| webhooks.hooks.managed.rules | list | `[{"apiGroups":["*"],"apiVersions":["*"],"operations":["CREATE","UPDATE","DELETE"],"resources":["*"],"scope":"Namespaced"},{"apiGroups":["capsule.clastix.io"],"apiVersions":["v1beta2"],"operations":["CREATE","UPDATE","DELETE"],"resources":["globalresourcequotas"],"scope":"Cluster"}]` | [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules) |
+| webhooks.hooks.managed.rules | list | `[{"apiGroups":["*"],"apiVersions":["*"],"operations":["CREATE","UPDATE","DELETE"],"resources":["*"],"scope":"Namespaced"},{"apiGroups":[""],"apiVersions":["v1"],"operations":["CREATE","UPDATE","DELETE"],"resources":["namespaces"],"scope":"Cluster"},{"apiGroups":["capsule.clastix.io"],"apiVersions":["v1beta2"],"operations":["CREATE","UPDATE","DELETE"],"resources":["globalresourcequotas"],"scope":"Cluster"}]` | [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules) |
 | webhooks.hooks.metadata | object | `{"enabled":true,"failurePolicy":"Ignore","matchConditions":[{"expression":"!has(request.subResource) || request.subResource == \"\"","name":"ignore-subresources"},{"expression":"request.resource.resource != \"events\"","name":"ignore-events"}],"matchPolicy":"Equivalent","namespaceSelector":{"matchExpressions":[{"key":"capsule.clastix.io/tenant","operator":"Exists"}]},"objectSelector":{},"opts":{},"reinvocationPolicy":"Never","rules":[{"apiGroups":["*"],"apiVersions":["*"],"operations":["CREATE","UPDATE"],"resources":["*"],"scope":"Namespaced"}]}` | Additional Metadata webhook |
 | webhooks.hooks.metadata.enabled | bool | `true` | Enable the Hook |
 | webhooks.hooks.metadata.failurePolicy | string | `"Ignore"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |

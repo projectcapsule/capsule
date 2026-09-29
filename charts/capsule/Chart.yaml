@@ -40,6 +40,8 @@ annotations:
     - name: Documentation
       url: https://projectcapsule.dev/
   artifacthub.io/changes: |
+    - kind: fixed
+      description: bind managed-object rule exemptions to the Capsule controller identity and protect both managed label values on namespaces and namespaced resources
     - kind: changed
       description: consolidate admission conditions at mutate entry and enforce level; migrate nested workload and service conditions before upgrading
     - kind: security

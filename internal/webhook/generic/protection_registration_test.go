@@ -58,6 +58,20 @@ func TestProtectionWebhookRegistration(t *testing.T) {
 	}
 }
 
+func TestManagedWebhookMatchesLabelTransitions(t *testing.T) {
+	matches := protectionWebhookMatcher(t, "managed")
+	for _, value := range []string{meta.ValueController, meta.ValueControllerResources} {
+		marked := protectionRegistrationObject(map[string]string{meta.NewManagedByCapsuleLabel: value})
+		plain := protectionRegistrationObject(nil)
+		require.True(t, matches(marked, nil), "create %s", value)
+		require.True(t, matches(marked, plain), "add %s", value)
+		require.True(t, matches(plain, marked), "remove %s", value)
+		require.True(t, matches(marked, marked), "retain %s", value)
+		require.True(t, matches(nil, marked), "delete %s", value)
+	}
+	require.False(t, matches(protectionRegistrationObject(nil), nil))
+}
+
 // Exercise the actual chart defaults, including selector AND condition behavior.
 // The e2e cases verify their installation by the admission controller as well.
 func protectionWebhookMatcher(t testing.TB, hook string) func(map[string]any, map[string]any) bool {
@@ -73,6 +87,20 @@ func protectionWebhookMatcher(t testing.TB, hook string) func(map[string]any, ma
 	registration, exists := values.Webhooks.Hooks[hook]
 	require.True(t, exists)
 	require.Contains(t, registration.Rules[0].Operations, admissionregistrationv1.Create)
+	if hook == "replications" || hook == "resourcePermit" {
+		// Both managed-resource guards must reach Namespace and namespaced
+		// objects, including a request that removes their protection markers.
+		require.Len(t, registration.Rules, 1)
+		rule := registration.Rules[0]
+		require.NotNil(t, rule.Scope)
+		require.Equal(t, admissionregistrationv1.AllScopes, *rule.Scope)
+		require.Equal(t, []string{"*"}, rule.APIGroups)
+		require.Equal(t, []string{"*"}, rule.APIVersions)
+		require.Equal(t, []string{"*"}, rule.Resources)
+		require.ElementsMatch(t, []admissionregistrationv1.OperationType{
+			admissionregistrationv1.Create, admissionregistrationv1.Update, admissionregistrationv1.Delete,
+		}, rule.Operations)
+	}
 	selector := labels.Everything()
 	if registration.ObjectSelector != nil {
 		selector, err = metav1.LabelSelectorAsSelector(registration.ObjectSelector)
