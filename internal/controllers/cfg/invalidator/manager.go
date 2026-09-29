@@ -75,6 +75,10 @@ func (r *CacheInvalidator) SetupWithManager(
 	r.reader = mgr.GetAPIReader()
 	r.metrics = metrics
 
+	options := ctrlConfig.Runtime.ToControllerOptions()
+	// Every replica serves admission from its own process-local caches.
+	options.NeedLeaderElection = new(false)
+
 	err = ctrl.NewControllerManagedBy(mgr).
 		Named("config/caches").
 		For(
@@ -130,7 +134,7 @@ func (r *CacheInvalidator) SetupWithManager(
 			},
 			),
 		).
-		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
+		WithOptions(options).
 		Complete(r)
 	if err != nil {
 		return err
@@ -177,6 +181,10 @@ func (r *CacheInvalidator) rebuildCaches(
 	log logr.Logger,
 ) error {
 	var errs []error
+
+	if err := r.rebuildConditionCache(ctx); err != nil {
+		errs = append(errs, err)
+	}
 
 	if err := r.rebuildRegexCache(ctx, log); err != nil {
 		errs = append(errs, fmt.Errorf("rebuild Regex cache: %w", err))

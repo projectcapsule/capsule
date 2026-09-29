@@ -27,7 +27,7 @@ func (h *containerRegistryRegexHandler) OnCreate(
 	_ client.Client,
 	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
-	decoder admission.Decoder,
+	_ admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
@@ -55,8 +55,8 @@ func (h *containerRegistryRegexHandler) OnUpdate(
 	_ client.Client,
 	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
-	old *capsulev1beta2.Tenant,
-	decoder admission.Decoder,
+	_ *capsulev1beta2.Tenant,
+	_ admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
@@ -71,7 +71,7 @@ func (h *containerRegistryRegexHandler) OnUpdate(
 //nolint:staticcheck
 func (h *containerRegistryRegexHandler) validate(
 	tnt *capsulev1beta2.Tenant,
-	req admission.Request,
+	_ admission.Request,
 ) *admission.Response {
 	if tnt.Spec.ContainerRegistries != nil && len(tnt.Spec.ContainerRegistries.Regex) > 0 {
 		if _, err := regexp.Compile(tnt.Spec.ContainerRegistries.Regex); err != nil {

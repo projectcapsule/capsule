@@ -38,6 +38,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	tenantresourceindexer "github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
+	"github.com/projectcapsule/capsule/pkg/runtime/ssa"
 )
 
 type globalResourceController struct {
@@ -52,6 +53,7 @@ type globalResourceController struct {
 	clients       impersonatedClientLoader[*capsulev1beta2.GlobalTenantResource]
 
 	impersonation *cache.ImpersonationCache
+	conditions    *cache.CELCache
 }
 
 func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
@@ -59,6 +61,8 @@ func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, ctrlConfig
 	r.reader = mgr.GetAPIReader()
 
 	r.processor = processor.Processor{
+		ReplicationOwners:            ssa.NewReplicationOwnerResolver(mgr.GetClient(), mgr.GetAPIReader()),
+		Conditions:                   r.conditions,
 		Configuration:                r.configuration,
 		GatherClient:                 mgr.GetAPIReader(),
 		AllowCrossNamespaceSelection: true,
@@ -385,13 +389,8 @@ func (r *globalResourceController) reconcile(
 		c,
 		&tntResource.Status.ProcessedItems,
 		acc,
-		processor.ProcessorOptions{
-			FieldOwnerPrefix: getFieldOwner(tntResource.GetName(), tntResource.GetNamespace()),
-			Prune:            *tntResource.Spec.PruningOnDelete,
-			Adopt:            *tntResource.Spec.Settings.Adopt,
-			Force:            *tntResource.Spec.Settings.Force,
-			Owner:            &owner,
-		})
+		replicationProcessorOptions(tntResource, &tntResource.Spec.TenantResourceCommonSpec, &owner),
+	)
 }
 
 func (r *globalResourceController) gatherResources(

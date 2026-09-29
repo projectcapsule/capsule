@@ -18,6 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/ssa"
 )
 
@@ -162,7 +163,18 @@ func (p *Processor) pruneProcessedItem(
 	obj *unstructured.Unstructured,
 	itemErrors *int,
 ) bool {
-	if !opts.Prune {
+	if item.Policy != nil && item.Policy.ShouldOrphan() {
+		fieldOwner := opts.FieldOwnerPrefix + "/" + item.FieldOwner("")
+
+		err := p.resourceManager().Orphan(ctx, c, obj, fieldOwner, opts.Owner)
+		if !failAndRecord(processed, itemErrors, item, "orphaning failed for item: ", err) {
+			processed.RemoveItem(item)
+		}
+
+		return true
+	}
+
+	if item.Policy == nil && !opts.Prune {
 		return false
 	}
 
@@ -170,18 +182,14 @@ func (p *Processor) pruneProcessedItem(
 
 	fieldOwner := opts.FieldOwnerPrefix + "/" + item.FieldOwner("")
 
-	deleted, err := p.Prune(ctx, c, obj, fieldOwner, &item)
+	_, err := p.Prune(ctx, c, obj, fieldOwner, &item, opts.Owner)
 	if failAndRecord(processed, itemErrors, item, "pruning failed for item: ", err) {
 		return true
 	}
 
-	if deleted {
-		processed.RemoveItem(item)
+	processed.RemoveItem(item)
 
-		return true
-	}
-
-	return false
+	return true
 }
 
 func (p *Processor) disownProcessedItem(
@@ -193,7 +201,9 @@ func (p *Processor) disownProcessedItem(
 	obj *unstructured.Unstructured,
 	itemErrors *int,
 ) {
-	err := p.resourceManager().Disown(ctx, c, obj, opts.Owner)
+	fieldOwner := opts.FieldOwnerPrefix + "/" + item.FieldOwner("")
+
+	err := p.resourceManager().Disown(ctx, c, obj, fieldOwner, opts.Owner)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			processed.RemoveItem(item)
@@ -241,6 +251,9 @@ func (p *Processor) applyAccumulatedItem(
 	or := meta.ObjectReferenceStatus{
 		ResourceID: item.Resource,
 		Type:       meta.ReadyCondition,
+	}
+	if current := processed.GetItem(item.Resource); current != nil {
+		or = *current
 	}
 
 	clusterScoped, err := p.isClusterScoped(item.Resource.GetGVK())
@@ -302,7 +315,7 @@ func (p *Processor) applyAccumulatorObject(
 		return false
 	}
 
-	ver, created, err := p.Apply(
+	result, err := p.Apply(
 		ctx,
 		c,
 		obj.Object,
@@ -310,29 +323,69 @@ func (p *Processor) applyAccumulatorObject(
 		opts.Force,
 		opts.Adopt,
 		opts.Owner,
-		processed.GetItem(item.Resource),
+		or,
+		obj.Policy,
 	)
 
-	or.Created = created
+	or.Created = or.Created || result.Created
 
-	if err != nil {
+	switch {
+	case err != nil:
+		if result.LastApply != nil {
+			// A first successful content write needs its cleanup policy even
+			// when metadata fails. Previously applied items, including legacy
+			// items with nil Policy, must retain their effective policy.
+			if !result.Skipped && or.LastApply.IsZero() && or.Policy == nil {
+				or.Policy = processedPolicy(obj.Policy)
+			}
+
+			or.LastApply = *result.LastApply
+		}
+
 		or.Status = metav1.ConditionFalse
 		or.Message = "apply failed for item " + obj.Origin.Origin + ": " + err.Error()
 
 		log.V(4).Info("failed to apply item", "item", obj.Origin.Origin)
-	} else {
-		if ver != nil {
-			or.LastApply = *ver
+	case result.Skipped:
+		or.Status = metav1.ConditionTrue
+		or.Message = ssa.ConditionNotMet
+
+		or.Created = result.Created
+
+		if or.LastApply.IsZero() && result.LastApply != nil {
+			or.LastApply = *result.LastApply
+		}
+
+		if result.PolicyReconciled {
+			or.Policy = processedPolicy(obj.Policy)
+		}
+	default:
+		or.Created = result.Created
+		or.Policy = processedPolicy(obj.Policy)
+
+		if result.LastApply != nil {
+			or.LastApply = *result.LastApply
 		}
 
 		or.Status = metav1.ConditionTrue
+		or.Message = ""
 
-		log.V(4).Info("successfully applied item", "item", obj.Origin.Origin, "version", ver)
+		log.V(4).Info("successfully applied item", "item", obj.Origin.Origin, "version", result.LastApply)
 	}
 
 	processed.UpdateItem(*or)
 
 	return err != nil
+}
+
+// Conditions are evaluated from the source block, never from item status.
+// Keep a detached lifecycle snapshot without duplicating CEL text per target.
+func processedPolicy(policy *apiruntime.ResourceReplicationPolicy) *apiruntime.ResourceTemplatePolicy {
+	if policy == nil {
+		return nil
+	}
+
+	return policy.ResourceTemplatePolicy.DeepCopy()
 }
 
 func (p *Processor) objectForProcessedItem(item meta.ObjectReferenceStatus) (*unstructured.Unstructured, error) {
@@ -372,6 +425,7 @@ func failAndRecord(
 	(*itemErrors)++
 	item.Status = metav1.ConditionFalse
 	item.Message = msg + err.Error()
+	item.Policy = item.Policy.DeepCopy()
 	processed.UpdateItem(item)
 
 	return true
@@ -385,22 +439,27 @@ func (p *Processor) Prune(
 	obj *unstructured.Unstructured,
 	fieldOwner string,
 	current *meta.ObjectReferenceStatus,
+	owner *metav1.OwnerReference,
 ) (deleted bool, err error) {
 	created := current != nil && current.Created
 
 	return p.resourceManager().Prune(ctx, c, obj, ssa.PruneOptions{
 		FieldOwner:        fieldOwner,
 		PreviouslyCreated: created,
+		OwnerReference:    owner,
 	})
 }
 
 func (p *Processor) resourceManager() ssa.Manager {
 	return ssa.Manager{
-		Reader: p.GatherClient,
-		Mapper: p.Mapper,
+		ReplicationOwners: p.ReplicationOwners,
+		Conditions:        p.Conditions,
+		Reader:            p.GatherClient,
+		Mapper:            p.Mapper,
 		Metadata: ssa.Metadata{
 			CreatedByValue:     meta.ValueControllerReplications,
 			ManagedByValue:     meta.ValueControllerReplications,
+			ProtectedByValue:   meta.ValueControllerReplications,
 			LegacyCreatedLabel: meta.ResourcesLabel,
 		},
 	}
@@ -424,17 +483,26 @@ func (r *Processor) Apply(
 	adopt bool,
 	ownerreference *metav1.OwnerReference,
 	current *meta.ObjectReferenceStatus,
-) (lastApply *metav1.Time, created bool, err error) {
+	policy *apiruntime.ResourceReplicationPolicy,
+) (ssa.ApplyResult, error) {
 	previouslyCreated := current != nil && current.Created
-	result, err := r.resourceManager().Apply(ctx, c, obj, ssa.ApplyOptions{
+
+	options := ssa.ApplyOptions{
 		FieldOwner:        fieldOwner,
 		Force:             force,
 		Adopt:             adopt,
 		OwnerReference:    ownerreference,
 		PreviouslyCreated: previouslyCreated,
-	})
+	}
 
-	return result.LastApply, result.Created, err
+	if policy != nil {
+		options.Condition = policy.Condition
+		options.Force = policy.Force
+		options.Adopt = policy.AllowsAdoption()
+		options.Protect = policy.IsProtected()
+	}
+
+	return r.resourceManager().Apply(ctx, c, obj, options)
 }
 
 func (r *Processor) isNamespaceTerminatingForObject(

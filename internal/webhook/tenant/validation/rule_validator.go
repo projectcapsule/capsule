@@ -26,12 +26,14 @@ import (
 )
 
 type RuleValidationHandler struct {
-	mapper k8smeta.RESTMapper
+	mapper   k8smeta.RESTMapper
+	compiler ruleengine.ConditionCompiler
 }
 
-func RuleHandler(mapper k8smeta.RESTMapper) handlers.TypedHandler[*capsulev1beta2.Tenant] {
+func RuleHandler(mapper k8smeta.RESTMapper, compiler ruleengine.ConditionCompiler) handlers.TypedHandler[*capsulev1beta2.Tenant] {
 	return &RuleValidationHandler{
-		mapper: mapper,
+		mapper:   mapper,
+		compiler: compiler,
 	}
 }
 
@@ -204,7 +206,7 @@ func (h *RuleValidationHandler) handle(
 		}
 
 		body := rule.NamespaceRuleBodyNamespace
-		if body.Enforce == nil && len(body.Quota) == 0 {
+		if body.Enforce == nil && len(body.Mutate) == 0 && len(body.Quota) == 0 {
 			continue
 		}
 
@@ -215,7 +217,7 @@ func (h *RuleValidationHandler) handle(
 		return nil
 	}
 
-	if err := ruleengine.ValidateRuleStatusBody(h.mapper, bodies); err != nil {
+	if err := ruleengine.ValidateRuleStatusBody(h.mapper, bodies, h.compiler); err != nil {
 		return ad.Deny(err.Error())
 	}
 

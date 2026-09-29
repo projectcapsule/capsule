@@ -73,9 +73,10 @@ func (p scopedStatusPatcher[T]) Patch(
 
 // Builds the processor options out of the settings shared by every replication resource.
 //
-// The field owner must be derived exactly as the full reconciliation does, otherwise the
-// two would fight over the server-side apply ownership of the very same objects.
-func scopedProcessorOptions(
+// Full and namespace-scoped reconciliation must use the same field owner and fallback settings.
+//
+//nolint:staticcheck // Stored resource blocks without a policy still use the deprecated settings.
+func replicationProcessorOptions(
 	obj client.Object,
 	spec *capsulev1beta2.TenantResourceCommonSpec,
 	owner *metav1.OwnerReference,

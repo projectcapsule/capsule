@@ -33,6 +33,13 @@ func TestAllowedListSpec_ExactMatch(t *testing.T) {
 			[]string{"a", "b", "c"},
 		},
 		{
+			// Entries differing only by case must all be found, while the
+			// match itself stays case-sensitive.
+			[]string{"nginx", "NGINX", "traefik"},
+			[]string{"nginx", "NGINX", "traefik"},
+			[]string{"Nginx", "haproxy"},
+		},
+		{
 			nil,
 			nil,
 			[]string{"any", "value"},
@@ -62,6 +69,7 @@ func TestAllowedListSpec_RegexMatch(t *testing.T) {
 	for _, tc := range []tc{
 		{`first-\w+-pattern`, []string{"first-date-pattern", "first-year-pattern"}, []string{"broken", "first-year", "second-date-pattern"}},
 		{``, nil, []string{"any", "value"}},
+		{`[`, nil, []string{"any", "value"}},
 	} {
 		a := api.AllowedListSpec{
 			Regex: tc.Regex,

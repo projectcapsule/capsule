@@ -73,7 +73,7 @@ func BuildNamespaceRuleBodyStatus(
 		}
 
 		body := rule.NamespaceRuleBodyNamespace
-		if body == nil || body.Enforce == nil {
+		if body == nil || (body.Enforce == nil && len(body.Mutate) == 0) {
 			continue
 		}
 
@@ -110,7 +110,7 @@ func BuildNamespaceRuleBodyStatus(
 	out := make([]*rules.NamespaceRuleBodyNamespace, 0, len(rendered))
 
 	for _, body := range rendered {
-		if body == nil || body.Enforce == nil {
+		if body == nil || (body.Enforce == nil && len(body.Mutate) == 0) {
 			continue
 		}
 
