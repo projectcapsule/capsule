@@ -4,9 +4,11 @@
 package api_test
 
 import (
+	"regexp/syntax"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/projectcapsule/capsule/pkg/api"
 )
@@ -164,4 +166,24 @@ func TestExactMatch_RootCause(t *testing.T) {
 	if !spec.ExactMatch("B") {
 		t.Errorf("ROOT CAUSE: ExactMatch(%q) returned false though %q is in %v", "B", "B", spec.Exact)
 	}
+}
+
+func TestForbiddenRegexInvalidAndEmptyMetadata(t *testing.T) {
+	for _, expression := range []string{"[", "(", "*invalid", "(?P<"} {
+		t.Run(expression, func(t *testing.T) {
+			spec := api.ForbiddenListSpec{Regex: expression}
+			require.True(t, spec.RegexMatch("example.com/foo"), "invalid deny patterns must fail closed")
+			for _, exact := range [][]string{nil, {"example.com/foo"}} {
+				spec.Exact = exact
+				err := api.ValidateForbidden(map[string]string{"example.com/foo": "bar"}, spec)
+				require.ErrorContains(t, err, "invalid forbidden metadata regex")
+				var syntaxError *syntax.Error
+				require.ErrorAs(t, err, &syntaxError)
+			}
+			require.NoError(t, api.ValidateForbidden(nil, spec))
+			require.NoError(t, api.ValidateForbidden(map[string]string{}, spec))
+		})
+	}
+	require.NoError(t, api.ValidateForbidden(map[string]string{"blocked": "yes"}, api.ForbiddenListSpec{Regex: " blocked"}), "legacy patterns retain literal leading whitespace")
+	require.Error(t, api.ValidateForbidden(map[string]string{"blocked": "yes"}, api.ForbiddenListSpec{Regex: "^blocked$"}))
 }

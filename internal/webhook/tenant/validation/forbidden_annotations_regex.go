@@ -69,25 +69,36 @@ func (h *forbiddenAnnotationsRegexHandler) OnUpdate(
 
 //nolint:staticcheck
 func (h *forbiddenAnnotationsRegexHandler) validate(tnt *capsulev1beta2.Tenant, req admission.Request) *admission.Response {
-	if tnt == nil || tnt.Spec.NamespaceOptions == nil {
+	if tnt == nil {
 		return nil
 	}
 
-	regexesToCheck := map[string]string{
-		"labels":      tnt.Spec.NamespaceOptions.ForbiddenLabels.Regex,
-		"annotations": tnt.Spec.NamespaceOptions.ForbiddenAnnotations.Regex,
+	// Keep the paths explicit so admission identifies the field to repair.
+	regexesToCheck := [4]struct{ path, expression string }{}
+	if options := tnt.Spec.NamespaceOptions; options != nil {
+		regexesToCheck[0].path = "spec.namespaceOptions.forbiddenLabels.deniedRegex"
+		regexesToCheck[0].expression = options.ForbiddenLabels.Regex
+		regexesToCheck[1].path = "spec.namespaceOptions.forbiddenAnnotations.deniedRegex"
+		regexesToCheck[1].expression = options.ForbiddenAnnotations.Regex
 	}
 
-	for scope, expression := range regexesToCheck {
-		if expression == "" {
+	if options := tnt.Spec.ServiceOptions; options != nil {
+		regexesToCheck[2].path = "spec.serviceOptions.forbiddenLabels.deniedRegex"
+		regexesToCheck[2].expression = options.ForbiddenLabels.Regex
+		regexesToCheck[3].path = "spec.serviceOptions.forbiddenAnnotations.deniedRegex"
+		regexesToCheck[3].expression = options.ForbiddenAnnotations.Regex
+	}
+
+	for _, check := range regexesToCheck {
+		if check.expression == "" {
 			continue
 		}
 
-		if _, err := regexp.Compile(expression); err != nil {
+		if _, err := regexp.Compile(check.expression); err != nil {
 			return ad.Denyf(
-				"unable to compile regex %q for forbidden %s: %v",
-				expression,
-				scope,
+				"unable to compile regex %q for %s: %v",
+				check.expression,
+				check.path,
 				err,
 			)
 		}
