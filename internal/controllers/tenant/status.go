@@ -13,6 +13,7 @@ import (
 	"github.com/go-logr/logr"
 	nodev1 "k8s.io/api/node/v1"
 	resources "k8s.io/api/resource/v1"
+	resourcesv1beta2 "k8s.io/api/resource/v1beta2"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -270,7 +271,7 @@ func (r *Manager) collectRBAC(ctx context.Context, tnt *capsulev1beta2.Tenant) (
 }
 
 func (r *Manager) collectAvailableResources(ctx context.Context, log logr.Logger, tnt *capsulev1beta2.Tenant) (err error) {
-	if r.classes.device {
+	if r.classes.deviceVersion != "" {
 		log.V(5).Info("collecting available deviceclasses")
 
 		if err = r.collectAvailableDeviceClasses(ctx, tnt); err != nil {
@@ -312,11 +313,16 @@ func (r *Manager) collectAvailableResources(ctx context.Context, log logr.Logger
 }
 
 func (r *Manager) collectAvailableDeviceClasses(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
+	var classes client.ObjectList = &resources.DeviceClassList{}
+	if r.classes.deviceVersion == resourcesv1beta2.SchemeGroupVersion.Version {
+		classes = &resourcesv1beta2.DeviceClassList{}
+	}
+
 	if tnt.Status.Classes.DeviceClasses, err = listObjectNamesBySelector2(
 		ctx,
 		r.reader,
 		tnt.Spec.DeviceClasses,
-		&resources.DeviceClassList{},
+		classes,
 	); err != nil {
 		return err
 	}

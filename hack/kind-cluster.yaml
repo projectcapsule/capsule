@@ -4,8 +4,16 @@ apiVersion: kind.x-k8s.io/v1alpha4
 name: capsule
 featureGates:
   ImageVolume: true
+  # DRA is disabled by default on Kubernetes 1.33.
+  DynamicResourceAllocation: true
+  # Exercise firstAvailable requests on Kubernetes 1.33, where this is alpha.
+  DRAPrioritizedList: true
   # Alpha and disabled by default on the Kubernetes 1.32 and 1.33 e2e jobs.
   PodLevelResources: true
+runtimeConfig:
+  # Kubernetes 1.33 components use v1beta1; Capsule uses v1beta2 until v1 is served.
+  resource.k8s.io/v1beta1: "true"
+  resource.k8s.io/v1beta2: "true"
 nodes:
 - role: control-plane
 - role: worker
