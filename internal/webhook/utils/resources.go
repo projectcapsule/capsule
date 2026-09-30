@@ -5,11 +5,13 @@ package utils
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	resources "k8s.io/api/resource/v1"
+	resourcesv1beta2 "k8s.io/api/resource/v1beta2"
 	schedulev1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -78,9 +80,19 @@ func GetGatewayClassClassByObjectName(ctx context.Context, c client.Reader, gate
 	return gatewayClass, nil
 }
 
-// Get DeviceClass by name (Does not return error if not found).
-func GetDeviceClassByName(ctx context.Context, c client.Reader, name string) (*resources.DeviceClass, error) {
-	class := &resources.DeviceClass{}
+// GetDeviceClassByName uses the API version delivered to the admission webhook.
+func GetDeviceClassByName(ctx context.Context, c client.Reader, name, version string) (client.Object, error) {
+	var class client.Object
+
+	switch version {
+	case resources.SchemeGroupVersion.Version:
+		class = &resources.DeviceClass{}
+	case resourcesv1beta2.SchemeGroupVersion.Version:
+		class = &resourcesv1beta2.DeviceClass{}
+	default:
+		return nil, fmt.Errorf("unsupported DeviceClass API version %q", version)
+	}
+
 	if err := c.Get(ctx, types.NamespacedName{Name: name}, class); err != nil {
 		return nil, err
 	}
