@@ -22,7 +22,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/api/resourcepermit"
@@ -119,6 +118,15 @@ var _ = Describe("managed labels cannot bypass metadata enforcement", Label("ten
 			_, err = cs.CoreV1().Namespaces().Patch(ctx, name, types.MergePatchType, patch, metav1.PatchOptions{})
 			return err
 		}
+		// This also runs when an assertion fails while the Namespace carries a
+		// controller-only marker. Restore it before ordinary Tenant cleanup.
+		DeferCleanup(func() {
+			Eventually(func() error {
+				return client.IgnoreNotFound(patchNamespace(controller, selected.Name, map[string]any{
+					meta.NewManagedByCapsuleLabel: nil, denied: nil,
+				}))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		})
 		denyNamespacePatch := func(name string, labels map[string]any, reasons ...string) {
 			Eventually(func(g Gomega) {
 				err := patchNamespace(owner, name, labels)
@@ -176,8 +184,17 @@ var _ = Describe("managed labels cannot bypass metadata enforcement", Label("ten
 			By("preserving authenticated controller writes despite matching deny rules")
 			created, err := controller.CoreV1().Pods(selected.Name).Create(ctx, newPod("controller-"+value, map[string]string{denied: "privileged", meta.NewManagedByCapsuleLabel: value}), metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
+			// The suite client is a Kubernetes administrator, but is not a
+			// configured Capsule administrator. Use the creator's identity before
+			// Tenant cleanup tries to delete Pods in the still-active namespace.
+			DeferCleanup(func() {
+				Eventually(func() error {
+					return deleteManagedLabelPod(ctx, controller, created)
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			})
 			Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: selected.Name, Name: created.Name}, current)).To(Succeed())
 			Expect(current.Labels).To(HaveKeyWithValue(denied, "privileged"))
+			expectDenied(k8sClient.Delete(ctx, created, client.DryRunAll), "Labeling resources as controller managed")
 			Eventually(func() error {
 				return patchNamespace(controller, selected.Name, map[string]any{denied: "privileged", meta.NewManagedByCapsuleLabel: value})
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
@@ -252,25 +269,14 @@ data:
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		} else {
 			protection, protectionReason = meta.ReplicationProtectionLabel, "is managed by a global capsule replication"
-			parent := &capsulev1beta2.GlobalTenantResource{Name: name, Spec: capsulev1beta2.GlobalTenantResourceSpec{
-				Scope:          api.ResourceScopeNamespace,
-				TenantSelector: metav1.LabelSelector{MatchLabels: map[string]string{"example.org/managed-label-tenant": tenantA.Name}},
-				ServiceAccount: resourcePermitServiceAccountReference(selected.Name, name),
-				TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{Resources: []capsulev1beta2.ResourceSpec{{
-					NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"kubernetes.io/metadata.name": selected.Name}},
-					Policy:            &runtime.ResourceReplicationPolicy{Protect: new(true)},
-					RawItems: []capsulev1beta2.RawExtension{{Object: &corev1.ConfigMap{
-						APIVersion: "v1", Kind: "ConfigMap", Name: name, Data: map[string]string{"source": source},
-					}}},
-				}}},
-			}}
+			parent := newManagedLabelReplication(name, tenantA.Name, selected.Name)
 			DeferCleanup(func() { EventuallyDeletion(parent) })
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, parent) }).Should(Succeed())
 			Eventually(func(g Gomega) {
 				current := &capsulev1beta2.GlobalTenantResource{}
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(parent), current)).To(Succeed())
 				g.Expect(current.Status.ProcessedItems).To(HaveLen(1))
-				g.Expect(current.Status.ProcessedItems[0].Status).To(Equal(metav1.ConditionTrue))
+				g.Expect(current.Status.ProcessedItems[0].Status).To(Equal(metav1.ConditionTrue), current.Status.ProcessedItems[0].Message)
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		}
 		Eventually(func(g Gomega) {
