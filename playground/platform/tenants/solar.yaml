@@ -28,7 +28,8 @@ spec:
           workloads:
             nodeSelector:
               kubernetes.io/os: linux
-        - conditions:
+        - action: merge
+          conditions:
             - name: shared-pool
               expression: "has(object.metadata.labels) && 'placement.example.com/pool' in object.metadata.labels && object.metadata.labels['placement.example.com/pool'] == 'shared'"
           workloads:
@@ -39,6 +40,15 @@ spec:
                 operator: Equal
                 value: shared
                 effect: NoSchedule
+        - action: replace
+          conditions:
+            - name: shared-pool
+              expression: "has(object.metadata.labels) && 'placement.example.com/pool' in object.metadata.labels && object.metadata.labels['placement.example.com/pool'] == 'shared'"
+            - name: default-scheduler
+              expression: "!has(object.spec.schedulerName) || object.spec.schedulerName in ['', 'default-scheduler']"
+          workloads:
+            # This demo scheduler is not installed; the example Pod has a scheduling gate.
+            scheduler: solar-shared-scheduler
 
       enforce:
         conditions:

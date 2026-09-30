@@ -57,7 +57,12 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 		}
 	}
 
-	return !equality.Semantic.DeepEqual(before, podPlacement(pod)), nil
+	return before.Scheduler != pod.Spec.SchedulerName ||
+		!equality.Semantic.DeepEqual(before.HostUsers, pod.Spec.HostUsers) ||
+		!equality.Semantic.DeepEqual(before.NodeSelector, pod.Spec.NodeSelector) ||
+		!equality.Semantic.DeepEqual(before.Tolerations, pod.Spec.Tolerations) ||
+		!equality.Semantic.DeepEqual(before.TopologySpreadConstraints, pod.Spec.TopologySpreadConstraints) ||
+		!equality.Semantic.DeepEqual(before.Affinity, pod.Spec.Affinity), nil
 }
 
 // A shallow read-only snapshot keeps the caller's Pod from escaping to the CEL
@@ -76,6 +81,7 @@ func matchesMutationConditions(ctx context.Context, evaluator *ruleengine.Condit
 
 func podPlacement(pod *corev1.Pod) *apirules.WorkloadMutation {
 	return &apirules.WorkloadMutation{
+		Scheduler:    pod.Spec.SchedulerName,
 		HostUsers:    pod.Spec.HostUsers,
 		NodeSelector: pod.Spec.NodeSelector, Tolerations: pod.Spec.Tolerations,
 		TopologySpreadConstraints: pod.Spec.TopologySpreadConstraints, Affinity: pod.Spec.Affinity,
@@ -84,6 +90,10 @@ func podPlacement(pod *corev1.Pod) *apirules.WorkloadMutation {
 
 func replacePodPlacement(pod *corev1.Pod, placement *apirules.WorkloadMutation) {
 	desired := placement.DeepCopy()
+	if desired.Scheduler != "" {
+		pod.Spec.SchedulerName = desired.Scheduler
+	}
+
 	if desired.HostUsers != nil {
 		pod.Spec.HostUsers = desired.HostUsers
 	}
@@ -112,6 +122,10 @@ func replacePodPlacement(pod *corev1.Pod, placement *apirules.WorkloadMutation) 
 }
 
 func mergePodPlacement(pod *corev1.Pod, placement *apirules.WorkloadMutation) error {
+	if placement.Scheduler != "" && pod.Spec.SchedulerName == "" {
+		pod.Spec.SchedulerName = placement.Scheduler
+	}
+
 	if placement.HostUsers != nil {
 		pod.Spec.HostUsers = new(*placement.HostUsers)
 	}

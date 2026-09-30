@@ -3829,8 +3829,8 @@ spec:
                             default: merge
                             description: |-
                               Action chooses how explicitly supplied properties are applied.
-                              Merge sets scalar values and map keys, upserts lists, and conjoins required affinity.
-                              Replace replaces each supplied property in full: hostUsers, nodeSelector,
+                              Merge fills an empty schedulerName, sets hostUsers and map keys, upserts lists, and conjoins required affinity.
+                              Replace replaces each supplied property in full: scheduler, hostUsers, nodeSelector,
                               tolerations, topologySpreadConstraints, or affinity. Omitted properties are
                               retained. Supplying affinity replaces all its branches, including omitted ones.
                             enum:
@@ -4828,6 +4828,16 @@ spec:
                                 description: NodeSelector sets configured keys on
                                   merge, or replaces the map on replace.
                                 type: object
+                              scheduler:
+                                description: |-
+                                  Scheduler sets spec.schedulerName on Pod creation. Merge fills only an empty
+                                  schedulerName, preserving all non-empty names, including default-scheduler.
+                                  Kubernetes defaults omitted schedulerName before admission. Use replace with
+                                  a condition to override default-scheduler while preserving custom schedulers.
+                                  Replace always overwrites schedulerName when the entry's conditions match.
+                                  Omitted or null leaves the Pod value unchanged.
+                                minLength: 1
+                                type: string
                               tolerations:
                                 description: |-
                                   Tolerations merges by key, operator (default Equal), value and effect.

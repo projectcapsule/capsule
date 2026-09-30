@@ -55,6 +55,35 @@ func TestMutationOnlyNamespaceProjectionAndTemplating(t *testing.T) {
 	}
 }
 
+func TestSchedulerNamespaceProjectionAndTemplating(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := capsulev1beta2.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"tenant-a", "tenant-b"} {
+		tnt := placementTenant(name)
+		tnt.Spec.Rules[0].Mutate[0].Workloads.Scheduler = "{{ .tenant.metadata.name }}-{{ .namespace.metadata.name }}"
+		for _, nsName := range []string{"first", "second"} {
+			ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: nsName, Labels: map[string]string{"profile": "placement"}}}
+			for range 2 {
+				result, err := tenant.BuildNamespaceRuleBodyStatus(scheme, ns, tnt)
+				if err != nil || len(result) != 1 || result[0].Mutate[0].Workloads.Scheduler != name+"-"+nsName {
+					t.Fatalf("scheduler projection=%v error=%v", result, err)
+				}
+				result[0].Mutate[0].Workloads.Scheduler = "mutated"
+			}
+			ns.Labels["profile"] = "other"
+			result, err := tenant.BuildNamespaceRuleBodyStatus(scheme, ns, tnt)
+			if err != nil || len(result) != 0 {
+				t.Fatalf("non-selected namespace got scheduler rules: %v %v", result, err)
+			}
+		}
+	}
+}
+
 func BenchmarkNamespacePlacementProjection(b *testing.B) {
 	scheme := runtime.NewScheme()
 	if err := corev1.AddToScheme(scheme); err != nil {

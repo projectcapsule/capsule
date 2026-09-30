@@ -15,6 +15,11 @@ import (
 func TestValidatePlacementConfiguration(t *testing.T) {
 	for _, tc := range []struct{ name, source, errorText string }{
 		{"ensure only", `mutate: [{workloads: {nodeSelector: {pool: shared}}}]`, ""},
+		{"scheduler only", `mutate: [{workloads: {scheduler: tenant-scheduler}}]`, ""},
+		{"scheduler replace", `mutate: [{action: replace, workloads: {scheduler: default-scheduler}}]`, ""},
+		{"scheduler null", `mutate: [{workloads: {scheduler: null}}]`, "at least one"},
+		{"scheduler empty", `mutate: [{workloads: {scheduler: ''}}]`, "at least one"},
+		{"scheduler blank", `mutate: [{workloads: {scheduler: '   '}}]`, "rules[0].mutate[0].workloads.scheduler: scheduler name must not be blank"},
 		{"host users false only", `mutate: [{workloads: {hostUsers: false}}]`, ""},
 		{"host users true replace", `mutate: [{action: replace, workloads: {hostUsers: true}}]`, ""},
 		{"null is not a mutation", `mutate: [{workloads: {hostUsers: null}}]`, "rules[0].mutate[0].workloads: at least one"},
