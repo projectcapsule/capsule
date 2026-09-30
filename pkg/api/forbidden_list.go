@@ -5,7 +5,6 @@ package api
 
 import (
 	"fmt"
-	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -25,7 +24,9 @@ func (in ForbiddenListSpec) RegexMatch(value string) (ok bool) {
 	if len(in.Regex) > 0 {
 		r, err := regexp.Compile(in.Regex)
 		if err != nil {
-			return false
+			// This boolean API cannot report configuration errors. Fail closed so
+			// malformed deny patterns cannot silently disable metadata protection.
+			return true
 		}
 
 		ok = r.MatchString(value)
@@ -68,17 +69,25 @@ func (f *ForbiddenError) appendForbiddenError() (append string) {
 }
 
 func ValidateForbidden(metadata map[string]string, forbiddenList ForbiddenListSpec) error {
-	if reflect.DeepEqual(ForbiddenListSpec{}, forbiddenList) {
+	if len(metadata) == 0 || (len(forbiddenList.Exact) == 0 && forbiddenList.Regex == "") {
 		return nil
 	}
 
+	var expression *regexp.Regexp
+
+	if forbiddenList.Regex != "" {
+		var err error
+
+		// Compile once per metadata map, preserving literal whitespace in legacy
+		// patterns. The rules regex cache normalizes whitespace and is not equivalent.
+		expression, err = regexp.Compile(forbiddenList.Regex)
+		if err != nil {
+			return fmt.Errorf("invalid forbidden metadata regex %q: %w", forbiddenList.Regex, err)
+		}
+	}
+
 	for key := range metadata {
-		var forbidden, matched bool
-
-		forbidden = forbiddenList.ExactMatch(key)
-		matched = forbiddenList.RegexMatch(key)
-
-		if forbidden || matched {
+		if forbiddenList.ExactMatch(key) || (expression != nil && expression.MatchString(key)) {
 			return NewForbiddenError(
 				key,
 				forbiddenList,
