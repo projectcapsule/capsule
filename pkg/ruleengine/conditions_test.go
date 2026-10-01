@@ -127,7 +127,7 @@ func TestValidateMutationAndConditions(t *testing.T) {
 }
 
 func TestMutationJSONPreservesExplicitEmptyProperties(t *testing.T) {
-	input := []byte(`{"mutate":[{"action":"replace","workloads":{"hostUsers":false,"nodeSelector":{},"tolerations":[],"topologySpreadConstraints":[],"affinity":{}}},{"workloads":{"nodeSelector":{"pool":"shared"}}}]}`)
+	input := []byte(`{"mutate":[{"action":"replace","workloads":{"scheduler":"tenant-scheduler","hostUsers":false,"nodeSelector":{},"tolerations":[],"topologySpreadConstraints":[],"affinity":{}}},{"workloads":{"nodeSelector":{"pool":"shared"}}}]}`)
 	var body rules.NamespaceRuleBodyNamespace
 	if err := json.Unmarshal(input, &body); err != nil {
 		t.Fatal(err)
@@ -141,11 +141,11 @@ func TestMutationJSONPreservesExplicitEmptyProperties(t *testing.T) {
 		t.Fatal(err)
 	}
 	first := again.Mutate[0].Workloads
-	if first.HostUsers == nil || *first.HostUsers || first.NodeSelector == nil || first.Tolerations == nil || first.TopologySpreadConstraints == nil || first.Affinity == nil {
+	if first.Scheduler != "tenant-scheduler" || first.HostUsers == nil || *first.HostUsers || first.NodeSelector == nil || first.Tolerations == nil || first.TopologySpreadConstraints == nil || first.Affinity == nil {
 		t.Fatalf("explicit empty value lost: %s", output)
 	}
 	second := again.Mutate[1].Workloads
-	if second.HostUsers != nil || second.Tolerations != nil || second.TopologySpreadConstraints != nil || second.Affinity != nil {
+	if second.Scheduler != "" || second.HostUsers != nil || second.Tolerations != nil || second.TopologySpreadConstraints != nil || second.Affinity != nil {
 		t.Fatalf("omitted values became explicit: %s", output)
 	}
 }

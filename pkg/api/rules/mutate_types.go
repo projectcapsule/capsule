@@ -25,8 +25,8 @@ type NamespaceRuleMutation struct {
 	Conditions []AdmissionCondition `json:"conditions,omitempty"`
 
 	// Action chooses how explicitly supplied properties are applied.
-	// Merge sets scalar values and map keys, upserts lists, and conjoins required affinity.
-	// Replace replaces each supplied property in full: hostUsers, nodeSelector,
+	// Merge fills an empty schedulerName, sets hostUsers and map keys, upserts lists, and conjoins required affinity.
+	// Replace replaces each supplied property in full: scheduler, hostUsers, nodeSelector,
 	// tolerations, topologySpreadConstraints, or affinity. Omitted properties are
 	// retained. Supplying affinity replaces all its branches, including omitted ones.
 	// +optional
@@ -45,6 +45,16 @@ type NamespaceRuleMutation struct {
 // On merge, required affinity restrictions from applicable entries are ANDed.
 // +kubebuilder:object:generate=true
 type WorkloadMutation struct {
+	// Scheduler sets spec.schedulerName on Pod creation. Merge fills only an empty
+	// schedulerName, preserving all non-empty names, including default-scheduler.
+	// Kubernetes defaults omitted schedulerName before admission. Use replace with
+	// a condition to override default-scheduler while preserving custom schedulers.
+	// Replace always overwrites schedulerName when the entry's conditions match.
+	// Omitted or null leaves the Pod value unchanged.
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	Scheduler string `json:"scheduler,omitempty"`
+
 	// HostUsers sets spec.hostUsers on both merge and replace. False requests a
 	// separate user namespace; true uses the host user namespace. Omitted or null
 	// leaves the Pod value unchanged. Requires Kubernetes/runtime support.

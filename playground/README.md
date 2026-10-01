@@ -285,9 +285,40 @@ namespaces labelled `env: test`; `solar-prod` is outside this profile. The setup
 waits for the effective placement rule before creating the example Pods.
 
 - `placement-default` receives `kubernetes.io/os: linux` when that selector is absent.
-- `placement-shared` also receives the shared pool selector and toleration because
+- `placement-shared` also receives `schedulerName: solar-shared-scheduler`, the
+  shared pool selector and toleration because
   its `placement.example.com/pool` label is `shared`. A scheduling gate keeps this
-  demonstration Pod pending without requiring specially labelled nodes.
+  demonstration Pod pending without requiring a custom scheduler or specially
+  labelled nodes.
+
+Set `mutate[].workloads.scheduler` to choose a scheduler for new Pods. With
+`action: merge` (the default), Capsule fills only an empty `schedulerName` and
+preserves all non-empty names, including `default-scheduler`. Kubernetes fills in
+`default-scheduler` before admission. To use another default while preserving
+custom scheduler names, the shared example uses a separate `replace` entry with
+this condition (alongside its shared-pool condition):
+
+```yaml
+mutate:
+  - action: replace
+    conditions:
+      - name: default-scheduler
+        expression: >-
+          !has(object.spec.schedulerName) ||
+          object.spec.schedulerName in ['', 'default-scheduler']
+    workloads:
+      scheduler: solar-shared-scheduler
+```
+
+This also replaces an explicitly selected `default-scheduler`, since admission
+cannot distinguish it from an omitted value. A separate entry keeps the shared
+node selector and toleration independent of the scheduler condition. To always
+set the scheduler, use `replace` without conditions.
+
+Omitting `scheduler` retains the current value. Mutation conditions still apply,
+and the resulting name must pass `enforce.workloads.schedulers` rules. Existing
+Pods and workload templates are not rewritten; controller-created Pods receive
+the scheduler when admitted.
 
 Inspect the admission result:
 

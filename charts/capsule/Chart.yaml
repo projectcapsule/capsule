@@ -40,6 +40,8 @@ annotations:
     - name: Documentation
       url: https://projectcapsule.dev/
   artifacthub.io/changes: |
+    - kind: added
+      description: added scheduler workload mutation with empty-only merge and conditional replacement for namespace profiles
     - kind: fixed
       description: reject malformed Service forbidden metadata regexes on Tenant admission and fail closed for stored invalid deny patterns
     - kind: fixed
