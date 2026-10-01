@@ -103,7 +103,8 @@ func (w NamespaceRuleEnforceWorkloadsBody) TargetsOnly() bool {
 
 func (w NamespaceRuleEnforceWorkloadsBody) HasPolicies() bool {
 	return len(w.NodeSelector) > 0 || len(w.Tolerations) > 0 || len(w.TopologySpreadConstraints) > 0 ||
-		len(w.Affinity) > 0 || w.Resources != nil || len(w.QoSClasses) > 0 || len(w.Registries) > 0 || len(w.Schedulers) > 0
+		len(w.Affinity) > 0 || w.Resources != nil || len(w.QoSClasses) > 0 || len(w.Registries) > 0 || len(w.Schedulers) > 0 ||
+		len(w.SeccompProfiles) > 0 || len(w.AppArmorProfiles) > 0
 }
 
 // PodTargets scopes a rule to gvk, translating controller-template locations to

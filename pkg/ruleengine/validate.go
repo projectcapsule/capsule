@@ -203,6 +203,10 @@ func validateWorkloadRules(
 		return err
 	}
 
+	if err := validateSecurityProfileRules(ruleIndex, workloads); err != nil {
+		return err
+	}
+
 	for j, registry := range workloads.Registries {
 		if err := validateExpression(
 			registry.Expression,

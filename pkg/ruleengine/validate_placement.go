@@ -219,8 +219,12 @@ func validateMutations(index int, mutations []rules.NamespaceRuleMutation) error
 }
 
 func validateMutationPlacement(path string, workload rules.WorkloadMutation) error {
-	if workload.Scheduler == "" && workload.HostUsers == nil && workload.NodeSelector == nil && workload.Tolerations == nil && workload.TopologySpreadConstraints == nil && workload.Affinity == nil {
+	if workload.Scheduler == "" && workload.HostUsers == nil && workload.NodeSelector == nil && workload.Tolerations == nil && workload.TopologySpreadConstraints == nil && workload.Affinity == nil && workload.SeccompProfile == nil && workload.AppArmorProfile == nil {
 		return fmt.Errorf("%s: at least one workload mutation property must be supplied", path)
+	}
+
+	if err := validateSecurityProfileMutation(path, workload); err != nil {
+		return err
 	}
 
 	if workload.Scheduler != "" && strings.TrimSpace(workload.Scheduler) == "" {
