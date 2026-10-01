@@ -464,6 +464,13 @@ func (r *Manager) persistResourceQuotaState(
 				key := types.NamespacedName{Namespace: rq.Namespace, Name: rq.Name}
 
 				if retryErr = reader.Get(ctx, key, found); retryErr != nil {
+					// Skip quotas that vanished between List and Get, e.g. when a
+					// namespace is deleted mid-reconcile. The create/update path
+					// already skips nonexistent namespaces; do the same here so the
+					// Tenant does not requeue on a quota that no longer exists.
+					if apierrors.IsNotFound(retryErr) {
+						return nil
+					}
 					return retryErr
 				}
 
