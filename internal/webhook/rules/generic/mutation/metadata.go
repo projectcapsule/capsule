@@ -22,6 +22,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/ruleengine"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	"github.com/projectcapsule/capsule/pkg/runtime/workloads"
 )
 
 type metadataRules struct{ compiler ruleengine.ConditionCompiler }
@@ -52,11 +53,13 @@ func (h *metadataRules) mutate(obj *unstructured.Unstructured, bodies []*apirule
 		}
 
 		conditions := ruleengine.NewConditionEvaluator(h.compiler, req.AdmissionRequest)
-		mutateResources := req.Operation == admissionv1.Create && req.SubResource == "" && gvk == corev1.SchemeGroupVersion.WithKind("Pod")
+		mutateResources := req.SubResource == "" && ((req.Operation == admissionv1.Create && gvk == corev1.SchemeGroupVersion.WithKind("Pod")) || len(workloads.PodTemplatePath(gvk)) > 0)
 
 		filtered, err := ruleengine.FilterNamespaceEnforcementConditions(ctx, conditions, obj, bodies,
 			func(body *apirules.NamespaceRuleEnforceBody) bool {
-				return hasMetadataMutation(gvk, body) || (mutateResources && body.Workloads.Resources != nil)
+				_, matches := body.Workloads.PodTargets(gvk)
+
+				return hasMetadataMutation(gvk, body) || (mutateResources && matches && body.Workloads.Resources != nil)
 			})
 		if err != nil {
 			response := admission.Errored(http.StatusInternalServerError, err)

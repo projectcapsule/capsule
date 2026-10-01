@@ -84,6 +84,31 @@ spec:
                 min: 1
                 max: 100
 
+    # A target without workload policies matches the native kind itself.
+    - namespaceSelector:
+        matchLabels:
+          env: test
+      enforce:
+        action: deny
+        workloads:
+          targets: [daemonset]
+
+    # With policies, targets scope those checks to the Deployment template.
+    - namespaceSelector:
+        matchLabels:
+          env: test
+      enforce:
+        action: deny
+        workloads:
+          targets: [deployment/containers]
+          registries:
+            - exact: [example.com/blocked/app:v1]
+          resources:
+            requests:
+              memory:
+                policy: Default
+                value: 32Mi
+
     # Promote only the dedicated TenantResource ServiceAccount. Capsule binds
     # this distributor role in every solar namespace so the TenantResource can
     # create the temporary user-facing RoleBindings there.

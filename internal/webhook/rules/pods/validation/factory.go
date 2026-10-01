@@ -61,6 +61,10 @@ func PodRules(
 	registryCache *cache.RegistryRuleSetCache,
 	compiler ruleengine.ConditionCompiler,
 ) handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod] {
+	return newPodRules(regexCache, registryCache, compiler)
+}
+
+func newPodRules(regexCache *cache.RegexCache, registryCache *cache.RegistryRuleSetCache, compiler ruleengine.ConditionCompiler) *podRules {
 	if regexCache == nil {
 		regexCache = cache.NewRegexCache()
 	}
@@ -161,6 +165,17 @@ func (h *podRules) validatePodRules(
 	enforceBodies []*apirules.NamespaceRuleEnforceBody,
 	old ...*corev1.Pod,
 ) error {
+	enforceBodies = ruleengine.WorkloadEnforcement(enforceBodies, corev1.SchemeGroupVersion.WithKind("Pod"))
+
+	return h.validateWorkloadRules(ctx, req, pod, pod, pod, tnt, recorder, enforceBodies, old...)
+}
+
+func (h *podRules) validateWorkloadRules(
+	ctx context.Context, req admission.Request, pod *corev1.Pod,
+	object client.Object, conditionObject any, tnt *capsulev1beta2.Tenant,
+	recorder events.EventRecorder, enforceBodies []*apirules.NamespaceRuleEnforceBody,
+	old ...*corev1.Pod,
+) error {
 	conditional := false
 
 	for _, body := range enforceBodies {
@@ -175,7 +190,7 @@ func (h *podRules) validatePodRules(
 
 	var err error
 
-	enforceBodies, err = ruleengine.FilterEnforcementConditions(ctx, evaluator, pod, enforceBodies,
+	enforceBodies, err = ruleengine.FilterEnforcementConditions(ctx, evaluator, conditionObject, enforceBodies,
 		func(body *apirules.NamespaceRuleEnforceBody) bool {
 			return hasWorkloadPolicy(body.Workloads, req.SubResource)
 		})
@@ -205,7 +220,7 @@ func (h *podRules) validatePodRules(
 		// but it must never influence allow/deny decisions.
 		for _, audit := range evaluation.Audits {
 			recorder.LabeledEvent(
-				pod,
+				object,
 				corev1.EventTypeNormal,
 				events.ReasonNamespaceRuleAudit,
 				events.ActionRuleAudit,
@@ -222,7 +237,7 @@ func (h *podRules) validatePodRules(
 
 			if errors.As(err, &decisionErr) && decisionErr.Decision != nil {
 				recorder.LabeledEvent(
-					pod,
+					object,
 					corev1.EventTypeWarning,
 					decisionErr.Decision.EventReason,
 					events.ActionValidationDenied,

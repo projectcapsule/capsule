@@ -1,0 +1,18 @@
+# Deliberately excluded from kustomization.yaml; use a server dry-run to see denial.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: forbidden-daemonset
+  namespace: solar-test
+spec:
+  selector:
+    matchLabels:
+      app: forbidden-daemonset
+  template:
+    metadata:
+      labels:
+        app: forbidden-daemonset
+    spec:
+      containers:
+        - name: app
+          image: registry.k8s.io/pause:3.10

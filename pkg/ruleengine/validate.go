@@ -185,14 +185,7 @@ func validateWorkloadRules(
 	workloads rules.NamespaceRuleEnforceWorkloadsBody,
 ) error {
 	for j, target := range workloads.Targets {
-		switch target {
-		case rules.DeprecatedValidateImages,
-			rules.ValidatePod,
-			rules.ValidateInitContainers,
-			rules.ValidateEphemeralContainers,
-			rules.ValidateContainers,
-			rules.ValidateVolumes:
-		default:
+		if _, valid := target.GroupKind(); !valid {
 			return fmt.Errorf(
 				"rules[%d].enforce.workloads.targets[%d] %q is invalid: unsupported workload target",
 				ruleIndex,
@@ -264,11 +257,13 @@ func validateWorkloadResourceTargets(
 	podTarget := false
 
 	for _, target := range targets {
-		switch target {
-		case rules.ValidatePod:
+		_, part, _ := strings.Cut(string(target), "/")
+
+		switch {
+		case target == rules.ValidatePod:
 			podTarget = true
-		case rules.ValidateContainers, rules.ValidateInitContainers:
-		case rules.ValidateEphemeralContainers, rules.ValidateVolumes, rules.DeprecatedValidateImages:
+		case part == "containers" || part == "initcontainers" || part == "":
+		default:
 			return false, fmt.Errorf(
 				"%s is invalid: workload target %q does not support resource policies",
 				path,
