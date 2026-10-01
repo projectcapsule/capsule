@@ -140,17 +140,18 @@ var _ = Describe("workload template targets", Label("tenant", "rules", "workload
 			g.Expect(ownerA.Get(ctx, client.ObjectKeyFromObject(good), stored)).To(Succeed())
 			g.Expect(stored.Spec.Template.Spec.Containers[0].Image).NotTo(Equal("example.com/blocked/app:v1"))
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-		By("applying the profile after a namespace label changes")
+		By("applying the profile after an administrator changes a namespace label")
 		Eventually(func(g Gomega) {
 			ns := &corev1.Namespace{}
-			g.Expect(ownerA.Get(ctx, client.ObjectKeyFromObject(other), ns)).To(Succeed())
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(other), ns)).To(Succeed())
 			ns.Labels["profile"] = "templates"
-			g.Expect(ownerA.Update(ctx, ns)).To(Succeed())
+			g.Expect(k8sClient.Update(ctx, ns)).To(Succeed())
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		waitProfile(other, true, false)
 		blocked := deployment(other, "newly-blocked")
 		blocked.Spec.Template.Spec.SchedulerName = "forbidden-scheduler"
 		Expect(ownerA.Create(ctx, blocked)).To(MatchError(ContainSubstring("scheduler")))
+		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(blocked), &appsv1.Deployment{}))).To(BeTrue())
 		By("re-evaluating enforcement conditions after a policy update")
 		Eventually(func(g Gomega) {
 			current := &capsulev1beta2.Tenant{}
