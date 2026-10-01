@@ -206,6 +206,8 @@ apply-user:
 	@$(KUBECTL) label ns solar-prod team=team-b --overwrite
 	@$(KUBECTL) -n solar-test wait --for=create rulestatus/capsule-managed-rules --timeout=$(TIMEOUT)
 	@$(KUBECTL) -n solar-test wait --for=jsonpath='{.status.rules[0].mutate[0].conditions[0].name}'=linux-default rulestatus/capsule-managed-rules --timeout=$(TIMEOUT)
+	@$(KUBECTL) -n solar-test wait --for=jsonpath='{.status.rules[1].enforce.workloads.targets[0]}'=daemonset rulestatus/capsule-managed-rules --timeout=$(TIMEOUT)
+	@$(KUBECTL) -n solar-test wait --for=jsonpath='{.status.rules[2].enforce.workloads.targets[0]}'=deployment/containers rulestatus/capsule-managed-rules --timeout=$(TIMEOUT)
 	@$(KUBECTL) kustomize user/solar | envsubst $(SUBSTITUTION_VARIABLES) | $(KUBECTL) apply --as alice --as-group projectcapsule.dev -f -
 
 wait-oidc: certificates ## Wait for ingress and Dex before enabling API-server OIDC.

@@ -10,23 +10,14 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/runtime"
 )
 
-// +kubebuilder:validation:Enum=pod;pod/initcontainers;pod/ephemeralcontainers;pod/containers;pod/volumes
-type WorkloadValidationTarget string
-
-const (
-	DeprecatedValidateImages WorkloadValidationTarget = "pod/images"
-
-	ValidatePod                 WorkloadValidationTarget = "pod"
-	ValidateInitContainers      WorkloadValidationTarget = "pod/initcontainers"
-	ValidateEphemeralContainers WorkloadValidationTarget = "pod/ephemeralcontainers"
-	ValidateContainers          WorkloadValidationTarget = "pod/containers"
-	ValidateVolumes             WorkloadValidationTarget = "pod/volumes"
-)
-
 // +kubebuilder:object:generate=true
 type NamespaceRuleEnforceWorkloadsBody struct {
-	// Define the enforcement targets this rule applies to.
-	// If empty, each webhook applies its own backwards-compatible default.
+	// Targets selects native workloads and, optionally, parts of their Pod specs.
+	// With no workload policies, the action matches the selected kinds themselves.
+	// With policies, targets scopes those policies; it does not also match the kind.
+	// Omitted targets preserve Pod-only defaults. Controller targets are opt-in.
+	// Whole-controller targets include every compatible location in the Pod template.
+	// Existing pod and pod/* part targets retain their established policy scope.
 	// +optional
 	Targets []WorkloadValidationTarget `json:"targets,omitempty"`
 
@@ -53,7 +44,8 @@ type NamespaceRuleEnforceWorkloadsBody struct {
 	// locations: Pod-level resources, regular containers, and init containers.
 	// Resource names unsupported at Pod level still apply to compatible container
 	// locations.
-	// Mutation is applied when a Pod is created. Remove and MatchRequest manage
+	// Mutation is applied when a Pod is created, or when an explicitly targeted
+	// controller is created or updated (to its Pod template). Remove and MatchRequest manage
 	// explicit values, Default fills an absent value, and Ratio fills an absent
 	// limit from its request. An explicit Ratio violation is then handled by the
 	// enclosing allow, deny, or audit action.
@@ -71,7 +63,7 @@ type NamespaceRuleEnforceWorkloadsBody struct {
 	// +optional
 	Registries []OCIRegistry `json:"registries,omitempty"`
 
-	// Schedulers defines schedulerName matchers for Pod admission.
+	// Schedulers defines schedulerName matchers for selected Pods and Pod templates.
 	//
 	// The rule is evaluated against pod.spec.schedulerName.
 	// Empty schedulerName is ignored and is not normalized to default-scheduler.

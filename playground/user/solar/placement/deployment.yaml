@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: targeted-deployment
+  namespace: solar-test
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: targeted-deployment
+  template:
+    metadata:
+      labels:
+        app: targeted-deployment
+    spec:
+      containers:
+        - name: app
+          image: registry.k8s.io/pause:3.10
