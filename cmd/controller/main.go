@@ -712,6 +712,7 @@ func main() {
 			regexCache,
 			cfg,
 			celCache,
+			podrules.TemplateRules(regexCache, registryCache, celCache),
 			rulesgenericvalidation.ForKind(
 				corev1.SchemeGroupVersion.WithKind("Pod").GroupKind(),
 				pod.Handler(cfg,

@@ -442,7 +442,7 @@ spec:
                           type: array
                       type: object
                     workloads:
-                      description: Enforcement for Workloads (Pods)
+                      description: Enforcement for native workload kinds and Pod properties.
                       properties:
                         affinity:
                           description: Affinity matches each complete required or
@@ -962,7 +962,8 @@ spec:
                             locations: Pod-level resources, regular containers, and init containers.
                             Resource names unsupported at Pod level still apply to compatible container
                             locations.
-                            Mutation is applied when a Pod is created. Remove and MatchRequest manage
+                            Mutation is applied when a Pod is created, or when an explicitly targeted
+                            controller is created or updated (to its Pod template). Remove and MatchRequest manage
                             explicit values, Default fills an absent value, and Ratio fills an absent
                             limit from its request. An explicit Ratio violation is then handled by the
                             enclosing allow, deny, or audit action.
@@ -1045,7 +1046,7 @@ spec:
                             rule: has(self.requests) || has(self.limits)
                         schedulers:
                           description: |-
-                            Schedulers defines schedulerName matchers for Pod admission.
+                            Schedulers defines schedulerName matchers for selected Pods and Pod templates.
 
                             The rule is evaluated against pod.spec.schedulerName.
                             Empty schedulerName is ignored and is not normalized to default-scheduler.
@@ -1076,15 +1077,16 @@ spec:
                           type: array
                         targets:
                           description: |-
-                            Define the enforcement targets this rule applies to.
-                            If empty, each webhook applies its own backwards-compatible default.
+                            Targets selects native workloads and, optionally, parts of their Pod specs.
+                            With no workload policies, the action matches the selected kinds themselves.
+                            With policies, targets scopes those policies; it does not also match the kind.
+                            Omitted targets preserve Pod-only defaults. Controller targets are opt-in.
+                            Whole-controller targets include every compatible location in the Pod template.
+                            Existing pod and pod/* part targets retain their established policy scope.
                           items:
-                            enum:
-                            - pod
-                            - pod/initcontainers
-                            - pod/ephemeralcontainers
-                            - pod/containers
-                            - pod/volumes
+                            description: WorkloadValidationTarget selects a native
+                              workload and optional Pod-spec location.
+                            pattern: ^(pod(/(initcontainers|ephemeralcontainers|containers|volumes))?|(deployment|statefulset|daemonset|replicaset|replicationcontroller|job|cronjob)(/(initcontainers|containers|volumes))?)$
                             type: string
                           type: array
                         tolerations:
@@ -3147,7 +3149,8 @@ spec:
                             type: array
                         type: object
                       workloads:
-                        description: Enforcement for Workloads (Pods)
+                        description: Enforcement for native workload kinds and Pod
+                          properties.
                         properties:
                           affinity:
                             description: Affinity matches each complete required or
@@ -3667,7 +3670,8 @@ spec:
                               locations: Pod-level resources, regular containers, and init containers.
                               Resource names unsupported at Pod level still apply to compatible container
                               locations.
-                              Mutation is applied when a Pod is created. Remove and MatchRequest manage
+                              Mutation is applied when a Pod is created, or when an explicitly targeted
+                              controller is created or updated (to its Pod template). Remove and MatchRequest manage
                               explicit values, Default fills an absent value, and Ratio fills an absent
                               limit from its request. An explicit Ratio violation is then handled by the
                               enclosing allow, deny, or audit action.
@@ -3752,7 +3756,7 @@ spec:
                               rule: has(self.requests) || has(self.limits)
                           schedulers:
                             description: |-
-                              Schedulers defines schedulerName matchers for Pod admission.
+                              Schedulers defines schedulerName matchers for selected Pods and Pod templates.
 
                               The rule is evaluated against pod.spec.schedulerName.
                               Empty schedulerName is ignored and is not normalized to default-scheduler.
@@ -3783,15 +3787,16 @@ spec:
                             type: array
                           targets:
                             description: |-
-                              Define the enforcement targets this rule applies to.
-                              If empty, each webhook applies its own backwards-compatible default.
+                              Targets selects native workloads and, optionally, parts of their Pod specs.
+                              With no workload policies, the action matches the selected kinds themselves.
+                              With policies, targets scopes those policies; it does not also match the kind.
+                              Omitted targets preserve Pod-only defaults. Controller targets are opt-in.
+                              Whole-controller targets include every compatible location in the Pod template.
+                              Existing pod and pod/* part targets retain their established policy scope.
                             items:
-                              enum:
-                              - pod
-                              - pod/initcontainers
-                              - pod/ephemeralcontainers
-                              - pod/containers
-                              - pod/volumes
+                              description: WorkloadValidationTarget selects a native
+                                workload and optional Pod-spec location.
+                              pattern: ^(pod(/(initcontainers|ephemeralcontainers|containers|volumes))?|(deployment|statefulset|daemonset|replicaset|replicationcontroller|job|cronjob)(/(initcontainers|containers|volumes))?)$
                               type: string
                             type: array
                           tolerations:
@@ -5796,7 +5801,8 @@ spec:
                               type: array
                           type: object
                         workloads:
-                          description: Enforcement for Workloads (Pods)
+                          description: Enforcement for native workload kinds and Pod
+                            properties.
                           properties:
                             affinity:
                               description: Affinity matches each complete required
@@ -6320,7 +6326,8 @@ spec:
                                 locations: Pod-level resources, regular containers, and init containers.
                                 Resource names unsupported at Pod level still apply to compatible container
                                 locations.
-                                Mutation is applied when a Pod is created. Remove and MatchRequest manage
+                                Mutation is applied when a Pod is created, or when an explicitly targeted
+                                controller is created or updated (to its Pod template). Remove and MatchRequest manage
                                 explicit values, Default fills an absent value, and Ratio fills an absent
                                 limit from its request. An explicit Ratio violation is then handled by the
                                 enclosing allow, deny, or audit action.
@@ -6405,7 +6412,7 @@ spec:
                                 rule: has(self.requests) || has(self.limits)
                             schedulers:
                               description: |-
-                                Schedulers defines schedulerName matchers for Pod admission.
+                                Schedulers defines schedulerName matchers for selected Pods and Pod templates.
 
                                 The rule is evaluated against pod.spec.schedulerName.
                                 Empty schedulerName is ignored and is not normalized to default-scheduler.
@@ -6436,15 +6443,16 @@ spec:
                               type: array
                             targets:
                               description: |-
-                                Define the enforcement targets this rule applies to.
-                                If empty, each webhook applies its own backwards-compatible default.
+                                Targets selects native workloads and, optionally, parts of their Pod specs.
+                                With no workload policies, the action matches the selected kinds themselves.
+                                With policies, targets scopes those policies; it does not also match the kind.
+                                Omitted targets preserve Pod-only defaults. Controller targets are opt-in.
+                                Whole-controller targets include every compatible location in the Pod template.
+                                Existing pod and pod/* part targets retain their established policy scope.
                               items:
-                                enum:
-                                - pod
-                                - pod/initcontainers
-                                - pod/ephemeralcontainers
-                                - pod/containers
-                                - pod/volumes
+                                description: WorkloadValidationTarget selects a native
+                                  workload and optional Pod-spec location.
+                                pattern: ^(pod(/(initcontainers|ephemeralcontainers|containers|volumes))?|(deployment|statefulset|daemonset|replicaset|replicationcontroller|job|cronjob)(/(initcontainers|containers|volumes))?)$
                                 type: string
                               type: array
                             tolerations:

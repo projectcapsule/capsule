@@ -153,7 +153,7 @@ func TestManagedMetadataAdmissionRespectsAudience(t *testing.T) {
 								t.Fatal(err)
 							}
 							req.OldObject.Raw = raw
-							handler := genericvalidation.Register(cache.NewRegexCache(), cfg, nil).GetHandlers()[0]
+							handler := genericvalidation.Register(cache.NewRegexCache(), cfg, nil, nil).GetHandlers()[0]
 							if operation == admissionv1.Create {
 								response = handler.OnCreate(cl, cl, decoder, recorder)(t.Context(), req)
 							} else {
