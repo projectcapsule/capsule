@@ -224,12 +224,18 @@ func validateMutations(index int, mutations []rules.NamespaceRuleMutation) error
 
 func validateMutationPlacement(path string, workload rules.WorkloadMutation) error {
 	podProperties := workload.HasPodProperties()
-	if !podProperties && workload.ReadOnlyRootFilesystem == nil {
+	if !podProperties && workload.ReadOnlyRootFilesystem == nil && workload.Registries.ImagePullPolicy == "" {
 		return fmt.Errorf("%s: at least one workload mutation property must be supplied", path)
 	}
 
 	if err := validateMutationTargets(path, workload, podProperties); err != nil {
 		return err
+	}
+
+	switch workload.Registries.ImagePullPolicy {
+	case "", corev1.PullAlways, corev1.PullIfNotPresent, corev1.PullNever:
+	default:
+		return fmt.Errorf("%s.registries.imagePullPolicy: unsupported pull policy %q", path, workload.Registries.ImagePullPolicy)
 	}
 
 	if err := validateSecurityProfileMutation(path, workload); err != nil {

@@ -182,6 +182,8 @@ spec:
             # pod includes regular, init/sidecar and newly added ephemeral containers.
             targets: [pod]
             readOnlyRootFilesystem: true
+            registries:
+              imagePullPolicy: Always
             seccompProfile:
               type: RuntimeDefault
       enforce:

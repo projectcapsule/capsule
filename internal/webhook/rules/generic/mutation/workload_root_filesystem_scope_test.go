@@ -28,6 +28,14 @@ import (
 )
 
 func TestEphemeralMutationTenantProfilesAudienceAndReads(t *testing.T) {
+	for _, imagePullPolicy := range []bool{false, true} {
+		t.Run(fmt.Sprintf("imagePullPolicy=%t", imagePullPolicy), func(t *testing.T) {
+			testEphemeralMutationTenantProfilesAudienceAndReads(t, imagePullPolicy)
+		})
+	}
+}
+
+func testEphemeralMutationTenantProfilesAudienceAndReads(t *testing.T, imagePullPolicy bool) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, capsule.AddToScheme(scheme))
@@ -40,6 +48,13 @@ func TestEphemeralMutationTenantProfilesAudienceAndReads(t *testing.T) {
 			status := &capsule.RuleStatus{ObjectMeta: metav1.ObjectMeta{Name: meta.NameForManagedRuleStatus(), Namespace: ns.Name}}
 			if profile == "selected" {
 				body := rootFilesystemBody(new(i == 0), rules.ValidatePod)
+				if imagePullPolicy {
+					policy := corev1.PullAlways
+					if i != 0 {
+						policy = corev1.PullNever
+					}
+					body = imagePullPolicyBody(policy, rules.ValidatePod)
+				}
 				body.Audience = []rules.Audience{{Kind: rules.AudienceKindUser, Name: name + "-owner"}}
 				status.Status.Rules = []*rules.NamespaceRuleBodyNamespace{body}
 			}
@@ -88,8 +103,17 @@ func TestEphemeralMutationTenantProfilesAudienceAndReads(t *testing.T) {
 				require.NotNil(t, response)
 				require.True(t, response.Allowed)
 				require.Len(t, response.Patches, 1)
-				require.Equal(t, "/spec/ephemeralContainers/1/securityContext", response.Patches[0].Path)
-				require.Equal(t, map[string]any{"readOnlyRootFilesystem": *tc.want}, response.Patches[0].Value)
+				if imagePullPolicy {
+					policy := "Always"
+					if !*tc.want {
+						policy = "Never"
+					}
+					require.Equal(t, "/spec/ephemeralContainers/1/imagePullPolicy", response.Patches[0].Path)
+					require.Equal(t, policy, response.Patches[0].Value)
+				} else {
+					require.Equal(t, "/spec/ephemeralContainers/1/securityContext", response.Patches[0].Path)
+					require.Equal(t, map[string]any{"readOnlyRootFilesystem": *tc.want}, response.Patches[0].Value)
+				}
 			}
 			// Existing wrapper reads: namespace, its owning Tenant, and namespace RuleStatus.
 			// The mutation adds no reads or cluster-wide lists, even on a skipped profile.

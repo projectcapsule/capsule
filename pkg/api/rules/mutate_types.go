@@ -29,9 +29,9 @@ type NamespaceRuleMutation struct {
 	Conditions []AdmissionCondition `json:"conditions,omitempty"`
 
 	// Action chooses how explicitly supplied properties are applied.
-	// Merge fills an empty schedulerName and absent security profiles, sets hostUsers, readOnlyRootFilesystem,
+	// Merge fills an empty schedulerName and absent security profiles, sets hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy,
 	// and map keys, upserts lists, and conjoins required affinity.
-	// Replace replaces each supplied property in full: scheduler, hostUsers, readOnlyRootFilesystem, nodeSelector,
+	// Replace replaces each supplied property in full: scheduler, hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy, nodeSelector,
 	// tolerations, topologySpreadConstraints, affinity, or security profiles. Omitted properties are
 	// retained. Supplying affinity replaces all its branches, including omitted ones.
 	// +optional
@@ -45,9 +45,9 @@ type NamespaceRuleMutation struct {
 
 // WorkloadMutation contains typed native Pod values. Empty maps/lists are
 // preserved so replace can clear a property; nil means the property is omitted.
-// It applies on Pod creation. ReadOnlyRootFilesystem also applies to newly added
+// It applies on Pod creation. ReadOnlyRootFilesystem and Registries.ImagePullPolicy also apply to newly added
 // ephemeral containers on subresource updates. Existing containers are never reconciled.
-// On merge, later entries override hostUsers, readOnlyRootFilesystem, matching map keys,
+// On merge, later entries override hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy, matching map keys,
 // tolerations and spread constraints.
 // On merge, required affinity restrictions from applicable entries are ANDed.
 // +kubebuilder:object:generate=true
@@ -61,6 +61,10 @@ type WorkloadMutation struct {
 	// +kubebuilder:validation:items:Enum=pod;pod/containers;pod/initcontainers;pod/ephemeralcontainers
 	// +listType=set
 	Targets []WorkloadValidationTarget `json:"targets,omitempty"`
+
+	// Registries configures image registry behavior for the selected containers.
+	// +optional
+	Registries WorkloadRegistryMutation `json:"registries,omitzero"`
 
 	// ReadOnlyRootFilesystem sets securityContext.readOnlyRootFilesystem on every
 	// selected regular or init container at Pod creation, and newly added ephemeral
@@ -126,6 +130,18 @@ type WorkloadMutation struct {
 	// Replace replaces all affinity, including any branches omitted from the rule.
 	// +optional
 	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+}
+
+// WorkloadRegistryMutation contains image registry settings applied to containers.
+// +kubebuilder:object:generate=true
+type WorkloadRegistryMutation struct {
+	// ImagePullPolicy sets imagePullPolicy on every selected regular or init
+	// container at Pod creation, and newly added ephemeral containers on subresource
+	// updates. Both merge and replace overwrite explicit and Kubernetes-defaulted
+	// values. Omitted or null preserves the existing policy. Applies to all Pod OSes.
+	// +optional
+	// +kubebuilder:validation:Enum=Always;IfNotPresent;Never
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 }
 
 // GetWorkloadTargets reports whether a mutation selects this Pod location.

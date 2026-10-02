@@ -27,6 +27,8 @@ func TestWorkloadMutationGeneratedSchemas(t *testing.T) {
 		visit = func(schema apiextensionsv1.JSONSchemaProps, path string) {
 			if _, ok := schema.Properties["readOnlyRootFilesystem"]; ok {
 				found++
+				require.NotContains(t, schema.Properties, "imagePullPolicy")
+				require.Contains(t, schema.Properties["registries"].Properties, "imagePullPolicy")
 				require.Equal(t, "set", *schema.Properties["targets"].XListType)
 				var internal apiextensions.JSONSchemaProps
 				require.NoError(t, apiextensionsv1.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&schema, &internal, nil))
@@ -36,6 +38,15 @@ func TestWorkloadMutationGeneratedSchemas(t *testing.T) {
 					object string
 					valid  bool
 				}{
+					{`{"registries":{"imagePullPolicy":"Always"}}`, true},
+					{`{"targets":["pod/initcontainers"],"registries":{"imagePullPolicy":"IfNotPresent"}}`, true},
+					{`{"targets":["pod/ephemeralcontainers"],"registries":{"imagePullPolicy":"Never"}}`, true},
+					{`{"registries":{"imagePullPolicy":"Sometimes"}}`, false},
+					{`{"registries":{"imagePullPolicy":"always"}}`, false},
+					{`{"registries":{"imagePullPolicy":""}}`, false},
+					{`{"registries":{"imagePullPolicy":true}}`, false},
+					{`{"registries":{}}`, true},
+					{`{"registries":"Always"}`, false},
 					{`{}`, true}, {`{"readOnlyRootFilesystem":false}`, true},
 					{`{"targets":[],"readOnlyRootFilesystem":true}`, true},
 					{`{"targets":["pod","pod/containers","pod/initcontainers","pod/ephemeralcontainers"],"readOnlyRootFilesystem":true}`, true},

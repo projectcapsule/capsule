@@ -44,7 +44,7 @@ func TestReadOnlyRootFilesystemActionsAndPresence(t *testing.T) {
 						changed, err := MutatePodPlacement(t.Context(), pod, []*rules.NamespaceRuleBodyNamespace{body}, nil)
 						require.NoError(t, err)
 						require.Equal(t, pass == 0 && !ptr.Equal(input, want), changed)
-						for _, container := range rootFilesystemContainers(pod, false, nil) {
+						for _, container := range workloadMutationContainers(pod, false, nil) {
 							require.Equal(t, want, rootFilesystemValue(*container.context))
 							require.Equal(t, int64(1000), *(*container.context).RunAsUser)
 						}

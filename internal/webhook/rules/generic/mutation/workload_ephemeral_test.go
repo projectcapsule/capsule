@@ -139,7 +139,7 @@ func TestEphemeralMutationIgnoresPodPropertiesAndObservesPriorEntries(t *testing
 	body.Mutate = append(body.Mutate, rules.NamespaceRuleMutation{Conditions: []rules.AdmissionCondition{{Expression: "object.spec.ephemeralContainers[1].securityContext.readOnlyRootFilesystem == true"}}, Workloads: rules.WorkloadMutation{ReadOnlyRootFilesystem: new(false)}})
 	body.Mutate = append(body.Mutate, rules.NamespaceRuleMutation{Conditions: []rules.AdmissionCondition{{Expression: "object.spec.missing == 'x'"}}, Workloads: rules.WorkloadMutation{Scheduler: "irrelevant"}})
 	before := obj.DeepCopy()
-	changed, err := mutateEphemeralRootFilesystems(t.Context(), obj, old, []*rules.NamespaceRuleBodyNamespace{body}, mutationConditions(t))
+	changed, err := mutateEphemeralContainers(t.Context(), obj, old, []*rules.NamespaceRuleBodyNamespace{body}, mutationConditions(t))
 	require.NoError(t, err)
 	require.True(t, changed)
 	items := before.Object["spec"].(map[string]any)["ephemeralContainers"].([]any)
@@ -195,7 +195,7 @@ func TestEphemeralMutationNoNewContainersAndMalformedObjects(t *testing.T) {
 			before := obj.DeepCopy()
 			body := rootFilesystemBody(new(true))
 			body.Mutate[0].Conditions = []rules.AdmissionCondition{{Expression: "object.invalid == true"}}
-			changed, err := mutateEphemeralRootFilesystems(t.Context(), obj, old, []*rules.NamespaceRuleBodyNamespace{body}, mutationConditions(t))
+			changed, err := mutateEphemeralContainers(t.Context(), obj, old, []*rules.NamespaceRuleBodyNamespace{body}, mutationConditions(t))
 			if tc.wantError == "" {
 				require.NoError(t, err)
 			} else {
