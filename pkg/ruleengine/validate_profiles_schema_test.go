@@ -53,6 +53,14 @@ func TestSecurityProfileLimitsInGeneratedSchemas(t *testing.T) {
 				}
 			}
 			var internal apiextensions.JSONSchemaProps
+			for _, name := range []string{"schedulers", "nodeSelector", "tolerations", "topologySpreadConstraints", "affinity"} {
+				require.Contains(t, schema.Properties["placement"].Properties, name)
+				require.NotContains(t, schema.Properties, name)
+			}
+			for _, name := range []string{"seccompProfiles", "appArmorProfiles"} {
+				require.Contains(t, schema.Properties["security"].Properties, name)
+				require.NotContains(t, schema.Properties, name)
+			}
 			require.NoError(t, apiextensionsv1.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&schema, &internal, nil))
 			validator, _, err := crdvalidation.NewSchemaValidator(&internal)
 			require.NoError(t, err)
@@ -80,7 +88,7 @@ func TestSecurityProfileLimitsInGeneratedSchemas(t *testing.T) {
 								if appArmor {
 									group = "appArmorProfiles"
 								}
-								location := "workloads." + group
+								location := "workloads.security." + group
 								if tc.name != "matchers" {
 									location += "[0]." + tc.name
 								}

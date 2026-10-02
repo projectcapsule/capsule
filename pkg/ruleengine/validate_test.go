@@ -169,12 +169,11 @@ func TestValidateRuleStatusBody(t *testing.T) {
 										"harbor/platform/debian:latest",
 									},
 								},
-							},
-							Schedulers: []runtime.ExpressionMatch{
+							}, Placement: rules.WorkloadPlacementEnforcement{Schedulers: []runtime.ExpressionMatch{
 								{
 									Expression: "tenant-[a-z0-9-]+",
 								},
-							},
+							}},
 						},
 						Services: rules.NamespaceRuleEnforceServicesBody{
 							Types: []rules.ServiceType{
@@ -529,17 +528,16 @@ func TestValidateRuleStatusBody(t *testing.T) {
 			bodies: []*rules.NamespaceRuleBodyNamespace{
 				{
 					Enforce: &rules.NamespaceRuleEnforceBody{
-						Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
-							Schedulers: []runtime.ExpressionMatch{
-								{
-									Expression: "[",
-								},
+						Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{Schedulers: []runtime.ExpressionMatch{
+							{
+								Expression: "[",
 							},
+						}},
 						},
 					},
 				},
 			},
-			wantErr: `rules[0].enforce.workloads.schedulers[0].exp "[" is invalid`,
+			wantErr: `rules[0].enforce.workloads.placement.schedulers[0].exp "[" is invalid`,
 		},
 		{
 			name:   "invalid service type",

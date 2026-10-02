@@ -10,7 +10,7 @@ import (
 )
 
 // VisitPlacementExpressions shares expression traversal between rule validation
-// and the existing regex-cache invalidator. Paths are relative to workloads.
+// and the existing regex-cache invalidator. Paths are relative to workloads.placement.
 func (w NamespaceRuleEnforceWorkloadsBody) VisitPlacementExpressions(visit func(string, *runtime.ExpressionMatch) error) error {
 	pair := func(path string, match WorkloadNodeSelectorMatch) error {
 		if err := visit(path+".key", (*runtime.ExpressionMatch)(match.Key)); err != nil {
@@ -37,19 +37,19 @@ func (w NamespaceRuleEnforceWorkloadsBody) VisitPlacementExpressions(visit func(
 		return requirements(path+".requirements", value.Requirements)
 	}
 
-	for i, value := range w.NodeSelector {
+	for i, value := range w.Placement.NodeSelector {
 		if err := pair(fmt.Sprintf("nodeSelector[%d]", i), value); err != nil {
 			return err
 		}
 	}
 
-	for i, value := range w.Tolerations {
+	for i, value := range w.Placement.Tolerations {
 		if err := pair(fmt.Sprintf("tolerations[%d]", i), value.WorkloadNodeSelectorMatch); err != nil {
 			return err
 		}
 	}
 
-	for i, value := range w.TopologySpreadConstraints {
+	for i, value := range w.Placement.TopologySpreadConstraints {
 		path := fmt.Sprintf("topologySpreadConstraints[%d]", i)
 		if err := visit(path+".topologyKey", (*runtime.ExpressionMatch)(value.TopologyKey)); err != nil {
 			return err
@@ -60,7 +60,7 @@ func (w NamespaceRuleEnforceWorkloadsBody) VisitPlacementExpressions(visit func(
 		}
 	}
 
-	for i, value := range w.Affinity {
+	for i, value := range w.Placement.Affinity {
 		path := fmt.Sprintf("affinity[%d]", i)
 		if err := visit(path+".topologyKey", (*runtime.ExpressionMatch)(value.TopologyKey)); err != nil {
 			return err

@@ -61,7 +61,7 @@ func TestServiceSkipsConditionsForWorkloadOnlyRule(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	body := &rules.NamespaceRuleEnforceBody{Conditions: []rules.AdmissionCondition{{Expression: "object.spec.containers.size() > 0"}}, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Tolerations: []rules.WorkloadTolerationMatch{{}}}}
+	body := &rules.NamespaceRuleEnforceBody{Conditions: []rules.AdmissionCondition{{Expression: "object.spec.containers.size() > 0"}}, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{Tolerations: []rules.WorkloadTolerationMatch{{}}}}}
 	err = ServiceRules(nil, compiler).(*serviceRules).validateServiceRules(t.Context(), admission.Request{}, &corev1.Service{}, nil, nil, []*rules.NamespaceRuleEnforceBody{body})
 	if err != nil || compiler.Stats() != 0 {
 		t.Fatalf("unrelated gate evaluated: err=%v compiled=%d", err, compiler.Stats())

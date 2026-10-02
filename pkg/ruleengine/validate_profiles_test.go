@@ -17,49 +17,51 @@ import (
 
 func TestValidateSecurityProfiles(t *testing.T) {
 	valid := &rules.NamespaceRuleBodyNamespace{
-		Mutate:  []rules.NamespaceRuleMutation{{Workloads: rules.WorkloadMutation{SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}, AppArmorProfile: &corev1.AppArmorProfile{Type: corev1.AppArmorProfileTypeLocalhost, LocalhostProfile: new("team-profile")}}}},
-		Enforce: &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{SeccompProfiles: []rules.WorkloadSecurityProfileMatch{{Types: []rules.SecurityProfileType{rules.SecurityProfileRuntimeDefault, rules.SecurityProfileLocalhost}, LocalhostProfiles: []apiruntime.ExpressionMatch{{ExpressionRegex: apiruntime.ExpressionRegex{Expression: `^teams/[^/]+\.json$`}}}}}}},
+		Mutate:  []rules.NamespaceRuleMutation{{Workloads: rules.WorkloadMutation{Security: rules.WorkloadSecurityMutation{SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}, AppArmorProfile: &corev1.AppArmorProfile{Type: corev1.AppArmorProfileTypeLocalhost, LocalhostProfile: new("team-profile")}}}}},
+		Enforce: &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Security: rules.WorkloadSecurityEnforcement{SeccompProfiles: []rules.WorkloadSecurityProfileMatch{{Types: []rules.SecurityProfileType{rules.SecurityProfileRuntimeDefault, rules.SecurityProfileLocalhost}, LocalhostProfiles: []apiruntime.ExpressionMatch{{ExpressionRegex: apiruntime.ExpressionRegex{Expression: `^teams/[^/]+\.json$`}}}}}}}},
 	}
 	require.NoError(t, ValidateRuleStatusBody(nil, []*rules.NamespaceRuleBodyNamespace{valid}))
 	for _, tc := range []struct {
 		name, want string
 		change     func(*rules.NamespaceRuleBodyNamespace)
 	}{
-		{"missing type", "seccompProfile.type", func(b *rules.NamespaceRuleBodyNamespace) { b.Mutate[0].Workloads.SeccompProfile.Type = "" }},
-		{"unknown type", "seccompProfile.type", func(b *rules.NamespaceRuleBodyNamespace) { b.Mutate[0].Workloads.SeccompProfile.Type = "Other" }},
+		{"missing type", "seccompProfile.type", func(b *rules.NamespaceRuleBodyNamespace) { b.Mutate[0].Workloads.Security.SeccompProfile.Type = "" }},
+		{"unknown type", "seccompProfile.type", func(b *rules.NamespaceRuleBodyNamespace) {
+			b.Mutate[0].Workloads.Security.SeccompProfile.Type = "Other"
+		}},
 		{"missing local file", "seccompProfile.localhostProfile", func(b *rules.NamespaceRuleBodyNamespace) {
-			b.Mutate[0].Workloads.SeccompProfile.Type = corev1.SeccompProfileTypeLocalhost
+			b.Mutate[0].Workloads.Security.SeccompProfile.Type = corev1.SeccompProfileTypeLocalhost
 		}},
 		{"unexpected local file", "seccompProfile.localhostProfile", func(b *rules.NamespaceRuleBodyNamespace) {
-			b.Mutate[0].Workloads.SeccompProfile.LocalhostProfile = new("a.json")
+			b.Mutate[0].Workloads.Security.SeccompProfile.LocalhostProfile = new("a.json")
 		}},
 		{"absolute path", "seccompProfile.localhostProfile", func(b *rules.NamespaceRuleBodyNamespace) {
-			b.Mutate[0].Workloads.SeccompProfile = &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeLocalhost, LocalhostProfile: new("/a.json")}
+			b.Mutate[0].Workloads.Security.SeccompProfile = &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeLocalhost, LocalhostProfile: new("/a.json")}
 		}},
 		{"path traversal", "seccompProfile.localhostProfile", func(b *rules.NamespaceRuleBodyNamespace) {
-			b.Mutate[0].Workloads.SeccompProfile = &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeLocalhost, LocalhostProfile: new("a/../b.json")}
+			b.Mutate[0].Workloads.Security.SeccompProfile = &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeLocalhost, LocalhostProfile: new("a/../b.json")}
 		}},
 		{"blank AppArmor", "appArmorProfile.localhostProfile", func(b *rules.NamespaceRuleBodyNamespace) {
-			b.Mutate[0].Workloads.AppArmorProfile.LocalhostProfile = new(" ")
+			b.Mutate[0].Workloads.Security.AppArmorProfile.LocalhostProfile = new(" ")
 		}},
 		{"unexpected AppArmor name", "appArmorProfile.localhostProfile", func(b *rules.NamespaceRuleBodyNamespace) {
-			b.Mutate[0].Workloads.AppArmorProfile.Type = corev1.AppArmorProfileTypeUnconfined
+			b.Mutate[0].Workloads.Security.AppArmorProfile.Type = corev1.AppArmorProfileTypeUnconfined
 		}},
-		{"no matched types", "seccompProfiles[0].types", func(b *rules.NamespaceRuleBodyNamespace) { b.Enforce.Workloads.SeccompProfiles[0].Types = nil }},
+		{"no matched types", "seccompProfiles[0].types", func(b *rules.NamespaceRuleBodyNamespace) { b.Enforce.Workloads.Security.SeccompProfiles[0].Types = nil }},
 		{"invalid matched type", "seccompProfiles[0].types", func(b *rules.NamespaceRuleBodyNamespace) {
-			b.Enforce.Workloads.SeccompProfiles[0].Types = []rules.SecurityProfileType{"Other"}
+			b.Enforce.Workloads.Security.SeccompProfiles[0].Types = []rules.SecurityProfileType{"Other"}
 		}},
 		{"name without Localhost", "localhostProfiles", func(b *rules.NamespaceRuleBodyNamespace) {
-			b.Enforce.Workloads.SeccompProfiles[0].Types = []rules.SecurityProfileType{rules.SecurityProfileRuntimeDefault}
+			b.Enforce.Workloads.Security.SeccompProfiles[0].Types = []rules.SecurityProfileType{rules.SecurityProfileRuntimeDefault}
 		}},
 		{"invalid regex", "localhostProfiles[0].exp", func(b *rules.NamespaceRuleBodyNamespace) {
-			b.Enforce.Workloads.SeccompProfiles[0].LocalhostProfiles[0].Expression = "["
+			b.Enforce.Workloads.Security.SeccompProfiles[0].LocalhostProfiles[0].Expression = "["
 		}},
 		{"empty matcher", "localhostProfiles[0]", func(b *rules.NamespaceRuleBodyNamespace) {
-			b.Enforce.Workloads.SeccompProfiles[0].LocalhostProfiles[0] = apiruntime.ExpressionMatch{}
+			b.Enforce.Workloads.Security.SeccompProfiles[0].LocalhostProfiles[0] = apiruntime.ExpressionMatch{}
 		}},
 		{"empty exact", "localhostProfiles[0].exact", func(b *rules.NamespaceRuleBodyNamespace) {
-			b.Enforce.Workloads.SeccompProfiles[0].LocalhostProfiles[0] = apiruntime.ExpressionMatch{Exact: []string{""}}
+			b.Enforce.Workloads.Security.SeccompProfiles[0].LocalhostProfiles[0] = apiruntime.ExpressionMatch{Exact: []string{""}}
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -70,7 +72,7 @@ func TestValidateSecurityProfiles(t *testing.T) {
 	}
 	for _, p := range []string{"profiles/tenant.json", "profiles/{{ .tenant.metadata.name }}.json"} {
 		body := valid.DeepCopy()
-		body.Mutate[0].Workloads.SeccompProfile = &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeLocalhost, LocalhostProfile: new(p)}
+		body.Mutate[0].Workloads.Security.SeccompProfile = &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeLocalhost, LocalhostProfile: new(p)}
 		require.NoError(t, ValidateRuleStatusBody(nil, []*rules.NamespaceRuleBodyNamespace{body}))
 	}
 	for _, target := range []rules.WorkloadValidationTarget{rules.ValidatePod, rules.ValidateDeployment} {
@@ -103,9 +105,9 @@ func securityProfileLimitBody(appArmor bool, field string, size int) *rules.Name
 	}
 	body := &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeAllow}}
 	if appArmor {
-		body.Enforce.Workloads.AppArmorProfiles = matches
+		body.Enforce.Workloads.Security.AppArmorProfiles = matches
 	} else {
-		body.Enforce.Workloads.SeccompProfiles = matches
+		body.Enforce.Workloads.Security.SeccompProfiles = matches
 	}
 	return body
 }
@@ -130,7 +132,7 @@ func TestValidateSecurityProfileLimits(t *testing.T) {
 					if size <= tc.limit {
 						require.NoError(t, err)
 					} else {
-						path := "rules[0].enforce.workloads." + group
+						path := "rules[0].enforce.workloads.security." + group
 						if tc.field != "matchers" {
 							path += "[0]." + tc.field
 						}
@@ -157,7 +159,7 @@ func BenchmarkValidateSecurityProfileLimits(b *testing.B) {
 					bodies := make([]*rules.NamespaceRuleBodyNamespace, rulesets)
 					for i := range bodies {
 						bodies[i] = securityProfileLimitBody(false, tc.field, size)
-						bodies[i].Enforce.Workloads.AppArmorProfiles = bodies[i].Enforce.Workloads.SeccompProfiles
+						bodies[i].Enforce.Workloads.Security.AppArmorProfiles = bodies[i].Enforce.Workloads.Security.SeccompProfiles
 					}
 					b.ReportAllocs()
 					for b.Loop() {

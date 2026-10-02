@@ -62,26 +62,19 @@ type WorkloadMutation struct {
 	// +listType=set
 	Targets []WorkloadValidationTarget `json:"targets,omitempty"`
 
-	// ReadOnlyRootFilesystem sets securityContext.readOnlyRootFilesystem on every
-	// selected regular or init container at Pod creation, and newly added ephemeral
-	// containers on subresource updates. Both merge and replace overwrite the value.
-	// False is an explicit setting; nil preserves it. Windows Pods are skipped.
+	// Placement configures the Pod scheduler and scheduling constraints.
 	// +optional
-	ReadOnlyRootFilesystem *bool `json:"readOnlyRootFilesystem,omitempty"`
+	Placement WorkloadPlacementMutation `json:"placement,omitzero"`
 
-	// SeccompProfile supplies the Pod-level securityContext.seccompProfile on
-	// Linux Pod creation. Merge fills an absent profile; replace replaces the
-	// complete profile. Explicit container profiles are preserved. Nil omits it.
+	// Security configures Pod and container security settings.
 	// +optional
-	SeccompProfile *corev1.SeccompProfile `json:"seccompProfile,omitempty"`
+	Security WorkloadSecurityMutation `json:"security,omitzero"`
+}
 
-	// AppArmorProfile supplies the Pod-level securityContext.appArmorProfile on
-	// Linux Pod creation. Merge fills an absent profile; replace replaces the
-	// complete profile. Explicit container profiles are preserved. Nil omits it.
-	// AppArmor and any Localhost profile must be available on eligible nodes.
-	// +optional
-	AppArmorProfile *corev1.AppArmorProfile `json:"appArmorProfile,omitempty"`
-
+// WorkloadPlacementMutation contains native Pod scheduling values.
+// Empty maps/lists are preserved so replace can clear an individual property.
+// +kubebuilder:object:generate=true
+type WorkloadPlacementMutation struct {
 	// Scheduler sets spec.schedulerName on Pod creation. Merge fills only an empty
 	// schedulerName, preserving all non-empty names, including default-scheduler.
 	// Kubernetes defaults omitted schedulerName before admission. Use replace with
@@ -91,12 +84,6 @@ type WorkloadMutation struct {
 	// +optional
 	// +kubebuilder:validation:MinLength=1
 	Scheduler string `json:"scheduler,omitempty"`
-
-	// HostUsers sets spec.hostUsers on both merge and replace. False requests a
-	// separate user namespace; true uses the host user namespace. Omitted or null
-	// leaves the Pod value unchanged. Requires Kubernetes/runtime support.
-	// +optional
-	HostUsers *bool `json:"hostUsers,omitempty"`
 
 	// NodeSelector sets configured keys on merge, or replaces the map on replace.
 	// +optional
@@ -128,6 +115,36 @@ type WorkloadMutation struct {
 	Affinity *corev1.Affinity `json:"affinity,omitempty"`
 }
 
+// WorkloadSecurityMutation contains native Pod and container security values.
+// +kubebuilder:object:generate=true
+type WorkloadSecurityMutation struct {
+	// ReadOnlyRootFilesystem sets securityContext.readOnlyRootFilesystem on every
+	// selected regular or init container at Pod creation, and newly added ephemeral
+	// containers on subresource updates. Both merge and replace overwrite the value.
+	// False is an explicit setting; nil preserves it. Windows Pods are skipped.
+	// +optional
+	ReadOnlyRootFilesystem *bool `json:"readOnlyRootFilesystem,omitempty"`
+
+	// SeccompProfile supplies the Pod-level securityContext.seccompProfile on
+	// Linux Pod creation. Merge fills an absent profile; replace replaces the
+	// complete profile. Explicit container profiles are preserved. Nil omits it.
+	// +optional
+	SeccompProfile *corev1.SeccompProfile `json:"seccompProfile,omitempty"`
+
+	// AppArmorProfile supplies the Pod-level securityContext.appArmorProfile on
+	// Linux Pod creation. Merge fills an absent profile; replace replaces the
+	// complete profile. Explicit container profiles are preserved. Nil omits it.
+	// AppArmor and any Localhost profile must be available on eligible nodes.
+	// +optional
+	AppArmorProfile *corev1.AppArmorProfile `json:"appArmorProfile,omitempty"`
+
+	// HostUsers sets spec.hostUsers on both merge and replace. False requests a
+	// separate user namespace; true uses the host user namespace. Omitted or null
+	// leaves the Pod value unchanged. Requires Kubernetes/runtime support.
+	// +optional
+	HostUsers *bool `json:"hostUsers,omitempty"`
+}
+
 // GetWorkloadTargets reports whether a mutation selects this Pod location.
 func (w WorkloadMutation) GetWorkloadTargets(target WorkloadValidationTarget) bool {
 	return len(w.Targets) == 0 || slices.Contains(w.Targets, ValidatePod) || slices.Contains(w.Targets, target)
@@ -135,5 +152,5 @@ func (w WorkloadMutation) GetWorkloadTargets(target WorkloadValidationTarget) bo
 
 // HasPodProperties reports whether any Pod-level property is configured.
 func (w WorkloadMutation) HasPodProperties() bool {
-	return w.Scheduler != "" || w.HostUsers != nil || w.NodeSelector != nil || w.Tolerations != nil || w.TopologySpreadConstraints != nil || w.Affinity != nil || w.SeccompProfile != nil || w.AppArmorProfile != nil
+	return w.Placement.Scheduler != "" || w.Security.HostUsers != nil || w.Placement.NodeSelector != nil || w.Placement.Tolerations != nil || w.Placement.TopologySpreadConstraints != nil || w.Placement.Affinity != nil || w.Security.SeccompProfile != nil || w.Security.AppArmorProfile != nil
 }

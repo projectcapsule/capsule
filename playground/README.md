@@ -311,7 +311,7 @@ waits for the effective placement rule before creating the example Pods.
   demonstration Pod pending without requiring a custom scheduler or specially
   labelled nodes.
 
-Set `mutate[].workloads.scheduler` to choose a scheduler for new Pods. With
+Set `mutate[].workloads.placement.scheduler` to choose a scheduler for new Pods. With
 `action: merge` (the default), Capsule fills only an empty `schedulerName` and
 preserves all non-empty names, including `default-scheduler`. Kubernetes fills in
 `default-scheduler` before admission. To use another default while preserving
@@ -319,15 +319,24 @@ custom scheduler names, the shared example uses a separate `replace` entry with
 this condition (alongside its shared-pool condition):
 
 ```yaml
-mutate:
-  - action: replace
-    conditions:
-      - name: default-scheduler
-        expression: >-
-          !has(object.spec.schedulerName) ||
-          object.spec.schedulerName in ['', 'default-scheduler']
-    workloads:
-      scheduler: solar-shared-scheduler
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: solar
+spec:
+  owners:
+    - kind: User
+      name: solar-owner
+  rules:
+    - mutate:
+        - action: replace
+          conditions:
+            - name: default-scheduler
+              expression: >-
+                !has(object.spec.schedulerName) || object.spec.schedulerName in ['', 'default-scheduler']
+          workloads:
+            placement:
+              scheduler: solar-shared-scheduler
 ```
 
 This also replaces an explicitly selected `default-scheduler`, since admission
@@ -336,7 +345,7 @@ node selector and toleration independent of the scheduler condition. To always
 set the scheduler, use `replace` without conditions.
 
 Omitting `scheduler` retains the current value. Mutation conditions still apply,
-and the resulting name must pass `enforce.workloads.schedulers` rules. Existing
+and the resulting name must pass `enforce.workloads.placement.schedulers` rules. Existing
 Pods and workload templates are not rewritten; controller-created Pods receive
 the scheduler when admitted.
 
