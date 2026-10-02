@@ -3,7 +3,11 @@
 
 package rules
 
-import corev1 "k8s.io/api/core/v1"
+import (
+	"slices"
+
+	corev1 "k8s.io/api/core/v1"
+)
 
 // MutationAction selects merge or replacement of supplied workload properties.
 type MutationAction string
@@ -25,9 +29,9 @@ type NamespaceRuleMutation struct {
 	Conditions []AdmissionCondition `json:"conditions,omitempty"`
 
 	// Action chooses how explicitly supplied properties are applied.
-	// Merge fills an empty schedulerName and absent security profiles, sets hostUsers
+	// Merge fills an empty schedulerName and absent security profiles, sets hostUsers, readOnlyRootFilesystem,
 	// and map keys, upserts lists, and conjoins required affinity.
-	// Replace replaces each supplied property in full: scheduler, hostUsers, nodeSelector,
+	// Replace replaces each supplied property in full: scheduler, hostUsers, readOnlyRootFilesystem, nodeSelector,
 	// tolerations, topologySpreadConstraints, affinity, or security profiles. Omitted properties are
 	// retained. Supplying affinity replaces all its branches, including omitted ones.
 	// +optional
@@ -41,11 +45,30 @@ type NamespaceRuleMutation struct {
 
 // WorkloadMutation contains typed native Pod values. Empty maps/lists are
 // preserved so replace can clear a property; nil means the property is omitted.
-// It applies only on Pod creation and never reconciles running Pods.
-// On merge, later entries override hostUsers, matching map keys, tolerations and spread constraints.
+// It applies on Pod creation. ReadOnlyRootFilesystem also applies to newly added
+// ephemeral containers on subresource updates. Existing containers are never reconciled.
+// On merge, later entries override hostUsers, readOnlyRootFilesystem, matching map keys,
+// tolerations and spread constraints.
 // On merge, required affinity restrictions from applicable entries are ANDed.
 // +kubebuilder:object:generate=true
 type WorkloadMutation struct {
+	// Targets selects compatible Pod locations. Omitted or empty selects all
+	// compatible locations. The pod target includes Pod-level properties and all
+	// container groups; pod/containers, pod/initcontainers and pod/ephemeralcontainers
+	// narrow selection to one group. Controller templates and volumes are not supported.
+	// +optional
+	// +kubebuilder:validation:MaxItems=4
+	// +kubebuilder:validation:items:Enum=pod;pod/containers;pod/initcontainers;pod/ephemeralcontainers
+	// +listType=set
+	Targets []WorkloadValidationTarget `json:"targets,omitempty"`
+
+	// ReadOnlyRootFilesystem sets securityContext.readOnlyRootFilesystem on every
+	// selected regular or init container at Pod creation, and newly added ephemeral
+	// containers on subresource updates. Both merge and replace overwrite the value.
+	// False is an explicit setting; nil preserves it. Windows Pods are skipped.
+	// +optional
+	ReadOnlyRootFilesystem *bool `json:"readOnlyRootFilesystem,omitempty"`
+
 	// SeccompProfile supplies the Pod-level securityContext.seccompProfile on
 	// Linux Pod creation. Merge fills an absent profile; replace replaces the
 	// complete profile. Explicit container profiles are preserved. Nil omits it.
@@ -103,4 +126,14 @@ type WorkloadMutation struct {
 	// Replace replaces all affinity, including any branches omitted from the rule.
 	// +optional
 	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+}
+
+// GetWorkloadTargets reports whether a mutation selects this Pod location.
+func (w WorkloadMutation) GetWorkloadTargets(target WorkloadValidationTarget) bool {
+	return len(w.Targets) == 0 || slices.Contains(w.Targets, ValidatePod) || slices.Contains(w.Targets, target)
+}
+
+// HasPodProperties reports whether any Pod-level property is configured.
+func (w WorkloadMutation) HasPodProperties() bool {
+	return w.Scheduler != "" || w.HostUsers != nil || w.NodeSelector != nil || w.Tolerations != nil || w.TopologySpreadConstraints != nil || w.Affinity != nil || w.SeccompProfile != nil || w.AppArmorProfile != nil
 }

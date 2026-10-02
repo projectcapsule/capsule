@@ -27,6 +27,8 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 
 	before := podPlacement(pod).DeepCopy()
 
+	var rootFilesystems []rootFilesystemContainer
+
 	for i, body := range bodies {
 		if body == nil {
 			continue
@@ -34,6 +36,9 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 
 		for j := range body.Mutate {
 			mutation := &body.Mutate[j]
+			if (len(mutation.Workloads.Targets) > 0 || mutation.Workloads.ReadOnlyRootFilesystem != nil) && !mutationAppliesToPod(pod, mutation.Workloads) {
+				continue
+			}
 
 			matched, err := matchesMutationConditions(ctx, conditions, pod, mutation.Conditions)
 			if err != nil {
@@ -46,27 +51,55 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 
 			switch mutation.Action {
 			case "", apirules.MutationActionMerge:
-				if err := mergePodPlacement(pod, &mutation.Workloads); err != nil {
-					return false, fmt.Errorf("rules[%d].mutate[%d].workloads: %w", i, j, err)
+				if mutation.Workloads.GetWorkloadTargets(apirules.ValidatePod) {
+					if err := mergePodPlacement(pod, &mutation.Workloads); err != nil {
+						return false, fmt.Errorf("rules[%d].mutate[%d].workloads: %w", i, j, err)
+					}
 				}
 			case apirules.MutationActionReplace:
-				replacePodPlacement(pod, &mutation.Workloads)
+				if mutation.Workloads.GetWorkloadTargets(apirules.ValidatePod) {
+					replacePodPlacement(pod, &mutation.Workloads)
+				}
 			default:
 				return false, fmt.Errorf("rules[%d].mutate[%d].action: unsupported action %q (expected merge or replace)", i, j, mutation.Action)
+			}
+
+			if mutation.Workloads.ReadOnlyRootFilesystem != nil && (pod.Spec.OS == nil || pod.Spec.OS.Name != corev1.Windows) {
+				if rootFilesystems == nil {
+					rootFilesystems = rootFilesystemContainers(pod, false, nil)
+				}
+
+				mutateRootFilesystems(rootFilesystems, mutation.Workloads)
 			}
 		}
 	}
 
-	after := podPlacement(pod)
+	return slices.ContainsFunc(rootFilesystems, rootFilesystemContainer.changed) || podPlacementChanged(before, podPlacement(pod)), nil
+}
 
-	return before.Scheduler != pod.Spec.SchedulerName ||
+func podPlacementChanged(before, after *apirules.WorkloadMutation) bool {
+	return before.Scheduler != after.Scheduler ||
 		(before.SeccompProfile != after.SeccompProfile && !equality.Semantic.DeepEqual(before.SeccompProfile, after.SeccompProfile)) ||
 		(before.AppArmorProfile != after.AppArmorProfile && !equality.Semantic.DeepEqual(before.AppArmorProfile, after.AppArmorProfile)) ||
-		!equality.Semantic.DeepEqual(before.HostUsers, pod.Spec.HostUsers) ||
-		!equality.Semantic.DeepEqual(before.NodeSelector, pod.Spec.NodeSelector) ||
-		!equality.Semantic.DeepEqual(before.Tolerations, pod.Spec.Tolerations) ||
-		!equality.Semantic.DeepEqual(before.TopologySpreadConstraints, pod.Spec.TopologySpreadConstraints) ||
-		!equality.Semantic.DeepEqual(before.Affinity, pod.Spec.Affinity), nil
+		!equality.Semantic.DeepEqual(before.HostUsers, after.HostUsers) ||
+		!equality.Semantic.DeepEqual(before.NodeSelector, after.NodeSelector) ||
+		!equality.Semantic.DeepEqual(before.Tolerations, after.Tolerations) ||
+		!equality.Semantic.DeepEqual(before.TopologySpreadConstraints, after.TopologySpreadConstraints) ||
+		!equality.Semantic.DeepEqual(before.Affinity, after.Affinity)
+}
+
+func mutationAppliesToPod(pod *corev1.Pod, workload apirules.WorkloadMutation) bool {
+	if workload.HasPodProperties() && workload.GetWorkloadTargets(apirules.ValidatePod) {
+		return true
+	}
+
+	if workload.ReadOnlyRootFilesystem == nil || (pod.Spec.OS != nil && pod.Spec.OS.Name == corev1.Windows) {
+		return false
+	}
+
+	return (len(pod.Spec.Containers) > 0 && workload.GetWorkloadTargets(apirules.ValidateContainers)) ||
+		(len(pod.Spec.InitContainers) > 0 && workload.GetWorkloadTargets(apirules.ValidateInitContainers)) ||
+		(len(pod.Spec.EphemeralContainers) > 0 && workload.GetWorkloadTargets(apirules.ValidateEphemeralContainers))
 }
 
 // A shallow read-only snapshot keeps the caller's Pod from escaping to the CEL

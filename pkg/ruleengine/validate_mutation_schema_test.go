@@ -1,0 +1,69 @@
+// Copyright 2020-2026 Project Capsule Authors
+// SPDX-License-Identifier: Apache-2.0
+
+package ruleengine
+
+import (
+	"encoding/json"
+	"os"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	crdvalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	"sigs.k8s.io/yaml"
+)
+
+func TestWorkloadMutationGeneratedSchemas(t *testing.T) {
+	for _, resource := range []string{"tenants", "rulestatuses"} {
+		data, err := os.ReadFile("../../charts/capsule/crds/capsule.clastix.io_" + resource + ".yaml")
+		require.NoError(t, err)
+		var crd apiextensionsv1.CustomResourceDefinition
+		require.NoError(t, yaml.UnmarshalStrict(data, &crd))
+		found := 0
+		var visit func(apiextensionsv1.JSONSchemaProps, string)
+		visit = func(schema apiextensionsv1.JSONSchemaProps, path string) {
+			if _, ok := schema.Properties["readOnlyRootFilesystem"]; ok {
+				found++
+				require.Equal(t, "set", *schema.Properties["targets"].XListType)
+				var internal apiextensions.JSONSchemaProps
+				require.NoError(t, apiextensionsv1.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&schema, &internal, nil))
+				validator, _, err := crdvalidation.NewSchemaValidator(&internal)
+				require.NoError(t, err)
+				for _, tc := range []struct {
+					object string
+					valid  bool
+				}{
+					{`{}`, true}, {`{"readOnlyRootFilesystem":false}`, true},
+					{`{"targets":[],"readOnlyRootFilesystem":true}`, true},
+					{`{"targets":["pod","pod/containers","pod/initcontainers","pod/ephemeralcontainers"],"readOnlyRootFilesystem":true}`, true},
+					{`{"targets":["deployment"],"readOnlyRootFilesystem":true}`, false},
+					{`{"targets":["pod/volumes"],"readOnlyRootFilesystem":true}`, false},
+					{`{"targets":["pod","pod","pod","pod","pod"],"readOnlyRootFilesystem":true}`, false},
+					{`{"readOnlyRootFilesystem":"false"}`, false},
+				} {
+					var obj any
+					require.NoError(t, json.Unmarshal([]byte(tc.object), &obj))
+					errs := crdvalidation.ValidateCustomResource(field.NewPath(path), obj, validator)
+					require.Equal(t, tc.valid, len(errs) == 0, "%s: %s: %v", path, tc.object, errs)
+				}
+			}
+			for name, property := range schema.Properties {
+				visit(property, path+"/"+name)
+			}
+			if schema.Items != nil && schema.Items.Schema != nil {
+				visit(*schema.Items.Schema, path+"/*")
+			}
+		}
+		for _, version := range crd.Spec.Versions {
+			visit(*version.Schema.OpenAPIV3Schema, resource+"/"+version.Name)
+		}
+		if resource == "tenants" {
+			require.Equal(t, 1, found)
+		} else {
+			require.Equal(t, 3, found)
+		}
+	}
+}

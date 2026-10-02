@@ -139,7 +139,7 @@ func TestMutationHandlerSkipsPlacementOutsidePodCreate(t *testing.T) {
 		req.Kind.Version = "v1"
 		req.Kind.Kind = "Pod"
 		obj := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "v1", "kind": "Pod", "spec": map[string]any{}}}
-		if response := h.mutate(obj, bodies)(context.Background(), admission.Request{AdmissionRequest: req}); response != nil {
+		if response := h.mutate(obj, nil, bodies)(context.Background(), admission.Request{AdmissionRequest: req}); response != nil {
 			t.Fatalf("unexpected placement response: %+v", response)
 		}
 	}

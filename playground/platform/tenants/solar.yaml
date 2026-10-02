@@ -179,6 +179,9 @@ spec:
       mutate:
         - action: merge
           workloads:
+            # pod includes regular, init/sidecar and newly added ephemeral containers.
+            targets: [pod]
+            readOnlyRootFilesystem: true
             seccompProfile:
               type: RuntimeDefault
       enforce:

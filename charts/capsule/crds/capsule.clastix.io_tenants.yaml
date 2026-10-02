@@ -4009,9 +4009,9 @@ spec:
                             default: merge
                             description: |-
                               Action chooses how explicitly supplied properties are applied.
-                              Merge fills an empty schedulerName and absent security profiles, sets hostUsers
+                              Merge fills an empty schedulerName and absent security profiles, sets hostUsers, readOnlyRootFilesystem,
                               and map keys, upserts lists, and conjoins required affinity.
-                              Replace replaces each supplied property in full: scheduler, hostUsers, nodeSelector,
+                              Replace replaces each supplied property in full: scheduler, hostUsers, readOnlyRootFilesystem, nodeSelector,
                               tolerations, topologySpreadConstraints, affinity, or security profiles. Omitted properties are
                               retained. Supplying affinity replaces all its branches, including omitted ones.
                             enum:
@@ -4049,8 +4049,10 @@ spec:
                             description: |-
                               WorkloadMutation contains typed native Pod values. Empty maps/lists are
                               preserved so replace can clear a property; nil means the property is omitted.
-                              It applies only on Pod creation and never reconciles running Pods.
-                              On merge, later entries override hostUsers, matching map keys, tolerations and spread constraints.
+                              It applies on Pod creation. ReadOnlyRootFilesystem also applies to newly added
+                              ephemeral containers on subresource updates. Existing containers are never reconciled.
+                              On merge, later entries override hostUsers, readOnlyRootFilesystem, matching map keys,
+                              tolerations and spread constraints.
                               On merge, required affinity restrictions from applicable entries are ANDed.
                             properties:
                               affinity:
@@ -5034,6 +5036,13 @@ spec:
                                 description: NodeSelector sets configured keys on
                                   merge, or replaces the map on replace.
                                 type: object
+                              readOnlyRootFilesystem:
+                                description: |-
+                                  ReadOnlyRootFilesystem sets securityContext.readOnlyRootFilesystem on every
+                                  selected regular or init container at Pod creation, and newly added ephemeral
+                                  containers on subresource updates. Both merge and replace overwrite the value.
+                                  False is an explicit setting; nil preserves it. Windows Pods are skipped.
+                                type: boolean
                               scheduler:
                                 description: |-
                                   Scheduler sets spec.schedulerName on Pod creation. Merge fills only an empty
@@ -5069,6 +5078,25 @@ spec:
                                 required:
                                 - type
                                 type: object
+                              targets:
+                                description: |-
+                                  Targets selects compatible Pod locations. Omitted or empty selects all
+                                  compatible locations. The pod target includes Pod-level properties and all
+                                  container groups; pod/containers, pod/initcontainers and pod/ephemeralcontainers
+                                  narrow selection to one group. Controller templates and volumes are not supported.
+                                items:
+                                  description: WorkloadValidationTarget selects a
+                                    native workload and optional Pod-spec location.
+                                  enum:
+                                  - pod
+                                  - pod/containers
+                                  - pod/initcontainers
+                                  - pod/ephemeralcontainers
+                                  pattern: ^(pod(/(initcontainers|ephemeralcontainers|containers|volumes))?|(deployment|statefulset|daemonset|replicaset|replicationcontroller|job|cronjob)(/(initcontainers|containers|volumes))?)$
+                                  type: string
+                                maxItems: 4
+                                type: array
+                                x-kubernetes-list-type: set
                               tolerations:
                                 description: |-
                                   Tolerations merges by key, operator (default Equal), value and effect.
