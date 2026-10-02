@@ -10,7 +10,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/projectcapsule/capsule/pkg/api/meta"
 	apirules "github.com/projectcapsule/capsule/pkg/api/rules"
 	"github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/ruleengine"
@@ -39,7 +38,7 @@ func (h *genericRules) validateMetadata(
 	gvk schema.GroupVersionKind,
 	enforceBodies []*apirules.NamespaceRuleEnforceBody,
 ) (*ruleengine.Evaluation, error) {
-	if obj == nil || len(enforceBodies) == 0 || meta.ShouldSkipObjectByRules(obj, h.objectSkipRules) {
+	if obj == nil || len(enforceBodies) == 0 {
 		return nil, nil
 	}
 
