@@ -57,6 +57,9 @@ func TestPlaygroundSecurityProfiles(t *testing.T) {
 			pod := &corev1.Pod{}
 			require.NoError(t, runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, pod))
 			if selected {
+				for _, container := range pod.Spec.Containers {
+					require.Equal(t, new(true), container.SecurityContext.ReadOnlyRootFilesystem)
+				}
 				require.Equal(t, corev1.SeccompProfileTypeRuntimeDefault, pod.Spec.SecurityContext.SeccompProfile.Type)
 				require.Equal(t, corev1.AppArmorProfileTypeRuntimeDefault, pod.Spec.SecurityContext.AppArmorProfile.Type)
 			} else {
