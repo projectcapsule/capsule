@@ -76,6 +76,7 @@ func GenericRules(
 
 	h.rules = []genericRuleValidator{
 		h.validateMetadata,
+		h.validateWorkloadTypes,
 	}
 	if len(compilers) > 0 {
 		h.compiler = compilers[0]
@@ -159,16 +160,17 @@ func (h *genericRules) validateGenericRules(
 	recorder events.EventRecorder,
 	enforceBodies []*apirules.NamespaceRuleEnforceBody,
 ) error {
-	if obj == nil {
+	if obj == nil || !matchesGenericMetadataRequest(req) {
 		return nil
 	}
 
 	obj.SetGroupVersionKind(gvk)
 
 	// Managed labels are bookkeeping, not proof of who submitted the object.
-	// Only the authenticated Capsule controller may use this exemption, even
-	// when the separate managed-label protection webhook is disabled.
-	if meta.ShouldSkipObjectByRules(obj, h.objectSkipRules) && users.IsControllerServiceAccount(req.UserInfo.Username) {
+	// Only the authenticated Capsule controller may skip metadata enforcement;
+	// workload type policies still apply to its requests.
+	skipMetadata := meta.ShouldSkipObjectByRules(obj, h.objectSkipRules) && users.IsControllerServiceAccount(req.UserInfo.Username)
+	if skipMetadata && !hasWorkloadTypePolicy(gvk, enforceBodies) {
 		return nil
 	}
 
@@ -177,6 +179,14 @@ func (h *genericRules) validateGenericRules(
 	enforceBodies, err = ruleengine.FilterEnforcementConditions(ctx,
 		ruleengine.NewConditionEvaluator(h.compiler, req.AdmissionRequest), nil, enforceBodies,
 		func(body *apirules.NamespaceRuleEnforceBody) bool {
+			if _, supported := workloadTypeForGVK(gvk); supported && workloadKindRuleApplies(gvk, body) {
+				return true
+			}
+
+			if skipMetadata {
+				return false
+			}
+
 			for _, metadata := range body.Metadata {
 				if metadata.MatchesGroupVersionKind(gvk) {
 					return true
@@ -189,7 +199,12 @@ func (h *genericRules) validateGenericRules(
 		return fmt.Errorf("enforce: %w", err)
 	}
 
-	for _, evaluate := range h.rules {
+	validators := h.rules
+	if skipMetadata {
+		validators = []genericRuleValidator{h.validateWorkloadTypes}
+	}
+
+	for _, evaluate := range validators {
 		evaluation, err := evaluate(oldObj, obj, gvk, enforceBodies)
 		if err != nil {
 			return err

@@ -100,6 +100,44 @@ func TestManagedMetadataExemptionRequiresConfiguredIdentity(t *testing.T) {
 	}
 }
 
+func TestManagedMetadataExemptionPreservesWorkloadTypes(t *testing.T) {
+	t.Setenv(configuration.EnvironmentControllerNamespace, "capsule-system")
+	t.Setenv(configuration.EnvironmentServiceaccountName, "capsule-controller")
+	for _, label := range []string{meta.ValueController, meta.ValueControllerResources} {
+		for _, operation := range []admissionv1.Operation{admissionv1.Create, admissionv1.Update} {
+			for _, actor := range []string{"alice", users.ServiceAccountUsername("capsule-system", "capsule-controller")} {
+				for _, action := range []rules.ActionType{rules.ActionTypeAllow, rules.ActionTypeDeny} {
+					t.Run(fmt.Sprintf("%s/%s/%s/%s", label, operation, actor, action), func(t *testing.T) {
+						bodies := managedIdentityRules(1)
+						bodies = append(bodies, &rules.NamespaceRuleBodyNamespace{Enforce: typePolicy(action, rules.ValidatePod)})
+						obj := genericMetadataObject(map[string]string{meta.NewManagedByCapsuleLabel: label, "example.org/denied-0": "true"}, nil)
+						req := admissionRequest("v1", "Pod")
+						req.Operation, req.UserInfo.Username = operation, actor
+						h := GenericRules(nil)
+						var response *admission.Response
+						if operation == admissionv1.Create {
+							response = h.OnCreate(nil, nil, obj, nil, testEventRecorder{}, testTenant(), bodies)(t.Context(), req)
+						} else {
+							response = h.OnUpdate(nil, nil, genericMetadataObject(nil, nil), obj, nil, testEventRecorder{}, testTenant(), bodies)(t.Context(), req)
+						}
+						if actor != "alice" && action == rules.ActionTypeAllow {
+							require.Nil(t, response, "metadata exemption must preserve chain continuation")
+							return
+						}
+						require.NotNil(t, response)
+						require.False(t, response.Allowed)
+						if actor == "alice" {
+							require.Contains(t, response.Result.Message, "metadata label")
+						} else {
+							require.Contains(t, response.Result.Message, "workload type")
+						}
+					})
+				}
+			}
+		}
+	}
+}
+
 func BenchmarkGenericMetadataAdmission(b *testing.B) {
 	b.Setenv(configuration.EnvironmentControllerNamespace, "capsule-system")
 	b.Setenv(configuration.EnvironmentServiceaccountName, "capsule-controller")
@@ -107,16 +145,23 @@ func BenchmarkGenericMetadataAdmission(b *testing.B) {
 		for _, tc := range []struct {
 			name, label, username string
 			denied                bool
+			workloadAction        rules.ActionType
 		}{
 			{name: "allow", username: "alice"},
 			{name: "deny", username: "alice", denied: true},
 			{name: "forged-controller", label: meta.ValueController, username: "alice", denied: true},
 			{name: "forged-resources", label: meta.ValueControllerResources, username: "alice", denied: true},
 			{name: "controller", label: meta.ValueController, username: users.ServiceAccountUsername("capsule-system", "capsule-controller")},
+			{name: "controller-workload-allow", label: meta.ValueController, username: users.ServiceAccountUsername("capsule-system", "capsule-controller"), workloadAction: rules.ActionTypeAllow},
+			{name: "controller-workload-deny", label: meta.ValueController, username: users.ServiceAccountUsername("capsule-system", "capsule-controller"), workloadAction: rules.ActionTypeDeny, denied: true},
+			{name: "forged-workload-allow", label: meta.ValueController, username: "alice", workloadAction: rules.ActionTypeAllow, denied: true},
 		} {
 			b.Run(fmt.Sprintf("rules=%d/%s", count, tc.name), func(b *testing.B) {
 				h := GenericRules(nil)
 				bodies := managedIdentityRules(count)
+				if tc.workloadAction != "" {
+					bodies = append(bodies, &rules.NamespaceRuleBodyNamespace{Enforce: typePolicy(tc.workloadAction, rules.ValidatePod)})
+				}
 				obj := &metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{Name: "pod", Labels: map[string]string{"example.org/allowed": "true"}}}
 				if tc.denied || tc.label != "" {
 					obj.Labels["example.org/denied-0"] = "true"

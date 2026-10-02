@@ -59,7 +59,7 @@ func TestForKindFiltersBeforeCallingHandler(t *testing.T) {
 func TestGenericValidatingIncludesResourceHandlers(t *testing.T) {
 	t.Parallel()
 
-	webhook := Register(nil, nil, nil, &requestSpyHandler{}, &requestSpyHandler{})
+	webhook := Register(nil, nil, nil, nil, &requestSpyHandler{}, &requestSpyHandler{})
 	if got := len(webhook.GetHandlers()); got != 4 {
 		t.Fatalf("handlers = %d, want generic metadata, two resource handlers, and ingress", got)
 	}

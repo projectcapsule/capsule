@@ -350,6 +350,15 @@ var _ = Describe("workload placement namespace profiles", Label("tenant", "rules
 			Expect(yaml.UnmarshalStrict(data, pod)).To(Succeed())
 			pod.Namespace = ""
 			created := createPod(ownerA, ns.Name, pod)
+			Eventually(func(g Gomega) {
+				stored := &corev1.Pod{}
+				g.Expect(k8sClient.Get(context.Background(), client.ObjectKeyFromObject(created), stored)).To(Succeed())
+				wantScheduler := corev1.DefaultSchedulerName
+				if name == "shared" {
+					wantScheduler = "solar-shared-scheduler"
+				}
+				g.Expect(stored.Spec.SchedulerName).To(Equal(wantScheduler))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			Expect(created.Spec.NodeSelector).To(HaveKeyWithValue("kubernetes.io/os", "linux"))
 			if name == "shared" {
 				Expect(created.Spec.NodeSelector).To(HaveKeyWithValue("placement.example.com/pool", "shared"))

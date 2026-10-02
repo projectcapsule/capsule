@@ -40,6 +40,10 @@ annotations:
     - name: Documentation
       url: https://projectcapsule.dev/
   artifacthub.io/changes: |
+    - kind: added
+      description: extend workload targets to native controller templates and kind-only allow, deny, and audit rules
+    - kind: added
+      description: added scheduler workload mutation with empty-only merge and conditional replacement for namespace profiles
     - kind: fixed
       description: bind managed-object rule exemptions to the Capsule controller identity and protect both managed label values on namespaces and namespaced resources
     - kind: fixed

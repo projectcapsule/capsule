@@ -70,6 +70,12 @@ var _ = Describe("managed labels cannot bypass metadata enforcement", Label("ten
 				}}},
 			}},
 		}}
+		tenantA.Spec.Rules = append(tenantA.Spec.Rules, &rules.NamespaceRuleBodyTenant{
+			NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{profile: "restricted"}},
+			NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{
+				Action: rules.ActionTypeAllow, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: []rules.WorkloadValidationTarget{rules.ValidatePod}},
+			}},
+		})
 		for _, tnt := range []*capsulev1beta2.Tenant{tenantA, tenantB} {
 			DeferCleanup(func() { EventuallyDeletion(tnt) })
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, tnt) }).Should(Succeed())
@@ -90,8 +96,9 @@ var _ = Describe("managed labels cannot bypass metadata enforcement", Label("ten
 		Eventually(func(g Gomega) {
 			status := &capsulev1beta2.RuleStatus{}
 			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: selected.Name, Name: meta.NameForManagedRuleStatus()}, status)).To(Succeed())
-			g.Expect(status.Status.Rules).To(HaveLen(1))
+			g.Expect(status.Status.Rules).To(HaveLen(2))
 			g.Expect(status.Status.Rules[0].Enforce).To(Equal(tenantA.Spec.Rules[0].Enforce))
+			g.Expect(status.Status.Rules[1].Enforce).To(Equal(tenantA.Spec.Rules[1].Enforce))
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		owner = ownerClient(tenantA.Spec.Owners[0].UserSpec)
 		controller = impersonationClientSet(ControllerServiceAccountFull, users.ServiceAccountGroups(ControllerNamespace))
@@ -205,6 +212,34 @@ var _ = Describe("managed labels cannot bypass metadata enforcement", Label("ten
 			Eventually(func() error {
 				return patchNamespace(controller, selected.Name, map[string]any{denied: nil, meta.NewManagedByCapsuleLabel: nil})
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		}
+
+		By("retaining workload type enforcement for authenticated controller writes")
+		Eventually(func() error {
+			current := &capsulev1beta2.Tenant{}
+			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(tenantA), current); err != nil {
+				return err
+			}
+			current.Spec.Rules[1].Enforce.Action = rules.ActionTypeDeny
+			return k8sClient.Update(ctx, current)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Eventually(func(g Gomega) {
+			status := &capsulev1beta2.RuleStatus{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: selected.Name, Name: meta.NameForManagedRuleStatus()}, status)).To(Succeed())
+			g.Expect(status.Status.ObservedGeneration).To(Equal(status.Generation))
+			g.Expect(status.Status.Rules).To(HaveLen(2))
+			g.Expect(status.Status.Rules[1].Enforce.Action).To(Equal(rules.ActionTypeDeny))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		for _, value := range []string{meta.ValueController, meta.ValueControllerResources} {
+			name := "workload-denied-" + value
+			Eventually(func(g Gomega) {
+				_, err := controller.CoreV1().Pods(selected.Name).Create(ctx, newPod(name, map[string]string{denied: "privileged", meta.NewManagedByCapsuleLabel: value}), metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+				g.Expect(err).To(MatchError(ContainSubstring("workload type")))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			_, err := controller.CoreV1().Pods(selected.Name).Create(ctx, newPod(name, map[string]string{denied: "privileged", meta.NewManagedByCapsuleLabel: value}), metav1.CreateOptions{})
+			expectDenied(err, "workload type")
+			current := &corev1.Pod{}
+			Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKey{Namespace: selected.Name, Name: name}, current))).To(BeTrue())
 		}
 
 		By("keeping unrelated namespace profiles and tenants independent")

@@ -273,6 +273,26 @@ kubectl --context kind-capsule delete globaltenantresource solar-gateway-api-acc
 These templates do not retain expired requests. Grafana cleanup deletes the
 dedicated namespace and everything in it.
 
+## Workload targets
+
+The `solar` tenant's test profile denies DaemonSets with a targets-only rule.
+Its Deployment rule scopes registry checks and memory defaults to regular
+containers in the template. Production namespaces do not receive either rule.
+`make apply-user` creates `targeted-deployment` with zero replicas; its stored
+template receives a `32Mi` memory request.
+
+```shell
+kubectl --context kind-capsule --as alice -n solar-test get deployment targeted-deployment -o yaml
+kubectl --context kind-capsule --as alice create --dry-run=server -f user/solar/placement/daemonset-denied.yaml
+kubectl --context kind-capsule --as alice -n solar-test set image deployment/targeted-deployment app=example.com/blocked/app:v1 --dry-run=server
+```
+
+The second command is denied because of the workload kind; the third is denied
+because of the image. The denied DaemonSet example is excluded from the applied
+kustomization. A rule containing workload policies does not also deny the whole
+selected kind. Targets-only `allow` rules form a kind allow-list, so allowing
+Deployments also requires allowing ReplicaSets and Pods for replicas to start.
+
 ## Conditional Pod placement
 
 Use `make dev` to install the current controller and CRDs for these examples.
@@ -285,9 +305,40 @@ namespaces labelled `env: test`; `solar-prod` is outside this profile. The setup
 waits for the effective placement rule before creating the example Pods.
 
 - `placement-default` receives `kubernetes.io/os: linux` when that selector is absent.
-- `placement-shared` also receives the shared pool selector and toleration because
+- `placement-shared` also receives `schedulerName: solar-shared-scheduler`, the
+  shared pool selector and toleration because
   its `placement.example.com/pool` label is `shared`. A scheduling gate keeps this
-  demonstration Pod pending without requiring specially labelled nodes.
+  demonstration Pod pending without requiring a custom scheduler or specially
+  labelled nodes.
+
+Set `mutate[].workloads.scheduler` to choose a scheduler for new Pods. With
+`action: merge` (the default), Capsule fills only an empty `schedulerName` and
+preserves all non-empty names, including `default-scheduler`. Kubernetes fills in
+`default-scheduler` before admission. To use another default while preserving
+custom scheduler names, the shared example uses a separate `replace` entry with
+this condition (alongside its shared-pool condition):
+
+```yaml
+mutate:
+  - action: replace
+    conditions:
+      - name: default-scheduler
+        expression: >-
+          !has(object.spec.schedulerName) ||
+          object.spec.schedulerName in ['', 'default-scheduler']
+    workloads:
+      scheduler: solar-shared-scheduler
+```
+
+This also replaces an explicitly selected `default-scheduler`, since admission
+cannot distinguish it from an omitted value. A separate entry keeps the shared
+node selector and toleration independent of the scheduler condition. To always
+set the scheduler, use `replace` without conditions.
+
+Omitting `scheduler` retains the current value. Mutation conditions still apply,
+and the resulting name must pass `enforce.workloads.schedulers` rules. Existing
+Pods and workload templates are not rewritten; controller-created Pods receive
+the scheduler when admitted.
 
 Inspect the admission result:
 

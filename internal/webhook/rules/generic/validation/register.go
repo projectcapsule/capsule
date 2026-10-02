@@ -27,12 +27,14 @@ type genericValidating struct {
 	configuration configuration.Configuration
 	resourceRules []handlers.Handler
 	compiler      ruleengine.ConditionCompiler
+	templates     handlers.TypedHandlerWithTenantWithRuleset[*unstructured.Unstructured]
 }
 
 func Register(
 	regexCache *cache.RegexCache,
 	cfg configuration.Configuration,
 	compiler ruleengine.ConditionCompiler,
+	templates handlers.TypedHandlerWithTenantWithRuleset[*unstructured.Unstructured],
 	resourceRules ...handlers.Handler,
 ) handlers.Webhook {
 	return &genericValidating{
@@ -40,15 +42,22 @@ func Register(
 		configuration: cfg,
 		resourceRules: resourceRules,
 		compiler:      compiler,
+		templates:     templates,
 	}
 }
 
 func (w *genericValidating) GetHandlers() []handlers.Handler {
+	checks := []handlers.TypedHandlerWithTenantWithRuleset[genericObject]{GenericRules(w.regexCache, w.compiler)}
+
+	if w.templates != nil {
+		checks = append(checks, &templateBridge{next: w.templates})
+	}
+
 	out := make([]handlers.Handler, 0, len(w.resourceRules)+2)
 	out = append(out, matchingRequest(
 		matchesGenericMetadataRequest,
 		genericHandler(w.configuration,
-			GenericRules(w.regexCache, w.compiler),
+			checks...,
 		),
 	))
 	out = append(out, w.resourceRules...)

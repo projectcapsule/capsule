@@ -39,8 +39,8 @@ func TestGenericRules(t *testing.T) {
 		t.Fatalf("expected regex cache")
 	}
 
-	if len(h.rules) != 1 {
-		t.Fatalf("expected one generic validator, got %d", len(h.rules))
+	if len(h.rules) != 2 {
+		t.Fatalf("expected metadata and workload type validators, got %d", len(h.rules))
 	}
 
 	if !h.managedMetadata.HasLabel(meta.TenantLabel) {
