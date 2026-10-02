@@ -137,10 +137,12 @@ spec:
                                   exactly.
                                 items:
                                   type: string
+                                maxItems: 64
                                 minItems: 1
                                 type: array
                               exp:
                                 description: Exp matches regular expression.
+                                maxLength: 4096
                                 minLength: 1
                                 type: string
                               negate:
@@ -218,10 +220,12 @@ spec:
                                           values exactly.
                                         items:
                                           type: string
+                                        maxItems: 64
                                         minItems: 1
                                         type: array
                                       exp:
                                         description: Exp matches regular expression.
+                                        maxLength: 4096
                                         minLength: 1
                                         type: string
                                       negate:
@@ -308,10 +312,12 @@ spec:
                                           values exactly.
                                         items:
                                           type: string
+                                        maxItems: 64
                                         minItems: 1
                                         type: array
                                       exp:
                                         description: Exp matches regular expression.
+                                        maxLength: 4096
                                         minLength: 1
                                         type: string
                                       negate:
@@ -369,10 +375,12 @@ spec:
                                       values exactly.
                                     items:
                                       type: string
+                                    maxItems: 64
                                     minItems: 1
                                     type: array
                                   exp:
                                     description: Exp matches regular expression.
+                                    maxLength: 4096
                                     minLength: 1
                                     type: string
                                   negate:
@@ -475,10 +483,12 @@ spec:
                                           items:
                                             minLength: 1
                                             type: string
+                                          maxItems: 64
                                           minItems: 1
                                           type: array
                                         exp:
                                           description: Exp matches regular expression.
+                                          maxLength: 4096
                                           minLength: 1
                                           type: string
                                         negate:
@@ -513,10 +523,12 @@ spec:
                                           items:
                                             minLength: 1
                                             type: string
+                                          maxItems: 64
                                           minItems: 1
                                           type: array
                                         exp:
                                           description: Exp matches regular expression.
+                                          maxLength: 4096
                                           minLength: 1
                                           type: string
                                         negate:
@@ -560,10 +572,12 @@ spec:
                                               items:
                                                 minLength: 1
                                                 type: string
+                                              maxItems: 64
                                               minItems: 1
                                               type: array
                                             exp:
                                               description: Exp matches regular expression.
+                                              maxLength: 4096
                                               minLength: 1
                                               type: string
                                             negate:
@@ -598,10 +612,12 @@ spec:
                                               items:
                                                 minLength: 1
                                                 type: string
+                                              maxItems: 64
                                               minItems: 1
                                               type: array
                                             exp:
                                               description: Exp matches regular expression.
+                                              maxLength: 4096
                                               minLength: 1
                                               type: string
                                             negate:
@@ -663,10 +679,12 @@ spec:
                                               items:
                                                 minLength: 1
                                                 type: string
+                                              maxItems: 64
                                               minItems: 1
                                               type: array
                                             exp:
                                               description: Exp matches regular expression.
+                                              maxLength: 4096
                                               minLength: 1
                                               type: string
                                             negate:
@@ -701,10 +719,12 @@ spec:
                                               items:
                                                 minLength: 1
                                                 type: string
+                                              maxItems: 64
                                               minItems: 1
                                               type: array
                                             exp:
                                               description: Exp matches regular expression.
+                                              maxLength: 4096
                                               minLength: 1
                                               type: string
                                             negate:
@@ -725,10 +745,12 @@ spec:
                                     items:
                                       minLength: 1
                                       type: string
+                                    maxItems: 64
                                     minItems: 1
                                     type: array
                                   exp:
                                     description: Exp matches regular expression.
+                                    maxLength: 4096
                                     minLength: 1
                                     type: string
                                   negate:
@@ -757,10 +779,12 @@ spec:
                                           items:
                                             minLength: 1
                                             type: string
+                                          maxItems: 64
                                           minItems: 1
                                           type: array
                                         exp:
                                           description: Exp matches regular expression.
+                                          maxLength: 4096
                                           minLength: 1
                                           type: string
                                         negate:
@@ -795,10 +819,12 @@ spec:
                                           items:
                                             minLength: 1
                                             type: string
+                                          maxItems: 64
                                           minItems: 1
                                           type: array
                                         exp:
                                           description: Exp matches regular expression.
+                                          maxLength: 4096
                                           minLength: 1
                                           type: string
                                         negate:
@@ -818,10 +844,12 @@ spec:
                                     items:
                                       minLength: 1
                                       type: string
+                                    maxItems: 64
                                     minItems: 1
                                     type: array
                                   exp:
                                     description: Exp matches regular expression.
+                                    maxLength: 4096
                                     minLength: 1
                                     type: string
                                   negate:
@@ -878,10 +906,12 @@ spec:
                                         values exactly.
                                       items:
                                         type: string
+                                      maxItems: 64
                                       minItems: 1
                                       type: array
                                     exp:
                                       description: Exp matches regular expression.
+                                      maxLength: 4096
                                       minLength: 1
                                       type: string
                                     negate:
@@ -893,6 +923,7 @@ spec:
                                   - message: at least one of exact or exp must be
                                       set
                                     rule: has(self.exact) || has(self.exp)
+                                maxItems: 64
                                 minItems: 1
                                 type: array
                               types:
@@ -906,11 +937,13 @@ spec:
                                   - Localhost
                                   - Unconfined
                                   type: string
+                                maxItems: 3
                                 minItems: 1
                                 type: array
                             required:
                             - types
                             type: object
+                          maxItems: 64
                           type: array
                         nodeSelector:
                           description: |-
@@ -934,10 +967,12 @@ spec:
                                     items:
                                       minLength: 1
                                       type: string
+                                    maxItems: 64
                                     minItems: 1
                                     type: array
                                   exp:
                                     description: Exp matches regular expression.
+                                    maxLength: 4096
                                     minLength: 1
                                     type: string
                                   negate:
@@ -958,10 +993,12 @@ spec:
                                     items:
                                       minLength: 1
                                       type: string
+                                    maxItems: 64
                                     minItems: 1
                                     type: array
                                   exp:
                                     description: Exp matches regular expression.
+                                    maxLength: 4096
                                     minLength: 1
                                     type: string
                                   negate:
@@ -991,10 +1028,12 @@ spec:
                                   exactly.
                                 items:
                                   type: string
+                                maxItems: 64
                                 minItems: 1
                                 type: array
                               exp:
                                 description: Exp matches regular expression.
+                                maxLength: 4096
                                 minLength: 1
                                 type: string
                               negate:
@@ -1120,10 +1159,12 @@ spec:
                                   exactly.
                                 items:
                                   type: string
+                                maxItems: 64
                                 minItems: 1
                                 type: array
                               exp:
                                 description: Exp matches regular expression.
+                                maxLength: 4096
                                 minLength: 1
                                 type: string
                               negate:
@@ -1162,10 +1203,12 @@ spec:
                                         values exactly.
                                       items:
                                         type: string
+                                      maxItems: 64
                                       minItems: 1
                                       type: array
                                     exp:
                                       description: Exp matches regular expression.
+                                      maxLength: 4096
                                       minLength: 1
                                       type: string
                                     negate:
@@ -1177,6 +1220,7 @@ spec:
                                   - message: at least one of exact or exp must be
                                       set
                                     rule: has(self.exact) || has(self.exp)
+                                maxItems: 64
                                 minItems: 1
                                 type: array
                               types:
@@ -1190,11 +1234,13 @@ spec:
                                   - Localhost
                                   - Unconfined
                                   type: string
+                                maxItems: 3
                                 minItems: 1
                                 type: array
                             required:
                             - types
                             type: object
+                          maxItems: 64
                           type: array
                         targets:
                           description: |-
@@ -1240,10 +1286,12 @@ spec:
                                     items:
                                       minLength: 1
                                       type: string
+                                    maxItems: 64
                                     minItems: 1
                                     type: array
                                   exp:
                                     description: Exp matches regular expression.
+                                    maxLength: 4096
                                     minLength: 1
                                     type: string
                                   negate:
@@ -1290,10 +1338,12 @@ spec:
                                     items:
                                       minLength: 1
                                       type: string
+                                    maxItems: 64
                                     minItems: 1
                                     type: array
                                   exp:
                                     description: Exp matches regular expression.
+                                    maxLength: 4096
                                     minLength: 1
                                     type: string
                                   negate:
@@ -1342,10 +1392,12 @@ spec:
                                               items:
                                                 minLength: 1
                                                 type: string
+                                              maxItems: 64
                                               minItems: 1
                                               type: array
                                             exp:
                                               description: Exp matches regular expression.
+                                              maxLength: 4096
                                               minLength: 1
                                               type: string
                                             negate:
@@ -1380,10 +1432,12 @@ spec:
                                               items:
                                                 minLength: 1
                                                 type: string
+                                              maxItems: 64
                                               minItems: 1
                                               type: array
                                             exp:
                                               description: Exp matches regular expression.
+                                              maxLength: 4096
                                               minLength: 1
                                               type: string
                                             negate:
@@ -1451,10 +1505,12 @@ spec:
                                     items:
                                       minLength: 1
                                       type: string
+                                    maxItems: 64
                                     minItems: 1
                                     type: array
                                   exp:
                                     description: Exp matches regular expression.
+                                    maxLength: 4096
                                     minLength: 1
                                     type: string
                                   negate:
@@ -3013,10 +3069,12 @@ spec:
                                     exactly.
                                   items:
                                     type: string
+                                  maxItems: 64
                                   minItems: 1
                                   type: array
                                 exp:
                                   description: Exp matches regular expression.
+                                  maxLength: 4096
                                   minLength: 1
                                   type: string
                                 negate:
@@ -3095,10 +3153,12 @@ spec:
                                             values exactly.
                                           items:
                                             type: string
+                                          maxItems: 64
                                           minItems: 1
                                           type: array
                                         exp:
                                           description: Exp matches regular expression.
+                                          maxLength: 4096
                                           minLength: 1
                                           type: string
                                         negate:
@@ -3185,10 +3245,12 @@ spec:
                                             values exactly.
                                           items:
                                             type: string
+                                          maxItems: 64
                                           minItems: 1
                                           type: array
                                         exp:
                                           description: Exp matches regular expression.
+                                          maxLength: 4096
                                           minLength: 1
                                           type: string
                                         negate:
@@ -3247,10 +3309,12 @@ spec:
                                         values exactly.
                                       items:
                                         type: string
+                                      maxItems: 64
                                       minItems: 1
                                       type: array
                                     exp:
                                       description: Exp matches regular expression.
+                                      maxLength: 4096
                                       minLength: 1
                                       type: string
                                     negate:
@@ -3355,10 +3419,12 @@ spec:
                                             items:
                                               minLength: 1
                                               type: string
+                                            maxItems: 64
                                             minItems: 1
                                             type: array
                                           exp:
                                             description: Exp matches regular expression.
+                                            maxLength: 4096
                                             minLength: 1
                                             type: string
                                           negate:
@@ -3393,10 +3459,12 @@ spec:
                                             items:
                                               minLength: 1
                                               type: string
+                                            maxItems: 64
                                             minItems: 1
                                             type: array
                                           exp:
                                             description: Exp matches regular expression.
+                                            maxLength: 4096
                                             minLength: 1
                                             type: string
                                           negate:
@@ -3440,10 +3508,12 @@ spec:
                                                 items:
                                                   minLength: 1
                                                   type: string
+                                                maxItems: 64
                                                 minItems: 1
                                                 type: array
                                               exp:
                                                 description: Exp matches regular expression.
+                                                maxLength: 4096
                                                 minLength: 1
                                                 type: string
                                               negate:
@@ -3478,10 +3548,12 @@ spec:
                                                 items:
                                                   minLength: 1
                                                   type: string
+                                                maxItems: 64
                                                 minItems: 1
                                                 type: array
                                               exp:
                                                 description: Exp matches regular expression.
+                                                maxLength: 4096
                                                 minLength: 1
                                                 type: string
                                               negate:
@@ -3543,10 +3615,12 @@ spec:
                                                 items:
                                                   minLength: 1
                                                   type: string
+                                                maxItems: 64
                                                 minItems: 1
                                                 type: array
                                               exp:
                                                 description: Exp matches regular expression.
+                                                maxLength: 4096
                                                 minLength: 1
                                                 type: string
                                               negate:
@@ -3581,10 +3655,12 @@ spec:
                                                 items:
                                                   minLength: 1
                                                   type: string
+                                                maxItems: 64
                                                 minItems: 1
                                                 type: array
                                               exp:
                                                 description: Exp matches regular expression.
+                                                maxLength: 4096
                                                 minLength: 1
                                                 type: string
                                               negate:
@@ -3605,10 +3681,12 @@ spec:
                                       items:
                                         minLength: 1
                                         type: string
+                                      maxItems: 64
                                       minItems: 1
                                       type: array
                                     exp:
                                       description: Exp matches regular expression.
+                                      maxLength: 4096
                                       minLength: 1
                                       type: string
                                     negate:
@@ -3637,10 +3715,12 @@ spec:
                                             items:
                                               minLength: 1
                                               type: string
+                                            maxItems: 64
                                             minItems: 1
                                             type: array
                                           exp:
                                             description: Exp matches regular expression.
+                                            maxLength: 4096
                                             minLength: 1
                                             type: string
                                           negate:
@@ -3675,10 +3755,12 @@ spec:
                                             items:
                                               minLength: 1
                                               type: string
+                                            maxItems: 64
                                             minItems: 1
                                             type: array
                                           exp:
                                             description: Exp matches regular expression.
+                                            maxLength: 4096
                                             minLength: 1
                                             type: string
                                           negate:
@@ -3698,10 +3780,12 @@ spec:
                                       items:
                                         minLength: 1
                                         type: string
+                                      maxItems: 64
                                       minItems: 1
                                       type: array
                                     exp:
                                       description: Exp matches regular expression.
+                                      maxLength: 4096
                                       minLength: 1
                                       type: string
                                     negate:
@@ -3758,10 +3842,12 @@ spec:
                                           values exactly.
                                         items:
                                           type: string
+                                        maxItems: 64
                                         minItems: 1
                                         type: array
                                       exp:
                                         description: Exp matches regular expression.
+                                        maxLength: 4096
                                         minLength: 1
                                         type: string
                                       negate:
@@ -3773,6 +3859,7 @@ spec:
                                     - message: at least one of exact or exp must be
                                         set
                                       rule: has(self.exact) || has(self.exp)
+                                  maxItems: 64
                                   minItems: 1
                                   type: array
                                 types:
@@ -3786,11 +3873,13 @@ spec:
                                     - Localhost
                                     - Unconfined
                                     type: string
+                                  maxItems: 3
                                   minItems: 1
                                   type: array
                               required:
                               - types
                               type: object
+                            maxItems: 64
                             type: array
                           nodeSelector:
                             description: |-
@@ -3814,10 +3903,12 @@ spec:
                                       items:
                                         minLength: 1
                                         type: string
+                                      maxItems: 64
                                       minItems: 1
                                       type: array
                                     exp:
                                       description: Exp matches regular expression.
+                                      maxLength: 4096
                                       minLength: 1
                                       type: string
                                     negate:
@@ -3838,10 +3929,12 @@ spec:
                                       items:
                                         minLength: 1
                                         type: string
+                                      maxItems: 64
                                       minItems: 1
                                       type: array
                                     exp:
                                       description: Exp matches regular expression.
+                                      maxLength: 4096
                                       minLength: 1
                                       type: string
                                     negate:
@@ -3871,10 +3964,12 @@ spec:
                                     exactly.
                                   items:
                                     type: string
+                                  maxItems: 64
                                   minItems: 1
                                   type: array
                                 exp:
                                   description: Exp matches regular expression.
+                                  maxLength: 4096
                                   minLength: 1
                                   type: string
                                 negate:
@@ -4002,10 +4097,12 @@ spec:
                                     exactly.
                                   items:
                                     type: string
+                                  maxItems: 64
                                   minItems: 1
                                   type: array
                                 exp:
                                   description: Exp matches regular expression.
+                                  maxLength: 4096
                                   minLength: 1
                                   type: string
                                 negate:
@@ -4044,10 +4141,12 @@ spec:
                                           values exactly.
                                         items:
                                           type: string
+                                        maxItems: 64
                                         minItems: 1
                                         type: array
                                       exp:
                                         description: Exp matches regular expression.
+                                        maxLength: 4096
                                         minLength: 1
                                         type: string
                                       negate:
@@ -4059,6 +4158,7 @@ spec:
                                     - message: at least one of exact or exp must be
                                         set
                                       rule: has(self.exact) || has(self.exp)
+                                  maxItems: 64
                                   minItems: 1
                                   type: array
                                 types:
@@ -4072,11 +4172,13 @@ spec:
                                     - Localhost
                                     - Unconfined
                                     type: string
+                                  maxItems: 3
                                   minItems: 1
                                   type: array
                               required:
                               - types
                               type: object
+                            maxItems: 64
                             type: array
                           targets:
                             description: |-
@@ -4122,10 +4224,12 @@ spec:
                                       items:
                                         minLength: 1
                                         type: string
+                                      maxItems: 64
                                       minItems: 1
                                       type: array
                                     exp:
                                       description: Exp matches regular expression.
+                                      maxLength: 4096
                                       minLength: 1
                                       type: string
                                     negate:
@@ -4172,10 +4276,12 @@ spec:
                                       items:
                                         minLength: 1
                                         type: string
+                                      maxItems: 64
                                       minItems: 1
                                       type: array
                                     exp:
                                       description: Exp matches regular expression.
+                                      maxLength: 4096
                                       minLength: 1
                                       type: string
                                     negate:
@@ -4224,10 +4330,12 @@ spec:
                                                 items:
                                                   minLength: 1
                                                   type: string
+                                                maxItems: 64
                                                 minItems: 1
                                                 type: array
                                               exp:
                                                 description: Exp matches regular expression.
+                                                maxLength: 4096
                                                 minLength: 1
                                                 type: string
                                               negate:
@@ -4262,10 +4370,12 @@ spec:
                                                 items:
                                                   minLength: 1
                                                   type: string
+                                                maxItems: 64
                                                 minItems: 1
                                                 type: array
                                               exp:
                                                 description: Exp matches regular expression.
+                                                maxLength: 4096
                                                 minLength: 1
                                                 type: string
                                               negate:
@@ -4333,10 +4443,12 @@ spec:
                                       items:
                                         minLength: 1
                                         type: string
+                                      maxItems: 64
                                       minItems: 1
                                       type: array
                                     exp:
                                       description: Exp matches regular expression.
+                                      maxLength: 4096
                                       minLength: 1
                                       type: string
                                     negate:
@@ -5837,10 +5949,12 @@ spec:
                                       values exactly.
                                     items:
                                       type: string
+                                    maxItems: 64
                                     minItems: 1
                                     type: array
                                   exp:
                                     description: Exp matches regular expression.
+                                    maxLength: 4096
                                     minLength: 1
                                     type: string
                                   negate:
@@ -5919,10 +6033,12 @@ spec:
                                               provided values exactly.
                                             items:
                                               type: string
+                                            maxItems: 64
                                             minItems: 1
                                             type: array
                                           exp:
                                             description: Exp matches regular expression.
+                                            maxLength: 4096
                                             minLength: 1
                                             type: string
                                           negate:
@@ -6009,10 +6125,12 @@ spec:
                                               provided values exactly.
                                             items:
                                               type: string
+                                            maxItems: 64
                                             minItems: 1
                                             type: array
                                           exp:
                                             description: Exp matches regular expression.
+                                            maxLength: 4096
                                             minLength: 1
                                             type: string
                                           negate:
@@ -6071,10 +6189,12 @@ spec:
                                           values exactly.
                                         items:
                                           type: string
+                                        maxItems: 64
                                         minItems: 1
                                         type: array
                                       exp:
                                         description: Exp matches regular expression.
+                                        maxLength: 4096
                                         minLength: 1
                                         type: string
                                       negate:
@@ -6179,10 +6299,12 @@ spec:
                                               items:
                                                 minLength: 1
                                                 type: string
+                                              maxItems: 64
                                               minItems: 1
                                               type: array
                                             exp:
                                               description: Exp matches regular expression.
+                                              maxLength: 4096
                                               minLength: 1
                                               type: string
                                             negate:
@@ -6217,10 +6339,12 @@ spec:
                                               items:
                                                 minLength: 1
                                                 type: string
+                                              maxItems: 64
                                               minItems: 1
                                               type: array
                                             exp:
                                               description: Exp matches regular expression.
+                                              maxLength: 4096
                                               minLength: 1
                                               type: string
                                             negate:
@@ -6264,11 +6388,13 @@ spec:
                                                   items:
                                                     minLength: 1
                                                     type: string
+                                                  maxItems: 64
                                                   minItems: 1
                                                   type: array
                                                 exp:
                                                   description: Exp matches regular
                                                     expression.
+                                                  maxLength: 4096
                                                   minLength: 1
                                                   type: string
                                                 negate:
@@ -6303,11 +6429,13 @@ spec:
                                                   items:
                                                     minLength: 1
                                                     type: string
+                                                  maxItems: 64
                                                   minItems: 1
                                                   type: array
                                                 exp:
                                                   description: Exp matches regular
                                                     expression.
+                                                  maxLength: 4096
                                                   minLength: 1
                                                   type: string
                                                 negate:
@@ -6369,11 +6497,13 @@ spec:
                                                   items:
                                                     minLength: 1
                                                     type: string
+                                                  maxItems: 64
                                                   minItems: 1
                                                   type: array
                                                 exp:
                                                   description: Exp matches regular
                                                     expression.
+                                                  maxLength: 4096
                                                   minLength: 1
                                                   type: string
                                                 negate:
@@ -6408,11 +6538,13 @@ spec:
                                                   items:
                                                     minLength: 1
                                                     type: string
+                                                  maxItems: 64
                                                   minItems: 1
                                                   type: array
                                                 exp:
                                                   description: Exp matches regular
                                                     expression.
+                                                  maxLength: 4096
                                                   minLength: 1
                                                   type: string
                                                 negate:
@@ -6433,10 +6565,12 @@ spec:
                                         items:
                                           minLength: 1
                                           type: string
+                                        maxItems: 64
                                         minItems: 1
                                         type: array
                                       exp:
                                         description: Exp matches regular expression.
+                                        maxLength: 4096
                                         minLength: 1
                                         type: string
                                       negate:
@@ -6465,10 +6599,12 @@ spec:
                                               items:
                                                 minLength: 1
                                                 type: string
+                                              maxItems: 64
                                               minItems: 1
                                               type: array
                                             exp:
                                               description: Exp matches regular expression.
+                                              maxLength: 4096
                                               minLength: 1
                                               type: string
                                             negate:
@@ -6503,10 +6639,12 @@ spec:
                                               items:
                                                 minLength: 1
                                                 type: string
+                                              maxItems: 64
                                               minItems: 1
                                               type: array
                                             exp:
                                               description: Exp matches regular expression.
+                                              maxLength: 4096
                                               minLength: 1
                                               type: string
                                             negate:
@@ -6526,10 +6664,12 @@ spec:
                                         items:
                                           minLength: 1
                                           type: string
+                                        maxItems: 64
                                         minItems: 1
                                         type: array
                                       exp:
                                         description: Exp matches regular expression.
+                                        maxLength: 4096
                                         minLength: 1
                                         type: string
                                       negate:
@@ -6586,10 +6726,12 @@ spec:
                                             values exactly.
                                           items:
                                             type: string
+                                          maxItems: 64
                                           minItems: 1
                                           type: array
                                         exp:
                                           description: Exp matches regular expression.
+                                          maxLength: 4096
                                           minLength: 1
                                           type: string
                                         negate:
@@ -6601,6 +6743,7 @@ spec:
                                       - message: at least one of exact or exp must
                                           be set
                                         rule: has(self.exact) || has(self.exp)
+                                    maxItems: 64
                                     minItems: 1
                                     type: array
                                   types:
@@ -6614,11 +6757,13 @@ spec:
                                       - Localhost
                                       - Unconfined
                                       type: string
+                                    maxItems: 3
                                     minItems: 1
                                     type: array
                                 required:
                                 - types
                                 type: object
+                              maxItems: 64
                               type: array
                             nodeSelector:
                               description: |-
@@ -6642,10 +6787,12 @@ spec:
                                         items:
                                           minLength: 1
                                           type: string
+                                        maxItems: 64
                                         minItems: 1
                                         type: array
                                       exp:
                                         description: Exp matches regular expression.
+                                        maxLength: 4096
                                         minLength: 1
                                         type: string
                                       negate:
@@ -6666,10 +6813,12 @@ spec:
                                         items:
                                           minLength: 1
                                           type: string
+                                        maxItems: 64
                                         minItems: 1
                                         type: array
                                       exp:
                                         description: Exp matches regular expression.
+                                        maxLength: 4096
                                         minLength: 1
                                         type: string
                                       negate:
@@ -6699,10 +6848,12 @@ spec:
                                       values exactly.
                                     items:
                                       type: string
+                                    maxItems: 64
                                     minItems: 1
                                     type: array
                                   exp:
                                     description: Exp matches regular expression.
+                                    maxLength: 4096
                                     minLength: 1
                                     type: string
                                   negate:
@@ -6830,10 +6981,12 @@ spec:
                                       values exactly.
                                     items:
                                       type: string
+                                    maxItems: 64
                                     minItems: 1
                                     type: array
                                   exp:
                                     description: Exp matches regular expression.
+                                    maxLength: 4096
                                     minLength: 1
                                     type: string
                                   negate:
@@ -6872,10 +7025,12 @@ spec:
                                             values exactly.
                                           items:
                                             type: string
+                                          maxItems: 64
                                           minItems: 1
                                           type: array
                                         exp:
                                           description: Exp matches regular expression.
+                                          maxLength: 4096
                                           minLength: 1
                                           type: string
                                         negate:
@@ -6887,6 +7042,7 @@ spec:
                                       - message: at least one of exact or exp must
                                           be set
                                         rule: has(self.exact) || has(self.exp)
+                                    maxItems: 64
                                     minItems: 1
                                     type: array
                                   types:
@@ -6900,11 +7056,13 @@ spec:
                                       - Localhost
                                       - Unconfined
                                       type: string
+                                    maxItems: 3
                                     minItems: 1
                                     type: array
                                 required:
                                 - types
                                 type: object
+                              maxItems: 64
                               type: array
                             targets:
                               description: |-
@@ -6950,10 +7108,12 @@ spec:
                                         items:
                                           minLength: 1
                                           type: string
+                                        maxItems: 64
                                         minItems: 1
                                         type: array
                                       exp:
                                         description: Exp matches regular expression.
+                                        maxLength: 4096
                                         minLength: 1
                                         type: string
                                       negate:
@@ -7000,10 +7160,12 @@ spec:
                                         items:
                                           minLength: 1
                                           type: string
+                                        maxItems: 64
                                         minItems: 1
                                         type: array
                                       exp:
                                         description: Exp matches regular expression.
+                                        maxLength: 4096
                                         minLength: 1
                                         type: string
                                       negate:
@@ -7052,11 +7214,13 @@ spec:
                                                   items:
                                                     minLength: 1
                                                     type: string
+                                                  maxItems: 64
                                                   minItems: 1
                                                   type: array
                                                 exp:
                                                   description: Exp matches regular
                                                     expression.
+                                                  maxLength: 4096
                                                   minLength: 1
                                                   type: string
                                                 negate:
@@ -7091,11 +7255,13 @@ spec:
                                                   items:
                                                     minLength: 1
                                                     type: string
+                                                  maxItems: 64
                                                   minItems: 1
                                                   type: array
                                                 exp:
                                                   description: Exp matches regular
                                                     expression.
+                                                  maxLength: 4096
                                                   minLength: 1
                                                   type: string
                                                 negate:
@@ -7163,10 +7329,12 @@ spec:
                                         items:
                                           minLength: 1
                                           type: string
+                                        maxItems: 64
                                         minItems: 1
                                         type: array
                                       exp:
                                         description: Exp matches regular expression.
+                                        maxLength: 4096
                                         minLength: 1
                                         type: string
                                       negate:

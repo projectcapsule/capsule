@@ -4,6 +4,8 @@
 package ruleengine
 
 import (
+	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -76,5 +78,99 @@ func TestValidateSecurityProfiles(t *testing.T) {
 		w.Targets = []rules.WorkloadValidationTarget{target}
 		require.True(t, w.HasPolicies())
 		require.False(t, w.TargetsOnly())
+	}
+}
+
+func securityProfileLimitBody(appArmor bool, field string, size int) *rules.NamespaceRuleBodyNamespace {
+	match := rules.WorkloadSecurityProfileMatch{
+		Types: []rules.SecurityProfileType{rules.SecurityProfileLocalhost},
+		LocalhostProfiles: []apiruntime.ExpressionMatch{{
+			ExpressionRegex: apiruntime.ExpressionRegex{Expression: `^profiles/team\.json$`},
+		}},
+	}
+	matches := []rules.WorkloadSecurityProfileMatch{match}
+	switch field {
+	case "matchers":
+		matches = slices.Repeat(matches, size)
+	case "types":
+		kinds := []rules.SecurityProfileType{rules.SecurityProfileLocalhost, rules.SecurityProfileRuntimeDefault, rules.SecurityProfileUnconfined}
+		matches[0].Types = make([]rules.SecurityProfileType, size)
+		for i := range size {
+			matches[0].Types[i] = kinds[i%len(kinds)]
+		}
+	case "localhostProfiles":
+		matches[0].LocalhostProfiles = slices.Repeat(match.LocalhostProfiles, size)
+	}
+	body := &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeAllow}}
+	if appArmor {
+		body.Enforce.Workloads.AppArmorProfiles = matches
+	} else {
+		body.Enforce.Workloads.SeccompProfiles = matches
+	}
+	return body
+}
+
+func TestValidateSecurityProfileLimits(t *testing.T) {
+	for _, appArmor := range []bool{false, true} {
+		group := "seccompProfiles"
+		if appArmor {
+			group = "appArmorProfiles"
+		}
+		for _, tc := range []struct {
+			field string
+			limit int
+		}{
+			{"matchers", 64}, {"types", 3}, {"localhostProfiles", 64},
+		} {
+			for _, size := range []int{tc.limit - 1, tc.limit, tc.limit + 1} {
+				t.Run(fmt.Sprintf("%s/%s/%d", group, tc.field, size), func(t *testing.T) {
+					body := securityProfileLimitBody(appArmor, tc.field, size)
+					original := body.DeepCopy()
+					err := ValidateRuleStatusBody(nil, []*rules.NamespaceRuleBodyNamespace{body})
+					if size <= tc.limit {
+						require.NoError(t, err)
+					} else {
+						path := "rules[0].enforce.workloads." + group
+						if tc.field != "matchers" {
+							path += "[0]." + tc.field
+						}
+						require.ErrorContains(t, err, path)
+						require.ErrorContains(t, err, fmt.Sprintf("at most %d", tc.limit))
+					}
+					require.Equal(t, original, body)
+				})
+			}
+		}
+	}
+}
+
+func BenchmarkValidateSecurityProfileLimits(b *testing.B) {
+	for _, rulesets := range []int{1, 10} {
+		for _, tc := range []struct {
+			field string
+			limit int
+		}{
+			{"matchers", 64}, {"types", 3}, {"localhostProfiles", 64},
+		} {
+			for _, size := range []int{1, tc.limit, tc.limit + 1} {
+				b.Run(fmt.Sprintf("rules=%d/%s=%d", rulesets, tc.field, size), func(b *testing.B) {
+					bodies := make([]*rules.NamespaceRuleBodyNamespace, rulesets)
+					for i := range bodies {
+						bodies[i] = securityProfileLimitBody(false, tc.field, size)
+						bodies[i].Enforce.Workloads.AppArmorProfiles = bodies[i].Enforce.Workloads.SeccompProfiles
+					}
+					b.ReportAllocs()
+					for b.Loop() {
+						err := ValidateRuleStatusBody(nil, bodies)
+						if size <= tc.limit && err != nil {
+							b.Fatal(err)
+						}
+						if size > tc.limit && err == nil {
+							b.Fatal("oversized profile policy was accepted")
+						}
+					}
+				})
+			}
+		}
 	}
 }

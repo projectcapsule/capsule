@@ -5,6 +5,9 @@ package e2e
 
 import (
 	"context"
+	"fmt"
+	"slices"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -65,6 +68,87 @@ var _ = Describe("workload security profiles", Label("tenant", "rules", "workloa
 		storedTenant := &capsule.Tenant{}
 		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(tenants[0]), storedTenant)).To(Succeed())
 		Expect(storedTenant.Spec.Rules).To(Equal(tenants[0].Spec.Rules))
+		By("accepting profile and expression limits and rejecting oversized values without replacing the stored policy")
+		for _, group := range []string{"seccompProfiles", "appArmorProfiles"} {
+			for _, limit := range []struct {
+				field string
+				count int
+			}{
+				{"matchers", 64}, {"types", 3}, {"localhostProfiles", 64},
+				{"localhostProfiles[0].exact", 64}, {"localhostProfiles[0].exp", 4096},
+			} {
+				profiles := []rules.WorkloadSecurityProfileMatch{{Types: []rules.SecurityProfileType{rules.SecurityProfileLocalhost}, LocalhostProfiles: []apiruntime.ExpressionMatch{{Exact: []string{tenants[0].Name + ".json"}}}}}
+				switch limit.field {
+				case "matchers":
+					profiles = slices.Repeat(profiles, limit.count)
+				case "types":
+					profiles[0].Types = []rules.SecurityProfileType{rules.SecurityProfileLocalhost, rules.SecurityProfileRuntimeDefault, rules.SecurityProfileUnconfined}
+				case "localhostProfiles":
+					profiles[0].LocalhostProfiles = slices.Repeat(profiles[0].LocalhostProfiles, limit.count)
+				case "localhostProfiles[0].exact":
+					profiles[0].LocalhostProfiles[0].Exact = slices.Repeat(profiles[0].LocalhostProfiles[0].Exact, limit.count)
+				case "localhostProfiles[0].exp":
+					profiles[0].LocalhostProfiles[0].Expression = strings.Repeat("a", limit.count)
+				}
+				set := func(tnt *capsule.Tenant) *[]rules.WorkloadSecurityProfileMatch {
+					if group == "appArmorProfiles" {
+						return &tnt.Spec.Rules[0].Enforce.Workloads.AppArmorProfiles
+					}
+					return &tnt.Spec.Rules[0].Enforce.Workloads.SeccompProfiles
+				}
+				Eventually(func(g Gomega) {
+					current := &capsule.Tenant{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(tenants[0]), current)).To(Succeed())
+					*set(current) = profiles
+					g.Expect(k8sClient.Update(ctx, current)).To(Succeed())
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+				Eventually(func(g Gomega) {
+					current := &capsule.Tenant{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(tenants[0]), current)).To(Succeed())
+					g.Expect(*set(current)).To(Equal(profiles))
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+				path := group
+				if limit.field != "matchers" {
+					path += "[0]." + limit.field
+				}
+				Eventually(func(g Gomega) {
+					current := &capsule.Tenant{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(tenants[0]), current)).To(Succeed())
+					matches := set(current)
+					switch limit.field {
+					case "matchers":
+						*matches = append(*matches, (*matches)[0])
+					case "types":
+						(*matches)[0].Types = append((*matches)[0].Types, rules.SecurityProfileLocalhost)
+					case "localhostProfiles":
+						(*matches)[0].LocalhostProfiles = append((*matches)[0].LocalhostProfiles, (*matches)[0].LocalhostProfiles[0])
+					case "localhostProfiles[0].exact":
+						(*matches)[0].LocalhostProfiles[0].Exact = append((*matches)[0].LocalhostProfiles[0].Exact, "other.json")
+					case "localhostProfiles[0].exp":
+						(*matches)[0].LocalhostProfiles[0].Expression += "a"
+					}
+					err := k8sClient.Update(ctx, current)
+					if err == nil {
+						Fail("oversized profile or expression was stored")
+					}
+					g.Expect(err).To(MatchError(And(ContainSubstring(path), Or(
+						ContainSubstring(fmt.Sprintf("at most %d", limit.count)),
+						ContainSubstring(fmt.Sprintf("may not be more than %d", limit.count)),
+					))))
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(tenants[0]), storedTenant)).To(Succeed())
+				Expect(*set(storedTenant)).To(Equal(profiles))
+			}
+		}
+		Eventually(func(g Gomega) {
+			current := &capsule.Tenant{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(tenants[0]), current)).To(Succeed())
+			current.Spec.Rules[0].Enforce.Workloads.SeccompProfiles = tenants[0].Spec.Rules[0].Enforce.Workloads.SeccompProfiles
+			current.Spec.Rules[0].Enforce.Workloads.AppArmorProfiles = tenants[0].Spec.Rules[0].Enforce.Workloads.AppArmorProfiles
+			g.Expect(k8sClient.Update(ctx, current)).To(Succeed())
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(tenants[1]), storedTenant)).To(Succeed())
+		Expect(storedTenant.Spec.Rules).To(Equal(tenants[1].Spec.Rules))
 		waitProfile := func(ns *corev1.Namespace, count int, disabled bool) {
 			Eventually(func(g Gomega) {
 				status := &capsule.RuleStatus{}

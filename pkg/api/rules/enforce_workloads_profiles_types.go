@@ -21,6 +21,7 @@ const (
 type WorkloadSecurityProfileMatch struct {
 	// Types selects profile types. Missing profiles never match.
 	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=3
 	Types []SecurityProfileType `json:"types"`
 
 	// LocalhostProfiles matches seccomp paths relative to the kubelet seccomp
@@ -28,5 +29,6 @@ type WorkloadSecurityProfileMatch struct {
 	// profile. Requires Localhost in types. Expressions use exact, exp and negate.
 	// +optional
 	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=64
 	LocalhostProfiles []runtime.ExpressionMatch `json:"localhostProfiles,omitempty"`
 }

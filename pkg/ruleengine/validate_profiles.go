@@ -19,10 +19,22 @@ func validateSecurityProfileRules(index int, workloads rules.NamespaceRuleEnforc
 	}{
 		{"seccompProfiles", workloads.SeccompProfiles}, {"appArmorProfiles", workloads.AppArmorProfiles},
 	} {
+		if len(group.matches) > 64 {
+			return fmt.Errorf("rules[%d].enforce.workloads.%s: at most 64 matchers are supported", index, group.name)
+		}
+
 		for i, match := range group.matches {
 			fieldPath := fmt.Sprintf("rules[%d].enforce.workloads.%s[%d]", index, group.name, i)
 			if len(match.Types) == 0 {
 				return fmt.Errorf("%s.types: at least one type is required", fieldPath)
+			}
+
+			if len(match.Types) > 3 {
+				return fmt.Errorf("%s.types: at most 3 types are supported", fieldPath)
+			}
+
+			if len(match.LocalhostProfiles) > 64 {
+				return fmt.Errorf("%s.localhostProfiles: at most 64 expressions are supported", fieldPath)
 			}
 
 			if err := placementEnum(fieldPath+".types", match.Types, rules.SecurityProfileRuntimeDefault, rules.SecurityProfileLocalhost, rules.SecurityProfileUnconfined); err != nil {
@@ -35,6 +47,10 @@ func validateSecurityProfileRules(index int, workloads rules.NamespaceRuleEnforc
 
 			for j, expression := range match.LocalhostProfiles {
 				p := fmt.Sprintf("%s.localhostProfiles[%d]", fieldPath, j)
+				if err := validateExpressionMatch(expression, p); err != nil {
+					return err
+				}
+
 				if len(expression.Exact) == 0 && strings.TrimSpace(expression.Expression) == "" {
 					return fmt.Errorf("%s: exact or exp is required", p)
 				}
@@ -43,10 +59,6 @@ func validateSecurityProfileRules(index int, workloads rules.NamespaceRuleEnforc
 					if strings.TrimSpace(name) == "" {
 						return fmt.Errorf("%s.exact: profile names must not be empty", p)
 					}
-				}
-
-				if err := validateExpressionMatch(expression, p); err != nil {
-					return err
 				}
 			}
 		}

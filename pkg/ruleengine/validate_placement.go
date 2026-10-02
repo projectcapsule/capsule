@@ -27,6 +27,10 @@ func validatePlacementRules(index int, workloads rules.NamespaceRuleEnforceWorkl
 			return nil
 		}
 
+		if err := validateExpressionMatch(*expression, path+"."+name); err != nil {
+			return err
+		}
+
 		if len(expression.Exact) == 0 && expression.Expression == "" {
 			return fmt.Errorf("%s.%s: at least one of exact or exp must be set", path, name)
 		}
@@ -35,7 +39,7 @@ func validatePlacementRules(index int, workloads rules.NamespaceRuleEnforceWorkl
 			return fmt.Errorf("%s.%s.exact: empty strings are not supported; use exp: '^$'", path, name)
 		}
 
-		return validateExpressionMatch(*expression, path+"."+name)
+		return nil
 	}); err != nil {
 		return err
 	}

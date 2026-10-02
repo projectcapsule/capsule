@@ -208,18 +208,18 @@ func validateWorkloadRules(
 	}
 
 	for j, registry := range workloads.Registries {
-		if err := validateExpression(
-			registry.Expression,
-			fmt.Sprintf("rules[%d].enforce.workloads.registries[%d].exp", ruleIndex, j),
+		if err := validateExpressionMatch(
+			registry.ExpressionMatch,
+			fmt.Sprintf("rules[%d].enforce.workloads.registries[%d]", ruleIndex, j),
 		); err != nil {
 			return err
 		}
 	}
 
 	for j, scheduler := range workloads.Schedulers {
-		if err := validateExpression(
-			scheduler.Expression,
-			fmt.Sprintf("rules[%d].enforce.workloads.schedulers[%d].exp", ruleIndex, j),
+		if err := validateExpressionMatch(
+			scheduler,
+			fmt.Sprintf("rules[%d].enforce.workloads.schedulers[%d]", ruleIndex, j),
 		); err != nil {
 			return err
 		}
@@ -585,20 +585,16 @@ func validateMetadataKey(key string) error {
 }
 
 func validateExpressionMatch(match runtime.ExpressionMatch, fieldPath string) error {
-	if err := validateExpression(match.Expression, fieldPath+".exp"); err != nil {
+	if err := match.ValidateLimits(fieldPath); err != nil {
 		return err
 	}
 
-	return nil
-}
-
-func validateExpression(expression string, fieldPath string) error {
-	if strings.TrimSpace(expression) == "" {
+	if strings.TrimSpace(match.Expression) == "" {
 		return nil
 	}
 
-	if _, err := regexp.Compile(expression); err != nil {
-		return fmt.Errorf("%s %q is invalid: %w", fieldPath, expression, err)
+	if _, err := regexp.Compile(match.Expression); err != nil {
+		return fmt.Errorf("%s.exp %q is invalid: %w", fieldPath, match.Expression, err)
 	}
 
 	return nil

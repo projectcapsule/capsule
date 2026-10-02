@@ -19,6 +19,7 @@ type PlacementExpressionMatch struct {
 
 	// Exact matches one of the provided values exactly.
 	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=64
 	// +kubebuilder:validation:items:MinLength=1
 	// +optional
 	Exact []string `json:"exact,omitempty"`
