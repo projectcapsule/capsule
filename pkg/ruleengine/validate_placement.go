@@ -223,8 +223,13 @@ func validateMutations(index int, mutations []rules.NamespaceRuleMutation) error
 }
 
 func validateMutationPlacement(path string, workload rules.WorkloadMutation) error {
-	if workload.Scheduler == "" && workload.HostUsers == nil && workload.NodeSelector == nil && workload.Tolerations == nil && workload.TopologySpreadConstraints == nil && workload.Affinity == nil && workload.SeccompProfile == nil && workload.AppArmorProfile == nil {
+	podProperties := workload.HasPodProperties()
+	if !podProperties && workload.ReadOnlyRootFilesystem == nil {
 		return fmt.Errorf("%s: at least one workload mutation property must be supplied", path)
+	}
+
+	if err := validateMutationTargets(path, workload, podProperties); err != nil {
+		return err
 	}
 
 	if err := validateSecurityProfileMutation(path, workload); err != nil {
