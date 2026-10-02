@@ -55,6 +55,8 @@ const (
 	ReasonForbiddenPodToleration     string = "ForbiddenPodToleration"
 	ReasonForbiddenPodTopologySpread string = "ForbiddenPodTopologySpread"
 	ReasonForbiddenPodAffinity       string = "ForbiddenPodAffinity"
+	ReasonForbiddenSeccompProfile    string = "ForbiddenSeccompProfile"
+	ReasonForbiddenAppArmorProfile   string = "ForbiddenAppArmorProfile"
 
 	// Ingress.
 	ReasonWildcardDenied           string = "WildcardDenied"

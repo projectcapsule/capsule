@@ -12,6 +12,23 @@ import (
 
 // +kubebuilder:object:generate=true
 type NamespaceRuleEnforceWorkloadsBody struct {
+	// SeccompProfiles matches effective Linux container profiles, resolving
+	// container overrides before Pod defaults. Privileged containers are Unconfined.
+	// Missing profiles do not match any type, so an allow-list rejects them.
+	// Omitted targets check regular, init and ephemeral containers; pod explicitly
+	// selects only the Pod default. Controller targets check their Pod templates.
+	// +optional
+	// +kubebuilder:validation:MaxItems=64
+	SeccompProfiles []WorkloadSecurityProfileMatch `json:"seccompProfiles,omitempty"`
+
+	// AppArmorProfiles matches effective Linux container profiles, including
+	// legacy AppArmor annotations before Pod defaults. It uses the same target
+	// and missing-profile semantics as SeccompProfiles. Privileged containers are
+	// Unconfined. Matching a Localhost name does not verify its installation.
+	// +optional
+	// +kubebuilder:validation:MaxItems=64
+	AppArmorProfiles []WorkloadSecurityProfileMatch `json:"appArmorProfiles,omitempty"`
+
 	// Targets selects native workloads and, optionally, parts of their Pod specs.
 	// With no workload policies, the action matches the selected kinds themselves.
 	// With policies, targets scopes those policies; it does not also match the kind.

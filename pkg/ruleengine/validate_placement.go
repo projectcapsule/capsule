@@ -27,6 +27,10 @@ func validatePlacementRules(index int, workloads rules.NamespaceRuleEnforceWorkl
 			return nil
 		}
 
+		if err := validateExpressionMatch(*expression, path+"."+name); err != nil {
+			return err
+		}
+
 		if len(expression.Exact) == 0 && expression.Expression == "" {
 			return fmt.Errorf("%s.%s: at least one of exact or exp must be set", path, name)
 		}
@@ -35,7 +39,7 @@ func validatePlacementRules(index int, workloads rules.NamespaceRuleEnforceWorkl
 			return fmt.Errorf("%s.%s.exact: empty strings are not supported; use exp: '^$'", path, name)
 		}
 
-		return validateExpressionMatch(*expression, path+"."+name)
+		return nil
 	}); err != nil {
 		return err
 	}
@@ -219,8 +223,12 @@ func validateMutations(index int, mutations []rules.NamespaceRuleMutation) error
 }
 
 func validateMutationPlacement(path string, workload rules.WorkloadMutation) error {
-	if workload.Scheduler == "" && workload.HostUsers == nil && workload.NodeSelector == nil && workload.Tolerations == nil && workload.TopologySpreadConstraints == nil && workload.Affinity == nil {
+	if workload.Scheduler == "" && workload.HostUsers == nil && workload.NodeSelector == nil && workload.Tolerations == nil && workload.TopologySpreadConstraints == nil && workload.Affinity == nil && workload.SeccompProfile == nil && workload.AppArmorProfile == nil {
 		return fmt.Errorf("%s: at least one workload mutation property must be supplied", path)
+	}
+
+	if err := validateSecurityProfileMutation(path, workload); err != nil {
+		return err
 	}
 
 	if workload.Scheduler != "" && strings.TrimSpace(workload.Scheduler) == "" {

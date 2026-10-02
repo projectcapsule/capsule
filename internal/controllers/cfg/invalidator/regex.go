@@ -99,6 +99,16 @@ func collectRegexExpressionsFromNamespaceRule(
 		set[cache.HashRegex(expr)] = expr
 	}
 
+	for _, profiles := range [][]rules.WorkloadSecurityProfileMatch{rule.Enforce.Workloads.SeccompProfiles, rule.Enforce.Workloads.AppArmorProfiles} {
+		for _, profile := range profiles {
+			for _, match := range profile.LocalhostProfiles {
+				if match.Expression != "" {
+					set[cache.HashRegex(match.ExpressionRegex)] = match.ExpressionRegex
+				}
+			}
+		}
+	}
+
 	for _, metadataRule := range rule.Enforce.Metadata {
 		for selector := range metadataRule.Labels {
 			expr := rules.MetadataKeyExpression(selector)

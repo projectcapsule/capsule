@@ -171,3 +171,34 @@ spec:
         promotions:
           - clusterRoles:
               - "secret-replicator"
+
+    # Opt-in security profiles. Label a namespace security-profile=confined.
+    - namespaceSelector:
+        matchLabels:
+          security-profile: confined
+      mutate:
+        - action: merge
+          workloads:
+            seccompProfile:
+              type: RuntimeDefault
+      enforce:
+        action: allow
+        workloads:
+          seccompProfiles:
+            - types: [RuntimeDefault]
+
+    # Enable separately, only on nodes with AppArmor support.
+    - namespaceSelector:
+        matchLabels:
+          security-profile: confined
+          apparmor: enabled
+      mutate:
+        - action: merge
+          workloads:
+            appArmorProfile:
+              type: RuntimeDefault
+      enforce:
+        action: allow
+        workloads:
+          appArmorProfiles:
+            - types: [RuntimeDefault]

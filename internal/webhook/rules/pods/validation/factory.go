@@ -46,7 +46,9 @@ type podRuleValidator struct {
 		[]*apirules.NamespaceRuleEnforceBody,
 	) (*ruleengine.Evaluation, error)
 	includeSubresources bool
-	changed             func(old, pod *corev1.Pod) bool
+	// When set, only this subresource and the main resource are evaluated.
+	subresource string
+	changed     func(old, pod *corev1.Pod) bool
 }
 
 type podRules struct {
@@ -80,6 +82,8 @@ func newPodRules(regexCache *cache.RegexCache, registryCache *cache.RegistryRule
 	}
 
 	h.rules = []podRuleValidator{
+		{evaluate: h.validateSeccompProfiles, includeSubresources: true, subresource: "ephemeralcontainers"},
+		{evaluate: h.validateAppArmorProfiles, includeSubresources: true, subresource: "ephemeralcontainers"},
 		{evaluate: h.validateNodeSelectors, changed: func(old, pod *corev1.Pod) bool {
 			return !equality.Semantic.DeepEqual(old.Spec.NodeSelector, pod.Spec.NodeSelector)
 		}},
@@ -179,7 +183,7 @@ func (h *podRules) validateWorkloadRules(
 	conditional := false
 
 	for _, body := range enforceBodies {
-		if body != nil && len(body.Conditions) > 0 && hasWorkloadPolicy(body.Workloads, req.SubResource) {
+		if body != nil && len(body.Conditions) > 0 && hasWorkloadPolicy(body.Workloads, req.SubResource, pod == nil || pod.Spec.OS == nil || pod.Spec.OS.Name != corev1.Windows) {
 			conditional = true
 
 			break
@@ -192,7 +196,7 @@ func (h *podRules) validateWorkloadRules(
 
 	enforceBodies, err = ruleengine.FilterEnforcementConditions(ctx, evaluator, conditionObject, enforceBodies,
 		func(body *apirules.NamespaceRuleEnforceBody) bool {
-			return hasWorkloadPolicy(body.Workloads, req.SubResource)
+			return hasWorkloadPolicy(body.Workloads, req.SubResource, pod == nil || pod.Spec.OS == nil || pod.Spec.OS.Name != corev1.Windows)
 		})
 	if err != nil {
 		return fmt.Errorf("enforce: %w", err)
@@ -204,6 +208,10 @@ func (h *podRules) validateWorkloadRules(
 		}
 
 		if req.SubResource != "" && !rule.includeSubresources {
+			continue
+		}
+
+		if req.SubResource != "" && rule.subresource != "" && req.SubResource != rule.subresource {
 			continue
 		}
 
@@ -257,7 +265,11 @@ func (h *podRules) validateWorkloadRules(
 }
 
 // Placement and resource policies do not run on subresources.
-func hasWorkloadPolicy(body apirules.NamespaceRuleEnforceWorkloadsBody, subresource string) bool {
+func hasWorkloadPolicy(body apirules.NamespaceRuleEnforceWorkloadsBody, subresource string, linux bool) bool {
+	if linux && (subresource == "" || subresource == "ephemeralcontainers") && (len(body.SeccompProfiles) > 0 || len(body.AppArmorProfiles) > 0) {
+		return true
+	}
+
 	if len(body.Schedulers) > 0 || len(body.QoSClasses) > 0 || len(body.Registries) > 0 {
 		return true
 	}
