@@ -30,12 +30,16 @@ import (
 func TestEphemeralMutationTenantProfilesAudienceAndReads(t *testing.T) {
 	for _, imagePullPolicy := range []bool{false, true} {
 		t.Run(fmt.Sprintf("imagePullPolicy=%t", imagePullPolicy), func(t *testing.T) {
-			testEphemeralMutationTenantProfilesAudienceAndReads(t, imagePullPolicy)
+			testMutationTenantProfilesAudienceAndReads(t, imagePullPolicy, false)
 		})
 	}
 }
 
-func testEphemeralMutationTenantProfilesAudienceAndReads(t *testing.T, imagePullPolicy bool) {
+func TestImagePullSecretsMutationTenantProfilesAudienceAndReads(t *testing.T) {
+	testMutationTenantProfilesAudienceAndReads(t, false, true)
+}
+
+func testMutationTenantProfilesAudienceAndReads(t *testing.T, imagePullPolicy, imagePullSecrets bool) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, capsule.AddToScheme(scheme))
@@ -54,6 +58,9 @@ func testEphemeralMutationTenantProfilesAudienceAndReads(t *testing.T, imagePull
 						policy = corev1.PullNever
 					}
 					body = imagePullPolicyBody(policy, rules.ValidatePod)
+				}
+				if imagePullSecrets {
+					body = imagePullSecretsBody(rules.MutationActionMerge, pullSecretRefs(name+"-registry"), rules.ValidatePod)
 				}
 				body.Audience = []rules.Audience{{Kind: rules.AudienceKindUser, Name: name + "-owner"}}
 				status.Status.Rules = []*rules.NamespaceRuleBodyNamespace{body}
@@ -90,9 +97,17 @@ func testEphemeralMutationTenantProfilesAudienceAndReads(t *testing.T, imagePull
 			old.SetNamespace(tc.namespace)
 			obj.SetNamespace(tc.namespace)
 			req := rootFilesystemAdmissionRequest(t, obj, old, admissionv1.Update, "ephemeralcontainers")
+			if imagePullSecrets {
+				unstructured.RemoveNestedField(obj.Object, "spec", "ephemeralContainers")
+				req = rootFilesystemAdmissionRequest(t, obj, nil, admissionv1.Create, "")
+			}
 			req.UserInfo.Username = tc.user
 			wrapper := handlers.TypedTenantWithRulesetHandler[*unstructured.Unstructured]{Factory: func() *unstructured.Unstructured { return &unstructured.Unstructured{} }, Handlers: []handlers.TypedHandlerWithTenantWithRuleset[*unstructured.Unstructured]{MetadataRules(nil)}}
-			response := wrapper.OnUpdate(c, c, admission.NewDecoder(scheme), nil)(t.Context(), req)
+			handle := wrapper.OnUpdate(c, c, admission.NewDecoder(scheme), nil)
+			if imagePullSecrets {
+				handle = wrapper.OnCreate(c, c, admission.NewDecoder(scheme), nil)
+			}
+			response := handle(t.Context(), req)
 			if tc.readError {
 				require.NotNil(t, response)
 				require.False(t, response.Allowed)
@@ -103,7 +118,14 @@ func testEphemeralMutationTenantProfilesAudienceAndReads(t *testing.T, imagePull
 				require.NotNil(t, response)
 				require.True(t, response.Allowed)
 				require.Len(t, response.Patches, 1)
-				if imagePullPolicy {
+				if imagePullSecrets {
+					name := "tenant-a-registry"
+					if !*tc.want {
+						name = "tenant-b-registry"
+					}
+					require.Equal(t, "/spec/imagePullSecrets", response.Patches[0].Path)
+					require.Equal(t, []any{map[string]any{"name": name}}, response.Patches[0].Value)
+				} else if imagePullPolicy {
 					policy := "Always"
 					if !*tc.want {
 						policy = "Never"

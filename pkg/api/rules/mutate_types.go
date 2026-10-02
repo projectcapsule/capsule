@@ -30,9 +30,9 @@ type NamespaceRuleMutation struct {
 
 	// Action chooses how explicitly supplied properties are applied.
 	// Merge fills an empty schedulerName and absent security profiles, sets hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy,
-	// and map keys, upserts lists, and conjoins required affinity.
+	// and map keys, adds missing imagePullSecrets by name, upserts lists, and conjoins required affinity.
 	// Replace replaces each supplied property in full: scheduler, hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy, nodeSelector,
-	// tolerations, topologySpreadConstraints, affinity, or security profiles. Omitted properties are
+	// registries.imagePullSecrets, tolerations, topologySpreadConstraints, affinity, or security profiles. Omitted properties are
 	// retained. Supplying affinity replaces all its branches, including omitted ones.
 	// +optional
 	// +kubebuilder:default=merge
@@ -62,7 +62,7 @@ type WorkloadMutation struct {
 	// +listType=set
 	Targets []WorkloadValidationTarget `json:"targets,omitempty"`
 
-	// Registries configures image registry behavior for the selected containers.
+	// Registries configures Pod image pull secrets and selected containers' pull policies.
 	// +optional
 	Registries WorkloadRegistryMutation `json:"registries,omitzero"`
 
@@ -132,7 +132,7 @@ type WorkloadMutation struct {
 	Affinity *corev1.Affinity `json:"affinity,omitempty"`
 }
 
-// WorkloadRegistryMutation contains image registry settings applied to containers.
+// WorkloadRegistryMutation contains Pod and container image registry settings.
 // +kubebuilder:object:generate=true
 type WorkloadRegistryMutation struct {
 	// ImagePullPolicy sets imagePullPolicy on every selected regular or init
@@ -142,6 +142,18 @@ type WorkloadRegistryMutation struct {
 	// +optional
 	// +kubebuilder:validation:Enum=Always;IfNotPresent;Never
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+
+	// ImagePullSecrets sets spec.imagePullSecrets on Pod creation. Merge appends
+	// missing names and removes existing duplicates, retaining first-occurrence order. Replace sets
+	// the complete list; an explicit empty list clears it. Omitted or null preserves it.
+	// Requires the pod target or omitted/empty targets. References always use the
+	// Pod's namespace; Capsule does not create, copy, or check the referenced Secrets.
+	// +optional
+	// +kubebuilder:validation:MaxItems=64
+	// +kubebuilder:validation:items:XValidation:rule="has(self.name) && self.name != ''",message="secret name must not be empty"
+	// +listType=map
+	// +listMapKey=name
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitzero"`
 }
 
 // GetWorkloadTargets reports whether a mutation selects this Pod location.
@@ -151,5 +163,5 @@ func (w WorkloadMutation) GetWorkloadTargets(target WorkloadValidationTarget) bo
 
 // HasPodProperties reports whether any Pod-level property is configured.
 func (w WorkloadMutation) HasPodProperties() bool {
-	return w.Scheduler != "" || w.HostUsers != nil || w.NodeSelector != nil || w.Tolerations != nil || w.TopologySpreadConstraints != nil || w.Affinity != nil || w.SeccompProfile != nil || w.AppArmorProfile != nil
+	return w.Scheduler != "" || w.HostUsers != nil || w.NodeSelector != nil || w.Tolerations != nil || w.TopologySpreadConstraints != nil || w.Affinity != nil || w.SeccompProfile != nil || w.AppArmorProfile != nil || w.Registries.ImagePullSecrets != nil
 }

@@ -26,6 +26,9 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 	}
 
 	before := podPlacement(pod).DeepCopy()
+	// Secret references are only appended or replaced, never edited in place.
+	// Retain a shallow snapshot so unrelated mutations add no slice allocation.
+	originalSecrets := pod.Spec.ImagePullSecrets
 
 	var containers []workloadMutationContainer
 
@@ -76,7 +79,7 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 		}
 	}
 
-	return slices.ContainsFunc(containers, workloadMutationContainer.changed) || podPlacementChanged(before, podPlacement(pod)), nil
+	return !slices.Equal(originalSecrets, pod.Spec.ImagePullSecrets) || slices.ContainsFunc(containers, workloadMutationContainer.changed) || podPlacementChanged(before, podPlacement(pod)), nil
 }
 
 func podPlacementChanged(before, after *apirules.WorkloadMutation) bool {
@@ -137,6 +140,10 @@ func replacePodPlacement(pod *corev1.Pod, placement *apirules.WorkloadMutation) 
 	mutatePodSecurityProfiles(pod, placement, true)
 
 	desired := placement.DeepCopy()
+	if desired.Registries.ImagePullSecrets != nil {
+		pod.Spec.ImagePullSecrets = desired.Registries.ImagePullSecrets
+	}
+
 	if desired.Scheduler != "" {
 		pod.Spec.SchedulerName = desired.Scheduler
 	}
@@ -170,6 +177,8 @@ func replacePodPlacement(pod *corev1.Pod, placement *apirules.WorkloadMutation) 
 
 func mergePodPlacement(pod *corev1.Pod, placement *apirules.WorkloadMutation) error {
 	mutatePodSecurityProfiles(pod, placement, false)
+
+	pod.Spec.ImagePullSecrets = mergeImagePullSecrets(pod.Spec.ImagePullSecrets, placement.Registries.ImagePullSecrets)
 
 	if placement.Scheduler != "" && pod.Spec.SchedulerName == "" {
 		pod.Spec.SchedulerName = placement.Scheduler

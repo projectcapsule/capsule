@@ -232,10 +232,8 @@ func validateMutationPlacement(path string, workload rules.WorkloadMutation) err
 		return err
 	}
 
-	switch workload.Registries.ImagePullPolicy {
-	case "", corev1.PullAlways, corev1.PullIfNotPresent, corev1.PullNever:
-	default:
-		return fmt.Errorf("%s.registries.imagePullPolicy: unsupported pull policy %q", path, workload.Registries.ImagePullPolicy)
+	if err := validateRegistryMutation(path+".registries", workload.Registries); err != nil {
+		return err
 	}
 
 	if err := validateSecurityProfileMutation(path, workload); err != nil {

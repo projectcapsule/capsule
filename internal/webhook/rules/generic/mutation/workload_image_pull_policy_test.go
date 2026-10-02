@@ -207,7 +207,7 @@ func TestImagePullPolicyEphemeralPreservesExistingAndUnknownFields(t *testing.T)
 	}
 }
 
-func TestImagePullPolicyMutationSkipsControllerTemplates(t *testing.T) {
+func TestRegistryMutationSkipsControllerTemplates(t *testing.T) {
 	obj := &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "apps/v1", "kind": "Deployment",
 		"metadata": map[string]any{"name": "app", "namespace": "tenant-a"},
@@ -220,7 +220,9 @@ func TestImagePullPolicyMutationSkipsControllerTemplates(t *testing.T) {
 		req := rootFilesystemAdmissionRequest(t, obj, before, operation, "")
 		req.Kind.Group, req.Kind.Kind = "apps", "Deployment"
 		req.Resource.Group, req.Resource.Resource = "apps", "deployments"
-		response := MetadataRules(nil).OnUpdate(nil, nil, before, obj, nil, nil, nil, []*rules.NamespaceRuleBodyNamespace{imagePullPolicyBody(corev1.PullAlways)})(t.Context(), req)
+		body := imagePullPolicyBody(corev1.PullAlways)
+		body.Mutate[0].Workloads.Registries.ImagePullSecrets = pullSecretRefs("pull")
+		response := MetadataRules(nil).OnUpdate(nil, nil, before, obj, nil, nil, nil, []*rules.NamespaceRuleBodyNamespace{body})(t.Context(), req)
 		require.Nil(t, response)
 		require.Equal(t, before, obj)
 	}
