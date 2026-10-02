@@ -1,0 +1,10 @@
+# Let the restricted OpenShift SCC assign the namespace's UID and groups.
+global:
+  podSecurityContext:
+    runAsUser: null
+    runAsGroup: null
+    fsGroup: null
+configReloader:
+  securityContext:
+    runAsUser: null
+    runAsGroup: null
