@@ -25,9 +25,10 @@ type NamespaceRuleMutation struct {
 	Conditions []AdmissionCondition `json:"conditions,omitempty"`
 
 	// Action chooses how explicitly supplied properties are applied.
-	// Merge fills an empty schedulerName, sets hostUsers and map keys, upserts lists, and conjoins required affinity.
+	// Merge fills an empty schedulerName and absent security profiles, sets hostUsers
+	// and map keys, upserts lists, and conjoins required affinity.
 	// Replace replaces each supplied property in full: scheduler, hostUsers, nodeSelector,
-	// tolerations, topologySpreadConstraints, or affinity. Omitted properties are
+	// tolerations, topologySpreadConstraints, affinity, or security profiles. Omitted properties are
 	// retained. Supplying affinity replaces all its branches, including omitted ones.
 	// +optional
 	// +kubebuilder:default=merge
@@ -45,6 +46,19 @@ type NamespaceRuleMutation struct {
 // On merge, required affinity restrictions from applicable entries are ANDed.
 // +kubebuilder:object:generate=true
 type WorkloadMutation struct {
+	// SeccompProfile supplies the Pod-level securityContext.seccompProfile on
+	// Linux Pod creation. Merge fills an absent profile; replace replaces the
+	// complete profile. Explicit container profiles are preserved. Nil omits it.
+	// +optional
+	SeccompProfile *corev1.SeccompProfile `json:"seccompProfile,omitempty"`
+
+	// AppArmorProfile supplies the Pod-level securityContext.appArmorProfile on
+	// Linux Pod creation. Merge fills an absent profile; replace replaces the
+	// complete profile. Explicit container profiles are preserved. Nil omits it.
+	// AppArmor and any Localhost profile must be available on eligible nodes.
+	// +optional
+	AppArmorProfile *corev1.AppArmorProfile `json:"appArmorProfile,omitempty"`
+
 	// Scheduler sets spec.schedulerName on Pod creation. Merge fills only an empty
 	// schedulerName, preserving all non-empty names, including default-scheduler.
 	// Kubernetes defaults omitted schedulerName before admission. Use replace with

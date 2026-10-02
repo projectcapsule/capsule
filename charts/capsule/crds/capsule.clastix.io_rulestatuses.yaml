@@ -137,10 +137,12 @@ spec:
                                   exactly.
                                 items:
                                   type: string
+                                maxItems: 64
                                 minItems: 1
                                 type: array
                               exp:
                                 description: Exp matches regular expression.
+                                maxLength: 4096
                                 minLength: 1
                                 type: string
                               negate:
@@ -218,10 +220,12 @@ spec:
                                           values exactly.
                                         items:
                                           type: string
+                                        maxItems: 64
                                         minItems: 1
                                         type: array
                                       exp:
                                         description: Exp matches regular expression.
+                                        maxLength: 4096
                                         minLength: 1
                                         type: string
                                       negate:
@@ -308,10 +312,12 @@ spec:
                                           values exactly.
                                         items:
                                           type: string
+                                        maxItems: 64
                                         minItems: 1
                                         type: array
                                       exp:
                                         description: Exp matches regular expression.
+                                        maxLength: 4096
                                         minLength: 1
                                         type: string
                                       negate:
@@ -369,10 +375,12 @@ spec:
                                       values exactly.
                                     items:
                                       type: string
+                                    maxItems: 64
                                     minItems: 1
                                     type: array
                                   exp:
                                     description: Exp matches regular expression.
+                                    maxLength: 4096
                                     minLength: 1
                                     type: string
                                   negate:
@@ -475,10 +483,12 @@ spec:
                                           items:
                                             minLength: 1
                                             type: string
+                                          maxItems: 64
                                           minItems: 1
                                           type: array
                                         exp:
                                           description: Exp matches regular expression.
+                                          maxLength: 4096
                                           minLength: 1
                                           type: string
                                         negate:
@@ -513,10 +523,12 @@ spec:
                                           items:
                                             minLength: 1
                                             type: string
+                                          maxItems: 64
                                           minItems: 1
                                           type: array
                                         exp:
                                           description: Exp matches regular expression.
+                                          maxLength: 4096
                                           minLength: 1
                                           type: string
                                         negate:
@@ -560,10 +572,12 @@ spec:
                                               items:
                                                 minLength: 1
                                                 type: string
+                                              maxItems: 64
                                               minItems: 1
                                               type: array
                                             exp:
                                               description: Exp matches regular expression.
+                                              maxLength: 4096
                                               minLength: 1
                                               type: string
                                             negate:
@@ -598,10 +612,12 @@ spec:
                                               items:
                                                 minLength: 1
                                                 type: string
+                                              maxItems: 64
                                               minItems: 1
                                               type: array
                                             exp:
                                               description: Exp matches regular expression.
+                                              maxLength: 4096
                                               minLength: 1
                                               type: string
                                             negate:
@@ -663,10 +679,12 @@ spec:
                                               items:
                                                 minLength: 1
                                                 type: string
+                                              maxItems: 64
                                               minItems: 1
                                               type: array
                                             exp:
                                               description: Exp matches regular expression.
+                                              maxLength: 4096
                                               minLength: 1
                                               type: string
                                             negate:
@@ -701,10 +719,12 @@ spec:
                                               items:
                                                 minLength: 1
                                                 type: string
+                                              maxItems: 64
                                               minItems: 1
                                               type: array
                                             exp:
                                               description: Exp matches regular expression.
+                                              maxLength: 4096
                                               minLength: 1
                                               type: string
                                             negate:
@@ -725,10 +745,12 @@ spec:
                                     items:
                                       minLength: 1
                                       type: string
+                                    maxItems: 64
                                     minItems: 1
                                     type: array
                                   exp:
                                     description: Exp matches regular expression.
+                                    maxLength: 4096
                                     minLength: 1
                                     type: string
                                   negate:
@@ -757,10 +779,12 @@ spec:
                                           items:
                                             minLength: 1
                                             type: string
+                                          maxItems: 64
                                           minItems: 1
                                           type: array
                                         exp:
                                           description: Exp matches regular expression.
+                                          maxLength: 4096
                                           minLength: 1
                                           type: string
                                         negate:
@@ -795,10 +819,12 @@ spec:
                                           items:
                                             minLength: 1
                                             type: string
+                                          maxItems: 64
                                           minItems: 1
                                           type: array
                                         exp:
                                           description: Exp matches regular expression.
+                                          maxLength: 4096
                                           minLength: 1
                                           type: string
                                         negate:
@@ -818,10 +844,12 @@ spec:
                                     items:
                                       minLength: 1
                                       type: string
+                                    maxItems: 64
                                     minItems: 1
                                     type: array
                                   exp:
                                     description: Exp matches regular expression.
+                                    maxLength: 4096
                                     minLength: 1
                                     type: string
                                   negate:
@@ -852,6 +880,71 @@ spec:
                                 type: object
                             type: object
                           type: array
+                        appArmorProfiles:
+                          description: |-
+                            AppArmorProfiles matches effective Linux container profiles, including
+                            legacy AppArmor annotations before Pod defaults. It uses the same target
+                            and missing-profile semantics as SeccompProfiles. Privileged containers are
+                            Unconfined. Matching a Localhost name does not verify its installation.
+                          items:
+                            description: |-
+                              WorkloadSecurityProfileMatch matches a profile type and optionally its local
+                              name/path. Entries are alternatives; localhostProfiles constrains only Localhost.
+                            properties:
+                              localhostProfiles:
+                                description: |-
+                                  LocalhostProfiles matches seccomp paths relative to the kubelet seccomp
+                                  directory, or loaded AppArmor profile names. Omitted permits any Localhost
+                                  profile. Requires Localhost in types. Expressions use exact, exp and negate.
+                                items:
+                                  description: |-
+                                    At least one of Exact or Exp must be set.
+                                    Both may be set together.
+                                  properties:
+                                    exact:
+                                      description: Exact matches one of the provided
+                                        values exactly.
+                                      items:
+                                        type: string
+                                      maxItems: 64
+                                      minItems: 1
+                                      type: array
+                                    exp:
+                                      description: Exp matches regular expression.
+                                      maxLength: 4096
+                                      minLength: 1
+                                      type: string
+                                    negate:
+                                      default: false
+                                      description: Negate regular Expression
+                                      type: boolean
+                                  type: object
+                                  x-kubernetes-validations:
+                                  - message: at least one of exact or exp must be
+                                      set
+                                    rule: has(self.exact) || has(self.exp)
+                                maxItems: 64
+                                minItems: 1
+                                type: array
+                              types:
+                                description: Types selects profile types. Missing
+                                  profiles never match.
+                                items:
+                                  description: SecurityProfileType selects a native
+                                    seccomp or AppArmor profile type.
+                                  enum:
+                                  - RuntimeDefault
+                                  - Localhost
+                                  - Unconfined
+                                  type: string
+                                maxItems: 3
+                                minItems: 1
+                                type: array
+                            required:
+                            - types
+                            type: object
+                          maxItems: 64
+                          type: array
                         nodeSelector:
                           description: |-
                             NodeSelector matches each node selector entry. Empty matchers match any entry.
@@ -874,10 +967,12 @@ spec:
                                     items:
                                       minLength: 1
                                       type: string
+                                    maxItems: 64
                                     minItems: 1
                                     type: array
                                   exp:
                                     description: Exp matches regular expression.
+                                    maxLength: 4096
                                     minLength: 1
                                     type: string
                                   negate:
@@ -898,10 +993,12 @@ spec:
                                     items:
                                       minLength: 1
                                       type: string
+                                    maxItems: 64
                                     minItems: 1
                                     type: array
                                   exp:
                                     description: Exp matches regular expression.
+                                    maxLength: 4096
                                     minLength: 1
                                     type: string
                                   negate:
@@ -931,10 +1028,12 @@ spec:
                                   exactly.
                                 items:
                                   type: string
+                                maxItems: 64
                                 minItems: 1
                                 type: array
                               exp:
                                 description: Exp matches regular expression.
+                                maxLength: 4096
                                 minLength: 1
                                 type: string
                               negate:
@@ -1060,10 +1159,12 @@ spec:
                                   exactly.
                                 items:
                                   type: string
+                                maxItems: 64
                                 minItems: 1
                                 type: array
                               exp:
                                 description: Exp matches regular expression.
+                                maxLength: 4096
                                 minLength: 1
                                 type: string
                               negate:
@@ -1074,6 +1175,72 @@ spec:
                             x-kubernetes-validations:
                             - message: at least one of exact or exp must be set
                               rule: has(self.exact) || has(self.exp)
+                          type: array
+                        seccompProfiles:
+                          description: |-
+                            SeccompProfiles matches effective Linux container profiles, resolving
+                            container overrides before Pod defaults. Privileged containers are Unconfined.
+                            Missing profiles do not match any type, so an allow-list rejects them.
+                            Omitted targets check regular, init and ephemeral containers; pod explicitly
+                            selects only the Pod default. Controller targets check their Pod templates.
+                          items:
+                            description: |-
+                              WorkloadSecurityProfileMatch matches a profile type and optionally its local
+                              name/path. Entries are alternatives; localhostProfiles constrains only Localhost.
+                            properties:
+                              localhostProfiles:
+                                description: |-
+                                  LocalhostProfiles matches seccomp paths relative to the kubelet seccomp
+                                  directory, or loaded AppArmor profile names. Omitted permits any Localhost
+                                  profile. Requires Localhost in types. Expressions use exact, exp and negate.
+                                items:
+                                  description: |-
+                                    At least one of Exact or Exp must be set.
+                                    Both may be set together.
+                                  properties:
+                                    exact:
+                                      description: Exact matches one of the provided
+                                        values exactly.
+                                      items:
+                                        type: string
+                                      maxItems: 64
+                                      minItems: 1
+                                      type: array
+                                    exp:
+                                      description: Exp matches regular expression.
+                                      maxLength: 4096
+                                      minLength: 1
+                                      type: string
+                                    negate:
+                                      default: false
+                                      description: Negate regular Expression
+                                      type: boolean
+                                  type: object
+                                  x-kubernetes-validations:
+                                  - message: at least one of exact or exp must be
+                                      set
+                                    rule: has(self.exact) || has(self.exp)
+                                maxItems: 64
+                                minItems: 1
+                                type: array
+                              types:
+                                description: Types selects profile types. Missing
+                                  profiles never match.
+                                items:
+                                  description: SecurityProfileType selects a native
+                                    seccomp or AppArmor profile type.
+                                  enum:
+                                  - RuntimeDefault
+                                  - Localhost
+                                  - Unconfined
+                                  type: string
+                                maxItems: 3
+                                minItems: 1
+                                type: array
+                            required:
+                            - types
+                            type: object
+                          maxItems: 64
                           type: array
                         targets:
                           description: |-
@@ -1119,10 +1286,12 @@ spec:
                                     items:
                                       minLength: 1
                                       type: string
+                                    maxItems: 64
                                     minItems: 1
                                     type: array
                                   exp:
                                     description: Exp matches regular expression.
+                                    maxLength: 4096
                                     minLength: 1
                                     type: string
                                   negate:
@@ -1169,10 +1338,12 @@ spec:
                                     items:
                                       minLength: 1
                                       type: string
+                                    maxItems: 64
                                     minItems: 1
                                     type: array
                                   exp:
                                     description: Exp matches regular expression.
+                                    maxLength: 4096
                                     minLength: 1
                                     type: string
                                   negate:
@@ -1221,10 +1392,12 @@ spec:
                                               items:
                                                 minLength: 1
                                                 type: string
+                                              maxItems: 64
                                               minItems: 1
                                               type: array
                                             exp:
                                               description: Exp matches regular expression.
+                                              maxLength: 4096
                                               minLength: 1
                                               type: string
                                             negate:
@@ -1259,10 +1432,12 @@ spec:
                                               items:
                                                 minLength: 1
                                                 type: string
+                                              maxItems: 64
                                               minItems: 1
                                               type: array
                                             exp:
                                               description: Exp matches regular expression.
+                                              maxLength: 4096
                                               minLength: 1
                                               type: string
                                             negate:
@@ -1330,10 +1505,12 @@ spec:
                                     items:
                                       minLength: 1
                                       type: string
+                                    maxItems: 64
                                     minItems: 1
                                     type: array
                                   exp:
                                     description: Exp matches regular expression.
+                                    maxLength: 4096
                                     minLength: 1
                                     type: string
                                   negate:
@@ -1365,9 +1542,10 @@ spec:
                         default: merge
                         description: |-
                           Action chooses how explicitly supplied properties are applied.
-                          Merge fills an empty schedulerName, sets hostUsers and map keys, upserts lists, and conjoins required affinity.
+                          Merge fills an empty schedulerName and absent security profiles, sets hostUsers
+                          and map keys, upserts lists, and conjoins required affinity.
                           Replace replaces each supplied property in full: scheduler, hostUsers, nodeSelector,
-                          tolerations, topologySpreadConstraints, or affinity. Omitted properties are
+                          tolerations, topologySpreadConstraints, affinity, or security profiles. Omitted properties are
                           retained. Supplying affinity replaces all its branches, including omitted ones.
                         enum:
                         - merge
@@ -2342,6 +2520,31 @@ spec:
                                     x-kubernetes-list-type: atomic
                                 type: object
                             type: object
+                          appArmorProfile:
+                            description: |-
+                              AppArmorProfile supplies the Pod-level securityContext.appArmorProfile on
+                              Linux Pod creation. Merge fills an absent profile; replace replaces the
+                              complete profile. Explicit container profiles are preserved. Nil omits it.
+                              AppArmor and any Localhost profile must be available on eligible nodes.
+                            properties:
+                              localhostProfile:
+                                description: |-
+                                  localhostProfile indicates a profile loaded on the node that should be used.
+                                  The profile must be preconfigured on the node to work.
+                                  Must match the loaded name of the profile.
+                                  Must be set if and only if type is "Localhost".
+                                type: string
+                              type:
+                                description: |-
+                                  type indicates which kind of AppArmor profile will be applied.
+                                  Valid options are:
+                                    Localhost - a profile pre-loaded on the node.
+                                    RuntimeDefault - the container runtime's default profile.
+                                    Unconfined - no AppArmor enforcement.
+                                type: string
+                            required:
+                            - type
+                            type: object
                           hostUsers:
                             description: |-
                               HostUsers sets spec.hostUsers on both merge and replace. False requests a
@@ -2364,6 +2567,31 @@ spec:
                               Omitted or null leaves the Pod value unchanged.
                             minLength: 1
                             type: string
+                          seccompProfile:
+                            description: |-
+                              SeccompProfile supplies the Pod-level securityContext.seccompProfile on
+                              Linux Pod creation. Merge fills an absent profile; replace replaces the
+                              complete profile. Explicit container profiles are preserved. Nil omits it.
+                            properties:
+                              localhostProfile:
+                                description: |-
+                                  localhostProfile indicates a profile defined in a file on the node should be used.
+                                  The profile must be preconfigured on the node to work.
+                                  Must be a descending path, relative to the kubelet's configured seccomp profile location.
+                                  Must be set if type is "Localhost". Must NOT be set for any other type.
+                                type: string
+                              type:
+                                description: |-
+                                  type indicates which kind of seccomp profile will be applied.
+                                  Valid options are:
+
+                                  Localhost - a profile defined in a file on the node should be used.
+                                  RuntimeDefault - the container runtime default profile should be used.
+                                  Unconfined - no profile should be applied.
+                                type: string
+                            required:
+                            - type
+                            type: object
                           tolerations:
                             description: |-
                               Tolerations merges by key, operator (default Equal), value and effect.
@@ -2841,10 +3069,12 @@ spec:
                                     exactly.
                                   items:
                                     type: string
+                                  maxItems: 64
                                   minItems: 1
                                   type: array
                                 exp:
                                   description: Exp matches regular expression.
+                                  maxLength: 4096
                                   minLength: 1
                                   type: string
                                 negate:
@@ -2923,10 +3153,12 @@ spec:
                                             values exactly.
                                           items:
                                             type: string
+                                          maxItems: 64
                                           minItems: 1
                                           type: array
                                         exp:
                                           description: Exp matches regular expression.
+                                          maxLength: 4096
                                           minLength: 1
                                           type: string
                                         negate:
@@ -3013,10 +3245,12 @@ spec:
                                             values exactly.
                                           items:
                                             type: string
+                                          maxItems: 64
                                           minItems: 1
                                           type: array
                                         exp:
                                           description: Exp matches regular expression.
+                                          maxLength: 4096
                                           minLength: 1
                                           type: string
                                         negate:
@@ -3075,10 +3309,12 @@ spec:
                                         values exactly.
                                       items:
                                         type: string
+                                      maxItems: 64
                                       minItems: 1
                                       type: array
                                     exp:
                                       description: Exp matches regular expression.
+                                      maxLength: 4096
                                       minLength: 1
                                       type: string
                                     negate:
@@ -3183,10 +3419,12 @@ spec:
                                             items:
                                               minLength: 1
                                               type: string
+                                            maxItems: 64
                                             minItems: 1
                                             type: array
                                           exp:
                                             description: Exp matches regular expression.
+                                            maxLength: 4096
                                             minLength: 1
                                             type: string
                                           negate:
@@ -3221,10 +3459,12 @@ spec:
                                             items:
                                               minLength: 1
                                               type: string
+                                            maxItems: 64
                                             minItems: 1
                                             type: array
                                           exp:
                                             description: Exp matches regular expression.
+                                            maxLength: 4096
                                             minLength: 1
                                             type: string
                                           negate:
@@ -3268,10 +3508,12 @@ spec:
                                                 items:
                                                   minLength: 1
                                                   type: string
+                                                maxItems: 64
                                                 minItems: 1
                                                 type: array
                                               exp:
                                                 description: Exp matches regular expression.
+                                                maxLength: 4096
                                                 minLength: 1
                                                 type: string
                                               negate:
@@ -3306,10 +3548,12 @@ spec:
                                                 items:
                                                   minLength: 1
                                                   type: string
+                                                maxItems: 64
                                                 minItems: 1
                                                 type: array
                                               exp:
                                                 description: Exp matches regular expression.
+                                                maxLength: 4096
                                                 minLength: 1
                                                 type: string
                                               negate:
@@ -3371,10 +3615,12 @@ spec:
                                                 items:
                                                   minLength: 1
                                                   type: string
+                                                maxItems: 64
                                                 minItems: 1
                                                 type: array
                                               exp:
                                                 description: Exp matches regular expression.
+                                                maxLength: 4096
                                                 minLength: 1
                                                 type: string
                                               negate:
@@ -3409,10 +3655,12 @@ spec:
                                                 items:
                                                   minLength: 1
                                                   type: string
+                                                maxItems: 64
                                                 minItems: 1
                                                 type: array
                                               exp:
                                                 description: Exp matches regular expression.
+                                                maxLength: 4096
                                                 minLength: 1
                                                 type: string
                                               negate:
@@ -3433,10 +3681,12 @@ spec:
                                       items:
                                         minLength: 1
                                         type: string
+                                      maxItems: 64
                                       minItems: 1
                                       type: array
                                     exp:
                                       description: Exp matches regular expression.
+                                      maxLength: 4096
                                       minLength: 1
                                       type: string
                                     negate:
@@ -3465,10 +3715,12 @@ spec:
                                             items:
                                               minLength: 1
                                               type: string
+                                            maxItems: 64
                                             minItems: 1
                                             type: array
                                           exp:
                                             description: Exp matches regular expression.
+                                            maxLength: 4096
                                             minLength: 1
                                             type: string
                                           negate:
@@ -3503,10 +3755,12 @@ spec:
                                             items:
                                               minLength: 1
                                               type: string
+                                            maxItems: 64
                                             minItems: 1
                                             type: array
                                           exp:
                                             description: Exp matches regular expression.
+                                            maxLength: 4096
                                             minLength: 1
                                             type: string
                                           negate:
@@ -3526,10 +3780,12 @@ spec:
                                       items:
                                         minLength: 1
                                         type: string
+                                      maxItems: 64
                                       minItems: 1
                                       type: array
                                     exp:
                                       description: Exp matches regular expression.
+                                      maxLength: 4096
                                       minLength: 1
                                       type: string
                                     negate:
@@ -3560,6 +3816,71 @@ spec:
                                   type: object
                               type: object
                             type: array
+                          appArmorProfiles:
+                            description: |-
+                              AppArmorProfiles matches effective Linux container profiles, including
+                              legacy AppArmor annotations before Pod defaults. It uses the same target
+                              and missing-profile semantics as SeccompProfiles. Privileged containers are
+                              Unconfined. Matching a Localhost name does not verify its installation.
+                            items:
+                              description: |-
+                                WorkloadSecurityProfileMatch matches a profile type and optionally its local
+                                name/path. Entries are alternatives; localhostProfiles constrains only Localhost.
+                              properties:
+                                localhostProfiles:
+                                  description: |-
+                                    LocalhostProfiles matches seccomp paths relative to the kubelet seccomp
+                                    directory, or loaded AppArmor profile names. Omitted permits any Localhost
+                                    profile. Requires Localhost in types. Expressions use exact, exp and negate.
+                                  items:
+                                    description: |-
+                                      At least one of Exact or Exp must be set.
+                                      Both may be set together.
+                                    properties:
+                                      exact:
+                                        description: Exact matches one of the provided
+                                          values exactly.
+                                        items:
+                                          type: string
+                                        maxItems: 64
+                                        minItems: 1
+                                        type: array
+                                      exp:
+                                        description: Exp matches regular expression.
+                                        maxLength: 4096
+                                        minLength: 1
+                                        type: string
+                                      negate:
+                                        default: false
+                                        description: Negate regular Expression
+                                        type: boolean
+                                    type: object
+                                    x-kubernetes-validations:
+                                    - message: at least one of exact or exp must be
+                                        set
+                                      rule: has(self.exact) || has(self.exp)
+                                  maxItems: 64
+                                  minItems: 1
+                                  type: array
+                                types:
+                                  description: Types selects profile types. Missing
+                                    profiles never match.
+                                  items:
+                                    description: SecurityProfileType selects a native
+                                      seccomp or AppArmor profile type.
+                                    enum:
+                                    - RuntimeDefault
+                                    - Localhost
+                                    - Unconfined
+                                    type: string
+                                  maxItems: 3
+                                  minItems: 1
+                                  type: array
+                              required:
+                              - types
+                              type: object
+                            maxItems: 64
+                            type: array
                           nodeSelector:
                             description: |-
                               NodeSelector matches each node selector entry. Empty matchers match any entry.
@@ -3582,10 +3903,12 @@ spec:
                                       items:
                                         minLength: 1
                                         type: string
+                                      maxItems: 64
                                       minItems: 1
                                       type: array
                                     exp:
                                       description: Exp matches regular expression.
+                                      maxLength: 4096
                                       minLength: 1
                                       type: string
                                     negate:
@@ -3606,10 +3929,12 @@ spec:
                                       items:
                                         minLength: 1
                                         type: string
+                                      maxItems: 64
                                       minItems: 1
                                       type: array
                                     exp:
                                       description: Exp matches regular expression.
+                                      maxLength: 4096
                                       minLength: 1
                                       type: string
                                     negate:
@@ -3639,10 +3964,12 @@ spec:
                                     exactly.
                                   items:
                                     type: string
+                                  maxItems: 64
                                   minItems: 1
                                   type: array
                                 exp:
                                   description: Exp matches regular expression.
+                                  maxLength: 4096
                                   minLength: 1
                                   type: string
                                 negate:
@@ -3770,10 +4097,12 @@ spec:
                                     exactly.
                                   items:
                                     type: string
+                                  maxItems: 64
                                   minItems: 1
                                   type: array
                                 exp:
                                   description: Exp matches regular expression.
+                                  maxLength: 4096
                                   minLength: 1
                                   type: string
                                 negate:
@@ -3784,6 +4113,72 @@ spec:
                               x-kubernetes-validations:
                               - message: at least one of exact or exp must be set
                                 rule: has(self.exact) || has(self.exp)
+                            type: array
+                          seccompProfiles:
+                            description: |-
+                              SeccompProfiles matches effective Linux container profiles, resolving
+                              container overrides before Pod defaults. Privileged containers are Unconfined.
+                              Missing profiles do not match any type, so an allow-list rejects them.
+                              Omitted targets check regular, init and ephemeral containers; pod explicitly
+                              selects only the Pod default. Controller targets check their Pod templates.
+                            items:
+                              description: |-
+                                WorkloadSecurityProfileMatch matches a profile type and optionally its local
+                                name/path. Entries are alternatives; localhostProfiles constrains only Localhost.
+                              properties:
+                                localhostProfiles:
+                                  description: |-
+                                    LocalhostProfiles matches seccomp paths relative to the kubelet seccomp
+                                    directory, or loaded AppArmor profile names. Omitted permits any Localhost
+                                    profile. Requires Localhost in types. Expressions use exact, exp and negate.
+                                  items:
+                                    description: |-
+                                      At least one of Exact or Exp must be set.
+                                      Both may be set together.
+                                    properties:
+                                      exact:
+                                        description: Exact matches one of the provided
+                                          values exactly.
+                                        items:
+                                          type: string
+                                        maxItems: 64
+                                        minItems: 1
+                                        type: array
+                                      exp:
+                                        description: Exp matches regular expression.
+                                        maxLength: 4096
+                                        minLength: 1
+                                        type: string
+                                      negate:
+                                        default: false
+                                        description: Negate regular Expression
+                                        type: boolean
+                                    type: object
+                                    x-kubernetes-validations:
+                                    - message: at least one of exact or exp must be
+                                        set
+                                      rule: has(self.exact) || has(self.exp)
+                                  maxItems: 64
+                                  minItems: 1
+                                  type: array
+                                types:
+                                  description: Types selects profile types. Missing
+                                    profiles never match.
+                                  items:
+                                    description: SecurityProfileType selects a native
+                                      seccomp or AppArmor profile type.
+                                    enum:
+                                    - RuntimeDefault
+                                    - Localhost
+                                    - Unconfined
+                                    type: string
+                                  maxItems: 3
+                                  minItems: 1
+                                  type: array
+                              required:
+                              - types
+                              type: object
+                            maxItems: 64
                             type: array
                           targets:
                             description: |-
@@ -3829,10 +4224,12 @@ spec:
                                       items:
                                         minLength: 1
                                         type: string
+                                      maxItems: 64
                                       minItems: 1
                                       type: array
                                     exp:
                                       description: Exp matches regular expression.
+                                      maxLength: 4096
                                       minLength: 1
                                       type: string
                                     negate:
@@ -3879,10 +4276,12 @@ spec:
                                       items:
                                         minLength: 1
                                         type: string
+                                      maxItems: 64
                                       minItems: 1
                                       type: array
                                     exp:
                                       description: Exp matches regular expression.
+                                      maxLength: 4096
                                       minLength: 1
                                       type: string
                                     negate:
@@ -3931,10 +4330,12 @@ spec:
                                                 items:
                                                   minLength: 1
                                                   type: string
+                                                maxItems: 64
                                                 minItems: 1
                                                 type: array
                                               exp:
                                                 description: Exp matches regular expression.
+                                                maxLength: 4096
                                                 minLength: 1
                                                 type: string
                                               negate:
@@ -3969,10 +4370,12 @@ spec:
                                                 items:
                                                   minLength: 1
                                                   type: string
+                                                maxItems: 64
                                                 minItems: 1
                                                 type: array
                                               exp:
                                                 description: Exp matches regular expression.
+                                                maxLength: 4096
                                                 minLength: 1
                                                 type: string
                                               negate:
@@ -4040,10 +4443,12 @@ spec:
                                       items:
                                         minLength: 1
                                         type: string
+                                      maxItems: 64
                                       minItems: 1
                                       type: array
                                     exp:
                                       description: Exp matches regular expression.
+                                      maxLength: 4096
                                       minLength: 1
                                       type: string
                                     negate:
@@ -4075,9 +4480,10 @@ spec:
                           default: merge
                           description: |-
                             Action chooses how explicitly supplied properties are applied.
-                            Merge fills an empty schedulerName, sets hostUsers and map keys, upserts lists, and conjoins required affinity.
+                            Merge fills an empty schedulerName and absent security profiles, sets hostUsers
+                            and map keys, upserts lists, and conjoins required affinity.
                             Replace replaces each supplied property in full: scheduler, hostUsers, nodeSelector,
-                            tolerations, topologySpreadConstraints, or affinity. Omitted properties are
+                            tolerations, topologySpreadConstraints, affinity, or security profiles. Omitted properties are
                             retained. Supplying affinity replaces all its branches, including omitted ones.
                           enum:
                           - merge
@@ -5058,6 +5464,31 @@ spec:
                                       x-kubernetes-list-type: atomic
                                   type: object
                               type: object
+                            appArmorProfile:
+                              description: |-
+                                AppArmorProfile supplies the Pod-level securityContext.appArmorProfile on
+                                Linux Pod creation. Merge fills an absent profile; replace replaces the
+                                complete profile. Explicit container profiles are preserved. Nil omits it.
+                                AppArmor and any Localhost profile must be available on eligible nodes.
+                              properties:
+                                localhostProfile:
+                                  description: |-
+                                    localhostProfile indicates a profile loaded on the node that should be used.
+                                    The profile must be preconfigured on the node to work.
+                                    Must match the loaded name of the profile.
+                                    Must be set if and only if type is "Localhost".
+                                  type: string
+                                type:
+                                  description: |-
+                                    type indicates which kind of AppArmor profile will be applied.
+                                    Valid options are:
+                                      Localhost - a profile pre-loaded on the node.
+                                      RuntimeDefault - the container runtime's default profile.
+                                      Unconfined - no AppArmor enforcement.
+                                  type: string
+                              required:
+                              - type
+                              type: object
                             hostUsers:
                               description: |-
                                 HostUsers sets spec.hostUsers on both merge and replace. False requests a
@@ -5080,6 +5511,31 @@ spec:
                                 Omitted or null leaves the Pod value unchanged.
                               minLength: 1
                               type: string
+                            seccompProfile:
+                              description: |-
+                                SeccompProfile supplies the Pod-level securityContext.seccompProfile on
+                                Linux Pod creation. Merge fills an absent profile; replace replaces the
+                                complete profile. Explicit container profiles are preserved. Nil omits it.
+                              properties:
+                                localhostProfile:
+                                  description: |-
+                                    localhostProfile indicates a profile defined in a file on the node should be used.
+                                    The profile must be preconfigured on the node to work.
+                                    Must be a descending path, relative to the kubelet's configured seccomp profile location.
+                                    Must be set if type is "Localhost". Must NOT be set for any other type.
+                                  type: string
+                                type:
+                                  description: |-
+                                    type indicates which kind of seccomp profile will be applied.
+                                    Valid options are:
+
+                                    Localhost - a profile defined in a file on the node should be used.
+                                    RuntimeDefault - the container runtime default profile should be used.
+                                    Unconfined - no profile should be applied.
+                                  type: string
+                              required:
+                              - type
+                              type: object
                             tolerations:
                               description: |-
                                 Tolerations merges by key, operator (default Equal), value and effect.
@@ -5493,10 +5949,12 @@ spec:
                                       values exactly.
                                     items:
                                       type: string
+                                    maxItems: 64
                                     minItems: 1
                                     type: array
                                   exp:
                                     description: Exp matches regular expression.
+                                    maxLength: 4096
                                     minLength: 1
                                     type: string
                                   negate:
@@ -5575,10 +6033,12 @@ spec:
                                               provided values exactly.
                                             items:
                                               type: string
+                                            maxItems: 64
                                             minItems: 1
                                             type: array
                                           exp:
                                             description: Exp matches regular expression.
+                                            maxLength: 4096
                                             minLength: 1
                                             type: string
                                           negate:
@@ -5665,10 +6125,12 @@ spec:
                                               provided values exactly.
                                             items:
                                               type: string
+                                            maxItems: 64
                                             minItems: 1
                                             type: array
                                           exp:
                                             description: Exp matches regular expression.
+                                            maxLength: 4096
                                             minLength: 1
                                             type: string
                                           negate:
@@ -5727,10 +6189,12 @@ spec:
                                           values exactly.
                                         items:
                                           type: string
+                                        maxItems: 64
                                         minItems: 1
                                         type: array
                                       exp:
                                         description: Exp matches regular expression.
+                                        maxLength: 4096
                                         minLength: 1
                                         type: string
                                       negate:
@@ -5835,10 +6299,12 @@ spec:
                                               items:
                                                 minLength: 1
                                                 type: string
+                                              maxItems: 64
                                               minItems: 1
                                               type: array
                                             exp:
                                               description: Exp matches regular expression.
+                                              maxLength: 4096
                                               minLength: 1
                                               type: string
                                             negate:
@@ -5873,10 +6339,12 @@ spec:
                                               items:
                                                 minLength: 1
                                                 type: string
+                                              maxItems: 64
                                               minItems: 1
                                               type: array
                                             exp:
                                               description: Exp matches regular expression.
+                                              maxLength: 4096
                                               minLength: 1
                                               type: string
                                             negate:
@@ -5920,11 +6388,13 @@ spec:
                                                   items:
                                                     minLength: 1
                                                     type: string
+                                                  maxItems: 64
                                                   minItems: 1
                                                   type: array
                                                 exp:
                                                   description: Exp matches regular
                                                     expression.
+                                                  maxLength: 4096
                                                   minLength: 1
                                                   type: string
                                                 negate:
@@ -5959,11 +6429,13 @@ spec:
                                                   items:
                                                     minLength: 1
                                                     type: string
+                                                  maxItems: 64
                                                   minItems: 1
                                                   type: array
                                                 exp:
                                                   description: Exp matches regular
                                                     expression.
+                                                  maxLength: 4096
                                                   minLength: 1
                                                   type: string
                                                 negate:
@@ -6025,11 +6497,13 @@ spec:
                                                   items:
                                                     minLength: 1
                                                     type: string
+                                                  maxItems: 64
                                                   minItems: 1
                                                   type: array
                                                 exp:
                                                   description: Exp matches regular
                                                     expression.
+                                                  maxLength: 4096
                                                   minLength: 1
                                                   type: string
                                                 negate:
@@ -6064,11 +6538,13 @@ spec:
                                                   items:
                                                     minLength: 1
                                                     type: string
+                                                  maxItems: 64
                                                   minItems: 1
                                                   type: array
                                                 exp:
                                                   description: Exp matches regular
                                                     expression.
+                                                  maxLength: 4096
                                                   minLength: 1
                                                   type: string
                                                 negate:
@@ -6089,10 +6565,12 @@ spec:
                                         items:
                                           minLength: 1
                                           type: string
+                                        maxItems: 64
                                         minItems: 1
                                         type: array
                                       exp:
                                         description: Exp matches regular expression.
+                                        maxLength: 4096
                                         minLength: 1
                                         type: string
                                       negate:
@@ -6121,10 +6599,12 @@ spec:
                                               items:
                                                 minLength: 1
                                                 type: string
+                                              maxItems: 64
                                               minItems: 1
                                               type: array
                                             exp:
                                               description: Exp matches regular expression.
+                                              maxLength: 4096
                                               minLength: 1
                                               type: string
                                             negate:
@@ -6159,10 +6639,12 @@ spec:
                                               items:
                                                 minLength: 1
                                                 type: string
+                                              maxItems: 64
                                               minItems: 1
                                               type: array
                                             exp:
                                               description: Exp matches regular expression.
+                                              maxLength: 4096
                                               minLength: 1
                                               type: string
                                             negate:
@@ -6182,10 +6664,12 @@ spec:
                                         items:
                                           minLength: 1
                                           type: string
+                                        maxItems: 64
                                         minItems: 1
                                         type: array
                                       exp:
                                         description: Exp matches regular expression.
+                                        maxLength: 4096
                                         minLength: 1
                                         type: string
                                       negate:
@@ -6216,6 +6700,71 @@ spec:
                                     type: object
                                 type: object
                               type: array
+                            appArmorProfiles:
+                              description: |-
+                                AppArmorProfiles matches effective Linux container profiles, including
+                                legacy AppArmor annotations before Pod defaults. It uses the same target
+                                and missing-profile semantics as SeccompProfiles. Privileged containers are
+                                Unconfined. Matching a Localhost name does not verify its installation.
+                              items:
+                                description: |-
+                                  WorkloadSecurityProfileMatch matches a profile type and optionally its local
+                                  name/path. Entries are alternatives; localhostProfiles constrains only Localhost.
+                                properties:
+                                  localhostProfiles:
+                                    description: |-
+                                      LocalhostProfiles matches seccomp paths relative to the kubelet seccomp
+                                      directory, or loaded AppArmor profile names. Omitted permits any Localhost
+                                      profile. Requires Localhost in types. Expressions use exact, exp and negate.
+                                    items:
+                                      description: |-
+                                        At least one of Exact or Exp must be set.
+                                        Both may be set together.
+                                      properties:
+                                        exact:
+                                          description: Exact matches one of the provided
+                                            values exactly.
+                                          items:
+                                            type: string
+                                          maxItems: 64
+                                          minItems: 1
+                                          type: array
+                                        exp:
+                                          description: Exp matches regular expression.
+                                          maxLength: 4096
+                                          minLength: 1
+                                          type: string
+                                        negate:
+                                          default: false
+                                          description: Negate regular Expression
+                                          type: boolean
+                                      type: object
+                                      x-kubernetes-validations:
+                                      - message: at least one of exact or exp must
+                                          be set
+                                        rule: has(self.exact) || has(self.exp)
+                                    maxItems: 64
+                                    minItems: 1
+                                    type: array
+                                  types:
+                                    description: Types selects profile types. Missing
+                                      profiles never match.
+                                    items:
+                                      description: SecurityProfileType selects a native
+                                        seccomp or AppArmor profile type.
+                                      enum:
+                                      - RuntimeDefault
+                                      - Localhost
+                                      - Unconfined
+                                      type: string
+                                    maxItems: 3
+                                    minItems: 1
+                                    type: array
+                                required:
+                                - types
+                                type: object
+                              maxItems: 64
+                              type: array
                             nodeSelector:
                               description: |-
                                 NodeSelector matches each node selector entry. Empty matchers match any entry.
@@ -6238,10 +6787,12 @@ spec:
                                         items:
                                           minLength: 1
                                           type: string
+                                        maxItems: 64
                                         minItems: 1
                                         type: array
                                       exp:
                                         description: Exp matches regular expression.
+                                        maxLength: 4096
                                         minLength: 1
                                         type: string
                                       negate:
@@ -6262,10 +6813,12 @@ spec:
                                         items:
                                           minLength: 1
                                           type: string
+                                        maxItems: 64
                                         minItems: 1
                                         type: array
                                       exp:
                                         description: Exp matches regular expression.
+                                        maxLength: 4096
                                         minLength: 1
                                         type: string
                                       negate:
@@ -6295,10 +6848,12 @@ spec:
                                       values exactly.
                                     items:
                                       type: string
+                                    maxItems: 64
                                     minItems: 1
                                     type: array
                                   exp:
                                     description: Exp matches regular expression.
+                                    maxLength: 4096
                                     minLength: 1
                                     type: string
                                   negate:
@@ -6426,10 +6981,12 @@ spec:
                                       values exactly.
                                     items:
                                       type: string
+                                    maxItems: 64
                                     minItems: 1
                                     type: array
                                   exp:
                                     description: Exp matches regular expression.
+                                    maxLength: 4096
                                     minLength: 1
                                     type: string
                                   negate:
@@ -6440,6 +6997,72 @@ spec:
                                 x-kubernetes-validations:
                                 - message: at least one of exact or exp must be set
                                   rule: has(self.exact) || has(self.exp)
+                              type: array
+                            seccompProfiles:
+                              description: |-
+                                SeccompProfiles matches effective Linux container profiles, resolving
+                                container overrides before Pod defaults. Privileged containers are Unconfined.
+                                Missing profiles do not match any type, so an allow-list rejects them.
+                                Omitted targets check regular, init and ephemeral containers; pod explicitly
+                                selects only the Pod default. Controller targets check their Pod templates.
+                              items:
+                                description: |-
+                                  WorkloadSecurityProfileMatch matches a profile type and optionally its local
+                                  name/path. Entries are alternatives; localhostProfiles constrains only Localhost.
+                                properties:
+                                  localhostProfiles:
+                                    description: |-
+                                      LocalhostProfiles matches seccomp paths relative to the kubelet seccomp
+                                      directory, or loaded AppArmor profile names. Omitted permits any Localhost
+                                      profile. Requires Localhost in types. Expressions use exact, exp and negate.
+                                    items:
+                                      description: |-
+                                        At least one of Exact or Exp must be set.
+                                        Both may be set together.
+                                      properties:
+                                        exact:
+                                          description: Exact matches one of the provided
+                                            values exactly.
+                                          items:
+                                            type: string
+                                          maxItems: 64
+                                          minItems: 1
+                                          type: array
+                                        exp:
+                                          description: Exp matches regular expression.
+                                          maxLength: 4096
+                                          minLength: 1
+                                          type: string
+                                        negate:
+                                          default: false
+                                          description: Negate regular Expression
+                                          type: boolean
+                                      type: object
+                                      x-kubernetes-validations:
+                                      - message: at least one of exact or exp must
+                                          be set
+                                        rule: has(self.exact) || has(self.exp)
+                                    maxItems: 64
+                                    minItems: 1
+                                    type: array
+                                  types:
+                                    description: Types selects profile types. Missing
+                                      profiles never match.
+                                    items:
+                                      description: SecurityProfileType selects a native
+                                        seccomp or AppArmor profile type.
+                                      enum:
+                                      - RuntimeDefault
+                                      - Localhost
+                                      - Unconfined
+                                      type: string
+                                    maxItems: 3
+                                    minItems: 1
+                                    type: array
+                                required:
+                                - types
+                                type: object
+                              maxItems: 64
                               type: array
                             targets:
                               description: |-
@@ -6485,10 +7108,12 @@ spec:
                                         items:
                                           minLength: 1
                                           type: string
+                                        maxItems: 64
                                         minItems: 1
                                         type: array
                                       exp:
                                         description: Exp matches regular expression.
+                                        maxLength: 4096
                                         minLength: 1
                                         type: string
                                       negate:
@@ -6535,10 +7160,12 @@ spec:
                                         items:
                                           minLength: 1
                                           type: string
+                                        maxItems: 64
                                         minItems: 1
                                         type: array
                                       exp:
                                         description: Exp matches regular expression.
+                                        maxLength: 4096
                                         minLength: 1
                                         type: string
                                       negate:
@@ -6587,11 +7214,13 @@ spec:
                                                   items:
                                                     minLength: 1
                                                     type: string
+                                                  maxItems: 64
                                                   minItems: 1
                                                   type: array
                                                 exp:
                                                   description: Exp matches regular
                                                     expression.
+                                                  maxLength: 4096
                                                   minLength: 1
                                                   type: string
                                                 negate:
@@ -6626,11 +7255,13 @@ spec:
                                                   items:
                                                     minLength: 1
                                                     type: string
+                                                  maxItems: 64
                                                   minItems: 1
                                                   type: array
                                                 exp:
                                                   description: Exp matches regular
                                                     expression.
+                                                  maxLength: 4096
                                                   minLength: 1
                                                   type: string
                                                 negate:
@@ -6698,10 +7329,12 @@ spec:
                                         items:
                                           minLength: 1
                                           type: string
+                                        maxItems: 64
                                         minItems: 1
                                         type: array
                                       exp:
                                         description: Exp matches regular expression.
+                                        maxLength: 4096
                                         minLength: 1
                                         type: string
                                       negate:
@@ -6733,9 +7366,10 @@ spec:
                             default: merge
                             description: |-
                               Action chooses how explicitly supplied properties are applied.
-                              Merge fills an empty schedulerName, sets hostUsers and map keys, upserts lists, and conjoins required affinity.
+                              Merge fills an empty schedulerName and absent security profiles, sets hostUsers
+                              and map keys, upserts lists, and conjoins required affinity.
                               Replace replaces each supplied property in full: scheduler, hostUsers, nodeSelector,
-                              tolerations, topologySpreadConstraints, or affinity. Omitted properties are
+                              tolerations, topologySpreadConstraints, affinity, or security profiles. Omitted properties are
                               retained. Supplying affinity replaces all its branches, including omitted ones.
                             enum:
                             - merge
@@ -7720,6 +8354,31 @@ spec:
                                         x-kubernetes-list-type: atomic
                                     type: object
                                 type: object
+                              appArmorProfile:
+                                description: |-
+                                  AppArmorProfile supplies the Pod-level securityContext.appArmorProfile on
+                                  Linux Pod creation. Merge fills an absent profile; replace replaces the
+                                  complete profile. Explicit container profiles are preserved. Nil omits it.
+                                  AppArmor and any Localhost profile must be available on eligible nodes.
+                                properties:
+                                  localhostProfile:
+                                    description: |-
+                                      localhostProfile indicates a profile loaded on the node that should be used.
+                                      The profile must be preconfigured on the node to work.
+                                      Must match the loaded name of the profile.
+                                      Must be set if and only if type is "Localhost".
+                                    type: string
+                                  type:
+                                    description: |-
+                                      type indicates which kind of AppArmor profile will be applied.
+                                      Valid options are:
+                                        Localhost - a profile pre-loaded on the node.
+                                        RuntimeDefault - the container runtime's default profile.
+                                        Unconfined - no AppArmor enforcement.
+                                    type: string
+                                required:
+                                - type
+                                type: object
                               hostUsers:
                                 description: |-
                                   HostUsers sets spec.hostUsers on both merge and replace. False requests a
@@ -7742,6 +8401,31 @@ spec:
                                   Omitted or null leaves the Pod value unchanged.
                                 minLength: 1
                                 type: string
+                              seccompProfile:
+                                description: |-
+                                  SeccompProfile supplies the Pod-level securityContext.seccompProfile on
+                                  Linux Pod creation. Merge fills an absent profile; replace replaces the
+                                  complete profile. Explicit container profiles are preserved. Nil omits it.
+                                properties:
+                                  localhostProfile:
+                                    description: |-
+                                      localhostProfile indicates a profile defined in a file on the node should be used.
+                                      The profile must be preconfigured on the node to work.
+                                      Must be a descending path, relative to the kubelet's configured seccomp profile location.
+                                      Must be set if type is "Localhost". Must NOT be set for any other type.
+                                    type: string
+                                  type:
+                                    description: |-
+                                      type indicates which kind of seccomp profile will be applied.
+                                      Valid options are:
+
+                                      Localhost - a profile defined in a file on the node should be used.
+                                      RuntimeDefault - the container runtime default profile should be used.
+                                      Unconfined - no profile should be applied.
+                                    type: string
+                                required:
+                                - type
+                                type: object
                               tolerations:
                                 description: |-
                                   Tolerations merges by key, operator (default Equal), value and effect.
