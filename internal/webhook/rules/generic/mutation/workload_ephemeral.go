@@ -16,9 +16,9 @@ import (
 	"github.com/projectcapsule/capsule/pkg/ruleengine"
 )
 
-func mutateEphemeralRootFilesystems(ctx context.Context, obj, old *unstructured.Unstructured, bodies []*rules.NamespaceRuleBodyNamespace, conditions *ruleengine.ConditionEvaluator) (bool, error) {
+func mutateEphemeralContainers(ctx context.Context, obj, old *unstructured.Unstructured, bodies []*rules.NamespaceRuleBodyNamespace, conditions *ruleengine.ConditionEvaluator) (bool, error) {
 	applicable := func(mutation rules.NamespaceRuleMutation) bool {
-		return mutation.Workloads.Security.ReadOnlyRootFilesystem != nil && mutation.Workloads.GetWorkloadTargets(rules.ValidateEphemeralContainers)
+		return hasContainerMutation(mutation.Workloads, true) && mutation.Workloads.GetWorkloadTargets(rules.ValidateEphemeralContainers)
 	}
 
 	if !slices.ContainsFunc(bodies, func(body *rules.NamespaceRuleBodyNamespace) bool {
@@ -36,16 +36,14 @@ func mutateEphemeralRootFilesystems(ctx context.Context, obj, old *unstructured.
 		return false, fmt.Errorf("decode Pod for ephemeral container mutation: %w", err)
 	}
 
-	if pod.Spec.OS != nil && pod.Spec.OS.Name == corev1.Windows {
-		return false, nil
-	}
+	linux := pod.Spec.OS == nil || pod.Spec.OS.Name != corev1.Windows
 
 	existing, err := existingEphemeralContainerNames(old)
 	if err != nil {
 		return false, err
 	}
 
-	containers := rootFilesystemContainers(pod, true, existing)
+	containers := workloadMutationContainers(pod, true, existing)
 	if len(containers) == 0 {
 		return false, nil
 	}
@@ -58,7 +56,7 @@ func mutateEphemeralRootFilesystems(ctx context.Context, obj, old *unstructured.
 		}
 
 		for j, mutation := range body.Mutate {
-			if !applicable(mutation) {
+			if !applicable(mutation) || !hasContainerMutation(mutation.Workloads, linux) {
 				continue
 			}
 
@@ -73,7 +71,7 @@ func mutateEphemeralRootFilesystems(ctx context.Context, obj, old *unstructured.
 
 			switch mutation.Action {
 			case "", rules.MutationActionMerge, rules.MutationActionReplace:
-				if mutateRootFilesystems(containers, mutation.Workloads) {
+				if mutateContainers(containers, mutation.Workloads, linux) {
 					conditions.ResetObject()
 				}
 			default:
@@ -82,11 +80,15 @@ func mutateEphemeralRootFilesystems(ctx context.Context, obj, old *unstructured.
 		}
 	}
 
-	if !slices.ContainsFunc(containers, rootFilesystemContainer.changed) {
+	if !slices.ContainsFunc(containers, workloadMutationContainer.changed) {
 		return false, nil
 	}
 
-	// Write only the selected Boolean leaves, retaining unknown API fields and
+	return writeEphemeralContainerMutations(obj, containers)
+}
+
+func writeEphemeralContainerMutations(obj *unstructured.Unstructured, containers []workloadMutationContainer) (bool, error) {
+	// Write only changed scalar leaves, retaining unknown API fields and
 	// every immutable existing container exactly as received.
 	values, _, err := unstructured.NestedFieldNoCopy(obj.Object, "spec", "ephemeralContainers")
 	if err != nil {
@@ -106,6 +108,14 @@ func mutateEphemeralRootFilesystems(ctx context.Context, obj, old *unstructured.
 		item, ok := items[container.index].(map[string]any)
 		if !ok {
 			return false, fmt.Errorf("ephemeralContainers[%d] must be an object", container.index)
+		}
+
+		if container.pullPolicyChanged() {
+			item["imagePullPolicy"] = string(*container.pullPolicy)
+		}
+
+		if !container.rootFilesystemChanged() {
+			continue
 		}
 
 		security, _ := item["securityContext"].(map[string]any)

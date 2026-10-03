@@ -26,8 +26,13 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 	}
 
 	before := podPlacement(pod).DeepCopy()
+	// Secret references are only appended or replaced, never edited in place.
+	// Retain a shallow snapshot so unrelated mutations add no slice allocation.
+	originalSecrets := pod.Spec.ImagePullSecrets
 
-	var rootFilesystems []rootFilesystemContainer
+	var containers []workloadMutationContainer
+
+	linux := pod.Spec.OS == nil || pod.Spec.OS.Name != corev1.Windows
 
 	for i, body := range bodies {
 		if body == nil {
@@ -36,7 +41,7 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 
 		for j := range body.Mutate {
 			mutation := &body.Mutate[j]
-			if (len(mutation.Workloads.Targets) > 0 || mutation.Workloads.Security.ReadOnlyRootFilesystem != nil) && !mutationAppliesToPod(pod, mutation.Workloads) {
+			if (len(mutation.Workloads.Targets) > 0 || mutation.Workloads.Security.ReadOnlyRootFilesystem != nil || mutation.Workloads.Registries.ImagePullPolicy != "") && !mutationAppliesToPod(pod, mutation.Workloads) {
 				continue
 			}
 
@@ -64,17 +69,17 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 				return false, fmt.Errorf("rules[%d].mutate[%d].action: unsupported action %q (expected merge or replace)", i, j, mutation.Action)
 			}
 
-			if mutation.Workloads.Security.ReadOnlyRootFilesystem != nil && (pod.Spec.OS == nil || pod.Spec.OS.Name != corev1.Windows) {
-				if rootFilesystems == nil {
-					rootFilesystems = rootFilesystemContainers(pod, false, nil)
+			if hasContainerMutation(mutation.Workloads, linux) {
+				if containers == nil {
+					containers = workloadMutationContainers(pod, false, nil)
 				}
 
-				mutateRootFilesystems(rootFilesystems, mutation.Workloads)
+				mutateContainers(containers, mutation.Workloads, linux)
 			}
 		}
 	}
 
-	return slices.ContainsFunc(rootFilesystems, rootFilesystemContainer.changed) || podPlacementChanged(before, podPlacement(pod)), nil
+	return !slices.Equal(originalSecrets, pod.Spec.ImagePullSecrets) || slices.ContainsFunc(containers, workloadMutationContainer.changed) || podPlacementChanged(before, podPlacement(pod)), nil
 }
 
 func podPlacementChanged(before, after *apirules.WorkloadMutation) bool {
@@ -93,7 +98,7 @@ func mutationAppliesToPod(pod *corev1.Pod, workload apirules.WorkloadMutation) b
 		return true
 	}
 
-	if workload.Security.ReadOnlyRootFilesystem == nil || (pod.Spec.OS != nil && pod.Spec.OS.Name == corev1.Windows) {
+	if !hasContainerMutation(workload, pod.Spec.OS == nil || pod.Spec.OS.Name != corev1.Windows) {
 		return false
 	}
 
@@ -139,6 +144,10 @@ func replacePodPlacement(pod *corev1.Pod, placement *apirules.WorkloadMutation) 
 	mutatePodSecurityProfiles(pod, placement, true)
 
 	desired := placement.DeepCopy()
+	if desired.Registries.ImagePullSecrets != nil {
+		pod.Spec.ImagePullSecrets = desired.Registries.ImagePullSecrets
+	}
+
 	if desired.Placement.Scheduler != "" {
 		pod.Spec.SchedulerName = desired.Placement.Scheduler
 	}
@@ -172,6 +181,8 @@ func replacePodPlacement(pod *corev1.Pod, placement *apirules.WorkloadMutation) 
 
 func mergePodPlacement(pod *corev1.Pod, placement *apirules.WorkloadMutation) error {
 	mutatePodSecurityProfiles(pod, placement, false)
+
+	pod.Spec.ImagePullSecrets = mergeImagePullSecrets(pod.Spec.ImagePullSecrets, placement.Registries.ImagePullSecrets)
 
 	if placement.Placement.Scheduler != "" && pod.Spec.SchedulerName == "" {
 		pod.Spec.SchedulerName = placement.Placement.Scheduler

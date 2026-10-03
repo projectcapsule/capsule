@@ -182,6 +182,8 @@ spec:
               readOnlyRootFilesystem: true
               seccompProfile:
                 type: RuntimeDefault
+            registries:
+              imagePullPolicy: Always
       enforce:
         action: allow
         workloads:

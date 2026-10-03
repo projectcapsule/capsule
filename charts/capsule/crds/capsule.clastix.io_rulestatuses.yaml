@@ -1558,10 +1558,10 @@ spec:
                         default: merge
                         description: |-
                           Action chooses how explicitly supplied properties are applied.
-                          Merge fills an empty schedulerName and absent security profiles, sets hostUsers, readOnlyRootFilesystem,
-                          and map keys, upserts lists, and conjoins required affinity.
-                          Replace replaces each supplied property in full: scheduler, hostUsers, readOnlyRootFilesystem, nodeSelector,
-                          tolerations, topologySpreadConstraints, affinity, or security profiles. Omitted properties are
+                          Merge fills an empty schedulerName and absent security profiles, sets hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy,
+                          and map keys, adds missing imagePullSecrets by name, upserts lists, and conjoins required affinity.
+                          Replace replaces each supplied property in full: scheduler, hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy, nodeSelector,
+                          registries.imagePullSecrets, tolerations, topologySpreadConstraints, affinity, or security profiles. Omitted properties are
                           retained. Supplying affinity replaces all its branches, including omitted ones.
                         enum:
                         - merge
@@ -1598,9 +1598,10 @@ spec:
                         description: |-
                           WorkloadMutation contains typed native Pod values. Empty maps/lists are
                           preserved so replace can clear a property; nil means the property is omitted.
-                          It applies on Pod creation. ReadOnlyRootFilesystem also applies to newly added
-                          ephemeral containers on subresource updates. Existing containers are never reconciled.
-                          On merge, later entries override hostUsers, readOnlyRootFilesystem, matching map keys,
+                          It applies on Pod creation. Security.ReadOnlyRootFilesystem and
+                          Registries.ImagePullPolicy also apply to newly added ephemeral containers on
+                          subresource updates. Existing containers are never reconciled.
+                          On merge, later entries override hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy, matching map keys,
                           tolerations and spread constraints.
                           On merge, required affinity restrictions from applicable entries are ANDed.
                         properties:
@@ -2793,6 +2794,53 @@ spec:
                                 x-kubernetes-list-map-keys:
                                 - topologyKey
                                 - whenUnsatisfiable
+                                x-kubernetes-list-type: map
+                            type: object
+                          registries:
+                            description: Registries configures Pod image pull secrets
+                              and selected containers' pull policies.
+                            properties:
+                              imagePullPolicy:
+                                description: |-
+                                  ImagePullPolicy sets imagePullPolicy on every selected regular or init
+                                  container at Pod creation, and newly added ephemeral containers on subresource
+                                  updates. Both merge and replace overwrite explicit and Kubernetes-defaulted
+                                  values. Omitted or null preserves the existing policy. Applies to all Pod OSes.
+                                enum:
+                                - Always
+                                - IfNotPresent
+                                - Never
+                                type: string
+                              imagePullSecrets:
+                                description: |-
+                                  ImagePullSecrets sets spec.imagePullSecrets on Pod creation. Merge appends
+                                  missing names and removes existing duplicates, retaining first-occurrence order. Replace sets
+                                  the complete list; an explicit empty list clears it. Omitted or null preserves it.
+                                  Requires the pod target or omitted/empty targets. References always use the
+                                  Pod's namespace; Capsule does not create, copy, or check the referenced Secrets.
+                                items:
+                                  description: |-
+                                    LocalObjectReference contains enough information to let you locate the
+                                    referenced object inside the same namespace.
+                                  properties:
+                                    name:
+                                      default: ""
+                                      description: |-
+                                        Name of the referent.
+                                        This field is effectively required, but due to backwards compatibility is
+                                        allowed to be empty. Instances of this type with an empty value here are
+                                        almost certainly wrong.
+                                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                      type: string
+                                  type: object
+                                  x-kubernetes-map-type: atomic
+                                  x-kubernetes-validations:
+                                  - message: secret name must not be empty
+                                    rule: has(self.name) && self.name != ''
+                                maxItems: 64
+                                type: array
+                                x-kubernetes-list-map-keys:
+                                - name
                                 x-kubernetes-list-type: map
                             type: object
                           security:
@@ -4561,10 +4609,10 @@ spec:
                           default: merge
                           description: |-
                             Action chooses how explicitly supplied properties are applied.
-                            Merge fills an empty schedulerName and absent security profiles, sets hostUsers, readOnlyRootFilesystem,
-                            and map keys, upserts lists, and conjoins required affinity.
-                            Replace replaces each supplied property in full: scheduler, hostUsers, readOnlyRootFilesystem, nodeSelector,
-                            tolerations, topologySpreadConstraints, affinity, or security profiles. Omitted properties are
+                            Merge fills an empty schedulerName and absent security profiles, sets hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy,
+                            and map keys, adds missing imagePullSecrets by name, upserts lists, and conjoins required affinity.
+                            Replace replaces each supplied property in full: scheduler, hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy, nodeSelector,
+                            registries.imagePullSecrets, tolerations, topologySpreadConstraints, affinity, or security profiles. Omitted properties are
                             retained. Supplying affinity replaces all its branches, including omitted ones.
                           enum:
                           - merge
@@ -4601,9 +4649,10 @@ spec:
                           description: |-
                             WorkloadMutation contains typed native Pod values. Empty maps/lists are
                             preserved so replace can clear a property; nil means the property is omitted.
-                            It applies on Pod creation. ReadOnlyRootFilesystem also applies to newly added
-                            ephemeral containers on subresource updates. Existing containers are never reconciled.
-                            On merge, later entries override hostUsers, readOnlyRootFilesystem, matching map keys,
+                            It applies on Pod creation. Security.ReadOnlyRootFilesystem and
+                            Registries.ImagePullPolicy also apply to newly added ephemeral containers on
+                            subresource updates. Existing containers are never reconciled.
+                            On merge, later entries override hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy, matching map keys,
                             tolerations and spread constraints.
                             On merge, required affinity restrictions from applicable entries are ANDed.
                           properties:
@@ -5808,6 +5857,53 @@ spec:
                                   x-kubernetes-list-map-keys:
                                   - topologyKey
                                   - whenUnsatisfiable
+                                  x-kubernetes-list-type: map
+                              type: object
+                            registries:
+                              description: Registries configures Pod image pull secrets
+                                and selected containers' pull policies.
+                              properties:
+                                imagePullPolicy:
+                                  description: |-
+                                    ImagePullPolicy sets imagePullPolicy on every selected regular or init
+                                    container at Pod creation, and newly added ephemeral containers on subresource
+                                    updates. Both merge and replace overwrite explicit and Kubernetes-defaulted
+                                    values. Omitted or null preserves the existing policy. Applies to all Pod OSes.
+                                  enum:
+                                  - Always
+                                  - IfNotPresent
+                                  - Never
+                                  type: string
+                                imagePullSecrets:
+                                  description: |-
+                                    ImagePullSecrets sets spec.imagePullSecrets on Pod creation. Merge appends
+                                    missing names and removes existing duplicates, retaining first-occurrence order. Replace sets
+                                    the complete list; an explicit empty list clears it. Omitted or null preserves it.
+                                    Requires the pod target or omitted/empty targets. References always use the
+                                    Pod's namespace; Capsule does not create, copy, or check the referenced Secrets.
+                                  items:
+                                    description: |-
+                                      LocalObjectReference contains enough information to let you locate the
+                                      referenced object inside the same namespace.
+                                    properties:
+                                      name:
+                                        default: ""
+                                        description: |-
+                                          Name of the referent.
+                                          This field is effectively required, but due to backwards compatibility is
+                                          allowed to be empty. Instances of this type with an empty value here are
+                                          almost certainly wrong.
+                                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                        type: string
+                                    type: object
+                                    x-kubernetes-map-type: atomic
+                                    x-kubernetes-validations:
+                                    - message: secret name must not be empty
+                                      rule: has(self.name) && self.name != ''
+                                  maxItems: 64
+                                  type: array
+                                  x-kubernetes-list-map-keys:
+                                  - name
                                   x-kubernetes-list-type: map
                               type: object
                             security:
@@ -7525,10 +7621,10 @@ spec:
                             default: merge
                             description: |-
                               Action chooses how explicitly supplied properties are applied.
-                              Merge fills an empty schedulerName and absent security profiles, sets hostUsers, readOnlyRootFilesystem,
-                              and map keys, upserts lists, and conjoins required affinity.
-                              Replace replaces each supplied property in full: scheduler, hostUsers, readOnlyRootFilesystem, nodeSelector,
-                              tolerations, topologySpreadConstraints, affinity, or security profiles. Omitted properties are
+                              Merge fills an empty schedulerName and absent security profiles, sets hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy,
+                              and map keys, adds missing imagePullSecrets by name, upserts lists, and conjoins required affinity.
+                              Replace replaces each supplied property in full: scheduler, hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy, nodeSelector,
+                              registries.imagePullSecrets, tolerations, topologySpreadConstraints, affinity, or security profiles. Omitted properties are
                               retained. Supplying affinity replaces all its branches, including omitted ones.
                             enum:
                             - merge
@@ -7565,9 +7661,10 @@ spec:
                             description: |-
                               WorkloadMutation contains typed native Pod values. Empty maps/lists are
                               preserved so replace can clear a property; nil means the property is omitted.
-                              It applies on Pod creation. ReadOnlyRootFilesystem also applies to newly added
-                              ephemeral containers on subresource updates. Existing containers are never reconciled.
-                              On merge, later entries override hostUsers, readOnlyRootFilesystem, matching map keys,
+                              It applies on Pod creation. Security.ReadOnlyRootFilesystem and
+                              Registries.ImagePullPolicy also apply to newly added ephemeral containers on
+                              subresource updates. Existing containers are never reconciled.
+                              On merge, later entries override hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy, matching map keys,
                               tolerations and spread constraints.
                               On merge, required affinity restrictions from applicable entries are ANDed.
                             properties:
@@ -8777,6 +8874,53 @@ spec:
                                     x-kubernetes-list-map-keys:
                                     - topologyKey
                                     - whenUnsatisfiable
+                                    x-kubernetes-list-type: map
+                                type: object
+                              registries:
+                                description: Registries configures Pod image pull
+                                  secrets and selected containers' pull policies.
+                                properties:
+                                  imagePullPolicy:
+                                    description: |-
+                                      ImagePullPolicy sets imagePullPolicy on every selected regular or init
+                                      container at Pod creation, and newly added ephemeral containers on subresource
+                                      updates. Both merge and replace overwrite explicit and Kubernetes-defaulted
+                                      values. Omitted or null preserves the existing policy. Applies to all Pod OSes.
+                                    enum:
+                                    - Always
+                                    - IfNotPresent
+                                    - Never
+                                    type: string
+                                  imagePullSecrets:
+                                    description: |-
+                                      ImagePullSecrets sets spec.imagePullSecrets on Pod creation. Merge appends
+                                      missing names and removes existing duplicates, retaining first-occurrence order. Replace sets
+                                      the complete list; an explicit empty list clears it. Omitted or null preserves it.
+                                      Requires the pod target or omitted/empty targets. References always use the
+                                      Pod's namespace; Capsule does not create, copy, or check the referenced Secrets.
+                                    items:
+                                      description: |-
+                                        LocalObjectReference contains enough information to let you locate the
+                                        referenced object inside the same namespace.
+                                      properties:
+                                        name:
+                                          default: ""
+                                          description: |-
+                                            Name of the referent.
+                                            This field is effectively required, but due to backwards compatibility is
+                                            allowed to be empty. Instances of this type with an empty value here are
+                                            almost certainly wrong.
+                                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                          type: string
+                                      type: object
+                                      x-kubernetes-map-type: atomic
+                                      x-kubernetes-validations:
+                                      - message: secret name must not be empty
+                                        rule: has(self.name) && self.name != ''
+                                    maxItems: 64
+                                    type: array
+                                    x-kubernetes-list-map-keys:
+                                    - name
                                     x-kubernetes-list-type: map
                                 type: object
                               security:

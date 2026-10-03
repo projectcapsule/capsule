@@ -224,11 +224,15 @@ func validateMutations(index int, mutations []rules.NamespaceRuleMutation) error
 
 func validateMutationPlacement(path string, workload rules.WorkloadMutation) error {
 	podProperties := workload.HasPodProperties()
-	if !podProperties && workload.Security.ReadOnlyRootFilesystem == nil {
+	if !podProperties && workload.Security.ReadOnlyRootFilesystem == nil && workload.Registries.ImagePullPolicy == "" {
 		return fmt.Errorf("%s: at least one workload mutation property must be supplied", path)
 	}
 
 	if err := validateMutationTargets(path, workload, podProperties); err != nil {
+		return err
+	}
+
+	if err := validateRegistryMutation(path+".registries", workload.Registries); err != nil {
 		return err
 	}
 

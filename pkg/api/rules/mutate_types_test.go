@@ -44,6 +44,7 @@ func TestNestedWorkloadMutationSerialization(t *testing.T) {
 		`{}`,
 		`{"placement":{"nodeSelector":{},"tolerations":[],"topologySpreadConstraints":[],"affinity":{}}}`,
 		`{"placement":{"scheduler":"team"},"security":{"hostUsers":false,"readOnlyRootFilesystem":false,"seccompProfile":{"type":"RuntimeDefault"},"appArmorProfile":{"type":"RuntimeDefault"}}}`,
+		`{"placement":{"scheduler":"team"},"security":{"readOnlyRootFilesystem":true},"registries":{"imagePullPolicy":"Always","imagePullSecrets":[]}}`,
 	} {
 		t.Run(source, func(t *testing.T) {
 			var workload WorkloadMutation
@@ -75,4 +76,62 @@ func TestNestedWorkloadMutationSerialization(t *testing.T) {
 	require.Equal(t, "shared", original.Placement.NodeSelector["pool"])
 	require.False(t, *original.Security.HostUsers)
 	require.Equal(t, corev1.SeccompProfileTypeRuntimeDefault, original.Security.SeccompProfile.Type)
+}
+
+func TestWorkloadMutationImagePullPolicyPresence(t *testing.T) {
+	for _, value := range []corev1.PullPolicy{"", corev1.PullAlways, corev1.PullIfNotPresent, corev1.PullNever} {
+		original := WorkloadMutation{Registries: WorkloadRegistryMutation{ImagePullPolicy: value}}
+		data, err := json.Marshal(original)
+		require.NoError(t, err)
+		var decoded WorkloadMutation
+		require.NoError(t, json.Unmarshal(data, &decoded))
+		require.Equal(t, original, decoded)
+		require.Equal(t, original, *original.DeepCopy())
+		if value == "" {
+			require.NotContains(t, string(data), "registries")
+		} else {
+			require.JSONEq(t, `{"registries":{"imagePullPolicy":"`+string(value)+`"}}`, string(data))
+		}
+	}
+	var workload WorkloadMutation
+	require.Error(t, json.Unmarshal([]byte(`{"registries":{"imagePullPolicy":false}}`), &workload))
+	require.NoError(t, json.Unmarshal([]byte(`{"registries":{"imagePullPolicy":null}}`), &workload))
+	require.Empty(t, workload.Registries.ImagePullPolicy)
+}
+
+func TestWorkloadMutationRegistryOmission(t *testing.T) {
+	for _, data := range []string{`{}`, `{"registries":null}`, `{"registries":{}}`, `{"registries":{"imagePullPolicy":null}}`} {
+		var workload WorkloadMutation
+		require.NoError(t, json.Unmarshal([]byte(data), &workload))
+		require.Empty(t, workload.Registries.ImagePullPolicy)
+		encoded, err := json.Marshal(workload)
+		require.NoError(t, err)
+		require.JSONEq(t, `{}`, string(encoded))
+	}
+}
+
+func TestWorkloadMutationImagePullSecretsPresenceAndDeepCopy(t *testing.T) {
+	for _, secrets := range [][]corev1.LocalObjectReference{nil, {}, {{Name: "tenant-registry"}}} {
+		original := WorkloadMutation{Registries: WorkloadRegistryMutation{ImagePullSecrets: secrets}}
+		data, err := json.Marshal(original)
+		require.NoError(t, err)
+		var decoded WorkloadMutation
+		require.NoError(t, json.Unmarshal(data, &decoded))
+		require.Equal(t, original, decoded)
+		copied := original.DeepCopy()
+		require.Equal(t, original, *copied)
+		if secrets == nil {
+			require.JSONEq(t, `{}`, string(data))
+		} else if len(secrets) == 0 {
+			require.JSONEq(t, `{"registries":{"imagePullSecrets":[]}}`, string(data))
+		} else {
+			require.JSONEq(t, `{"registries":{"imagePullSecrets":[{"name":"tenant-registry"}]}}`, string(data))
+			copied.Registries.ImagePullSecrets[0].Name = "changed"
+			require.Equal(t, "tenant-registry", original.Registries.ImagePullSecrets[0].Name)
+		}
+	}
+	var workload WorkloadMutation
+	require.NoError(t, json.Unmarshal([]byte(`{"registries":{"imagePullSecrets":null}}`), &workload))
+	require.Nil(t, workload.Registries.ImagePullSecrets)
+	require.Error(t, json.Unmarshal([]byte(`{"registries":{"imagePullSecrets":["secret-name"]}}`), &workload))
 }
