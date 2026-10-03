@@ -34,14 +34,14 @@ var _ = Describe("scheduler mutation namespace profiles", Label("tenant", "rules
 				Owners: rbac.OwnerListSpec{{Kind: "User", Name: name}},
 				Rules: []*rules.NamespaceRuleBodyTenant{
 					{NamespaceSelector: selected, NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{
-						{Action: rules.MutationActionReplace, Conditions: []rules.AdmissionCondition{{Name: "default-scheduler", Expression: `!has(object.spec.schedulerName) || object.spec.schedulerName in ['', 'default-scheduler']`}}, Workloads: rules.WorkloadMutation{Scheduler: "{{ .tenant.metadata.name }}"}},
-						{Workloads: rules.WorkloadMutation{NodeSelector: map[string]string{"scheduler.example.com/pool": name}}},
-						{Action: rules.MutationActionReplace, Conditions: []rules.AdmissionCondition{{Expression: `has(object.metadata.labels) && 'deny-scheduler' in object.metadata.labels && object.metadata.labels['deny-scheduler'] == 'true'`}}, Workloads: rules.WorkloadMutation{Scheduler: "forbidden-scheduler"}},
+						{Action: rules.MutationActionReplace, Conditions: []rules.AdmissionCondition{{Name: "default-scheduler", Expression: `!has(object.spec.schedulerName) || object.spec.schedulerName in ['', 'default-scheduler']`}}, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{Scheduler: "{{ .tenant.metadata.name }}"}}},
+						{Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{"scheduler.example.com/pool": name}}}},
+						{Action: rules.MutationActionReplace, Conditions: []rules.AdmissionCondition{{Expression: `has(object.metadata.labels) && 'deny-scheduler' in object.metadata.labels && object.metadata.labels['deny-scheduler'] == 'true'`}}, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{Scheduler: "forbidden-scheduler"}}},
 					}}},
-					{NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"scheduler-profile": "replace"}}, NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{{Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{Scheduler: name + "-forced"}}}}},
-					{NamespaceSelector: selected, NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Audience: []rules.Audience{{Kind: rules.AudienceKindUser, Name: "not-the-scheduler-owner"}}, Mutate: []rules.NamespaceRuleMutation{{Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{Scheduler: "wrong-audience"}}}}},
-					{NamespaceSelector: selected, NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeDeny, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"forbidden-scheduler"}}}}}}},
-					{NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"scheduler-profile": "merge-only"}}, NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{{Workloads: rules.WorkloadMutation{Scheduler: "{{ .tenant.metadata.name }}"}}}}},
+					{NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"scheduler-profile": "replace"}}, NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{{Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{Scheduler: name + "-forced"}}}}}},
+					{NamespaceSelector: selected, NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Audience: []rules.Audience{{Kind: rules.AudienceKindUser, Name: "not-the-scheduler-owner"}}, Mutate: []rules.NamespaceRuleMutation{{Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{Scheduler: "wrong-audience"}}}}}},
+					{NamespaceSelector: selected, NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeDeny, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"forbidden-scheduler"}}}}}}}},
+					{NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"scheduler-profile": "merge-only"}}, NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{{Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{Scheduler: "{{ .tenant.metadata.name }}"}}}}}},
 				},
 			}}
 			Expect(k8sClient.Create(ctx, tnt)).To(Succeed())
@@ -61,7 +61,7 @@ var _ = Describe("scheduler mutation namespace profiles", Label("tenant", "rules
 				g.Expect(ready.Status).To(Equal(metav1.ConditionTrue))
 				g.Expect(status.Status.Rules).To(HaveLen(count))
 				if count > 0 {
-					g.Expect(status.Status.Rules[0].Mutate[0].Workloads.Scheduler).To(Equal(scheduler))
+					g.Expect(status.Status.Rules[0].Mutate[0].Workloads.Placement.Scheduler).To(Equal(scheduler))
 				}
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		}
@@ -139,16 +139,16 @@ var _ = Describe("scheduler mutation namespace profiles", Label("tenant", "rules
 		Eventually(func(g Gomega) {
 			current := &capsulev1beta2.Tenant{}
 			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(tenants[0]), current)).To(Succeed())
-			current.Spec.Rules[0].Mutate[0].Workloads.Scheduler = "   "
+			current.Spec.Rules[0].Mutate[0].Workloads.Placement.Scheduler = "   "
 			err := k8sClient.Update(ctx, current)
 			if err == nil {
 				Fail("blank scheduler configuration was accepted")
 			}
-			g.Expect(err).To(MatchError(And(ContainSubstring("workloads.scheduler"), ContainSubstring("must not be blank"))))
+			g.Expect(err).To(MatchError(And(ContainSubstring("workloads.placement.scheduler"), ContainSubstring("must not be blank"))))
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		storedTenant := &capsulev1beta2.Tenant{}
 		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(tenants[0]), storedTenant)).To(Succeed())
-		Expect(storedTenant.Spec.Rules[0].Mutate[0].Workloads.Scheduler).To(Equal("{{ .tenant.metadata.name }}"))
+		Expect(storedTenant.Spec.Rules[0].Mutate[0].Workloads.Placement.Scheduler).To(Equal("{{ .tenant.metadata.name }}"))
 
 		By("applying a changed policy only to newly created Pods")
 		Eventually(func() error {
@@ -156,7 +156,7 @@ var _ = Describe("scheduler mutation namespace profiles", Label("tenant", "rules
 			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(tenants[0]), current); err != nil {
 				return err
 			}
-			current.Spec.Rules[0].Mutate[0].Workloads.Scheduler = "updated-scheduler"
+			current.Spec.Rules[0].Mutate[0].Workloads.Placement.Scheduler = "updated-scheduler"
 			return k8sClient.Update(ctx, current)
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		TenantReady(tenants[0], metav1.ConditionTrue, defaultTimeoutInterval)

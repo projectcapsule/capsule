@@ -31,14 +31,14 @@ var _ = Describe("workload security profiles", Label("tenant", "rules", "workloa
 		prefix := "e2e-profiles-" + rand.String(8)
 		var tenants []*capsule.Tenant
 		var owners []client.Client
-		defaults := rules.WorkloadMutation{SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}, AppArmorProfile: &corev1.AppArmorProfile{Type: corev1.AppArmorProfileTypeRuntimeDefault}}
+		defaults := rules.WorkloadMutation{Security: rules.WorkloadSecurityMutation{SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}, AppArmorProfile: &corev1.AppArmorProfile{Type: corev1.AppArmorProfileTypeRuntimeDefault}}}
 		for _, suffix := range []string{"a", "b"} {
 			name := prefix + "-" + suffix
 			matches := []rules.WorkloadSecurityProfileMatch{{Types: []rules.SecurityProfileType{rules.SecurityProfileRuntimeDefault, rules.SecurityProfileLocalhost}, LocalhostProfiles: []apiruntime.ExpressionMatch{{Exact: []string{name + ".json"}}}}}
 			tnt := &capsule.Tenant{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{"env": "e2e"}}, Spec: capsule.TenantSpec{Owners: rbac.OwnerListSpec{{Kind: "User", Name: name}}, Rules: []*rules.NamespaceRuleBodyTenant{
 				{NamespaceSelector: &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "security-profile", Operator: metav1.LabelSelectorOpIn, Values: []string{"default", "replace"}}}}, NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
 					Mutate:  []rules.NamespaceRuleMutation{{Workloads: defaults}},
-					Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeAllow, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: []rules.WorkloadValidationTarget{rules.ValidateContainers, rules.ValidateInitContainers, rules.ValidateEphemeralContainers, rules.ValidateDeployment}, SeccompProfiles: matches, AppArmorProfiles: matches}},
+					Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeAllow, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: []rules.WorkloadValidationTarget{rules.ValidateContainers, rules.ValidateInitContainers, rules.ValidateEphemeralContainers, rules.ValidateDeployment}, Security: rules.WorkloadSecurityEnforcement{SeccompProfiles: matches, AppArmorProfiles: matches}}},
 				}},
 				{NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"security-profile": "replace"}}, NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{{Action: rules.MutationActionReplace, Workloads: defaults}}}},
 			}}}
@@ -54,9 +54,9 @@ var _ = Describe("workload security profiles", Label("tenant", "rules", "workloa
 				current := &capsule.Tenant{}
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(tenants[0]), current)).To(Succeed())
 				if field == "seccompProfiles" {
-					current.Spec.Rules[0].Enforce.Workloads.SeccompProfiles[0].LocalhostProfiles[0].Expression = "["
+					current.Spec.Rules[0].Enforce.Workloads.Security.SeccompProfiles[0].LocalhostProfiles[0].Expression = "["
 				} else {
-					current.Spec.Rules[0].Mutate[0].Workloads.AppArmorProfile.LocalhostProfile = new("unexpected")
+					current.Spec.Rules[0].Mutate[0].Workloads.Security.AppArmorProfile.LocalhostProfile = new("unexpected")
 				}
 				err := k8sClient.Update(ctx, current)
 				if err == nil {
@@ -92,9 +92,9 @@ var _ = Describe("workload security profiles", Label("tenant", "rules", "workloa
 				}
 				set := func(tnt *capsule.Tenant) *[]rules.WorkloadSecurityProfileMatch {
 					if group == "appArmorProfiles" {
-						return &tnt.Spec.Rules[0].Enforce.Workloads.AppArmorProfiles
+						return &tnt.Spec.Rules[0].Enforce.Workloads.Security.AppArmorProfiles
 					}
-					return &tnt.Spec.Rules[0].Enforce.Workloads.SeccompProfiles
+					return &tnt.Spec.Rules[0].Enforce.Workloads.Security.SeccompProfiles
 				}
 				Eventually(func(g Gomega) {
 					current := &capsule.Tenant{}
@@ -143,8 +143,8 @@ var _ = Describe("workload security profiles", Label("tenant", "rules", "workloa
 		Eventually(func(g Gomega) {
 			current := &capsule.Tenant{}
 			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(tenants[0]), current)).To(Succeed())
-			current.Spec.Rules[0].Enforce.Workloads.SeccompProfiles = tenants[0].Spec.Rules[0].Enforce.Workloads.SeccompProfiles
-			current.Spec.Rules[0].Enforce.Workloads.AppArmorProfiles = tenants[0].Spec.Rules[0].Enforce.Workloads.AppArmorProfiles
+			current.Spec.Rules[0].Enforce.Workloads.Security.SeccompProfiles = tenants[0].Spec.Rules[0].Enforce.Workloads.Security.SeccompProfiles
+			current.Spec.Rules[0].Enforce.Workloads.Security.AppArmorProfiles = tenants[0].Spec.Rules[0].Enforce.Workloads.Security.AppArmorProfiles
 			g.Expect(k8sClient.Update(ctx, current)).To(Succeed())
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(tenants[1]), storedTenant)).To(Succeed())
@@ -156,7 +156,7 @@ var _ = Describe("workload security profiles", Label("tenant", "rules", "workloa
 				g.Expect(status.Status.ObservedGeneration).To(Equal(status.Generation))
 				g.Expect(status.Status.Rules).To(HaveLen(count))
 				if count > 0 {
-					g.Expect(status.Status.Rules[0].Enforce.Workloads.SeccompProfiles).To(HaveLen(1))
+					g.Expect(status.Status.Rules[0].Enforce.Workloads.Security.SeccompProfiles).To(HaveLen(1))
 					if disabled {
 						g.Expect(status.Status.Rules[0].Enforce.Conditions).To(Equal([]rules.AdmissionCondition{{Expression: "false"}}))
 					} else {

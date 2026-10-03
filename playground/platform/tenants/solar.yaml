@@ -1,4 +1,3 @@
----
 apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
@@ -12,10 +11,10 @@ metadata:
 spec:
   permissions:
     matchOwners:
-    - matchLabels:
-        team: platform
-    - matchLabels:
-        customer: renewable
+      - matchLabels:
+          team: platform
+      - matchLabels:
+          customer: renewable
   rules:
     # Placement applies to test namespaces; production keeps its own profile.
     - namespaceSelector:
@@ -26,20 +25,22 @@ spec:
             - name: linux-default
               expression: "!has(object.spec.nodeSelector) || !('kubernetes.io/os' in object.spec.nodeSelector)"
           workloads:
-            nodeSelector:
-              kubernetes.io/os: linux
+            placement:
+              nodeSelector:
+                kubernetes.io/os: linux
         - action: merge
           conditions:
             - name: shared-pool
               expression: "has(object.metadata.labels) && 'placement.example.com/pool' in object.metadata.labels && object.metadata.labels['placement.example.com/pool'] == 'shared'"
           workloads:
-            nodeSelector:
-              placement.example.com/pool: shared
-            tolerations:
-              - key: infrastructure.example.com/dedicated
-                operator: Equal
-                value: shared
-                effect: NoSchedule
+            placement:
+              nodeSelector:
+                placement.example.com/pool: shared
+              tolerations:
+                - key: infrastructure.example.com/dedicated
+                  operator: Equal
+                  value: shared
+                  effect: NoSchedule
         - action: replace
           conditions:
             - name: shared-pool
@@ -47,43 +48,42 @@ spec:
             - name: default-scheduler
               expression: "!has(object.spec.schedulerName) || object.spec.schedulerName in ['', 'default-scheduler']"
           workloads:
-            # This demo scheduler is not installed; the example Pod has a scheduling gate.
-            scheduler: solar-shared-scheduler
-
+            placement:
+              # This demo scheduler is not installed; the example Pod has a scheduling gate.
+              scheduler: solar-shared-scheduler
       enforce:
         conditions:
           - name: pod-request
             expression: "request.kind.kind == 'Pod' && (!has(request.kind.group) || request.kind.group == '')"
         action: allow
         workloads:
-          nodeSelector:
-            - key:
-                exact: [kubernetes.io/os]
-              values:
-                exact: [linux]
-            - key:
-                exp: '^placement\.example\.com/[a-z0-9-]+$'
-              values:
-                exact: [shared, batch]
-
-          affinity:
-            - types: [nodeAffinity]
-              modes: [required, preferred]
-              requirements:
-                - key:
-                    exact: [topology.kubernetes.io/zone]
-                  operators: [In]
-                  values:
-                    exact: [zone-a, zone-b]
-            - types: [podAffinity, podAntiAffinity]
-              modes: [preferred]
-              topologyKey:
-                exact: [kubernetes.io/hostname]
-              namespaceScope: SameNamespace
-              weight:
-                min: 1
-                max: 100
-
+          placement:
+            nodeSelector:
+              - key:
+                  exact: [kubernetes.io/os]
+                values:
+                  exact: [linux]
+              - key:
+                  exp: '^placement\.example\.com/[a-z0-9-]+$'
+                values:
+                  exact: [shared, batch]
+            affinity:
+              - types: [nodeAffinity]
+                modes: [required, preferred]
+                requirements:
+                  - key:
+                      exact: [topology.kubernetes.io/zone]
+                    operators: [In]
+                    values:
+                      exact: [zone-a, zone-b]
+              - types: [podAffinity, podAntiAffinity]
+                modes: [preferred]
+                topologyKey:
+                  exact: [kubernetes.io/hostname]
+                namespaceScope: SameNamespace
+                weight:
+                  min: 1
+                  max: 100
     # A target without workload policies matches the native kind itself.
     - namespaceSelector:
         matchLabels:
@@ -92,7 +92,6 @@ spec:
         action: deny
         workloads:
           targets: [daemonset]
-
     # With policies, targets scope those checks to the Deployment template.
     - namespaceSelector:
         matchLabels:
@@ -102,13 +101,12 @@ spec:
         workloads:
           targets: [deployment/containers]
           registries:
-            - exact: [example.com/blocked/app:v1]
+            - exact: ['example.com/blocked/app:v1']
           resources:
             requests:
               memory:
                 policy: Default
                 value: 32Mi
-
     # Promote only the dedicated TenantResource ServiceAccount. Capsule binds
     # this distributor role in every solar namespace so the TenantResource can
     # create the temporary user-facing RoleBindings there.
@@ -171,7 +169,6 @@ spec:
         promotions:
           - clusterRoles:
               - "secret-replicator"
-
     # Opt-in security profiles. Label a namespace security-profile=confined.
     - namespaceSelector:
         matchLabels:
@@ -181,15 +178,16 @@ spec:
           workloads:
             # pod includes regular, init/sidecar and newly added ephemeral containers.
             targets: [pod]
-            readOnlyRootFilesystem: true
-            seccompProfile:
-              type: RuntimeDefault
+            security:
+              readOnlyRootFilesystem: true
+              seccompProfile:
+                type: RuntimeDefault
       enforce:
         action: allow
         workloads:
-          seccompProfiles:
-            - types: [RuntimeDefault]
-
+          security:
+            seccompProfiles:
+              - types: [RuntimeDefault]
     # Enable separately, only on nodes with AppArmor support.
     - namespaceSelector:
         matchLabels:
@@ -198,10 +196,12 @@ spec:
       mutate:
         - action: merge
           workloads:
-            appArmorProfile:
-              type: RuntimeDefault
+            security:
+              appArmorProfile:
+                type: RuntimeDefault
       enforce:
         action: allow
         workloads:
-          appArmorProfiles:
-            - types: [RuntimeDefault]
+          security:
+            appArmorProfiles:
+              - types: [RuntimeDefault]

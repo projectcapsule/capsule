@@ -37,7 +37,7 @@ var _ = Describe("workload type namespace profiles", Label("tenant", "rules", "w
 			policy("audit", rules.ActionTypeAudit, rules.ValidateDaemonSet),
 			policy("conditional", rules.ActionTypeDeny, rules.ValidateDaemonSet),
 			policy("restricted", rules.ActionTypeDeny, rules.ValidateDeployment),
-			{NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeDeny, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"forbidden-scheduler"}}}}}}},
+			{NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeDeny, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"forbidden-scheduler"}}}}}}}},
 		}}}
 		a.Spec.Rules[3].Enforce.Conditions = []rules.AdmissionCondition{{Name: "blocked", Expression: `has(object.metadata.labels) && 'blocked' in object.metadata.labels && object.metadata.labels['blocked'] == 'true'`}}
 		a.Spec.Rules[4].Audience = []rules.Audience{{Kind: rules.AudienceKindUser, Name: "not-the-workload-owner"}}

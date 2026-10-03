@@ -64,7 +64,7 @@ func mutateRootFilesystems(containers []rootFilesystemContainer, workload rules.
 	changed := false
 
 	for _, container := range containers {
-		if !workload.GetWorkloadTargets(container.target) || ptr.Equal(rootFilesystemValue(*container.context), workload.ReadOnlyRootFilesystem) {
+		if !workload.GetWorkloadTargets(container.target) || ptr.Equal(rootFilesystemValue(*container.context), workload.Security.ReadOnlyRootFilesystem) {
 			continue
 		}
 
@@ -72,7 +72,7 @@ func mutateRootFilesystems(containers []rootFilesystemContainer, workload rules.
 			*container.context = &corev1.SecurityContext{}
 		}
 
-		(*container.context).ReadOnlyRootFilesystem = new(*workload.ReadOnlyRootFilesystem)
+		(*container.context).ReadOnlyRootFilesystem = new(*workload.Security.ReadOnlyRootFilesystem)
 		changed = true
 	}
 

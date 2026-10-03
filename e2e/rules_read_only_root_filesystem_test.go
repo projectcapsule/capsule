@@ -28,7 +28,7 @@ var _ = Describe("read-only root filesystem mutation", Label("tenant", "rules", 
 		var tenants []*capsule.Tenant
 		var owners []client.Client
 		mutation := func(value bool, target rules.WorkloadValidationTarget) rules.NamespaceRuleMutation {
-			return rules.NamespaceRuleMutation{Action: rules.MutationActionMerge, Workloads: rules.WorkloadMutation{Targets: []rules.WorkloadValidationTarget{target}, ReadOnlyRootFilesystem: new(value)}}
+			return rules.NamespaceRuleMutation{Action: rules.MutationActionMerge, Workloads: rules.WorkloadMutation{Targets: []rules.WorkloadValidationTarget{target}, Security: rules.WorkloadSecurityMutation{ReadOnlyRootFilesystem: new(value)}}}
 		}
 		for i, suffix := range []string{"a", "b"} {
 			name := prefix + "-" + suffix
@@ -151,7 +151,7 @@ var _ = Describe("read-only root filesystem mutation", Label("tenant", "rules", 
 		Eventually(func(g Gomega) {
 			current := &capsule.Tenant{}
 			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(tenants[0]), current)).To(Succeed())
-			current.Spec.Rules[0].Mutate[1].Workloads.ReadOnlyRootFilesystem = new(false)
+			current.Spec.Rules[0].Mutate[1].Workloads.Security.ReadOnlyRootFilesystem = new(false)
 			g.Expect(k8sClient.Update(ctx, current)).To(Succeed())
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		waitProfile(selected, 0, 0)

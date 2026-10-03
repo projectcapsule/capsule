@@ -20,7 +20,7 @@ import (
 func placementTenant(name string) *capsulev1beta2.Tenant {
 	return &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: name}, Spec: capsulev1beta2.TenantSpec{Rules: []*rules.NamespaceRuleBodyTenant{{
 		NamespaceSelector:          &metav1.LabelSelector{MatchLabels: map[string]string{"profile": "placement"}},
-		NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{{Workloads: rules.WorkloadMutation{NodeSelector: map[string]string{"pool": "{{ .tenant.metadata.name }}"}}}}},
+		NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{{Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{"pool": "{{ .tenant.metadata.name }}"}}}}}},
 	}}}}
 }
 
@@ -39,12 +39,12 @@ func TestMutationOnlyNamespaceProjectionAndTemplating(t *testing.T) {
 		if err != nil || len(result) != 1 {
 			t.Fatalf("projection=%v error=%v", result, err)
 		}
-		if result[0].Enforce != nil || result[0].Mutate[0].Workloads.NodeSelector["pool"] != name {
+		if result[0].Enforce != nil || result[0].Mutate[0].Workloads.Placement.NodeSelector["pool"] != name {
 			t.Fatalf("wrong mutation-only projection: %+v", result[0])
 		}
-		result[0].Mutate[0].Workloads.NodeSelector["pool"] = "mutated"
+		result[0].Mutate[0].Workloads.Placement.NodeSelector["pool"] = "mutated"
 		again, err := tenant.BuildNamespaceRuleBodyStatus(scheme, ns, tnt)
-		if err != nil || again[0].Mutate[0].Workloads.NodeSelector["pool"] != name {
+		if err != nil || again[0].Mutate[0].Workloads.Placement.NodeSelector["pool"] != name {
 			t.Fatal("projection aliases cached/template values")
 		}
 		ns.Labels["profile"] = "other"
@@ -65,15 +65,15 @@ func TestSchedulerNamespaceProjectionAndTemplating(t *testing.T) {
 	}
 	for _, name := range []string{"tenant-a", "tenant-b"} {
 		tnt := placementTenant(name)
-		tnt.Spec.Rules[0].Mutate[0].Workloads.Scheduler = "{{ .tenant.metadata.name }}-{{ .namespace.metadata.name }}"
+		tnt.Spec.Rules[0].Mutate[0].Workloads.Placement.Scheduler = "{{ .tenant.metadata.name }}-{{ .namespace.metadata.name }}"
 		for _, nsName := range []string{"first", "second"} {
 			ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: nsName, Labels: map[string]string{"profile": "placement"}}}
 			for range 2 {
 				result, err := tenant.BuildNamespaceRuleBodyStatus(scheme, ns, tnt)
-				if err != nil || len(result) != 1 || result[0].Mutate[0].Workloads.Scheduler != name+"-"+nsName {
+				if err != nil || len(result) != 1 || result[0].Mutate[0].Workloads.Placement.Scheduler != name+"-"+nsName {
 					t.Fatalf("scheduler projection=%v error=%v", result, err)
 				}
-				result[0].Mutate[0].Workloads.Scheduler = "mutated"
+				result[0].Mutate[0].Workloads.Placement.Scheduler = "mutated"
 			}
 			ns.Labels["profile"] = "other"
 			result, err := tenant.BuildNamespaceRuleBodyStatus(scheme, ns, tnt)
@@ -123,7 +123,7 @@ func TestMutationProjectionRetainsActionsConditionsAndEmptyProperties(t *testing
 		t.Fatal(err)
 	}
 	tnt := placementTenant("tenant-a")
-	tnt.Spec.Rules[0].Mutate = append(tnt.Spec.Rules[0].Mutate, rules.NamespaceRuleMutation{Conditions: []rules.AdmissionCondition{{Name: "tenant", Expression: `request.namespace == '{{ .namespace.metadata.name }}'`}}, Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{ReadOnlyRootFilesystem: new(false), Targets: []rules.WorkloadValidationTarget{rules.ValidatePod}, HostUsers: ptr.To(false), NodeSelector: map[string]string{}, Tolerations: []corev1.Toleration{}, TopologySpreadConstraints: []corev1.TopologySpreadConstraint{}, Affinity: &corev1.Affinity{}}})
+	tnt.Spec.Rules[0].Mutate = append(tnt.Spec.Rules[0].Mutate, rules.NamespaceRuleMutation{Conditions: []rules.AdmissionCondition{{Name: "tenant", Expression: `request.namespace == '{{ .namespace.metadata.name }}'`}}, Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{Security: rules.WorkloadSecurityMutation{ReadOnlyRootFilesystem: new(false), HostUsers: ptr.To(false)}, Targets: []rules.WorkloadValidationTarget{rules.ValidatePod}, Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{}, Tolerations: []corev1.Toleration{}, TopologySpreadConstraints: []corev1.TopologySpreadConstraint{}, Affinity: &corev1.Affinity{}}}})
 	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "work-a", Labels: map[string]string{"profile": "placement"}}}
 	result, err := tenant.BuildNamespaceRuleBodyStatus(scheme, ns, tnt)
 	if err != nil {
@@ -133,19 +133,19 @@ func TestMutationProjectionRetainsActionsConditionsAndEmptyProperties(t *testing
 		t.Fatalf("wrong ordered projection: %+v", result)
 	}
 	block := result[0].Mutate[1]
-	if block.Workloads.HostUsers == nil || *block.Workloads.HostUsers || block.Action != rules.MutationActionReplace || block.Conditions[0].Expression != `request.namespace == 'work-a'` || block.Workloads.NodeSelector == nil || block.Workloads.Tolerations == nil || block.Workloads.TopologySpreadConstraints == nil || block.Workloads.Affinity == nil {
+	if block.Workloads.Security.HostUsers == nil || *block.Workloads.Security.HostUsers || block.Action != rules.MutationActionReplace || block.Conditions[0].Expression != `request.namespace == 'work-a'` || block.Workloads.Placement.NodeSelector == nil || block.Workloads.Placement.Tolerations == nil || block.Workloads.Placement.TopologySpreadConstraints == nil || block.Workloads.Placement.Affinity == nil {
 		t.Fatalf("lost fields: %+v", block)
 	}
-	if block.Workloads.ReadOnlyRootFilesystem == nil || *block.Workloads.ReadOnlyRootFilesystem || len(block.Workloads.Targets) != 1 || block.Workloads.Targets[0] != rules.ValidatePod {
+	if block.Workloads.Security.ReadOnlyRootFilesystem == nil || *block.Workloads.Security.ReadOnlyRootFilesystem || len(block.Workloads.Targets) != 1 || block.Workloads.Targets[0] != rules.ValidatePod {
 		t.Fatalf("lost filesystem mutation fields: %+v", block.Workloads)
 	}
-	*block.Workloads.ReadOnlyRootFilesystem = true
+	*block.Workloads.Security.ReadOnlyRootFilesystem = true
 	block.Workloads.Targets[0] = rules.ValidateInitContainers
-	if *tnt.Spec.Rules[0].Mutate[1].Workloads.ReadOnlyRootFilesystem || tnt.Spec.Rules[0].Mutate[1].Workloads.Targets[0] != rules.ValidatePod {
+	if *tnt.Spec.Rules[0].Mutate[1].Workloads.Security.ReadOnlyRootFilesystem || tnt.Spec.Rules[0].Mutate[1].Workloads.Targets[0] != rules.ValidatePod {
 		t.Fatal("filesystem mutation aliases Tenant")
 	}
-	*block.Workloads.HostUsers = true
-	if *tnt.Spec.Rules[0].Mutate[1].Workloads.HostUsers {
+	*block.Workloads.Security.HostUsers = true
+	if *tnt.Spec.Rules[0].Mutate[1].Workloads.Security.HostUsers {
 		t.Fatal("hostUsers aliases Tenant")
 	}
 	block.Conditions[0].Expression = "false"

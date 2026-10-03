@@ -34,9 +34,9 @@ func profileBody(appArmor bool, action rules.ActionType, types ...rules.Security
 	b := &rules.NamespaceRuleEnforceBody{Action: action}
 	match := []rules.WorkloadSecurityProfileMatch{{Types: types}}
 	if appArmor {
-		b.Workloads.AppArmorProfiles = match
+		b.Workloads.Security.AppArmorProfiles = match
 	} else {
-		b.Workloads.SeccompProfiles = match
+		b.Workloads.Security.SeccompProfiles = match
 	}
 	return b
 }
@@ -136,9 +136,9 @@ func TestSecurityProfileOrderingAndLocalhostMatching(t *testing.T) {
 			pod := profilePod()
 			pod.Spec.Containers[0].SecurityContext = profileContext(rules.SecurityProfileLocalhost, "teams/a.json")
 			allow := profileBody(appArmor, rules.ActionTypeAllow, rules.SecurityProfileRuntimeDefault, rules.SecurityProfileLocalhost)
-			match := &allow.Workloads.SeccompProfiles
+			match := &allow.Workloads.Security.SeccompProfiles
 			if appArmor {
-				match = &allow.Workloads.AppArmorProfiles
+				match = &allow.Workloads.Security.AppArmorProfiles
 			}
 			(*match)[0].LocalhostProfiles = []apiruntime.ExpressionMatch{{Exact: []string{"other"}}, {ExpressionRegex: apiruntime.ExpressionRegex{Expression: `^teams/a\.json$`}}}
 			h := newPodRules(nil, nil, nil)
@@ -261,7 +261,7 @@ func TestSecurityProfileConcurrentCacheUse(t *testing.T) {
 	h := newPodRules(nil, nil, nil)
 	b := profileBody(false, rules.ActionTypeAllow, rules.SecurityProfileLocalhost)
 	b.Workloads.Targets = []rules.WorkloadValidationTarget{rules.ValidateContainers}
-	b.Workloads.SeccompProfiles[0].LocalhostProfiles = []apiruntime.ExpressionMatch{{ExpressionRegex: apiruntime.ExpressionRegex{Expression: `^teams/a\.json$`}}}
+	b.Workloads.Security.SeccompProfiles[0].LocalhostProfiles = []apiruntime.ExpressionMatch{{ExpressionRegex: apiruntime.ExpressionRegex{Expression: `^teams/a\.json$`}}}
 	original := b.DeepCopy()
 	var wg sync.WaitGroup
 	for i := range 32 {

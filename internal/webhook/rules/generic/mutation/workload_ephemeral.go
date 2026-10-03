@@ -18,7 +18,7 @@ import (
 
 func mutateEphemeralRootFilesystems(ctx context.Context, obj, old *unstructured.Unstructured, bodies []*rules.NamespaceRuleBodyNamespace, conditions *ruleengine.ConditionEvaluator) (bool, error) {
 	applicable := func(mutation rules.NamespaceRuleMutation) bool {
-		return mutation.Workloads.ReadOnlyRootFilesystem != nil && mutation.Workloads.GetWorkloadTargets(rules.ValidateEphemeralContainers)
+		return mutation.Workloads.Security.ReadOnlyRootFilesystem != nil && mutation.Workloads.GetWorkloadTargets(rules.ValidateEphemeralContainers)
 	}
 
 	if !slices.ContainsFunc(bodies, func(body *rules.NamespaceRuleBodyNamespace) bool {

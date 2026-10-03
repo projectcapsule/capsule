@@ -75,7 +75,7 @@ func (h *podRules) validateNodeSelectors(pod *corev1.Pod, bodies []*rules.Namesp
 			return values
 		},
 		func(body rules.NamespaceRuleEnforceWorkloadsBody) []rules.WorkloadNodeSelectorMatch {
-			return body.NodeSelector
+			return body.Placement.NodeSelector
 		},
 		func(rule rules.WorkloadNodeSelectorMatch, value ruleengine.Value) (bool, error) {
 			key, ok := value.Data.(string)
@@ -100,7 +100,7 @@ func (h *podRules) validateTolerations(pod *corev1.Pod, bodies []*rules.Namespac
 			return values
 		},
 		func(body rules.NamespaceRuleEnforceWorkloadsBody) []rules.WorkloadTolerationMatch {
-			return body.Tolerations
+			return body.Placement.Tolerations
 		},
 		func(rule rules.WorkloadTolerationMatch, value ruleengine.Value) (bool, error) {
 			toleration, ok := value.Data.(corev1.Toleration)
@@ -125,7 +125,7 @@ func (h *podRules) validateTopologySpread(pod *corev1.Pod, bodies []*rules.Names
 			return values
 		},
 		func(body rules.NamespaceRuleEnforceWorkloadsBody) []rules.WorkloadTopologySpreadMatch {
-			return body.TopologySpreadConstraints
+			return body.Placement.TopologySpreadConstraints
 		},
 		func(rule rules.WorkloadTopologySpreadMatch, value ruleengine.Value) (bool, error) {
 			constraint, ok := value.Data.(corev1.TopologySpreadConstraint)
@@ -141,7 +141,9 @@ func (h *podRules) validateAffinity(pod *corev1.Pod, bodies []*rules.NamespaceRu
 	matcher := workloads.PlacementMatcher{Expressions: h.regexCache}
 
 	return evaluatePlacement(pod, bodies, "affinity", events.ReasonForbiddenPodAffinity, affinityValues,
-		func(body rules.NamespaceRuleEnforceWorkloadsBody) []rules.WorkloadAffinityMatch { return body.Affinity },
+		func(body rules.NamespaceRuleEnforceWorkloadsBody) []rules.WorkloadAffinityMatch {
+			return body.Placement.Affinity
+		},
 		func(rule rules.WorkloadAffinityMatch, value ruleengine.Value) (bool, error) {
 			term, ok := value.Data.(workloads.PlacementAffinityTerm)
 			if !ok {
