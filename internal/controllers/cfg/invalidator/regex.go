@@ -90,7 +90,7 @@ func collectRegexExpressionsFromNamespaceRule(
 		set[cache.HashRegex(expr)] = expr
 	}
 
-	for _, scheduler := range rule.Enforce.Workloads.Schedulers {
+	for _, scheduler := range rule.Enforce.Workloads.Placement.Schedulers {
 		expr := scheduler.ExpressionRegex
 		if expr.Expression == "" {
 			continue
@@ -99,7 +99,7 @@ func collectRegexExpressionsFromNamespaceRule(
 		set[cache.HashRegex(expr)] = expr
 	}
 
-	for _, profiles := range [][]rules.WorkloadSecurityProfileMatch{rule.Enforce.Workloads.SeccompProfiles, rule.Enforce.Workloads.AppArmorProfiles} {
+	for _, profiles := range [][]rules.WorkloadSecurityProfileMatch{rule.Enforce.Workloads.Security.SeccompProfiles, rule.Enforce.Workloads.Security.AppArmorProfiles} {
 		for _, profile := range profiles {
 			for _, match := range profile.LocalhostProfiles {
 				if match.Expression != "" {

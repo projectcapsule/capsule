@@ -24,6 +24,7 @@ import (
 
 var _ = Describe("image pull policy mutation", Label("tenant", "rules", "workloads", "image-pull-policy-mutation"), func() {
 	It("selects container groups within namespace profiles and patches only new ephemeral containers", func() {
+		const image = "registry.k8s.io/pause:3.10"
 		ctx := context.Background()
 		prefix := "e2e-pull-" + rand.String(8)
 		var tenants []*capsule.Tenant
@@ -48,7 +49,7 @@ var _ = Describe("image pull policy mutation", Label("tenant", "rules", "workloa
 				{NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"pull-profile": "conflict"}}, NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
 					Mutate: []rules.NamespaceRuleMutation{mutation(corev1.PullNever, rules.ValidatePod)},
 					Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeAllow, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
-						Registries: []rules.OCIRegistry{{ExpressionMatch: apiruntime.ExpressionMatch{Exact: []string{"registry.k8s.io"}}, Policy: []corev1.PullPolicy{corev1.PullAlways}}},
+						Registries: []rules.OCIRegistry{{ExpressionMatch: apiruntime.ExpressionMatch{Exact: []string{image}}, Policy: []corev1.PullPolicy{corev1.PullAlways}}},
 					}},
 				}},
 			}}}
@@ -85,7 +86,7 @@ var _ = Describe("image pull policy mutation", Label("tenant", "rules", "workloa
 		newPod := func(ns *corev1.Namespace, name string, initial corev1.PullPolicy) *corev1.Pod {
 			container := func(name string) corev1.Container {
 				security := restrictedContainerSecurityContext()
-				return corev1.Container{Name: name, Image: "registry.k8s.io/pause:3.10", ImagePullPolicy: initial, SecurityContext: security}
+				return corev1.Container{Name: name, Image: image, ImagePullPolicy: initial, SecurityContext: security}
 			}
 			sidecar := container("sidecar")
 			sidecar.RestartPolicy = new(corev1.ContainerRestartPolicyAlways)
@@ -142,6 +143,18 @@ var _ = Describe("image pull policy mutation", Label("tenant", "rules", "workloa
 		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(tenants[0]), storedTenant)).To(Succeed())
 		Expect(storedTenant.Spec.Rules).To(Equal(tenants[0].Spec.Rules))
 
+		By("admitting the same image once mutation satisfies its enforced pull policy")
+		Eventually(func(g Gomega) {
+			current := &capsule.Tenant{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(tenants[0]), current)).To(Succeed())
+			current.Spec.Rules[2].Mutate[0].Workloads.Registries.ImagePullPolicy = corev1.PullAlways
+			g.Expect(k8sClient.Update(ctx, current)).To(Succeed())
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		waitProfile(conflictNS, 0, 2)
+		allowed := newPod(conflictNS, "compatible-policy", corev1.PullNever)
+		Expect(owners[0].Create(ctx, allowed)).To(Succeed())
+		verify(allowed, corev1.PullAlways, corev1.PullAlways)
+
 		By("patching only newly added ephemeral containers, including after policy changes")
 		DeferCleanup(GrantEphemeralContainersUpdate(selected.Name, tenants[0].Name))
 		cs := ownerClient(tenants[0].Spec.Owners[0].UserSpec)
@@ -151,7 +164,7 @@ var _ = Describe("image pull policy mutation", Label("tenant", "rules", "workloa
 				g.Expect(err).NotTo(HaveOccurred())
 				if !slices.ContainsFunc(current.Spec.EphemeralContainers, func(c corev1.EphemeralContainer) bool { return c.Name == name }) {
 					security := restrictedContainerSecurityContext()
-					current.Spec.EphemeralContainers = append(current.Spec.EphemeralContainers, corev1.EphemeralContainer{EphemeralContainerCommon: corev1.EphemeralContainerCommon{Name: name, Image: "registry.k8s.io/pause:3.10", SecurityContext: security}})
+					current.Spec.EphemeralContainers = append(current.Spec.EphemeralContainers, corev1.EphemeralContainer{EphemeralContainerCommon: corev1.EphemeralContainerCommon{Name: name, Image: image, SecurityContext: security}})
 				}
 				_, err = cs.CoreV1().Pods(selected.Name).UpdateEphemeralContainers(ctx, current.Name, current, metav1.UpdateOptions{})
 				g.Expect(err).NotTo(HaveOccurred())

@@ -442,10 +442,8 @@ func schedulerEnforceForTest(
 	schedulers ...runtime.ExpressionMatch,
 ) *apirules.NamespaceRuleEnforceBody {
 	return &apirules.NamespaceRuleEnforceBody{
-		Action: action,
-		Workloads: apirules.NamespaceRuleEnforceWorkloadsBody{
-			Schedulers: schedulers,
-		},
+		Action:    action,
+		Workloads: apirules.NamespaceRuleEnforceWorkloadsBody{Placement: apirules.WorkloadPlacementEnforcement{Schedulers: schedulers}},
 	}
 }
 

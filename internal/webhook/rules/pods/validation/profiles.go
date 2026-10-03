@@ -179,13 +179,13 @@ func profileTargetMatches(body *rules.NamespaceRuleEnforceBody, target rules.Wor
 func (h *podRules) evaluateSecurityProfile(profile securityProfile, target rules.WorkloadValidationTarget, path string, bodies []*rules.NamespaceRuleEnforceBody, appArmor bool) (*ruleengine.Evaluation, error) {
 	name, reason := "seccomp profile", events.ReasonForbiddenSeccompProfile
 	extract := func(body *rules.NamespaceRuleEnforceBody) []rules.WorkloadSecurityProfileMatch {
-		return body.Workloads.SeccompProfiles
+		return body.Workloads.Security.SeccompProfiles
 	}
 
 	if appArmor {
 		name, reason = "AppArmor profile", events.ReasonForbiddenAppArmorProfile
 		extract = func(body *rules.NamespaceRuleEnforceBody) []rules.WorkloadSecurityProfileMatch {
-			return body.Workloads.AppArmorProfiles
+			return body.Workloads.Security.AppArmorProfiles
 		}
 	}
 
@@ -247,10 +247,10 @@ func (h *podRules) matchSecurityProfile(match rules.WorkloadSecurityProfileMatch
 
 func securityProfileMatches(body *rules.NamespaceRuleEnforceBody, appArmor bool) []rules.WorkloadSecurityProfileMatch {
 	if appArmor {
-		return body.Workloads.AppArmorProfiles
+		return body.Workloads.Security.AppArmorProfiles
 	}
 
-	return body.Workloads.SeccompProfiles
+	return body.Workloads.Security.SeccompProfiles
 }
 
 func effectiveSecurityProfile(pod *corev1.Pod, name string, sc *corev1.SecurityContext, fallback securityProfile, appArmor bool) securityProfile {

@@ -29,7 +29,7 @@ func TestWorkloadMutationGeneratedSchemas(t *testing.T) {
 		found := 0
 		var visit func(apiextensionsv1.JSONSchemaProps, string)
 		visit = func(schema apiextensionsv1.JSONSchemaProps, path string) {
-			if _, ok := schema.Properties["readOnlyRootFilesystem"]; ok {
+			if _, ok := schema.Properties["security"].Properties["readOnlyRootFilesystem"]; ok {
 				found++
 				require.NotContains(t, schema.Properties, "imagePullPolicy")
 				secrets := schema.Properties["registries"].Properties["imagePullSecrets"]
@@ -38,6 +38,14 @@ func TestWorkloadMutationGeneratedSchemas(t *testing.T) {
 				require.EqualValues(t, 64, *secrets.MaxItems)
 				require.NotEmpty(t, secrets.Items.Schema.XValidations)
 				require.Contains(t, schema.Properties["registries"].Properties, "imagePullPolicy")
+				for _, name := range []string{"scheduler", "nodeSelector", "tolerations", "topologySpreadConstraints", "affinity"} {
+					require.Contains(t, schema.Properties["placement"].Properties, name)
+					require.NotContains(t, schema.Properties, name)
+				}
+				for _, name := range []string{"hostUsers", "readOnlyRootFilesystem", "seccompProfile", "appArmorProfile"} {
+					require.Contains(t, schema.Properties["security"].Properties, name)
+					require.NotContains(t, schema.Properties, name)
+				}
 				require.Equal(t, "set", *schema.Properties["targets"].XListType)
 				var internal apiextensions.JSONSchemaProps
 				require.NoError(t, apiextensionsv1.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&schema, &internal, nil))
@@ -80,13 +88,13 @@ func TestWorkloadMutationGeneratedSchemas(t *testing.T) {
 					{`{"registries":{"imagePullSecrets":"registry"}}`, false},
 					{`{"registries":{}}`, true},
 					{`{"registries":"Always"}`, false},
-					{`{}`, true}, {`{"readOnlyRootFilesystem":false}`, true},
-					{`{"targets":[],"readOnlyRootFilesystem":true}`, true},
-					{`{"targets":["pod","pod/containers","pod/initcontainers","pod/ephemeralcontainers"],"readOnlyRootFilesystem":true}`, true},
-					{`{"targets":["deployment"],"readOnlyRootFilesystem":true}`, false},
-					{`{"targets":["pod/volumes"],"readOnlyRootFilesystem":true}`, false},
-					{`{"targets":["pod","pod","pod","pod","pod"],"readOnlyRootFilesystem":true}`, false},
-					{`{"readOnlyRootFilesystem":"false"}`, false},
+					{`{}`, true}, {`{"security": {"readOnlyRootFilesystem": false}}`, true},
+					{`{"targets": [], "security": {"readOnlyRootFilesystem": true}}`, true},
+					{`{"targets": ["pod", "pod/containers", "pod/initcontainers", "pod/ephemeralcontainers"], "security": {"readOnlyRootFilesystem": true}}`, true},
+					{`{"targets": ["deployment"], "security": {"readOnlyRootFilesystem": true}}`, false},
+					{`{"targets": ["pod/volumes"], "security": {"readOnlyRootFilesystem": true}}`, false},
+					{`{"targets": ["pod", "pod", "pod", "pod", "pod"], "security": {"readOnlyRootFilesystem": true}}`, false},
+					{`{"security": {"readOnlyRootFilesystem": "false"}}`, false},
 				} {
 					var obj any
 					require.NoError(t, json.Unmarshal([]byte(tc.object), &obj))

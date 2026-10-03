@@ -25,7 +25,7 @@ func TestSecurityProfileMutation(t *testing.T) {
 		for _, initial := range []string{"absent", "RuntimeDefault", "Localhost", "Unconfined"} {
 			for _, windows := range []bool{false, true} {
 				t.Run(fmt.Sprintf("%s/%s/windows=%v", action, initial, windows), func(t *testing.T) {
-					desired := rules.WorkloadMutation{SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}, AppArmorProfile: &corev1.AppArmorProfile{Type: corev1.AppArmorProfileTypeRuntimeDefault}}
+					desired := rules.WorkloadMutation{Security: rules.WorkloadSecurityMutation{SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}, AppArmorProfile: &corev1.AppArmorProfile{Type: corev1.AppArmorProfileTypeRuntimeDefault}}}
 					body := &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{{Action: action, Workloads: desired}}}
 					original := body.DeepCopy()
 					pod := &corev1.Pod{Spec: corev1.PodSpec{SecurityContext: &corev1.PodSecurityContext{RunAsUser: new(int64(1000))}, Containers: []corev1.Container{{Name: "app", SecurityContext: &corev1.SecurityContext{SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeUnconfined}}}}}}
@@ -48,8 +48,8 @@ func TestSecurityProfileMutation(t *testing.T) {
 						require.Equal(t, change && pass == 0, changed)
 					}
 					if change {
-						require.Equal(t, desired.SeccompProfile, pod.Spec.SecurityContext.SeccompProfile)
-						require.Equal(t, desired.AppArmorProfile, pod.Spec.SecurityContext.AppArmorProfile)
+						require.Equal(t, desired.Security.SeccompProfile, pod.Spec.SecurityContext.SeccompProfile)
+						require.Equal(t, desired.Security.AppArmorProfile, pod.Spec.SecurityContext.AppArmorProfile)
 					} else {
 						require.Equal(t, before, pod)
 					}
@@ -68,9 +68,9 @@ func TestSecurityProfileMutation(t *testing.T) {
 
 func TestSecurityProfileMutationConditionsAndScope(t *testing.T) {
 	body := &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{
-		{Workloads: rules.WorkloadMutation{SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}}},
-		{Conditions: []rules.AdmissionCondition{{Expression: `object.spec.securityContext.seccompProfile.type == 'RuntimeDefault'`}}, Workloads: rules.WorkloadMutation{AppArmorProfile: &corev1.AppArmorProfile{Type: corev1.AppArmorProfileTypeLocalhost, LocalhostProfile: new("team-profile")}}},
-		{Action: rules.MutationActionReplace, Conditions: []rules.AdmissionCondition{{Expression: "false"}}, Workloads: rules.WorkloadMutation{SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeUnconfined}}},
+		{Workloads: rules.WorkloadMutation{Security: rules.WorkloadSecurityMutation{SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}}}},
+		{Conditions: []rules.AdmissionCondition{{Expression: `object.spec.securityContext.seccompProfile.type == 'RuntimeDefault'`}}, Workloads: rules.WorkloadMutation{Security: rules.WorkloadSecurityMutation{AppArmorProfile: &corev1.AppArmorProfile{Type: corev1.AppArmorProfileTypeLocalhost, LocalhostProfile: new("team-profile")}}}},
+		{Action: rules.MutationActionReplace, Conditions: []rules.AdmissionCondition{{Expression: "false"}}, Workloads: rules.WorkloadMutation{Security: rules.WorkloadSecurityMutation{SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeUnconfined}}}},
 	}}
 	compiler, err := cache.NewCELCache()
 	require.NoError(t, err)
@@ -110,7 +110,7 @@ func BenchmarkSecurityProfileMutation(b *testing.B) {
 			b.Run(fmt.Sprintf("rules=%d/%s", size, action), func(b *testing.B) {
 				var bodies []*rules.NamespaceRuleBodyNamespace
 				for range size {
-					bodies = append(bodies, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{{Action: action, Workloads: rules.WorkloadMutation{SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}, AppArmorProfile: &corev1.AppArmorProfile{Type: corev1.AppArmorProfileTypeRuntimeDefault}}}}})
+					bodies = append(bodies, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{{Action: action, Workloads: rules.WorkloadMutation{Security: rules.WorkloadSecurityMutation{SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}, AppArmorProfile: &corev1.AppArmorProfile{Type: corev1.AppArmorProfileTypeRuntimeDefault}}}}}})
 				}
 				obj := &unstructured.Unstructured{}
 				req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{Operation: admissionv1.Create, Kind: metav1.GroupVersionKind{Version: "v1", Kind: "Pod"}, Object: runtime.RawExtension{Raw: []byte(`{"apiVersion":"v1","kind":"Pod","spec":{}}`)}}}

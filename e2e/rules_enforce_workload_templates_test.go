@@ -29,11 +29,11 @@ var _ = Describe("workload template targets", Label("tenant", "rules", "workload
 		ctx := context.Background()
 		prefix := "e2e-targets-" + rand.String(8)
 		a := &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: prefix + "-a", Labels: map[string]string{"env": "e2e"}}, Spec: capsulev1beta2.TenantSpec{Owners: rbac.OwnerListSpec{{Kind: "User", Name: prefix + "-a"}}, Rules: []*rules.NamespaceRuleBodyTenant{{NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"profile": "templates"}}, NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeDeny, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
-			Targets:      []rules.WorkloadValidationTarget{rules.ValidateDeployment, rules.ValidateCronJob},
-			Schedulers:   []apiruntime.ExpressionMatch{{Exact: []string{"forbidden-scheduler"}}},
-			Registries:   []rules.OCIRegistry{{ExpressionMatch: apiruntime.ExpressionMatch{Exact: []string{"example.com/blocked/app:v1"}}}},
-			NodeSelector: []rules.WorkloadNodeSelectorMatch{{Key: &rules.PlacementExpressionMatch{Exact: []string{"example.com/forbidden"}}}},
-			Resources:    &rules.WorkloadResourceRules{Requests: map[corev1.ResourceName]rules.WorkloadResourceRequestPolicy{corev1.ResourceMemory: {Policy: rules.WorkloadResourceRequestPolicyDefault, Value: new(resource.MustParse("32Mi"))}}, Limits: map[corev1.ResourceName]rules.WorkloadResourceLimitPolicy{corev1.ResourceMemory: {Policy: rules.WorkloadResourceLimitPolicyRatio, Value: new(resource.MustParse("2"))}}},
+			Targets: []rules.WorkloadValidationTarget{rules.ValidateDeployment, rules.ValidateCronJob}, Placement: rules.WorkloadPlacementEnforcement{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"forbidden-scheduler"}}},
+
+				NodeSelector: []rules.WorkloadNodeSelectorMatch{{Key: &rules.PlacementExpressionMatch{Exact: []string{"example.com/forbidden"}}}}}, Registries: []rules.OCIRegistry{{ExpressionMatch: apiruntime.ExpressionMatch{Exact: []string{"example.com/blocked/app:v1"}}}},
+
+			Resources: &rules.WorkloadResourceRules{Requests: map[corev1.ResourceName]rules.WorkloadResourceRequestPolicy{corev1.ResourceMemory: {Policy: rules.WorkloadResourceRequestPolicyDefault, Value: new(resource.MustParse("32Mi"))}}, Limits: map[corev1.ResourceName]rules.WorkloadResourceLimitPolicy{corev1.ResourceMemory: {Policy: rules.WorkloadResourceLimitPolicyRatio, Value: new(resource.MustParse("2"))}}},
 		}}}}}}}
 		b := &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: prefix + "-b", Labels: map[string]string{"env": "e2e"}}, Spec: capsulev1beta2.TenantSpec{Owners: rbac.OwnerListSpec{{Kind: "User", Name: prefix + "-b"}}}}
 		for _, tnt := range []*capsulev1beta2.Tenant{a, b} {

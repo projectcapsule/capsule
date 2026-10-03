@@ -42,7 +42,7 @@ func TestPodConditionsScopeAndUpdateReevaluation(t *testing.T) {
 				return nil, nil
 			}}}}
 			bodies := []*rules.NamespaceRuleEnforceBody{
-				{Conditions: []rules.AdmissionCondition{{Name: "condition", Expression: tc.expression}}, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Tolerations: []rules.WorkloadTolerationMatch{{}}}},
+				{Conditions: []rules.AdmissionCondition{{Name: "condition", Expression: tc.expression}}, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{Tolerations: []rules.WorkloadTolerationMatch{{}}}}},
 				{},
 			}
 			original := bodies[0].DeepCopy()
@@ -69,10 +69,7 @@ func TestPlacementOnlyConditionsSkipSubresources(t *testing.T) {
 	}
 	h := PodRules(nil, nil, c).(*podRules)
 	bodies := []*rules.NamespaceRuleEnforceBody{{
-		Conditions: []rules.AdmissionCondition{{Expression: `object.spec.missing == 'x'`}}, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
-
-			Tolerations: []rules.WorkloadTolerationMatch{{}},
-		}}}
+		Conditions: []rules.AdmissionCondition{{Expression: `object.spec.missing == 'x'`}}, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{Tolerations: []rules.WorkloadTolerationMatch{{}}}}}}
 	for _, subresource := range []string{"status", "ephemeralcontainers"} {
 		req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{SubResource: subresource}}
 		if err := h.validatePodRules(context.Background(), req, &corev1.Pod{}, nil, nil, bodies); err != nil {

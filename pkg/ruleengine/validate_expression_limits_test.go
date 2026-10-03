@@ -23,17 +23,17 @@ func TestValidateExpressionMatchLimitsAcrossRules(t *testing.T) {
 		{"workloads.registries[0]", func(b *rules.NamespaceRuleEnforceBody, m apiruntime.ExpressionMatch) {
 			b.Workloads.Registries = []rules.OCIRegistry{{ExpressionMatch: m}}
 		}},
-		{"workloads.schedulers[0]", func(b *rules.NamespaceRuleEnforceBody, m apiruntime.ExpressionMatch) {
-			b.Workloads.Schedulers = []apiruntime.ExpressionMatch{m}
+		{"workloads.placement.schedulers[0]", func(b *rules.NamespaceRuleEnforceBody, m apiruntime.ExpressionMatch) {
+			b.Workloads.Placement.Schedulers = []apiruntime.ExpressionMatch{m}
 		}},
-		{"workloads.nodeSelector[0].key", func(b *rules.NamespaceRuleEnforceBody, m apiruntime.ExpressionMatch) {
-			b.Workloads.NodeSelector = []rules.WorkloadNodeSelectorMatch{{Key: (*rules.PlacementExpressionMatch)(&m)}}
+		{"workloads.placement.nodeSelector[0].key", func(b *rules.NamespaceRuleEnforceBody, m apiruntime.ExpressionMatch) {
+			b.Workloads.Placement.NodeSelector = []rules.WorkloadNodeSelectorMatch{{Key: (*rules.PlacementExpressionMatch)(&m)}}
 		}},
-		{"workloads.seccompProfiles[0].localhostProfiles[0]", func(b *rules.NamespaceRuleEnforceBody, m apiruntime.ExpressionMatch) {
-			b.Workloads.SeccompProfiles = []rules.WorkloadSecurityProfileMatch{{Types: []rules.SecurityProfileType{rules.SecurityProfileLocalhost}, LocalhostProfiles: []apiruntime.ExpressionMatch{m}}}
+		{"workloads.security.seccompProfiles[0].localhostProfiles[0]", func(b *rules.NamespaceRuleEnforceBody, m apiruntime.ExpressionMatch) {
+			b.Workloads.Security.SeccompProfiles = []rules.WorkloadSecurityProfileMatch{{Types: []rules.SecurityProfileType{rules.SecurityProfileLocalhost}, LocalhostProfiles: []apiruntime.ExpressionMatch{m}}}
 		}},
-		{"workloads.appArmorProfiles[0].localhostProfiles[0]", func(b *rules.NamespaceRuleEnforceBody, m apiruntime.ExpressionMatch) {
-			b.Workloads.AppArmorProfiles = []rules.WorkloadSecurityProfileMatch{{Types: []rules.SecurityProfileType{rules.SecurityProfileLocalhost}, LocalhostProfiles: []apiruntime.ExpressionMatch{m}}}
+		{"workloads.security.appArmorProfiles[0].localhostProfiles[0]", func(b *rules.NamespaceRuleEnforceBody, m apiruntime.ExpressionMatch) {
+			b.Workloads.Security.AppArmorProfiles = []rules.WorkloadSecurityProfileMatch{{Types: []rules.SecurityProfileType{rules.SecurityProfileLocalhost}, LocalhostProfiles: []apiruntime.ExpressionMatch{m}}}
 		}},
 		{"ingress.hostnames[0]", func(b *rules.NamespaceRuleEnforceBody, m apiruntime.ExpressionMatch) {
 			b.Ingress = rules.NamespaceRuleEnforceIngressBody{Types: []rules.IngressType{rules.IngressTypeIngress}, Hostnames: []apiruntime.ExpressionMatch{m}}
@@ -102,7 +102,7 @@ func BenchmarkValidateExpressionMatchLimits(b *testing.B) {
 				for i := range bodies {
 					bodies[i] = &rules.NamespaceRuleBodyNamespace{}
 					if tc.name != "skip" {
-						bodies[i].Enforce = &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Schedulers: []apiruntime.ExpressionMatch{tc.m}}}
+						bodies[i].Enforce = &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{Schedulers: []apiruntime.ExpressionMatch{tc.m}}}}
 					}
 				}
 				b.ReportAllocs()

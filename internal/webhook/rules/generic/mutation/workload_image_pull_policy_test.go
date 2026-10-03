@@ -70,7 +70,7 @@ func TestImagePullPolicyMutationTargets(t *testing.T) {
 					pod.Spec.OS = &corev1.PodOS{Name: corev1.Windows}
 				}
 				body := imagePullPolicyBody(corev1.PullAlways, targets...)
-				body.Mutate[0].Workloads.ReadOnlyRootFilesystem = new(true)
+				body.Mutate[0].Workloads.Security.ReadOnlyRootFilesystem = new(true)
 				changed, err := MutatePodPlacement(t.Context(), pod, []*rules.NamespaceRuleBodyNamespace{body}, nil)
 				require.NoError(t, err)
 				require.True(t, changed)
@@ -182,7 +182,7 @@ func TestImagePullPolicyEphemeralPreservesExistingAndUnknownFields(t *testing.T)
 		body.Mutate[0].Action = action
 		body.Mutate = append(body.Mutate, rules.NamespaceRuleMutation{
 			Conditions: []rules.AdmissionCondition{{Expression: "object.spec.ephemeralContainers[1].imagePullPolicy == 'Always'"}},
-			Workloads:  rules.WorkloadMutation{Registries: rules.WorkloadRegistryMutation{ImagePullPolicy: corev1.PullIfNotPresent}, ReadOnlyRootFilesystem: new(true)},
+			Workloads:  rules.WorkloadMutation{Registries: rules.WorkloadRegistryMutation{ImagePullPolicy: corev1.PullIfNotPresent}, Security: rules.WorkloadSecurityMutation{ReadOnlyRootFilesystem: new(true)}},
 		})
 		original := body.DeepCopy()
 		for pass := range 2 {

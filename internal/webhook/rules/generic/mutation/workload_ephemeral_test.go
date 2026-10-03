@@ -134,10 +134,10 @@ func TestRootFilesystemAdmissionScopeAndConditions(t *testing.T) {
 func TestEphemeralMutationIgnoresPodPropertiesAndObservesPriorEntries(t *testing.T) {
 	old, obj := ephemeralRootFilesystemObjects(t)
 	body := rootFilesystemBody(new(true))
-	body.Mutate[0].Workloads.HostUsers = new(false)
-	body.Mutate[0].Workloads.SeccompProfile = &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}
-	body.Mutate = append(body.Mutate, rules.NamespaceRuleMutation{Conditions: []rules.AdmissionCondition{{Expression: "object.spec.ephemeralContainers[1].securityContext.readOnlyRootFilesystem == true"}}, Workloads: rules.WorkloadMutation{ReadOnlyRootFilesystem: new(false)}})
-	body.Mutate = append(body.Mutate, rules.NamespaceRuleMutation{Conditions: []rules.AdmissionCondition{{Expression: "object.spec.missing == 'x'"}}, Workloads: rules.WorkloadMutation{Scheduler: "irrelevant"}})
+	body.Mutate[0].Workloads.Security.HostUsers = new(false)
+	body.Mutate[0].Workloads.Security.SeccompProfile = &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}
+	body.Mutate = append(body.Mutate, rules.NamespaceRuleMutation{Conditions: []rules.AdmissionCondition{{Expression: "object.spec.ephemeralContainers[1].securityContext.readOnlyRootFilesystem == true"}}, Workloads: rules.WorkloadMutation{Security: rules.WorkloadSecurityMutation{ReadOnlyRootFilesystem: new(false)}}})
+	body.Mutate = append(body.Mutate, rules.NamespaceRuleMutation{Conditions: []rules.AdmissionCondition{{Expression: "object.spec.missing == 'x'"}}, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{Scheduler: "irrelevant"}}})
 	before := obj.DeepCopy()
 	changed, err := mutateEphemeralContainers(t.Context(), obj, old, []*rules.NamespaceRuleBodyNamespace{body}, mutationConditions(t))
 	require.NoError(t, err)

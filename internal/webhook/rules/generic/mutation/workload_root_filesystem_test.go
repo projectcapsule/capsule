@@ -24,7 +24,7 @@ func rootFilesystemPod(initial *bool) *corev1.Pod {
 }
 
 func rootFilesystemBody(value *bool, targets ...rules.WorkloadValidationTarget) *rules.NamespaceRuleBodyNamespace {
-	return &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{{Workloads: rules.WorkloadMutation{ReadOnlyRootFilesystem: value, Targets: targets}}}}
+	return &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{{Workloads: rules.WorkloadMutation{Security: rules.WorkloadSecurityMutation{ReadOnlyRootFilesystem: value}, Targets: targets}}}}
 }
 
 func TestReadOnlyRootFilesystemActionsAndPresence(t *testing.T) {
@@ -100,8 +100,8 @@ func TestReadOnlyRootFilesystemConditionsAndIsolation(t *testing.T) {
 		}
 		body := rootFilesystemBody(new(true), rules.ValidatePod)
 		body.Mutate = append(body.Mutate,
-			rules.NamespaceRuleMutation{Conditions: []rules.AdmissionCondition{{Expression: "object.spec.containers[0].securityContext.readOnlyRootFilesystem == true"}}, Workloads: rules.WorkloadMutation{NodeSelector: map[string]string{"observed": "yes"}}},
-			rules.NamespaceRuleMutation{Conditions: []rules.AdmissionCondition{{Expression: "false"}}, Workloads: rules.WorkloadMutation{ReadOnlyRootFilesystem: new(false)}},
+			rules.NamespaceRuleMutation{Conditions: []rules.AdmissionCondition{{Expression: "object.spec.containers[0].securityContext.readOnlyRootFilesystem == true"}}, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{"observed": "yes"}}}},
+			rules.NamespaceRuleMutation{Conditions: []rules.AdmissionCondition{{Expression: "false"}}, Workloads: rules.WorkloadMutation{Security: rules.WorkloadSecurityMutation{ReadOnlyRootFilesystem: new(false)}}},
 		)
 		before := pod.DeepCopy()
 		changed, err := MutatePodPlacement(t.Context(), pod, []*rules.NamespaceRuleBodyNamespace{nil, body}, mutationConditions(t))

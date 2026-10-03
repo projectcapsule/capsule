@@ -24,7 +24,7 @@ func TestHostUsersMutationPresenceAndActions(t *testing.T) {
 			for desiredName, desired := range values {
 				t.Run(fmt.Sprintf("%s/%s-to-%s", action, inputName, desiredName), func(t *testing.T) {
 					pod := &corev1.Pod{Spec: corev1.PodSpec{HostUsers: input, NodeSelector: map[string]string{"keep": "yes"}}}
-					bodies := []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{{Action: action, Workloads: rules.WorkloadMutation{HostUsers: desired}}}}}
+					bodies := []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{{Action: action, Workloads: rules.WorkloadMutation{Security: rules.WorkloadSecurityMutation{HostUsers: desired}}}}}}
 					before := bodies[0].DeepCopy()
 					want := input
 					if desired != nil {
@@ -57,9 +57,9 @@ func TestHostUsersOrderedConditionsAndUnstructuredOutput(t *testing.T) {
 		for _, desired := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/%v", action, desired), func(t *testing.T) {
 				body := &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{
-					{Action: action, Workloads: rules.WorkloadMutation{HostUsers: ptr.To(desired)}},
-					{Conditions: []rules.AdmissionCondition{{Name: "after-host-users", Expression: fmt.Sprintf("object.spec.hostUsers == %v", desired)}}, Workloads: rules.WorkloadMutation{NodeSelector: map[string]string{"observed": "yes"}}},
-					{Conditions: []rules.AdmissionCondition{{Expression: "false"}}, Workloads: rules.WorkloadMutation{HostUsers: ptr.To(!desired)}},
+					{Action: action, Workloads: rules.WorkloadMutation{Security: rules.WorkloadSecurityMutation{HostUsers: ptr.To(desired)}}},
+					{Conditions: []rules.AdmissionCondition{{Name: "after-host-users", Expression: fmt.Sprintf("object.spec.hostUsers == %v", desired)}}, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{"observed": "yes"}}}},
+					{Conditions: []rules.AdmissionCondition{{Expression: "false"}}, Workloads: rules.WorkloadMutation{Security: rules.WorkloadSecurityMutation{HostUsers: ptr.To(!desired)}}},
 				}}
 				obj := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "v1", "kind": "Pod", "spec": map[string]any{"hostUsers": !desired}}}
 				for pass := 0; pass < 2; pass++ {
@@ -89,8 +89,8 @@ func TestMutationAffinityErrorLocation(t *testing.T) {
 	}
 	pod := &corev1.Pod{Spec: corev1.PodSpec{Affinity: &corev1.Affinity{NodeAffinity: &corev1.NodeAffinity{RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{NodeSelectorTerms: existing}}}}}
 	bodies := []*rules.NamespaceRuleBodyNamespace{nil, {Mutate: []rules.NamespaceRuleMutation{
-		{Workloads: rules.WorkloadMutation{HostUsers: ptr.To(false)}},
-		{Workloads: rules.WorkloadMutation{Affinity: &corev1.Affinity{NodeAffinity: &corev1.NodeAffinity{RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{NodeSelectorTerms: configured}}}}},
+		{Workloads: rules.WorkloadMutation{Security: rules.WorkloadSecurityMutation{HostUsers: ptr.To(false)}}},
+		{Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{Affinity: &corev1.Affinity{NodeAffinity: &corev1.NodeAffinity{RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{NodeSelectorTerms: configured}}}}}},
 	}}}
 	_, err := MutatePodPlacement(context.Background(), pod, bodies, nil)
 	if err == nil || !strings.Contains(err.Error(), "rules[1].mutate[1].workloads: affinity: nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution:") {
@@ -104,7 +104,7 @@ func BenchmarkHostUsersMutation(b *testing.B) {
 			b.Run(fmt.Sprintf("%s/rules=%d", action, count), func(b *testing.B) {
 				bodies := make([]*rules.NamespaceRuleBodyNamespace, count)
 				for i := range bodies {
-					bodies[i] = &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{{Action: action, Workloads: rules.WorkloadMutation{HostUsers: ptr.To(i%2 == 1)}}}}
+					bodies[i] = &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{{Action: action, Workloads: rules.WorkloadMutation{Security: rules.WorkloadSecurityMutation{HostUsers: ptr.To(i%2 == 1)}}}}}
 				}
 				b.ReportAllocs()
 				for b.Loop() {

@@ -76,7 +76,7 @@ func mutateContainers(containers []workloadMutationContainer, workload rules.Wor
 			changed = true
 		}
 
-		if !linux || workload.ReadOnlyRootFilesystem == nil || ptr.Equal(rootFilesystemValue(*container.context), workload.ReadOnlyRootFilesystem) {
+		if !linux || workload.Security.ReadOnlyRootFilesystem == nil || ptr.Equal(rootFilesystemValue(*container.context), workload.Security.ReadOnlyRootFilesystem) {
 			continue
 		}
 
@@ -84,7 +84,7 @@ func mutateContainers(containers []workloadMutationContainer, workload rules.Wor
 			*container.context = &corev1.SecurityContext{}
 		}
 
-		(*container.context).ReadOnlyRootFilesystem = new(*workload.ReadOnlyRootFilesystem)
+		(*container.context).ReadOnlyRootFilesystem = new(*workload.Security.ReadOnlyRootFilesystem)
 		changed = true
 	}
 
@@ -104,5 +104,5 @@ func (c workloadMutationContainer) rootFilesystemChanged() bool {
 }
 
 func hasContainerMutation(workload rules.WorkloadMutation, linux bool) bool {
-	return workload.Registries.ImagePullPolicy != "" || (linux && workload.ReadOnlyRootFilesystem != nil)
+	return workload.Registries.ImagePullPolicy != "" || (linux && workload.Security.ReadOnlyRootFilesystem != nil)
 }

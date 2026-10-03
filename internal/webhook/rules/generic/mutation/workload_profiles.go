@@ -10,7 +10,7 @@ import (
 )
 
 func mutatePodSecurityProfiles(pod *corev1.Pod, desired *rules.WorkloadMutation, replace bool) {
-	if (desired.SeccompProfile == nil && desired.AppArmorProfile == nil) || (pod.Spec.OS != nil && pod.Spec.OS.Name == corev1.Windows) {
+	if (desired.Security.SeccompProfile == nil && desired.Security.AppArmorProfile == nil) || (pod.Spec.OS != nil && pod.Spec.OS.Name == corev1.Windows) {
 		return
 	}
 
@@ -19,11 +19,11 @@ func mutatePodSecurityProfiles(pod *corev1.Pod, desired *rules.WorkloadMutation,
 	}
 
 	current := pod.Spec.SecurityContext
-	if desired.SeccompProfile != nil && (replace || current.SeccompProfile == nil) {
-		current.SeccompProfile = desired.SeccompProfile.DeepCopy()
+	if desired.Security.SeccompProfile != nil && (replace || current.SeccompProfile == nil) {
+		current.SeccompProfile = desired.Security.SeccompProfile.DeepCopy()
 	}
 
-	if desired.AppArmorProfile != nil && (replace || current.AppArmorProfile == nil) {
-		current.AppArmorProfile = desired.AppArmorProfile.DeepCopy()
+	if desired.Security.AppArmorProfile != nil && (replace || current.AppArmorProfile == nil) {
+		current.AppArmorProfile = desired.Security.AppArmorProfile.DeepCopy()
 	}
 }
