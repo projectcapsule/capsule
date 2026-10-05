@@ -12,6 +12,11 @@ import (
 
 // +kubebuilder:object:generate=true
 type NamespaceRuleEnforceWorkloadsBody struct {
+	// DisruptionBudgets constrains PDB coverage of selected Pods and controller templates.
+	// Only whole-workload targets apply; omitted targets select Pods.
+	// +optional
+	DisruptionBudgets *WorkloadDisruptionBudgetRules `json:"disruptionBudgets,omitempty"`
+
 	// Targets selects native workloads and, optionally, parts of their Pod specs.
 	// With no workload policies, the action matches the selected kinds themselves.
 	// With policies, targets scopes those policies; it does not also match the kind.

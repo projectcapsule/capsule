@@ -12,19 +12,22 @@ import (
 )
 
 func TestNestedWorkloadEnforcementSerialization(t *testing.T) {
-	const source = `{"targets":["pod"],"placement":{"schedulers":[{"exact":["team"]}],"nodeSelector":[{}]},"security":{"seccompProfiles":[{"types":["RuntimeDefault"]}],"appArmorProfiles":[{"types":["Localhost"],"localhostProfiles":[{"exact":["team-profile"]}]}]}}`
+	const source = `{"targets":["pod"],"disruptionBudgets":{"allowOverlap":false},"placement":{"schedulers":[{"exact":["team"]}],"nodeSelector":[{}]},"security":{"seccompProfiles":[{"types":["RuntimeDefault"]}],"appArmorProfiles":[{"types":["Localhost"],"localhostProfiles":[{"exact":["team-profile"]}]}]}}`
 	var workload NamespaceRuleEnforceWorkloadsBody
 	require.NoError(t, yaml.UnmarshalStrict([]byte(source), &workload))
 	require.True(t, workload.HasPolicies())
+	require.True(t, workload.HasPodSpecPolicies())
 	require.False(t, workload.TargetsOnly())
 	encoded, err := json.Marshal(workload.DeepCopy())
 	require.NoError(t, err)
 	require.JSONEq(t, source, string(encoded))
 	copied := workload.DeepCopy()
+	*copied.DisruptionBudgets.AllowOverlap = true
 	copied.Placement.Schedulers[0].Exact[0] = "other"
 	copied.Security.SeccompProfiles[0].Types[0] = SecurityProfileUnconfined
 	copied.Security.AppArmorProfiles[0].LocalhostProfiles[0].Exact[0] = "other-profile"
 	require.Equal(t, "team", workload.Placement.Schedulers[0].Exact[0])
+	require.False(t, *workload.DisruptionBudgets.AllowOverlap)
 	require.Equal(t, SecurityProfileRuntimeDefault, workload.Security.SeccompProfiles[0].Types[0])
 	require.Equal(t, "team-profile", workload.Security.AppArmorProfiles[0].LocalhostProfiles[0].Exact[0])
 	for _, source := range []string{

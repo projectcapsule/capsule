@@ -102,6 +102,12 @@ func (w NamespaceRuleEnforceWorkloadsBody) TargetsOnly() bool {
 }
 
 func (w NamespaceRuleEnforceWorkloadsBody) HasPolicies() bool {
+	return w.DisruptionBudgets != nil || w.HasPodSpecPolicies()
+}
+
+// HasPodSpecPolicies excludes coverage policies which only inspect labels and
+// related resources, so template admission can skip decoding an unused Pod spec.
+func (w NamespaceRuleEnforceWorkloadsBody) HasPodSpecPolicies() bool {
 	return len(w.Placement.NodeSelector) > 0 || len(w.Placement.Tolerations) > 0 || len(w.Placement.TopologySpreadConstraints) > 0 ||
 		len(w.Placement.Affinity) > 0 || w.Resources != nil || len(w.QoSClasses) > 0 || len(w.Registries) > 0 || len(w.Placement.Schedulers) > 0 ||
 		len(w.Security.SeccompProfiles) > 0 || len(w.Security.AppArmorProfiles) > 0

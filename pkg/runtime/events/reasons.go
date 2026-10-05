@@ -18,8 +18,9 @@ const (
 	ReasonAdmissionFailure string = "AdmissionFailed"
 
 	// RuleStatus.
-	ReasonNamespaceRuleAudit    string = "NamespaceRuleAudit"
-	ReasonForbiddenWorkloadType string = "ForbiddenWorkloadType"
+	ReasonNamespaceRuleAudit        string = "NamespaceRuleAudit"
+	ReasonForbiddenWorkloadType     string = "ForbiddenWorkloadType"
+	ReasonForbiddenDisruptionBudget string = "ForbiddenDisruptionBudget"
 	// Namespace.
 	ReasonNamespaceHijack string = "ReasonNamespacePatch"
 

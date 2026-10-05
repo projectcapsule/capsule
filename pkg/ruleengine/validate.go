@@ -199,6 +199,10 @@ func validateWorkloadRules(
 		return err
 	}
 
+	if err := validateDisruptionBudgetRules(ruleIndex, workloads); err != nil {
+		return err
+	}
+
 	if err := validatePlacementRules(ruleIndex, workloads); err != nil {
 		return err
 	}
