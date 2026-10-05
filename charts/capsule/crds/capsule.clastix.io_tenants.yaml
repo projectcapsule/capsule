@@ -3408,6 +3408,56 @@ spec:
                                 type: object
                               maxItems: 64
                               type: array
+                            disruptionBudgets:
+                              description: |-
+                                DisruptionBudgets constrains PDB coverage of selected Pods and controller templates.
+                                Only whole-workload targets apply; omitted targets select Pods.
+                              properties:
+                                allowOverlap:
+                                  description: |-
+                                    AllowOverlap permits multiple PDBs to select the same Pod or selected
+                                    controller template. False rejects overlap for allow/deny actions and
+                                    reports violations for audit. True permits overlap in an allow rule;
+                                    omitted does not participate in evaluation. Rule ordering is preserved.
+                                    Checks run on PDB selector changes and selected Pod/template label changes.
+                                    Conditions and audience apply to the admission request, including PDB writes.
+                                    Cross-resource admission reads are not an atomic transaction.
+                                  type: boolean
+                                evictableReplicas:
+                                  description: |-
+                                    EvictableReplicas bounds the configured number of evictable replicas of each
+                                    selected Deployment, StatefulSet, ReplicaSet or ReplicationController.
+                                    Uses desired spec.replicas and Kubernetes' upward percentage rounding;
+                                    zero replicas are exempt. Checks controller writes, /scale, and PDB writes.
+                                    Bounds are inclusive nonnegative integers; omitted bounds are unrestricted.
+                                    Allow requires compliance; deny/audit match violations, like resource constraints.
+                                    Other targets do not have a desired replica count and skip this property.
+                                    At least one supported controller target must be explicitly selected.
+                                  properties:
+                                    max:
+                                      format: int64
+                                      type: integer
+                                    min:
+                                      format: int64
+                                      type: integer
+                                  type: object
+                                unhealthyPodEvictionPolicies:
+                                  description: |-
+                                    UnhealthyPodEvictionPolicies matches the effective PDB policy. Omission in a
+                                    PDB means IfHealthyBudget. Allow accepts listed values; deny/audit match
+                                    listed values, like other enum lists. Empty imposes no restriction.
+                                  items:
+                                    description: |-
+                                      UnhealthyPodEvictionPolicyType defines the criteria for when unhealthy pods
+                                      should be considered for eviction.
+                                    enum:
+                                    - IfHealthyBudget
+                                    - AlwaysAllow
+                                    type: string
+                                  maxItems: 2
+                                  type: array
+                                  x-kubernetes-list-type: set
+                              type: object
                             nodeSelector:
                               description: |-
                                 NodeSelector matches each node selector entry. Empty matchers match any entry.

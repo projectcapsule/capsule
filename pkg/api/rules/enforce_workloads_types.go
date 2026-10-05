@@ -12,6 +12,11 @@ import (
 
 // +kubebuilder:object:generate=true
 type NamespaceRuleEnforceWorkloadsBody struct {
+	// DisruptionBudgets constrains PDB coverage of selected Pods and controller templates.
+	// Only whole-workload targets apply; omitted targets select Pods.
+	// +optional
+	DisruptionBudgets *WorkloadDisruptionBudgetRules `json:"disruptionBudgets,omitempty"`
+
 	// SeccompProfiles matches effective Linux container profiles, resolving
 	// container overrides before Pod defaults. Privileged containers are Unconfined.
 	// Missing profiles do not match any type, so an allow-list rejects them.

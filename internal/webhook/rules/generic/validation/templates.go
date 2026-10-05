@@ -69,7 +69,7 @@ func matchesTemplatePolicies(req admission.Request, bodies []*rules.NamespaceRul
 	}
 
 	for _, body := range bodies {
-		if body == nil || body.Enforce == nil || !body.Enforce.Workloads.HasPolicies() {
+		if body == nil || body.Enforce == nil || !body.Enforce.Workloads.HasPodSpecPolicies() {
 			continue
 		}
 

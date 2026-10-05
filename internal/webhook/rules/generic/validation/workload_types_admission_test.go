@@ -50,7 +50,7 @@ func TestTemplateAdmissionSharesRequestReads(t *testing.T) {
 		objects = append(objects, tnt, ns, rs)
 	}
 	cl := &typeAdmissionClient{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()}
-	chain := Register(nil, nil, nil, podvalidation.TemplateRules(nil, nil, nil)).GetHandlers()
+	chain := Register(nil, nil, nil, nil, podvalidation.TemplateRules(nil, nil, nil)).GetHandlers()
 	for _, namespace := range []string{"a", "b"} {
 		cl.gets.Store(0)
 		req := requestWithKind("apps", "Deployment")
@@ -137,9 +137,9 @@ func BenchmarkTemplateHandlerChain(b *testing.B) {
 						requests[i].Object.Raw = []byte(fmt.Sprintf(`{"apiVersion":"apps/v1","kind":"Deployment","metadata":{"name":"app","namespace":%q},"spec":{"template":{"spec":{"schedulerName":"default-scheduler","containers":[{"name":"app","image":"example.com/app:v1"}]}}}}`, name))
 					}
 					cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
-					chain := Register(nil, nil, nil, nil).GetHandlers()
+					chain := Register(nil, nil, nil, nil, nil).GetHandlers()
 					if enabled {
-						chain = Register(nil, nil, nil, podvalidation.TemplateRules(nil, nil, nil)).GetHandlers()
+						chain = Register(nil, nil, nil, nil, podvalidation.TemplateRules(nil, nil, nil)).GetHandlers()
 					}
 					decoder := admission.NewDecoder(scheme)
 					b.ReportAllocs()
@@ -224,7 +224,7 @@ func TestWorkloadTypeAdmissionProfilesAndReads(t *testing.T) {
 						require.NoError(t, err)
 						req.OldObject = req.Object
 						spy := &requestSpyHandler{}
-						chain := Register(nil, nil, compiler, nil, spy).GetHandlers()
+						chain := Register(nil, nil, nil, compiler, nil, spy).GetHandlers()
 						var response *admission.Response
 						for _, handler := range chain {
 							if operation == admissionv1.Create {
@@ -259,14 +259,14 @@ func TestWorkloadTypeAdmissionProfilesAndReads(t *testing.T) {
 				req := requestWithKind("apps", "DaemonSet")
 				req.Namespace = "a-selected"
 				req.SubResource = subresource
-				h := Register(nil, nil, compiler, nil).GetHandlers()[0]
+				h := Register(nil, nil, nil, compiler, nil).GetHandlers()[0]
 				require.Nil(t, h.OnUpdate(cl, cl, admission.NewDecoder(scheme), nil)(t.Context(), req))
 				require.Zero(t, cl.gets.Load())
 			}
 			cl.failTenant = true
 			req := requestWithKind("apps", "DaemonSet")
 			req.Namespace = "a-selected"
-			response := Register(nil, nil, compiler, nil).GetHandlers()[0].OnCreate(cl, cl, admission.NewDecoder(scheme), nil)(t.Context(), req)
+			response := Register(nil, nil, nil, compiler, nil).GetHandlers()[0].OnCreate(cl, cl, admission.NewDecoder(scheme), nil)(t.Context(), req)
 			require.NotNil(t, response)
 			require.False(t, response.Allowed)
 			require.Contains(t, response.Result.Message, "tenant read unavailable")
