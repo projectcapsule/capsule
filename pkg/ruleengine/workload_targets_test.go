@@ -32,7 +32,7 @@ func TestWorkloadEnforcementScope(t *testing.T) {
 		{"foreign group", []rules.WorkloadValidationTarget{rules.ValidateDeployment}, nil, schema.GroupVersionKind{Group: "example.com", Version: "v1", Kind: "Deployment"}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			body := &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: tc.targets, Schedulers: []runtime.ExpressionMatch{{Exact: []string{"batch"}}}}}
+			body := &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: tc.targets, Placement: rules.WorkloadPlacementEnforcement{Schedulers: []runtime.ExpressionMatch{{Exact: []string{"batch"}}}}}}
 			before := body.DeepCopy()
 			got := WorkloadEnforcement([]*rules.NamespaceRuleEnforceBody{body}, tc.gvk)
 			if tc.selected {

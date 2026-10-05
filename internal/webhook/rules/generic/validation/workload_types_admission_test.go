@@ -46,7 +46,7 @@ func TestTemplateAdmissionSharesRequestReads(t *testing.T) {
 		tnt := &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: name, UID: types.UID(name)}}
 		ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name, OwnerReferences: []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: name, UID: tnt.UID}}}}
 		rs := &capsulev1beta2.RuleStatus{ObjectMeta: metav1.ObjectMeta{Name: meta.NameForManagedRuleStatus(), Namespace: name}}
-		rs.Status.Rules = []*rules.NamespaceRuleBodyNamespace{{Enforce: &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: []rules.WorkloadValidationTarget{rules.ValidateDeployment}, Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{name}}}}}}}
+		rs.Status.Rules = []*rules.NamespaceRuleBodyNamespace{{Enforce: &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: []rules.WorkloadValidationTarget{rules.ValidateDeployment}, Placement: rules.WorkloadPlacementEnforcement{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{name}}}}}}}}
 		objects = append(objects, tnt, ns, rs)
 	}
 	cl := &typeAdmissionClient{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()}
@@ -105,7 +105,7 @@ func TestTemplateAdmissionSharesRequestReads(t *testing.T) {
 	req := requestWithKind("apps", "Deployment")
 	for _, body := range []*rules.NamespaceRuleBodyNamespace{nil,
 		{Enforce: typePolicy(rules.ActionTypeDeny, rules.ValidateDeployment)},
-		{Enforce: &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: []rules.WorkloadValidationTarget{rules.ValidateJob}, Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"batch"}}}}}},
+		{Enforce: &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: []rules.WorkloadValidationTarget{rules.ValidateJob}, Placement: rules.WorkloadPlacementEnforcement{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"batch"}}}}}}},
 	} {
 		// A nil decoder catches accidental full-object decoding before the skip.
 		require.Nil(t, bridge.OnCreate(nil, nil, nil, nil, nil, nil, []*rules.NamespaceRuleBodyNamespace{body})(t.Context(), req))
@@ -129,7 +129,7 @@ func BenchmarkTemplateHandlerChain(b *testing.B) {
 						ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name, OwnerReferences: []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: name, UID: tnt.UID}}}}
 						rs := &capsulev1beta2.RuleStatus{ObjectMeta: metav1.ObjectMeta{Name: meta.NameForManagedRuleStatus(), Namespace: name}}
 						for range count {
-							rs.Status.Rules = append(rs.Status.Rules, &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: []rules.WorkloadValidationTarget{rules.ValidateDeployment}, Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"blocked"}}}}}})
+							rs.Status.Rules = append(rs.Status.Rules, &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: []rules.WorkloadValidationTarget{rules.ValidateDeployment}, Placement: rules.WorkloadPlacementEnforcement{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"blocked"}}}}}}})
 						}
 						objects = append(objects, tnt, ns, rs)
 						requests[i] = requestWithKind("apps", "Deployment")

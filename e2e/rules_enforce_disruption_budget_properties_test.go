@@ -22,6 +22,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 )
 
 var _ = Describe("PDB property namespace profiles", Label("tenant", "rules", "workloads", "disruption-budgets"), func() {
@@ -31,6 +32,7 @@ var _ = Describe("PDB property namespace profiles", Label("tenant", "rules", "wo
 		body := &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeAllow, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
 			Targets:           []rules.WorkloadValidationTarget{rules.ValidateDeployment, rules.ValidateStatefulSet},
 			DisruptionBudgets: &rules.WorkloadDisruptionBudgetRules{AllowOverlap: new(false), EvictableReplicas: &rules.PlacementRange{Min: new(int64(1)), Max: new(int64(2))}, UnhealthyPodEvictionPolicies: []policyv1.UnhealthyPodEvictionPolicyType{policyv1.AlwaysAllow}},
+			Placement:         rules.WorkloadPlacementEnforcement{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{corev1.DefaultSchedulerName}}}},
 		}}}
 		a := &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: prefix + "-a", Labels: map[string]string{"env": "e2e"}}, Spec: capsulev1beta2.TenantSpec{Owners: rbac.OwnerListSpec{{Kind: "User", Name: prefix + "-a"}}, Rules: []*rules.NamespaceRuleBodyTenant{{NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"profile": "pdb-properties"}}, NamespaceRuleBodyNamespace: body}}}}
 		b := &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: prefix + "-b", Labels: map[string]string{"env": "e2e"}}, Spec: capsulev1beta2.TenantSpec{Owners: rbac.OwnerListSpec{{Kind: "User", Name: prefix + "-b"}}}}
@@ -55,6 +57,7 @@ var _ = Describe("PDB property namespace profiles", Label("tenant", "rules", "wo
 				if selected {
 					g.Expect(rs.Status.Rules).To(HaveLen(1))
 					g.Expect(rs.Status.Rules[0].Enforce.Workloads.DisruptionBudgets).To(Equal(body.Enforce.Workloads.DisruptionBudgets))
+					g.Expect(rs.Status.Rules[0].Enforce.Workloads.Placement).To(Equal(body.Enforce.Workloads.Placement))
 				} else {
 					g.Expect(rs.Status.Rules).To(BeEmpty())
 				}
@@ -92,6 +95,26 @@ var _ = Describe("PDB property namespace profiles", Label("tenant", "rules", "wo
 		pdb := budget(selected, "web")
 		create(ownerA, pdb)
 		assertReplicas(ownerA, web, 4)
+		By("composing PDB constraints with nested placement policies in the selected profile")
+		for _, ns := range []*corev1.Namespace{selected, other, isolated} {
+			actor := ownerA
+			if ns == isolated {
+				actor = ownerB
+			}
+			custom := deployment(ns, "custom-scheduler", 4)
+			custom.Spec.Template.Spec.SchedulerName = "custom-scheduler"
+			if ns == selected {
+				Expect(actor.Create(ctx, custom)).To(MatchError(ContainSubstring("scheduler")))
+				Expect(apierrors.IsNotFound(actor.Get(ctx, client.ObjectKeyFromObject(custom), &appsv1.Deployment{}))).To(BeTrue())
+				continue
+			}
+			create(actor, custom)
+			Eventually(func(g Gomega) {
+				stored := &appsv1.Deployment{}
+				g.Expect(actor.Get(ctx, client.ObjectKeyFromObject(custom), stored)).To(Succeed())
+				g.Expect(stored.Spec.Template.Spec.SchedulerName).To(Equal("custom-scheduler"))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		}
 		By("checking the reverse order before controller Pods exist")
 		create(ownerA, budget(selected, "future"))
 		invalid := deployment(selected, "future", 3)

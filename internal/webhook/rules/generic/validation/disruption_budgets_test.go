@@ -255,6 +255,23 @@ func TestDisruptionBudgetEmptyBodyIsNotKindPolicy(t *testing.T) {
 	require.False(t, body.TargetsOnly())
 	require.False(t, body.HasPodSpecPolicies())
 	require.False(t, matchesTemplatePolicies(requestWithKind("apps", "Deployment"), []*rules.NamespaceRuleBodyNamespace{{Enforce: &rules.NamespaceRuleEnforceBody{Workloads: body}}}))
+	for _, policy := range []struct {
+		name string
+		body rules.NamespaceRuleEnforceWorkloadsBody
+	}{
+		{"placement", rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{NodeSelector: []rules.WorkloadNodeSelectorMatch{{}}}}},
+		{"security", rules.NamespaceRuleEnforceWorkloadsBody{Security: rules.WorkloadSecurityEnforcement{SeccompProfiles: []rules.WorkloadSecurityProfileMatch{{Types: []rules.SecurityProfileType{rules.SecurityProfileRuntimeDefault}}}}}},
+	} {
+		t.Run(policy.name, func(t *testing.T) {
+			policy.body.Targets = body.Targets
+			policy.body.DisruptionBudgets = body.DisruptionBudgets
+			require.True(t, policy.body.HasPodSpecPolicies())
+			require.False(t, policy.body.TargetsOnly())
+			bodies := []*rules.NamespaceRuleBodyNamespace{{Enforce: &rules.NamespaceRuleEnforceBody{Workloads: policy.body}}}
+			require.True(t, matchesTemplatePolicies(requestWithKind("apps", "Deployment"), bodies))
+			require.False(t, matchesTemplatePolicies(requestWithKind("apps", "StatefulSet"), bodies))
+		})
+	}
 	raw, err := json.Marshal(overlapRule(rules.ActionTypeAllow, false))
 	require.NoError(t, err)
 	require.Contains(t, string(raw), `"allowOverlap":false`)

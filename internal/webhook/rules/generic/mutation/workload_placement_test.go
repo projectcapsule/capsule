@@ -22,15 +22,14 @@ func placementTerm(key string, values ...string) corev1.NodeSelectorTerm {
 }
 
 func placementBaseline() []*rules.NamespaceRuleBodyNamespace {
-	return []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{{Workloads: rules.WorkloadMutation{
-		NodeSelector:              map[string]string{"pool": "shared"},
+	return []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{{Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{"pool": "shared"},
 		Tolerations:               []corev1.Toleration{{Key: "dedicated", Value: "shared", Effect: corev1.TaintEffectNoExecute, TolerationSeconds: ptr.To(int64(60))}},
 		TopologySpreadConstraints: []corev1.TopologySpreadConstraint{{TopologyKey: "zone", WhenUnsatisfiable: corev1.DoNotSchedule, MaxSkew: 1, LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "checkout"}}}},
 		Affinity: &corev1.Affinity{
 			NodeAffinity:    &corev1.NodeAffinity{RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{NodeSelectorTerms: []corev1.NodeSelectorTerm{placementTerm("zone", "a", "b")}}},
 			PodAffinity:     &corev1.PodAffinity{RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{{TopologyKey: "zone", LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "cache"}}}}},
 			PodAntiAffinity: &corev1.PodAntiAffinity{PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{{Weight: 50, PodAffinityTerm: corev1.PodAffinityTerm{TopologyKey: "host", LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "checkout"}}}}}},
-		},
+		}},
 	}}}}}
 }
 
@@ -81,10 +80,10 @@ func TestMutatePlacementMergesAllPropertiesAndIsIdempotent(t *testing.T) {
 func TestMutatePlacementOrderedOverrides(t *testing.T) {
 	bodies := placementBaseline()
 	later := bodies[0].DeepCopy()
-	later.Mutate[0].Workloads.NodeSelector["pool"] = "batch"
-	later.Mutate[0].Workloads.Tolerations[0].TolerationSeconds = nil
-	later.Mutate[0].Workloads.TopologySpreadConstraints[0].MaxSkew = 2
-	later.Mutate[0].Workloads.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Weight = 80
+	later.Mutate[0].Workloads.Placement.NodeSelector["pool"] = "batch"
+	later.Mutate[0].Workloads.Placement.Tolerations[0].TolerationSeconds = nil
+	later.Mutate[0].Workloads.Placement.TopologySpreadConstraints[0].MaxSkew = 2
+	later.Mutate[0].Workloads.Placement.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Weight = 80
 	bodies = append(bodies, later)
 	pod := &corev1.Pod{}
 	if _, err := MutatePodPlacement(context.Background(), pod, bodies, nil); err != nil {

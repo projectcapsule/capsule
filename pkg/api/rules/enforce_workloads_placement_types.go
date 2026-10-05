@@ -148,7 +148,7 @@ const (
 )
 
 // WorkloadAffinityMatch matches an entire affinity term. Fields are ANDed;
-// entries in enforce.workloads.affinity are alternatives. {} matches any term.
+// entries in enforce.workloads.placement.affinity are alternatives. {} matches any term.
 // +kubebuilder:object:generate=true
 type WorkloadAffinityMatch struct {
 	// Types defaults to all types. Type-specific constraints only match the

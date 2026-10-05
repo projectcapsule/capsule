@@ -25,7 +25,7 @@ import (
 
 func conditionalMetadataBody(expression string) *rules.NamespaceRuleBodyNamespace {
 	return &rules.NamespaceRuleBodyNamespace{
-		Mutate: []rules.NamespaceRuleMutation{{Workloads: rules.WorkloadMutation{NodeSelector: map[string]string{"independent": "yes"}}}},
+		Mutate: []rules.NamespaceRuleMutation{{Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{"independent": "yes"}}}}},
 		Enforce: &rules.NamespaceRuleEnforceBody{
 			Conditions: []rules.AdmissionCondition{{Expression: expression}},
 			Metadata:   []rules.MetadataRule{{VersionKinds: apiruntime.VersionKinds{APIGroups: []string{"v1"}, Kinds: []string{"Pod"}}, Labels: map[string]rules.MetadataValueRule{"applied": {Default: ptr.To("yes")}}}},

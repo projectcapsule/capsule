@@ -59,7 +59,7 @@ func (h *metadataRules) mutate(obj, old *unstructured.Unstructured, bodies []*ap
 				return nil
 			}
 
-			changed, err := mutateEphemeralRootFilesystems(ctx, obj, old, bodies, conditions)
+			changed, err := mutateEphemeralContainers(ctx, obj, old, bodies, conditions)
 
 			return mutationResponse(obj, req, changed, err)
 		}
