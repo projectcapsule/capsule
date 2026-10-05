@@ -266,14 +266,14 @@ func (h *podRules) validateWorkloadRules(
 
 // Placement and resource policies do not run on subresources.
 func hasWorkloadPolicy(body apirules.NamespaceRuleEnforceWorkloadsBody, subresource string, linux bool) bool {
-	if linux && (subresource == "" || subresource == "ephemeralcontainers") && (len(body.SeccompProfiles) > 0 || len(body.AppArmorProfiles) > 0) {
+	if linux && (subresource == "" || subresource == "ephemeralcontainers") && (len(body.Security.SeccompProfiles) > 0 || len(body.Security.AppArmorProfiles) > 0) {
 		return true
 	}
 
-	if len(body.Schedulers) > 0 || len(body.QoSClasses) > 0 || len(body.Registries) > 0 {
+	if len(body.Placement.Schedulers) > 0 || len(body.QoSClasses) > 0 || len(body.Registries) > 0 {
 		return true
 	}
 
-	return subresource == "" && (len(body.NodeSelector) > 0 || len(body.Tolerations) > 0 ||
-		len(body.TopologySpreadConstraints) > 0 || len(body.Affinity) > 0 || body.Resources != nil)
+	return subresource == "" && (len(body.Placement.NodeSelector) > 0 || len(body.Placement.Tolerations) > 0 ||
+		len(body.Placement.TopologySpreadConstraints) > 0 || len(body.Placement.Affinity) > 0 || body.Resources != nil)
 }

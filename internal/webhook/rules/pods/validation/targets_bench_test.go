@@ -25,7 +25,7 @@ func BenchmarkPodTargetAdmission(b *testing.B) {
 			pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "app", Namespace: "tenant-a"}, Spec: corev1.PodSpec{SchedulerName: "default-scheduler", Containers: []corev1.Container{{Name: "app", Image: "example.com/team/app:v1"}}}}
 			var bodies []*rules.NamespaceRuleBodyNamespace
 			for range count {
-				bodies = append(bodies, &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"blocked"}}}}}})
+				bodies = append(bodies, &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"blocked"}}}}}}})
 			}
 			call := h.OnCreate(nil, nil, pod, nil, events.NewEventRecorder(nil, logr.Discard(), nil, nil), &capsulev1beta2.Tenant{}, bodies)
 			b.ReportAllocs()

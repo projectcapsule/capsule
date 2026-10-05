@@ -199,6 +199,10 @@ func validateWorkloadRules(
 		return err
 	}
 
+	if err := validateDisruptionBudgetRules(ruleIndex, workloads); err != nil {
+		return err
+	}
+
 	if err := validatePlacementRules(ruleIndex, workloads); err != nil {
 		return err
 	}
@@ -216,10 +220,10 @@ func validateWorkloadRules(
 		}
 	}
 
-	for j, scheduler := range workloads.Schedulers {
+	for j, scheduler := range workloads.Placement.Schedulers {
 		if err := validateExpressionMatch(
 			scheduler,
-			fmt.Sprintf("rules[%d].enforce.workloads.schedulers[%d]", ruleIndex, j),
+			fmt.Sprintf("rules[%d].enforce.workloads.placement.schedulers[%d]", ruleIndex, j),
 		); err != nil {
 			return err
 		}

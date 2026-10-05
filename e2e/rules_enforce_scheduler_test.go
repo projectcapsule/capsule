@@ -47,15 +47,14 @@ var _ = Describe("enforcing pod schedulerName namespace rules", Ordered, Label("
 						NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
 							Enforce: &rules.NamespaceRuleEnforceBody{
 								Action: rules.ActionTypeDeny,
-								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
-									Schedulers: []runtime.ExpressionMatch{
-										{
-											Exact: []string{
-												"forbidden-scheduler",
-												"legacy-scheduler",
-											},
+								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{Schedulers: []runtime.ExpressionMatch{
+									{
+										Exact: []string{
+											"forbidden-scheduler",
+											"legacy-scheduler",
 										},
 									},
+								}},
 								},
 							},
 						},
@@ -64,14 +63,13 @@ var _ = Describe("enforcing pod schedulerName namespace rules", Ordered, Label("
 						NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
 							Enforce: &rules.NamespaceRuleEnforceBody{
 								Action: rules.ActionTypeAudit,
-								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
-									Schedulers: []runtime.ExpressionMatch{
-										{
-											Exact: []string{
-												"audited-scheduler",
-											},
+								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{Schedulers: []runtime.ExpressionMatch{
+									{
+										Exact: []string{
+											"audited-scheduler",
 										},
 									},
+								}},
 								},
 							},
 						},
@@ -85,14 +83,13 @@ var _ = Describe("enforcing pod schedulerName namespace rules", Ordered, Label("
 						NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
 							Enforce: &rules.NamespaceRuleEnforceBody{
 								Action: rules.ActionTypeAllow,
-								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
-									Schedulers: []runtime.ExpressionMatch{
-										{
-											Exact: []string{
-												"forbidden-scheduler",
-											},
+								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{Schedulers: []runtime.ExpressionMatch{
+									{
+										Exact: []string{
+											"forbidden-scheduler",
 										},
 									},
+								}},
 								},
 							},
 						},
@@ -106,14 +103,13 @@ var _ = Describe("enforcing pod schedulerName namespace rules", Ordered, Label("
 						NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
 							Enforce: &rules.NamespaceRuleEnforceBody{
 								Action: rules.ActionTypeDeny,
-								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
-									Schedulers: []runtime.ExpressionMatch{
-										{
-											Exact: []string{
-												"audited-scheduler",
-											},
+								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{Schedulers: []runtime.ExpressionMatch{
+									{
+										Exact: []string{
+											"audited-scheduler",
 										},
 									},
+								}},
 								},
 							},
 						},
@@ -127,12 +123,11 @@ var _ = Describe("enforcing pod schedulerName namespace rules", Ordered, Label("
 						NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
 							Enforce: &rules.NamespaceRuleEnforceBody{
 								Action: rules.ActionTypeAllow,
-								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
-									Schedulers: []runtime.ExpressionMatch{
-										{
-											Expression: "^team-[a-z0-9-]+$",
-										},
+								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{Schedulers: []runtime.ExpressionMatch{
+									{
+										Expression: "^team-[a-z0-9-]+$",
 									},
+								}},
 								},
 							},
 						},
@@ -146,12 +141,11 @@ var _ = Describe("enforcing pod schedulerName namespace rules", Ordered, Label("
 						NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
 							Enforce: &rules.NamespaceRuleEnforceBody{
 								Action: rules.ActionTypeDeny,
-								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
-									Schedulers: []runtime.ExpressionMatch{
-										{
-											Expression: "^team-blocked-[a-z0-9-]+$",
-										},
+								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{Schedulers: []runtime.ExpressionMatch{
+									{
+										Expression: "^team-blocked-[a-z0-9-]+$",
 									},
+								}},
 								},
 							},
 						},
@@ -183,7 +177,7 @@ var _ = Describe("enforcing pod schedulerName namespace rules", Ordered, Label("
 				g.Expect(gotRule).NotTo(BeNil())
 				g.Expect(gotRule.Enforce.Action).To(Equal(expected.action))
 				g.Expect(gotRule.Enforce.Workloads.Targets).To(Equal(expected.targets))
-				g.Expect(gotRule.Enforce.Workloads.Schedulers).To(Equal(expected.schedulers))
+				g.Expect(gotRule.Enforce.Workloads.Placement.Schedulers).To(Equal(expected.schedulers))
 			}
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	}

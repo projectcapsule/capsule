@@ -40,8 +40,8 @@ func BenchmarkSecurityProfileAdmission(b *testing.B) {
 						var bodies []*rules.NamespaceRuleBodyNamespace
 						for range size {
 							body := profileBody(false, rules.ActionTypeAllow, rules.SecurityProfileLocalhost)
-							body.Workloads.SeccompProfiles[0].LocalhostProfiles = []apiruntime.ExpressionMatch{{ExpressionRegex: apiruntime.ExpressionRegex{Expression: "^" + tnt.Name + `/.*\.json$`}}}
-							body.Workloads.AppArmorProfiles = body.Workloads.SeccompProfiles
+							body.Workloads.Security.SeccompProfiles[0].LocalhostProfiles = []apiruntime.ExpressionMatch{{ExpressionRegex: apiruntime.ExpressionRegex{Expression: "^" + tnt.Name + `/.*\.json$`}}}
+							body.Workloads.Security.AppArmorProfiles = body.Workloads.Security.SeccompProfiles
 							if mode == "skip" {
 								body.Workloads.Targets = []rules.WorkloadValidationTarget{rules.ValidateDeployment}
 							}

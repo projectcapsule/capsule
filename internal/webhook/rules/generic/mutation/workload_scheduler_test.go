@@ -28,7 +28,7 @@ func TestSchedulerMutationActions(t *testing.T) {
 			for _, configured := range []string{"", corev1.DefaultSchedulerName, "tenant-scheduler"} {
 				t.Run(fmt.Sprintf("%s/%s-to-%s", action, input, configured), func(t *testing.T) {
 					pod := &corev1.Pod{Spec: corev1.PodSpec{SchedulerName: input, NodeSelector: map[string]string{"keep": "yes"}}}
-					bodies := []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{{Action: action, Workloads: rules.WorkloadMutation{Scheduler: configured}}}}}
+					bodies := []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{{Action: action, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{Scheduler: configured}}}}}}
 					before := bodies[0].DeepCopy()
 					want := input
 					if configured != "" && (action == rules.MutationActionReplace || input == "") {
@@ -50,11 +50,11 @@ func TestSchedulerMutationActions(t *testing.T) {
 
 func TestSchedulerMutationOrderAndConditions(t *testing.T) {
 	bodies := []*rules.NamespaceRuleBodyNamespace{nil, {Mutate: []rules.NamespaceRuleMutation{
-		{Workloads: rules.WorkloadMutation{Scheduler: "first"}},
-		{Workloads: rules.WorkloadMutation{Scheduler: "second"}},
-		{Action: rules.MutationActionReplace, Conditions: []rules.AdmissionCondition{{Expression: `object.spec.schedulerName == 'first'`}}, Workloads: rules.WorkloadMutation{Scheduler: "replaced"}},
-		{Conditions: []rules.AdmissionCondition{{Expression: `object.spec.schedulerName == 'replaced'`}}, Workloads: rules.WorkloadMutation{NodeSelector: map[string]string{"observed": "yes"}}},
-		{Action: rules.MutationActionReplace, Conditions: []rules.AdmissionCondition{{Expression: "false"}}, Workloads: rules.WorkloadMutation{Scheduler: "skipped"}},
+		{Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{Scheduler: "first"}}},
+		{Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{Scheduler: "second"}}},
+		{Action: rules.MutationActionReplace, Conditions: []rules.AdmissionCondition{{Expression: `object.spec.schedulerName == 'first'`}}, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{Scheduler: "replaced"}}},
+		{Conditions: []rules.AdmissionCondition{{Expression: `object.spec.schedulerName == 'replaced'`}}, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{"observed": "yes"}}}},
+		{Action: rules.MutationActionReplace, Conditions: []rules.AdmissionCondition{{Expression: "false"}}, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{Scheduler: "skipped"}}},
 	}}}
 	obj := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "v1", "kind": "Pod", "spec": map[string]any{"schedulerName": ""}}}
 	for pass := range 2 {
@@ -75,7 +75,7 @@ func TestSchedulerConditionalDefault(t *testing.T) {
 	body := &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{{
 		Action:     rules.MutationActionReplace,
 		Conditions: []rules.AdmissionCondition{{Name: "default-scheduler", Expression: `!has(object.spec.schedulerName) || object.spec.schedulerName in ['', 'default-scheduler']`}},
-		Workloads:  rules.WorkloadMutation{Scheduler: "tenant-scheduler"},
+		Workloads:  rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{Scheduler: "tenant-scheduler"}},
 	}}}
 	for _, input := range []string{"omitted", "", corev1.DefaultSchedulerName, "custom-scheduler"} {
 		t.Run(input, func(t *testing.T) {
@@ -102,7 +102,7 @@ func TestSchedulerConditionalDefault(t *testing.T) {
 }
 
 func TestSchedulerMutationHandlerScope(t *testing.T) {
-	bodies := []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{{Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{Scheduler: "tenant-scheduler"}}}}}
+	bodies := []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{{Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{Scheduler: "tenant-scheduler"}}}}}}
 	h := MetadataRules(nil)
 	for _, tc := range []struct {
 		name, kind, subresource string
@@ -182,7 +182,7 @@ func BenchmarkSchedulerMutation(b *testing.B) {
 							if mode == "replace" || conditional {
 								action = rules.MutationActionReplace
 							}
-							body := &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{{Action: action, Workloads: rules.WorkloadMutation{Scheduler: fmt.Sprintf("tenant-%d-scheduler-%d", tenant, rule)}}}}
+							body := &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{{Action: action, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{Scheduler: fmt.Sprintf("tenant-%d-scheduler-%d", tenant, rule)}}}}}
 							if conditional {
 								body.Mutate[0].Conditions = []rules.AdmissionCondition{{Name: "default-scheduler", Expression: expression}}
 							}
@@ -211,7 +211,7 @@ func BenchmarkSchedulerMutation(b *testing.B) {
 							if mode == "replace" {
 								index = count - 1
 							}
-							want = bodies[i%tenants][index].Mutate[0].Workloads.Scheduler
+							want = bodies[i%tenants][index].Mutate[0].Workloads.Placement.Scheduler
 						}
 						got, _, err := unstructured.NestedString(obj.Object, "spec", "schedulerName")
 						if err != nil || got != want {

@@ -46,11 +46,11 @@ func TestTemplateAdmissionSharesRequestReads(t *testing.T) {
 		tnt := &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: name, UID: types.UID(name)}}
 		ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name, OwnerReferences: []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: name, UID: tnt.UID}}}}
 		rs := &capsulev1beta2.RuleStatus{ObjectMeta: metav1.ObjectMeta{Name: meta.NameForManagedRuleStatus(), Namespace: name}}
-		rs.Status.Rules = []*rules.NamespaceRuleBodyNamespace{{Enforce: &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: []rules.WorkloadValidationTarget{rules.ValidateDeployment}, Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{name}}}}}}}
+		rs.Status.Rules = []*rules.NamespaceRuleBodyNamespace{{Enforce: &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: []rules.WorkloadValidationTarget{rules.ValidateDeployment}, Placement: rules.WorkloadPlacementEnforcement{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{name}}}}}}}}
 		objects = append(objects, tnt, ns, rs)
 	}
 	cl := &typeAdmissionClient{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()}
-	chain := Register(nil, nil, nil, podvalidation.TemplateRules(nil, nil, nil)).GetHandlers()
+	chain := Register(nil, nil, nil, nil, podvalidation.TemplateRules(nil, nil, nil)).GetHandlers()
 	for _, namespace := range []string{"a", "b"} {
 		cl.gets.Store(0)
 		req := requestWithKind("apps", "Deployment")
@@ -105,7 +105,7 @@ func TestTemplateAdmissionSharesRequestReads(t *testing.T) {
 	req := requestWithKind("apps", "Deployment")
 	for _, body := range []*rules.NamespaceRuleBodyNamespace{nil,
 		{Enforce: typePolicy(rules.ActionTypeDeny, rules.ValidateDeployment)},
-		{Enforce: &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: []rules.WorkloadValidationTarget{rules.ValidateJob}, Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"batch"}}}}}},
+		{Enforce: &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: []rules.WorkloadValidationTarget{rules.ValidateJob}, Placement: rules.WorkloadPlacementEnforcement{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"batch"}}}}}}},
 	} {
 		// A nil decoder catches accidental full-object decoding before the skip.
 		require.Nil(t, bridge.OnCreate(nil, nil, nil, nil, nil, nil, []*rules.NamespaceRuleBodyNamespace{body})(t.Context(), req))
@@ -129,7 +129,7 @@ func BenchmarkTemplateHandlerChain(b *testing.B) {
 						ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name, OwnerReferences: []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: name, UID: tnt.UID}}}}
 						rs := &capsulev1beta2.RuleStatus{ObjectMeta: metav1.ObjectMeta{Name: meta.NameForManagedRuleStatus(), Namespace: name}}
 						for range count {
-							rs.Status.Rules = append(rs.Status.Rules, &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: []rules.WorkloadValidationTarget{rules.ValidateDeployment}, Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"blocked"}}}}}})
+							rs.Status.Rules = append(rs.Status.Rules, &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: []rules.WorkloadValidationTarget{rules.ValidateDeployment}, Placement: rules.WorkloadPlacementEnforcement{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"blocked"}}}}}}})
 						}
 						objects = append(objects, tnt, ns, rs)
 						requests[i] = requestWithKind("apps", "Deployment")
@@ -137,9 +137,9 @@ func BenchmarkTemplateHandlerChain(b *testing.B) {
 						requests[i].Object.Raw = []byte(fmt.Sprintf(`{"apiVersion":"apps/v1","kind":"Deployment","metadata":{"name":"app","namespace":%q},"spec":{"template":{"spec":{"schedulerName":"default-scheduler","containers":[{"name":"app","image":"example.com/app:v1"}]}}}}`, name))
 					}
 					cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
-					chain := Register(nil, nil, nil, nil).GetHandlers()
+					chain := Register(nil, nil, nil, nil, nil).GetHandlers()
 					if enabled {
-						chain = Register(nil, nil, nil, podvalidation.TemplateRules(nil, nil, nil)).GetHandlers()
+						chain = Register(nil, nil, nil, nil, podvalidation.TemplateRules(nil, nil, nil)).GetHandlers()
 					}
 					decoder := admission.NewDecoder(scheme)
 					b.ReportAllocs()
@@ -224,7 +224,7 @@ func TestWorkloadTypeAdmissionProfilesAndReads(t *testing.T) {
 						require.NoError(t, err)
 						req.OldObject = req.Object
 						spy := &requestSpyHandler{}
-						chain := Register(nil, nil, compiler, nil, spy).GetHandlers()
+						chain := Register(nil, nil, nil, compiler, nil, spy).GetHandlers()
 						var response *admission.Response
 						for _, handler := range chain {
 							if operation == admissionv1.Create {
@@ -259,14 +259,14 @@ func TestWorkloadTypeAdmissionProfilesAndReads(t *testing.T) {
 				req := requestWithKind("apps", "DaemonSet")
 				req.Namespace = "a-selected"
 				req.SubResource = subresource
-				h := Register(nil, nil, compiler, nil).GetHandlers()[0]
+				h := Register(nil, nil, nil, compiler, nil).GetHandlers()[0]
 				require.Nil(t, h.OnUpdate(cl, cl, admission.NewDecoder(scheme), nil)(t.Context(), req))
 				require.Zero(t, cl.gets.Load())
 			}
 			cl.failTenant = true
 			req := requestWithKind("apps", "DaemonSet")
 			req.Namespace = "a-selected"
-			response := Register(nil, nil, compiler, nil).GetHandlers()[0].OnCreate(cl, cl, admission.NewDecoder(scheme), nil)(t.Context(), req)
+			response := Register(nil, nil, nil, compiler, nil).GetHandlers()[0].OnCreate(cl, cl, admission.NewDecoder(scheme), nil)(t.Context(), req)
 			require.NotNil(t, response)
 			require.False(t, response.Allowed)
 			require.Contains(t, response.Result.Message, "tenant read unavailable")

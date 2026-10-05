@@ -33,11 +33,11 @@ func mutationConditions(t testing.TB) *ruleengine.ConditionEvaluator {
 
 func TestOrderedConditionalMutations(t *testing.T) {
 	bodies := []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{
-		{Workloads: rules.WorkloadMutation{NodeSelector: map[string]string{"pool": "shared"}}},
-		{Conditions: []rules.AdmissionCondition{{Name: "shared", Expression: `object.spec.nodeSelector['pool'] == 'shared' && request.operation == 'CREATE'`}}, Workloads: rules.WorkloadMutation{Tolerations: []corev1.Toleration{{Key: "shared", Operator: corev1.TolerationOpExists}}}},
-		{Conditions: []rules.AdmissionCondition{{Expression: `!has(object.spec.nodeSelector)`}}, Workloads: rules.WorkloadMutation{NodeSelector: map[string]string{"wrong": "yes"}}},
-		{Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{NodeSelector: map[string]string{"pool": "dedicated"}}},
-		{Conditions: []rules.AdmissionCondition{{Expression: `object.spec.nodeSelector['pool'] == 'dedicated'`}}, Workloads: rules.WorkloadMutation{NodeSelector: map[string]string{"seen": "yes"}}},
+		{Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{"pool": "shared"}}}},
+		{Conditions: []rules.AdmissionCondition{{Name: "shared", Expression: `object.spec.nodeSelector['pool'] == 'shared' && request.operation == 'CREATE'`}}, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{Tolerations: []corev1.Toleration{{Key: "shared", Operator: corev1.TolerationOpExists}}}}},
+		{Conditions: []rules.AdmissionCondition{{Expression: `!has(object.spec.nodeSelector)`}}, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{"wrong": "yes"}}}},
+		{Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{"pool": "dedicated"}}}},
+		{Conditions: []rules.AdmissionCondition{{Expression: `object.spec.nodeSelector['pool'] == 'dedicated'`}}, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{"seen": "yes"}}}},
 	}}}
 	before := bodies[0].DeepCopy()
 	pod := &corev1.Pod{}
@@ -60,8 +60,8 @@ func TestReplacePlacementPreservesOmittedAndClearsExplicit(t *testing.T) {
 		name, rule string
 		clear      bool
 	}{
-		{"replace supplied selectors", `{"nodeSelector":{"new":"value"}}`, false},
-		{"clear explicit properties", `{"nodeSelector":{},"tolerations":[],"topologySpreadConstraints":[],"affinity":{}}`, true},
+		{"replace supplied selectors", `{"placement":{"nodeSelector":{"new":"value"}}}`, false},
+		{"clear explicit properties", `{"placement":{"nodeSelector":{},"tolerations":[],"topologySpreadConstraints":[],"affinity":{}}}`, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			pod := &corev1.Pod{}
@@ -107,8 +107,8 @@ func TestWorkloadConditionErrorDoesNotCommitPartialMutation(t *testing.T) {
 		t.Fatal(err)
 	}
 	bodies := []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{
-		{Workloads: rules.WorkloadMutation{NodeSelector: map[string]string{"first": "yes"}}},
-		{Conditions: []rules.AdmissionCondition{{Name: "broken", Expression: `object.spec.missing == 'x'`}}, Workloads: rules.WorkloadMutation{Tolerations: []corev1.Toleration{}}},
+		{Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{"first": "yes"}}}},
+		{Conditions: []rules.AdmissionCondition{{Name: "broken", Expression: `object.spec.missing == 'x'`}}, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{Tolerations: []corev1.Toleration{}}}},
 	}}}
 	values, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&corev1.Pod{})
 	if err != nil {
@@ -133,7 +133,7 @@ func TestMutationHandlerSkipsPlacementOutsidePodCreate(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := MetadataRules(c).(*metadataRules)
-	bodies := []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{{Conditions: []rules.AdmissionCondition{{Expression: `object.spec.missing == 'x'`}}, Workloads: rules.WorkloadMutation{NodeSelector: map[string]string{"pool": "shared"}}}}}}
+	bodies := []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{{Conditions: []rules.AdmissionCondition{{Expression: `object.spec.missing == 'x'`}}, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{"pool": "shared"}}}}}}}
 	for _, req := range []admissionv1.AdmissionRequest{{Operation: admissionv1.Update}, {Operation: admissionv1.Create, SubResource: "status"}} {
 		req.Kind.Group = ""
 		req.Kind.Version = "v1"
@@ -181,7 +181,7 @@ func TestWorkloadResourceMutationConditionsAndPlacementOrdering(t *testing.T) {
 					Targets:   []rules.WorkloadValidationTarget{rules.ValidateContainers},
 					Resources: &rules.WorkloadResourceRules{Requests: map[corev1.ResourceName]rules.WorkloadResourceRequestPolicy{corev1.ResourceCPU: {Policy: rules.WorkloadResourceRequestPolicyDefault, Value: &quantity}}},
 				}},
-			Mutate: []rules.NamespaceRuleMutation{{Conditions: []rules.AdmissionCondition{{Expression: `has(object.spec.containers[0].resources.requests) && 'cpu' in object.spec.containers[0].resources.requests && object.spec.containers[0].resources.requests['cpu'] == '1'`}}, Workloads: rules.WorkloadMutation{NodeSelector: map[string]string{"resources-applied": "yes"}}}},
+			Mutate: []rules.NamespaceRuleMutation{{Conditions: []rules.AdmissionCondition{{Expression: `has(object.spec.containers[0].resources.requests) && 'cpu' in object.spec.containers[0].resources.requests && object.spec.containers[0].resources.requests['cpu'] == '1'`}}, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{"resources-applied": "yes"}}}}},
 		}
 		pod := &corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "app", Image: "app"}}}}
 		values, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pod)

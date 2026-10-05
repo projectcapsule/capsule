@@ -23,6 +23,7 @@ import (
 const Path = "/rules/generic/validating"
 
 type genericValidating struct {
+	selectorCache *cache.LabelSelectorCache
 	regexCache    *cache.RegexCache
 	configuration configuration.Configuration
 	resourceRules []handlers.Handler
@@ -32,12 +33,18 @@ type genericValidating struct {
 
 func Register(
 	regexCache *cache.RegexCache,
+	selectorCache *cache.LabelSelectorCache,
 	cfg configuration.Configuration,
 	compiler ruleengine.ConditionCompiler,
 	templates handlers.TypedHandlerWithTenantWithRuleset[*unstructured.Unstructured],
 	resourceRules ...handlers.Handler,
 ) handlers.Webhook {
+	if selectorCache == nil {
+		selectorCache = cache.NewLabelSelectorCache()
+	}
+
 	return &genericValidating{
+		selectorCache: selectorCache,
 		regexCache:    regexCache,
 		configuration: cfg,
 		resourceRules: resourceRules,
@@ -47,7 +54,10 @@ func Register(
 }
 
 func (w *genericValidating) GetHandlers() []handlers.Handler {
-	checks := []handlers.TypedHandlerWithTenantWithRuleset[genericObject]{GenericRules(w.regexCache, w.compiler)}
+	checks := []handlers.TypedHandlerWithTenantWithRuleset[genericObject]{
+		GenericRules(w.regexCache, w.compiler),
+		&disruptionBudgetRules{selectors: w.selectorCache, compiler: w.compiler},
+	}
 
 	if w.templates != nil {
 		checks = append(checks, &templateBridge{next: w.templates})
@@ -55,7 +65,9 @@ func (w *genericValidating) GetHandlers() []handlers.Handler {
 
 	out := make([]handlers.Handler, 0, len(w.resourceRules)+2)
 	out = append(out, matchingRequest(
-		matchesGenericMetadataRequest,
+		func(req admission.Request) bool {
+			return matchesGenericMetadataRequest(req) || matchesBudgetPodStatus(req) || matchesBudgetScale(req)
+		},
 		genericHandler(w.configuration,
 			checks...,
 		),

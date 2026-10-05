@@ -15,7 +15,7 @@ import (
 
 func TestCollectSecurityProfileRegexes(t *testing.T) {
 	match := rules.WorkloadSecurityProfileMatch{Types: []rules.SecurityProfileType{rules.SecurityProfileLocalhost}, LocalhostProfiles: []apiruntime.ExpressionMatch{{ExpressionRegex: apiruntime.ExpressionRegex{Expression: "^tenant-a/"}}, {Exact: []string{"exact-only"}}}}
-	b := &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{SeccompProfiles: []rules.WorkloadSecurityProfileMatch{match}, AppArmorProfiles: []rules.WorkloadSecurityProfileMatch{match}}}}
+	b := &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Security: rules.WorkloadSecurityEnforcement{SeccompProfiles: []rules.WorkloadSecurityProfileMatch{match}, AppArmorProfiles: []rules.WorkloadSecurityProfileMatch{match}}}}}
 	set := map[string]apiruntime.ExpressionRegex{}
 	collectRegexExpressionsFromNamespaceRules(set, []*rules.NamespaceRuleBodyNamespace{nil, b, b.DeepCopy()})
 	require.Len(t, set, 1)

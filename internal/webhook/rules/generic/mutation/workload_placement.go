@@ -26,8 +26,13 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 	}
 
 	before := podPlacement(pod).DeepCopy()
+	// Secret references are only appended or replaced, never edited in place.
+	// Retain a shallow snapshot so unrelated mutations add no slice allocation.
+	originalSecrets := pod.Spec.ImagePullSecrets
 
-	var rootFilesystems []rootFilesystemContainer
+	var containers []workloadMutationContainer
+
+	linux := pod.Spec.OS == nil || pod.Spec.OS.Name != corev1.Windows
 
 	for i, body := range bodies {
 		if body == nil {
@@ -36,7 +41,7 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 
 		for j := range body.Mutate {
 			mutation := &body.Mutate[j]
-			if (len(mutation.Workloads.Targets) > 0 || mutation.Workloads.ReadOnlyRootFilesystem != nil) && !mutationAppliesToPod(pod, mutation.Workloads) {
+			if (len(mutation.Workloads.Targets) > 0 || mutation.Workloads.Security.ReadOnlyRootFilesystem != nil || mutation.Workloads.Registries.ImagePullPolicy != "") && !mutationAppliesToPod(pod, mutation.Workloads) {
 				continue
 			}
 
@@ -64,28 +69,28 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 				return false, fmt.Errorf("rules[%d].mutate[%d].action: unsupported action %q (expected merge or replace)", i, j, mutation.Action)
 			}
 
-			if mutation.Workloads.ReadOnlyRootFilesystem != nil && (pod.Spec.OS == nil || pod.Spec.OS.Name != corev1.Windows) {
-				if rootFilesystems == nil {
-					rootFilesystems = rootFilesystemContainers(pod, false, nil)
+			if hasContainerMutation(mutation.Workloads, linux) {
+				if containers == nil {
+					containers = workloadMutationContainers(pod, false, nil)
 				}
 
-				mutateRootFilesystems(rootFilesystems, mutation.Workloads)
+				mutateContainers(containers, mutation.Workloads, linux)
 			}
 		}
 	}
 
-	return slices.ContainsFunc(rootFilesystems, rootFilesystemContainer.changed) || podPlacementChanged(before, podPlacement(pod)), nil
+	return !slices.Equal(originalSecrets, pod.Spec.ImagePullSecrets) || slices.ContainsFunc(containers, workloadMutationContainer.changed) || podPlacementChanged(before, podPlacement(pod)), nil
 }
 
 func podPlacementChanged(before, after *apirules.WorkloadMutation) bool {
-	return before.Scheduler != after.Scheduler ||
-		(before.SeccompProfile != after.SeccompProfile && !equality.Semantic.DeepEqual(before.SeccompProfile, after.SeccompProfile)) ||
-		(before.AppArmorProfile != after.AppArmorProfile && !equality.Semantic.DeepEqual(before.AppArmorProfile, after.AppArmorProfile)) ||
-		!equality.Semantic.DeepEqual(before.HostUsers, after.HostUsers) ||
-		!equality.Semantic.DeepEqual(before.NodeSelector, after.NodeSelector) ||
-		!equality.Semantic.DeepEqual(before.Tolerations, after.Tolerations) ||
-		!equality.Semantic.DeepEqual(before.TopologySpreadConstraints, after.TopologySpreadConstraints) ||
-		!equality.Semantic.DeepEqual(before.Affinity, after.Affinity)
+	return before.Placement.Scheduler != after.Placement.Scheduler ||
+		(before.Security.SeccompProfile != after.Security.SeccompProfile && !equality.Semantic.DeepEqual(before.Security.SeccompProfile, after.Security.SeccompProfile)) ||
+		(before.Security.AppArmorProfile != after.Security.AppArmorProfile && !equality.Semantic.DeepEqual(before.Security.AppArmorProfile, after.Security.AppArmorProfile)) ||
+		!equality.Semantic.DeepEqual(before.Security.HostUsers, after.Security.HostUsers) ||
+		!equality.Semantic.DeepEqual(before.Placement.NodeSelector, after.Placement.NodeSelector) ||
+		!equality.Semantic.DeepEqual(before.Placement.Tolerations, after.Placement.Tolerations) ||
+		!equality.Semantic.DeepEqual(before.Placement.TopologySpreadConstraints, after.Placement.TopologySpreadConstraints) ||
+		!equality.Semantic.DeepEqual(before.Placement.Affinity, after.Placement.Affinity)
 }
 
 func mutationAppliesToPod(pod *corev1.Pod, workload apirules.WorkloadMutation) bool {
@@ -93,7 +98,7 @@ func mutationAppliesToPod(pod *corev1.Pod, workload apirules.WorkloadMutation) b
 		return true
 	}
 
-	if workload.ReadOnlyRootFilesystem == nil || (pod.Spec.OS != nil && pod.Spec.OS.Name == corev1.Windows) {
+	if !hasContainerMutation(workload, pod.Spec.OS == nil || pod.Spec.OS.Name != corev1.Windows) {
 		return false
 	}
 
@@ -118,14 +123,18 @@ func matchesMutationConditions(ctx context.Context, evaluator *ruleengine.Condit
 
 func podPlacement(pod *corev1.Pod) *apirules.WorkloadMutation {
 	placement := &apirules.WorkloadMutation{
-		Scheduler:    pod.Spec.SchedulerName,
-		HostUsers:    pod.Spec.HostUsers,
-		NodeSelector: pod.Spec.NodeSelector, Tolerations: pod.Spec.Tolerations,
-		TopologySpreadConstraints: pod.Spec.TopologySpreadConstraints, Affinity: pod.Spec.Affinity,
+		Placement: apirules.WorkloadPlacementMutation{
+			Scheduler:                 pod.Spec.SchedulerName,
+			NodeSelector:              pod.Spec.NodeSelector,
+			Tolerations:               pod.Spec.Tolerations,
+			TopologySpreadConstraints: pod.Spec.TopologySpreadConstraints,
+			Affinity:                  pod.Spec.Affinity,
+		},
+		Security: apirules.WorkloadSecurityMutation{HostUsers: pod.Spec.HostUsers},
 	}
 	if pod.Spec.SecurityContext != nil {
-		placement.SeccompProfile = pod.Spec.SecurityContext.SeccompProfile
-		placement.AppArmorProfile = pod.Spec.SecurityContext.AppArmorProfile
+		placement.Security.SeccompProfile = pod.Spec.SecurityContext.SeccompProfile
+		placement.Security.AppArmorProfile = pod.Spec.SecurityContext.AppArmorProfile
 	}
 
 	return placement
@@ -135,49 +144,55 @@ func replacePodPlacement(pod *corev1.Pod, placement *apirules.WorkloadMutation) 
 	mutatePodSecurityProfiles(pod, placement, true)
 
 	desired := placement.DeepCopy()
-	if desired.Scheduler != "" {
-		pod.Spec.SchedulerName = desired.Scheduler
+	if desired.Registries.ImagePullSecrets != nil {
+		pod.Spec.ImagePullSecrets = desired.Registries.ImagePullSecrets
 	}
 
-	if desired.HostUsers != nil {
-		pod.Spec.HostUsers = desired.HostUsers
+	if desired.Placement.Scheduler != "" {
+		pod.Spec.SchedulerName = desired.Placement.Scheduler
 	}
 
-	if desired.NodeSelector != nil {
-		pod.Spec.NodeSelector = desired.NodeSelector
+	if desired.Security.HostUsers != nil {
+		pod.Spec.HostUsers = desired.Security.HostUsers
 	}
 
-	if desired.Tolerations != nil {
-		for i := range desired.Tolerations {
-			if desired.Tolerations[i].Operator == "" {
-				desired.Tolerations[i].Operator = corev1.TolerationOpEqual
+	if desired.Placement.NodeSelector != nil {
+		pod.Spec.NodeSelector = desired.Placement.NodeSelector
+	}
+
+	if desired.Placement.Tolerations != nil {
+		for i := range desired.Placement.Tolerations {
+			if desired.Placement.Tolerations[i].Operator == "" {
+				desired.Placement.Tolerations[i].Operator = corev1.TolerationOpEqual
 			}
 		}
 
-		pod.Spec.Tolerations = desired.Tolerations
+		pod.Spec.Tolerations = desired.Placement.Tolerations
 	}
 
-	if desired.TopologySpreadConstraints != nil {
-		pod.Spec.TopologySpreadConstraints = desired.TopologySpreadConstraints
+	if desired.Placement.TopologySpreadConstraints != nil {
+		pod.Spec.TopologySpreadConstraints = desired.Placement.TopologySpreadConstraints
 	}
 
-	if desired.Affinity != nil {
-		pod.Spec.Affinity = desired.Affinity
+	if desired.Placement.Affinity != nil {
+		pod.Spec.Affinity = desired.Placement.Affinity
 	}
 }
 
 func mergePodPlacement(pod *corev1.Pod, placement *apirules.WorkloadMutation) error {
 	mutatePodSecurityProfiles(pod, placement, false)
 
-	if placement.Scheduler != "" && pod.Spec.SchedulerName == "" {
-		pod.Spec.SchedulerName = placement.Scheduler
+	pod.Spec.ImagePullSecrets = mergeImagePullSecrets(pod.Spec.ImagePullSecrets, placement.Registries.ImagePullSecrets)
+
+	if placement.Placement.Scheduler != "" && pod.Spec.SchedulerName == "" {
+		pod.Spec.SchedulerName = placement.Placement.Scheduler
 	}
 
-	if placement.HostUsers != nil {
-		pod.Spec.HostUsers = new(*placement.HostUsers)
+	if placement.Security.HostUsers != nil {
+		pod.Spec.HostUsers = new(*placement.Security.HostUsers)
 	}
 
-	for key, value := range placement.NodeSelector {
+	for key, value := range placement.Placement.NodeSelector {
 		if pod.Spec.NodeSelector == nil {
 			pod.Spec.NodeSelector = make(map[string]string)
 		}
@@ -185,7 +200,7 @@ func mergePodPlacement(pod *corev1.Pod, placement *apirules.WorkloadMutation) er
 		pod.Spec.NodeSelector[key] = value
 	}
 
-	for _, desired := range placement.Tolerations {
+	for _, desired := range placement.Placement.Tolerations {
 		desired := *desired.DeepCopy()
 		if desired.Operator == "" {
 			desired.Operator = corev1.TolerationOpEqual
@@ -194,12 +209,12 @@ func mergePodPlacement(pod *corev1.Pod, placement *apirules.WorkloadMutation) er
 		upsertPlacement(&pod.Spec.Tolerations, desired, sameToleration)
 	}
 
-	for _, desired := range placement.TopologySpreadConstraints {
+	for _, desired := range placement.Placement.TopologySpreadConstraints {
 		upsertPlacement(&pod.Spec.TopologySpreadConstraints, *desired.DeepCopy(), sameSpreadConstraint)
 	}
 
-	if placement.Affinity != nil {
-		if err := ensureAffinity(&pod.Spec.Affinity, placement.Affinity); err != nil {
+	if placement.Placement.Affinity != nil {
+		if err := ensureAffinity(&pod.Spec.Affinity, placement.Placement.Affinity); err != nil {
 			return fmt.Errorf("affinity: %w", err)
 		}
 	}

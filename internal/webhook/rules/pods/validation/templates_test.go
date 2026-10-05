@@ -60,11 +60,11 @@ func TestTemplateWorkloadPolicies(t *testing.T) {
 			name, message string
 			body          rules.NamespaceRuleEnforceWorkloadsBody
 		}{
-			{"scheduler", "scheduler", rules.NamespaceRuleEnforceWorkloadsBody{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"batch"}}}}},
+			{"scheduler", "scheduler", rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"batch"}}}}}},
 			{"registry", "registry", rules.NamespaceRuleEnforceWorkloadsBody{Registries: []rules.OCIRegistry{{ExpressionMatch: apiruntime.ExpressionMatch{Exact: []string{"example.com/team/app:v1"}}}}}},
 			{"resources", "resource", rules.NamespaceRuleEnforceWorkloadsBody{Resources: &rules.WorkloadResourceRules{Limits: map[corev1.ResourceName]rules.WorkloadResourceLimitPolicy{corev1.ResourceMemory: {Policy: rules.WorkloadResourceLimitPolicyRatio, Value: new(resource.MustParse("1.5"))}}}}},
 			{"qos", "QoS", rules.NamespaceRuleEnforceWorkloadsBody{QoSClasses: []corev1.PodQOSClass{corev1.PodQOSBurstable}}},
-			{"placement", "nodeSelector", rules.NamespaceRuleEnforceWorkloadsBody{NodeSelector: []rules.WorkloadNodeSelectorMatch{{}}}},
+			{"placement", "nodeSelector", rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{NodeSelector: []rules.WorkloadNodeSelectorMatch{{}}}}},
 		} {
 			t.Run(string(target)+"/"+policy.name, func(t *testing.T) {
 				obj, req := templateFixture(t, target)
@@ -152,7 +152,7 @@ func TestTemplateConditionsPartsAndScope(t *testing.T) {
 	require.Contains(t, call().Result.Message, "template is missing")
 	// Controller-only scheduler/QoS policies cannot affect Pods.
 	pod := &corev1.Pod{Spec: corev1.PodSpec{SchedulerName: "batch"}}
-	podBody := &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: []rules.WorkloadValidationTarget{rules.ValidateDeployment}, Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"batch"}}}}}
+	podBody := &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: []rules.WorkloadValidationTarget{rules.ValidateDeployment}, Placement: rules.WorkloadPlacementEnforcement{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"batch"}}}}}}
 	require.NoError(t, PodRules(nil, nil, compiler).(*podRules).validatePodRules(t.Context(), admission.Request{}, pod, nil, nil, []*rules.NamespaceRuleEnforceBody{podBody}))
 }
 
@@ -166,12 +166,12 @@ func BenchmarkTemplateAdmission(b *testing.B) {
 				obj, req := templateFixture(b, rules.ValidateDeployment)
 				var bodies []*rules.NamespaceRuleBodyNamespace
 				for range count {
-					body := &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeDeny, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: []rules.WorkloadValidationTarget{rules.ValidateDeployment}, Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"other"}}}}}}
+					body := &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeDeny, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: []rules.WorkloadValidationTarget{rules.ValidateDeployment}, Placement: rules.WorkloadPlacementEnforcement{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"other"}}}}}}}
 					if mode == "skip" {
 						body.Enforce.Workloads.Targets = []rules.WorkloadValidationTarget{rules.ValidateJob}
 					}
 					if mode == "deny" {
-						body.Enforce.Workloads.Schedulers[0].Exact[0] = "batch"
+						body.Enforce.Workloads.Placement.Schedulers[0].Exact[0] = "batch"
 					}
 					if mode == "conditional" || mode == "cold" {
 						body.Enforce.Conditions = []rules.AdmissionCondition{{Expression: `object.spec.template.spec.schedulerName == 'batch'`}}

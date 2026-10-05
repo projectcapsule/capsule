@@ -17,14 +17,14 @@ func validateSecurityProfileRules(index int, workloads rules.NamespaceRuleEnforc
 		name    string
 		matches []rules.WorkloadSecurityProfileMatch
 	}{
-		{"seccompProfiles", workloads.SeccompProfiles}, {"appArmorProfiles", workloads.AppArmorProfiles},
+		{"seccompProfiles", workloads.Security.SeccompProfiles}, {"appArmorProfiles", workloads.Security.AppArmorProfiles},
 	} {
 		if len(group.matches) > 64 {
-			return fmt.Errorf("rules[%d].enforce.workloads.%s: at most 64 matchers are supported", index, group.name)
+			return fmt.Errorf("rules[%d].enforce.workloads.security.%s: at most 64 matchers are supported", index, group.name)
 		}
 
 		for i, match := range group.matches {
-			fieldPath := fmt.Sprintf("rules[%d].enforce.workloads.%s[%d]", index, group.name, i)
+			fieldPath := fmt.Sprintf("rules[%d].enforce.workloads.security.%s[%d]", index, group.name, i)
 			if len(match.Types) == 0 {
 				return fmt.Errorf("%s.types: at least one type is required", fieldPath)
 			}
@@ -68,13 +68,13 @@ func validateSecurityProfileRules(index int, workloads rules.NamespaceRuleEnforc
 }
 
 func validateSecurityProfileMutation(fieldPath string, workload rules.WorkloadMutation) error {
-	if p := workload.SeccompProfile; p != nil {
+	if p := workload.Security.SeccompProfile; p != nil {
 		if err := validateNativeSecurityProfile(fieldPath+".seccompProfile", string(p.Type), p.LocalhostProfile, true); err != nil {
 			return err
 		}
 	}
 
-	if p := workload.AppArmorProfile; p != nil {
+	if p := workload.Security.AppArmorProfile; p != nil {
 		if err := validateNativeSecurityProfile(fieldPath+".appArmorProfile", string(p.Type), p.LocalhostProfile, false); err != nil {
 			return err
 		}

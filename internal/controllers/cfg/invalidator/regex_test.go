@@ -33,14 +33,13 @@ func TestPlacementRegexCacheRebuild(t *testing.T) {
 	requirement := func() []rules.PlacementRequirementMatch {
 		return []rules.PlacementRequirementMatch{{WorkloadNodeSelectorMatch: pair()}}
 	}
-	body := &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
-		NodeSelector:              []rules.WorkloadNodeSelectorMatch{pair()},
+	body := &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{NodeSelector: []rules.WorkloadNodeSelectorMatch{pair()},
 		Tolerations:               []rules.WorkloadTolerationMatch{{WorkloadNodeSelectorMatch: pair()}},
 		TopologySpreadConstraints: []rules.WorkloadTopologySpreadMatch{{TopologyKey: expression(), LabelSelector: &rules.PlacementLabelSelectorMatch{Requirements: requirement()}}},
 		Affinity: []rules.WorkloadAffinityMatch{{
 			TopologyKey: expression(), Namespaces: expression(), Requirements: requirement(), FieldRequirements: requirement(),
 			LabelSelector: &rules.PlacementLabelSelectorMatch{Requirements: requirement()}, NamespaceSelector: &rules.PlacementLabelSelectorMatch{Requirements: requirement()},
-		}},
+		}}},
 	}}}
 	scheme := k8sruntime.NewScheme()
 	if err := capsulev1beta2.AddToScheme(scheme); err != nil {

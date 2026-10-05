@@ -42,7 +42,7 @@ func (h *podRules) validateSchedulers(
 					return nil
 				}
 
-				return enforce.Workloads.Schedulers
+				return enforce.Workloads.Placement.Schedulers
 			},
 			Matches: func(match runtime.ExpressionMatch, value ruleengine.Value) (ruleengine.Match, error) {
 				matched, err := match.MatchesWithExpressionMatcher(h.regexCache, value.Value)

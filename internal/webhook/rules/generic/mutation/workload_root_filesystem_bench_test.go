@@ -17,6 +17,14 @@ import (
 )
 
 func BenchmarkRootFilesystemMutation(b *testing.B) {
+	benchmarkContainerMutation(b, false)
+}
+
+func BenchmarkImagePullPolicyMutation(b *testing.B) {
+	benchmarkContainerMutation(b, true)
+}
+
+func benchmarkContainerMutation(b *testing.B, imagePullPolicy bool) {
 	for _, size := range []int{1, 20} {
 		for _, tenants := range []int{1, 4} {
 			for _, mode := range []string{"create", "ephemeral", "skip-target", "skip-condition", "condition-error"} {
@@ -46,6 +54,13 @@ func BenchmarkRootFilesystemMutation(b *testing.B) {
 					for tenant := range profiles {
 						for range size {
 							body := rootFilesystemBody(new(tenant%2 == 0), rules.ValidatePod)
+							if imagePullPolicy {
+								policy := corev1.PullAlways
+								if tenant%2 != 0 {
+									policy = corev1.PullNever
+								}
+								body = imagePullPolicyBody(policy, rules.ValidatePod)
+							}
 							switch mode {
 							case "skip-target":
 								body.Mutate[0].Workloads.Targets = []rules.WorkloadValidationTarget{rules.ValidateInitContainers}
@@ -73,7 +88,7 @@ func BenchmarkRootFilesystemMutation(b *testing.B) {
 							}
 						default:
 							if response == nil || !response.Allowed || len(response.Patches) == 0 {
-								b.Fatal("expected root filesystem patch")
+								b.Fatal("expected container mutation patch")
 							}
 						}
 					}

@@ -41,6 +41,8 @@ annotations:
       url: https://projectcapsule.dev/
   artifacthub.io/changes: |
     - kind: added
+      description: enforce PDB overlap, eviction allowance and unhealthy Pod policies through namespace workload rules
+    - kind: added
       description: extend workload targets to native controller templates and kind-only allow, deny, and audit rules
     - kind: added
       description: added scheduler workload mutation with empty-only merge and conditional replacement for namespace profiles
