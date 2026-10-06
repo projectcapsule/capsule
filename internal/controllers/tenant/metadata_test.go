@@ -12,75 +12,27 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/api/rules"
 )
 
-func TestEnsureMetadataKeepsFinalizerForRuleGlobalResourceQuotas(t *testing.T) {
-	t.Parallel()
-
-	tnt := &capsulev1beta2.Tenant{
-		Name: "tenant-a",
-		Spec: capsulev1beta2.TenantSpec{Rules: []*rules.NamespaceRuleBodyTenant{{
-			NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
-				Quota: []rules.ResourceQuotaRule{{Name: "compute"}},
-			},
-		}}},
-	}
-	manager := &Manager{}
-
-	if err := manager.ensureMetadata(context.Background(), tnt); err != nil {
-		t.Fatalf("ensureMetadata() error = %v", err)
-	}
-	if !controllerutil.ContainsFinalizer(tnt, meta.ControllerFinalizer) {
-		t.Fatal("Tenant with rule-generated GlobalResourceQuota is missing the controller finalizer")
-	}
-
-	now := metav1.Now()
-	tnt.DeletionTimestamp = &now
-	if err := manager.ensureMetadata(context.Background(), tnt); err != nil {
-		t.Fatalf("ensureMetadata() while deleting error = %v", err)
-	}
-	if controllerutil.ContainsFinalizer(tnt, meta.ControllerFinalizer) {
-		t.Fatal("Tenant controller finalizer was retained after managed child cleanup")
-	}
-}
-
-func TestHasRuleGlobalResourceQuotas(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name  string
-		rules []*rules.NamespaceRuleBodyTenant
-		want  bool
-	}{
-		{name: "no rules"},
-		{name: "nil rule", rules: []*rules.NamespaceRuleBodyTenant{nil}},
-		{name: "rule without namespace body", rules: []*rules.NamespaceRuleBodyTenant{{}}},
-		{
-			name: "rule without quota",
-			rules: []*rules.NamespaceRuleBodyTenant{{
-				NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{},
-			}},
-		},
-		{
-			name: "rule with quota",
-			rules: []*rules.NamespaceRuleBodyTenant{{
-				NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
-					Quota: []rules.ResourceQuotaRule{{Name: "compute"}},
-				},
-			}},
-			want: true,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-
-			tnt := &capsulev1beta2.Tenant{Spec: capsulev1beta2.TenantSpec{Rules: test.rules}}
-			if got := hasRuleGlobalResourceQuotas(tnt); got != test.want {
-				t.Fatalf("hasRuleGlobalResourceQuotas() = %t, want %t", got, test.want)
-			}
-		})
+func TestEnsureMetadataProtectsEmptyActiveTenant(t *testing.T) {
+	for _, deleting := range []bool{false, true} {
+		tnt := &capsulev1beta2.Tenant{Name: "tenant-a", Finalizers: []string{"example.com/other"}}
+		if deleting {
+			now := metav1.Now()
+			tnt.DeletionTimestamp = &now
+		}
+		manager := &Manager{}
+		if err := manager.ensureMetadata(context.Background(), tnt); err != nil {
+			t.Fatal(err)
+		}
+		if controllerutil.ContainsFinalizer(tnt, meta.ControllerFinalizer) == deleting {
+			t.Fatalf("deleting=%t finalizers=%v", deleting, tnt.Finalizers)
+		}
+		if !controllerutil.ContainsFinalizer(tnt, "example.com/other") {
+			t.Fatal("unrelated finalizer removed")
+		}
+		if tnt.Labels[meta.TenantNameLabel] != tnt.Name {
+			t.Fatal("missing Tenant name label")
+		}
 	}
 }

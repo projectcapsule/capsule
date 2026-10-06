@@ -76,9 +76,18 @@ func (r *Manager) reconcileDeletingTenantNamespaces(
 				return nil
 			}
 
+			if !namespaceOwnedByTenant(namespace, tnt) {
+				removed <- statusNamespace.Name
+
+				return nil
+			}
+
 			if namespace.DeletionTimestamp == nil {
 				if err := r.Delete(ctx, namespace, &client.DeleteOptions{
 					PropagationPolicy: ptr.To(metav1.DeletePropagationBackground),
+					Preconditions: &metav1.Preconditions{
+						UID: new(namespace.UID), ResourceVersion: new(namespace.ResourceVersion),
+					},
 				}); err != nil && !apierrors.IsNotFound(err) {
 					log.Error(err, "unable to delete tenant namespace",
 						"tenant", tnt.GetName(),
@@ -106,6 +115,11 @@ func (r *Manager) reconcileDeletingTenantNamespaces(
 				}
 
 				namespace = latest
+				if !namespaceOwnedByTenant(namespace, tnt) {
+					removed <- statusNamespace.Name
+
+					return nil
+				}
 			}
 
 			stat, err := r.reconcileNamespace(ctx, log, namespace, tnt, templateTenant)
@@ -156,6 +170,16 @@ func (r *Manager) reconcileDeletingTenantNamespaces(
 	tnt.Status.Size = uint(len(tnt.Status.Spaces))
 
 	return errors.Join(joined...)
+}
+
+func namespaceOwnedByTenant(namespace *corev1.Namespace, tnt *capsulev1beta2.Tenant) bool {
+	for _, ref := range namespace.OwnerReferences {
+		if tenant.IsTenantOwnerReferenceForTenant(ref, tnt) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (r *Manager) reconcileActiveTenantNamespaces(

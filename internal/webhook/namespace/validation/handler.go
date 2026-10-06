@@ -5,16 +5,17 @@ package validation
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	webhookutils "github.com/projectcapsule/capsule/internal/webhook/utils"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
@@ -68,8 +69,8 @@ func (h *handler) OnCreate(
 			return nil
 		}
 
-		if terminating := h.rejectOnTermination(ns, tnt); terminating != nil {
-			return terminating
+		if response := validateTenantAssignment(nil, tnt); response != nil {
+			return response
 		}
 
 		for _, hndl := range h.handlers {
@@ -211,8 +212,8 @@ func (h *handler) OnUpdate(
 			return nil
 		}
 
-		if terminating := h.rejectOnTermination(ns, newTenant); terminating != nil {
-			return terminating
+		if response := validateTenantAssignment(oldNs, newTenant); response != nil {
+			return response
 		}
 
 		if adminTenantTransition {
@@ -305,28 +306,32 @@ func namespaceTenantAssignmentChanged(oldNs, newNs *corev1.Namespace) bool {
 	)
 }
 
-func (h *handler) rejectOnTermination(
-	ns *corev1.Namespace,
+func validateTenantAssignment(
+	oldNs *corev1.Namespace,
 	t *capsulev1beta2.Tenant,
 ) *admission.Response {
 	if t == nil {
 		return nil
 	}
 
-	if t.DeletionTimestamp == nil {
-		return nil
+	// Existing namespaces must be able to finish deletion even if they never
+	// reached status.spaces. Use the persisted old ownership, including UID,
+	// rather than the incoming owner reference or the Tenant status projection.
+	if oldNs != nil {
+		for _, ref := range oldNs.OwnerReferences {
+			if tenant.IsTenantOwnerReferenceForTenant(ref, t) {
+				return nil
+			}
+		}
 	}
 
-	instance := t.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{
-		Name: ns.GetName(),
-		UID:  ns.GetUID(),
-	})
-
-	if instance != nil {
-		return nil
+	if t.DeletionTimestamp != nil {
+		return ad.Deny("tenant is terminating and does not accept new namespaces")
 	}
 
-	err := fmt.Errorf("tenant is terminating and does not accept new namespaces")
+	if !controllerutil.ContainsFinalizer(t, meta.ControllerFinalizer) {
+		return ad.Deny("tenant lifecycle protection is not ready; retry after the Tenant is reconciled")
+	}
 
-	return ad.ErroredResponse(err)
+	return nil
 }

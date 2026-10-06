@@ -120,6 +120,23 @@ Cleanup failures are logged and retried by `capsule/namespace-cleanup`; inspect
 that controller's reconcile errors and queue metrics separately from
 `capsule/tenants`.
 
+Tenant admission installs the controller finalizer before the Tenant can acquire
+namespaces. The controller also repairs active Tenants created before this
+behavior was introduced. Namespace admission rejects new assignments until that
+protection exists, and rejects assignments to terminating Tenants. These checks
+reuse the existing authoritative Tenant read and add no admission API calls.
+Updates to namespaces already owned by that Tenant can still complete cleanup.
+
+During deletion, `status.spaces` is a work list, not proof that all owned
+namespaces have been discovered. Once that list drains and child cleanup succeeds,
+the controller checks namespace metadata directly against the API server before
+releasing the finalizer. This check uses pages of at most 500 namespaces and
+matches Tenant owner-reference UIDs, including namespaces without Tenant labels.
+Discovered children return to the deletion work list. Active reconciliation and
+repeated deletion reconciles waiting on known namespaces do not perform this
+scan. The final check scales with the cluster's namespace count; namespace status,
+labels, and an eventually consistent informer index cannot safely prove absence.
+
 ### Controller benchmarks
 
 Run the reconciliation benchmarks with the Go toolchain declared in `go.mod`:

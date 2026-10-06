@@ -348,7 +348,7 @@ func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *caps
 
 	if instance.DeletionTimestamp != nil {
 		if err = r.runPhase(log, "namespaces", func() error { return r.reconcileNamespaces(ctx, log, instance) }); err != nil {
-			errs = append(errs, fmt.Errorf("namespace(s) had reconciliation errors: %w", err))
+			return fmt.Errorf("namespace(s) had reconciliation errors: %w", err)
 		}
 
 		// The managed-resource webhook intentionally denies deletion by the
@@ -360,8 +360,8 @@ func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *caps
 			return errors.Join(errs...)
 		}
 
-		if err = r.runPhase(log, "metadata", func() error { return r.ensureMetadata(ctx, instance) }); err != nil {
-			errs = append(errs, fmt.Errorf("cannot ensure metadata: %w", err))
+		if err = r.runPhase(log, "metadata", func() error { return r.finalizeTenant(ctx, instance) }); err != nil {
+			errs = append(errs, fmt.Errorf("cannot finalize Tenant: %w", err))
 		}
 
 		return errors.Join(errs...)
