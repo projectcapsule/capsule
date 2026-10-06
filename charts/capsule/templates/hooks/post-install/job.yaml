@@ -72,23 +72,37 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "capsule.post-install.name" . }}
+      initContainers:
+      - name: tls-secret-created
+        image: {{ include "capsule.jobsFullyQualifiedDockerImage" . }}
+        imagePullPolicy: {{ $Values.image.pullPolicy }}
+        command:
+        - /bin/kubectl
+        args:
+        - wait
+        - --for=create
+        - --timeout=168h
+        - --namespace={{ $.Release.Namespace }}
+        - secrets/{{ include "capsule.secretTlsName" $ }}
+        {{- if $Values.securityContext.enabled }}
+        securityContext: {{- omit $Values.securityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
+        {{- with $Values.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
       containers:
       - name: tls
         image: {{ include "capsule.jobsFullyQualifiedDockerImage" . }}
         imagePullPolicy: {{ $Values.image.pullPolicy }}
         command:
-        - "sh"
-        - "-c"
-        - |
-          set -o errexit ; set -o nounset
-          while [ -z $(kubectl -n $NAMESPACE get secret {{ include "capsule.secretTlsName" $ }} -o jsonpath='{.data.tls\.crt}') ]; do
-            echo 'waiting Capsule to be up and running...' && sleep 5;
-          done
-        env:
-        - name: NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
+        - /bin/kubectl
+        args:
+        - wait
+        - '--for=jsonpath={.data.tls\.crt}'
+        - --timeout=168h
+        - --namespace={{ $.Release.Namespace }}
+        - secrets/{{ include "capsule.secretTlsName" $ }}
         {{- if $Values.securityContext.enabled }}
         securityContext: {{- omit $Values.securityContext "enabled" | toYaml | nindent 10 }}
         {{- end }}

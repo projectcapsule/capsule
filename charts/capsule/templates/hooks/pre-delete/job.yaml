@@ -77,20 +77,18 @@ spec:
           image: {{ include "capsule.jobsFullyQualifiedDockerImage" . }}
           imagePullPolicy: {{ $Values.image.pullPolicy }}
           command:
-          - "/bin/sh"
-          - "-c"
-          - |
-              set -o errexit ; set -o xtrace ; set -o nounset
+          - /bin/kubectl
+          args:
+            - delete
+            - --ignore-not-found=true
           {{- if or (.Values.tls.create) (.Values.certManager.generateCertificates) }}
-              kubectl delete secret -n $NAMESPACE {{ include "capsule.secretTlsName" $ }} --ignore-not-found
+            - --namespace={{ $.Release.Namespace }}
+            - secrets/{{ include "capsule.secretTlsName" $ }}
           {{- end }}
-              kubectl delete clusterroles.rbac.authorization.k8s.io capsule-namespace-deleter capsule-namespace-provisioner --ignore-not-found
-              kubectl delete clusterrolebindings.rbac.authorization.k8s.io capsule-namespace-deleter capsule-namespace-provisioner --ignore-not-found
-          env:
-            - name: NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
+            - clusterroles.rbac.authorization.k8s.io/capsule-namespace-deleter
+            - clusterroles.rbac.authorization.k8s.io/capsule-namespace-provisioner
+            - clusterrolebindings.rbac.authorization.k8s.io/capsule-namespace-deleter
+            - clusterrolebindings.rbac.authorization.k8s.io/capsule-namespace-provisioner
           {{- if $Values.securityContext.enabled }}
           securityContext: {{- omit $Values.securityContext "enabled" | toYaml | nindent 12 }}
           {{- end }}
