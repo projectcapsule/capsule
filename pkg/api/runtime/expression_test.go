@@ -7,8 +7,41 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
+	"strings"
 	"testing"
 )
+
+func TestExpressionMatchValidateLimits(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name      string
+		match     ExpressionMatch
+		wantError string
+	}{
+		{"empty", ExpressionMatch{}, ""},
+		{"empty exact", ExpressionMatch{Exact: []string{}}, ""},
+		{"syntax is validated separately", ExpressionMatch{ExpressionRegex: ExpressionRegex{Expression: "["}}, ""},
+		{"exact limit", ExpressionMatch{Exact: slices.Repeat([]string{"a"}, 64)}, ""},
+		{"exact oversized", ExpressionMatch{Exact: slices.Repeat([]string{"a"}, 65)}, "match.exact: at most 64 values are supported"},
+		{"exp limit", ExpressionMatch{ExpressionRegex: ExpressionRegex{Expression: strings.Repeat("a", 4096)}}, ""},
+		{"exp oversized", ExpressionMatch{ExpressionRegex: ExpressionRegex{Expression: strings.Repeat("a", 4097)}}, "match.exp: at most 4096 characters are supported"},
+		{"unicode limit", ExpressionMatch{ExpressionRegex: ExpressionRegex{Expression: strings.Repeat("界", 4096)}}, ""},
+		{"unicode oversized with exact and negate", ExpressionMatch{Exact: []string{"a"}, ExpressionRegex: ExpressionRegex{Expression: strings.Repeat("界", 4097), Negate: true}}, "match.exp: at most 4096 characters are supported"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.match.ValidateLimits("match")
+			if tc.wantError == "" {
+				if err != nil {
+					t.Fatalf("unexpected validation error: %v", err)
+				}
+			} else if err == nil || err.Error() != tc.wantError {
+				t.Fatalf("validation error = %v, want %q", err, tc.wantError)
+			}
+		})
+	}
+}
 
 type fakeExpressionRegexMatcher struct {
 	t *testing.T

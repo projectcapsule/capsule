@@ -46,7 +46,7 @@ type NamespaceRuleEnforceBody struct {
 	//+kubebuilder:default:=deny
 	Action ActionType `json:"action,omitempty"`
 
-	// Enforcement for Workloads (Pods)
+	// Enforcement for native workload kinds and Pod properties.
 	Workloads NamespaceRuleEnforceWorkloadsBody `json:"workloads,omitempty"`
 
 	// Enforcement for Services.

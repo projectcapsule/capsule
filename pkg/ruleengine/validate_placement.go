@@ -20,11 +20,15 @@ import (
 )
 
 func validatePlacementRules(index int, workloads rules.NamespaceRuleEnforceWorkloadsBody) error {
-	path := fmt.Sprintf("rules[%d].enforce.workloads", index)
+	path := fmt.Sprintf("rules[%d].enforce.workloads.placement", index)
 
 	if err := workloads.VisitPlacementExpressions(func(name string, expression *runtime.ExpressionMatch) error {
 		if expression == nil {
 			return nil
+		}
+
+		if err := validateExpressionMatch(*expression, path+"."+name); err != nil {
+			return err
 		}
 
 		if len(expression.Exact) == 0 && expression.Expression == "" {
@@ -35,12 +39,12 @@ func validatePlacementRules(index int, workloads rules.NamespaceRuleEnforceWorkl
 			return fmt.Errorf("%s.%s.exact: empty strings are not supported; use exp: '^$'", path, name)
 		}
 
-		return validateExpressionMatch(*expression, path+"."+name)
+		return nil
 	}); err != nil {
 		return err
 	}
 
-	for i, rule := range workloads.Tolerations {
+	for i, rule := range workloads.Placement.Tolerations {
 		path := fmt.Sprintf("%s.tolerations[%d]", path, i)
 		if err := placementEnum(path+".operators", rule.Operators, corev1.TolerationOpEqual, corev1.TolerationOpExists); err != nil {
 			return err
@@ -57,7 +61,7 @@ func validatePlacementRules(index int, workloads rules.NamespaceRuleEnforceWorkl
 		}
 	}
 
-	for i, rule := range workloads.TopologySpreadConstraints {
+	for i, rule := range workloads.Placement.TopologySpreadConstraints {
 		path := fmt.Sprintf("%s.topologySpreadConstraints[%d]", path, i)
 		if err := placementEnum(path+".whenUnsatisfiable", rule.WhenUnsatisfiable, corev1.DoNotSchedule, corev1.ScheduleAnyway); err != nil {
 			return err
@@ -84,7 +88,7 @@ func validatePlacementRules(index int, workloads rules.NamespaceRuleEnforceWorkl
 		}
 	}
 
-	for i, rule := range workloads.Affinity {
+	for i, rule := range workloads.Placement.Affinity {
 		if err := validateAffinityMatch(fmt.Sprintf("%s.affinity[%d]", path, i), rule); err != nil {
 			return err
 		}
@@ -219,17 +223,36 @@ func validateMutations(index int, mutations []rules.NamespaceRuleMutation) error
 }
 
 func validateMutationPlacement(path string, workload rules.WorkloadMutation) error {
-	if workload.HostUsers == nil && workload.NodeSelector == nil && workload.Tolerations == nil && workload.TopologySpreadConstraints == nil && workload.Affinity == nil {
+	podProperties := workload.HasPodProperties()
+	if !podProperties && workload.Security.ReadOnlyRootFilesystem == nil && workload.Registries.ImagePullPolicy == "" {
 		return fmt.Errorf("%s: at least one workload mutation property must be supplied", path)
 	}
 
-	for key, value := range workload.NodeSelector {
+	if err := validateMutationTargets(path, workload, podProperties); err != nil {
+		return err
+	}
+
+	if err := validateRegistryMutation(path+".registries", workload.Registries); err != nil {
+		return err
+	}
+
+	if err := validateSecurityProfileMutation(path+".security", workload); err != nil {
+		return err
+	}
+
+	path += ".placement"
+
+	if workload.Placement.Scheduler != "" && strings.TrimSpace(workload.Placement.Scheduler) == "" {
+		return fmt.Errorf("%s.scheduler: scheduler name must not be blank", path)
+	}
+
+	for key, value := range workload.Placement.NodeSelector {
 		if err := placementLabel(path+".nodeSelector", key, value); err != nil {
 			return err
 		}
 	}
 
-	for i, toleration := range workload.Tolerations {
+	for i, toleration := range workload.Placement.Tolerations {
 		if err := validateEnsuredToleration(fmt.Sprintf("%s.tolerations[%d]", path, i), toleration); err != nil {
 			return err
 		}
@@ -237,7 +260,7 @@ func validateMutationPlacement(path string, workload rules.WorkloadMutation) err
 
 	seen := make(map[string]struct{})
 
-	for i, constraint := range workload.TopologySpreadConstraints {
+	for i, constraint := range workload.Placement.TopologySpreadConstraints {
 		path := fmt.Sprintf("%s.topologySpreadConstraints[%d]", path, i)
 
 		identity := constraint.TopologyKey + "\x00" + string(constraint.WhenUnsatisfiable)
@@ -253,7 +276,7 @@ func validateMutationPlacement(path string, workload rules.WorkloadMutation) err
 		}
 	}
 
-	return validateEnsuredAffinity(path+".affinity", workload.Affinity)
+	return validateEnsuredAffinity(path+".affinity", workload.Placement.Affinity)
 }
 
 func placementLabel(path, key, value string) error {

@@ -32,12 +32,16 @@ func MutateWorkloadResources(
 	bodies []*apirules.NamespaceRuleBodyNamespace,
 	conditions *ruleengine.ConditionEvaluator,
 ) (bool, error) {
-	if obj == nil || gvk != corev1.SchemeGroupVersion.WithKind("Pod") {
+	if obj == nil || (gvk != corev1.SchemeGroupVersion.WithKind("Pod") && len(workloads.PodTemplatePath(gvk)) == 0) {
 		return false, nil
 	}
 
 	filtered, err := ruleengine.FilterNamespaceEnforcementConditions(ctx, conditions, obj, bodies,
-		func(body *apirules.NamespaceRuleEnforceBody) bool { return body.Workloads.Resources != nil })
+		func(body *apirules.NamespaceRuleEnforceBody) bool {
+			_, matches := body.Workloads.PodTargets(gvk)
+
+			return matches && body.Workloads.Resources != nil
+		})
 	if err != nil {
 		return false, err
 	}
@@ -53,6 +57,10 @@ func mutateWorkloadResources(
 	bodies []*apirules.NamespaceRuleBodyNamespace,
 	conditions *ruleengine.ConditionEvaluator,
 ) (bool, error) {
+	if obj != nil && len(workloads.PodTemplatePath(gvk)) > 0 {
+		return mutateTemplateResources(obj, gvk, bodies)
+	}
+
 	if obj == nil || gvk != corev1.SchemeGroupVersion.WithKind("Pod") {
 		return false, nil
 	}
@@ -93,6 +101,12 @@ func MutatePodResources(
 	pod *corev1.Pod,
 	bodies []*apirules.NamespaceRuleBodyNamespace,
 ) (bool, error) {
+	enforce := ruleengine.WorkloadEnforcement(ruleengine.EnforceBodiesFromNamespaceRules(bodies), corev1.SchemeGroupVersion.WithKind("Pod"))
+
+	return mutatePodResources(pod, enforce)
+}
+
+func mutatePodResources(pod *corev1.Pod, bodies []*apirules.NamespaceRuleEnforceBody) (bool, error) {
 	if pod == nil {
 		return false, nil
 	}
@@ -175,21 +189,21 @@ func backfillMissingPodRequests(pod *corev1.Pod) {
 }
 
 func collectWorkloadResourcePolicies(
-	bodies []*apirules.NamespaceRuleBodyNamespace,
+	bodies []*apirules.NamespaceRuleEnforceBody,
 	target apirules.WorkloadValidationTarget,
 ) workloadResourcePolicies {
 	out := workloadResourcePolicies{}
 
 	for _, body := range bodies {
-		if body == nil || body.Enforce == nil || body.Enforce.Workloads.Resources == nil {
+		if body == nil || body.Workloads.Resources == nil {
 			continue
 		}
 
-		if !resourcePoliciesTarget(body.Enforce.Workloads, target) {
+		if !resourcePoliciesTarget(body.Workloads, target) {
 			continue
 		}
 
-		resources := body.Enforce.Workloads.Resources
+		resources := body.Workloads.Resources
 		for name, policy := range resources.Requests {
 			if !resourcePolicySupportsTarget(name, target) {
 				continue

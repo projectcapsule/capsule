@@ -9,20 +9,21 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	capmeta "github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/runtime/quota"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
@@ -145,7 +146,7 @@ func awaitGlobalQuotaReady(ctx context.Context, name string) {
 		gq := &capsulev1beta2.GlobalCustomQuota{}
 		g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: name}, gq)).To(Succeed())
 
-		g.Expect(gq.Status.Targets).NotTo(Equal(0))
+		g.Expect(gq.Status.Targets).NotTo(BeEmpty())
 
 		// status should be initialized by the controller
 		g.Expect(gq.Status.Usage.Used.String()).NotTo(BeEmpty())
@@ -157,7 +158,11 @@ func awaitGlobalQuotaReady(ctx context.Context, name string) {
 			Namespace: "capsule-system",
 		}, ledger)).To(Succeed())
 
-		g.Expect(capmeta.IsStatusConditionTrue(gq.Status.Conditions, capmeta.ReadyCondition)).To(BeTrue())
+		ready := gq.Status.Conditions.GetConditionByType(meta.ReadyCondition)
+		g.Expect(ready).NotTo(BeNil(), "GlobalCustomQuota %s has no Ready condition", name)
+		g.Expect(ready.Status).To(Equal(metav1.ConditionTrue),
+			"GlobalCustomQuota %s is not ready: reason=%s message=%s", name, ready.Reason, ready.Message)
+		g.Expect(gq.Status.ObservedGeneration).To(Equal(gq.Generation))
 
 		g.Expect(ledger.Spec.TargetRef.Kind).To(Equal("GlobalCustomQuota"))
 		g.Expect(ledger.Spec.TargetRef.Name).To(Equal(name))
@@ -326,56 +331,93 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 	})
 
 	It("aggregates a custom pod quantity path and settles the corresponding ledger", Label("skip-on-openshift"), func() {
-		q := &capsulev1beta2.GlobalCustomQuota{
-			Name: "gq-pod-cpu-requests",
-			Labels: map[string]string{
-				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-			},
-			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
-				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
-					Limit: resource.MustParse("500m"),
-					Sources: []capsulev1beta2.CustomQuotaSpecSource{
-						{
-							APIVersion: "v1",
-							Kind:       "Pod",
-							Operation:  quota.OpAdd,
-							Path:       ".spec.containers[*].resources.requests.cpu",
-							Selectors: []selectors.SelectorWithFields{
-								{
-									LabelSelector: &metav1.LabelSelector{
-										MatchLabels: map[string]string{
-											"track": "yes",
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
+		By("isolating the quota from identically labelled Pods in another tenant")
+		prefix := "e2e-quota-cpu-" + rand.String(6)
+		tenants := []*capsulev1beta2.Tenant{
+			{Name: prefix + "-a", Labels: map[string]string{"env": "e2e"}, Spec: capsulev1beta2.TenantSpec{
+				Owners: rbac.OwnerListSpec{{Name: prefix + "-a", Kind: rbac.UserOwner}},
+			}},
+			{Name: prefix + "-b", Labels: map[string]string{"env": "e2e"}, Spec: capsulev1beta2.TenantSpec{
+				Owners: rbac.OwnerListSpec{{Name: prefix + "-b", Kind: rbac.UserOwner}},
+			}},
 		}
+		namespaces := make([]*corev1.Namespace, 0, len(tenants))
+		for _, tenant := range tenants {
+			DeferCleanup(func() { EventuallyDeletion(tenant) })
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, tenant) }).Should(Succeed())
+			TenantReady(tenant, metav1.ConditionTrue, defaultTimeoutInterval)
+			namespace := NewNamespace(tenant.Name+"-ns", map[string]string{meta.TenantLabel: tenant.Name})
+			NamespaceCreation(namespace, tenant.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+			TenantNamespaceReady(tenant, namespace, 1)
+			namespaces = append(namespaces, namespace)
+		}
+		selected, unrelated := namespaces[0], namespaces[1]
+		ownerA := ownerClient(tenants[0].Spec.Owners[0].UserSpec)
+		ownerB := ownerClient(tenants[1].Spec.Owners[0].UserSpec)
+		unrelatedPod := MakePod(unrelated.Name, "no-cpu-request", map[string]string{"track": "yes"}, nil, "registry.k8s.io/pause:3.10.1", "", "")
+		EventuallyCreation(func() error {
+			_, err := ownerB.CoreV1().Pods(unrelated.Name).Create(ctx, unrelatedPod, metav1.CreateOptions{})
+			return err
+		}).Should(Succeed())
+
+		q := newGlobalPodCPUQuota(prefix, selected.Name)
 
 		EventuallyCreation(func() error {
 			return k8sClient.Create(ctx, q)
 		}).Should(Succeed())
 		awaitGlobalQuotaReady(ctx, q.GetName())
+		expectGlobalQuotaNamespaces(q.Name, selected.Name)
+		expectGlobalQuotaUsedAndClaims(ctx, q.Name, "0", 0)
 
-		dep := MakeDeployment(testNamespace, "cpu-requests", 2, map[string]string{
+		By("rejecting missing quantities only in the selected namespace")
+		invalid := MakePod(selected.Name, "no-cpu-request", map[string]string{"track": "yes"}, nil, "registry.k8s.io/pause:3.10.1", "", "")
+		Eventually(func(g Gomega) {
+			_, err := ownerA.CoreV1().Pods(selected.Name).Create(ctx, invalid, metav1.CreateOptions{})
+			Expect(err).To(HaveOccurred(), "a Pod with no CPU request must be rejected")
+			g.Expect(err).To(MatchError(ContainSubstring("did not resolve to any value")))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Eventually(func(g Gomega) {
+			_, err := ownerA.CoreV1().Pods(selected.Name).Get(ctx, invalid.Name, metav1.GetOptions{})
+			g.Expect(apierrors.IsNotFound(err)).To(BeTrue(), "rejected Pod must not exist: %v", err)
+			pod, err := ownerB.CoreV1().Pods(unrelated.Name).Get(ctx, unrelatedPod.Name, metav1.GetOptions{})
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(pod.Spec.Containers[0].Resources.Requests).NotTo(HaveKey(corev1.ResourceCPU))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		By("aggregating and settling the selected tenant's CPU usage")
+
+		dep := MakeDeployment(selected.Name, "cpu-requests", 2, map[string]string{
 			"track": "yes",
 		}, "100m")
 		EventuallyCreation(func() error {
-			dep.ResourceVersion = ""
-			return k8sClient.Create(ctx, dep)
+			_, err := ownerA.AppsV1().Deployments(selected.Name).Create(ctx, dep, metav1.CreateOptions{})
+			return err
 		}).Should(Succeed())
-		ExpectPodsForDeployment(ctx, testNamespace, "cpu-requests", 2)
+		ExpectPodsForDeployment(ctx, selected.Name, "cpu-requests", 2)
 
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "200m", 2)
 		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 
-		ScaleDeployment(ctx, testNamespace, "cpu-requests", 4)
-		ExpectPodsForDeployment(ctx, testNamespace, "cpu-requests", 4)
+		ScaleDeployment(ctx, selected.Name, "cpu-requests", 4)
+		ExpectPodsForDeployment(ctx, selected.Name, "cpu-requests", 4)
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "400m", 4)
 		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
+
+		By("leaving writes in the other tenant outside this quota")
+		outside := MakePod(unrelated.Name, "outside-limit", map[string]string{"track": "yes"}, nil, "registry.k8s.io/pause:3.10.1", "700m", "")
+		EventuallyCreation(func() error {
+			_, err := ownerB.CoreV1().Pods(unrelated.Name).Create(ctx, outside, metav1.CreateOptions{})
+			return err
+		}).Should(Succeed())
+		Eventually(func(g Gomega) {
+			pod, err := ownerB.CoreV1().Pods(unrelated.Name).Get(ctx, outside.Name, metav1.GetOptions{})
+			g.Expect(err).NotTo(HaveOccurred())
+			cpu := pod.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU]
+			g.Expect(cpu.Cmp(resource.MustParse("700m"))).To(Equal(0))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		awaitGlobalQuotaReady(ctx, q.Name)
+		expectGlobalQuotaUsedAndClaims(ctx, q.Name, "400m", 4)
+		expectLedgerSettled(ctx, ControllerNamespace, q.Name)
 
 		ledger := getLedger(ctx, ControllerNamespace, q.GetName())
 		Expect(ledger.Spec.TargetRef.Kind).To(Equal("GlobalCustomQuota"))

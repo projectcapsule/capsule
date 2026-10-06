@@ -56,11 +56,10 @@ func TestBuildNamespaceRuleBodyStatus(t *testing.T) {
 	tnt.Status.State = capsulev1beta2.TenantStateActive
 	matching := &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{
 		Action: rules.ActionTypeAudit,
-		Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
-			Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{
-				"{{ .tenant.status.state }}",
-				"{{ .namespace.status.phase }}",
-			}}},
+		Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{
+			"{{ .tenant.status.state }}",
+			"{{ .namespace.status.phase }}",
+		}}}},
 		},
 	}, Quota: []rules.ResourceQuotaRule{{Name: "shared-compute"}}}
 	quotaOnly := &rules.NamespaceRuleBodyNamespace{Quota: []rules.ResourceQuotaRule{{Name: "object-counts"}}}
@@ -96,8 +95,8 @@ func TestBuildNamespaceRuleBodyStatus(t *testing.T) {
 	if len(got[0].Quota) != 0 {
 		t.Fatalf("BuildNamespaceRuleBodyStatus() quota = %#v, want none", got[0].Quota)
 	}
-	if !reflect.DeepEqual(got[0].Enforce.Workloads.Schedulers[0].Exact, []string{"Active", "Active"}) {
-		t.Fatalf("BuildNamespaceRuleBodyStatus() scheduler = %#v", got[0].Enforce.Workloads.Schedulers)
+	if !reflect.DeepEqual(got[0].Enforce.Workloads.Placement.Schedulers[0].Exact, []string{"Active", "Active"}) {
+		t.Fatalf("BuildNamespaceRuleBodyStatus() scheduler = %#v", got[0].Enforce.Workloads.Placement.Schedulers)
 	}
 
 	got[0].Enforce.Action = rules.ActionTypeDeny
@@ -113,8 +112,8 @@ func TestBuildNamespaceRuleBodyStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{string(tnt.Status.State), string(ns.Status.Phase)}; !reflect.DeepEqual(got[0].Enforce.Workloads.Schedulers[0].Exact, want) {
-		t.Fatalf("cached template did not see updated status: %#v", got[0].Enforce.Workloads.Schedulers)
+	if want := []string{string(tnt.Status.State), string(ns.Status.Phase)}; !reflect.DeepEqual(got[0].Enforce.Workloads.Placement.Schedulers[0].Exact, want) {
+		t.Fatalf("cached template did not see updated status: %#v", got[0].Enforce.Workloads.Placement.Schedulers)
 	}
 
 	ns.Labels["env"] = "dev"

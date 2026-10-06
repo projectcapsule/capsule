@@ -651,6 +651,7 @@ func main() {
 	// Initialize Caches
 	impersonationCache := cache.NewImpersonationCache()
 	regexCache := cache.NewRegexCache()
+	labelSelectorCache := cache.NewLabelSelectorCache()
 	registryCache := cache.NewRegistryRuleSetCache(regexCache)
 	jsonPathCache := cache.NewJSONPathCache()
 
@@ -710,8 +711,10 @@ func main() {
 		rulesgenericmutation.Register(cfg, celCache),
 		rulesgenericvalidation.Register(
 			regexCache,
+			labelSelectorCache,
 			cfg,
 			celCache,
+			podrules.TemplateRules(regexCache, registryCache, celCache),
 			rulesgenericvalidation.ForKind(
 				corev1.SchemeGroupVersion.WithKind("Pod").GroupKind(),
 				pod.Handler(cfg,

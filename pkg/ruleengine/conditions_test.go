@@ -102,16 +102,16 @@ func TestValidateMutationAndConditions(t *testing.T) {
 	c := conditionCache(t)
 	for _, tc := range []struct{ name, yaml, want string }{
 		{"empty mutation", `mutate: [{}]`, "workload mutation property"},
-		{"invalid action", `mutate: [{action: append, workloads: {tolerations: []}}]`, "action"},
-		{"clear all", `mutate: [{action: replace, workloads: {nodeSelector: {}, tolerations: [], topologySpreadConstraints: [], affinity: {}}}]`, ""},
-		{"conditional mutation", `mutate: [{conditions: [{name: create, expression: "request.operation == 'CREATE'"}], workloads: {nodeSelector: {pool: shared}}}]`, ""},
-		{"invalid mutation expression", `mutate: [{conditions: [{expression: "object.spec."}], workloads: {tolerations: []}}]`, "mutate[0].conditions[0]"},
+		{"invalid action", `mutate: [{action: append, workloads: {"placement": {tolerations: []}}}]`, "action"},
+		{"clear all", `mutate: [{action: replace, workloads: {"placement": {nodeSelector: {}, tolerations: [], topologySpreadConstraints: [], affinity: {}}}}]`, ""},
+		{"conditional mutation", `mutate: [{conditions: [{name: create, expression: "request.operation == 'CREATE'"}], workloads: {"placement": {nodeSelector: {pool: shared}}}}]`, ""},
+		{"invalid mutation expression", `mutate: [{conditions: [{expression: "object.spec."}], workloads: {"placement": {tolerations: []}}}]`, "mutate[0].conditions[0]"},
 		{"Boolean required", `enforce: {conditions: [{expression: "'x'"}]}`, "must evaluate to bool"},
 		{"invalid enforcement expression", `enforce: {conditions: [{expression: "1"}]}`, "enforce.conditions[0]"},
 		{"duplicate names", `enforce: {conditions: [{name: same, expression: "true"}, {name: same, expression: "false"}]}`, "duplicate condition name"},
 		{"invalid name", `enforce: {conditions: [{name: 'not valid', expression: "true"}]}`, ".name"},
 		{"empty expression", `enforce: {conditions: [{expression: ""}]}`, "must not be empty"},
-		{"shared gate", `enforce: {conditions: [{expression: "has(object.metadata.labels)"}], workloads: {tolerations: [{}]}, services: {types: [NodePort]}}`, ""},
+		{"shared gate", `enforce: {conditions: [{expression: "has(object.metadata.labels)"}], workloads: {"placement": {tolerations: [{}]}}, services: {types: [NodePort]}}`, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var body rules.NamespaceRuleBodyNamespace
@@ -127,7 +127,7 @@ func TestValidateMutationAndConditions(t *testing.T) {
 }
 
 func TestMutationJSONPreservesExplicitEmptyProperties(t *testing.T) {
-	input := []byte(`{"mutate":[{"action":"replace","workloads":{"hostUsers":false,"nodeSelector":{},"tolerations":[],"topologySpreadConstraints":[],"affinity":{}}},{"workloads":{"nodeSelector":{"pool":"shared"}}}]}`)
+	input := []byte(`{"mutate": [{"action": "replace", "workloads": {"placement": {"scheduler": "tenant-scheduler", "nodeSelector": {}, "tolerations": [], "topologySpreadConstraints": [], "affinity": {}}, "security": {"hostUsers": false}}}, {"workloads": {"placement": {"nodeSelector": {"pool": "shared"}}}}]}`)
 	var body rules.NamespaceRuleBodyNamespace
 	if err := json.Unmarshal(input, &body); err != nil {
 		t.Fatal(err)
@@ -141,11 +141,11 @@ func TestMutationJSONPreservesExplicitEmptyProperties(t *testing.T) {
 		t.Fatal(err)
 	}
 	first := again.Mutate[0].Workloads
-	if first.HostUsers == nil || *first.HostUsers || first.NodeSelector == nil || first.Tolerations == nil || first.TopologySpreadConstraints == nil || first.Affinity == nil {
+	if first.Placement.Scheduler != "tenant-scheduler" || first.Security.HostUsers == nil || *first.Security.HostUsers || first.Placement.NodeSelector == nil || first.Placement.Tolerations == nil || first.Placement.TopologySpreadConstraints == nil || first.Placement.Affinity == nil {
 		t.Fatalf("explicit empty value lost: %s", output)
 	}
 	second := again.Mutate[1].Workloads
-	if second.HostUsers != nil || second.Tolerations != nil || second.TopologySpreadConstraints != nil || second.Affinity != nil {
+	if second.Placement.Scheduler != "" || second.Security.HostUsers != nil || second.Placement.Tolerations != nil || second.Placement.TopologySpreadConstraints != nil || second.Placement.Affinity != nil {
 		t.Fatalf("omitted values became explicit: %s", output)
 	}
 }
@@ -235,7 +235,7 @@ func BenchmarkAdmissionConditions(b *testing.B) {
 
 func TestConditionsOnlyAtActionLevel(t *testing.T) {
 	for _, input := range []string{
-		`mutate: [{workloads: {conditions: [{expression: "false"}], nodeSelector: {pool: shared}}}]`,
+		`mutate: [{workloads: {conditions: [{expression: "false"}], "placement": {nodeSelector: {pool: shared}}}}]`,
 		`enforce: {workloads: {conditions: [{expression: "false"}]}}`,
 		`enforce: {services: {conditions: [{expression: "false"}]}}`,
 	} {
@@ -270,7 +270,7 @@ func TestConditionRawObjectDecoding(t *testing.T) {
 func TestNamespaceEnforcementGatePreservesMutationAndOrder(t *testing.T) {
 	c := conditionCache(t)
 	body := &rules.NamespaceRuleBodyNamespace{
-		Mutate:  []rules.NamespaceRuleMutation{{Workloads: rules.WorkloadMutation{NodeSelector: map[string]string{"pool": "shared"}}}},
+		Mutate:  []rules.NamespaceRuleMutation{{Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{"pool": "shared"}}}}},
 		Enforce: &rules.NamespaceRuleEnforceBody{Conditions: []rules.AdmissionCondition{{Expression: "false"}}},
 	}
 	original := body.DeepCopy()
@@ -282,7 +282,7 @@ func TestNamespaceEnforcementGatePreservesMutationAndOrder(t *testing.T) {
 	if len(filtered) != 4 || filtered[0] != nil || filtered[1].Enforce != nil || filtered[2] != bodies[2] || filtered[3].Enforce != nil {
 		t.Fatalf("incorrect filtered order: %#v", filtered)
 	}
-	if filtered[1].Mutate[0].Workloads.NodeSelector["pool"] != "shared" || body.Enforce.Conditions[0] != original.Enforce.Conditions[0] {
+	if filtered[1].Mutate[0].Workloads.Placement.NodeSelector["pool"] != "shared" || body.Enforce.Conditions[0] != original.Enforce.Conditions[0] {
 		t.Fatal("lost independent mutation or modified cached input")
 	}
 }

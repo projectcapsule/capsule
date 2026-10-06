@@ -18,7 +18,9 @@ const (
 	ReasonAdmissionFailure string = "AdmissionFailed"
 
 	// RuleStatus.
-	ReasonNamespaceRuleAudit string = "NamespaceRuleAudit"
+	ReasonNamespaceRuleAudit        string = "NamespaceRuleAudit"
+	ReasonForbiddenWorkloadType     string = "ForbiddenWorkloadType"
+	ReasonForbiddenDisruptionBudget string = "ForbiddenDisruptionBudget"
 	// Namespace.
 	ReasonNamespaceHijack string = "ReasonNamespacePatch"
 
@@ -54,6 +56,8 @@ const (
 	ReasonForbiddenPodToleration     string = "ForbiddenPodToleration"
 	ReasonForbiddenPodTopologySpread string = "ForbiddenPodTopologySpread"
 	ReasonForbiddenPodAffinity       string = "ForbiddenPodAffinity"
+	ReasonForbiddenSeccompProfile    string = "ForbiddenSeccompProfile"
+	ReasonForbiddenAppArmorProfile   string = "ForbiddenAppArmorProfile"
 
 	// Ingress.
 	ReasonWildcardDenied           string = "WildcardDenied"

@@ -43,24 +43,22 @@ var _ = Describe("workload placement namespace profiles", Label("tenant", "rules
 		return &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: "e2e-placement-" + suffix, Labels: map[string]string{"env": "e2e"}}, Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{{CoreOwnerSpec: rbac.CoreOwnerSpec{UserSpec: rbac.UserSpec{Name: "e2e-placement-owner-" + suffix, Kind: "User"}}}},
 			Rules: []*rules.NamespaceRuleBodyTenant{
-				{NamespaceSelector: profileSelector(), NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{{Workloads: rules.WorkloadMutation{
-					NodeSelector:              map[string]string{"placement.example.com/pool": "{{ .tenant.metadata.name }}"},
+				{NamespaceSelector: profileSelector(), NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{{Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{"placement.example.com/pool": "{{ .tenant.metadata.name }}"},
 					Tolerations:               []corev1.Toleration{{Key: "placement.example.com/pool", Operator: corev1.TolerationOpEqual, Value: "{{ .tenant.metadata.name }}", Effect: corev1.TaintEffectNoSchedule}},
 					TopologySpreadConstraints: []corev1.TopologySpreadConstraint{{TopologyKey: "topology.kubernetes.io/zone", MaxSkew: 1, WhenUnsatisfiable: corev1.DoNotSchedule, LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "checkout"}}}},
 					Affinity: &corev1.Affinity{
 						NodeAffinity:    &corev1.NodeAffinity{RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{NodeSelectorTerms: []corev1.NodeSelectorTerm{{MatchExpressions: []corev1.NodeSelectorRequirement{{Key: "topology.kubernetes.io/zone", Operator: corev1.NodeSelectorOpIn, Values: []string{"zone-a", "zone-b"}}}}}}},
 						PodAffinity:     &corev1.PodAffinity{PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{{Weight: 50, PodAffinityTerm: corev1.PodAffinityTerm{TopologyKey: "topology.kubernetes.io/zone", LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "cache"}}}}}},
 						PodAntiAffinity: &corev1.PodAntiAffinity{PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{{Weight: 100, PodAffinityTerm: corev1.PodAffinityTerm{TopologyKey: "kubernetes.io/hostname", LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "checkout"}}}}}},
-					},
+					}},
 				}}}}},
-				{NamespaceSelector: profileSelector(), NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeDeny, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
-					NodeSelector:              []rules.WorkloadNodeSelectorMatch{{Key: &rules.PlacementExpressionMatch{ExpressionRegex: apiruntime.ExpressionRegex{Expression: `^forbidden\.example\.com/`}}}},
+				{NamespaceSelector: profileSelector(), NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeDeny, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{NodeSelector: []rules.WorkloadNodeSelectorMatch{{Key: &rules.PlacementExpressionMatch{ExpressionRegex: apiruntime.ExpressionRegex{Expression: `^forbidden\.example\.com/`}}}},
 					Tolerations:               []rules.WorkloadTolerationMatch{{WorkloadNodeSelectorMatch: rules.WorkloadNodeSelectorMatch{Key: exact("forbidden.example.com/pool")}}},
 					TopologySpreadConstraints: []rules.WorkloadTopologySpreadMatch{{TopologyKey: exact("forbidden.example.com/rack")}},
-					Affinity:                  []rules.WorkloadAffinityMatch{{Types: []rules.PlacementAffinityType{rules.PlacementPodAntiAffinity}, Modes: []rules.PlacementAffinityMode{rules.PlacementAffinityRequired}}},
+					Affinity:                  []rules.WorkloadAffinityMatch{{Types: []rules.PlacementAffinityType{rules.PlacementPodAntiAffinity}, Modes: []rules.PlacementAffinityMode{rules.PlacementAffinityRequired}}}},
 				}}}},
-				{NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"placement-profile": "strict"}}, NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeAllow, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{NodeSelector: []rules.WorkloadNodeSelectorMatch{{Key: exact("placement.example.com/pool"), Values: exact("{{ .tenant.metadata.name }}")}}}}}},
-				{NamespaceSelector: profileSelector(), NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Audience: []rules.Audience{{Kind: rules.AudienceKindUser, Name: "not-the-placement-owner"}}, Mutate: []rules.NamespaceRuleMutation{{Workloads: rules.WorkloadMutation{NodeSelector: map[string]string{"audience": "unmatched"}}}}}},
+				{NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"placement-profile": "strict"}}, NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeAllow, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{NodeSelector: []rules.WorkloadNodeSelectorMatch{{Key: exact("placement.example.com/pool"), Values: exact("{{ .tenant.metadata.name }}")}}}}}}},
+				{NamespaceSelector: profileSelector(), NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Audience: []rules.Audience{{Kind: rules.AudienceKindUser, Name: "not-the-placement-owner"}}, Mutate: []rules.NamespaceRuleMutation{{Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{"audience": "unmatched"}}}}}}},
 			},
 		}}
 	}
@@ -87,7 +85,7 @@ var _ = Describe("workload placement namespace profiles", Label("tenant", "rules
 			g.Expect(status.Status.Rules).To(HaveLen(want))
 			if want > 0 {
 				g.Expect(status.Status.Rules[0].Mutate).NotTo(BeNil())
-				g.Expect(status.Status.Rules[0].Mutate[0].Workloads.NodeSelector["placement.example.com/pool"]).To(Equal(tnt.Name))
+				g.Expect(status.Status.Rules[0].Mutate[0].Workloads.Placement.NodeSelector["placement.example.com/pool"]).To(Equal(tnt.Name))
 			}
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		return ns
@@ -212,13 +210,13 @@ var _ = Describe("workload placement namespace profiles", Label("tenant", "rules
 			if err := k8sClient.Get(context.Background(), client.ObjectKeyFromObject(tnt), current); err != nil {
 				return err
 			}
-			current.Spec.Rules[0].Mutate[0].Workloads.NodeSelector["placement.example.com/pool"] = "updated"
+			current.Spec.Rules[0].Mutate[0].Workloads.Placement.NodeSelector["placement.example.com/pool"] = "updated"
 			return k8sClient.Update(context.Background(), current)
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		Eventually(func(g Gomega) {
 			status := &capsulev1beta2.RuleStatus{}
 			g.Expect(k8sClient.Get(context.Background(), client.ObjectKey{Namespace: ns.Name, Name: meta.NameForManagedRuleStatus()}, status)).To(Succeed())
-			g.Expect(status.Status.Rules[0].Mutate[0].Workloads.NodeSelector["placement.example.com/pool"]).To(Equal("updated"))
+			g.Expect(status.Status.Rules[0].Mutate[0].Workloads.Placement.NodeSelector["placement.example.com/pool"]).To(Equal("updated"))
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		updated := createPod(cs, ns.Name, newPod("after-policy-change"))
 		Expect(updated.Spec.NodeSelector["placement.example.com/pool"]).To(Equal("updated"))
@@ -255,7 +253,7 @@ var _ = Describe("workload placement namespace profiles", Label("tenant", "rules
 			{},
 		} {
 			before, err := updatePlacementTenant(current, func(invalid *capsulev1beta2.Tenant) {
-				invalid.Spec.Rules[1].Enforce.Workloads.NodeSelector[0].Key = expression
+				invalid.Spec.Rules[1].Enforce.Workloads.Placement.NodeSelector[0].Key = expression
 			})
 			Expect(err).To(HaveOccurred())
 			Expect(strings.Contains(err.Error(), "nodeSelector") && strings.Contains(err.Error(), "exp")).To(BeTrue(), err.Error())
@@ -274,15 +272,14 @@ var _ = Describe("workload placement namespace profiles", Label("tenant", "rules
 		_, updateErr := updatePlacementTenant(a, func(current *capsulev1beta2.Tenant) {
 			current.Spec.Rules[0].Mutate = append(current.Spec.Rules[0].Mutate,
 				rules.NamespaceRuleMutation{
-					Conditions: mode("replace"), Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{
-						NodeSelector:              map[string]string{"replacement": "yes"},
+					Conditions: mode("replace"), Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{"replacement": "yes"},
 						Tolerations:               []corev1.Toleration{{Key: "replacement", Operator: corev1.TolerationOpExists}},
 						TopologySpreadConstraints: []corev1.TopologySpreadConstraint{{TopologyKey: "kubernetes.io/hostname", MaxSkew: 2, WhenUnsatisfiable: corev1.ScheduleAnyway, LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "checkout"}}}},
-						Affinity:                  &corev1.Affinity{NodeAffinity: &corev1.NodeAffinity{RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{NodeSelectorTerms: []corev1.NodeSelectorTerm{{MatchExpressions: []corev1.NodeSelectorRequirement{{Key: "disk", Operator: corev1.NodeSelectorOpIn, Values: []string{"ssd"}}}}}}}},
+						Affinity:                  &corev1.Affinity{NodeAffinity: &corev1.NodeAffinity{RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{NodeSelectorTerms: []corev1.NodeSelectorTerm{{MatchExpressions: []corev1.NodeSelectorRequirement{{Key: "disk", Operator: corev1.NodeSelectorOpIn, Values: []string{"ssd"}}}}}}}}},
 					}},
-				rules.NamespaceRuleMutation{Conditions: []rules.AdmissionCondition{{Name: "after-replace", Expression: "has(object.spec.nodeSelector) && 'replacement' in object.spec.nodeSelector"}}, Workloads: rules.WorkloadMutation{NodeSelector: map[string]string{"ordered": "yes"}}},
-				rules.NamespaceRuleMutation{Conditions: mode("clear"), Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{NodeSelector: map[string]string{}, Tolerations: []corev1.Toleration{}, TopologySpreadConstraints: []corev1.TopologySpreadConstraint{}, Affinity: &corev1.Affinity{}}},
-				rules.NamespaceRuleMutation{Conditions: append(mode("error"), rules.AdmissionCondition{Name: "runtime-error", Expression: "object.spec.missing == 'x'"}), Workloads: rules.WorkloadMutation{NodeSelector: map[string]string{"error": "never"}}},
+				rules.NamespaceRuleMutation{Conditions: []rules.AdmissionCondition{{Name: "after-replace", Expression: "has(object.spec.nodeSelector) && 'replacement' in object.spec.nodeSelector"}}, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{"ordered": "yes"}}}},
+				rules.NamespaceRuleMutation{Conditions: mode("clear"), Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{}, Tolerations: []corev1.Toleration{}, TopologySpreadConstraints: []corev1.TopologySpreadConstraint{}, Affinity: &corev1.Affinity{}}}},
+				rules.NamespaceRuleMutation{Conditions: append(mode("error"), rules.AdmissionCondition{Name: "runtime-error", Expression: "object.spec.missing == 'x'"}), Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{"error": "never"}}}},
 			)
 		})
 		Expect(updateErr).To(Succeed())
@@ -290,7 +287,7 @@ var _ = Describe("workload placement namespace profiles", Label("tenant", "rules
 			status := &capsulev1beta2.RuleStatus{}
 			g.Expect(k8sClient.Get(context.Background(), client.ObjectKey{Namespace: ns.Name, Name: meta.NameForManagedRuleStatus()}, status)).To(Succeed())
 			g.Expect(status.Status.Rules[0].Mutate).To(HaveLen(5))
-			g.Expect(status.Status.Rules[0].Mutate[3].Workloads.Tolerations).NotTo(BeNil())
+			g.Expect(status.Status.Rules[0].Mutate[3].Workloads.Placement.Tolerations).NotTo(BeNil())
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		podWithMode := func(value string) *corev1.Pod {
 			pod := newPod("conditional-" + value)
@@ -350,6 +347,15 @@ var _ = Describe("workload placement namespace profiles", Label("tenant", "rules
 			Expect(yaml.UnmarshalStrict(data, pod)).To(Succeed())
 			pod.Namespace = ""
 			created := createPod(ownerA, ns.Name, pod)
+			Eventually(func(g Gomega) {
+				stored := &corev1.Pod{}
+				g.Expect(k8sClient.Get(context.Background(), client.ObjectKeyFromObject(created), stored)).To(Succeed())
+				wantScheduler := corev1.DefaultSchedulerName
+				if name == "shared" {
+					wantScheduler = "solar-shared-scheduler"
+				}
+				g.Expect(stored.Spec.SchedulerName).To(Equal(wantScheduler))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			Expect(created.Spec.NodeSelector).To(HaveKeyWithValue("kubernetes.io/os", "linux"))
 			if name == "shared" {
 				Expect(created.Spec.NodeSelector).To(HaveKeyWithValue("placement.example.com/pool", "shared"))
@@ -488,15 +494,11 @@ var _ = Describe("workload placement namespace profiles", Label("tenant", "rules
 		ownerA, ownerB := ownerClient(a.Spec.Owners[0].UserSpec), ownerClient(b.Spec.Owners[0].UserSpec)
 		_, err := updatePlacementTenant(a, func(current *capsulev1beta2.Tenant) {
 			current.Spec.Rules[0].Mutate = append(current.Spec.Rules[0].Mutate,
-				rules.NamespaceRuleMutation{Workloads: rules.WorkloadMutation{HostUsers: ptr.To(false)}},
+				rules.NamespaceRuleMutation{Workloads: rules.WorkloadMutation{Security: rules.WorkloadSecurityMutation{HostUsers: ptr.To(false)}}},
 				rules.NamespaceRuleMutation{
-					Conditions: []rules.AdmissionCondition{{Name: "host-users", Expression: "'host-users' in object.metadata.labels && object.metadata.labels['host-users'] == 'true'"}}, Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{
-						HostUsers: ptr.To(true),
-					}},
+					Conditions: []rules.AdmissionCondition{{Name: "host-users", Expression: "'host-users' in object.metadata.labels && object.metadata.labels['host-users'] == 'true'"}}, Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{Security: rules.WorkloadSecurityMutation{HostUsers: ptr.To(true)}}},
 				rules.NamespaceRuleMutation{
-					Conditions: []rules.AdmissionCondition{{Name: "after-host-users", Expression: "object.spec.hostUsers == false"}}, Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{
-						NodeSelector: map[string]string{"user-namespace": "yes"},
-					}},
+					Conditions: []rules.AdmissionCondition{{Name: "after-host-users", Expression: "object.spec.hostUsers == false"}}, Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{"user-namespace": "yes"}}}},
 			)
 		})
 		Expect(err).NotTo(HaveOccurred())
@@ -505,8 +507,8 @@ var _ = Describe("workload placement namespace profiles", Label("tenant", "rules
 			g.Expect(k8sClient.Get(context.Background(), client.ObjectKey{Namespace: ns.Name, Name: meta.NameForManagedRuleStatus()}, status)).To(Succeed())
 			g.Expect(status.Status.Rules[0].Mutate).To(HaveLen(4))
 			g.Expect(status.Status.Rules[0].Mutate[1].Action).To(Equal(rules.MutationActionMerge))
-			g.Expect(status.Status.Rules[0].Mutate[1].Workloads.HostUsers).To(Equal(ptr.To(false)))
-			g.Expect(status.Status.Rules[0].Mutate[2].Workloads.HostUsers).To(Equal(ptr.To(true)))
+			g.Expect(status.Status.Rules[0].Mutate[1].Workloads.Security.HostUsers).To(Equal(ptr.To(false)))
+			g.Expect(status.Status.Rules[0].Mutate[2].Workloads.Security.HostUsers).To(Equal(ptr.To(true)))
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		for i, initial := range []*bool{nil, ptr.To(true), ptr.To(false)} {
 			pod := newPod(fmt.Sprintf("host-users-false-%d", i))
@@ -562,7 +564,7 @@ var _ = Describe("workload placement namespace profiles", Label("tenant", "rules
 		invalid := &unstructured.Unstructured{Object: values}
 		invalid.SetAPIVersion(capsulev1beta2.GroupVersion.String())
 		invalid.SetKind("Tenant")
-		Expect(unstructured.SetNestedSlice(invalid.Object, []any{map[string]any{"mutate": []any{map[string]any{"workloads": map[string]any{"hostUsers": "false"}}}}}, "spec", "rules")).To(Succeed())
+		Expect(unstructured.SetNestedSlice(invalid.Object, []any{map[string]any{"mutate": []any{map[string]any{"workloads": map[string]any{"security": map[string]any{"hostUsers": "false"}}}}}}, "spec", "rules")).To(Succeed())
 		err = k8sClient.Create(context.Background(), invalid)
 		// The typed mutation webhook decodes the request before CRD validation.
 		Expect(err).To(MatchError(And(ContainSubstring("hostUsers"), ContainSubstring("cannot unmarshal string"), ContainSubstring("type bool"))))

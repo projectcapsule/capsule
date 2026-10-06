@@ -46,7 +46,9 @@ type podRuleValidator struct {
 		[]*apirules.NamespaceRuleEnforceBody,
 	) (*ruleengine.Evaluation, error)
 	includeSubresources bool
-	changed             func(old, pod *corev1.Pod) bool
+	// When set, only this subresource and the main resource are evaluated.
+	subresource string
+	changed     func(old, pod *corev1.Pod) bool
 }
 
 type podRules struct {
@@ -61,6 +63,10 @@ func PodRules(
 	registryCache *cache.RegistryRuleSetCache,
 	compiler ruleengine.ConditionCompiler,
 ) handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod] {
+	return newPodRules(regexCache, registryCache, compiler)
+}
+
+func newPodRules(regexCache *cache.RegexCache, registryCache *cache.RegistryRuleSetCache, compiler ruleengine.ConditionCompiler) *podRules {
 	if regexCache == nil {
 		regexCache = cache.NewRegexCache()
 	}
@@ -76,6 +82,8 @@ func PodRules(
 	}
 
 	h.rules = []podRuleValidator{
+		{evaluate: h.validateSeccompProfiles, includeSubresources: true, subresource: "ephemeralcontainers"},
+		{evaluate: h.validateAppArmorProfiles, includeSubresources: true, subresource: "ephemeralcontainers"},
 		{evaluate: h.validateNodeSelectors, changed: func(old, pod *corev1.Pod) bool {
 			return !equality.Semantic.DeepEqual(old.Spec.NodeSelector, pod.Spec.NodeSelector)
 		}},
@@ -161,10 +169,21 @@ func (h *podRules) validatePodRules(
 	enforceBodies []*apirules.NamespaceRuleEnforceBody,
 	old ...*corev1.Pod,
 ) error {
+	enforceBodies = ruleengine.WorkloadEnforcement(enforceBodies, corev1.SchemeGroupVersion.WithKind("Pod"))
+
+	return h.validateWorkloadRules(ctx, req, pod, pod, pod, tnt, recorder, enforceBodies, old...)
+}
+
+func (h *podRules) validateWorkloadRules(
+	ctx context.Context, req admission.Request, pod *corev1.Pod,
+	object client.Object, conditionObject any, tnt *capsulev1beta2.Tenant,
+	recorder events.EventRecorder, enforceBodies []*apirules.NamespaceRuleEnforceBody,
+	old ...*corev1.Pod,
+) error {
 	conditional := false
 
 	for _, body := range enforceBodies {
-		if body != nil && len(body.Conditions) > 0 && hasWorkloadPolicy(body.Workloads, req.SubResource) {
+		if body != nil && len(body.Conditions) > 0 && hasWorkloadPolicy(body.Workloads, req.SubResource, pod == nil || pod.Spec.OS == nil || pod.Spec.OS.Name != corev1.Windows) {
 			conditional = true
 
 			break
@@ -175,9 +194,9 @@ func (h *podRules) validatePodRules(
 
 	var err error
 
-	enforceBodies, err = ruleengine.FilterEnforcementConditions(ctx, evaluator, pod, enforceBodies,
+	enforceBodies, err = ruleengine.FilterEnforcementConditions(ctx, evaluator, conditionObject, enforceBodies,
 		func(body *apirules.NamespaceRuleEnforceBody) bool {
-			return hasWorkloadPolicy(body.Workloads, req.SubResource)
+			return hasWorkloadPolicy(body.Workloads, req.SubResource, pod == nil || pod.Spec.OS == nil || pod.Spec.OS.Name != corev1.Windows)
 		})
 	if err != nil {
 		return fmt.Errorf("enforce: %w", err)
@@ -189,6 +208,10 @@ func (h *podRules) validatePodRules(
 		}
 
 		if req.SubResource != "" && !rule.includeSubresources {
+			continue
+		}
+
+		if req.SubResource != "" && rule.subresource != "" && req.SubResource != rule.subresource {
 			continue
 		}
 
@@ -205,7 +228,7 @@ func (h *podRules) validatePodRules(
 		// but it must never influence allow/deny decisions.
 		for _, audit := range evaluation.Audits {
 			recorder.LabeledEvent(
-				pod,
+				object,
 				corev1.EventTypeNormal,
 				events.ReasonNamespaceRuleAudit,
 				events.ActionRuleAudit,
@@ -222,7 +245,7 @@ func (h *podRules) validatePodRules(
 
 			if errors.As(err, &decisionErr) && decisionErr.Decision != nil {
 				recorder.LabeledEvent(
-					pod,
+					object,
 					corev1.EventTypeWarning,
 					decisionErr.Decision.EventReason,
 					events.ActionValidationDenied,
@@ -242,11 +265,15 @@ func (h *podRules) validatePodRules(
 }
 
 // Placement and resource policies do not run on subresources.
-func hasWorkloadPolicy(body apirules.NamespaceRuleEnforceWorkloadsBody, subresource string) bool {
-	if len(body.Schedulers) > 0 || len(body.QoSClasses) > 0 || len(body.Registries) > 0 {
+func hasWorkloadPolicy(body apirules.NamespaceRuleEnforceWorkloadsBody, subresource string, linux bool) bool {
+	if linux && (subresource == "" || subresource == "ephemeralcontainers") && (len(body.Security.SeccompProfiles) > 0 || len(body.Security.AppArmorProfiles) > 0) {
 		return true
 	}
 
-	return subresource == "" && (len(body.NodeSelector) > 0 || len(body.Tolerations) > 0 ||
-		len(body.TopologySpreadConstraints) > 0 || len(body.Affinity) > 0 || body.Resources != nil)
+	if len(body.Placement.Schedulers) > 0 || len(body.QoSClasses) > 0 || len(body.Registries) > 0 {
+		return true
+	}
+
+	return subresource == "" && (len(body.Placement.NodeSelector) > 0 || len(body.Placement.Tolerations) > 0 ||
+		len(body.Placement.TopologySpreadConstraints) > 0 || len(body.Placement.Affinity) > 0 || body.Resources != nil)
 }

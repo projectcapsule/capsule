@@ -109,9 +109,14 @@ func TestManagedMetadataAdmissionRespectsAudience(t *testing.T) {
 					name         string
 					user         authenticationv1.UserInfo
 					key, value   string
+					managedLabel string
 					wantBlocking bool
 				}{
 					{name: "matching user", user: alice, key: "example.corp/alice", value: "alice"},
+					{name: "forged controller label", user: alice, key: "example.corp/rogue", value: "forbidden", managedLabel: meta.ValueController, wantBlocking: true},
+					{name: "forged resources label", user: alice, key: "example.corp/rogue", value: "forbidden", managedLabel: meta.ValueControllerResources, wantBlocking: true},
+					{name: "replication marker does not exempt metadata", user: alice, key: "example.corp/rogue", value: "forbidden", managedLabel: meta.ValueControllerReplications, wantBlocking: true},
+					{name: "permit marker does not exempt metadata", user: alice, key: "example.corp/rogue", value: "forbidden", managedLabel: meta.ValueControllerResourcePermit, wantBlocking: true},
 					{name: "other user cannot inherit exemption", user: bob, key: "example.corp/alice", value: "alice", wantBlocking: true},
 					{name: "other user empty value", user: bob, key: "example.corp/alice", wantBlocking: true},
 					{name: "first audience shared value", user: alice, key: "example.corp/shared", value: "alice"},
@@ -126,6 +131,9 @@ func TestManagedMetadataAdmissionRespectsAudience(t *testing.T) {
 					t.Run(strings.Join([]string{kind, string(operation), field, tt.name}, "/"), func(t *testing.T) {
 						old := ns.DeepCopy()
 						obj := old.DeepCopy()
+						if tt.managedLabel != "" {
+							obj.Labels[meta.NewManagedByCapsuleLabel] = tt.managedLabel
+						}
 						if field == "labels" {
 							obj.Labels[tt.key] = tt.value
 						} else {
@@ -153,7 +161,7 @@ func TestManagedMetadataAdmissionRespectsAudience(t *testing.T) {
 								t.Fatal(err)
 							}
 							req.OldObject.Raw = raw
-							handler := genericvalidation.Register(cache.NewRegexCache(), cfg, nil).GetHandlers()[0]
+							handler := genericvalidation.Register(cache.NewRegexCache(), nil, cfg, nil, nil).GetHandlers()[0]
 							if operation == admissionv1.Create {
 								response = handler.OnCreate(cl, cl, decoder, recorder)(t.Context(), req)
 							} else {

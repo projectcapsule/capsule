@@ -1,0 +1,26 @@
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: pdb-example
+spec:
+  owners:
+    - kind: User
+      name: alice
+  rules:
+    - namespaceSelector:
+        matchLabels:
+          workload-profile: production
+      enforce:
+        action: allow
+        workloads:
+          targets:
+            - pod
+            - deployment
+            - statefulset
+          disruptionBudgets:
+            allowOverlap: false
+            evictableReplicas:
+              min: 1
+              max: 2
+            unhealthyPodEvictionPolicies:
+              - AlwaysAllow

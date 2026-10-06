@@ -8,6 +8,12 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"unicode/utf8"
+)
+
+const (
+	MaxExpressionMatchExactValues = 64
+	MaxExpressionRegexLength      = 4096
 )
 
 // At least one of Exact or Exp must be set.
@@ -20,6 +26,7 @@ type ExpressionMatch struct {
 	// Exact matches one of the provided values exactly.
 	//
 	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=64
 	// +kubebuilder:validation:Items:MinLength=1
 	// +optional
 	Exact []string `json:"exact,omitempty"`
@@ -29,6 +36,7 @@ type ExpressionRegex struct {
 	// Exp matches regular expression.
 	//
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=4096
 	// +optional
 	Expression string `json:"exp,omitempty"`
 	// Negate regular Expression
@@ -38,6 +46,20 @@ type ExpressionRegex struct {
 
 type ExpressionRegexMatcher interface {
 	MatchRegex(expression ExpressionRegex, value string) (bool, error)
+}
+
+// ValidateLimits checks policy size limits without compiling the expression.
+// Length is measured in Unicode characters to match Kubernetes schema validation.
+func (m ExpressionMatch) ValidateLimits(fieldPath string) error {
+	if len(m.Exact) > MaxExpressionMatchExactValues {
+		return fmt.Errorf("%s.exact: at most %d values are supported", fieldPath, MaxExpressionMatchExactValues)
+	}
+
+	if len(m.Expression) > MaxExpressionRegexLength && utf8.RuneCountInString(m.Expression) > MaxExpressionRegexLength {
+		return fmt.Errorf("%s.exp: at most %d characters are supported", fieldPath, MaxExpressionRegexLength)
+	}
+
+	return nil
 }
 
 func (m ExpressionMatch) Matches(value string) (bool, error) {

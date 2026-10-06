@@ -90,13 +90,23 @@ func collectRegexExpressionsFromNamespaceRule(
 		set[cache.HashRegex(expr)] = expr
 	}
 
-	for _, scheduler := range rule.Enforce.Workloads.Schedulers {
+	for _, scheduler := range rule.Enforce.Workloads.Placement.Schedulers {
 		expr := scheduler.ExpressionRegex
 		if expr.Expression == "" {
 			continue
 		}
 
 		set[cache.HashRegex(expr)] = expr
+	}
+
+	for _, profiles := range [][]rules.WorkloadSecurityProfileMatch{rule.Enforce.Workloads.Security.SeccompProfiles, rule.Enforce.Workloads.Security.AppArmorProfiles} {
+		for _, profile := range profiles {
+			for _, match := range profile.LocalhostProfiles {
+				if match.Expression != "" {
+					set[cache.HashRegex(match.ExpressionRegex)] = match.ExpressionRegex
+				}
+			}
+		}
 	}
 
 	for _, metadataRule := range rule.Enforce.Metadata {

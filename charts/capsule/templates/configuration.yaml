@@ -314,6 +314,7 @@ spec:
               - resource.k8s.io
             apiVersions:
               - v1
+              - v1beta2
             operations:
               - CREATE
               - UPDATE
@@ -1374,8 +1375,8 @@ spec:
         {{- with $.Values.webhooks.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-          - name: mutations-ignore-subresources
-            expression: '!has(request.subResource) || request.subResource == ""'
+          - name: mutations-supported-subresources
+            expression: '!has(request.subResource) || request.subResource == "" || (request.subResource == "ephemeralcontainers" && request.operation == "UPDATE" && request.resource.group == "" && request.resource.resource == "pods")'
         rules:
           {{- toYaml .rules | nindent 10 }}
         sideEffects: None

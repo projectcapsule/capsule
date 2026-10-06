@@ -1530,6 +1530,7 @@ webhooks:
             operator: In
             values:
               - "controller"
+              - "resources"
       # @schema type: object
       # @schema additionalProperties: true
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
@@ -1549,6 +1550,19 @@ webhooks:
           resources:
             - '*'
           scope: "Namespaced"
+        # Namespace metadata uses the same generic enforcement rules. Protect
+        # both managed label values here too, excluding lifecycle subresources.
+        - apiGroups:
+            - ""
+          apiVersions:
+            - v1
+          operations:
+            - CREATE
+            - UPDATE
+            - DELETE
+          resources:
+            - namespaces
+          scope: "Cluster"
         # Rule-generated GlobalResourceQuotas carry the managed-by label and
         # must receive the same drift protection as namespaced managed objects.
         # The status subresource is intentionally not included.

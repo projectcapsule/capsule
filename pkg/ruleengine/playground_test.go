@@ -43,11 +43,14 @@ func TestPlaygroundPlacementExamples(t *testing.T) {
 		t.Fatal("placement must select test profile")
 	}
 	recorder := events.NewEventRecorder(nil, logr.Discard(), nil, nil)
-	for _, name := range []string{"default", "shared", "denied"} {
+	for _, name := range []string{"default", "shared", "shared-custom", "denied"} {
 		t.Run(name, func(t *testing.T) {
 			fixture := name
 			if name == "denied" {
 				fixture = "default"
+			}
+			if name == "shared-custom" {
+				fixture = "shared"
 			}
 			data, err := os.ReadFile("../../playground/user/solar/placement/" + fixture + ".yaml")
 			if err != nil {
@@ -56,6 +59,16 @@ func TestPlaygroundPlacementExamples(t *testing.T) {
 			pod := &corev1.Pod{}
 			if err := yaml.UnmarshalStrict(data, pod); err != nil {
 				t.Fatal(err)
+			}
+			// Admission receives the Kubernetes scheduler default even when omitted in YAML.
+			pod.Spec.SchedulerName = corev1.DefaultSchedulerName
+			wantScheduler := corev1.DefaultSchedulerName
+			if name == "shared" {
+				wantScheduler = "solar-shared-scheduler"
+			}
+			if name == "shared-custom" {
+				pod.Spec.SchedulerName = "custom-scheduler"
+				wantScheduler = "custom-scheduler"
 			}
 			if name == "denied" {
 				pod.Spec.NodeSelector = map[string]string{"kubernetes.io/os": "windows"}
@@ -90,7 +103,10 @@ func TestPlaygroundPlacementExamples(t *testing.T) {
 			if pod.Spec.NodeSelector["kubernetes.io/os"] != "linux" {
 				t.Fatal("missing linux default")
 			}
-			if name == "shared" && (pod.Spec.NodeSelector["placement.example.com/pool"] != "shared" || len(pod.Spec.Tolerations) != 1) {
+			if pod.Spec.SchedulerName != wantScheduler {
+				t.Fatalf("scheduler=%q want=%q", pod.Spec.SchedulerName, wantScheduler)
+			}
+			if fixture == "shared" && (pod.Spec.NodeSelector["placement.example.com/pool"] != "shared" || len(pod.Spec.Tolerations) != 1) {
 				t.Fatal("missing shared placement")
 			}
 			if name == "default" && len(pod.Spec.Tolerations) != 0 {

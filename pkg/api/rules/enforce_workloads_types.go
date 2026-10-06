@@ -10,42 +10,21 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/runtime"
 )
 
-// +kubebuilder:validation:Enum=pod;pod/initcontainers;pod/ephemeralcontainers;pod/containers;pod/volumes
-type WorkloadValidationTarget string
-
-const (
-	DeprecatedValidateImages WorkloadValidationTarget = "pod/images"
-
-	ValidatePod                 WorkloadValidationTarget = "pod"
-	ValidateInitContainers      WorkloadValidationTarget = "pod/initcontainers"
-	ValidateEphemeralContainers WorkloadValidationTarget = "pod/ephemeralcontainers"
-	ValidateContainers          WorkloadValidationTarget = "pod/containers"
-	ValidateVolumes             WorkloadValidationTarget = "pod/volumes"
-)
-
 // +kubebuilder:object:generate=true
 type NamespaceRuleEnforceWorkloadsBody struct {
-	// Define the enforcement targets this rule applies to.
-	// If empty, each webhook applies its own backwards-compatible default.
+	// DisruptionBudgets constrains PDB coverage of selected Pods and controller templates.
+	// Only whole-workload targets apply; omitted targets select Pods.
+	// +optional
+	DisruptionBudgets *WorkloadDisruptionBudgetRules `json:"disruptionBudgets,omitempty"`
+
+	// Targets selects native workloads and, optionally, parts of their Pod specs.
+	// With no workload policies, the action matches the selected kinds themselves.
+	// With policies, targets scopes those policies; it does not also match the kind.
+	// Omitted targets preserve Pod-only defaults. Controller targets are opt-in.
+	// Whole-controller targets include every compatible location in the Pod template.
+	// Existing pod and pod/* part targets retain their established policy scope.
 	// +optional
 	Targets []WorkloadValidationTarget `json:"targets,omitempty"`
-
-	// NodeSelector matches each node selector entry. Empty matchers match any entry.
-	// Placement rules apply to the pod target; allowing an entry does not require it.
-	// +optional
-	NodeSelector []WorkloadNodeSelectorMatch `json:"nodeSelector,omitempty"`
-
-	// Tolerations matches each toleration, including injected and wildcard tolerations.
-	// +optional
-	Tolerations []WorkloadTolerationMatch `json:"tolerations,omitempty"`
-
-	// TopologySpreadConstraints matches each complete spread constraint.
-	// +optional
-	TopologySpreadConstraints []WorkloadTopologySpreadMatch `json:"topologySpreadConstraints,omitempty"`
-
-	// Affinity matches each complete required or preferred affinity term.
-	// +optional
-	Affinity []WorkloadAffinityMatch `json:"affinity,omitempty"`
 
 	// Resources defines mutation and enforcement policies for Pod and container
 	// resource requests and limits. The workload targets select where the
@@ -53,7 +32,8 @@ type NamespaceRuleEnforceWorkloadsBody struct {
 	// locations: Pod-level resources, regular containers, and init containers.
 	// Resource names unsupported at Pod level still apply to compatible container
 	// locations.
-	// Mutation is applied when a Pod is created. Remove and MatchRequest manage
+	// Mutation is applied when a Pod is created, or when an explicitly targeted
+	// controller is created or updated (to its Pod template). Remove and MatchRequest manage
 	// explicit values, Default fills an absent value, and Ratio fills an absent
 	// limit from its request. An explicit Ratio violation is then handled by the
 	// enclosing allow, deny, or audit action.
@@ -71,13 +51,63 @@ type NamespaceRuleEnforceWorkloadsBody struct {
 	// +optional
 	Registries []OCIRegistry `json:"registries,omitempty"`
 
-	// Schedulers defines schedulerName matchers for Pod admission.
+	// Placement matches the Pod scheduler and scheduling constraints.
+	// +optional
+	Placement WorkloadPlacementEnforcement `json:"placement,omitzero"`
+
+	// Security matches effective Pod and container security profiles.
+	// +optional
+	Security WorkloadSecurityEnforcement `json:"security,omitzero"`
+}
+
+// WorkloadPlacementEnforcement contains matchers for Pod scheduling properties.
+// +kubebuilder:object:generate=true
+type WorkloadPlacementEnforcement struct {
+	// NodeSelector matches each node selector entry. Empty matchers match any entry.
+	// Placement rules apply to the pod target; allowing an entry does not require it.
+	// +optional
+	NodeSelector []WorkloadNodeSelectorMatch `json:"nodeSelector,omitempty"`
+
+	// Tolerations matches each toleration, including injected and wildcard tolerations.
+	// +optional
+	Tolerations []WorkloadTolerationMatch `json:"tolerations,omitempty"`
+
+	// TopologySpreadConstraints matches each complete spread constraint.
+	// +optional
+	TopologySpreadConstraints []WorkloadTopologySpreadMatch `json:"topologySpreadConstraints,omitempty"`
+
+	// Affinity matches each complete required or preferred affinity term.
+	// +optional
+	Affinity []WorkloadAffinityMatch `json:"affinity,omitempty"`
+
+	// Schedulers defines schedulerName matchers for selected Pods and Pod templates.
 	//
 	// The rule is evaluated against pod.spec.schedulerName.
 	// Empty schedulerName is ignored and is not normalized to default-scheduler.
 	//
 	// +optional
 	Schedulers []runtime.ExpressionMatch `json:"schedulers,omitempty"`
+}
+
+// WorkloadSecurityEnforcement contains matchers for effective security profiles.
+// +kubebuilder:object:generate=true
+type WorkloadSecurityEnforcement struct {
+	// SeccompProfiles matches effective Linux container profiles, resolving
+	// container overrides before Pod defaults. Privileged containers are Unconfined.
+	// Missing profiles do not match any type, so an allow-list rejects them.
+	// Omitted targets check regular, init and ephemeral containers; pod explicitly
+	// selects only the Pod default. Controller targets check their Pod templates.
+	// +optional
+	// +kubebuilder:validation:MaxItems=64
+	SeccompProfiles []WorkloadSecurityProfileMatch `json:"seccompProfiles,omitempty"`
+
+	// AppArmorProfiles matches effective Linux container profiles, including
+	// legacy AppArmor annotations before Pod defaults. It uses the same target
+	// and missing-profile semantics as SeccompProfiles. Privileged containers are
+	// Unconfined. Matching a Localhost name does not verify its installation.
+	// +optional
+	// +kubebuilder:validation:MaxItems=64
+	AppArmorProfiles []WorkloadSecurityProfileMatch `json:"appArmorProfiles,omitempty"`
 }
 
 type WorkloadResourceRequestPolicyType string

@@ -22,6 +22,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/ruleengine"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	"github.com/projectcapsule/capsule/pkg/runtime/workloads"
 )
 
 type metadataRules struct{ compiler ruleengine.ConditionCompiler }
@@ -31,18 +32,18 @@ func MetadataRules(compiler ruleengine.ConditionCompiler) handlers.TypedHandlerW
 }
 
 func (h *metadataRules) OnCreate(_ client.Client, _ client.Reader, obj *unstructured.Unstructured, _ admission.Decoder, _ events.EventRecorder, _ *capsulev1beta2.Tenant, bodies []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
-	return h.mutate(obj, bodies)
+	return h.mutate(obj, nil, bodies)
 }
 
-func (h *metadataRules) OnUpdate(_ client.Client, _ client.Reader, _ *unstructured.Unstructured, obj *unstructured.Unstructured, _ admission.Decoder, _ events.EventRecorder, _ *capsulev1beta2.Tenant, bodies []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
-	return h.mutate(obj, bodies)
+func (h *metadataRules) OnUpdate(_ client.Client, _ client.Reader, old *unstructured.Unstructured, obj *unstructured.Unstructured, _ admission.Decoder, _ events.EventRecorder, _ *capsulev1beta2.Tenant, bodies []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
+	return h.mutate(obj, old, bodies)
 }
 
 func (*metadataRules) OnDelete(client.Client, client.Reader, *unstructured.Unstructured, admission.Decoder, events.EventRecorder, *capsulev1beta2.Tenant, []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response { return nil }
 }
 
-func (h *metadataRules) mutate(obj *unstructured.Unstructured, bodies []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
+func (h *metadataRules) mutate(obj, old *unstructured.Unstructured, bodies []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		gvk := schema.GroupVersionKind{Group: req.Kind.Group, Version: req.Kind.Version, Kind: req.Kind.Kind}
 		if gvk.Version == "" || gvk.Kind == "" {
@@ -52,11 +53,24 @@ func (h *metadataRules) mutate(obj *unstructured.Unstructured, bodies []*apirule
 		}
 
 		conditions := ruleengine.NewConditionEvaluator(h.compiler, req.AdmissionRequest)
-		mutateResources := req.Operation == admissionv1.Create && req.SubResource == "" && gvk == corev1.SchemeGroupVersion.WithKind("Pod")
+
+		if req.SubResource != "" {
+			if req.SubResource != "ephemeralcontainers" || req.Operation != admissionv1.Update || gvk != corev1.SchemeGroupVersion.WithKind("Pod") {
+				return nil
+			}
+
+			changed, err := mutateEphemeralContainers(ctx, obj, old, bodies, conditions)
+
+			return mutationResponse(obj, req, changed, err)
+		}
+
+		mutateResources := req.SubResource == "" && ((req.Operation == admissionv1.Create && gvk == corev1.SchemeGroupVersion.WithKind("Pod")) || len(workloads.PodTemplatePath(gvk)) > 0)
 
 		filtered, err := ruleengine.FilterNamespaceEnforcementConditions(ctx, conditions, obj, bodies,
 			func(body *apirules.NamespaceRuleEnforceBody) bool {
-				return hasMetadataMutation(gvk, body) || (mutateResources && body.Workloads.Resources != nil)
+				_, matches := body.Workloads.PodTargets(gvk)
+
+				return hasMetadataMutation(gvk, body) || (mutateResources && matches && body.Workloads.Resources != nil)
 			})
 		if err != nil {
 			response := admission.Errored(http.StatusInternalServerError, err)
@@ -79,21 +93,31 @@ func (h *metadataRules) mutate(obj *unstructured.Unstructured, bodies []*apirule
 			}
 		}
 
-		if !metadataMutated && !resourcesMutated {
-			return nil
-		}
+		return mutationResponse(obj, req, metadataMutated || resourcesMutated, nil)
+	}
+}
 
-		marshaled, err := json.Marshal(obj)
-		if err != nil {
-			response := admission.Errored(http.StatusInternalServerError, err)
-
-			return &response
-		}
-
-		response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
+func mutationResponse(obj *unstructured.Unstructured, req admission.Request, changed bool, err error) *admission.Response {
+	if err != nil {
+		response := admission.Errored(http.StatusInternalServerError, err)
 
 		return &response
 	}
+
+	if !changed {
+		return nil
+	}
+
+	marshaled, err := json.Marshal(obj)
+	if err != nil {
+		response := admission.Errored(http.StatusInternalServerError, err)
+
+		return &response
+	}
+
+	response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
+
+	return &response
 }
 
 // HasMetadataMutation reports whether any rule can default or manage metadata

@@ -19,6 +19,10 @@ design and follow the conventions of the package you are changing.
   types, helpers, handlers, controllers, caches, and test fixtures wherever possible.
 - Every change requires unit tests and end-to-end (e2e) tests. Add or extend coverage
   for the changed behavior; an unrelated passing suite is insufficient.
+- Cover application behavior with handler/controller unit tests and tenant e2e
+  scenarios. Do not add or expand chart tests or edit chart README files unless
+  the user explicitly requests them; chart configuration changes alone do not
+  require those additions.
 - Every e2e change must cover positive and negative cases with one or more real
   Tenant objects present. Add multiple tenants whenever isolation or shared state
   is involved.
@@ -203,8 +207,9 @@ Kubernetes write.
   defaulting, dry-run behavior, and configured failure policies. Performance work
   must not weaken tenant isolation or bypass required validation.
 - Align webhook registration, match conditions, selectors, operation/resource
-  filters, and chart configuration with the handler behavior. Test both requests
-  that should reach the webhook and those that should be excluded.
+  filters, and chart configuration with the handler behavior. Use handler unit
+  tests and scoped e2e to cover requests that should reach the webhook and those
+  that should be excluded. Do not infer a requirement to add chart tests.
 
 ### Bound work on every request
 
@@ -493,8 +498,9 @@ and `go.mod` instead of independently selecting newer tools.
 | Local e2e cleanup | `make e2e-destroy` or `make e2e-destroy-openshift` after preserving observations and completing the relevant run. |
 | Focused benchmarks | `go test ./path/to/changed/package -run '^$' -bench 'BenchmarkName' -benchmem -count=5` (replace path/name). |
 | Existing benchmark examples | `go test ./pkg/tenant ./internal/controllers/resources -run '^$' -bench . -benchmem -count=5`. |
-| Chart checks | `make helm-lint`; use `make helm-test` for installation behavior. |
-| Chart documentation/schema | `make helm-docs` and `make helm-schema` when chart values or documentation change. |
+| Existing chart checks | `make helm-lint`; use `make helm-test` for installation behavior. Running existing checks does not require adding chart tests. |
+| Chart schema | `make helm-schema` when the values schema needs updating. |
+| Chart documentation | Only when explicitly requested: edit `charts/capsule/README.md.gotmpl` and run `make helm-docs`. Do not automatically regenerate README values tables for chart configuration changes. |
 | Diff hygiene | `git diff --check` and review the full diff, including new files. |
 
 Do not use `go test ./...` as a unit-only shortcut: `e2e/` contains a suite that uses
@@ -555,10 +561,12 @@ declare the change fully validated while required evidence is missing.
   `zz_generated.deepcopy.go` or generated CRDs under `charts/capsule/crds/`.
 - Keep API types, defaults/validation, conversions, CRDs, RBAC, webhook rules, and
   tests consistent. Review generated changes for unintended schema/default changes.
-- Update chart values, templates, schema, and documentation together when affected.
-  Edit `charts/capsule/README.md.gotmpl` and regenerate its README. Follow
-  `DEVELOPMENT.md` for chart changelog annotations; release version bumps belong to
-  the release process.
+- Keep functional chart values, templates, and schema consistent when affected.
+  Do not add or expand chart tests, README prose, or generated README values tables
+  unless explicitly requested. Chart changes do not automatically require README
+  updates. When documentation is requested, edit `charts/capsule/README.md.gotmpl`
+  and regenerate its README. Follow `DEVELOPMENT.md` for chart changelog annotations;
+  release version bumps belong to the release process.
 - Keep credentials, kubeconfigs, certificates/private keys, test artifacts, and
   benchmark output out of commits. Preserve unrelated local files.
 - Describe the resulting namespace profile behavior, rules API integration, reused

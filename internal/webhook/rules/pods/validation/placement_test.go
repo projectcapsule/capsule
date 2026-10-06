@@ -39,7 +39,7 @@ func TestPlacementEmptyMatchersAndOrdering(t *testing.T) {
 		TopologySpreadConstraints: []corev1.TopologySpreadConstraint{{TopologyKey: "zone", MaxSkew: 1, WhenUnsatisfiable: corev1.DoNotSchedule}},
 		Affinity:                  &corev1.Affinity{NodeAffinity: &corev1.NodeAffinity{RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{NodeSelectorTerms: []corev1.NodeSelectorTerm{{}}}}},
 	}}
-	policy := rules.NamespaceRuleEnforceWorkloadsBody{NodeSelector: []rules.WorkloadNodeSelectorMatch{{}}, Tolerations: []rules.WorkloadTolerationMatch{{}}, TopologySpreadConstraints: []rules.WorkloadTopologySpreadMatch{{}}, Affinity: []rules.WorkloadAffinityMatch{{}}}
+	policy := rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{NodeSelector: []rules.WorkloadNodeSelectorMatch{{}}, Tolerations: []rules.WorkloadTolerationMatch{{}}, TopologySpreadConstraints: []rules.WorkloadTopologySpreadMatch{{}}, Affinity: []rules.WorkloadAffinityMatch{{}}}}
 	for name, evaluate := range map[string]func(*corev1.Pod, []*rules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error){
 		"nodeSelector": h.validateNodeSelectors, "tolerations": h.validateTolerations, "topologySpreadConstraints": h.validateTopologySpread, "affinity": h.validateAffinity,
 	} {
@@ -85,7 +85,7 @@ func TestPlacementEmptyMatchersAndOrdering(t *testing.T) {
 
 func TestNodeSelectorRegexAndEveryEntry(t *testing.T) {
 	h := &podRules{regexCache: cache.NewRegexCache()}
-	bodies := []*rules.NamespaceRuleEnforceBody{placementRule(rules.ActionTypeAllow, rules.NamespaceRuleEnforceWorkloadsBody{NodeSelector: []rules.WorkloadNodeSelectorMatch{{Key: placementRegex(`^placement\.example\.com/`), Values: placementExact("shared")}}})}
+	bodies := []*rules.NamespaceRuleEnforceBody{placementRule(rules.ActionTypeAllow, rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{NodeSelector: []rules.WorkloadNodeSelectorMatch{{Key: placementRegex(`^placement\.example\.com/`), Values: placementExact("shared")}}}})}
 	for _, tc := range []struct {
 		key, value string
 		denied     bool
@@ -104,7 +104,7 @@ func TestNodeSelectorRegexAndEveryEntry(t *testing.T) {
 func TestTolerationMatchingSemantics(t *testing.T) {
 	h := &podRules{regexCache: cache.NewRegexCache()}
 	policy := rules.WorkloadTolerationMatch{WorkloadNodeSelectorMatch: rules.WorkloadNodeSelectorMatch{Key: placementExact("dedicated"), Values: placementExact("shared")}, Operators: []corev1.TolerationOperator{corev1.TolerationOpEqual}, Effects: []corev1.TaintEffect{corev1.TaintEffectNoExecute}, TolerationSeconds: &rules.TolerationDurationMatch{PlacementRange: rules.PlacementRange{Max: ptr.To(int64(300))}, AllowUnlimited: ptr.To(false)}}
-	bodies := []*rules.NamespaceRuleEnforceBody{placementRule(rules.ActionTypeAllow, rules.NamespaceRuleEnforceWorkloadsBody{Tolerations: []rules.WorkloadTolerationMatch{policy}})}
+	bodies := []*rules.NamespaceRuleEnforceBody{placementRule(rules.ActionTypeAllow, rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{Tolerations: []rules.WorkloadTolerationMatch{policy}}})}
 	base := corev1.Toleration{Key: "dedicated", Value: "shared", Effect: corev1.TaintEffectNoExecute, TolerationSeconds: ptr.To(int64(300))}
 	for _, tc := range []struct {
 		name   string
@@ -132,7 +132,7 @@ func TestTolerationMatchingSemantics(t *testing.T) {
 func TestTopologySpreadChecksEffectiveSelectors(t *testing.T) {
 	h := &podRules{regexCache: cache.NewRegexCache()}
 	policy := rules.WorkloadTopologySpreadMatch{TopologyKey: placementExact("zone"), MaxSkew: &rules.PlacementRange{Max: ptr.To(int64(2))}, LabelSelector: &rules.PlacementLabelSelectorMatch{Required: true, Requirements: []rules.PlacementRequirementMatch{{WorkloadNodeSelectorMatch: rules.WorkloadNodeSelectorMatch{Key: placementExact("app"), Values: placementExact("checkout")}, Operators: []corev1.NodeSelectorOperator{corev1.NodeSelectorOpIn}}}}}
-	bodies := []*rules.NamespaceRuleEnforceBody{placementRule(rules.ActionTypeAllow, rules.NamespaceRuleEnforceWorkloadsBody{TopologySpreadConstraints: []rules.WorkloadTopologySpreadMatch{policy}})}
+	bodies := []*rules.NamespaceRuleEnforceBody{placementRule(rules.ActionTypeAllow, rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{TopologySpreadConstraints: []rules.WorkloadTopologySpreadMatch{policy}}})}
 	for _, tc := range []struct {
 		name     string
 		selector *metav1.LabelSelector
@@ -166,7 +166,7 @@ func TestAffinityFlatMatchersAndTermBoundaries(t *testing.T) {
 	}
 	nodeRule := rules.WorkloadAffinityMatch{Types: []rules.PlacementAffinityType{rules.PlacementNodeAffinity}, Modes: []rules.PlacementAffinityMode{rules.PlacementAffinityRequired}, Requirements: []rules.PlacementRequirementMatch{requirement("zone")}}
 	podRule := rules.WorkloadAffinityMatch{Types: []rules.PlacementAffinityType{rules.PlacementPodAffinity, rules.PlacementPodAntiAffinity}, Modes: []rules.PlacementAffinityMode{rules.PlacementAffinityPreferred}, NamespaceScope: rules.PlacementSameNamespace, TopologyKey: placementExact("host"), LabelSelector: &rules.PlacementLabelSelectorMatch{Required: true, Requirements: []rules.PlacementRequirementMatch{requirement("app")}}}
-	bodies := []*rules.NamespaceRuleEnforceBody{placementRule(rules.ActionTypeAllow, rules.NamespaceRuleEnforceWorkloadsBody{Affinity: []rules.WorkloadAffinityMatch{nodeRule, podRule}})}
+	bodies := []*rules.NamespaceRuleEnforceBody{placementRule(rules.ActionTypeAllow, rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{Affinity: []rules.WorkloadAffinityMatch{nodeRule, podRule}}})}
 	term := corev1.PodAffinityTerm{TopologyKey: "host", LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "checkout"}}}
 	base := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "team"}, Spec: corev1.PodSpec{Affinity: &corev1.Affinity{PodAffinity: &corev1.PodAffinity{PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{{Weight: 50, PodAffinityTerm: term}}}, PodAntiAffinity: &corev1.PodAntiAffinity{PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{{Weight: 100, PodAffinityTerm: term}}}}}}
 	for _, tc := range []struct {
@@ -203,7 +203,7 @@ func TestAffinityFlatMatchersAndTermBoundaries(t *testing.T) {
 	// Two alternatives cannot each authorize half of the same node selector term.
 	nodeOther := nodeRule
 	nodeOther.Requirements = []rules.PlacementRequirementMatch{requirement("disk")}
-	bodies[0].Workloads.Affinity = append(bodies[0].Workloads.Affinity, nodeOther)
+	bodies[0].Workloads.Placement.Affinity = append(bodies[0].Workloads.Placement.Affinity, nodeOther)
 	pod := &corev1.Pod{Spec: corev1.PodSpec{Affinity: &corev1.Affinity{NodeAffinity: &corev1.NodeAffinity{RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{NodeSelectorTerms: []corev1.NodeSelectorTerm{{MatchExpressions: []corev1.NodeSelectorRequirement{{Key: "zone", Operator: corev1.NodeSelectorOpIn, Values: []string{"a"}}, {Key: "disk", Operator: corev1.NodeSelectorOpIn, Values: []string{"ssd"}}}}}}}}}}
 	result, err := h.validateAffinity(pod, bodies)
 	if err != nil || result.BlockingError() == nil {
@@ -219,7 +219,7 @@ func TestAffinityFlatMatchersAndTermBoundaries(t *testing.T) {
 func TestPlacementValidationSkipsUnchangedUpdatesAndSubresources(t *testing.T) {
 	h := PodRules(nil, nil, nil).(*podRules)
 	pod := &corev1.Pod{Spec: corev1.PodSpec{Tolerations: []corev1.Toleration{{Operator: corev1.TolerationOpExists}}}}
-	bodies := []*rules.NamespaceRuleEnforceBody{placementRule(rules.ActionTypeDeny, rules.NamespaceRuleEnforceWorkloadsBody{Tolerations: []rules.WorkloadTolerationMatch{{}}})}
+	bodies := []*rules.NamespaceRuleEnforceBody{placementRule(rules.ActionTypeDeny, rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{Tolerations: []rules.WorkloadTolerationMatch{{}}}})}
 	if err := h.validatePodRules(context.Background(), admission.Request{}, pod, nil, nil, bodies, pod.DeepCopy()); err != nil {
 		t.Fatalf("unrelated update rejected: %v", err)
 	}
@@ -236,7 +236,7 @@ func BenchmarkPlacementValidation(b *testing.B) {
 				h := &podRules{regexCache: cache.NewRegexCache()}
 				var bodies []*rules.NamespaceRuleEnforceBody
 				for i := 0; i < count; i++ {
-					bodies = append(bodies, placementRule(rules.ActionTypeAllow, rules.NamespaceRuleEnforceWorkloadsBody{NodeSelector: []rules.WorkloadNodeSelectorMatch{{Key: placementRegex(`^placement\.example\.com/`), Values: placementExact("shared")}}}))
+					bodies = append(bodies, placementRule(rules.ActionTypeAllow, rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{NodeSelector: []rules.WorkloadNodeSelectorMatch{{Key: placementRegex(`^placement\.example\.com/`), Values: placementExact("shared")}}}}))
 				}
 				value := "shared"
 				if denied {
@@ -265,9 +265,7 @@ func BenchmarkPlacementValidationRegexCache(b *testing.B) {
 	for _, mode := range []string{"cold", "warm", "invalidated", "parallel"} {
 		b.Run(mode, func(b *testing.B) {
 			h := &podRules{regexCache: cache.NewRegexCache()}
-			bodies := []*rules.NamespaceRuleEnforceBody{placementRule(rules.ActionTypeAllow, rules.NamespaceRuleEnforceWorkloadsBody{
-				NodeSelector: []rules.WorkloadNodeSelectorMatch{{Key: placementRegex(`^placement\.example\.com/`), Values: placementExact("shared")}},
-			})}
+			bodies := []*rules.NamespaceRuleEnforceBody{placementRule(rules.ActionTypeAllow, rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{NodeSelector: []rules.WorkloadNodeSelectorMatch{{Key: placementRegex(`^placement\.example\.com/`), Values: placementExact("shared")}}}})}
 			pod := &corev1.Pod{Spec: corev1.PodSpec{NodeSelector: map[string]string{"placement.example.com/pool": "shared"}}}
 			check := func() {
 				result, err := h.validateNodeSelectors(pod, bodies)

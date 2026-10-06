@@ -39,8 +39,8 @@ func TestGenericRules(t *testing.T) {
 		t.Fatalf("expected regex cache")
 	}
 
-	if len(h.rules) != 1 {
-		t.Fatalf("expected one generic validator, got %d", len(h.rules))
+	if len(h.rules) != 2 {
+		t.Fatalf("expected metadata and workload type validators, got %d", len(h.rules))
 	}
 
 	if !h.managedMetadata.HasLabel(meta.TenantLabel) {
@@ -225,7 +225,7 @@ func TestValidateGenericRules(t *testing.T) {
 		}
 	})
 
-	t.Run("skips controller managed objects before validators", func(t *testing.T) {
+	t.Run("does not skip managed objects without a controller request identity", func(t *testing.T) {
 		t.Parallel()
 
 		called := false
@@ -282,8 +282,8 @@ func TestValidateGenericRules(t *testing.T) {
 			t.Fatalf("expected no error, got %v", err)
 		}
 
-		if called {
-			t.Fatalf("validator must not be called for skipped object")
+		if !called {
+			t.Fatalf("validator must be called for an unauthenticated managed object")
 		}
 	})
 
