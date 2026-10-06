@@ -20,9 +20,11 @@ design and follow the conventions of the package you are changing.
 - Every change requires unit tests and end-to-end (e2e) tests. Add or extend coverage
   for the changed behavior; an unrelated passing suite is insufficient.
 - Cover application behavior with handler/controller unit tests and tenant e2e
-  scenarios. Do not add or expand chart tests or edit chart README files unless
-  the user explicitly requests them; chart configuration changes alone do not
-  require those additions.
+  scenarios. Do not add or expand chart tests unless the user explicitly requests
+  them; chart configuration changes alone do not require those additions.
+- Do not create, edit, or regenerate repository Markdown documentation unless the
+  user explicitly requests it. Report implementation details, performance evidence,
+  and review findings in the response or PR instead.
 - Every e2e change must cover positive and negative cases with one or more real
   Tenant objects present. Add multiple tenants whenever isolation or shared state
   is involved.
@@ -307,7 +309,7 @@ workloads, representative rule/object sizes, and cache/concurrency states. Inclu
 counting-reader/client tests when lookup behavior changes.
 
 Report timing, allocations, API-call changes, and scaling behavior. Fix regressions
-or explicitly document their measured cost and the required correctness tradeoff
+or explicitly report their measured cost and the required correctness tradeoff
 for review; do not silently accept them. If API round trips, contention, or webhook
 selection changes, also validate with a real-cluster workload. Fake-client benchmark
 timings alone cannot establish production admission latency.
@@ -500,7 +502,6 @@ and `go.mod` instead of independently selecting newer tools.
 | Existing benchmark examples | `go test ./pkg/tenant ./internal/controllers/resources -run '^$' -bench . -benchmem -count=5`. |
 | Existing chart checks | `make helm-lint`; use `make helm-test` for installation behavior. Running existing checks does not require adding chart tests. |
 | Chart schema | `make helm-schema` when the values schema needs updating. |
-| Chart documentation | Only when explicitly requested: edit `charts/capsule/README.md.gotmpl` and run `make helm-docs`. Do not automatically regenerate README values tables for chart configuration changes. |
 | Diff hygiene | `git diff --check` and review the full diff, including new files. |
 
 Do not use `go test ./...` as a unit-only shortcut: `e2e/` contains a suite that uses
@@ -562,11 +563,8 @@ declare the change fully validated while required evidence is missing.
 - Keep API types, defaults/validation, conversions, CRDs, RBAC, webhook rules, and
   tests consistent. Review generated changes for unintended schema/default changes.
 - Keep functional chart values, templates, and schema consistent when affected.
-  Do not add or expand chart tests, README prose, or generated README values tables
-  unless explicitly requested. Chart changes do not automatically require README
-  updates. When documentation is requested, edit `charts/capsule/README.md.gotmpl`
-  and regenerate its README. Follow `DEVELOPMENT.md` for chart changelog annotations;
-  release version bumps belong to the release process.
+  Do not add or expand chart tests unless explicitly requested. Release version
+  bumps belong to the release process.
 - Keep credentials, kubeconfigs, certificates/private keys, test artifacts, and
   benchmark output out of commits. Preserve unrelated local files.
 - Describe the resulting namespace profile behavior, rules API integration, reused

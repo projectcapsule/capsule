@@ -88,7 +88,7 @@ func lifecycleAdmissionFixture(t testing.TB, count int, mode string) (func(conte
 	handler := func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.OnCreate(cl, cl, decoder, nil)(ctx, req)
 	}
-	if mode == "terminating-existing-update" || mode == "terminating-migration" {
+	if mode == "active-existing-update" || mode == "terminating-existing-update" || mode == "terminating-migration" {
 		old := ns.DeepCopy()
 		if mode == "terminating-migration" {
 			old = &corev1.Namespace{Name: ns.Name}
@@ -107,7 +107,7 @@ func lifecycleAdmissionFixture(t testing.TB, count int, mode string) (func(conte
 }
 
 func TestNamespaceAssignmentLifecycle(t *testing.T) {
-	for _, mode := range []string{"active", "unprotected", "terminating", "terminating-recorded-name", "terminating-existing-update", "terminating-migration", "unmanaged"} {
+	for _, mode := range []string{"active", "active-existing-update", "unprotected", "terminating", "terminating-recorded-name", "terminating-existing-update", "terminating-migration", "unmanaged"} {
 		t.Run(mode, func(t *testing.T) {
 			handler, req, reads := lifecycleAdmissionFixture(t, 2, mode)
 			response := handler(t.Context(), req)
@@ -158,7 +158,7 @@ func TestNamespaceAssignmentLifecycleForTenantOwners(t *testing.T) {
 
 func BenchmarkNamespaceLifecycleAdmission(b *testing.B) {
 	for _, count := range []int{1, 1000} {
-		for _, mode := range []string{"active", "terminating", "unmanaged"} {
+		for _, mode := range []string{"active", "active-existing-update", "terminating", "unmanaged"} {
 			b.Run(fmt.Sprintf("tenants=%d/%s", count, mode), func(b *testing.B) {
 				handler, req, reads := lifecycleAdmissionFixture(b, count, mode)
 				b.ReportAllocs()

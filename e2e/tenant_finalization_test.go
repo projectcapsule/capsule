@@ -14,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
@@ -21,6 +22,127 @@ import (
 )
 
 var _ = Describe("Tenant finalization", Label("tenant", "termination", "tenant-finalization"), func() {
+	DescribeTable("allows Kubernetes to finish namespace deletion after the owning Tenant disappears", func(recreate bool) {
+		ctx := context.Background()
+		admin := clusterAdminClient()
+		name := "e2e-orphan-" + rand.String(6)
+		tenantA := &capsulev1beta2.Tenant{Name: name, Labels: map[string]string{"env": "e2e"}, Spec: capsulev1beta2.TenantSpec{Owners: rbac.OwnerListSpec{{Name: name, Kind: rbac.UserOwner}}}}
+		tenantB := &capsulev1beta2.Tenant{Name: name + "-other", Labels: map[string]string{"env": "e2e"}, Spec: capsulev1beta2.TenantSpec{Owners: rbac.OwnerListSpec{{Name: name + "-other", Kind: rbac.UserOwner}}}}
+		for _, tnt := range []*capsulev1beta2.Tenant{tenantA, tenantB} {
+			Expect(k8sClient.Create(ctx, tnt)).To(Succeed())
+			DeferCleanup(func() { EventuallyDeletion(tnt) })
+			TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
+		}
+		foreign := NewNamespace(name+"-foreign", map[string]string{meta.TenantLabel: tenantB.Name})
+		NamespaceCreation(foreign, tenantB.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceReady(tenantB, foreign, 1)
+		held := NewNamespace(name+"-held", map[string]string{meta.TenantLabel: tenantA.Name})
+		hold := corev1.FinalizerName("e2e.projectcapsule.dev/hold-namespace")
+		metadataHold := "e2e.projectcapsule.dev/hold-namespace-metadata"
+		held.Finalizers = []string{metadataHold}
+		held.Spec.Finalizers = []corev1.FinalizerName{corev1.FinalizerKubernetes, hold}
+		NamespaceCreation(held, tenantA.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceReady(tenantA, held, 1)
+		release := func() {
+			Eventually(func() error {
+				current, err := admin.CoreV1().Namespaces().Get(ctx, held.Name, metav1.GetOptions{})
+				if apierrors.IsNotFound(err) {
+					return nil
+				}
+				if err != nil {
+					return err
+				}
+				if controllerutil.RemoveFinalizer(current, metadataHold) {
+					if err := k8sClient.Update(ctx, current); err != nil {
+						return err
+					}
+				}
+				remaining := []corev1.FinalizerName{}
+				for _, finalizer := range current.Spec.Finalizers {
+					if finalizer != hold {
+						remaining = append(remaining, finalizer)
+					}
+				}
+				current.Spec.Finalizers = remaining
+				_, err = admin.CoreV1().Namespaces().Finalize(ctx, current, metav1.UpdateOptions{})
+				return err
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		}
+		DeferCleanup(release)
+		Expect(k8sClient.Delete(ctx, tenantA)).To(Succeed())
+		Eventually(func(g Gomega) {
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(held), held)).To(Succeed())
+			g.Expect(held.DeletionTimestamp).NotTo(BeNil())
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		By("reproducing the state of a namespace that persisted after its Tenant's final scan")
+		// Admission and namespace persistence are separate from Tenant finalization.
+		// Deliberately remove the deleting Tenant's finalizer as administrator to
+		// reproduce that ordering deterministically, without timing-dependent sleeps
+		// or changing webhook configuration shared with parallel tests.
+		Eventually(func() error {
+			current := &capsulev1beta2.Tenant{}
+			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(tenantA), current); err != nil {
+				return client.IgnoreNotFound(err)
+			}
+			controllerutil.RemoveFinalizer(current, meta.ControllerFinalizer)
+			return k8sClient.Update(ctx, current)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Eventually(func() bool {
+			return apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(tenantA), &capsulev1beta2.Tenant{}))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
+		var replacement *capsulev1beta2.Tenant
+		if recreate {
+			By("recreating the Tenant name with a different UID")
+			replacement = &capsulev1beta2.Tenant{Name: tenantA.Name, Labels: map[string]string{"env": "e2e"}, Spec: tenantA.Spec}
+			Expect(k8sClient.Create(ctx, replacement)).To(Succeed())
+			DeferCleanup(func() { EventuallyDeletion(replacement) })
+			Expect(replacement.UID).NotTo(Equal(tenantA.UID))
+			TenantReady(replacement, metav1.ConditionTrue, defaultTimeoutInterval)
+		}
+
+		By("rejecting tenant reassignment through the finalize subresource")
+		Eventually(func() error {
+			current, err := admin.CoreV1().Namespaces().Get(ctx, held.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			current.Labels[meta.TenantLabel] = tenantB.Name
+			current.OwnerReferences = []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: tenantB.Name, UID: tenantB.UID}}
+			_, err = admin.CoreV1().Namespaces().Finalize(ctx, current, metav1.UpdateOptions{})
+			if err == nil {
+				Fail("namespace ownership changed through the finalize subresource")
+			}
+			return err
+		}, defaultTimeoutInterval, defaultPollInterval).Should(MatchError(ContainSubstring("namespace tenant ownership can not change during termination")))
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(held), held)).To(Succeed())
+		Expect(held.Labels[meta.TenantLabel]).To(Equal(tenantA.Name))
+		Expect(held.OwnerReferences).To(ContainElement(HaveField("UID", tenantA.UID)))
+		Expect(held.Spec.Finalizers).To(ContainElement(hold))
+		Expect(held.Finalizers).To(ContainElement(metadataHold))
+
+		By("letting the namespace controller update status without its former Tenant")
+		Eventually(func(g Gomega) {
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(held), held)).To(Succeed())
+			g.Expect(held.Status.Phase).To(Equal(corev1.NamespaceTerminating))
+			g.Expect(held.Spec.Finalizers).NotTo(ContainElement(corev1.FinalizerKubernetes))
+		}, defaultTerminationTimeoutInterval, defaultPollInterval).Should(Succeed())
+		release()
+		Eventually(func() bool {
+			return apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(held), &corev1.Namespace{}))
+		}, defaultTerminationTimeoutInterval, defaultPollInterval).Should(BeTrue())
+		if replacement != nil {
+			current := &capsulev1beta2.Tenant{}
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(replacement), current)).To(Succeed())
+			Expect(current.UID).To(Equal(replacement.UID))
+			Expect(current.DeletionTimestamp).To(BeNil())
+		}
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(tenantB), tenantB)).To(Succeed())
+		Expect(tenantB.DeletionTimestamp).To(BeNil())
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(foreign), foreign)).To(Succeed())
+		Expect(foreign.DeletionTimestamp).To(BeNil())
+	}, Entry("missing Tenant", false), Entry("recreated Tenant", true))
+
 	It("retains an owner until its namespaces disappear even when namespace status is missing", func() {
 		ctx := context.Background()
 		admin := clusterAdminClient()
