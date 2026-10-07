@@ -81,6 +81,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/route"
 	rulesgenericmutation "github.com/projectcapsule/capsule/internal/webhook/rules/generic/mutation"
 	rulesgenericvalidation "github.com/projectcapsule/capsule/internal/webhook/rules/generic/validation"
+	networkpolicyrules "github.com/projectcapsule/capsule/internal/webhook/rules/networkpolicies/validation"
 	podrules "github.com/projectcapsule/capsule/internal/webhook/rules/pods/validation"
 	servicerules "github.com/projectcapsule/capsule/internal/webhook/rules/services/validation"
 	"github.com/projectcapsule/capsule/internal/webhook/service"
@@ -728,6 +729,7 @@ func main() {
 					servicerules.ServiceRules(regexCache, celCache),
 				),
 			),
+			networkpolicyrules.Handler(cfg, celCache),
 		),
 		route.GenericReplicasHandler(),
 		route.GenericManagedHandler(cfg),
