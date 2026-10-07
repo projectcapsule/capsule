@@ -43,7 +43,7 @@ annotations:
     - kind: fixed
       description: declare generic rule webhook side effects as NoneOnDryRun and suppress NetworkPolicy audit and denial Events for dry runs
     - kind: changed
-      description: use registry.k8s.io/kubectl as the default image for chart hooks
+      description: preserve clastix/kubectl as the default while supporting the official kubectl image
     - kind: added
       description: enforce PDB overlap, eviction allowance and unhealthy Pod policies through namespace workload rules
     - kind: added
