@@ -76,8 +76,6 @@ spec:
         - name: pre-delete-job
           image: {{ include "capsule.jobsFullyQualifiedDockerImage" . }}
           imagePullPolicy: {{ $Values.image.pullPolicy }}
-          command:
-          - /bin/kubectl
           args:
             - delete
             - --ignore-not-found=true

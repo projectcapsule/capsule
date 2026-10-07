@@ -81,8 +81,6 @@ spec:
         {{- if $Values.securityContext.enabled }}
         securityContext: {{- omit $Values.securityContext "enabled" | toYaml | nindent 10 }}
         {{- end }}
-        command:
-        - /bin/kubectl
         args:
         - apply
         - --server-side=true

@@ -76,8 +76,6 @@ spec:
       - name: tls-secret-created
         image: {{ include "capsule.jobsFullyQualifiedDockerImage" . }}
         imagePullPolicy: {{ $Values.image.pullPolicy }}
-        command:
-        - /bin/kubectl
         args:
         - wait
         - --for=create
@@ -95,8 +93,6 @@ spec:
       - name: tls
         image: {{ include "capsule.jobsFullyQualifiedDockerImage" . }}
         imagePullPolicy: {{ $Values.image.pullPolicy }}
-        command:
-        - /bin/kubectl
         args:
         - wait
         - '--for=jsonpath={.data.tls\.crt}'
