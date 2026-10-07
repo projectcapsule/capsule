@@ -44,7 +44,7 @@ var _ = Describe("NetworkPolicy egress CIDR namespace profiles", Label("tenant",
 			Rules: []*rules.NamespaceRuleBodyTenant{
 				profileRule("restricted", rules.ActionTypeDeny, "10.20.0.0/16", "fd00:1234::/48"),
 				profileRule("allowlist", rules.ActionTypeAllow, "192.0.2.0/25", "192.0.2.128/25"),
-				profileRule("audit", rules.ActionTypeAudit, "10.20.0.0/16"),
+				profileRule("audit", rules.ActionTypeAudit, "10.0.0.0/8", "10.20.0.0/16", "10.20.0.0/17"),
 				profileRule("conditional", rules.ActionTypeDeny, "10.20.0.0/16"),
 				profileRule("restricted", rules.ActionTypeDeny, "192.0.2.0/24"),
 			},
@@ -87,7 +87,7 @@ var _ = Describe("NetworkPolicy egress CIDR namespace profiles", Label("tenant",
 		restricted := newNS(a, "restricted", 1, "10.20.0.0/16", "fd00:1234::/48", "192.0.2.0/24")
 		other := newNS(a, "other", 2)
 		allowlist := newNS(a, "allowlist", 3, "192.0.2.0/25", "192.0.2.128/25")
-		audited := newNS(a, "audit", 4, "10.20.0.0/16")
+		audited := newNS(a, "audit", 4, "10.0.0.0/8", "10.20.0.0/16", "10.20.0.0/17")
 		conditional := newNS(a, "conditional", 5, "10.20.0.0/16")
 		isolated := newNS(b, "restricted", 1, "192.0.2.0/24")
 		policy := func(ns *corev1.Namespace, name, cidr string, except ...string) *networkingv1.NetworkPolicy {
@@ -162,6 +162,66 @@ var _ = Describe("NetworkPolicy egress CIDR namespace profiles", Label("tenant",
 			Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKey{Namespace: sample.ns.Name, Name: "latency-dry-run"}, &networkingv1.NetworkPolicy{}))).To(BeTrue())
 		}
 
+		By("keeping audit and deny dry runs free of Events on creation and updates")
+		for _, sample := range []struct {
+			ns     *corev1.Namespace
+			denied bool
+		}{{audited, false}, {restricted, true}} {
+			err := ownerA.Create(ctx, policy(sample.ns, "dry-create", "10.20.0.0/16"), client.DryRunAll)
+			if sample.denied {
+				Expect(err).To(MatchError(ContainSubstring("networkPolicy egress CIDR")))
+			} else {
+				Expect(err).NotTo(HaveOccurred())
+			}
+			Expect(apierrors.IsNotFound(ownerA.Get(ctx, client.ObjectKey{Namespace: sample.ns.Name, Name: "dry-create"}, &networkingv1.NetworkPolicy{}))).To(BeTrue())
+			original := policy(sample.ns, "dry-update", "192.0.2.0/24")
+			create(ownerA, original)
+			Eventually(func(g Gomega) {
+				current := &networkingv1.NetworkPolicy{}
+				g.Expect(ownerA.Get(ctx, client.ObjectKeyFromObject(original), current)).To(Succeed())
+				current.Spec.Egress[0].To[0].IPBlock.CIDR = "10.20.0.0/16"
+				err := ownerA.Update(ctx, current, client.DryRunAll)
+				if sample.denied {
+					if err == nil {
+						Fail("disallowed dry-run update succeeded")
+					}
+					g.Expect(err).To(MatchError(ContainSubstring("networkPolicy egress CIDR")))
+				} else {
+					g.Expect(err).NotTo(HaveOccurred())
+				}
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			Eventually(func(g Gomega) {
+				current := &networkingv1.NetworkPolicy{}
+				g.Expect(ownerA.Get(ctx, client.ObjectKeyFromObject(original), current)).To(Succeed())
+				g.Expect(current.Spec).To(Equal(original.Spec))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		}
+		Consistently(func(g Gomega) {
+			for _, ns := range []*corev1.Namespace{audited, restricted} {
+				list := &eventsv1.EventList{}
+				g.Expect(k8sClient.List(ctx, list, client.InNamespace(ns.Name))).To(Succeed())
+				for _, event := range list.Items {
+					if event.Regarding.Kind == "NetworkPolicy" {
+						g.Expect(event.Regarding.Name).NotTo(BeElementOf("dry-create", "dry-update", "latency-dry-run"))
+					}
+				}
+			}
+		}, 3*defaultPollInterval, defaultPollInterval).Should(Succeed())
+
+		By("subtracting large exception lists while preserving protected ranges")
+		large := policy(restricted, "large-exceptions", "10.0.0.0/8")
+		for i := range 8192 {
+			n := 2 * i
+			large.Spec.Egress[0].To[0].IPBlock.Except = append(large.Spec.Egress[0].To[0].IPBlock.Except, fmt.Sprintf("10.%d.%d.%d/32", n>>16, (n>>8)&255, n&255))
+		}
+		start := time.Now()
+		deny(ownerA, large.DeepCopy())
+		fmt.Fprintf(GinkgoWriter, "NetworkPolicy with 8192 exceptions denied in %s (API round trip)\n", time.Since(start))
+		large.Spec.Egress[0].To[0].IPBlock.Except = append(large.Spec.Egress[0].To[0].IPBlock.Except, "10.20.0.0/16")
+		start = time.Now()
+		create(ownerA, large)
+		fmt.Fprintf(GinkgoWriter, "NetworkPolicy with 8193 exceptions persisted in %s (API round trip plus verification)\n", time.Since(start))
+
 		By("rejecting updates without changing the persisted policy")
 		Eventually(func(g Gomega) {
 			current := &networkingv1.NetworkPolicy{}
@@ -178,17 +238,24 @@ var _ = Describe("NetworkPolicy egress CIDR namespace profiles", Label("tenant",
 		Expect(stored.Spec.Egress[0].To[0].IPBlock.CIDR).To(Equal("192.0.2.0/24"))
 
 		By("auditing matching grants and evaluating conditions on metadata updates")
-		create(ownerA, policy(audited, "audited", "10.20.0.0/16"))
+		auditPolicy := policy(audited, "audited", "10.20.0.0/16")
+		for range 7 {
+			auditPolicy.Spec.Egress[0].To = append(auditPolicy.Spec.Egress[0].To, auditPolicy.Spec.Egress[0].To[0])
+		}
+		create(ownerA, auditPolicy)
 		Eventually(func(g Gomega) {
 			list := &eventsv1.EventList{}
 			g.Expect(k8sClient.List(ctx, list, client.InNamespace(audited.Name))).To(Succeed())
-			found := false
+			messages := make(map[string]int)
 			for _, event := range list.Items {
 				if event.Reason == events.ReasonNamespaceRuleAudit && event.Regarding.Name == "audited" && event.Regarding.Kind == "NetworkPolicy" {
-					found = true
+					messages[event.Note]++
 				}
 			}
-			g.Expect(found).To(BeTrue())
+			g.Expect(messages).To(HaveLen(24), "three matching CIDRs for each of eight peers")
+			for _, count := range messages {
+				g.Expect(count).To(Equal(1), "audit once per peer/CIDR, not partition")
+			}
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		conditionalPolicy := policy(conditional, "conditional", "10.20.0.0/16")
 		create(ownerA, conditionalPolicy)

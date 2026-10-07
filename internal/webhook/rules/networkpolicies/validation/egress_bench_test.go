@@ -96,6 +96,7 @@ func BenchmarkEgressCIDRConcurrent(b *testing.B) {
 	obj := policy("0.0.0.0/0", "10.20.0.0/16")
 	bodies := []*rules.NamespaceRuleEnforceBody{cidrRule(rules.ActionTypeDeny, "10.20.0.0/16")}
 	b.ReportAllocs()
+	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			result, err := evaluate(b.Context(), obj, bodies)
@@ -104,4 +105,59 @@ func BenchmarkEgressCIDRConcurrent(b *testing.B) {
 			}
 		}
 	})
+}
+
+func BenchmarkEgressExceptions(b *testing.B) {
+	for _, count := range []int{512, 2048, 8192} {
+		b.Run(fmt.Sprint(count), func(b *testing.B) {
+			obj := exceptionPolicy(count)
+			bodies := []*rules.NamespaceRuleEnforceBody{cidrRule(rules.ActionTypeDeny, "192.0.2.0/24")}
+			b.ReportAllocs()
+			for b.Loop() {
+				result, err := evaluate(b.Context(), obj, bodies)
+				if err != nil || result.BlockingError() != nil {
+					b.Fatalf("unexpected result: %v, %v", result, err)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkEgressOverlappingAudits(b *testing.B) {
+	for _, count := range []int{16, 64} {
+		for _, peers := range []int{1, 8, 32} {
+			b.Run(fmt.Sprintf("cidrs=%d/peers=%d", count, peers), func(b *testing.B) {
+				obj, bodies := auditPolicy(count, peers)
+				b.ReportAllocs()
+				for b.Loop() {
+					result, err := evaluate(b.Context(), obj, bodies)
+					if err != nil || result.BlockingError() != nil || len(result.Audits) != count*peers {
+						b.Fatalf("unexpected audit result: %v, %v", result, err)
+					}
+				}
+			})
+		}
+	}
+}
+
+func BenchmarkEgressStressConcurrent(b *testing.B) {
+	for _, audit := range []bool{false, true} {
+		b.Run(fmt.Sprintf("audit=%v", audit), func(b *testing.B) {
+			obj := exceptionPolicy(8192)
+			bodies := []*rules.NamespaceRuleEnforceBody{cidrRule(rules.ActionTypeDeny, "192.0.2.0/24")}
+			if audit {
+				obj, bodies = auditPolicy(64, 8)
+			}
+			b.ReportAllocs()
+			b.ResetTimer()
+			b.RunParallel(func(pb *testing.PB) {
+				for pb.Next() {
+					result, err := evaluate(b.Context(), obj, bodies)
+					if err != nil || result.BlockingError() != nil {
+						b.Errorf("unexpected result: %v, %v", result, err)
+					}
+				}
+			})
+		})
+	}
 }

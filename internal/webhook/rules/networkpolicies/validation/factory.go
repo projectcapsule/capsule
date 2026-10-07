@@ -65,25 +65,22 @@ func (h *networkPolicyRules) validate(obj *networkingv1.NetworkPolicy, recorder 
 			return nil
 		}
 
-		// A peer can contain multiple address partitions. Emit each matching
-		// audit message once, rather than once per partition.
-		seen := make(map[string]struct{}, len(result.Audits))
-		for _, audit := range result.Audits {
-			if _, found := seen[audit.Message]; found {
-				continue
+		blocking := result.BlockingError()
+
+		if req.DryRun == nil || !*req.DryRun {
+			for _, audit := range result.Audits {
+				recorder.LabeledEvent(obj, corev1.EventTypeNormal, events.ReasonNamespaceRuleAudit, events.ActionRuleAudit, audit.Message).
+					WithRelated(tnt).WithTenantLabel(tnt).WithRequestAnnotations(req).Emit(ctx)
 			}
 
-			seen[audit.Message] = struct{}{}
-
-			recorder.LabeledEvent(obj, corev1.EventTypeNormal, events.ReasonNamespaceRuleAudit, events.ActionRuleAudit, audit.Message).
-				WithRelated(tnt).WithTenantLabel(tnt).WithRequestAnnotations(req).Emit(ctx)
+			if blocking != nil {
+				recorder.LabeledEvent(obj, corev1.EventTypeWarning, events.ReasonForbiddenNetworkPolicyEgressCIDR, events.ActionValidationDenied, blocking.Error()).
+					WithRelated(tnt).WithTenantLabel(tnt).WithRequestAnnotations(req).Emit(ctx)
+			}
 		}
 
-		if err := result.BlockingError(); err != nil {
-			recorder.LabeledEvent(obj, corev1.EventTypeWarning, events.ReasonForbiddenNetworkPolicyEgressCIDR, events.ActionValidationDenied, err.Error()).
-				WithRelated(tnt).WithTenantLabel(tnt).WithRequestAnnotations(req).Emit(ctx)
-
-			return ad.Deny(err.Error())
+		if blocking != nil {
+			return ad.Deny(blocking.Error())
 		}
 
 		return nil

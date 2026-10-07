@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"net/netip"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -115,17 +116,23 @@ func TestEgressCIDRGrants(t *testing.T) {
 func TestEgressPartitionCoverage(t *testing.T) {
 	rng := rand.New(rand.NewPCG(3, 7))
 	for range 200 {
-		obj := policy("192.0.2.0/24", fmt.Sprintf("192.0.2.%d/28", rng.IntN(16)*16))
+		obj := policy("192.0.2.0/24")
+		for range 1 + rng.IntN(12) {
+			obj.Spec.Egress[0].To[0].IPBlock.Except = append(obj.Spec.Egress[0].To[0].IPBlock.Except, netip.MustParsePrefix(fmt.Sprintf("192.0.2.%d/%d", rng.IntN(256), 25+rng.IntN(8))).Masked().String())
+		}
 		var bodies []*rules.NamespaceRuleEnforceBody
 		for range 8 {
 			action := []rules.ActionType{rules.ActionTypeDeny, rules.ActionTypeAllow, rules.ActionTypeAudit}[rng.IntN(3)]
 			bodies = append(bodies, cidrRule(action, fmt.Sprintf("192.0.2.%d/%d", rng.IntN(256), 24+rng.IntN(9))))
 		}
 		denied := false
-		except := netip.MustParsePrefix(obj.Spec.Egress[0].To[0].IPBlock.Except[0])
+		var exceptions []netip.Prefix
+		for _, raw := range obj.Spec.Egress[0].To[0].IPBlock.Except {
+			exceptions = append(exceptions, netip.MustParsePrefix(raw))
+		}
 		for address := 0; address < 256; address++ {
 			ip := netip.AddrFrom4([4]byte{192, 0, 2, byte(address)})
-			if except.Contains(ip) {
+			if slices.ContainsFunc(exceptions, func(except netip.Prefix) bool { return except.Contains(ip) }) {
 				continue
 			}
 			hasAllow, last := false, rules.ActionType("")
