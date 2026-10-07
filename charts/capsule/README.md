@@ -484,12 +484,14 @@ and [replication documentation](https://projectcapsule.dev/docs/replications/).
 | webhooks.hooks.tenants.reinvocationPolicy | string | `"Never"` | [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy) |
 | webhooks.labels | object | `{}` | Additional Labels for all webhooks |
 | webhooks.matchConditions | list | `[]` | MatchConditions for all webhooks |
+| webhooks.mutating.matchConditions | list | `[]` | Additional MatchConditions for all mutating webhooks, combined with global and per-hook conditions |
 | webhooks.mutatingWebhooksTimeoutSeconds | int | `30` | Timeout in seconds for mutating webhooks |
 | webhooks.service.caBundle | string | `""` | CABundle for the webhook service |
 | webhooks.service.name | string | `""` | Custom service name for the webhook service |
 | webhooks.service.namespace | string | `""` | Custom service namespace for the webhook service |
 | webhooks.service.port | integer, null | `nil` | Custom service port for the webhook service |
 | webhooks.service.url | string | `""` | The URL where the capsule webhook services are running (Overwrites cluster scoped service definition) |
+| webhooks.validating.matchConditions | list | `[]` | Additional MatchConditions for all validating webhooks, combined with global and per-hook conditions |
 | webhooks.validatingWebhooksTimeoutSeconds | int | `30` | Timeout in seconds for validating webhooks |
 
 ## Notes on installing Custom Resource Definitions with Helm3
