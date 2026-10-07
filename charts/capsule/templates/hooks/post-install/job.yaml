@@ -72,23 +72,6 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "capsule.post-install.name" . }}
-      initContainers:
-      - name: tls-secret-created
-        image: {{ include "capsule.jobsFullyQualifiedDockerImage" . }}
-        imagePullPolicy: {{ $Values.image.pullPolicy }}
-        args:
-        - wait
-        - --for=create
-        - --timeout=168h
-        - --namespace={{ $.Release.Namespace }}
-        - secrets/{{ include "capsule.secretTlsName" $ }}
-        {{- if $Values.securityContext.enabled }}
-        securityContext: {{- omit $Values.securityContext "enabled" | toYaml | nindent 10 }}
-        {{- end }}
-        {{- with $Values.resources }}
-        resources:
-          {{- toYaml . | nindent 10 }}
-        {{- end }}
       containers:
       - name: tls
         image: {{ include "capsule.jobsFullyQualifiedDockerImage" . }}

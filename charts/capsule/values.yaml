@@ -15,7 +15,7 @@ global:
       enabled: true
     kubectl:
       image:
-        # -- Set the image registry of the helm chart job
+        # -- Set the image repository of the helm chart job
         registry: docker.io
         # -- Set the image repository of the helm chart job
         repository: clastix/kubectl
