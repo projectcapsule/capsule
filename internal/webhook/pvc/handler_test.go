@@ -65,7 +65,7 @@ func TestValidatingHandlerSkipsTerminatingClaimWithUnchangedSpec(t *testing.T) {
 
 	base := fake.NewClientBuilder().WithScheme(scheme).Build()
 	reader := &pvcCountingReader{Reader: base}
-	handler := Handler(PersistentVolumeValidatingVolume())
+	handler := Handler(PersistentVolumeValidatingVolume(nil))
 	request := pvcUpdateAdmissionRequest(t, oldPVC, newPVC)
 
 	if response := handler.OnUpdate(nil, reader, admission.NewDecoder(scheme), nil)(
@@ -111,7 +111,7 @@ func TestHandlersSkipBoundClaimsBeforeTenantLookup(t *testing.T) {
 		},
 		{
 			name:    "validating",
-			handler: Handler(PersistentVolumeValidatingVolume()),
+			handler: Handler(PersistentVolumeValidatingVolume(nil)),
 		},
 	}
 
@@ -175,7 +175,7 @@ func TestVolumeHooksSkipBoundClaimUpdates(t *testing.T) {
 		t.Fatalf("selector expressions = %#v, want unchanged", newPVC.Spec.Selector.MatchExpressions)
 	}
 
-	if response := PersistentVolumeValidatingVolume().OnUpdate(
+	if response := PersistentVolumeValidatingVolume(nil).OnUpdate(
 		nil,
 		nil,
 		oldPVC,

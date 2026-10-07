@@ -60,6 +60,10 @@ func ValidateRuleStatusBody(
 			return err
 		}
 
+		if err := validateStorageRules(i, rule.Enforce.Storage); err != nil {
+			return err
+		}
+
 		if err := validateIngressRules(i, rule.Enforce.Ingress); err != nil {
 			return err
 		}

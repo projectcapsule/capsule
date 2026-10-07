@@ -62,7 +62,10 @@ func NewCompiler() (*Compiler, error) {
 
 	conditionEnvSet, err := envSet.Extend(environment.VersionedOptions{
 		IntroducedVersion: version.MajorMinor(1, 0),
-		EnvOptions:        []celgo.EnvOption{celgo.Variable("request", celgo.DynType)},
+		EnvOptions: []celgo.EnvOption{
+			celgo.Variable("request", celgo.DynType),
+			celgo.Variable("volume", celgo.DynType),
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("build admission condition CEL environment: %w", err)
@@ -263,11 +266,22 @@ func (c *CompiledExpression) EvaluateBooleanWithVariables(
 }
 
 func (c *CompiledExpression) EvaluateCondition(ctx context.Context, object, request map[string]any) (bool, error) {
+	return c.EvaluateConditionWithVolume(ctx, object, request, nil)
+}
+
+// EvaluateConditionWithVolume supplies a read-only PV snapshot for PVC volume
+// enforcement. Other condition consumers see volume as null.
+func (c *CompiledExpression) EvaluateConditionWithVolume(ctx context.Context, object, request, volume map[string]any) (bool, error) {
 	if c == nil || c.program == nil || c.resultType != ResultTypeCondition {
 		return false, fmt.Errorf("compiled admission condition is invalid")
 	}
 
-	value, _, err := c.program.ContextEval(ctx, map[string]any{ObjectVariable: object, "request": request})
+	var volumeValue any
+	if volume != nil {
+		volumeValue = volume
+	}
+
+	value, _, err := c.program.ContextEval(ctx, map[string]any{ObjectVariable: object, "request": request, "volume": volumeValue})
 	if err != nil {
 		return false, fmt.Errorf("evaluate CEL condition %q: %w", c.expression, err)
 	}
