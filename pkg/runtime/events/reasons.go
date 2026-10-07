@@ -4,6 +4,7 @@
 package events
 
 const (
+	ReasonForbiddenNetworkPolicyEgressCIDR = "ForbiddenNetworkPolicyEgressCIDR"
 	// Generic.
 	ReasonTenantResourceWriteOp string = "TenantResourceWriteOp"
 	ReasonOverprovision         string = "Overprovisioned"

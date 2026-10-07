@@ -40,6 +40,8 @@ annotations:
     - name: Documentation
       url: https://projectcapsule.dev/
   artifacthub.io/changes: |
+    - kind: fixed
+      description: declare generic rule webhook side effects as NoneOnDryRun and suppress NetworkPolicy audit and denial Events for dry runs
     - kind: added
       description: enforce PDB overlap, eviction allowance and unhealthy Pod policies through namespace workload rules
     - kind: added

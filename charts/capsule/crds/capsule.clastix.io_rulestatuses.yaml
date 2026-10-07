@@ -91,7 +91,7 @@ spec:
                     conditions:
                       description: |-
                         Conditions gate this entire enforcement rule, including workloads, services,
-                        metadata and ingress. All conditions must be true; empty means apply.
+                        metadata, ingress and network. All conditions must be true; empty means apply.
                         Conditions run during admission; managed metadata in a conditional rule
                         is applied on matching requests only and is not reconciled in the background.
                       items:
@@ -341,6 +341,36 @@ spec:
                         - message: at least one of labels or annotations must be set
                           rule: has(self.labels) || has(self.annotations)
                       type: array
+                    network:
+                      description: Network configures network enforcement for namespace
+                        resources.
+                      properties:
+                        policies:
+                          description: Policies constrains native NetworkPolicies.
+                          properties:
+                            egress:
+                              description: |-
+                                Egress constrains destination address grants. Selector-based peers are
+                                unaffected. No constraints are applied when omitted.
+                              properties:
+                                cidrs:
+                                  description: |-
+                                    CIDRs matches addresses granted by ipBlock.cidr after subtracting except.
+                                    Omitted destinations on an egress rule grant both IPv4 and IPv6 address
+                                    space. An empty NetworkPolicy egress list contains no grants to validate.
+                                    An empty CIDRs list imposes no constraint.
+                                    Ordered allow/deny decisions apply to every granted address: deny rejects
+                                    overlapping grants, allow requires complete coverage, and audit reports
+                                    overlaps. A later allow cannot authorize addresses outside its CIDRs.
+                                  items:
+                                    maxLength: 49
+                                    type: string
+                                  maxItems: 64
+                                  type: array
+                                  x-kubernetes-list-type: set
+                              type: object
+                          type: object
+                      type: object
                     services:
                       description: Enforcement for Services.
                       properties:
@@ -3185,7 +3215,7 @@ spec:
                       conditions:
                         description: |-
                           Conditions gate this entire enforcement rule, including workloads, services,
-                          metadata and ingress. All conditions must be true; empty means apply.
+                          metadata, ingress and network. All conditions must be true; empty means apply.
                           Conditions run during admission; managed metadata in a conditional rule
                           is applied on matching requests only and is not reconciled in the background.
                         items:
@@ -3437,6 +3467,36 @@ spec:
                               set
                             rule: has(self.labels) || has(self.annotations)
                         type: array
+                      network:
+                        description: Network configures network enforcement for namespace
+                          resources.
+                        properties:
+                          policies:
+                            description: Policies constrains native NetworkPolicies.
+                            properties:
+                              egress:
+                                description: |-
+                                  Egress constrains destination address grants. Selector-based peers are
+                                  unaffected. No constraints are applied when omitted.
+                                properties:
+                                  cidrs:
+                                    description: |-
+                                      CIDRs matches addresses granted by ipBlock.cidr after subtracting except.
+                                      Omitted destinations on an egress rule grant both IPv4 and IPv6 address
+                                      space. An empty NetworkPolicy egress list contains no grants to validate.
+                                      An empty CIDRs list imposes no constraint.
+                                      Ordered allow/deny decisions apply to every granted address: deny rejects
+                                      overlapping grants, allow requires complete coverage, and audit reports
+                                      overlaps. A later allow cannot authorize addresses outside its CIDRs.
+                                    items:
+                                      maxLength: 49
+                                      type: string
+                                    maxItems: 64
+                                    type: array
+                                    x-kubernetes-list-type: set
+                                type: object
+                            type: object
+                        type: object
                       services:
                         description: Enforcement for Services.
                         properties:
@@ -6234,7 +6294,7 @@ spec:
                         conditions:
                           description: |-
                             Conditions gate this entire enforcement rule, including workloads, services,
-                            metadata and ingress. All conditions must be true; empty means apply.
+                            metadata, ingress and network. All conditions must be true; empty means apply.
                             Conditions run during admission; managed metadata in a conditional rule
                             is applied on matching requests only and is not reconciled in the background.
                           items:
@@ -6486,6 +6546,36 @@ spec:
                                 be set
                               rule: has(self.labels) || has(self.annotations)
                           type: array
+                        network:
+                          description: Network configures network enforcement for
+                            namespace resources.
+                          properties:
+                            policies:
+                              description: Policies constrains native NetworkPolicies.
+                              properties:
+                                egress:
+                                  description: |-
+                                    Egress constrains destination address grants. Selector-based peers are
+                                    unaffected. No constraints are applied when omitted.
+                                  properties:
+                                    cidrs:
+                                      description: |-
+                                        CIDRs matches addresses granted by ipBlock.cidr after subtracting except.
+                                        Omitted destinations on an egress rule grant both IPv4 and IPv6 address
+                                        space. An empty NetworkPolicy egress list contains no grants to validate.
+                                        An empty CIDRs list imposes no constraint.
+                                        Ordered allow/deny decisions apply to every granted address: deny rejects
+                                        overlapping grants, allow requires complete coverage, and audit reports
+                                        overlaps. A later allow cannot authorize addresses outside its CIDRs.
+                                      items:
+                                        maxLength: 49
+                                        type: string
+                                      maxItems: 64
+                                      type: array
+                                      x-kubernetes-list-type: set
+                                  type: object
+                              type: object
+                          type: object
                         services:
                           description: Enforcement for Services.
                           properties:
