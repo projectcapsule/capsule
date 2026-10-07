@@ -59,10 +59,9 @@ func (h persistentVolumeValidatingVolume) OnUpdate(
 			return nil
 		}
 
-		if err := validatePVCSelector(newPVC, tnt); err != nil {
-			return ad.ErroredResponse(err)
-		}
-
+		// The API server enforces selector immutability after creation. Existing
+		// claims may have been created through an authorized webhook exclusion.
+		// Keep checking the PV when an update establishes the volume binding.
 		return validatePVCVolumeName(ctx, reader, newPVC, tnt)
 	}
 }
