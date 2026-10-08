@@ -20,14 +20,243 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
+	apiRuntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 )
 
 var _ = Describe("namespace cleanup and provisioning", Label("namespace-cleanup", "termination", "rolebindings"), func() {
+	It("completes finalizer updates while preserving metadata enforcement and tenant isolation", Label("termination-metadata"), func() {
+		ctx := context.Background()
+		name := "e2e-finalizer-metadata-" + rand.String(6)
+		const blockedLabel = "e2e.projectcapsule.dev/blocked"
+		tenantA := &capsulev1beta2.Tenant{Name: name, Labels: map[string]string{"env": "e2e"}, Spec: capsulev1beta2.TenantSpec{
+			Owners: rbac.OwnerListSpec{{Name: name, Kind: rbac.UserOwner}},
+			Rules: []*rules.NamespaceRuleBodyTenant{{
+				NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"profile": "guarded"}},
+				NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{
+					Action: rules.ActionTypeDeny,
+					Metadata: []rules.MetadataRule{{APIGroups: []string{"v1"}, Kinds: []string{"ConfigMap"},
+						Labels: map[string]rules.MetadataValueRule{blockedLabel: {Values: []apiRuntime.ExpressionMatch{{Exact: []string{"true"}}}}},
+					}},
+				}},
+			}},
+		}}
+		tenantB := &capsulev1beta2.Tenant{Name: name + "-other", Labels: map[string]string{"env": "e2e"}, Spec: capsulev1beta2.TenantSpec{
+			Owners: rbac.OwnerListSpec{{Name: name + "-other", Kind: rbac.UserOwner}},
+		}}
+		for _, tnt := range []*capsulev1beta2.Tenant{tenantA, tenantB} {
+			Expect(k8sClient.Create(ctx, tnt)).To(Succeed())
+			DeferCleanup(func() { EventuallyDeletion(tnt) })
+			TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
+		}
+		createNamespace := func(tnt *capsulev1beta2.Tenant, suffix string, labels map[string]string, size uint) *corev1.Namespace {
+			labels[meta.TenantLabel] = tnt.Name
+			ns := NewNamespace(name+suffix, labels)
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+			DeferCleanup(func() { ForceDeleteNamespace(ctx, ns.Name) })
+			TenantNamespaceReady(tnt, ns, size)
+			return ns
+		}
+		selected := createNamespace(tenantA, "-selected", map[string]string{"profile": "guarded"}, 1)
+		plain := createNamespace(tenantA, "-plain", map[string]string{}, 2)
+		foreign := createNamespace(tenantB, "-foreign", map[string]string{}, 1)
+		actor := impersonationClient(tenantA.Spec.Owners[0].Name, withDefaultGroups(nil))
+		otherActor := impersonationClient(tenantB.Spec.Owners[0].Name, withDefaultGroups(nil))
+		create := func(c client.Client, ns *corev1.Namespace, blocked bool) *corev1.ConfigMap {
+			labels := map[string]string{"env": "e2e"}
+			if blocked {
+				labels[blockedLabel] = "true"
+			}
+			cm := &corev1.ConfigMap{Name: "held", Namespace: ns.Name, Labels: labels,
+				Finalizers: []string{"e2e.projectcapsule.dev/hold-object"}, Data: map[string]string{"tenant": ns.Name},
+			}
+			Expect(c.Create(ctx, cm)).To(Succeed())
+			return cm
+		}
+		held := create(actor, selected, false)
+		unselected := create(actor, plain, true)
+		preserved := create(otherActor, foreign, true)
+
+		By("maintaining namespace ownership labels on ordinary updates")
+		Eventually(func() error {
+			current := &corev1.ConfigMap{}
+			if err := actor.Get(ctx, client.ObjectKeyFromObject(unselected), current); err != nil {
+				return err
+			}
+			current.Labels[meta.NewTenantLabel], current.Labels[meta.ManagedByCapsuleLabel] = tenantB.Name, tenantB.Name
+			return actor.Update(ctx, current)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Eventually(func(g Gomega) {
+			current := &corev1.ConfigMap{}
+			g.Expect(actor.Get(ctx, client.ObjectKeyFromObject(unselected), current)).To(Succeed())
+			g.Expect(current.Labels[meta.NewTenantLabel]).To(Equal(tenantA.Name))
+			g.Expect(current.Labels[meta.ManagedByCapsuleLabel]).To(Equal(tenantA.Name))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		By("enforcing selected namespace rules during finalizer removal")
+		Expect(actor.Delete(ctx, held)).To(Succeed())
+		Eventually(func(g Gomega) {
+			g.Expect(actor.Get(ctx, client.ObjectKeyFromObject(held), held)).To(Succeed())
+			g.Expect(held.DeletionTimestamp).NotTo(BeNil())
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		var rejected error
+		Eventually(func() error {
+			current := &corev1.ConfigMap{}
+			if err := actor.Get(ctx, client.ObjectKeyFromObject(held), current); err != nil {
+				return err
+			}
+			current.Finalizers = nil
+			current.Labels[blockedLabel] = "true"
+			rejected = actor.Update(ctx, current)
+			if rejected == nil {
+				Fail("metadata enforcement was bypassed while removing a finalizer")
+			}
+			return rejected
+		}, defaultTimeoutInterval, defaultPollInterval).Should(MatchError(ContainSubstring(`metadata label "true" at metadata.labels["e2e.projectcapsule.dev/blocked"] is denied by namespace rule`)))
+		Expect(apierrors.IsForbidden(rejected)).To(BeTrue())
+		Expect(actor.Get(ctx, client.ObjectKeyFromObject(held), held)).To(Succeed())
+		Expect(held.Labels).NotTo(HaveKey(blockedLabel))
+		Expect(held.Finalizers).To(ContainElement("e2e.projectcapsule.dev/hold-object"))
+
+		By("completing an authorized finalizer-only update")
+		Eventually(func() error {
+			current := &corev1.ConfigMap{}
+			if err := actor.Get(ctx, client.ObjectKeyFromObject(held), current); err != nil {
+				return err
+			}
+			current.Finalizers = nil
+			return actor.Update(ctx, current)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Eventually(func() bool {
+			return apierrors.IsNotFound(actor.Get(ctx, client.ObjectKeyFromObject(held), &corev1.ConfigMap{}))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
+
+		By("preserving the other Tenant's resources and access boundaries")
+		err := actor.Delete(ctx, preserved)
+		Expect(apierrors.IsForbidden(err)).To(BeTrue())
+		Expect(err).To(MatchError(ContainSubstring(`cannot delete resource "configmaps"`)))
+		current := &corev1.ConfigMap{}
+		Expect(otherActor.Get(ctx, client.ObjectKeyFromObject(preserved), current)).To(Succeed())
+		Expect(current.UID).To(Equal(preserved.UID))
+		Expect(current.Data).To(Equal(preserved.Data))
+		Expect(current.Labels[meta.NewTenantLabel]).To(Equal(tenantB.Name))
+		Expect(current.Finalizers).To(Equal(preserved.Finalizers))
+		Expect(current.DeletionTimestamp).To(BeNil())
+	})
+
+	It("cleans a batch of namespaces before releasing the Tenant and preserves another tenant", Label("termination-performance"), func() {
+		ctx := context.Background()
+		prefix := "e2e-termination-batch-" + rand.String(6)
+		var tenants []*capsulev1beta2.Tenant
+		for _, suffix := range []string{"-a", "-b"} {
+			tnt := &capsulev1beta2.Tenant{Name: prefix + suffix, Labels: map[string]string{"env": "e2e"}, Spec: capsulev1beta2.TenantSpec{
+				Owners: rbac.OwnerListSpec{{Name: prefix + suffix, Kind: rbac.UserOwner}},
+			}}
+			Expect(k8sClient.Create(ctx, tnt)).To(Succeed())
+			DeferCleanup(func() { EventuallyDeletion(tnt) })
+			TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
+			tenants = append(tenants, tnt)
+		}
+		createNamespace := func(tnt *capsulev1beta2.Tenant, name string, size uint) *corev1.Namespace {
+			ns := NewNamespace(name, map[string]string{meta.TenantLabel: tnt.Name})
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+			DeferCleanup(func() { ForceDeleteNamespace(ctx, ns.Name) })
+			TenantNamespaceReady(tnt, ns, size)
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(ns), ns)).To(Succeed())
+			return ns
+		}
+		foreign := createNamespace(tenants[1], prefix+"-foreign", 1)
+		preserved := &corev1.ConfigMap{Name: "preserved", Namespace: foreign.Name, Data: map[string]string{"tenant": tenants[1].Name}}
+		Expect(k8sClient.Create(ctx, preserved)).To(Succeed())
+		actor := impersonationClient(tenants[0].Spec.Owners[0].Name, withDefaultGroups(nil))
+		err := actor.Delete(ctx, preserved)
+		Expect(apierrors.IsForbidden(err)).To(BeTrue())
+		Expect(err).To(MatchError(ContainSubstring(`cannot delete resource "configmaps"`)))
+
+		const hold = "e2e.projectcapsule.dev/hold-batch"
+		var namespaces []*corev1.Namespace
+		for i := range 4 {
+			ns := createNamespace(tenants[0], fmt.Sprintf("%s-%d", prefix, i), uint(i+1))
+			Eventually(func() error {
+				current := &corev1.Namespace{}
+				if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(ns), current); err != nil {
+					return err
+				}
+				if !controllerutil.AddFinalizer(current, hold) {
+					return nil
+				}
+				return k8sClient.Update(ctx, current)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			for j := range 64 {
+				cm := &corev1.ConfigMap{Name: fmt.Sprintf("held-%d", j), Namespace: ns.Name,
+					Labels: map[string]string{"env": "e2e", "termination-batch": prefix}, Finalizers: []string{"e2e.projectcapsule.dev/hold-content"},
+					Data: map[string]string{"payload": strings.Repeat("x", 16*1024)},
+				}
+				Expect(actor.Create(ctx, cm)).To(Succeed())
+			}
+			namespaces = append(namespaces, ns)
+		}
+		By("deleting the Tenant with four populated namespaces")
+		started := time.Now()
+		Expect(k8sClient.Delete(ctx, tenants[0])).To(Succeed())
+		Eventually(func(g Gomega) {
+			for _, ns := range namespaces {
+				list := &corev1.ConfigMapList{}
+				g.Expect(k8sClient.List(ctx, list, client.InNamespace(ns.Name), client.MatchingLabels{"termination-batch": prefix})).To(Succeed())
+				g.Expect(list.Items).To(BeEmpty())
+			}
+		}, defaultTerminationTimeoutInterval, defaultPollInterval).Should(Succeed())
+		elapsed := time.Since(started)
+		GinkgoWriter.Printf("Termination batch: namespaces=4 objects=256 payload=16KiB cleanup=%s\n", elapsed)
+		AddReportEntry("termination-batch-cleanup", elapsed.String())
+
+		By("retaining the Tenant until every namespace actually disappears")
+		currentTenant := &capsulev1beta2.Tenant{}
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(tenants[0]), currentTenant)).To(Succeed())
+		Expect(currentTenant.Finalizers).To(ContainElement(meta.ControllerFinalizer))
+		for _, ns := range namespaces {
+			current := &corev1.Namespace{}
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(ns), current)).To(Succeed())
+			Expect(current.DeletionTimestamp).NotTo(BeNil())
+			Expect(current.Finalizers).To(ContainElement(hold))
+			Eventually(func() error {
+				current := &corev1.Namespace{}
+				if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(ns), current); err != nil {
+					return client.IgnoreNotFound(err)
+				}
+				if !controllerutil.RemoveFinalizer(current, hold) {
+					return nil
+				}
+				return k8sClient.Update(ctx, current)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		}
+		Eventually(func(g Gomega) {
+			for _, ns := range namespaces {
+				g.Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(ns), &corev1.Namespace{}))).To(BeTrue())
+			}
+			g.Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(tenants[0]), &capsulev1beta2.Tenant{}))).To(BeTrue())
+		}, defaultTerminationTimeoutInterval, defaultPollInterval).Should(Succeed())
+		GinkgoWriter.Printf("Termination batch: Tenant and namespaces removed after %s\n", time.Since(started))
+
+		By("preserving the other Tenant and its namespace contents")
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(tenants[1]), currentTenant)).To(Succeed())
+		Expect(currentTenant.DeletionTimestamp).To(BeNil())
+		currentNamespace := &corev1.Namespace{}
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(foreign), currentNamespace)).To(Succeed())
+		Expect(currentNamespace.UID).To(Equal(foreign.UID))
+		Expect(currentNamespace.DeletionTimestamp).To(BeNil())
+		currentMap := &corev1.ConfigMap{}
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(preserved), currentMap)).To(Succeed())
+		Expect(currentMap.UID).To(Equal(preserved.UID))
+		Expect(currentMap.Data).To(Equal(preserved.Data))
+		Expect(currentMap.DeletionTimestamp).To(BeNil())
+	})
+
 	It("preserves namespace profiles and tenant isolation while namespaces are repeatedly recreated", func() {
 		ctx := context.Background()
 		name := "e2e-cleanup-" + rand.String(6)

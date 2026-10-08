@@ -486,6 +486,9 @@ func BenchmarkNamespaceCleanupPopulated(b *testing.B) {
 				if mode == "already-deleting-with-finalizers" && resources.patches != count*b.N {
 					b.Fatal("missing PATCHes")
 				}
+				if resources.gets != 0 {
+					b.Fatal("cleanup performed redundant object GETs")
+				}
 				b.ReportMetric(float64(reader.calls)/float64(b.N), "namespace-GET/op")
 				b.ReportMetric(float64(resources.gets)/float64(b.N), "object-GET/op")
 				b.ReportMetric(float64(resources.deletes)/float64(b.N), "DELETE/op")
@@ -526,10 +529,19 @@ func TestCleanupPreservesCapsuleLifecycleFinalizers(t *testing.T) {
 			foreign.SetNamespace("tenant-b-ns")
 			dyn := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{gvr: obj.GetKind() + "List"}, obj, foreign)
 			if mode == "added-after-list" {
-				dyn.PrependReactor("get", gvr.Resource, func(ktesting.Action) (bool, runtime.Object, error) {
+				listed := false
+				dyn.PrependReactor("list", gvr.Resource, func(ktesting.Action) (bool, runtime.Object, error) {
+					if listed {
+						return false, nil, nil
+					}
+					listed = true
 					current := obj.DeepCopy()
 					current.SetFinalizers([]string{meta.ControllerFinalizer, "example.com/hold"})
-					return true, current, nil
+					current.SetResourceVersion("11")
+					if err := dyn.Tracker().Update(gvr, current, ns.Name); err != nil {
+						t.Fatal(err)
+					}
+					return true, &unstructured.UnstructuredList{Items: []unstructured.Unstructured{*obj.DeepCopy()}}, nil
 				})
 			}
 			patches := 0
@@ -537,11 +549,19 @@ func TestCleanupPreservesCapsuleLifecycleFinalizers(t *testing.T) {
 				patches++
 				var patch struct {
 					Metadata struct {
-						Finalizers []string `json:"finalizers"`
+						Finalizers      []string  `json:"finalizers"`
+						UID             types.UID `json:"uid"`
+						ResourceVersion string    `json:"resourceVersion"`
 					} `json:"metadata"`
 				}
 				if err := json.Unmarshal(a.(ktesting.PatchAction).GetPatch(), &patch); err != nil {
 					return true, nil, err
+				}
+				if patch.Metadata.UID != obj.GetUID() || patch.Metadata.ResourceVersion == "" {
+					return true, nil, errors.New("patch lacks object preconditions")
+				}
+				if mode == "added-after-list" && patch.Metadata.ResourceVersion == "10" {
+					return true, nil, apierrors.NewConflict(gvr.GroupResource(), obj.GetName(), errors.New("finalizers changed after LIST"))
 				}
 				if !reflect.DeepEqual(patch.Metadata.Finalizers, want) && !(len(want) == 0 && len(patch.Metadata.Finalizers) == 0) {
 					return true, nil, fmt.Errorf("finalizers=%v, want=%v", patch.Metadata.Finalizers, want)
@@ -550,6 +570,17 @@ func TestCleanupPreservesCapsuleLifecycleFinalizers(t *testing.T) {
 			})
 			reader := &cleanupReader{current: ns}
 			changed, err := tenant.NamespacedCascadingCleanup(t.Context(), reader, nil, &cleanupCache{gvrs: []schema.GroupVersionResource{gvr}}, dyn, ns)
+			if mode == "added-after-list" {
+				if changed || !apierrors.IsConflict(err) {
+					t.Fatalf("stale snapshot was accepted: changed=%v error=%v", changed, err)
+				}
+				current, getErr := dyn.Tracker().Get(gvr, ns.Name, obj.GetName())
+				if getErr != nil || !reflect.DeepEqual(current.(*unstructured.Unstructured).GetFinalizers(), []string{meta.ControllerFinalizer, "example.com/hold"}) {
+					t.Fatalf("stale patch changed finalizers: %v, %v", current, getErr)
+				}
+				patches = 0
+				changed, err = tenant.NamespacedCascadingCleanup(t.Context(), reader, nil, &cleanupCache{gvrs: []schema.GroupVersionResource{gvr}}, dyn, ns)
+			}
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -603,6 +634,158 @@ func TestCleanupChecksNamespaceOnlyForWrites(t *testing.T) {
 			if reader.calls != expectedReads {
 				t.Fatalf("namespace GETs=%d, want=%d", reader.calls, expectedReads)
 			}
+			for _, action := range dyn.Actions() {
+				if action.GetVerb() == "get" {
+					t.Fatal("cleanup performed a redundant object GET")
+				}
+			}
 		})
+	}
+}
+
+func cleanupContentConditions(message string) []corev1.NamespaceCondition {
+	return []corev1.NamespaceCondition{
+		{Type: corev1.NamespaceDeletionDiscoveryFailure, Status: corev1.ConditionFalse},
+		{Type: corev1.NamespaceDeletionGVParsingFailure, Status: corev1.ConditionFalse},
+		{Type: corev1.NamespaceDeletionContentFailure, Status: corev1.ConditionFalse},
+		{Type: corev1.NamespaceContentRemaining, Status: corev1.ConditionTrue, LastTransitionTime: metav1.Now(), Message: message},
+		{Type: corev1.NamespaceFinalizersRemaining, Status: corev1.ConditionTrue},
+	}
+}
+
+func TestCleanupUsesRecentNativeContentReportsWithFullScanFallback(t *testing.T) {
+	for _, mode := range []string{"hint", "complete", "stale", "future", "before-deletion", "missing", "discovery-error", "parsing-error", "deletion-error", "unknown-status", "unknown-format", "malformed-count", "zero-count", "missing-group", "unknown-resource", "inconsistent-complete"} {
+		t.Run(mode, func(t *testing.T) {
+			ns := cleanupNamespace()
+			ns.Status.Conditions = cleanupContentConditions("Some resources are remaining: configmaps. has 1 resource instances")
+			switch mode {
+			case "complete", "inconsistent-complete":
+				ns.Status.Conditions[3].Status = corev1.ConditionFalse
+				if mode == "complete" {
+					ns.Status.Conditions[4].Status = corev1.ConditionFalse
+				}
+			case "stale":
+				ns.Status.Conditions[3].LastTransitionTime = metav1.NewTime(time.Now().Add(-time.Minute))
+			case "future":
+				ns.Status.Conditions[3].LastTransitionTime = metav1.NewTime(time.Now().Add(time.Minute))
+			case "before-deletion":
+				ns.DeletionTimestamp = new(metav1.Now())
+				ns.Status.Conditions[3].LastTransitionTime = metav1.NewTime(time.Now().Add(-time.Second))
+			case "missing":
+				ns.Status.Conditions = nil
+			case "discovery-error":
+				ns.Status.Conditions[0].Status = corev1.ConditionTrue
+			case "parsing-error":
+				ns.Status.Conditions[1].Status = corev1.ConditionUnknown
+			case "deletion-error":
+				ns.Status.Conditions[2].Status = corev1.ConditionTrue
+			case "unknown-status":
+				ns.Status.Conditions[3].Status = corev1.ConditionUnknown
+			case "unknown-format":
+				ns.Status.Conditions[3].Message = "Unrecognized remaining resources report"
+			case "malformed-count":
+				ns.Status.Conditions[3].Message = "Some resources are remaining: configmaps. has many resource instances"
+			case "zero-count":
+				ns.Status.Conditions[3].Message = "Some resources are remaining: configmaps. has 0 resource instances"
+			case "missing-group":
+				ns.Status.Conditions[3].Message = "Some resources are remaining: configmaps has 1 resource instances"
+			case "unknown-resource":
+				ns.Status.Conditions[3].Message = "Some resources are remaining: unavailable.example.com has 1 resource instances"
+			}
+			widgetGVR := schema.GroupVersionResource{Group: "example.com", Version: "v1", Resource: "widgets"}
+			widget := cleanupObject(ns.Name, "fallback")
+			widget.SetAPIVersion("example.com/v1")
+			widget.SetKind("Widget")
+			widget.SetFinalizers(nil)
+			dyn := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{cleanupGVR: "ConfigMapList", widgetGVR: "WidgetList"}, widget)
+			cache := &cleanupCache{gvrs: []schema.GroupVersionResource{cleanupGVR, widgetGVR}}
+			_, err := tenant.NamespacedCascadingCleanup(t.Context(), &cleanupReader{current: ns}, nil, cache, dyn, ns)
+			if err != nil {
+				t.Fatal(err)
+			}
+			lists := 0
+			for _, action := range dyn.Actions() {
+				if action.GetVerb() == "list" {
+					lists++
+				}
+			}
+			wantLists := 2
+			if mode == "hint" {
+				wantLists = 1
+			}
+			if mode == "complete" {
+				wantLists = 0
+			}
+			if lists != wantLists {
+				t.Fatalf("LISTs=%d want=%d", lists, wantLists)
+			}
+			if mode == "complete" && cache.calls != 0 {
+				t.Fatal("completed content unnecessarily used discovery")
+			}
+			_, err = dyn.Tracker().Get(widgetGVR, ns.Name, widget.GetName())
+			if apierrors.IsNotFound(err) != (wantLists == 2) {
+				t.Fatalf("fallback resource error=%v", err)
+			}
+			if mode == "hint" || mode == "complete" {
+				// A stale or incomplete report can delay work, but cannot abandon
+				// it: once the hint expires, even unchanged status scans all APIs.
+				ns.Status.Conditions[3].LastTransitionTime = metav1.NewTime(time.Now().Add(-time.Minute))
+				if _, err := tenant.NamespacedCascadingCleanup(t.Context(), &cleanupReader{current: ns}, nil, cache, dyn, ns); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := dyn.Tracker().Get(widgetGVR, ns.Name, widget.GetName()); !apierrors.IsNotFound(err) {
+					t.Fatalf("expired hint did not clean unreported content: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkNamespaceCleanupContentReports(b *testing.B) {
+	for _, count := range []int{30, 300} {
+		for _, mode := range []string{"full", "hint", "complete"} {
+			b.Run(fmt.Sprintf("resourceTypes=%d/%s", count, mode), func(b *testing.B) {
+				ns := cleanupNamespace()
+				if mode != "full" {
+					ns.Status.Conditions = cleanupContentConditions("Some resources are remaining: configmaps. has 1 resource instances")
+				}
+				if mode == "complete" {
+					ns.Status.Conditions[3].Status = corev1.ConditionFalse
+					ns.Status.Conditions[4].Status = corev1.ConditionFalse
+				}
+				cache := &cleanupCache{gvrs: []schema.GroupVersionResource{cleanupGVR}}
+				kinds := map[schema.GroupVersionResource]string{cleanupGVR: "ConfigMapList"}
+				for i := 1; i < count; i++ {
+					gvr := schema.GroupVersionResource{Group: "example.com", Version: "v1", Resource: fmt.Sprintf("objects%d", i)}
+					cache.gvrs = append(cache.gvrs, gvr)
+					kinds[gvr] = fmt.Sprintf("Object%dList", i)
+				}
+				dyn := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), kinds)
+				lists := 0
+				b.ReportAllocs()
+				for b.Loop() {
+					dyn.ClearActions()
+					if changed, err := tenant.NamespacedCascadingCleanup(b.Context(), &cleanupReader{current: ns}, nil, cache, dyn, ns); err != nil || changed {
+						b.Fatalf("changed=%v error=%v", changed, err)
+					}
+					for _, action := range dyn.Actions() {
+						if action.GetVerb() == "list" {
+							lists++
+						}
+					}
+				}
+				wantLists := count
+				if mode == "hint" {
+					wantLists = 1
+				}
+				if mode == "complete" {
+					wantLists = 0
+				}
+				if lists != wantLists*b.N {
+					b.Fatalf("LISTs=%d want=%d", lists, wantLists*b.N)
+				}
+				b.ReportMetric(float64(lists)/float64(b.N), "dynamic-LIST/op")
+			})
+		}
 	}
 }

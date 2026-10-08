@@ -26,6 +26,7 @@ import (
 	ktesting "k8s.io/client-go/testing"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -117,6 +118,37 @@ func TestNamespaceCleanupControllerScopeAndLifecycle(t *testing.T) {
 				t.Fatalf("requeue=%s", result.RequeueAfter)
 			}
 		})
+	}
+}
+
+func TestNamespaceCleanupUsesDedicatedAuthoritativeReader(t *testing.T) {
+	tnt := &capsulev1beta2.Tenant{Name: "tenant-a", UID: "tenant-a-uid"}
+	ns := cleanupOwnedNamespace(tnt, "cleanup", true)
+	manager, dyn := namespaceCleanupFixture(t, tnt, ns)
+	reads, lists := 0, 0
+	manager.cleanupReader = interceptor.NewClient(manager.Client.(client.WithWatch), interceptor.Funcs{
+		Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+			reads++
+			return c.Get(ctx, key, obj, opts...)
+		},
+		List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+			lists++
+			return c.List(ctx, list, opts...)
+		},
+	})
+	manager.reader = interceptor.NewClient(manager.Client.(client.WithWatch), interceptor.Funcs{
+		Get: func(context.Context, client.WithWatch, client.ObjectKey, client.Object, ...client.GetOption) error {
+			t.Fatal("cleanup consumed the reader shared with admission")
+			return nil
+		},
+		List: func(context.Context, client.WithWatch, client.ObjectList, ...client.ListOption) error {
+			t.Fatal("cleanup consumed the reader shared with admission")
+			return nil
+		},
+	})
+	result, err := manager.reconcileNamespaceCleanup(t.Context(), reconcile.Request{NamespacedName: client.ObjectKeyFromObject(ns)})
+	if err != nil || result.RequeueAfter != namespaceCleanupRetryPeriod || reads < 3 || lists != 1 || len(dyn.Actions()) == 0 {
+		t.Fatalf("result=%+v error=%v reads=%d lists=%d actions=%v", result, err, reads, lists, dyn.Actions())
 	}
 }
 

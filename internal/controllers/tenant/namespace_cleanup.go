@@ -5,10 +5,12 @@ package tenant
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -22,13 +24,31 @@ import (
 const (
 	namespaceCascadingCleanupGracePeriod = 10 * time.Second
 	namespaceCleanupRetryPeriod          = 5 * time.Second
+	namespaceCleanupWorkers              = 4
 )
 
 func (r *Manager) setupNamespaceCleanupController(mgr ctrl.Manager, config utils.ControllerOptions) error {
+	// Cleanup performs an authoritative namespace read before every destructive
+	// write. Give those reads a separate client so a deletion batch cannot drain
+	// the namespace-read token bucket used by admission and Tenant provisioning.
+	// Keep the existing configured QPS/burst and reuse the manager's transport.
+	cleanupConfig := rest.CopyConfig(mgr.GetConfig())
+	cleanupConfig.RateLimiter = nil
+
+	cleanupClient, err := client.New(cleanupConfig, client.Options{
+		Scheme: mgr.GetScheme(), Mapper: mgr.GetRESTMapper(), HTTPClient: mgr.GetHTTPClient(),
+	})
+	if err != nil {
+		return fmt.Errorf("create namespace cleanup reader: %w", err)
+	}
+
+	r.cleanupReader = cleanupClient
+
 	options := config.Runtime.ToControllerOptions()
-	// Cleanup already fans out to four resource types. A single worker bounds
-	// background API pressure independently of Tenant provisioning concurrency.
-	options.MaxConcurrentReconciles = 1
+	// Independent namespace workers keep one slow namespace from blocking all
+	// other terminations. Each worker processes at most four resource types,
+	// bounding cleanup to sixteen concurrent operations across namespaces.
+	options.MaxConcurrentReconciles = namespaceCleanupWorkers
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("capsule/namespace-cleanup").
@@ -42,8 +62,13 @@ func (r *Manager) setupNamespaceCleanupController(mgr ctrl.Manager, config utils
 }
 
 func (r *Manager) reconcileNamespaceCleanup(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	reader := r.cleanupReader
+	if reader == nil {
+		reader = r.reader
+	}
+
 	ns := &corev1.Namespace{}
-	if err := r.reader.Get(ctx, request.NamespacedName, ns); err != nil {
+	if err := reader.Get(ctx, request.NamespacedName, ns); err != nil {
 		return reconcile.Result{}, client.IgnoreNotFound(err)
 	}
 
@@ -52,7 +77,7 @@ func (r *Manager) reconcileNamespaceCleanup(ctx context.Context, request reconci
 	}
 	// Labels only select candidates; a live Tenant with the matching owner UID
 	// establishes the scope of this controller's destructive operations.
-	tnt, err := tenant.ResolveNamespaceTenant(ctx, r.reader, ns)
+	tnt, err := tenant.ResolveNamespaceTenant(ctx, reader, ns)
 	if apierrors.IsNotFound(err) {
 		return reconcile.Result{}, nil
 	}
@@ -74,7 +99,7 @@ func (r *Manager) reconcileNamespaceCleanup(ctx context.Context, request reconci
 		return reconcile.Result{RequeueAfter: remaining}, nil
 	}
 
-	pending, err := tenant.NamespaceIsPendingPodTerminating(ctx, r.reader, ns)
+	pending, err := tenant.NamespaceIsPendingPodTerminating(ctx, reader, ns)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -84,7 +109,7 @@ func (r *Manager) reconcileNamespaceCleanup(ctx context.Context, request reconci
 	}
 
 	err = r.runPhase(ctrl.LoggerFrom(ctx), "namespace_cleanup", func() error {
-		_, cleanupErr := tenant.NamespacedCascadingCleanup(ctx, r.reader, r.DiscoveryClient, &r.discoveryCache, r.DynamicClient, ns)
+		_, cleanupErr := tenant.NamespacedCascadingCleanup(ctx, reader, r.DiscoveryClient, &r.discoveryCache, r.DynamicClient, ns)
 
 		return cleanupErr
 	})

@@ -51,7 +51,8 @@ import (
 type Manager struct {
 	client.Client
 
-	reader client.Reader
+	reader        client.Reader
+	cleanupReader client.Reader
 
 	DiscoveryClient discovery.DiscoveryInterface
 	DynamicClient   dynamic.Interface

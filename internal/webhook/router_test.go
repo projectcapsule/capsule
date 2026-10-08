@@ -18,6 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/internal/webhook/generic"
 	namespacevalidation "github.com/projectcapsule/capsule/internal/webhook/namespace/validation"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
@@ -30,6 +31,39 @@ func (followingNamespaceGuard) OnUpdate(client.Client, client.Reader, admission.
 	return func(context.Context, admission.Request) *admission.Response {
 		response := admission.Denied("following namespace guard")
 		return &response
+	}
+}
+
+func TestTenantAssignmentFinalizerCompletionContinuesAdmissionChain(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	cl := fake.NewClientBuilder().WithScheme(scheme).Build()
+	stamp := metav1.Now()
+	old := &corev1.ConfigMap{APIVersion: "v1", Kind: "ConfigMap", Name: "held", Namespace: "tenant-a",
+		UID: "held-uid", DeletionTimestamp: &stamp, Finalizers: []string{"example.com/hold"},
+		Labels: map[string]string{meta.ManagedByCapsuleLabel: "tenant-a", meta.NewTenantLabel: "tenant-a"},
+	}
+	obj := old.DeepCopy()
+	obj.Finalizers = nil
+	raw, err := json.Marshal(obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldRaw, err := json.Marshal(old)
+	if err != nil {
+		t.Fatal(err)
+	}
+	router := &handlerRouter{client: cl, reader: cl, decoder: admission.NewDecoder(scheme),
+		handlers: []handlers.Handler{generic.TenantAssignmentHandler(), followingNamespaceGuard{}},
+	}
+	response := router.Handle(t.Context(), admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+		Operation: admissionv1.Update, Namespace: obj.Namespace, Name: obj.Name,
+		Object: runtime.RawExtension{Raw: raw}, OldObject: runtime.RawExtension{Raw: oldRaw},
+	}})
+	if response.Allowed || response.Result.Message != "following namespace guard" {
+		t.Fatalf("finalizer completion skipped the following guard: %+v", response)
 	}
 }
 
