@@ -7,6 +7,8 @@ import "fmt"
 
 // AdmissionCondition is a Boolean CEL gate for a mutation entry or enforcement rule. It can
 // inspect object and request metadata, but cannot generate mutation values.
+// During PVC volume access evaluation, volume contains the referenced PV;
+// otherwise volume is null. Conditions never modify the PVC or PV.
 // +kubebuilder:object:generate=true
 type AdmissionCondition struct {
 	// Name identifies a condition in admission errors. Names must be unique within a block.
