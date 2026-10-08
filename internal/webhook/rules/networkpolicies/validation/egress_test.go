@@ -9,6 +9,7 @@ import (
 	"math/rand/v2"
 	"net/netip"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -90,24 +91,34 @@ func TestEgressCIDRGrants(t *testing.T) {
 		{"invalid except", policy("10.0.0.0/8", "invalid"), []*rules.NamespaceRuleEnforceBody{deny}, false, "except[0]", false},
 		{"outside except", policy("10.0.0.0/8", "192.0.2.0/24"), []*rules.NamespaceRuleEnforceBody{deny}, false, "except[0]", false},
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			original := tc.obj.DeepCopy()
-			result, err := evaluate(t.Context(), tc.obj, tc.bodies)
-			if tc.err != "" {
-				require.ErrorContains(t, err, tc.err)
-				return
-			}
-			require.NoError(t, err)
-			require.Equal(t, tc.denied, result.BlockingError() != nil)
-			if tc.denied {
-				require.Contains(t, result.BlockingError().Error(), "spec.egress[0].to")
-			}
-			if tc.audit {
-				require.NotEmpty(t, result.Audits)
-			}
-			require.Equal(t, original, tc.obj, "admission must not mutate input")
-		})
+	for _, direction := range []string{"egress", "ingress"} {
+		for _, tc := range cases {
+			t.Run(direction+"/"+tc.name, func(t *testing.T) {
+				obj, bodies := tc.obj.DeepCopy(), tc.bodies
+				wantError := tc.err
+				path := "spec.egress[0].to"
+				if direction == "ingress" {
+					obj, bodies = ingressFixtures(obj, bodies)
+					wantError = strings.ReplaceAll(wantError, "spec.egress[0].to", "spec.ingress[0].from")
+					path = "spec.ingress[0].from"
+				}
+				original := obj.DeepCopy()
+				result, err := evaluate(t.Context(), obj, bodies)
+				if tc.err != "" {
+					require.ErrorContains(t, err, wantError)
+					return
+				}
+				require.NoError(t, err)
+				require.Equal(t, tc.denied, result.BlockingError() != nil)
+				if tc.denied {
+					require.Contains(t, result.BlockingError().Error(), path)
+				}
+				if tc.audit {
+					require.NotEmpty(t, result.Audits)
+				}
+				require.Equal(t, original, obj, "admission must not mutate input")
+			})
+		}
 	}
 }
 

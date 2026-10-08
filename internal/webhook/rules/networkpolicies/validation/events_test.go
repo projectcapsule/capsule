@@ -54,51 +54,62 @@ func (e *recordedEvent) WithRequestAnnotations(req admission.Request) events.Lab
 }
 
 func TestNetworkPolicyDryRunEvents(t *testing.T) {
-	no, yes := false, true
-	for _, action := range []rules.ActionType{rules.ActionTypeAudit, rules.ActionTypeDeny, rules.ActionTypeAllow} {
-		for _, operation := range []admissionv1.Operation{admissionv1.Create, admissionv1.Update} {
-			for _, dryRun := range []*bool{nil, &no, &yes} {
-				name := "omitted"
-				if dryRun != nil {
-					name = fmt.Sprint(*dryRun)
-				}
-				t.Run(fmt.Sprintf("%s/%s/dryRun=%s", action, operation, name), func(t *testing.T) {
-					cl, decoder, requests := admissionFixture(t, 2, true, func(i int) []*rules.NamespaceRuleBodyNamespace {
-						if i == 1 {
-							return nil
-						}
-						return []*rules.NamespaceRuleBodyNamespace{{Enforce: cidrRule(action, "10.0.0.0/8")}}
-					})
-					for i, req := range requests {
-						recorder := &recordingEvents{EventRecorder: events.NewEventRecorder(nil, logr.Discard(), nil, nil)}
-						req.DryRun, req.Operation, req.OldObject = dryRun, operation, req.Object
-						handler := Handler(nil, nil)
-						handle := handler.OnCreate(cl, cl, decoder, recorder)
-						if operation == admissionv1.Update {
-							handle = handler.OnUpdate(cl, cl, decoder, recorder)
-						}
-						response := handle(t.Context(), req)
-						if i == 0 && action == rules.ActionTypeDeny {
-							require.NotNil(t, response)
-							require.False(t, response.Allowed)
-							require.Contains(t, response.Result.Message, "networkPolicy egress CIDR")
-						} else {
-							require.Nil(t, response, "successful checks must continue the admission chain")
-						}
-						if i == 1 || action == rules.ActionTypeAllow || (dryRun != nil && *dryRun) {
-							require.Empty(t, recorder.emitted)
-						} else {
-							require.Len(t, recorder.emitted, 1)
-							reason := events.ReasonNamespaceRuleAudit
-							if action == rules.ActionTypeDeny {
-								reason = events.ReasonForbiddenNetworkPolicyEgressCIDR
-							}
-							require.Equal(t, reason, recorder.emitted[0].Reason())
-							require.Equal(t, "tenant-0", recorder.emitted[0].Labels()[meta.NewTenantLabel])
-						}
-					}
-				})
-			}
+	for _, ingress := range []bool{false, true} {
+		direction := "egress"
+		if ingress {
+			direction = "ingress"
 		}
+		t.Run(direction, func(t *testing.T) {
+			no, yes := false, true
+			for _, action := range []rules.ActionType{rules.ActionTypeAudit, rules.ActionTypeDeny, rules.ActionTypeAllow} {
+				for _, operation := range []admissionv1.Operation{admissionv1.Create, admissionv1.Update} {
+					for _, dryRun := range []*bool{nil, &no, &yes} {
+						name := "omitted"
+						if dryRun != nil {
+							name = fmt.Sprint(*dryRun)
+						}
+						t.Run(fmt.Sprintf("%s/%s/dryRun=%s", action, operation, name), func(t *testing.T) {
+							cl, decoder, requests := admissionFixture(t, 2, true, func(i int) []*rules.NamespaceRuleBodyNamespace {
+								if i == 1 {
+									return nil
+								}
+								return []*rules.NamespaceRuleBodyNamespace{{Enforce: cidrRule(action, "10.0.0.0/8")}}
+							}, ingress)
+							for i, req := range requests {
+								recorder := &recordingEvents{EventRecorder: events.NewEventRecorder(nil, logr.Discard(), nil, nil)}
+								req.DryRun, req.Operation, req.OldObject = dryRun, operation, req.Object
+								handler := Handler(nil, nil)
+								handle := handler.OnCreate(cl, cl, decoder, recorder)
+								if operation == admissionv1.Update {
+									handle = handler.OnUpdate(cl, cl, decoder, recorder)
+								}
+								response := handle(t.Context(), req)
+								if i == 0 && action == rules.ActionTypeDeny {
+									require.NotNil(t, response)
+									require.False(t, response.Allowed)
+									require.Contains(t, response.Result.Message, "networkPolicy "+direction+" CIDR")
+								} else {
+									require.Nil(t, response, "successful checks must continue the admission chain")
+								}
+								if i == 1 || action == rules.ActionTypeAllow || (dryRun != nil && *dryRun) {
+									require.Empty(t, recorder.emitted)
+								} else {
+									require.Len(t, recorder.emitted, 1)
+									reason := events.ReasonNamespaceRuleAudit
+									if action == rules.ActionTypeDeny {
+										reason = events.ReasonForbiddenNetworkPolicyEgressCIDR
+										if ingress {
+											reason = events.ReasonForbiddenNetworkPolicyIngressCIDR
+										}
+									}
+									require.Equal(t, reason, recorder.emitted[0].Reason())
+									require.Equal(t, "tenant-0", recorder.emitted[0].Labels()[meta.NewTenantLabel])
+								}
+							}
+						})
+					}
+				}
+			}
+		})
 	}
 }
