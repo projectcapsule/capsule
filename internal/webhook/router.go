@@ -89,22 +89,29 @@ func (r *handlerRouter) Handle(ctx context.Context, req admission.Request) admis
 		reader = webhookutils.NewRequestCachingReader(reader)
 	}
 
+	// Select per request: the shared recorder also serves concurrent admissions
+	// and controllers, whose Events must remain enabled.
+	recorder := r.recorder
+	if req.DryRun != nil && *req.DryRun {
+		recorder = events.NewDiscardRecorder()
+	}
+
 	switch req.Operation {
 	case admissionv1.Create:
 		for _, h := range r.handlers {
-			if response := h.OnCreate(r.client, reader, r.decoder, r.recorder)(ctx, req); response != nil {
+			if response := h.OnCreate(r.client, reader, r.decoder, recorder)(ctx, req); response != nil {
 				return r.recordResponse(span, *response)
 			}
 		}
 	case admissionv1.Update:
 		for _, h := range r.handlers {
-			if response := h.OnUpdate(r.client, reader, r.decoder, r.recorder)(ctx, req); response != nil {
+			if response := h.OnUpdate(r.client, reader, r.decoder, recorder)(ctx, req); response != nil {
 				return r.recordResponse(span, *response)
 			}
 		}
 	case admissionv1.Delete:
 		for _, h := range r.handlers {
-			if response := h.OnDelete(r.client, reader, r.decoder, r.recorder)(ctx, req); response != nil {
+			if response := h.OnDelete(r.client, reader, r.decoder, recorder)(ctx, req); response != nil {
 				return r.recordResponse(span, *response)
 			}
 		}

@@ -156,7 +156,8 @@ var _ = Describe("deprecated scheduler rules", Label("tenant", "rules", "enforce
 			if err == nil {
 				Fail("unlisted scheduler was accepted in a Deployment")
 			}
-			g.Expect(err).To(MatchError(ContainSubstring("spec.template.spec.schedulerName")))
+			g.Expect(apierrors.IsForbidden(err)).To(BeTrue())
+			g.Expect(err).To(MatchError(ContainSubstring(`spec.template: scheduler "unlisted" at spec.schedulerName is not allowed by namespace rule`)))
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		Expect(owners[0].Get(ctx, client.ObjectKeyFromObject(deployment), deployment)).To(Succeed())
 		Expect(deployment.Spec.Template.Spec.SchedulerName).To(Equal("legacy-a"))
@@ -191,11 +192,11 @@ var _ = Describe("deprecated scheduler rules", Label("tenant", "rules", "enforce
 		checkPod(owners[0], selected, "legacy-a", false)
 		Eventually(func() error {
 			current := &corev1.Namespace{}
-			if err := owners[0].Get(ctx, client.ObjectKeyFromObject(unselected), current); err != nil {
+			if err := admin.Get(ctx, client.ObjectKeyFromObject(unselected), current); err != nil {
 				return err
 			}
 			current.Labels["scheduler-profile"] = "selected"
-			return owners[0].Update(ctx, current)
+			return admin.Update(ctx, current)
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		expectProfile(unselected, 2, "updated-a")
 		checkPod(owners[0], unselected, "unlisted", false)
