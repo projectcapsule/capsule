@@ -16,50 +16,101 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
-func hasEgressCIDRs(body *rules.NamespaceRuleEnforceBody) bool {
-	return body.Network.Policies.Egress != nil && len(body.Network.Policies.Egress.CIDRs) > 0
+func hasPolicyCIDRs(body *rules.NamespaceRuleEnforceBody) bool {
+	policy := body.Network.Policies
+
+	return (policy.Egress != nil && len(policy.Egress.CIDRs) > 0) ||
+		(policy.Ingress != nil && len(policy.Ingress.CIDRs) > 0)
 }
 
-type egressCIDR struct {
+func directionRule(body *rules.NamespaceRuleEnforceBody, direction networkingv1.PolicyType) *rules.NetworkPolicyCIDRRule {
+	if direction == networkingv1.PolicyTypeIngress {
+		return body.Network.Policies.Ingress
+	}
+
+	return body.Network.Policies.Egress
+}
+
+type policyCIDR struct {
 	prefix netip.Prefix
 	audit  bool
 }
 
-// evaluate partitions grants at rule and exception boundaries. Membership of
+func evaluate(ctx context.Context, obj *networkingv1.NetworkPolicy, bodies []*rules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
+	if obj == nil {
+		return nil, nil
+	}
+
+	// Preserve egress decision order. A successful direction cannot authorize
+	// grants in the other direction; either direction may reject the policy.
+	result, err := evaluateDirection(ctx, obj, bodies, networkingv1.PolicyTypeEgress)
+	if err != nil || result.BlockingError() != nil {
+		return result, err
+	}
+
+	ingress, err := evaluateDirection(ctx, obj, bodies, networkingv1.PolicyTypeIngress)
+	if result == nil {
+		return ingress, err
+	}
+
+	result.Append(ingress)
+
+	return result, err
+}
+
+// evaluateDirection partitions grants at rule and exception boundaries. Membership of
 // every CIDR is constant inside each partition, so one address per partition
 // proves coverage of the entire grant, including IPv6 /0, without enumerating
 // addresses. The existing evaluator retains ordered decisions and allow misses.
-func evaluate(ctx context.Context, obj *networkingv1.NetworkPolicy, bodies []*rules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
-	if obj == nil || len(obj.Spec.Egress) == 0 ||
-		(len(obj.Spec.PolicyTypes) > 0 && !slices.Contains(obj.Spec.PolicyTypes, networkingv1.PolicyTypeEgress)) {
+func evaluateDirection(ctx context.Context, obj *networkingv1.NetworkPolicy, bodies []*rules.NamespaceRuleEnforceBody, direction networkingv1.PolicyType) (*ruleengine.Evaluation, error) {
+	name, allowed, reason := "networkPolicy egress CIDR", "Allowed egress CIDRs", events.ReasonForbiddenNetworkPolicyEgressCIDR
+	message := func(action rules.ActionType, value ruleengine.Value, matched any) string {
+		return fmt.Sprintf("networkPolicy egress CIDR %q at %s matches %s rule for CIDR %v", value.Value, value.Path, action, matched)
+	}
+	count := len(obj.Spec.Egress)
+
+	if direction == networkingv1.PolicyTypeIngress {
+		name, allowed, reason = "networkPolicy ingress CIDR", "Allowed ingress CIDRs", events.ReasonForbiddenNetworkPolicyIngressCIDR
+		message = func(action rules.ActionType, value ruleengine.Value, matched any) string {
+			return fmt.Sprintf("networkPolicy ingress CIDR %q at %s matches %s rule for CIDR %v", value.Value, value.Path, action, matched)
+		}
+		count = len(obj.Spec.Ingress)
+	}
+
+	if count == 0 || (len(obj.Spec.PolicyTypes) > 0 && !slices.Contains(obj.Spec.PolicyTypes, direction)) {
 		return nil, nil
 	}
 
 	// Prefix parsing is cheap, allocation-free, and done once per rule per
 	// request, never per peer or partition. No cluster lookup or mutable shared
 	// state is needed; the supplied effective rules are the source of truth.
-	prepared := make(map[*rules.NamespaceRuleEnforceBody][]egressCIDR)
+	prepared := make(map[*rules.NamespaceRuleEnforceBody][]policyCIDR)
 
 	var boundaries []netip.Addr
 
 	for _, body := range bodies {
-		if body == nil || !hasEgressCIDRs(body) {
+		if body == nil {
 			continue
 		}
 
-		prefixes := make([]egressCIDR, 0, len(body.Network.Policies.Egress.CIDRs))
+		configured := directionRule(body, direction)
+		if configured == nil || len(configured.CIDRs) == 0 {
+			continue
+		}
 
-		for _, cidr := range body.Network.Policies.Egress.CIDRs {
+		prefixes := make([]policyCIDR, 0, len(configured.CIDRs))
+
+		for _, cidr := range configured.CIDRs {
 			if err := ctx.Err(); err != nil {
 				return nil, err
 			}
 
 			prefix, err := parsePrefix(cidr)
 			if err != nil {
-				return nil, fmt.Errorf("networkPolicy egress CIDR rule: %w", err)
+				return nil, fmt.Errorf("%s rule: %w", name, err)
 			}
 
-			prefixes = append(prefixes, egressCIDR{prefix: prefix, audit: body.Action == rules.ActionTypeAudit})
+			prefixes = append(prefixes, policyCIDR{prefix: prefix, audit: body.Action == rules.ActionTypeAudit})
 			boundaries = appendBoundaries(boundaries, prefix)
 		}
 
@@ -77,12 +128,12 @@ func evaluate(ctx context.Context, obj *networkingv1.NetworkPolicy, bodies []*ru
 	// evaluator allocates a decision/message for each matching partition.
 	var seenAudits map[netip.Prefix]struct{}
 
-	set := ruleengine.Set[egressCIDR, []ruleengine.Value]{
-		Name:        "networkPolicy egress CIDR",
-		EventReason: events.ReasonForbiddenNetworkPolicyEgressCIDR,
+	set := ruleengine.Set[policyCIDR, []ruleengine.Value]{
+		Name:        name,
+		EventReason: reason,
 		Values:      func(values []ruleengine.Value) []ruleengine.Value { return values },
-		Rules:       func(body *rules.NamespaceRuleEnforceBody) []egressCIDR { return prepared[body] },
-		Matches: func(cidr egressCIDR, value ruleengine.Value) (ruleengine.Match, error) {
+		Rules:       func(body *rules.NamespaceRuleEnforceBody) []policyCIDR { return prepared[body] },
+		Matches: func(cidr policyCIDR, value ruleengine.Value) (ruleengine.Match, error) {
 			if err := ctx.Err(); err != nil {
 				return ruleengine.Match{}, err
 			}
@@ -106,14 +157,12 @@ func evaluate(ctx context.Context, obj *networkingv1.NetworkPolicy, bodies []*ru
 
 			return ruleengine.Match{Matched: true, MatchedValue: cidr.prefix.String()}, nil
 		},
-		RuleDescription:    func(cidr egressCIDR) string { return cidr.prefix.String() },
-		AllowedDescription: "Allowed egress CIDRs",
-		Message: func(action rules.ActionType, value ruleengine.Value, matched any) string {
-			return fmt.Sprintf("networkPolicy egress CIDR %q at %s matches %s rule for CIDR %v", value.Value, value.Path, action, matched)
-		},
+		RuleDescription:    func(cidr policyCIDR) string { return cidr.prefix.String() },
+		AllowedDescription: allowed,
+		Message:            message,
 	}
 	result := &ruleengine.Evaluation{}
-	err := walkEgressValues(ctx, obj, boundaries, func(values []ruleengine.Value) error {
+	err := walkPolicyValues(ctx, obj, direction, boundaries, func(values []ruleengine.Value) error {
 		clear(seenAudits)
 
 		evaluation, err := ruleengine.EvaluateEnforce(values, bodies, set)
@@ -135,54 +184,67 @@ func evaluate(ctx context.Context, obj *networkingv1.NetworkPolicy, bodies []*ru
 
 // Process one peer at a time, bounding temporary storage by rule/exception
 // boundaries rather than multiplying it by every peer in an untrusted object.
-func walkEgressValues(ctx context.Context, obj *networkingv1.NetworkPolicy, boundaries []netip.Addr, visit func([]ruleengine.Value) error) error {
-	for i, rule := range obj.Spec.Egress {
+func walkPolicyValues(ctx context.Context, obj *networkingv1.NetworkPolicy, direction networkingv1.PolicyType, boundaries []netip.Addr, visit func([]ruleengine.Value) error) error {
+	if direction == networkingv1.PolicyTypeIngress {
+		for i, rule := range obj.Spec.Ingress {
+			if err := walkPeers(ctx, rule.From, boundaries, fmt.Sprintf("spec.ingress[%d].from", i), visit); err != nil {
+				return err
+			}
+		}
+	} else {
+		for i, rule := range obj.Spec.Egress {
+			if err := walkPeers(ctx, rule.To, boundaries, fmt.Sprintf("spec.egress[%d].to", i), visit); err != nil {
+				return err
+			}
+		}
+	}
+
+	return ctx.Err()
+}
+
+func walkPeers(ctx context.Context, peers []networkingv1.NetworkPolicyPeer, boundaries []netip.Addr, path string, visit func([]ruleengine.Value) error) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	if len(peers) == 0 {
+		return visitUnrestricted(ctx, boundaries, path, visit)
+	}
+
+	for j, peer := range peers {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 
-		path := fmt.Sprintf("spec.egress[%d].to", i)
-		if len(rule.To) == 0 {
-			if err := visitUnrestricted(ctx, boundaries, path, visit); err != nil {
-				return err
+		peerPath := fmt.Sprintf("%s[%d]", path, j)
+
+		if peer.IPBlock == nil {
+			if peer.PodSelector == nil && peer.NamespaceSelector == nil {
+				if err := visitUnrestricted(ctx, boundaries, peerPath, visit); err != nil {
+					return err
+				}
 			}
+
+			continue
 		}
 
-		for j, peer := range rule.To {
-			if err := ctx.Err(); err != nil {
-				return err
-			}
+		prefix, err := parsePrefix(peer.IPBlock.CIDR)
+		if err != nil {
+			return fmt.Errorf("%s.ipBlock.cidr: %w", peerPath, err)
+		}
 
-			peerPath := fmt.Sprintf("%s[%d]", path, j)
+		exceptions, err := prepareExceptions(ctx, prefix, peer.IPBlock.Except, peerPath)
+		if err != nil {
+			return err
+		}
 
-			if peer.IPBlock == nil {
-				if peer.PodSelector == nil && peer.NamespaceSelector == nil {
-					if err := visitUnrestricted(ctx, boundaries, peerPath, visit); err != nil {
-						return err
-					}
-				}
+		values, err := appendGrant(ctx, nil, prefix, exceptions, boundaries, peerPath+".ipBlock.cidr")
+		if err != nil {
+			return err
+		}
 
-				continue
-			}
-
-			prefix, err := parsePrefix(peer.IPBlock.CIDR)
-			if err != nil {
-				return fmt.Errorf("%s.ipBlock.cidr: %w", peerPath, err)
-			}
-
-			exceptions, err := prepareExceptions(ctx, prefix, peer.IPBlock.Except, peerPath)
-			if err != nil {
-				return err
-			}
-
-			values, err := appendGrant(ctx, nil, prefix, exceptions, boundaries, peerPath+".ipBlock.cidr")
-			if err != nil {
-				return err
-			}
-
-			if err := visit(values); err != nil {
-				return err
-			}
+		if err := visit(values); err != nil {
+			return err
 		}
 	}
 

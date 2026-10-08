@@ -82,14 +82,19 @@ func ValidateRuleStatusBody(
 }
 
 func validateNetworkPolicyRules(ruleIndex int, policy rules.NamespaceRuleEnforceNetworkPoliciesBody) error {
-	if policy.Egress == nil {
-		return nil
-	}
+	for _, direction := range []struct {
+		name string
+		rule *rules.NetworkPolicyCIDRRule
+	}{{"egress", policy.Egress}, {"ingress", policy.Ingress}} {
+		if direction.rule == nil {
+			continue
+		}
 
-	for i, cidr := range policy.Egress.CIDRs {
-		prefix, err := netip.ParsePrefix(cidr)
-		if err != nil || prefix.Addr().Is4In6() {
-			return fmt.Errorf("rules[%d].enforce.network.policies.egress.cidrs[%d] %q is invalid: must be an IPv4 or IPv6 CIDR (IPv4-mapped IPv6 is unsupported)", ruleIndex, i, cidr)
+		for i, cidr := range direction.rule.CIDRs {
+			prefix, err := netip.ParsePrefix(cidr)
+			if err != nil || prefix.Addr().Is4In6() {
+				return fmt.Errorf("rules[%d].enforce.network.policies.%s.cidrs[%d] %q is invalid: must be an IPv4 or IPv6 CIDR (IPv4-mapped IPv6 is unsupported)", ruleIndex, direction.name, i, cidr)
+			}
 		}
 	}
 
