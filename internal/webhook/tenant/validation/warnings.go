@@ -80,6 +80,7 @@ func (h *warningHandler) handle(tnt *capsulev1beta2.Tenant, req admission.Reques
 	}
 
 	response.Warnings = append(response.Warnings, deprecatedTenantFieldWarnings(tnt)...)
+	response.Warnings = append(response.Warnings, deprecatedSchedulerWarnings(tnt)...)
 
 	//nolint:staticcheck
 	if len(tnt.Spec.LimitRanges.Items) > 0 {
@@ -136,6 +137,23 @@ func (h *warningHandler) handle(tnt *capsulev1beta2.Tenant, req admission.Reques
 	}
 
 	return response
+}
+
+func deprecatedSchedulerWarnings(tnt *capsulev1beta2.Tenant) []string {
+	for _, rule := range tnt.Spec.Rules {
+		if rule == nil || rule.NamespaceRuleBodyNamespace == nil || rule.Enforce == nil {
+			continue
+		}
+
+		//nolint:staticcheck // Warn once per request even when several rules use the field.
+		if len(rule.Enforce.Workloads.Schedulers) > 0 {
+			return []string{
+				"The field `spec.rules[].enforce.workloads.schedulers` is deprecated and will be removed in a future release. Please migrate to `spec.rules[].enforce.workloads.placement.schedulers`.",
+			}
+		}
+	}
+
+	return nil
 }
 
 func deprecatedTenantFieldWarnings(tnt *capsulev1beta2.Tenant) (warnings []string) {

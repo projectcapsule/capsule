@@ -258,6 +258,16 @@ func validateWorkloadRules(
 		}
 	}
 
+	//nolint:staticcheck // Apply the same validation to deprecated scheduler rules.
+	for j, scheduler := range workloads.Schedulers {
+		if err := validateExpressionMatch(
+			scheduler,
+			fmt.Sprintf("rules[%d].enforce.workloads.schedulers[%d]", ruleIndex, j),
+		); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

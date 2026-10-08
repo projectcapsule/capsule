@@ -41,6 +41,12 @@ func TestPlacementRegexCacheRebuild(t *testing.T) {
 			LabelSelector: &rules.PlacementLabelSelectorMatch{Requirements: requirement()}, NamespaceSelector: &rules.PlacementLabelSelectorMatch{Requirements: requirement()},
 		}}},
 	}}}
+	body.Enforce.Workloads.Placement.Schedulers = []runtime.ExpressionMatch{{ExpressionRegex: expression().ExpressionRegex}}
+	body.Enforce.Workloads.Schedulers = []runtime.ExpressionMatch{
+		{ExpressionRegex: expression().ExpressionRegex},
+		body.Enforce.Workloads.Placement.Schedulers[0],
+		{Exact: []string{"no-expression"}},
+	}
 	scheme := k8sruntime.NewScheme()
 	if err := capsulev1beta2.AddToScheme(scheme); err != nil {
 		t.Fatal(err)

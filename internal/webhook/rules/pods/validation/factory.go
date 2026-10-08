@@ -270,7 +270,8 @@ func hasWorkloadPolicy(body apirules.NamespaceRuleEnforceWorkloadsBody, subresou
 		return true
 	}
 
-	if len(body.Placement.Schedulers) > 0 || len(body.QoSClasses) > 0 || len(body.Registries) > 0 {
+	//nolint:staticcheck // Deprecated scheduler rules still activate workload enforcement.
+	if len(body.Placement.Schedulers) > 0 || len(body.Schedulers) > 0 || len(body.QoSClasses) > 0 || len(body.Registries) > 0 {
 		return true
 	}
 

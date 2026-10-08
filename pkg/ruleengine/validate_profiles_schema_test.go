@@ -55,7 +55,9 @@ func TestSecurityProfileLimitsInGeneratedSchemas(t *testing.T) {
 			var internal apiextensions.JSONSchemaProps
 			for _, name := range []string{"schedulers", "nodeSelector", "tolerations", "topologySpreadConstraints", "affinity"} {
 				require.Contains(t, schema.Properties["placement"].Properties, name)
-				require.NotContains(t, schema.Properties, name)
+				if name != "schedulers" {
+					require.NotContains(t, schema.Properties, name)
+				}
 			}
 			for _, name := range []string{"seccompProfiles", "appArmorProfiles"} {
 				require.Contains(t, schema.Properties["security"].Properties, name)

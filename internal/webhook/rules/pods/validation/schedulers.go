@@ -4,6 +4,7 @@
 package validation
 
 import (
+	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -42,7 +43,19 @@ func (h *podRules) validateSchedulers(
 					return nil
 				}
 
-				return enforce.Workloads.Placement.Schedulers
+				preferred := enforce.Workloads.Placement.Schedulers
+
+				legacy := enforce.Workloads.Schedulers //nolint:staticcheck // Preserve deprecated scheduler rules.
+				if len(legacy) == 0 {
+					return preferred
+				}
+
+				if len(preferred) == 0 {
+					return legacy
+				}
+
+				// Both inputs may be cache-owned; never append into their backing arrays.
+				return slices.Concat(preferred, legacy)
 			},
 			Matches: func(match runtime.ExpressionMatch, value ruleengine.Value) (ruleengine.Match, error) {
 				matched, err := match.MatchesWithExpressionMatcher(h.regexCache, value.Value)
