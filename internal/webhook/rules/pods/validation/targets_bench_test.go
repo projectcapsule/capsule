@@ -16,6 +16,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 func BenchmarkPodTargetAdmission(b *testing.B) {
@@ -35,5 +36,74 @@ func BenchmarkPodTargetAdmission(b *testing.B) {
 				}
 			}
 		})
+	}
+}
+
+func BenchmarkSchedulerCompatibilityAdmission(b *testing.B) {
+	for _, tenants := range []int{1, 8} {
+		for _, count := range []int{1, 20} {
+			for _, field := range []string{"placement", "placement-pair", "legacy", "both"} {
+				for _, mode := range []string{"allow", "deny", "skip", "cold", "parallel"} {
+					b.Run(fmt.Sprintf("tenants=%d/rules=%d/%s/%s", tenants, count, field, mode), func(b *testing.B) {
+						h := PodRules(nil, nil, nil).(*podRules)
+						recorder := events.NewEventRecorder(nil, logr.Discard(), nil, nil)
+						calls := make([]handlers.Func, tenants)
+						for i := range tenants {
+							name := fmt.Sprintf("tenant-%d", i)
+							tnt := &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: name}}
+							pod := schedulerPodForTest("allowed-" + name)
+							pod.Namespace = name
+							if mode == "deny" {
+								pod.Spec.SchedulerName = "blocked-" + name
+							}
+							bodies := make([]*rules.NamespaceRuleBodyNamespace, count)
+							for j := range bodies {
+								body := &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeDeny}
+								match := schedulerExpressionForTest("^blocked-" + name + "$")
+								if field != "legacy" {
+									body.Workloads.Placement.Schedulers = []apiruntime.ExpressionMatch{match}
+								}
+								if field == "placement-pair" {
+									body.Workloads.Placement.Schedulers = append(body.Workloads.Placement.Schedulers, match)
+								}
+								if field == "legacy" || field == "both" {
+									body.Workloads.Schedulers = []apiruntime.ExpressionMatch{match}
+								}
+								if mode == "skip" {
+									body.Workloads.Targets = []rules.WorkloadValidationTarget{rules.ValidateJob}
+								}
+								bodies[j] = &rules.NamespaceRuleBodyNamespace{Enforce: body}
+							}
+							calls[i] = h.OnCreate(nil, nil, pod, nil, recorder, tnt, bodies)
+						}
+						run := func(i int) {
+							response := calls[i%tenants](b.Context(), admission.Request{})
+							if (response != nil) != (mode == "deny") || (response != nil && response.Allowed) {
+								b.Fatalf("unexpected response: %v", response)
+							}
+						}
+						for i := range tenants {
+							run(i)
+						}
+						b.ReportAllocs()
+						b.ResetTimer()
+						if mode == "parallel" {
+							b.RunParallel(func(pb *testing.PB) {
+								for i := 0; pb.Next(); i++ {
+									run(i)
+								}
+							})
+						} else {
+							for i := 0; b.Loop(); i++ {
+								if mode == "cold" {
+									h.regexCache.Reset()
+								}
+								run(i)
+							}
+						}
+					})
+				}
+			}
+		}
 	}
 }

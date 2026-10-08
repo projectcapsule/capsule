@@ -1550,6 +1550,40 @@ spec:
                           x-kubernetes-validations:
                           - message: at least one of requests or limits must be set
                             rule: has(self.requests) || has(self.limits)
+                        schedulers:
+                          description: |-
+                            Schedulers defines additional schedulerName matchers for selected Pods and
+                            Pod templates. These are combined with placement.schedulers under the same
+                            rule action; a match in either field counts as a match.
+
+                            Deprecated: use Placement.Schedulers instead.
+                          items:
+                            description: |-
+                              At least one of Exact or Exp must be set.
+                              Both may be set together.
+                            properties:
+                              exact:
+                                description: Exact matches one of the provided values
+                                  exactly.
+                                items:
+                                  type: string
+                                maxItems: 64
+                                minItems: 1
+                                type: array
+                              exp:
+                                description: Exp matches regular expression.
+                                maxLength: 4096
+                                minLength: 1
+                                type: string
+                              negate:
+                                default: false
+                                description: Negate regular Expression
+                                type: boolean
+                            type: object
+                            x-kubernetes-validations:
+                            - message: at least one of exact or exp must be set
+                              rule: has(self.exact) || has(self.exp)
+                          type: array
                         security:
                           description: Security matches effective Pod and container
                             security profiles.
@@ -4760,6 +4794,40 @@ spec:
                             - message: at least one of requests or limits must be
                                 set
                               rule: has(self.requests) || has(self.limits)
+                          schedulers:
+                            description: |-
+                              Schedulers defines additional schedulerName matchers for selected Pods and
+                              Pod templates. These are combined with placement.schedulers under the same
+                              rule action; a match in either field counts as a match.
+
+                              Deprecated: use Placement.Schedulers instead.
+                            items:
+                              description: |-
+                                At least one of Exact or Exp must be set.
+                                Both may be set together.
+                              properties:
+                                exact:
+                                  description: Exact matches one of the provided values
+                                    exactly.
+                                  items:
+                                    type: string
+                                  maxItems: 64
+                                  minItems: 1
+                                  type: array
+                                exp:
+                                  description: Exp matches regular expression.
+                                  maxLength: 4096
+                                  minLength: 1
+                                  type: string
+                                negate:
+                                  default: false
+                                  description: Negate regular Expression
+                                  type: boolean
+                              type: object
+                              x-kubernetes-validations:
+                              - message: at least one of exact or exp must be set
+                                rule: has(self.exact) || has(self.exp)
+                            type: array
                           security:
                             description: Security matches effective Pod and container
                               security profiles.
@@ -7931,6 +7999,40 @@ spec:
                               - message: at least one of requests or limits must be
                                   set
                                 rule: has(self.requests) || has(self.limits)
+                            schedulers:
+                              description: |-
+                                Schedulers defines additional schedulerName matchers for selected Pods and
+                                Pod templates. These are combined with placement.schedulers under the same
+                                rule action; a match in either field counts as a match.
+
+                                Deprecated: use Placement.Schedulers instead.
+                              items:
+                                description: |-
+                                  At least one of Exact or Exp must be set.
+                                  Both may be set together.
+                                properties:
+                                  exact:
+                                    description: Exact matches one of the provided
+                                      values exactly.
+                                    items:
+                                      type: string
+                                    maxItems: 64
+                                    minItems: 1
+                                    type: array
+                                  exp:
+                                    description: Exp matches regular expression.
+                                    maxLength: 4096
+                                    minLength: 1
+                                    type: string
+                                  negate:
+                                    default: false
+                                    description: Negate regular Expression
+                                    type: boolean
+                                type: object
+                                x-kubernetes-validations:
+                                - message: at least one of exact or exp must be set
+                                  rule: has(self.exact) || has(self.exp)
+                              type: array
                             security:
                               description: Security matches effective Pod and container
                                 security profiles.

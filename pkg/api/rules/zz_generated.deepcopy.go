@@ -359,6 +359,13 @@ func (in *NamespaceRuleEnforceWorkloadsBody) DeepCopyInto(out *NamespaceRuleEnfo
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.Schedulers != nil {
+		in, out := &in.Schedulers, &out.Schedulers
+		*out = make([]runtime.ExpressionMatch, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	in.Placement.DeepCopyInto(&out.Placement)
 	in.Security.DeepCopyInto(&out.Security)
 }

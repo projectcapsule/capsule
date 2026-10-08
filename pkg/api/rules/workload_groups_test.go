@@ -34,6 +34,8 @@ func TestNestedWorkloadEnforcementSerialization(t *testing.T) {
 		`{"targets":["daemonset"]}`,
 		`{"targets":["daemonset"],"placement":{},"security":{}}`,
 		`{"targets":["daemonset"],"placement":null,"security":null}`,
+		`{"targets":["daemonset"],"schedulers":[]}`,
+		`{"targets":["daemonset"],"schedulers":null}`,
 	} {
 		var kindOnly NamespaceRuleEnforceWorkloadsBody
 		require.NoError(t, yaml.UnmarshalStrict([]byte(source), &kindOnly))
@@ -43,8 +45,27 @@ func TestNestedWorkloadEnforcementSerialization(t *testing.T) {
 		require.NoError(t, err)
 		require.JSONEq(t, `{"targets":["daemonset"]}`, string(encoded))
 	}
-	for _, field := range []string{"schedulers", "seccompProfiles", "appArmorProfiles", "nodeSelector", "tolerations", "topologySpreadConstraints", "affinity"} {
+	for _, field := range []string{"seccompProfiles", "appArmorProfiles", "nodeSelector", "tolerations", "topologySpreadConstraints", "affinity"} {
 		var workload NamespaceRuleEnforceWorkloadsBody
 		require.ErrorContains(t, yaml.UnmarshalStrict([]byte(`{"`+field+`":[]}`), &workload), "unknown field")
+	}
+}
+
+func TestDeprecatedSchedulersSerialization(t *testing.T) {
+	for _, source := range []string{
+		`{"targets":["pod"],"schedulers":[{"exact":["legacy"]}]}`,
+		`{"targets":["deployment"],"schedulers":[{"exact":["legacy"]}],"placement":{"schedulers":[{"exact":["preferred"]}]}}`,
+	} {
+		var workload NamespaceRuleEnforceWorkloadsBody
+		require.NoError(t, yaml.UnmarshalStrict([]byte(source), &workload))
+		require.True(t, workload.HasPodSpecPolicies())
+		require.True(t, workload.HasPolicies())
+		require.False(t, workload.TargetsOnly())
+		copied := workload.DeepCopy()
+		encoded, err := json.Marshal(copied)
+		require.NoError(t, err)
+		require.JSONEq(t, source, string(encoded))
+		copied.Schedulers[0].Exact[0] = "changed"
+		require.Equal(t, "legacy", workload.Schedulers[0].Exact[0])
 	}
 }

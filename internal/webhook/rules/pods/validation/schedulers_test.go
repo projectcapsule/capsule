@@ -360,80 +360,91 @@ func TestPodRulesValidateSchedulers(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := podRulesForTest()
+	for _, original := range tests {
+		for _, field := range []string{"placement", "legacy"} {
+			tt := original
+			tt.enforceBodies = make([]*apirules.NamespaceRuleEnforceBody, len(original.enforceBodies))
+			for i, body := range original.enforceBodies {
+				tt.enforceBodies[i] = body.DeepCopy()
+				if body != nil && field == "legacy" {
+					tt.enforceBodies[i].Workloads.Schedulers = tt.enforceBodies[i].Workloads.Placement.Schedulers
+					tt.enforceBodies[i].Workloads.Placement.Schedulers = nil
+				}
+			}
+			t.Run(tt.name+"/"+field, func(t *testing.T) {
+				h := podRulesForTest()
 
-			evaluation, err := h.validateSchedulers(tt.pod, tt.enforceBodies)
+				evaluation, err := h.validateSchedulers(tt.pod, tt.enforceBodies)
 
-			if tt.wantErr != "" {
-				if err == nil {
-					t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+				if tt.wantErr != "" {
+					if err == nil {
+						t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+					}
+
+					if !strings.Contains(err.Error(), tt.wantErr) {
+						t.Fatalf("expected error containing %q, got %q", tt.wantErr, err.Error())
+					}
+
+					return
 				}
 
-				if !strings.Contains(err.Error(), tt.wantErr) {
-					t.Fatalf("expected error containing %q, got %q", tt.wantErr, err.Error())
+				if err != nil {
+					t.Fatalf("expected no error, got %v", err)
 				}
 
-				return
-			}
+				if evaluation == nil {
+					t.Fatalf("expected evaluation, got nil")
+				}
 
-			if err != nil {
-				t.Fatalf("expected no error, got %v", err)
-			}
+				if tt.wantBlocking && evaluation.Blocking == nil {
+					t.Fatalf("expected blocking decision, got nil")
+				}
 
-			if evaluation == nil {
-				t.Fatalf("expected evaluation, got nil")
-			}
+				if !tt.wantBlocking && evaluation.Blocking != nil {
+					t.Fatalf("expected no blocking decision, got %#v", evaluation.Blocking)
+				}
 
-			if tt.wantBlocking && evaluation.Blocking == nil {
-				t.Fatalf("expected blocking decision, got nil")
-			}
+				if tt.wantFinal && evaluation.Final == nil {
+					t.Fatalf("expected final decision, got nil")
+				}
 
-			if !tt.wantBlocking && evaluation.Blocking != nil {
-				t.Fatalf("expected no blocking decision, got %#v", evaluation.Blocking)
-			}
+				if !tt.wantFinal && evaluation.Final != nil {
+					t.Fatalf("expected no final decision, got %#v", evaluation.Final)
+				}
 
-			if tt.wantFinal && evaluation.Final == nil {
-				t.Fatalf("expected final decision, got nil")
-			}
+				if len(evaluation.Audits) != tt.wantAudits {
+					t.Fatalf("expected %d audit decisions, got %d", tt.wantAudits, len(evaluation.Audits))
+				}
 
-			if !tt.wantFinal && evaluation.Final != nil {
-				t.Fatalf("expected no final decision, got %#v", evaluation.Final)
-			}
+				if len(tt.wantMessage) > 0 {
+					msg := decisionMessageForSchedulerTest(evaluation)
 
-			if len(evaluation.Audits) != tt.wantAudits {
-				t.Fatalf("expected %d audit decisions, got %d", tt.wantAudits, len(evaluation.Audits))
-			}
-
-			if len(tt.wantMessage) > 0 {
-				msg := decisionMessageForSchedulerTest(evaluation)
-
-				for _, expected := range tt.wantMessage {
-					if !strings.Contains(msg, expected) {
-						t.Fatalf("expected message %q to contain %q", msg, expected)
+					for _, expected := range tt.wantMessage {
+						if !strings.Contains(msg, expected) {
+							t.Fatalf("expected message %q to contain %q", msg, expected)
+						}
 					}
 				}
-			}
 
-			if evaluation.Final != nil {
-				if evaluation.Final.EventReason != events.ReasonForbiddenPodScheduler {
-					t.Fatalf("final event reason = %q, want %q", evaluation.Final.EventReason, events.ReasonForbiddenPodScheduler)
+				if evaluation.Final != nil {
+					if evaluation.Final.EventReason != events.ReasonForbiddenPodScheduler {
+						t.Fatalf("final event reason = %q, want %q", evaluation.Final.EventReason, events.ReasonForbiddenPodScheduler)
+					}
 				}
-			}
 
-			if evaluation.Blocking != nil {
-				if evaluation.Blocking.EventReason != events.ReasonForbiddenPodScheduler {
-					t.Fatalf("blocking event reason = %q, want %q", evaluation.Blocking.EventReason, events.ReasonForbiddenPodScheduler)
+				if evaluation.Blocking != nil {
+					if evaluation.Blocking.EventReason != events.ReasonForbiddenPodScheduler {
+						t.Fatalf("blocking event reason = %q, want %q", evaluation.Blocking.EventReason, events.ReasonForbiddenPodScheduler)
+					}
 				}
-			}
 
-			for _, audit := range evaluation.Audits {
-				if audit.EventReason != events.ReasonForbiddenPodScheduler {
-					t.Fatalf("audit event reason = %q, want %q", audit.EventReason, events.ReasonForbiddenPodScheduler)
+				for _, audit := range evaluation.Audits {
+					if audit.EventReason != events.ReasonForbiddenPodScheduler {
+						t.Fatalf("audit event reason = %q, want %q", audit.EventReason, events.ReasonForbiddenPodScheduler)
+					}
 				}
-			}
-		})
+			})
+		}
 	}
 }
 
