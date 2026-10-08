@@ -31,17 +31,11 @@ func MutatingHandler(handler ...handlers.TypedHandlerWithTenant[*corev1.Persiste
 		Predicate: func(
 			req admission.Request,
 			pvc *corev1.PersistentVolumeClaim,
-			oldPVC *corev1.PersistentVolumeClaim,
+			_ *corev1.PersistentVolumeClaim,
 		) bool {
-			if !requiresPVCSpecValidation(req, pvc, oldPVC) {
-				return false
-			}
-
-			if pvc.Spec.Selector != nil {
-				return true
-			}
-
-			return req.Operation == admissionv1.Create && pvc.Spec.VolumeName != ""
+			// Selectors are immutable after creation, including while Pending.
+			return req.Operation == admissionv1.Create && pvc != nil &&
+				(pvc.Spec.Selector != nil || pvc.Spec.VolumeName != "")
 		},
 	}
 }
@@ -51,9 +45,8 @@ func requiresPVCSpecValidation(
 	pvc *corev1.PersistentVolumeClaim,
 	oldPVC *corev1.PersistentVolumeClaim,
 ) bool {
-	// A bound PVC's volume binding fields, including its selector, are immutable.
-	// Reapplying the tenant selector during an update would make otherwise valid
-	// metadata or resize updates fail for claims created before Capsule enforced it.
+	// A bound PVC's volume binding fields are immutable. Metadata and resize
+	// updates do not introduce a new volume binding to validate.
 	if req.Operation == admissionv1.Update &&
 		isBoundPVC(oldPVC) {
 		return false

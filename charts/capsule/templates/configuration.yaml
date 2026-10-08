@@ -86,7 +86,7 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
@@ -95,9 +95,12 @@ spec:
         {{- with $.Values.webhooks.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
         rules:
           {{- toYaml .rules |  nindent 10 }}
-        sideEffects: None
+        sideEffects: NoneOnDryRun
         timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
         {{- end }}
       {{- end }}
@@ -123,8 +126,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- with .matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
+        {{- end }}
+        {{- with .matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -167,13 +178,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -214,13 +228,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -261,13 +278,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with .rules }}
@@ -300,13 +320,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -348,13 +371,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -394,13 +420,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -442,13 +471,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -486,13 +518,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -538,6 +573,9 @@ spec:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
           - name: skip-bound-pvc-updates
@@ -587,13 +625,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -632,13 +673,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -668,13 +712,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -704,13 +751,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -740,13 +790,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -776,13 +829,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -812,8 +868,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- with .matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
+        {{- end }}
+        {{- with .matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -844,13 +908,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -891,13 +958,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -938,13 +1008,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -984,13 +1057,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -1038,6 +1114,9 @@ spec:
         {{- with $.Values.webhooks.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
           - name: requires-promotion-label
             expression: >
               has(object.metadata.labels) &&
@@ -1074,8 +1153,13 @@ spec:
         path: "/serviceaccounts/references/validating"
         failurePolicy: {{ .references.failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
-        {{- with $.Values.webhooks.matchConditions }}
+        {{- if or $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
+        {{- end }}
+        {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -1114,13 +1198,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -1160,13 +1247,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -1197,13 +1287,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -1234,13 +1327,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -1271,8 +1367,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- with .matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
+        {{- end }}
+        {{- with .matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -1320,13 +1424,16 @@ spec:
         objectSelector:
           {{- toYaml . | nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.mutating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . | nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.mutating.matchConditions }}
           {{- toYaml . | nindent 10 }}
         {{- end }}
         rules:
@@ -1375,6 +1482,9 @@ spec:
         {{- with $.Values.webhooks.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
+        {{- with $.Values.webhooks.mutating.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
           - name: mutations-supported-subresources
             expression: '!has(request.subResource) || request.subResource == "" || (request.subResource == "ephemeralcontainers" && request.operation == "UPDATE" && request.resource.group == "" && request.resource.resource == "pods")'
         rules:
@@ -1406,13 +1516,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.mutating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.mutating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -1463,24 +1576,13 @@ spec:
         {{- with $.Values.webhooks.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-          - name: skip-bound-pvc-updates
-            expression: >
-              request.operation != "UPDATE" ||
-              !has(oldObject.status.phase) ||
-              oldObject.status.phase != "Bound"
-          - name: requires-pvc-spec-validation
-            expression: >
-              request.operation != "UPDATE" ||
-              !has(object.metadata.deletionTimestamp) ||
-              object.spec != oldObject.spec
+        {{- with $.Values.webhooks.mutating.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
           - name: requires-static-binding
             expression: >
               has(object.spec.selector) ||
-              (
-                request.operation == "CREATE" &&
-                has(object.spec.volumeName) &&
-                object.spec.volumeName != ""
-              )
+              (has(object.spec.volumeName) && object.spec.volumeName != "")
         rules:
           - apiGroups:
               - ""
@@ -1488,7 +1590,6 @@ spec:
               - v1
             operations:
               - CREATE
-              - UPDATE
             resources:
               - persistentvolumeclaims
             scope: Namespaced
@@ -1519,13 +1620,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.mutating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.mutating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -1564,13 +1668,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.mutating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.mutating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -1609,13 +1716,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.mutating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.mutating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -1656,13 +1766,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.mutating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.mutating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -1703,13 +1816,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.mutating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.mutating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -1750,13 +1866,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.mutating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.mutating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -1797,13 +1916,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.mutating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.mutating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -1845,13 +1967,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.mutating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.mutating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:
@@ -1883,13 +2008,16 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.mutating.matchConditions }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         {{- with $.Values.webhooks.matchConditions }}
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with $.Values.webhooks.mutating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         rules:

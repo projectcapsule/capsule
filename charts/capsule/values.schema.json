@@ -3028,6 +3028,15 @@
                     "description": "MatchConditions for all webhooks",
                     "type": "array"
                 },
+                "mutating": {
+                    "type": "object",
+                    "properties": {
+                        "matchConditions": {
+                            "description": "Additional MatchConditions for all mutating webhooks, combined with global and per-hook conditions",
+                            "type": "array"
+                        }
+                    }
+                },
                 "mutatingWebhooksTimeoutSeconds": {
                     "description": "Timeout in seconds for mutating webhooks",
                     "type": "integer"
@@ -3057,6 +3066,15 @@
                         "url": {
                             "description": "The URL where the capsule webhook services are running (Overwrites cluster scoped service definition)",
                             "type": "string"
+                        }
+                    }
+                },
+                "validating": {
+                    "type": "object",
+                    "properties": {
+                        "matchConditions": {
+                            "description": "Additional MatchConditions for all validating webhooks, combined with global and per-hook conditions",
+                            "type": "array"
                         }
                     }
                 },

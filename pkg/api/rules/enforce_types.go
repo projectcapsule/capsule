@@ -31,7 +31,7 @@ type Audience struct {
 // +kubebuilder:object:generate=true
 type NamespaceRuleEnforceBody struct {
 	// Conditions gate this entire enforcement rule, including workloads, services,
-	// metadata, ingress and storage. All conditions must be true; empty means apply.
+	// metadata, ingress, network and storage. All conditions must be true; empty means apply.
 	// Conditions run during admission; managed metadata in a conditional rule
 	// is applied on matching requests only and is not reconciled in the background.
 	// +optional
@@ -56,6 +56,10 @@ type NamespaceRuleEnforceBody struct {
 	// Additional access to PersistentVolumes without a tenant ownership label.
 	// +optional
 	Storage NamespaceRuleEnforceStorageBody `json:"storage,omitempty"`
+
+	// Network configures network enforcement for namespace resources.
+	// +optional
+	Network NamespaceRuleEnforceNetworkBody `json:"network,omitempty"`
 
 	// Enforcement for object metadata on namespaced resources.
 	//

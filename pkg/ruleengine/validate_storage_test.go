@@ -40,3 +40,33 @@ func TestValidateStorageRules(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateStorageAndNetworkRules(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		selector *metav1.LabelSelector
+		cidr     string
+		want     string
+	}{
+		{name: "both valid", selector: &metav1.LabelSelector{}, cidr: "10.0.0.0/8"},
+		{name: "invalid storage", cidr: "10.0.0.0/8", want: "selector is required"},
+		{name: "invalid network", selector: &metav1.LabelSelector{}, cidr: "invalid", want: "enforce.network.policies.egress.cidrs"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body := &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{
+				Storage: rules.NamespaceRuleEnforceStorageBody{Volumes: []rules.PersistentVolumeMatch{{Selector: tc.selector}}},
+				Network: rules.NamespaceRuleEnforceNetworkBody{Policies: rules.NamespaceRuleEnforceNetworkPoliciesBody{
+					Egress: &rules.NetworkPolicyCIDRRule{CIDRs: []string{tc.cidr}},
+				}},
+			}}
+			err := ValidateRuleStatusBody(nil, []*rules.NamespaceRuleBodyNamespace{body})
+			if tc.want == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error=%v, want %q", err, tc.want)
+			}
+		})
+	}
+}

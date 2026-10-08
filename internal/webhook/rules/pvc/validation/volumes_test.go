@@ -125,6 +125,15 @@ func TestVolumeAccessAdmission(t *testing.T) {
 		statusReads int
 	}{
 		{name: "restore handoff", statusReads: 1},
+		{name: "restore handoff without tenant selector", change: func(f *volumeFixture) {
+			f.old.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{"velero.io/dynamic-pv-restore": "destination-copy"}}
+			f.claim.Spec.Selector = f.old.Spec.Selector.DeepCopy()
+		}, statusReads: 1},
+		{name: "restored selector cannot override other tenant ownership", change: func(f *volumeFixture) {
+			f.old.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{"velero.io/dynamic-pv-restore": "destination-copy"}}
+			f.claim.Spec.Selector = f.old.Spec.Selector.DeepCopy()
+			f.pv.Labels[meta.TenantLabel] = "tenant-b"
+		}, want: "cross-tenant mount"},
 		{name: "explicit binding create", change: func(f *volumeFixture) { f.req.Operation = admissionv1.Create }, statusReads: 1},
 		{name: "same tenant unaffected by nonmatching rules", change: func(f *volumeFixture) {
 			f.pv.Labels[meta.TenantLabel] = f.tenant.Name
@@ -174,7 +183,10 @@ func TestVolumeAccessAdmission(t *testing.T) {
 			f.pv.DeletionTimestamp = &now
 			f.pv.Finalizers = []string{"test"}
 		}, want: "missing the Tenant label"},
-		{name: "invalid PVC tenant selector", change: func(f *volumeFixture) { f.claim.Spec.Selector.MatchExpressions[0].Values = []string{"tenant-b"} }, want: "must contain only tenant"},
+		{name: "invalid PVC tenant selector on create", change: func(f *volumeFixture) {
+			f.req.Operation = admissionv1.Create
+			f.claim.Spec.Selector.MatchExpressions[0].Values = []string{"tenant-b"}
+		}, want: "must contain only tenant"},
 		{name: "bound skip", change: func(f *volumeFixture) { f.old.Status.Phase = corev1.ClaimBound }},
 		{name: "dynamic skip", change: func(f *volumeFixture) { f.claim.Spec.VolumeName = ""; f.claim.Spec.Selector = nil }},
 	} {
