@@ -82,7 +82,7 @@ func BenchmarkPVCAdmission(b *testing.B) {
 					case "mutating-update":
 						handler = MutatingHandler(PersistentVolumeMutatingVolume()).OnUpdate(nil, reader, decoder, nil)
 					default:
-						handler = Handler(PersistentVolumeValidatingVolume()).OnUpdate(nil, reader, decoder, nil)
+						handler = Handler(PersistentVolumeValidatingVolume(nil)).OnUpdate(nil, reader, decoder, nil)
 					}
 					ctx := context.Background()
 					b.ReportAllocs()

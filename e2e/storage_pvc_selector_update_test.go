@@ -21,6 +21,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
+	"github.com/projectcapsule/capsule/pkg/api/rules"
 )
 
 var _ = Describe("PVC selector immutability during restore", Label("config", "tenant", "storage", "persistentvolumeclaim", "pvc-selector-update"), func() {
@@ -214,9 +215,37 @@ var _ = Describe("PVC selector immutability during restore", Label("config", "te
 		}
 	})
 
-	It("still denies cross-tenant and unlabeled PV binding updates for restored claims", func() {
+	It("scopes additional restore access to its audience and still denies cross-tenant binding", func() {
 		ctx := context.Background()
 		pvc := createRestoredClaim("restored")
+		grant := &rules.NamespaceRuleBodyTenant{NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
+			Audience: []rules.Audience{{Kind: rules.AudienceKindGroup, Name: "system:serviceaccounts:" + ns.Name}},
+			Enforce: &rules.NamespaceRuleEnforceBody{
+				Action:     rules.ActionTypeAllow,
+				Conditions: []rules.AdmissionCondition{{Expression: "request.operation == 'UPDATE'"}},
+				Storage:    rules.NamespaceRuleEnforceStorageBody{Volumes: []rules.PersistentVolumeMatch{{Selector: &metav1.LabelSelector{}}}},
+			},
+		}}
+		Eventually(func() error {
+			current := &capsulev1beta2.Tenant{}
+			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(tenantA), current); err != nil {
+				return err
+			}
+			current.Spec.Rules = []*rules.NamespaceRuleBodyTenant{grant.DeepCopy()}
+			return k8sClient.Update(ctx, current)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Eventually(func(g Gomega) {
+			status := &capsulev1beta2.RuleStatus{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: ns.Name, Name: meta.NameForManagedRuleStatus()}, status)).To(Succeed())
+			g.Expect(status.Status.ObservedGeneration).To(Equal(status.Generation))
+			ready := status.Status.Conditions.GetConditionByType(meta.ReadyCondition)
+			g.Expect(ready).NotTo(BeNil())
+			g.Expect(ready.Status).To(Equal(metav1.ConditionTrue))
+			g.Expect(status.Status.Rules).To(HaveLen(1))
+			g.Expect(status.Status.Rules[0].Audience).To(Equal(grant.Audience))
+			g.Expect(status.Status.Rules[0].Enforce).To(Equal(grant.Enforce))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
 		for _, tenant := range []string{tenantB.Name, ""} {
 			pv := createVolume(pvc, tenant, "does-not-match")
 			if tenant == "" {
@@ -252,6 +281,32 @@ var _ = Describe("PVC selector immutability during restore", Label("config", "te
 			Expect(owner.Get(ctx, client.ObjectKeyFromObject(pvc), current)).To(Succeed())
 			Expect(current.Spec.VolumeName).To(BeEmpty())
 			Expect(current.Spec.Selector).To(Equal(pvc.Spec.Selector))
+
+			Eventually(func() error {
+				current := &corev1.PersistentVolumeClaim{}
+				if err := restorer.Get(ctx, client.ObjectKeyFromObject(pvc), current); err != nil {
+					return err
+				}
+				base := current.DeepCopy()
+				current.Spec.VolumeName = pv.Name
+				err := restorer.Patch(ctx, current, client.MergeFromWithOptions(base, client.MergeFromWithOptimisticLock{}))
+				if apierrors.IsConflict(err) || tenant == "" {
+					return err
+				}
+				Expect(err).To(HaveOccurred(), "a restore grant must not bypass PV ownership")
+				Expect(err.Error()).To(ContainSubstring("cross-tenant"))
+				return nil
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			Eventually(func(g Gomega) {
+				current := &corev1.PersistentVolumeClaim{}
+				g.Expect(restorer.Get(ctx, client.ObjectKeyFromObject(pvc), current)).To(Succeed())
+				g.Expect(current.Spec.Selector).To(Equal(pvc.Spec.Selector))
+				if tenant == "" {
+					g.Expect(current.Spec.VolumeName).To(Equal(pv.Name))
+				} else {
+					g.Expect(current.Spec.VolumeName).To(BeEmpty())
+				}
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		}
 	})
 })

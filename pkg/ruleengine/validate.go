@@ -61,6 +61,10 @@ func ValidateRuleStatusBody(
 			return err
 		}
 
+		if err := validateStorageRules(i, rule.Enforce.Storage); err != nil {
+			return err
+		}
+
 		if err := validateNetworkPolicyRules(i, rule.Enforce.Network.Policies); err != nil {
 			return err
 		}

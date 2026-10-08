@@ -101,7 +101,7 @@ func TestRestoredPVCUpdateStillValidatesVolumeOwnership(t *testing.T) {
 			newPVC.Annotations = map[string]string{"restored": "true"}
 			snapshot := newPVC.DeepCopy()
 			tnt := &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: "tenant-a"}}
-			response := PersistentVolumeValidatingVolume().OnUpdate(nil, reader, oldPVC, newPVC, admission.NewDecoder(scheme), nil, tnt)(
+			response := PersistentVolumeValidatingVolume(nil).OnUpdate(nil, reader, oldPVC, newPVC, admission.NewDecoder(scheme), nil, tnt)(
 				t.Context(), pvcUpdateAdmissionRequest(t, oldPVC, newPVC),
 			)
 			if tt.wantError == "" {

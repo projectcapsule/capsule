@@ -22,14 +22,22 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
-type persistentVolumeValidatingVolume struct{}
+// VolumeAccess evaluates additional permissions only after legacy ownership
+// validation finds a PV without a tenant label. It must never mutate the PV.
+type VolumeAccess interface {
+	Allows(ctx context.Context, c client.Client, reader client.Reader, req admission.Request, claim *corev1.PersistentVolumeClaim, volume *corev1.PersistentVolume, tnt *capsulev1beta2.Tenant, recorder events.EventRecorder) (bool, error)
+}
 
-func PersistentVolumeValidatingVolume() handlers.TypedHandlerWithTenant[*corev1.PersistentVolumeClaim] {
-	return &persistentVolumeValidatingVolume{}
+type persistentVolumeValidatingVolume struct {
+	access VolumeAccess
+}
+
+func PersistentVolumeValidatingVolume(access VolumeAccess) handlers.TypedHandlerWithTenant[*corev1.PersistentVolumeClaim] {
+	return &persistentVolumeValidatingVolume{access: access}
 }
 
 func (h persistentVolumeValidatingVolume) OnCreate(
-	_ client.Client,
+	c client.Client,
 	reader client.Reader,
 	pvc *corev1.PersistentVolumeClaim,
 	decoder admission.Decoder,
@@ -41,12 +49,18 @@ func (h persistentVolumeValidatingVolume) OnCreate(
 			return ad.ErroredResponse(err)
 		}
 
-		return validatePVCVolumeName(ctx, reader, pvc, tnt)
+		return validatePVCVolumeName(ctx, reader, pvc, tnt, func(pv *corev1.PersistentVolume) (bool, error) {
+			if h.access == nil {
+				return false, nil
+			}
+
+			return h.access.Allows(ctx, c, reader, req, pvc, pv, tnt, recorder)
+		})
 	}
 }
 
 func (h persistentVolumeValidatingVolume) OnUpdate(
-	_ client.Client,
+	c client.Client,
 	reader client.Reader,
 	oldPVC *corev1.PersistentVolumeClaim,
 	newPVC *corev1.PersistentVolumeClaim,
@@ -62,7 +76,13 @@ func (h persistentVolumeValidatingVolume) OnUpdate(
 		// The API server enforces selector immutability after creation. Existing
 		// claims may have been created through an authorized webhook exclusion.
 		// Keep checking the PV when an update establishes the volume binding.
-		return validatePVCVolumeName(ctx, reader, newPVC, tnt)
+		return validatePVCVolumeName(ctx, reader, newPVC, tnt, func(pv *corev1.PersistentVolume) (bool, error) {
+			if h.access == nil {
+				return false, nil
+			}
+
+			return h.access.Allows(ctx, c, reader, req, newPVC, pv, tnt, recorder)
+		})
 	}
 }
 
@@ -123,6 +143,7 @@ func validatePVCVolumeName(
 	c client.Reader,
 	pvc *corev1.PersistentVolumeClaim,
 	tnt *capsulev1beta2.Tenant,
+	additionalAccess func(*corev1.PersistentVolume) (bool, error),
 ) *admission.Response {
 	if pvc == nil || tnt == nil {
 		return nil
@@ -143,18 +164,25 @@ func validatePVCVolumeName(
 		return ad.ErroredResponse(err)
 	}
 
-	if pv.GetLabels() == nil {
-		return ad.Deny(errors.NewMissingTenantPVLabelsError(pv.GetName(), events.ActionValidationDenied).Error())
-	}
-
 	value, ok := pv.GetLabels()[meta.TenantLabel]
-	if !ok {
-		return ad.Deny(errors.NewMissingTenantPVLabelsError(pv.GetName(), events.ActionValidationDenied).Error())
+	if ok {
+		if value != tnt.Name {
+			return ad.Deny(errors.NewCrossTenantPVMountError(pv.GetName(), events.ActionValidationDenied).Error())
+		}
+
+		return nil
 	}
 
-	if value != tnt.Name {
-		return ad.Deny(errors.NewCrossTenantPVMountError(pv.GetName(), events.ActionValidationDenied).Error())
+	if additionalAccess != nil && pv.DeletionTimestamp == nil {
+		allowed, err := additionalAccess(&pv)
+		if err != nil {
+			return ad.ErroredResponse(err)
+		}
+
+		if allowed {
+			return nil
+		}
 	}
 
-	return nil
+	return ad.Deny(errors.NewMissingTenantPVLabelsError(pv.GetName(), events.ActionValidationDenied).Error())
 }
