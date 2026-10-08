@@ -2546,13 +2546,15 @@ spec:
                         conditions:
                           description: |-
                             Conditions gate this entire enforcement rule, including workloads, services,
-                            metadata, ingress and network. All conditions must be true; empty means apply.
+                            metadata, ingress, network and storage. All conditions must be true; empty means apply.
                             Conditions run during admission; managed metadata in a conditional rule
                             is applied on matching requests only and is not reconciled in the background.
                           items:
                             description: |-
                               AdmissionCondition is a Boolean CEL gate for a mutation entry or enforcement rule. It can
                               inspect object and request metadata, but cannot generate mutation values.
+                              During PVC volume access evaluation, volume contains the referenced PV;
+                              otherwise volume is null. Conditions never modify the PVC or PV.
                             properties:
                               expression:
                                 description: |-
@@ -2813,8 +2815,31 @@ spec:
                                     cidrs:
                                       description: |-
                                         CIDRs matches addresses granted by ipBlock.cidr after subtracting except.
-                                        Omitted destinations on an egress rule grant both IPv4 and IPv6 address
-                                        space. An empty NetworkPolicy egress list contains no grants to validate.
+                                        Omitted peers on an ingress or egress rule grant both IPv4 and IPv6 address
+                                        space. An empty NetworkPolicy ingress or egress list has no grants in that
+                                        direction to validate. Each direction is evaluated independently.
+                                        An empty CIDRs list imposes no constraint.
+                                        Ordered allow/deny decisions apply to every granted address: deny rejects
+                                        overlapping grants, allow requires complete coverage, and audit reports
+                                        overlaps. A later allow cannot authorize addresses outside its CIDRs.
+                                      items:
+                                        maxLength: 49
+                                        type: string
+                                      maxItems: 64
+                                      type: array
+                                      x-kubernetes-list-type: set
+                                  type: object
+                                ingress:
+                                  description: |-
+                                    Ingress constrains source address grants. Selector-based peers are
+                                    unaffected. No constraints are applied when omitted.
+                                  properties:
+                                    cidrs:
+                                      description: |-
+                                        CIDRs matches addresses granted by ipBlock.cidr after subtracting except.
+                                        Omitted peers on an ingress or egress rule grant both IPv4 and IPv6 address
+                                        space. An empty NetworkPolicy ingress or egress list has no grants in that
+                                        direction to validate. Each direction is evaluated independently.
                                         An empty CIDRs list imposes no constraint.
                                         Ordered allow/deny decisions apply to every granted address: deny rejects
                                         overlapping grants, allow requires complete coverage, and audit reports
@@ -2936,6 +2961,81 @@ spec:
                                 - ExternalName
                                 type: string
                               type: array
+                          type: object
+                        storage:
+                          description: Additional access to PersistentVolumes without
+                            a tenant ownership label.
+                          properties:
+                            volumes:
+                              description: |-
+                                Volumes matches additional PersistentVolumes. Entries are ORed. Conditions
+                                on the enclosing enforcement rule must also match. The last matching
+                                allow/deny decides the exception; audit never grants access.
+                              items:
+                                description: PersistentVolumeMatch matches labels
+                                  on the referenced PersistentVolume.
+                                properties:
+                                  name:
+                                    description: Name identifies this match in admission
+                                      and audit messages.
+                                    maxLength: 63
+                                    type: string
+                                  selector:
+                                    description: |-
+                                      Selector matches existing PV labels, independently of PVC.spec.selector.
+                                      An explicit empty selector matches all PVs. Capsule's tenant ownership
+                                      label cannot be overridden by a selector or an allow decision.
+                                    properties:
+                                      matchExpressions:
+                                        description: matchExpressions is a list of
+                                          label selector requirements. The requirements
+                                          are ANDed.
+                                        items:
+                                          description: |-
+                                            A label selector requirement is a selector that contains values, a key, and an operator that
+                                            relates the key and values.
+                                          properties:
+                                            key:
+                                              description: key is the label key that
+                                                the selector applies to.
+                                              type: string
+                                            operator:
+                                              description: |-
+                                                operator represents a key's relationship to a set of values.
+                                                Valid operators are In, NotIn, Exists and DoesNotExist.
+                                              type: string
+                                            values:
+                                              description: |-
+                                                values is an array of string values. If the operator is In or NotIn,
+                                                the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                                the values array must be empty. This array is replaced during a strategic
+                                                merge patch.
+                                              items:
+                                                type: string
+                                              type: array
+                                              x-kubernetes-list-type: atomic
+                                          required:
+                                          - key
+                                          - operator
+                                          type: object
+                                        type: array
+                                        x-kubernetes-list-type: atomic
+                                      matchLabels:
+                                        additionalProperties:
+                                          type: string
+                                        description: |-
+                                          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                                          map is equivalent to an element of matchExpressions, whose key field is "key", the
+                                          operator is "In", and the values array contains only "value". The requirements are ANDed.
+                                        type: object
+                                    type: object
+                                    x-kubernetes-map-type: atomic
+                                required:
+                                - selector
+                                type: object
+                              maxItems: 64
+                              type: array
+                              x-kubernetes-list-type: atomic
                           type: object
                         workloads:
                           description: Enforcement for native workload kinds and Pod
@@ -3948,6 +4048,40 @@ spec:
                               - message: at least one of requests or limits must be
                                   set
                                 rule: has(self.requests) || has(self.limits)
+                            schedulers:
+                              description: |-
+                                Schedulers defines additional schedulerName matchers for selected Pods and
+                                Pod templates. These are combined with placement.schedulers under the same
+                                rule action; a match in either field counts as a match.
+
+                                Deprecated: use Placement.Schedulers instead.
+                              items:
+                                description: |-
+                                  At least one of Exact or Exp must be set.
+                                  Both may be set together.
+                                properties:
+                                  exact:
+                                    description: Exact matches one of the provided
+                                      values exactly.
+                                    items:
+                                      type: string
+                                    maxItems: 64
+                                    minItems: 1
+                                    type: array
+                                  exp:
+                                    description: Exp matches regular expression.
+                                    maxLength: 4096
+                                    minLength: 1
+                                    type: string
+                                  negate:
+                                    default: false
+                                    description: Negate regular Expression
+                                    type: boolean
+                                type: object
+                                x-kubernetes-validations:
+                                - message: at least one of exact or exp must be set
+                                  rule: has(self.exact) || has(self.exp)
+                              type: array
                             security:
                               description: Security matches effective Pod and container
                                 security profiles.
@@ -4130,6 +4264,8 @@ spec:
                               description: |-
                                 AdmissionCondition is a Boolean CEL gate for a mutation entry or enforcement rule. It can
                                 inspect object and request metadata, but cannot generate mutation values.
+                                During PVC volume access evaluation, volume contains the referenced PV;
+                                otherwise volume is null. Conditions never modify the PVC or PV.
                               properties:
                                 expression:
                                   description: |-

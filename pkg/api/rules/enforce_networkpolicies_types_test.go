@@ -15,7 +15,7 @@ func TestNetworkPolicyEnforcementJSONAndDeepCopy(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(`{
 		"enforce": {
 			"action": "deny",
-			"network": {"policies": {"egress": {"cidrs": ["0.0.0.0/0", "::/0"]}}}
+			"network": {"policies": {"ingress": {"cidrs": ["192.0.2.0/24"]}, "egress": {"cidrs": ["0.0.0.0/0", "::/0"]}}}
 		}
 	}`), &body))
 	require.NotNil(t, body.Enforce)
@@ -30,11 +30,15 @@ func TestNetworkPolicyEnforcementJSONAndDeepCopy(t *testing.T) {
 	require.NotContains(t, enforce, "networkPolicies")
 	require.Equal(t, map[string]any{
 		"policies": map[string]any{
-			"egress": map[string]any{"cidrs": []any{"0.0.0.0/0", "::/0"}},
+			"ingress": map[string]any{"cidrs": []any{"192.0.2.0/24"}},
+			"egress":  map[string]any{"cidrs": []any{"0.0.0.0/0", "::/0"}},
 		},
 	}, enforce["network"])
 
+	require.Equal(t, []string{"192.0.2.0/24"}, body.Enforce.Network.Policies.Ingress.CIDRs)
 	copy := body.DeepCopy()
+	copy.Enforce.Network.Policies.Ingress.CIDRs[0] = "::/0"
+	require.Equal(t, "192.0.2.0/24", body.Enforce.Network.Policies.Ingress.CIDRs[0])
 	copy.Enforce.Network.Policies.Egress.CIDRs[0] = "192.0.2.0/24"
 	require.Equal(t, "0.0.0.0/0", body.Enforce.Network.Policies.Egress.CIDRs[0])
 
@@ -43,6 +47,23 @@ func TestNetworkPolicyEnforcementJSONAndDeepCopy(t *testing.T) {
 		require.NoError(t, json.Unmarshal([]byte(empty), &body))
 		if body.Enforce != nil {
 			require.Nil(t, body.Enforce.Network.Policies.Egress)
+			require.Nil(t, body.Enforce.Network.Policies.Ingress)
+		}
+	}
+}
+
+func TestNetworkPolicyLegacyEgress(t *testing.T) {
+	var body NamespaceRuleBodyNamespace
+	require.NoError(t, json.Unmarshal([]byte(`{"enforce":{"network":{"policies":{"egress":{"cidrs":["10.0.0.0/8"]}}}}}`), &body))
+	require.Nil(t, body.Enforce.Network.Policies.Ingress)
+	require.Equal(t, []string{"10.0.0.0/8"}, body.Enforce.Network.Policies.Egress.CIDRs)
+	for _, raw := range []string{`{}`, `{"ingress":{}}`, `{"ingress":{"cidrs":[]}}`} {
+		var policy NamespaceRuleEnforceNetworkPoliciesBody
+		require.NoError(t, json.Unmarshal([]byte(raw), &policy))
+		copy := policy.DeepCopy()
+		require.Equal(t, policy, *copy)
+		if policy.Ingress != nil {
+			require.Empty(t, policy.Ingress.CIDRs)
 		}
 	}
 }

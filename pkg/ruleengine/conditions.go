@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apiserver/pkg/cel/environment"
@@ -23,14 +24,25 @@ type ConditionCompiler interface {
 
 // ConditionEvaluator owns request-local metadata, never evaluation results.
 type ConditionEvaluator struct {
-	compiler ConditionCompiler
-	request  admissionv1.AdmissionRequest
-	metadata map[string]any
-	object   map[string]any
+	compiler     ConditionCompiler
+	request      admissionv1.AdmissionRequest
+	metadata     map[string]any
+	object       map[string]any
+	volume       *corev1.PersistentVolume
+	volumeObject map[string]any
 }
 
 func NewConditionEvaluator(compiler ConditionCompiler, request admissionv1.AdmissionRequest) *ConditionEvaluator {
 	return &ConditionEvaluator{compiler: compiler, request: request}
+}
+
+// WithVolume attaches the already-read PV without performing any API I/O.
+// Conversion is deferred until a condition needs evaluation.
+func (e *ConditionEvaluator) WithVolume(volume *corev1.PersistentVolume) *ConditionEvaluator {
+	e.volume = volume
+	e.volumeObject = nil
+
+	return e
 }
 
 // ResetObject invalidates only the current request's object view after mutation.
@@ -84,13 +96,22 @@ func (e *ConditionEvaluator) Matches(ctx context.Context, object any, conditions
 
 	var firstError error
 
+	if e.volume != nil && e.volumeObject == nil {
+		var err error
+
+		e.volumeObject, err = runtime.DefaultUnstructuredConverter.ToUnstructured(e.volume)
+		if err != nil {
+			return false, fmt.Errorf("decode condition volume: %w", err)
+		}
+	}
+
 	for i, condition := range conditions {
 		compiled, compileErr := e.compiler.GetOrCompileCondition(condition.Expression, environment.StoredExpressions)
 
 		matched := false
 
 		if compileErr == nil {
-			matched, compileErr = compiled.EvaluateCondition(ctx, e.object, e.metadata)
+			matched, compileErr = compiled.EvaluateConditionWithVolume(ctx, e.object, e.metadata, e.volumeObject)
 		}
 
 		if compileErr == nil && !matched {

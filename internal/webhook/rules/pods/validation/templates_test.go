@@ -60,6 +60,7 @@ func TestTemplateWorkloadPolicies(t *testing.T) {
 			name, message string
 			body          rules.NamespaceRuleEnforceWorkloadsBody
 		}{
+			{"legacy scheduler", "scheduler", rules.NamespaceRuleEnforceWorkloadsBody{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"batch"}}}}},
 			{"scheduler", "scheduler", rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"batch"}}}}}},
 			{"registry", "registry", rules.NamespaceRuleEnforceWorkloadsBody{Registries: []rules.OCIRegistry{{ExpressionMatch: apiruntime.ExpressionMatch{Exact: []string{"example.com/team/app:v1"}}}}}},
 			{"resources", "resource", rules.NamespaceRuleEnforceWorkloadsBody{Resources: &rules.WorkloadResourceRules{Limits: map[corev1.ResourceName]rules.WorkloadResourceLimitPolicy{corev1.ResourceMemory: {Policy: rules.WorkloadResourceLimitPolicyRatio, Value: new(resource.MustParse("1.5"))}}}}},

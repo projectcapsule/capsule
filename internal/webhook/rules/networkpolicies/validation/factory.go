@@ -51,7 +51,7 @@ func (h *networkPolicyRules) validate(obj *networkingv1.NetworkPolicy, recorder 
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		enforce, err := ruleengine.FilterEnforcementConditions(ctx,
 			ruleengine.NewConditionEvaluator(h.compiler, req.AdmissionRequest), obj,
-			ruleengine.EnforceBodiesFromNamespaceRules(bodies), hasEgressCIDRs)
+			ruleengine.EnforceBodiesFromNamespaceRules(bodies), hasPolicyCIDRs)
 		if err != nil {
 			return ad.Deny(fmt.Sprintf("enforce: %s", err))
 		}
@@ -74,7 +74,7 @@ func (h *networkPolicyRules) validate(obj *networkingv1.NetworkPolicy, recorder 
 			}
 
 			if blocking != nil {
-				recorder.LabeledEvent(obj, corev1.EventTypeWarning, events.ReasonForbiddenNetworkPolicyEgressCIDR, events.ActionValidationDenied, blocking.Error()).
+				recorder.LabeledEvent(obj, corev1.EventTypeWarning, result.Blocking.EventReason, events.ActionValidationDenied, blocking.Error()).
 					WithRelated(tnt).WithTenantLabel(tnt).WithRequestAnnotations(req).Emit(ctx)
 			}
 		}

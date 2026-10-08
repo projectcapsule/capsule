@@ -940,6 +940,14 @@ webhooks:
   #        ]
   #      )
 
+  mutating:
+    # -- Additional MatchConditions for all mutating webhooks, combined with global and per-hook conditions
+    matchConditions: []
+
+  validating:
+    # -- Additional MatchConditions for all validating webhooks, combined with global and per-hook conditions
+    matchConditions: []
+
   # Admission Webhook Configuration
   hooks:
     customquotas:

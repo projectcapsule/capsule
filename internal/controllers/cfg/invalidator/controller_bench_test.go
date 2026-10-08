@@ -40,6 +40,7 @@ func BenchmarkControllerCacheInvalidator(b *testing.B) {
 				rule := &rules.NamespaceRuleBodyNamespace{
 					Enforce: &rules.NamespaceRuleEnforceBody{
 						Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
+							Schedulers: []apiruntime.ExpressionMatch{{ExpressionRegex: apiruntime.ExpressionRegex{Expression: fmt.Sprintf("^scheduler-%d$", i)}}},
 							Registries: []rules.OCIRegistry{
 								{
 									ExpressionMatch: apiruntime.ExpressionMatch{ExpressionRegex: apiruntime.ExpressionRegex{Expression: fmt.Sprintf("^registry-%d.example.com/", i)}},
@@ -92,7 +93,7 @@ func BenchmarkControllerCacheInvalidator(b *testing.B) {
 			if _, err := r.Reconcile(b.Context(), req); err != nil {
 				b.Fatal(err)
 			}
-			if regex.Stats() != count || r.RegistryCache.Stats() != count || r.TargetsCache.Stats() != count || r.JSONPathCache.Stats() != 1 {
+			if regex.Stats() != 2*count || r.RegistryCache.Stats() != count || r.TargetsCache.Stats() != count || r.JSONPathCache.Stats() != 1 {
 				b.Fatal("cache rebuild did not populate expected entries")
 			}
 			calls.Reset()

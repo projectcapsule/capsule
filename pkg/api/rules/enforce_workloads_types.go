@@ -51,6 +51,15 @@ type NamespaceRuleEnforceWorkloadsBody struct {
 	// +optional
 	Registries []OCIRegistry `json:"registries,omitempty"`
 
+	// Schedulers defines additional schedulerName matchers for selected Pods and
+	// Pod templates. These are combined with placement.schedulers under the same
+	// rule action; a match in either field counts as a match.
+	//
+	// Deprecated: use Placement.Schedulers instead.
+	//
+	// +optional
+	Schedulers []runtime.ExpressionMatch `json:"schedulers,omitempty"`
+
 	// Placement matches the Pod scheduler and scheduling constraints.
 	// +optional
 	Placement WorkloadPlacementEnforcement `json:"placement,omitzero"`

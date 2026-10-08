@@ -14,7 +14,10 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 )
 
-func BenchmarkEgressCIDR(b *testing.B) {
+func BenchmarkEgressCIDR(b *testing.B)  { benchmarkCIDR(b, false) }
+func BenchmarkIngressCIDR(b *testing.B) { benchmarkCIDR(b, true) }
+
+func benchmarkCIDR(b *testing.B, ingress bool) {
 	for _, count := range []int{1, 16, 64} {
 		for _, peers := range []int{1, 8} {
 			for _, outcome := range []string{"allow", "allow-overrides", "deny", "skip"} {
@@ -41,6 +44,9 @@ func BenchmarkEgressCIDR(b *testing.B) {
 							obj.Spec.Egress[0].To[i] = peer
 						}
 					}
+					if ingress {
+						obj, bodies = ingressFixtures(obj, bodies)
+					}
 					b.ReportAllocs()
 					for b.Loop() {
 						result, err := evaluate(b.Context(), obj, bodies)
@@ -55,7 +61,10 @@ func BenchmarkEgressCIDR(b *testing.B) {
 }
 
 // enabled=false measures the existing generic chain on exactly the same input.
-func BenchmarkNetworkPolicyAdmission(b *testing.B) {
+func BenchmarkNetworkPolicyAdmission(b *testing.B)        { benchmarkPolicyAdmission(b, false) }
+func BenchmarkIngressNetworkPolicyAdmission(b *testing.B) { benchmarkPolicyAdmission(b, true) }
+
+func benchmarkPolicyAdmission(b *testing.B, ingress bool) {
 	for _, tenants := range []int{1, 100} {
 		for _, enabled := range []bool{false, true} {
 			for _, outcome := range []string{"allow", "deny", "unrelated"} {
@@ -66,7 +75,7 @@ func BenchmarkNetworkPolicyAdmission(b *testing.B) {
 							cidr = "10.0.0.0/8"
 						}
 						return []*rules.NamespaceRuleBodyNamespace{{Enforce: cidrRule(rules.ActionTypeDeny, cidr)}}
-					})
+					}, ingress)
 					if outcome == "unrelated" {
 						for i := range requests {
 							requests[i].Kind.Group, requests[i].Kind.Kind = "", "ConfigMap"
@@ -158,6 +167,52 @@ func BenchmarkEgressStressConcurrent(b *testing.B) {
 					}
 				}
 			})
+		})
+	}
+}
+
+func BenchmarkIngressStressConcurrent(b *testing.B) {
+	for _, audit := range []bool{false, true} {
+		b.Run(fmt.Sprintf("audit=%v", audit), func(b *testing.B) {
+			obj := exceptionPolicy(8192)
+			bodies := []*rules.NamespaceRuleEnforceBody{cidrRule(rules.ActionTypeDeny, "192.0.2.0/24")}
+			if audit {
+				obj, bodies = auditPolicy(64, 8)
+			}
+			obj, bodies = ingressFixtures(obj, bodies)
+			b.ReportAllocs()
+			b.ResetTimer()
+			b.RunParallel(func(pb *testing.PB) {
+				for pb.Next() {
+					result, err := evaluate(b.Context(), obj, bodies)
+					if err != nil || result.BlockingError() != nil || (audit && len(result.Audits) != 64*8) {
+						b.Errorf("unexpected result: %v, %v", result, err)
+					}
+				}
+			})
+		})
+	}
+}
+
+func BenchmarkNetworkPolicyBothDirections(b *testing.B) {
+	for _, count := range []int{1, 16, 64} {
+		b.Run(fmt.Sprintf("rules=%d", count), func(b *testing.B) {
+			obj := policy("192.0.2.0/24")
+			obj.Spec.PolicyTypes = append(obj.Spec.PolicyTypes, networkingv1.PolicyTypeIngress)
+			obj.Spec.Ingress = []networkingv1.NetworkPolicyIngressRule{{From: obj.Spec.Egress[0].To}}
+			var bodies []*rules.NamespaceRuleEnforceBody
+			for i := range count {
+				body := cidrRule(rules.ActionTypeDeny, fmt.Sprintf("10.%d.0.0/16", i))
+				body.Network.Policies.Ingress = &rules.NetworkPolicyCIDRRule{CIDRs: []string{fmt.Sprintf("172.16.%d.0/24", i)}}
+				bodies = append(bodies, body)
+			}
+			b.ReportAllocs()
+			for b.Loop() {
+				result, err := evaluate(b.Context(), obj, bodies)
+				if err != nil || result.BlockingError() != nil {
+					b.Fatalf("unexpected result: %v, %v", result, err)
+				}
+			}
 		})
 	}
 }
