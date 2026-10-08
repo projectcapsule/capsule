@@ -81,7 +81,9 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/route"
 	rulesgenericmutation "github.com/projectcapsule/capsule/internal/webhook/rules/generic/mutation"
 	rulesgenericvalidation "github.com/projectcapsule/capsule/internal/webhook/rules/generic/validation"
+	networkpolicyrules "github.com/projectcapsule/capsule/internal/webhook/rules/networkpolicies/validation"
 	podrules "github.com/projectcapsule/capsule/internal/webhook/rules/pods/validation"
+	pvcrules "github.com/projectcapsule/capsule/internal/webhook/rules/pvc/validation"
 	servicerules "github.com/projectcapsule/capsule/internal/webhook/rules/services/validation"
 	"github.com/projectcapsule/capsule/internal/webhook/service"
 	"github.com/projectcapsule/capsule/internal/webhook/serviceaccounts"
@@ -728,6 +730,7 @@ func main() {
 					servicerules.ServiceRules(regexCache, celCache),
 				),
 			),
+			networkpolicyrules.Handler(cfg, celCache),
 		),
 		route.GenericReplicasHandler(),
 		route.GenericManagedHandler(cfg),
@@ -742,7 +745,7 @@ func main() {
 		route.Ingress(ingress.Class(cfg, kubeVersion), ingress.Hostnames(cfg), ingress.Collision(cfg), ingress.Wildcard()),
 		route.PVCValidating(
 			pvc.Handler(
-				pvc.PersistentVolumeValidatingVolume(),
+				pvc.PersistentVolumeValidatingVolume(pvcrules.VolumeRules(cfg, labelSelectorCache, celCache)),
 				pvc.PersistentVolumeValidatingClass(),
 			),
 		),

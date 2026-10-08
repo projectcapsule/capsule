@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"regexp"
 	"strings"
 
@@ -60,12 +61,40 @@ func ValidateRuleStatusBody(
 			return err
 		}
 
+		if err := validateStorageRules(i, rule.Enforce.Storage); err != nil {
+			return err
+		}
+
+		if err := validateNetworkPolicyRules(i, rule.Enforce.Network.Policies); err != nil {
+			return err
+		}
+
 		if err := validateIngressRules(i, rule.Enforce.Ingress); err != nil {
 			return err
 		}
 
 		if err := validateMetadataRules(i, rule.Enforce.Metadata, mapper); err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+func validateNetworkPolicyRules(ruleIndex int, policy rules.NamespaceRuleEnforceNetworkPoliciesBody) error {
+	for _, direction := range []struct {
+		name string
+		rule *rules.NetworkPolicyCIDRRule
+	}{{"egress", policy.Egress}, {"ingress", policy.Ingress}} {
+		if direction.rule == nil {
+			continue
+		}
+
+		for i, cidr := range direction.rule.CIDRs {
+			prefix, err := netip.ParsePrefix(cidr)
+			if err != nil || prefix.Addr().Is4In6() {
+				return fmt.Errorf("rules[%d].enforce.network.policies.%s.cidrs[%d] %q is invalid: must be an IPv4 or IPv6 CIDR (IPv4-mapped IPv6 is unsupported)", ruleIndex, direction.name, i, cidr)
+			}
 		}
 	}
 
@@ -224,6 +253,16 @@ func validateWorkloadRules(
 		if err := validateExpressionMatch(
 			scheduler,
 			fmt.Sprintf("rules[%d].enforce.workloads.placement.schedulers[%d]", ruleIndex, j),
+		); err != nil {
+			return err
+		}
+	}
+
+	//nolint:staticcheck // Apply the same validation to deprecated scheduler rules.
+	for j, scheduler := range workloads.Schedulers {
+		if err := validateExpressionMatch(
+			scheduler,
+			fmt.Sprintf("rules[%d].enforce.workloads.schedulers[%d]", ruleIndex, j),
 		); err != nil {
 			return err
 		}

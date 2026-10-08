@@ -58,43 +58,17 @@ func (h persistentVolumeMutatingVolume) OnCreate(
 }
 
 func (h persistentVolumeMutatingVolume) OnUpdate(
-	_ client.Client,
-	_ client.Reader,
-	oldPVC *corev1.PersistentVolumeClaim,
-	newPVC *corev1.PersistentVolumeClaim,
-	_ admission.Decoder,
-	recorder events.EventRecorder,
-	tnt *capsulev1beta2.Tenant,
+	client.Client,
+	client.Reader,
+	*corev1.PersistentVolumeClaim,
+	*corev1.PersistentVolumeClaim,
+	admission.Decoder,
+	events.EventRecorder,
+	*capsulev1beta2.Tenant,
 ) handlers.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if isBoundPVC(oldPVC) {
-			return nil
-		}
-
-		if newPVC == nil || tnt == nil {
-			return nil
-		}
-
-		// Avoid mutating normal dynamically provisioned PVCs.
-		//
-		// Only canonicalize tenant selector if the PVC already participates in
-		// static binding semantics.
-		if newPVC.Spec.Selector == nil {
-			return nil
-		}
-
-		newPVC.Spec.Selector = addTenantSelectorExpression(newPVC.Spec.Selector, tnt.Name)
-
-		marshaled, err := json.Marshal(newPVC)
-		if err != nil {
-			response := admission.Errored(http.StatusInternalServerError, err)
-
-			return &response
-		}
-
-		response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
-
-		return &response
+	return func(context.Context, admission.Request) *admission.Response {
+		// Kubernetes makes spec.selector immutable even before a PVC is bound.
+		return nil
 	}
 }
 
