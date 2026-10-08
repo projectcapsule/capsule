@@ -1,0 +1,13 @@
+scenarioKinds:
+  - id: primary
+    name: Primary
+    description: The main successful path of a Capability or Journey.
+  - id: alternative
+    name: Alternative
+    description: Another successful path under different conditions or choices.
+  - id: validation
+    name: Validation
+    description: A request refused because of who acts or what was supplied.
+  - id: edge
+    name: Edge
+    description: A conflict, exhaustion or unavailable dependency the Product distinguishes.
