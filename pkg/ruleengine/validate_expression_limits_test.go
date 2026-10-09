@@ -23,6 +23,9 @@ func TestValidateExpressionMatchLimitsAcrossRules(t *testing.T) {
 		{"workloads.registries[0]", func(b *rules.NamespaceRuleEnforceBody, m apiruntime.ExpressionMatch) {
 			b.Workloads.Registries = []rules.OCIRegistry{{ExpressionMatch: m}}
 		}},
+		{"workloads.schedulers[0]", func(b *rules.NamespaceRuleEnforceBody, m apiruntime.ExpressionMatch) {
+			b.Workloads.Schedulers = []apiruntime.ExpressionMatch{m}
+		}},
 		{"workloads.placement.schedulers[0]", func(b *rules.NamespaceRuleEnforceBody, m apiruntime.ExpressionMatch) {
 			b.Workloads.Placement.Schedulers = []apiruntime.ExpressionMatch{m}
 		}},

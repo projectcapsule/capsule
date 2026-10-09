@@ -60,6 +60,7 @@ func TestTemplateWorkloadPolicies(t *testing.T) {
 			name, message string
 			body          rules.NamespaceRuleEnforceWorkloadsBody
 		}{
+			{"legacy scheduler", "scheduler", rules.NamespaceRuleEnforceWorkloadsBody{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"batch"}}}}},
 			{"scheduler", "scheduler", rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"batch"}}}}}},
 			{"registry", "registry", rules.NamespaceRuleEnforceWorkloadsBody{Registries: []rules.OCIRegistry{{ExpressionMatch: apiruntime.ExpressionMatch{Exact: []string{"example.com/team/app:v1"}}}}}},
 			{"resources", "resource", rules.NamespaceRuleEnforceWorkloadsBody{Resources: &rules.WorkloadResourceRules{Limits: map[corev1.ResourceName]rules.WorkloadResourceLimitPolicy{corev1.ResourceMemory: {Policy: rules.WorkloadResourceLimitPolicyRatio, Value: new(resource.MustParse("1.5"))}}}}},
@@ -96,6 +97,20 @@ func TestTemplateWorkloadPolicies(t *testing.T) {
 				require.Equal(t, original, obj)
 				body.Enforce.Action = rules.ActionTypeAudit
 				require.Nil(t, h.OnCreate(nil, nil, obj, nil, recorder, tenant, []*rules.NamespaceRuleBodyNamespace{body})(t.Context(), req))
+				if policy.message == "scheduler" {
+					body.Enforce.Action = rules.ActionTypeAllow
+					req.Operation = admissionv1.Create
+					require.Nil(t, h.OnCreate(nil, nil, obj, nil, recorder, tenant, []*rules.NamespaceRuleBodyNamespace{body})(t.Context(), req))
+
+					updated := obj.DeepCopy()
+					path := workloads.PodTemplatePath(obj.GroupVersionKind())
+					require.NoError(t, unstructured.SetNestedField(updated.Object, "unlisted", append(path, "spec", "schedulerName")...))
+					req.Operation = admissionv1.Update
+					response := h.OnUpdate(nil, nil, obj, updated, nil, recorder, tenant, []*rules.NamespaceRuleBodyNamespace{body})(t.Context(), req)
+					require.NotNil(t, response)
+					require.False(t, response.Allowed)
+					require.Contains(t, response.Result.Message, strings.Join(path, ".")+`: scheduler "unlisted" at spec.schedulerName is not allowed by namespace rule`)
+				}
 				// Omitting targets and selecting a different kind must not opt this controller in.
 				body.Enforce.Action = rules.ActionTypeDeny
 				for _, targets := range [][]rules.WorkloadValidationTarget{nil, {rules.ValidatePod}} {

@@ -86,8 +86,12 @@ func (r *eventRecorder) LabeledEvent(
 	action string,
 	note string,
 ) LabeledEvent {
+	return newLabeledEvent(r, regarding, eventType, reason, action, note)
+}
+
+func newLabeledEvent(emitter eventEmitter, regarding runtime.Object, eventType, reason, action, note string) *labeledEvent {
 	return &labeledEvent{
-		emitter:     r,
+		emitter:     emitter,
 		regarding:   regarding,
 		eventType:   eventType,
 		reason:      reason,

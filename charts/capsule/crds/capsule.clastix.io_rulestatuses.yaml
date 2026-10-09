@@ -358,8 +358,31 @@ spec:
                                 cidrs:
                                   description: |-
                                     CIDRs matches addresses granted by ipBlock.cidr after subtracting except.
-                                    Omitted destinations on an egress rule grant both IPv4 and IPv6 address
-                                    space. An empty NetworkPolicy egress list contains no grants to validate.
+                                    Omitted peers on an ingress or egress rule grant both IPv4 and IPv6 address
+                                    space. An empty NetworkPolicy ingress or egress list has no grants in that
+                                    direction to validate. Each direction is evaluated independently.
+                                    An empty CIDRs list imposes no constraint.
+                                    Ordered allow/deny decisions apply to every granted address: deny rejects
+                                    overlapping grants, allow requires complete coverage, and audit reports
+                                    overlaps. A later allow cannot authorize addresses outside its CIDRs.
+                                  items:
+                                    maxLength: 49
+                                    type: string
+                                  maxItems: 64
+                                  type: array
+                                  x-kubernetes-list-type: set
+                              type: object
+                            ingress:
+                              description: |-
+                                Ingress constrains source address grants. Selector-based peers are
+                                unaffected. No constraints are applied when omitted.
+                              properties:
+                                cidrs:
+                                  description: |-
+                                    CIDRs matches addresses granted by ipBlock.cidr after subtracting except.
+                                    Omitted peers on an ingress or egress rule grant both IPv4 and IPv6 address
+                                    space. An empty NetworkPolicy ingress or egress list has no grants in that
+                                    direction to validate. Each direction is evaluated independently.
                                     An empty CIDRs list imposes no constraint.
                                     Ordered allow/deny decisions apply to every granted address: deny rejects
                                     overlapping grants, allow requires complete coverage, and audit reports
@@ -1550,6 +1573,40 @@ spec:
                           x-kubernetes-validations:
                           - message: at least one of requests or limits must be set
                             rule: has(self.requests) || has(self.limits)
+                        schedulers:
+                          description: |-
+                            Schedulers defines additional schedulerName matchers for selected Pods and
+                            Pod templates. These are combined with placement.schedulers under the same
+                            rule action; a match in either field counts as a match.
+
+                            Deprecated: use Placement.Schedulers instead.
+                          items:
+                            description: |-
+                              At least one of Exact or Exp must be set.
+                              Both may be set together.
+                            properties:
+                              exact:
+                                description: Exact matches one of the provided values
+                                  exactly.
+                                items:
+                                  type: string
+                                maxItems: 64
+                                minItems: 1
+                                type: array
+                              exp:
+                                description: Exp matches regular expression.
+                                maxLength: 4096
+                                minLength: 1
+                                type: string
+                              negate:
+                                default: false
+                                description: Negate regular Expression
+                                type: boolean
+                            type: object
+                            x-kubernetes-validations:
+                            - message: at least one of exact or exp must be set
+                              rule: has(self.exact) || has(self.exp)
+                          type: array
                         security:
                           description: Security matches effective Pod and container
                             security profiles.
@@ -3563,8 +3620,31 @@ spec:
                                   cidrs:
                                     description: |-
                                       CIDRs matches addresses granted by ipBlock.cidr after subtracting except.
-                                      Omitted destinations on an egress rule grant both IPv4 and IPv6 address
-                                      space. An empty NetworkPolicy egress list contains no grants to validate.
+                                      Omitted peers on an ingress or egress rule grant both IPv4 and IPv6 address
+                                      space. An empty NetworkPolicy ingress or egress list has no grants in that
+                                      direction to validate. Each direction is evaluated independently.
+                                      An empty CIDRs list imposes no constraint.
+                                      Ordered allow/deny decisions apply to every granted address: deny rejects
+                                      overlapping grants, allow requires complete coverage, and audit reports
+                                      overlaps. A later allow cannot authorize addresses outside its CIDRs.
+                                    items:
+                                      maxLength: 49
+                                      type: string
+                                    maxItems: 64
+                                    type: array
+                                    x-kubernetes-list-type: set
+                                type: object
+                              ingress:
+                                description: |-
+                                  Ingress constrains source address grants. Selector-based peers are
+                                  unaffected. No constraints are applied when omitted.
+                                properties:
+                                  cidrs:
+                                    description: |-
+                                      CIDRs matches addresses granted by ipBlock.cidr after subtracting except.
+                                      Omitted peers on an ingress or egress rule grant both IPv4 and IPv6 address
+                                      space. An empty NetworkPolicy ingress or egress list has no grants in that
+                                      direction to validate. Each direction is evaluated independently.
                                       An empty CIDRs list imposes no constraint.
                                       Ordered allow/deny decisions apply to every granted address: deny rejects
                                       overlapping grants, allow requires complete coverage, and audit reports
@@ -4760,6 +4840,40 @@ spec:
                             - message: at least one of requests or limits must be
                                 set
                               rule: has(self.requests) || has(self.limits)
+                          schedulers:
+                            description: |-
+                              Schedulers defines additional schedulerName matchers for selected Pods and
+                              Pod templates. These are combined with placement.schedulers under the same
+                              rule action; a match in either field counts as a match.
+
+                              Deprecated: use Placement.Schedulers instead.
+                            items:
+                              description: |-
+                                At least one of Exact or Exp must be set.
+                                Both may be set together.
+                              properties:
+                                exact:
+                                  description: Exact matches one of the provided values
+                                    exactly.
+                                  items:
+                                    type: string
+                                  maxItems: 64
+                                  minItems: 1
+                                  type: array
+                                exp:
+                                  description: Exp matches regular expression.
+                                  maxLength: 4096
+                                  minLength: 1
+                                  type: string
+                                negate:
+                                  default: false
+                                  description: Negate regular Expression
+                                  type: boolean
+                              type: object
+                              x-kubernetes-validations:
+                              - message: at least one of exact or exp must be set
+                                rule: has(self.exact) || has(self.exp)
+                            type: array
                           security:
                             description: Security matches effective Pod and container
                               security profiles.
@@ -6721,8 +6835,31 @@ spec:
                                     cidrs:
                                       description: |-
                                         CIDRs matches addresses granted by ipBlock.cidr after subtracting except.
-                                        Omitted destinations on an egress rule grant both IPv4 and IPv6 address
-                                        space. An empty NetworkPolicy egress list contains no grants to validate.
+                                        Omitted peers on an ingress or egress rule grant both IPv4 and IPv6 address
+                                        space. An empty NetworkPolicy ingress or egress list has no grants in that
+                                        direction to validate. Each direction is evaluated independently.
+                                        An empty CIDRs list imposes no constraint.
+                                        Ordered allow/deny decisions apply to every granted address: deny rejects
+                                        overlapping grants, allow requires complete coverage, and audit reports
+                                        overlaps. A later allow cannot authorize addresses outside its CIDRs.
+                                      items:
+                                        maxLength: 49
+                                        type: string
+                                      maxItems: 64
+                                      type: array
+                                      x-kubernetes-list-type: set
+                                  type: object
+                                ingress:
+                                  description: |-
+                                    Ingress constrains source address grants. Selector-based peers are
+                                    unaffected. No constraints are applied when omitted.
+                                  properties:
+                                    cidrs:
+                                      description: |-
+                                        CIDRs matches addresses granted by ipBlock.cidr after subtracting except.
+                                        Omitted peers on an ingress or egress rule grant both IPv4 and IPv6 address
+                                        space. An empty NetworkPolicy ingress or egress list has no grants in that
+                                        direction to validate. Each direction is evaluated independently.
                                         An empty CIDRs list imposes no constraint.
                                         Ordered allow/deny decisions apply to every granted address: deny rejects
                                         overlapping grants, allow requires complete coverage, and audit reports
@@ -7931,6 +8068,40 @@ spec:
                               - message: at least one of requests or limits must be
                                   set
                                 rule: has(self.requests) || has(self.limits)
+                            schedulers:
+                              description: |-
+                                Schedulers defines additional schedulerName matchers for selected Pods and
+                                Pod templates. These are combined with placement.schedulers under the same
+                                rule action; a match in either field counts as a match.
+
+                                Deprecated: use Placement.Schedulers instead.
+                              items:
+                                description: |-
+                                  At least one of Exact or Exp must be set.
+                                  Both may be set together.
+                                properties:
+                                  exact:
+                                    description: Exact matches one of the provided
+                                      values exactly.
+                                    items:
+                                      type: string
+                                    maxItems: 64
+                                    minItems: 1
+                                    type: array
+                                  exp:
+                                    description: Exp matches regular expression.
+                                    maxLength: 4096
+                                    minLength: 1
+                                    type: string
+                                  negate:
+                                    default: false
+                                    description: Negate regular Expression
+                                    type: boolean
+                                type: object
+                                x-kubernetes-validations:
+                                - message: at least one of exact or exp must be set
+                                  rule: has(self.exact) || has(self.exp)
+                              type: array
                             security:
                               description: Security matches effective Pod and container
                                 security profiles.
