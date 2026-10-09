@@ -19,6 +19,8 @@ rules:
   - ""
   resources:
   - secrets
+  resourceNames:
+  - {{ include "capsule.secretTlsName" $ }}
   verbs:
   - get
   - list
