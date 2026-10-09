@@ -36,7 +36,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/users"
 )
 
-const controllerName = "resourcepermit"
+const controllerName = "capsule/permits/resourcepermit"
 
 const (
 	templateResolutionFailedReason = "TemplateResolutionFailed"

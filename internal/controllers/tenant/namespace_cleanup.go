@@ -24,7 +24,6 @@ import (
 const (
 	namespaceCascadingCleanupGracePeriod = 10 * time.Second
 	namespaceCleanupRetryPeriod          = 5 * time.Second
-	namespaceCleanupWorkers              = 4
 )
 
 func (r *Manager) setupNamespaceCleanupController(mgr ctrl.Manager, config utils.ControllerOptions) error {
@@ -45,13 +44,9 @@ func (r *Manager) setupNamespaceCleanupController(mgr ctrl.Manager, config utils
 	r.cleanupReader = cleanupClient
 
 	options := config.Runtime.ToControllerOptions()
-	// Independent namespace workers keep one slow namespace from blocking all
-	// other terminations. Each worker processes at most four resource types,
-	// bounding cleanup to sixteen concurrent operations across namespaces.
-	options.MaxConcurrentReconciles = namespaceCleanupWorkers
 
 	return ctrl.NewControllerManagedBy(mgr).
-		Named("capsule/namespace-cleanup").
+		Named("capsule/tenants/namespace-cleanup").
 		For(&corev1.Namespace{}, builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
 			ns, ok := obj.(*corev1.Namespace)
 

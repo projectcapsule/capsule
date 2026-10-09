@@ -39,7 +39,7 @@ func (r *ResourcePermitTemplateReconciler) SetupWithManager(mgr ctrl.Manager, op
 			&capsulev1beta2.ResourcePermitTemplate{},
 			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
 		).
-		Named("resourcepermittemplate").
+		Named("capsule/permits/resourcepermittemplate").
 		WithOptions(options.Runtime.ToControllerOptions()).
 		Complete(r)
 }
