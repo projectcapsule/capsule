@@ -87,6 +87,28 @@ var _ = Describe(
 			requested := waitForResourcePermitPhase(ctx, request, capsulev1beta2.ResourcePermitPhaseRequested)
 			requireRenderedResourcePermitStatus(requested)
 
+			By("rejecting an obsolete controller status write without overwriting the published request")
+			var obsolete *capsulev1beta2.ResourcePermit
+			Eventually(func() error {
+				current := &capsulev1beta2.ResourcePermit{}
+				if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(request), current); err != nil {
+					return err
+				}
+				obsolete = current.DeepCopy()
+				if current.Annotations == nil {
+					current.Annotations = map[string]string{}
+				}
+				current.Annotations["e2e.projectcapsule.dev/status-version"] = "updated"
+				return k8sClient.Update(ctx, current)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			// Deliberately keep the pre-update version to exercise API-server
+			// optimistic concurrency, as used by the controller's status writer.
+			err := impersonationClient(ControllerServiceAccountFull, nil).Status().Update(ctx, obsolete)
+			Expect(apierrors.IsConflict(err)).To(BeTrue(), "expected version conflict, got %v", err)
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(request), requested)).To(Succeed())
+			Expect(requested.Status.Request).To(Equal(obsolete.Status.Request))
+			Expect(requested.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseRequested))
+
 			injectedResources := []apiruntime.RenderedResource{{
 				Targets: []runtime.RawExtension{{Raw: []byte(`{
 					"apiVersion":"v1",
@@ -226,7 +248,7 @@ var _ = Describe(
 			}, original)).To(Succeed())
 
 			injected := &corev1.Secret{}
-			err := k8sClient.Get(ctx, types.NamespacedName{
+			err = k8sClient.Get(ctx, types.NamespacedName{
 				Name: "e2e-resourcepermit-transition-injected", Namespace: request.Namespace,
 			}, injected)
 			Expect(apierrors.IsNotFound(err)).To(BeTrue())

@@ -274,6 +274,7 @@ var _ = Describe("managed labels cannot bypass metadata enforcement", Label("ten
 		grantResourcePermitServiceAccount(other.Name, name+"-other", selected.Name, []string{"get", "patch", "update"})
 		otherRunner := impersonationClient(serviceAccountUsername(other.Name, name+"-other"), serviceAccountGroups(other.Name))
 		cm := &corev1.ConfigMap{Name: name, Namespace: selected.Name}
+		var permit *capsulev1beta2.ResourcePermit
 		protection, protectionReason := meta.ResourcePermitProtectionLabel, "resources protected by a ResourcePermit"
 		By("creating a real managed target through its execution ServiceAccount")
 		if source == meta.ValueControllerResourcePermit {
@@ -290,7 +291,7 @@ data:
 			}}
 			DeferCleanup(func() { EventuallyDeletion(template) })
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, template) }).Should(Succeed())
-			permit := newImpersonatedResourcePermit(selected.Name, name, template.Name)
+			permit = newImpersonatedResourcePermit(selected.Name, name, template.Name)
 			DeferCleanup(func() {
 				expireResourcePermitForCleanup(ctx, permit)
 				EventuallyDeletion(permit)
@@ -373,5 +374,20 @@ data:
 		Expect(cm.Labels).To(HaveKeyWithValue(protection, meta.ValueTrue))
 		Expect(cm.Annotations).To(HaveKeyWithValue("example.org/valid", "allowed"))
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKey{Namespace: other.Name, Name: name}, &corev1.ConfigMap{}))).To(BeTrue())
+		if permit != nil {
+			By("preserving an accepted expiration until the permit and its protected target are deleted")
+			expireResourcePermitForCleanup(ctx, permit)
+			Eventually(func(g Gomega) {
+				current := &capsulev1beta2.ResourcePermit{}
+				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(permit), current)
+				if !apierrors.IsNotFound(err) {
+					g.Expect(err).NotTo(HaveOccurred())
+					// Fail immediately if reconciliation revives an expired permit.
+					Expect(current.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseExpired))
+				}
+				g.Expect(apierrors.IsNotFound(err)).To(BeTrue(), "permit cleanup is incomplete: %+v", current.Status)
+				g.Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(cm), &corev1.ConfigMap{}))).To(BeTrue())
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		}
 	}, Entry("ResourcePermit", Label("resource-permit"), meta.ValueControllerResourcePermit), Entry("GlobalTenantResource", Label("replications"), meta.ValueControllerReplications))
 })

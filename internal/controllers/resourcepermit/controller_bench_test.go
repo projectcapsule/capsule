@@ -85,7 +85,7 @@ func BenchmarkControllerPermitTemplate(b *testing.B) {
 }
 
 func BenchmarkControllerResourcePermit(b *testing.B) {
-	for _, mode := range []string{"preflight", "requested"} {
+	for _, mode := range []string{"preflight", "requested", "active"} {
 		for _, count := range []int{1, 32} {
 			b.Run(fmt.Sprintf("%s/resources=%d", mode, count), func(b *testing.B) {
 				scheme := runtime.NewScheme()
@@ -122,6 +122,21 @@ func BenchmarkControllerResourcePermit(b *testing.B) {
 				if _, err := r.Reconcile(b.Context(), req); err != nil {
 					b.Fatal(err)
 				}
+				wantPhase := capsulev1beta2.ResourcePermitPhaseRequested
+				if mode == "active" {
+					if err := base.Get(b.Context(), req.NamespacedName, obj); err != nil {
+						b.Fatal(err)
+					}
+					obj.Finalizers = []string{meta.ControllerFinalizer}
+					if err := base.Update(b.Context(), obj); err != nil {
+						b.Fatal(err)
+					}
+					wantPhase = capsulev1beta2.ResourcePermitPhaseActive
+					obj.Status.Phase = wantPhase
+					if err := base.Status().Update(b.Context(), obj); err != nil {
+						b.Fatal(err)
+					}
+				}
 				calls.Reset()
 				b.ReportAllocs()
 				for b.Loop() {
@@ -144,7 +159,7 @@ func BenchmarkControllerResourcePermit(b *testing.B) {
 				if err := base.Get(b.Context(), req.NamespacedName, obj); err != nil {
 					b.Fatal(err)
 				}
-				if obj.Status.Phase != capsulev1beta2.ResourcePermitPhaseRequested || obj.Status.Request == nil || len(obj.Status.Request.Resources) != count {
+				if obj.Status.Phase != wantPhase || obj.Status.Request == nil || len(obj.Status.Request.Resources) != count {
 					b.Fatalf("permit not prepared for review: %#v", obj.Status)
 				}
 			})

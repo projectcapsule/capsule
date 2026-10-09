@@ -9,7 +9,10 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
+	"strings"
 	"sync"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
@@ -27,6 +30,8 @@ import (
 )
 
 var errCleanupNamespaceChanged = errors.New("cleanup namespace disappeared or changed identity")
+
+const namespaceCleanupHintLifetime = 30 * time.Second
 
 // NamespacedCascadingCleanup completes cleanup of a terminating namespace after
 // Pods have gone. The reader must bypass the informer cache. Namespace identity
@@ -61,9 +66,21 @@ func NamespacedCascadingCleanup(ctx context.Context, reader client.Reader, disco
 		return false, err
 	}
 
+	// Kubernetes already enumerates namespace content. Its recent successful
+	// report is a work hint, never permission to finalize a namespace or Tenant.
+	// Missing, stale, failed or unfamiliar reports retain the full scan fallback.
+	hints, hinted := namespaceCleanupHints(ns)
+	if hinted && len(hints) == 0 {
+		return false, nil
+	}
+
 	gvrs, err := resourceCache.Get(disco)
 	if err != nil {
 		return false, err
+	}
+
+	if hinted {
+		gvrs = hintedCleanupResources(gvrs, hints)
 	}
 
 	var (
@@ -117,6 +134,78 @@ func NamespacedCascadingCleanup(ctx context.Context, reader client.Reader, disco
 	}
 
 	return cleanedAny, errors.Join(errs...)
+}
+
+func namespaceCleanupHints(ns *corev1.Namespace) (map[schema.GroupResource]struct{}, bool) {
+	conditions := make(map[corev1.NamespaceConditionType]corev1.NamespaceCondition, len(ns.Status.Conditions))
+	for _, condition := range ns.Status.Conditions {
+		conditions[condition.Type] = condition
+	}
+
+	for _, kind := range []corev1.NamespaceConditionType{corev1.NamespaceDeletionDiscoveryFailure, corev1.NamespaceDeletionGVParsingFailure, corev1.NamespaceDeletionContentFailure} {
+		condition, found := conditions[kind]
+		if !found || condition.Status != corev1.ConditionFalse {
+			return nil, false
+		}
+	}
+
+	content, found := conditions[corev1.NamespaceContentRemaining]
+	if !found || content.LastTransitionTime.Before(ns.DeletionTimestamp) || time.Since(content.LastTransitionTime.Time) >= namespaceCleanupHintLifetime || content.LastTransitionTime.After(time.Now()) {
+		return nil, false
+	}
+
+	if content.Status == corev1.ConditionFalse {
+		finalizers, found := conditions[corev1.NamespaceFinalizersRemaining]
+
+		return nil, found && finalizers.Status == corev1.ConditionFalse
+	}
+
+	message, recognized := strings.CutPrefix(content.Message, "Some resources are remaining: ")
+	if content.Status != corev1.ConditionTrue || !recognized {
+		return nil, false
+	}
+
+	hints := make(map[schema.GroupResource]struct{})
+
+	for entry := range strings.SplitSeq(message, ", ") {
+		fields := strings.Fields(entry)
+		if len(fields) != 5 || fields[1] != "has" || fields[3] != "resource" || fields[4] != "instances" {
+			return nil, false
+		}
+
+		count, err := strconv.ParseUint(fields[2], 10, 64)
+		if err != nil || count == 0 {
+			return nil, false
+		}
+
+		resource, group, recognized := strings.Cut(fields[0], ".")
+		if !recognized || resource == "" {
+			return nil, false
+		}
+
+		hints[schema.GroupResource{Resource: resource, Group: group}] = struct{}{}
+	}
+
+	return hints, len(hints) > 0
+}
+
+func hintedCleanupResources(gvrs []schema.GroupVersionResource, hints map[schema.GroupResource]struct{}) []schema.GroupVersionResource {
+	selected := make([]schema.GroupVersionResource, 0, len(hints))
+
+	matched := make(map[schema.GroupResource]struct{}, len(hints))
+
+	for _, gvr := range gvrs {
+		if _, hinted := hints[gvr.GroupResource()]; hinted {
+			selected = append(selected, gvr)
+			matched[gvr.GroupResource()] = struct{}{}
+		}
+	}
+
+	if len(matched) != len(hints) {
+		return gvrs
+	}
+
+	return selected
 }
 
 func cleanupResourceType(ctx context.Context, dyn dynamic.Interface, gvr schema.GroupVersionResource, namespace string, check func(context.Context) error) (bool, error) {
@@ -192,15 +281,24 @@ func cleanupNamespacedObject(ctx context.Context, resources dynamic.ResourceInte
 	if _, removable := meta.FilterFinalizers(obj.GetFinalizers(), retainedFinalizers); !removable {
 		return changed, nil
 	}
-	// Deletion changes resourceVersion. Read the exact object again, and only
-	// remove the finalizers observed on that version of the original object.
-	current, err := resources.Get(ctx, obj.GetName(), metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
-		return changed, nil
-	}
+	// An already-terminating object's LIST snapshot is sufficient: the patch
+	// checks both UID and resourceVersion, so concurrent finalizer changes or
+	// replacements cannot be overwritten. DELETE changes resourceVersion and
+	// therefore still requires a fresh snapshot before the patch.
+	current := obj
 
-	if err != nil {
-		return changed, fmt.Errorf("get %q before clearing finalizers: %w", obj.GetName(), err)
+	if changed {
+		var err error
+
+		current, err = resources.Get(ctx, obj.GetName(), metav1.GetOptions{})
+
+		if apierrors.IsNotFound(err) {
+			return changed, nil
+		}
+
+		if err != nil {
+			return changed, fmt.Errorf("get %q before clearing finalizers: %w", obj.GetName(), err)
+		}
 	}
 
 	remaining, removable := meta.FilterFinalizers(current.GetFinalizers(), retainedFinalizers)

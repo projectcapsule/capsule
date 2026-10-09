@@ -5,6 +5,7 @@ package tenant
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -28,7 +29,7 @@ import (
 )
 
 func BenchmarkControllerTenant(b *testing.B) {
-	for _, kind := range []string{"tenant", "resource-quotas", "namespace-cleanup"} {
+	for _, kind := range []string{"tenant", "resource-quotas", "namespace-cleanup", "namespace-cleanup-missing-tenant", "namespace-cleanup-recreated-tenant"} {
 		for _, count := range []int{1, 32} {
 			b.Run(fmt.Sprintf("%s/namespaces=%d", kind, count), func(b *testing.B) {
 				tnt := &capsulev1beta2.Tenant{
@@ -52,10 +53,20 @@ func BenchmarkControllerTenant(b *testing.B) {
 					},
 				}
 				other := &capsulev1beta2.Tenant{Name: "tenant-b", UID: "tenant-b-uid"}
-				objects := []client.Object{tnt, other, cleanupOwnedNamespace(other, "unrelated", false)}
+				objects := []client.Object{other, cleanupOwnedNamespace(other, "unrelated", false)}
+				switch kind {
+				case "namespace-cleanup-missing-tenant":
+				case "namespace-cleanup-recreated-tenant":
+					replacement := tnt.DeepCopy()
+					replacement.UID = "replacement-tenant-uid"
+					objects = append(objects, replacement)
+				default:
+					objects = append(objects, tnt)
+				}
+				cleanup := strings.HasPrefix(kind, "namespace-cleanup")
 				for i := range count {
 					name := fmt.Sprintf("team-%d", i)
-					ns := cleanupOwnedNamespace(tnt, name, kind == "namespace-cleanup")
+					ns := cleanupOwnedNamespace(tnt, name, cleanup)
 					if i%2 == 0 {
 						ns.Labels["profile"] = "reader"
 					}
@@ -80,7 +91,7 @@ func BenchmarkControllerTenant(b *testing.B) {
 				if kind == "resource-quotas" {
 					controller = reconcile.Func(r.reconcileResourceQuotas)
 				}
-				if kind == "namespace-cleanup" {
+				if cleanup {
 					controller = reconcile.Func(r.reconcileNamespaceCleanup)
 					req.Name = "team-0"
 				}
@@ -109,7 +120,7 @@ func BenchmarkControllerTenant(b *testing.B) {
 					if len(quotas.Items) != count {
 						b.Fatalf("got %d quotas, want %d", len(quotas.Items), count)
 					}
-				case "namespace-cleanup":
+				case "namespace-cleanup", "namespace-cleanup-missing-tenant", "namespace-cleanup-recreated-tenant":
 					if len(dyn.Actions()) == 0 {
 						b.Fatal("cleanup did not scan resources")
 					}
