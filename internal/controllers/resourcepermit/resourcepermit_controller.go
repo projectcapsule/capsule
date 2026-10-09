@@ -813,20 +813,11 @@ func (r *ResourcePermitReconciler) updateStatus(
 	log logr.Logger,
 	br *capsulev1beta2.ResourcePermit,
 ) error {
-	current := &capsulev1beta2.ResourcePermit{}
-	if err := r.Get(ctx, client.ObjectKeyFromObject(br), current); err != nil {
-		return client.IgnoreNotFound(fmt.Errorf("failed to refetch instance before update: %w", err))
-	}
-
-	// Admission can approve, expire, or retry a permit during reconciliation.
-	// A fresh resourceVersion must never authorize writing the old decision.
-	// Reconcile the new state instead of retrying this status on a conflict.
-	if current.UID != br.UID || current.ResourceVersion != br.ResourceVersion {
-		return apierrors.NewConflict(capsulev1beta2.GroupVersion.WithResource("resourcepermits").GroupResource(), br.Name,
-			errors.New("ResourcePermit changed during reconciliation"))
-	}
-
-	current.Status = br.Status
+	// Write the original UID and resourceVersion: the API server rejects any
+	// concurrent approval, expiry, or replacement. Never adopt a newer version
+	// to retry an old decision. A cached GET can lag behind our own earlier write
+	// in this reconcile, so it cannot safely serve as a freshness check.
+	current := br.DeepCopy()
 
 	log.V(7).Info("updating status", "status", current.Status)
 

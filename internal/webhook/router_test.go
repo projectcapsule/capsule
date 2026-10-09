@@ -27,12 +27,40 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/webhook/generic"
 	namespacevalidation "github.com/projectcapsule/capsule/internal/webhook/namespace/validation"
+	rulesmutation "github.com/projectcapsule/capsule/internal/webhook/rules/generic/mutation"
+	rulesvalidation "github.com/projectcapsule/capsule/internal/webhook/rules/generic/validation"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type followingNamespaceGuard struct{ handlers.Handler }
+
+func TestRulesetFinalizerCompletionContinuesAdmissionChain(t *testing.T) {
+	t.Setenv(configuration.EnvironmentControllerNamespace, "capsule-system")
+	t.Setenv(configuration.EnvironmentServiceaccountName, "capsule")
+	stamp := metav1.Now()
+	old := &corev1.ConfigMap{APIVersion: "v1", Kind: "ConfigMap", Name: "held", Namespace: "tenant-a",
+		UID: "held-uid", DeletionTimestamp: &stamp, Finalizers: []string{"example.com/hold"}, Data: map[string]string{"profile": "unchanged"},
+	}
+	obj := old.DeepCopy()
+	obj.Finalizers = nil
+	previous, err := json.Marshal(old)
+	require.NoError(t, err)
+	raw, err := json.Marshal(obj)
+	require.NoError(t, err)
+	for _, registration := range []handlers.Webhook{rulesmutation.Register(nil, nil), rulesvalidation.Register(nil, nil, nil, nil, nil)} {
+		router := &handlerRouter{handlers: append(registration.GetHandlers(), followingNamespaceGuard{})}
+		response := router.Handle(t.Context(), admission.Request{Operation: admissionv1.Update, Namespace: old.Namespace, Name: old.Name,
+			Kind:      metav1.GroupVersionKind{Version: "v1", Kind: "ConfigMap"},
+			OldObject: runtime.RawExtension{Raw: previous}, Object: runtime.RawExtension{Raw: raw},
+			UserInfo: authenticationv1.UserInfo{Username: "system:serviceaccount:capsule-system:capsule"},
+		})
+		require.False(t, response.Allowed)
+		require.Equal(t, "following namespace guard", response.Result.Message, registration.GetPath())
+	}
+}
 
 func (followingNamespaceGuard) OnUpdate(client.Client, client.Reader, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {

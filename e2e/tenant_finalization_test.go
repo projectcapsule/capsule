@@ -22,7 +22,7 @@ import (
 )
 
 var _ = Describe("Tenant finalization", Label("tenant", "termination", "tenant-finalization"), func() {
-	DescribeTable("allows Kubernetes to finish namespace deletion after the owning Tenant disappears", func(recreate bool) {
+	DescribeTable("cleans blocked resources and finishes namespace deletion after the owning Tenant disappears", func(recreate bool) {
 		ctx := context.Background()
 		admin := clusterAdminClient()
 		name := "e2e-orphan-" + rand.String(6)
@@ -43,6 +43,16 @@ var _ = Describe("Tenant finalization", Label("tenant", "termination", "tenant-f
 		held.Spec.Finalizers = []corev1.FinalizerName{corev1.FinalizerKubernetes, hold}
 		NamespaceCreation(held, tenantA.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceReady(tenantA, held, 1)
+		actor := impersonationClient(tenantA.Spec.Owners[0].Name, withDefaultGroups(nil))
+		blocked := &corev1.ConfigMap{Name: "blocked", Namespace: held.Name,
+			Finalizers: []string{"e2e.projectcapsule.dev/hold-content"}, Data: map[string]string{"tenant": tenantA.Name},
+		}
+		Expect(actor.Create(ctx, blocked)).To(Succeed())
+		preserved := &corev1.ConfigMap{Name: "blocked", Namespace: foreign.Name, Data: map[string]string{"tenant": tenantB.Name}}
+		Expect(impersonationClient(tenantB.Spec.Owners[0].Name, withDefaultGroups(nil)).Create(ctx, preserved)).To(Succeed())
+		err := actor.Delete(ctx, preserved)
+		Expect(apierrors.IsForbidden(err)).To(BeTrue())
+		Expect(err).To(MatchError(ContainSubstring(`cannot delete resource "configmaps"`)))
 		release := func() {
 			Eventually(func() error {
 				current, err := admin.CoreV1().Namespaces().Get(ctx, held.Name, metav1.GetOptions{})
@@ -92,6 +102,8 @@ var _ = Describe("Tenant finalization", Label("tenant", "termination", "tenant-f
 			return apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(tenantA), &capsulev1beta2.Tenant{}))
 		}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
 		var replacement *capsulev1beta2.Tenant
+		var replacementNamespace *corev1.Namespace
+		var replacementContent *corev1.ConfigMap
 		if recreate {
 			By("recreating the Tenant name with a different UID")
 			replacement = &capsulev1beta2.Tenant{Name: tenantA.Name, Labels: map[string]string{"env": "e2e"}, Spec: tenantA.Spec}
@@ -99,6 +111,14 @@ var _ = Describe("Tenant finalization", Label("tenant", "termination", "tenant-f
 			DeferCleanup(func() { EventuallyDeletion(replacement) })
 			Expect(replacement.UID).NotTo(Equal(tenantA.UID))
 			TenantReady(replacement, metav1.ConditionTrue, defaultTimeoutInterval)
+			replacementNamespace = NewNamespace(name+"-replacement", map[string]string{meta.TenantLabel: replacement.Name})
+			NamespaceCreation(replacementNamespace, replacement.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+			DeferCleanup(func() { ForceDeleteNamespace(ctx, replacementNamespace.Name) })
+			TenantNamespaceReady(replacement, replacementNamespace, 1)
+			replacementContent = &corev1.ConfigMap{Name: blocked.Name, Namespace: replacementNamespace.Name,
+				Finalizers: append([]string(nil), blocked.Finalizers...), Data: map[string]string{"tenant": "replacement"},
+			}
+			Expect(actor.Create(ctx, replacementContent)).To(Succeed())
 		}
 
 		By("rejecting tenant reassignment through the finalize subresource")
@@ -121,6 +141,10 @@ var _ = Describe("Tenant finalization", Label("tenant", "termination", "tenant-f
 		Expect(held.Spec.Finalizers).To(ContainElement(hold))
 		Expect(held.Finalizers).To(ContainElement(metadataHold))
 
+		By("clearing blocked content without its former Tenant")
+		Eventually(func() bool {
+			return apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(blocked), &corev1.ConfigMap{}))
+		}, defaultTerminationTimeoutInterval, defaultPollInterval).Should(BeTrue())
 		By("letting the namespace controller update status without its former Tenant")
 		Eventually(func(g Gomega) {
 			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(held), held)).To(Succeed())
@@ -136,11 +160,22 @@ var _ = Describe("Tenant finalization", Label("tenant", "termination", "tenant-f
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(replacement), current)).To(Succeed())
 			Expect(current.UID).To(Equal(replacement.UID))
 			Expect(current.DeletionTimestamp).To(BeNil())
+			currentContent := &corev1.ConfigMap{}
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(replacementContent), currentContent)).To(Succeed())
+			Expect(currentContent.UID).To(Equal(replacementContent.UID))
+			Expect(currentContent.Data).To(Equal(replacementContent.Data))
+			Expect(currentContent.Finalizers).To(Equal(replacementContent.Finalizers))
+			Expect(currentContent.DeletionTimestamp).To(BeNil())
 		}
 		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(tenantB), tenantB)).To(Succeed())
 		Expect(tenantB.DeletionTimestamp).To(BeNil())
 		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(foreign), foreign)).To(Succeed())
 		Expect(foreign.DeletionTimestamp).To(BeNil())
+		currentContent := &corev1.ConfigMap{}
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(preserved), currentContent)).To(Succeed())
+		Expect(currentContent.UID).To(Equal(preserved.UID))
+		Expect(currentContent.Data).To(Equal(preserved.Data))
+		Expect(currentContent.DeletionTimestamp).To(BeNil())
 	}, Entry("missing Tenant", false), Entry("recreated Tenant", true))
 
 	It("retains an owner until its namespaces disappear even when namespace status is missing", func() {

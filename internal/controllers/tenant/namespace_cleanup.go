@@ -9,7 +9,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -70,23 +69,17 @@ func (r *Manager) reconcileNamespaceCleanup(ctx context.Context, request reconci
 	if ns.DeletionTimestamp == nil {
 		return reconcile.Result{}, nil
 	}
-	// Labels only select candidates; a live Tenant with the matching owner UID
-	// establishes the scope of this controller's destructive operations.
-	tnt, err := tenant.ResolveNamespaceTenant(ctx, reader, ns)
-	if apierrors.IsNotFound(err) {
-		return reconcile.Result{}, nil
-	}
-
-	if err != nil {
-		return reconcile.Result{}, err
-	}
-
-	if tnt == nil {
-		return reconcile.Result{}, nil
-	}
-
+	// Admission persists the Tenant owner UID on each namespace. Cleanup is
+	// scoped to that namespace's UID and owner, even when an in-flight CREATE
+	// persisted after Tenant finalization or the Tenant name has been reused.
+	// The cleanup helper rechecks that identity before every destructive write.
+	// Labels alone never authorize cleanup, and incomplete ownership fails closed.
 	refs := tenant.TenantOwnerReferences(ns)
-	if len(refs) != 1 || tnt.UID == "" || !tenant.IsTenantOwnerReferenceForTenant(refs[0], tnt) {
+	if ns.UID == "" || len(refs) != 1 || refs[0].Name == "" || refs[0].UID == "" {
+		return reconcile.Result{}, nil
+	}
+
+	if label := tenant.TenanLabelValue(ns); label != "" && label != refs[0].Name {
 		return reconcile.Result{}, nil
 	}
 

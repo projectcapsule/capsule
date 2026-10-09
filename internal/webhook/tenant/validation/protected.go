@@ -7,9 +7,11 @@ import (
 	"context"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -43,6 +45,12 @@ func (h *protectedHandler) OnDelete(
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if tnt.Spec.PreventDeletion {
 			return ad.Deny("tenant is protected and cannot be deleted")
+		}
+
+		// Older empty Tenants may not yet have been repaired by reconciliation.
+		// DELETE cannot add a finalizer, so retain them until repair completes.
+		if tnt.DeletionTimestamp == nil && !controllerutil.ContainsFinalizer(tnt, meta.ControllerFinalizer) {
+			return ad.Deny("tenant lifecycle protection is not ready; retry after the Tenant is reconciled")
 		}
 
 		return nil

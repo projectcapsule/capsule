@@ -7,11 +7,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -333,5 +337,98 @@ func TestTenantFinalizationDeletesUnrecordedActiveNamespace(t *testing.T) {
 	}
 	if !controllerutil.ContainsFinalizer(tnt, meta.ControllerFinalizer) {
 		t.Fatal("Tenant finalized while namespace still exists")
+	}
+}
+
+func TestNamespaceCleanupRecoversChildAfterTenantFinalScan(t *testing.T) {
+	for _, recreated := range []bool{false, true} {
+		t.Run(fmt.Sprintf("recreated=%t", recreated), func(t *testing.T) {
+			ctx := t.Context()
+			tnt := deletingLifecycleTenant()
+			other := &capsulev1beta2.Tenant{Name: "tenant-b", UID: "tenant-b-uid"}
+			foreign := cleanupOwnedNamespace(other, "foreign", false)
+			manager, dyn := namespaceCleanupFixture(t, tnt, other, foreign)
+			api := manager.Client.(client.WithWatch)
+			if err := api.Get(ctx, client.ObjectKeyFromObject(tnt), tnt); err != nil {
+				t.Fatal(err)
+			}
+			// Model a late child becoming visible after the final LIST snapshot.
+			late := cleanupOwnedNamespace(tnt, "late", true)
+			manager.reader = interceptor.NewClient(api, interceptor.Funcs{
+				List: func(ctx context.Context, cl client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+					if err := cl.List(ctx, list, opts...); err != nil {
+						return err
+					}
+					if _, ok := list.(*metav1.PartialObjectMetadataList); ok {
+						return cl.Create(ctx, late)
+					}
+					return nil
+				},
+			})
+			if err := manager.finalizeTenant(ctx, tnt); err != nil {
+				t.Fatal(err)
+			}
+			if err := api.Update(ctx, tnt); err != nil {
+				t.Fatal(err)
+			}
+			if err := api.Get(ctx, client.ObjectKeyFromObject(tnt), &capsulev1beta2.Tenant{}); !apierrors.IsNotFound(err) {
+				t.Fatalf("Tenant should be finalized: %v", err)
+			}
+			// Native GC starts namespace deletion after the parent disappears.
+			if err := api.Delete(ctx, late); err != nil {
+				t.Fatal(err)
+			}
+			if err := api.Get(ctx, client.ObjectKeyFromObject(late), late); err != nil {
+				t.Fatal(err)
+			}
+			if recreated {
+				if err := api.Create(ctx, &capsulev1beta2.Tenant{Name: tnt.Name, UID: "replacement-tenant-uid"}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			manager.reader = api
+			// Advance only the test's read projection past the cleanup grace.
+			// Identity and ownership still come from the persisted namespace.
+			manager.cleanupReader = interceptor.NewClient(api, interceptor.Funcs{
+				Get: func(ctx context.Context, cl client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+					err := cl.Get(ctx, key, obj, opts...)
+					if ns, ok := obj.(*corev1.Namespace); ok && err == nil && ns.DeletionTimestamp != nil {
+						stamp := metav1.NewTime(time.Now().Add(-time.Hour))
+						ns.DeletionTimestamp = &stamp
+					}
+					return err
+				},
+			})
+			gvr := schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}
+			held := &corev1.ConfigMap{Name: "held", Namespace: late.Name, UID: "held-uid", ResourceVersion: "1",
+				Finalizers: []string{"example.com/hold"}, Data: map[string]string{"tenant": tnt.Name},
+			}
+			held.SetDeletionTimestamp(late.DeletionTimestamp)
+			preserved := held.DeepCopy()
+			preserved.SetNamespace(foreign.Name)
+			preserved.SetUID("foreign-configmap-uid")
+			preserved.SetDeletionTimestamp(nil)
+			for _, obj := range []runtime.Object{held, preserved} {
+				if err := dyn.Tracker().Add(obj); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := manager.reconcileNamespaceCleanup(ctx, reconcile.Request{Name: late.Name}); err != nil {
+				t.Fatal(err)
+			}
+			current, err := dyn.Tracker().Get(gvr, late.Name, held.GetName())
+			if err != nil || len(current.(*corev1.ConfigMap).Finalizers) != 0 {
+				t.Fatalf("late namespace content was abandoned: %v, %v", current, err)
+			}
+			for _, action := range dyn.Actions() {
+				if action.GetNamespace() != late.Name {
+					t.Fatalf("cleanup escaped the original namespace: %v", action)
+				}
+			}
+			current, err = dyn.Tracker().Get(gvr, foreign.Name, preserved.GetName())
+			if err != nil || !reflect.DeepEqual(current, preserved) {
+				t.Fatalf("foreign content changed: %v, %v", current, err)
+			}
+		})
 	}
 }

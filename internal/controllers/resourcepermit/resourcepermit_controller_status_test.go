@@ -22,7 +22,7 @@ import (
 
 func TestResourcePermitReconcilePreservesConcurrentExpiration(t *testing.T) {
 	t.Parallel()
-	for _, stage := range []string{"before finalizer read", "before status read", "during status write"} {
+	for _, stage := range []string{"before finalizer read", "after finalizer read", "during status write"} {
 		t.Run(stage, func(t *testing.T) {
 			t.Parallel()
 			ctx := t.Context()
@@ -51,10 +51,14 @@ func TestResourcePermitReconcilePreservesConcurrentExpiration(t *testing.T) {
 			cl := interceptor.NewClient(base, interceptor.Funcs{
 				Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 					reads++
-					if (stage == "before finalizer read" && reads == 1) || (stage == "before status read" && reads == 2) {
+					if stage == "before finalizer read" && reads == 1 {
 						expire()
 					}
-					return c.Get(ctx, key, obj, opts...)
+					err := c.Get(ctx, key, obj, opts...)
+					if stage == "after finalizer read" && reads == 1 {
+						expire()
+					}
+					return err
 				},
 				SubResourceUpdate: func(ctx context.Context, c client.Client, subresource string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
 					writes++
@@ -98,9 +102,36 @@ func TestResourcePermitStatusUpdateAdvancesVersion(t *testing.T) {
 	}
 }
 
+func TestResourcePermitStatusUpdatesIgnoreLaggingCache(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, capsulev1beta2.AddToScheme(scheme))
+	permit := &capsulev1beta2.ResourcePermit{Name: "permit", Namespace: "tenant-a", UID: "permit-uid"}
+	api := fake.NewClientBuilder().WithScheme(scheme).WithObjects(permit).WithStatusSubresource(permit).Build()
+	require.NoError(t, api.Get(t.Context(), client.ObjectKeyFromObject(permit), permit))
+	cacheSnapshot := permit.DeepCopy()
+	reads := 0
+	cl := interceptor.NewClient(api, interceptor.Funcs{
+		Get: func(_ context.Context, _ client.WithWatch, _ client.ObjectKey, obj client.Object, _ ...client.GetOption) error {
+			reads++
+			cacheSnapshot.DeepCopyInto(obj.(*capsulev1beta2.ResourcePermit))
+			return nil
+		},
+	})
+	r := &ResourcePermitReconciler{Client: cl}
+	for _, phase := range []capsulev1beta2.ResourcePermitPhase{capsulev1beta2.ResourcePermitPhaseCreated, capsulev1beta2.ResourcePermitPhaseRequested} {
+		permit.Status.Phase = phase
+		require.NoError(t, r.updateStatus(t.Context(), logr.Discard(), permit))
+		current := &capsulev1beta2.ResourcePermit{}
+		require.NoError(t, api.Get(t.Context(), client.ObjectKeyFromObject(permit), current))
+		require.Equal(t, phase, current.Status.Phase)
+		require.Equal(t, current.ResourceVersion, permit.ResourceVersion)
+	}
+	require.Zero(t, reads, "avoid both API reads and false conflicts from stale informer reads")
+}
+
 func TestResourcePermitStatusUpdatePreservesOtherChanges(t *testing.T) {
 	t.Parallel()
-	for _, state := range []string{"metadata changed", "recreated", "gone", "read failure", "write failure"} {
+	for _, state := range []string{"metadata changed", "recreated", "gone", "cache unavailable", "write failure"} {
 		t.Run(state, func(t *testing.T) {
 			t.Parallel()
 			ctx := t.Context()
@@ -120,8 +151,9 @@ func TestResourcePermitStatusUpdatePreservesOtherChanges(t *testing.T) {
 				require.NoError(t, base.Delete(ctx, permit))
 				permit = &capsulev1beta2.ResourcePermit{Name: permit.Name, Namespace: permit.Namespace, UID: "replacement"}
 				require.NoError(t, base.Create(ctx, permit))
-				// Equal versions in the fake must not obscure the UID guard.
-				snapshot.ResourceVersion = permit.ResourceVersion
+				// The fake reuses versions on CREATE. Model the API server's distinct
+				// replacement version without adopting it into the stale snapshot.
+				require.NoError(t, base.Update(ctx, permit))
 			case "gone":
 				require.NoError(t, base.Delete(ctx, permit))
 			}
@@ -129,7 +161,7 @@ func TestResourcePermitStatusUpdatePreservesOtherChanges(t *testing.T) {
 			writes := 0
 			cl := interceptor.NewClient(base, interceptor.Funcs{
 				Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-					if state == "read failure" {
+					if state == "cache unavailable" {
 						return dependencyErr
 					}
 					return c.Get(ctx, key, obj, opts...)
@@ -150,18 +182,21 @@ func TestResourcePermitStatusUpdatePreservesOtherChanges(t *testing.T) {
 				require.True(t, apierrors.IsConflict(err), "got %v", err)
 			case "gone":
 				require.NoError(t, err)
-			case "read failure", "write failure":
+			case "cache unavailable":
+				require.NoError(t, err, "status writes must not depend on the informer cache")
+			case "write failure":
 				require.ErrorIs(t, err, dependencyErr)
 			}
-			if state == "write failure" {
-				require.Equal(t, 1, writes)
-			} else {
-				require.Zero(t, writes)
-			}
+			require.Equal(t, 1, writes, "send the original version once; never retry a stale decision")
 			if state != "gone" {
 				current := &capsulev1beta2.ResourcePermit{}
 				require.NoError(t, base.Get(ctx, key, current))
-				require.Equal(t, permit, current)
+				if state == "cache unavailable" {
+					require.Equal(t, snapshot.Status, current.Status)
+					require.Equal(t, permit.UID, current.UID)
+				} else {
+					require.Equal(t, permit, current)
+				}
 			}
 			currentOther := &capsulev1beta2.ResourcePermit{}
 			require.NoError(t, base.Get(ctx, client.ObjectKeyFromObject(other), currentOther))

@@ -102,7 +102,6 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 				},
 			},
 			mocks: func(cl *mc.MockClient, scl *mc.MockSubResourceWriter) {
-				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil).Times(2)
 				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBrt).
 					Do(func(_ any, _ any, brt *capsulev1beta2.GlobalResourcePermitTemplate, _ ...any) {
 						brt.ResourceVersion = "1234"
@@ -145,7 +144,6 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 				}},
 			},
 			mocks: func(cl *mc.MockClient, scl *mc.MockSubResourceWriter) {
-				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil).Times(2)
 				cl.EXPECT().
 					Get(
 						gm.Any(),
@@ -193,7 +191,6 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 							Targets: []runtime.RawExtension{mtConfigMapParameterized},
 						}}
 					})
-				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil)
 				scl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
 			},
 			verify: func(t *testing.T, br *capsulev1beta2.ResourcePermit) {
@@ -226,7 +223,6 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 							Targets: []runtime.RawExtension{mtConfigMapRendered},
 						}}
 					})
-				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil).Times(2)
 				cl.EXPECT().Get(gm.Any(), gm.Any(), matchUs).
 					Return(apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, "test-configmap"))
 				cl.EXPECT().Create(gm.Any(), matchUs, gm.Any(), gm.Any()).Return(assert.AnError)
@@ -268,7 +264,6 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 				},
 			},
 			mocks: func(cl *mc.MockClient, scl *mc.MockSubResourceWriter) {
-				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil)
 				scl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
 			},
 			verify: func(t *testing.T, br *capsulev1beta2.ResourcePermit) {
@@ -298,7 +293,6 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 				},
 			},
 			mocks: func(cl *mc.MockClient, scl *mc.MockSubResourceWriter) {
-				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil)
 				cl.EXPECT().Get(gm.Any(), gm.Any(), matchUs).
 					Return(apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, "test-configmap"))
 				cl.EXPECT().Create(gm.Any(), matchUs, gm.Any(), gm.Any()).Return(nil)
@@ -347,7 +341,7 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 			},
 			mocks: func(cl *mc.MockClient, scl *mc.MockSubResourceWriter) {
 				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBrt).Return(nil)
-				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil).Times(2)
+				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil)
 				cl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
 				scl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
 			},
@@ -396,7 +390,7 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 			},
 			mocks: func(cl *mc.MockClient, scl *mc.MockSubResourceWriter) {
 				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBrt).Return(nil)
-				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil).Times(2)
+				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil)
 				cl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
 				cl.EXPECT().Get(gm.Any(), gm.Any(), matchUs).
 					Return(apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, "test-configmap"))
@@ -463,7 +457,7 @@ func TestResourcePermitReconciler_reconcile(t *testing.T) {
 			},
 			mocks: func(cl *mc.MockClient, scl *mc.MockSubResourceWriter) {
 				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBrt).Return(nil)
-				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil).Times(2)
+				cl.EXPECT().Get(gm.Any(), gm.Any(), matchBr).Return(nil)
 				cl.EXPECT().Update(gm.Any(), matchBr, gm.Any()).Return(nil)
 				cl.EXPECT().Get(gm.Any(), gm.Any(), matchUs).
 					Return(apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, "test-configmap"))
@@ -673,7 +667,6 @@ func TestResourcePermitReconcileReturnsStatusWriteError(t *testing.T) {
 				}
 				cl.EXPECT().Get(gm.Any(), client.ObjectKey{Name: templateName}, gm.Any()).Return(templateErr)
 			}
-			cl.EXPECT().Get(gm.Any(), client.ObjectKeyFromObject(br), gm.Any()).Return(nil)
 			cl.EXPECT().Status().Return(scl)
 			scl.EXPECT().Update(gm.Any(), gm.Any()).Return(statusErr)
 			r := &ResourcePermitReconciler{Client: cl}

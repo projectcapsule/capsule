@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 
 	"github.com/go-logr/logr"
 	"golang.org/x/sync/errgroup"
@@ -191,6 +192,12 @@ func (r *Manager) reconcileActiveTenantNamespaces(
 	if err := r.List(ctx, list, client.MatchingFields{".metadata.ownerReferences[*].capsule": tnt.GetName()}); err != nil {
 		return err
 	}
+
+	// The index selects candidates by name. A recreated Tenant must not inherit
+	// namespace profiles or lifecycle status from the previous owner's UID.
+	list.Items = slices.DeleteFunc(list.Items, func(ns corev1.Namespace) bool {
+		return !namespaceOwnedByTenant(&ns, tnt)
+	})
 
 	// Rule rendering reads the complete Tenant, including status. Keep one
 	// immutable snapshot for all namespace workers so their status updates do

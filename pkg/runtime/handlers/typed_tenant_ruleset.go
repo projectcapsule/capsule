@@ -124,6 +124,10 @@ func (h *TypedTenantWithRulesetHandler[T]) OnUpdate(
 			return nil
 		}
 
+		if isControllerFinalizerRemoval(req) {
+			return nil
+		}
+
 		rulesetResult := h.readRulesetAsync(ctx, reader, req.Namespace)
 
 		tnt, err := h.resolveTenant(ctx, reader, req)

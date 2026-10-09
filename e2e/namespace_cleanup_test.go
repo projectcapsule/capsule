@@ -123,6 +123,25 @@ var _ = Describe("namespace cleanup and provisioning", Label("namespace-cleanup"
 		Expect(held.Labels).NotTo(HaveKey(blockedLabel))
 		Expect(held.Finalizers).To(ContainElement("e2e.projectcapsule.dev/hold-object"))
 
+		By("requiring controller finalizer removal to preserve resource metadata")
+		controller := impersonationClient(ControllerServiceAccountFull, nil)
+		Eventually(func() error {
+			current := &corev1.ConfigMap{}
+			if err := controller.Get(ctx, client.ObjectKeyFromObject(held), current); err != nil {
+				return err
+			}
+			current.Finalizers = nil
+			current.Labels[blockedLabel] = "true"
+			err := controller.Update(ctx, current)
+			if err == nil {
+				Fail("controller finalizer update bypassed the namespace metadata rule")
+			}
+			return err
+		}, defaultTimeoutInterval, defaultPollInterval).Should(MatchError(ContainSubstring("denied by namespace rule")))
+		Expect(actor.Get(ctx, client.ObjectKeyFromObject(held), held)).To(Succeed())
+		Expect(held.Finalizers).To(ContainElement("e2e.projectcapsule.dev/hold-object"))
+		Expect(held.Labels).NotTo(HaveKey(blockedLabel))
+
 		By("completing an authorized finalizer-only update")
 		Eventually(func() error {
 			current := &corev1.ConfigMap{}
@@ -379,7 +398,7 @@ var _ = Describe("namespace cleanup and provisioning", Label("namespace-cleanup"
 		foreignCustomResource := newCustomResource(foreign.Name)
 		EventuallyCreation(func() error { return k8sClient.Create(ctx, foreignCustomResource) }).Should(Succeed())
 		var previousUID string
-		for cycle := 0; cycle < 3; cycle++ {
+		for cycle := range 3 {
 			By(fmt.Sprintf("recreating a namespace, cycle %d", cycle+1))
 			churn := createNamespace(tenantA, name+"-churn", "reader")
 			Expect(string(churn.UID)).NotTo(Equal(previousUID))

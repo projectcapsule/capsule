@@ -77,7 +77,7 @@ func cleanupOwnedNamespace(tnt *capsulev1beta2.Tenant, name string, terminating 
 }
 
 func TestNamespaceCleanupControllerScopeAndLifecycle(t *testing.T) {
-	for _, mode := range []string{"active", "unowned", "stale-owner", "missing-tenant", "missing-namespace", "grace", "pods", "cleanup", "failure"} {
+	for _, mode := range []string{"active", "unowned", "recreated-tenant", "missing-tenant", "missing-label", "mismatched-label", "empty-owner-uid", "empty-owner-name", "empty-namespace-uid", "multiple-owners", "foreign-group", "legacy-reference", "missing-namespace", "grace", "pods", "orphan-pods", "cleanup", "failure"} {
 		t.Run(mode, func(t *testing.T) {
 			tnt := &capsulev1beta2.Tenant{Name: "tenant-a", UID: "tenant-a-uid"}
 			ns := cleanupOwnedNamespace(tnt, "cleanup", true)
@@ -89,10 +89,26 @@ func TestNamespaceCleanupControllerScopeAndLifecycle(t *testing.T) {
 			case "unowned":
 				ns.Labels = nil
 				ns.OwnerReferences = nil
-			case "stale-owner":
+			case "recreated-tenant":
 				ns.OwnerReferences[0].UID = "deleted-tenant-uid"
 			case "missing-tenant":
 				objects = []client.Object{ns}
+			case "missing-label":
+				ns.Labels = nil
+			case "mismatched-label":
+				ns.Labels[meta.TenantLabel] = "tenant-b"
+			case "empty-owner-uid":
+				ns.OwnerReferences[0].UID = ""
+			case "empty-owner-name":
+				ns.OwnerReferences[0].Name = ""
+			case "empty-namespace-uid":
+				ns.UID = ""
+			case "multiple-owners":
+				ns.OwnerReferences = append(ns.OwnerReferences, metav1.OwnerReference{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: "tenant-b", UID: "tenant-b-uid"})
+			case "foreign-group":
+				ns.OwnerReferences[0].APIVersion = "example.com/v1"
+			case "legacy-reference":
+				ns.OwnerReferences[0].APIVersion = capsulev1beta2.GroupVersion.Group + "/v1beta1"
 			case "missing-namespace":
 				objects = []client.Object{tnt}
 			case "grace":
@@ -100,6 +116,8 @@ func TestNamespaceCleanupControllerScopeAndLifecycle(t *testing.T) {
 				ns.DeletionTimestamp = &stamp
 			case "pods":
 				objects = append(objects, &corev1.Pod{Name: "pending", Namespace: ns.Name})
+			case "orphan-pods":
+				objects = []client.Object{ns, &corev1.Pod{Name: "pending", Namespace: ns.Name}}
 			}
 			manager, dyn := namespaceCleanupFixture(t, objects...)
 			if mode == "failure" {
@@ -109,11 +127,11 @@ func TestNamespaceCleanupControllerScopeAndLifecycle(t *testing.T) {
 			if (err != nil) != (mode == "failure") {
 				t.Fatalf("error=%v", err)
 			}
-			wantWork := mode == "cleanup" || mode == "failure"
+			wantWork := mode == "cleanup" || mode == "failure" || mode == "missing-tenant" || mode == "recreated-tenant" || mode == "missing-label" || mode == "legacy-reference"
 			if (len(dyn.Actions()) > 0) != wantWork {
 				t.Fatalf("unexpected cleanup work: %v", dyn.Actions())
 			}
-			wantRetry := mode == "grace" || mode == "pods" || mode == "cleanup"
+			wantRetry := mode == "grace" || mode == "pods" || mode == "orphan-pods" || (wantWork && mode != "failure")
 			if (result.RequeueAfter > 0) != wantRetry {
 				t.Fatalf("requeue=%s", result.RequeueAfter)
 			}
@@ -128,6 +146,9 @@ func TestNamespaceCleanupUsesDedicatedAuthoritativeReader(t *testing.T) {
 	reads, lists := 0, 0
 	manager.cleanupReader = interceptor.NewClient(manager.Client.(client.WithWatch), interceptor.Funcs{
 		Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+			if _, ok := obj.(*capsulev1beta2.Tenant); ok {
+				t.Fatal("cleanup must not depend on a live Tenant or consume a Tenant read")
+			}
 			reads++
 			return c.Get(ctx, key, obj, opts...)
 		},
@@ -147,7 +168,7 @@ func TestNamespaceCleanupUsesDedicatedAuthoritativeReader(t *testing.T) {
 		},
 	})
 	result, err := manager.reconcileNamespaceCleanup(t.Context(), reconcile.Request{NamespacedName: client.ObjectKeyFromObject(ns)})
-	if err != nil || result.RequeueAfter != namespaceCleanupRetryPeriod || reads < 3 || lists != 1 || len(dyn.Actions()) == 0 {
+	if err != nil || result.RequeueAfter != namespaceCleanupRetryPeriod || reads != 2 || lists != 1 || len(dyn.Actions()) == 0 {
 		t.Fatalf("result=%+v error=%v reads=%d lists=%d actions=%v", result, err, reads, lists, dyn.Actions())
 	}
 }
