@@ -5,6 +5,7 @@ package webhook
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"testing"
@@ -13,16 +14,135 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/require"
 	admissionv1 "k8s.io/api/admission/v1"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	k8sevents "k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/internal/webhook/generic"
+	namespacevalidation "github.com/projectcapsule/capsule/internal/webhook/namespace/validation"
+	rulesmutation "github.com/projectcapsule/capsule/internal/webhook/rules/generic/mutation"
+	rulesvalidation "github.com/projectcapsule/capsule/internal/webhook/rules/generic/validation"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
+
+type followingNamespaceGuard struct{ handlers.Handler }
+
+func TestRulesetFinalizerCompletionContinuesAdmissionChain(t *testing.T) {
+	t.Setenv(configuration.EnvironmentControllerNamespace, "capsule-system")
+	t.Setenv(configuration.EnvironmentServiceaccountName, "capsule")
+	stamp := metav1.Now()
+	old := &corev1.ConfigMap{APIVersion: "v1", Kind: "ConfigMap", Name: "held", Namespace: "tenant-a",
+		UID: "held-uid", DeletionTimestamp: &stamp, Finalizers: []string{"example.com/hold"}, Data: map[string]string{"profile": "unchanged"},
+	}
+	obj := old.DeepCopy()
+	obj.Finalizers = nil
+	previous, err := json.Marshal(old)
+	require.NoError(t, err)
+	raw, err := json.Marshal(obj)
+	require.NoError(t, err)
+	for _, registration := range []handlers.Webhook{rulesmutation.Register(nil, nil), rulesvalidation.Register(nil, nil, nil, nil, nil)} {
+		router := &handlerRouter{handlers: append(registration.GetHandlers(), followingNamespaceGuard{})}
+		response := router.Handle(t.Context(), admission.Request{Operation: admissionv1.Update, Namespace: old.Namespace, Name: old.Name,
+			Kind:      metav1.GroupVersionKind{Version: "v1", Kind: "ConfigMap"},
+			OldObject: runtime.RawExtension{Raw: previous}, Object: runtime.RawExtension{Raw: raw},
+			UserInfo: authenticationv1.UserInfo{Username: "system:serviceaccount:capsule-system:capsule"},
+		})
+		require.False(t, response.Allowed)
+		require.Equal(t, "following namespace guard", response.Result.Message, registration.GetPath())
+	}
+}
+
+func (followingNamespaceGuard) OnUpdate(client.Client, client.Reader, admission.Decoder, events.EventRecorder) handlers.Func {
+	return func(context.Context, admission.Request) *admission.Response {
+		response := admission.Denied("following namespace guard")
+		return &response
+	}
+}
+
+func TestTenantAssignmentFinalizerCompletionContinuesAdmissionChain(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	cl := fake.NewClientBuilder().WithScheme(scheme).Build()
+	stamp := metav1.Now()
+	old := &corev1.ConfigMap{APIVersion: "v1", Kind: "ConfigMap", Name: "held", Namespace: "tenant-a",
+		UID: "held-uid", DeletionTimestamp: &stamp, Finalizers: []string{"example.com/hold"},
+		Labels: map[string]string{meta.ManagedByCapsuleLabel: "tenant-a", meta.NewTenantLabel: "tenant-a"},
+	}
+	obj := old.DeepCopy()
+	obj.Finalizers = nil
+	raw, err := json.Marshal(obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldRaw, err := json.Marshal(old)
+	if err != nil {
+		t.Fatal(err)
+	}
+	router := &handlerRouter{client: cl, reader: cl, decoder: admission.NewDecoder(scheme),
+		handlers: []handlers.Handler{generic.TenantAssignmentHandler(), followingNamespaceGuard{}},
+	}
+	response := router.Handle(t.Context(), admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+		Operation: admissionv1.Update, Namespace: obj.Namespace, Name: obj.Name,
+		Object: runtime.RawExtension{Raw: raw}, OldObject: runtime.RawExtension{Raw: oldRaw},
+	}})
+	if response.Allowed || response.Result.Message != "following namespace guard" {
+		t.Fatalf("finalizer completion skipped the following guard: %+v", response)
+	}
+}
+
+func TestNamespaceLifecycleContinuesAdmissionChain(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := capsulev1beta2.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	cl := fake.NewClientBuilder().WithScheme(scheme).Build()
+	now := metav1.Now()
+	ns := &corev1.Namespace{
+		Name: "late", UID: "late-uid", DeletionTimestamp: &now,
+		Finalizers:      []string{"example.com/hold"},
+		Labels:          map[string]string{meta.TenantLabel: "gone"},
+		OwnerReferences: []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: "gone", UID: "gone-uid"}},
+	}
+	raw, err := json.Marshal(ns)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newNs := ns.DeepCopy()
+	newNs.Finalizers = nil
+	newRaw, err := json.Marshal(newNs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	router := &handlerRouter{
+		client: cl, reader: cl, decoder: admission.NewDecoder(scheme),
+		handlers: []handlers.Handler{namespacevalidation.NamespaceHandler(nil), followingNamespaceGuard{}},
+	}
+	for _, subresource := range []string{"", "status", "finalize"} {
+		response := router.Handle(t.Context(), admission.Request{
+			Operation: admissionv1.Update, SubResource: subresource,
+			Object: runtime.RawExtension{Raw: newRaw}, OldObject: runtime.RawExtension{Raw: raw},
+			UserInfo: authenticationv1.UserInfo{Username: "system:kube-controller-manager"},
+		})
+		if response.Allowed || response.Result.Message != "following namespace guard" {
+			t.Fatalf("%s: lifecycle handler skipped the following guard: %+v", subresource, response)
+		}
+	}
+}
 
 // Capture writes from the production recorder's queue, including Events created
 // without request annotations. The final marker drains earlier writes FIFO.

@@ -81,6 +81,7 @@ func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, ctrlConfig
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
+		Named("capsule/replications/globaltenantresource").
 		For(
 			&capsulev1beta2.GlobalTenantResource{},
 			builder.WithPredicates(

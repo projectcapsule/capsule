@@ -5,6 +5,7 @@ package cache
 
 import (
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -17,10 +18,12 @@ import (
 const defaultDiscoveryCacheTTL = 30 * time.Second
 
 type DiscoveryNamespacedResourceCache struct {
-	mu        sync.Mutex
-	expiresAt time.Time
-	gvrs      []schema.GroupVersionResource
-	ttl       time.Duration
+	mu         sync.Mutex
+	buildMu    sync.Mutex
+	generation uint64
+	expiresAt  time.Time
+	gvrs       []schema.GroupVersionResource
+	ttl        time.Duration
 }
 
 func NewDiscoveryNamespacedResourceCache() DiscoveryNamespacedResourceCache {
@@ -42,16 +45,22 @@ func NewDiscoveryNamespacedResourceCacheWithTTL(ttl time.Duration) DiscoveryName
 func (c *DiscoveryNamespacedResourceCache) Get(
 	disco discovery.DiscoveryInterface,
 ) ([]schema.GroupVersionResource, error) {
+	if gvrs, ok := c.cached(); ok {
+		return gvrs, nil
+	}
+
+	// Serialize cold discovery independently of cache access. Invalidation and
+	// warm reads never wait for network I/O while holding the data mutex.
+	c.buildMu.Lock()
+	defer c.buildMu.Unlock()
+
+	if gvrs, ok := c.cached(); ok {
+		return gvrs, nil
+	}
+
 	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if c.ttl <= 0 {
-		c.ttl = defaultDiscoveryCacheTTL
-	}
-
-	if time.Now().Before(c.expiresAt) && len(c.gvrs) > 0 {
-		return c.gvrs, nil
-	}
+	generation := c.generation
+	c.mu.Unlock()
 
 	resourceLists, err := disco.ServerPreferredNamespacedResources()
 	if err != nil && len(resourceLists) == 0 {
@@ -63,10 +72,21 @@ func (c *DiscoveryNamespacedResourceCache) Get(
 		return nil, err
 	}
 
-	c.gvrs = append(c.gvrs[:0], gvrs...)
-	c.expiresAt = time.Now().Add(c.ttl)
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	return c.gvrs, nil
+	if c.generation == generation {
+		if c.ttl <= 0 {
+			c.ttl = defaultDiscoveryCacheTTL
+		}
+
+		// Publish a new snapshot: parallel cleanup can still be reading the old
+		// result when this entry expires or is invalidated.
+		c.gvrs = gvrs
+		c.expiresAt = time.Now().Add(c.ttl)
+	}
+
+	return slices.Clone(gvrs), nil
 }
 
 func (c *DiscoveryNamespacedResourceCache) Invalidate() {
@@ -75,4 +95,16 @@ func (c *DiscoveryNamespacedResourceCache) Invalidate() {
 
 	c.expiresAt = time.Time{}
 	c.gvrs = nil
+	c.generation++
+}
+
+func (c *DiscoveryNamespacedResourceCache) cached() ([]schema.GroupVersionResource, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if !time.Now().Before(c.expiresAt) {
+		return nil, false
+	}
+
+	return slices.Clone(c.gvrs), true
 }

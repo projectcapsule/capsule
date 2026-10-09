@@ -26,7 +26,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
 
-const globalResourcePermitTemplateControllerName = "globalresourcepermittemplate"
+const globalResourcePermitTemplateControllerName = "capsule/permits/globalresourcepermittemplate"
 
 // GlobalResourcePermitTemplateReconciler resolves namespace selectors for admission and discovery.
 type GlobalResourcePermitTemplateReconciler struct {

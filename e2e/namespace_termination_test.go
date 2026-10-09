@@ -166,15 +166,32 @@ var _ = Describe("terminating namespace with guardrails", Ordered, Label("namesp
 			)
 		})
 
-		By("verifying tenant still exists (and finalizer cleanup depending on policy)", func() {
+		By("keeping lifecycle protection on the active Tenant after its last namespace disappears", func() {
 			Eventually(func(g Gomega) {
 				cur := &capsulev1beta2.Tenant{}
 				err := k8sClient.Get(ctx, types.NamespacedName{Name: tnt.GetName()}, cur)
 				g.Expect(err).ToNot(HaveOccurred())
 
 				g.Expect(cur.Status.Size).Should(Equal(uint(0)))
-				g.Expect(controllerutil.ContainsFinalizer(cur, meta.ControllerFinalizer)).To(BeFalse())
+				g.Expect(cur.Status.Spaces).To(BeEmpty())
+				g.Expect(cur.Status.Namespaces).To(BeEmpty())
+				g.Expect(cur.DeletionTimestamp).To(BeNil())
+				g.Expect(controllerutil.ContainsFinalizer(cur, meta.ControllerFinalizer)).To(BeTrue())
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		})
+
+		By("accepting another namespace while the empty Tenant remains protected", func() {
+			ns := NewNamespace("", map[string]string{meta.TenantLabel: tnt.Name})
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+			TenantNamespaceReady(tnt, ns, 1)
+			EventuallyDeletion(ns)
+		})
+
+		By("finalizing the Tenant after an explicit deletion", func() {
+			EventuallyDeletionWithoutPodCleanup(tnt)
+			Eventually(func() bool {
+				return apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: tnt.Name}, &capsulev1beta2.Tenant{}))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
 		})
 	})
 })

@@ -19,7 +19,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -37,7 +36,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/users"
 )
 
-const controllerName = "resourcepermit"
+const controllerName = "capsule/permits/resourcepermit"
 
 const (
 	templateResolutionFailedReason = "TemplateResolutionFailed"
@@ -814,26 +813,20 @@ func (r *ResourcePermitReconciler) updateStatus(
 	log logr.Logger,
 	br *capsulev1beta2.ResourcePermit,
 ) error {
-	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		current := &capsulev1beta2.ResourcePermit{}
-		if err := r.Get(ctx, client.ObjectKeyFromObject(br), current); err != nil {
-			return fmt.Errorf("failed to refetch instance before update: %w", err)
-		}
+	// Write the original UID and resourceVersion: the API server rejects any
+	// concurrent approval, expiry, or replacement. Never adopt a newer version
+	// to retry an old decision. A cached GET can lag behind our own earlier write
+	// in this reconcile, so it cannot safely serve as a freshness check.
+	current := br.DeepCopy()
 
-		current.Status = br.Status
+	log.V(7).Info("updating status", "status", current.Status)
 
-		log.V(7).Info("updating status", "status", current.Status)
-
-		if err := r.Client.Status().Update(ctx, current); err != nil {
-			return fmt.Errorf("failed to update status: %w", err)
-		}
-
-		return nil
-	})
-	if err != nil {
+	if err := r.Client.Status().Update(ctx, current); err != nil {
 		// An expired or terminating permit may have been deleted during reconcile.
-		return client.IgnoreNotFound(err)
+		return client.IgnoreNotFound(fmt.Errorf("failed to update status: %w", err))
 	}
+
+	br.ResourceVersion = current.ResourceVersion
 
 	log.V(7).Info("successful update", "status", br.Status)
 
@@ -852,6 +845,13 @@ func (r *ResourcePermitReconciler) addFinalizer(
 	// such as restoring Approved before retrying activation.
 	current := br.DeepCopy()
 	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, current, func() error {
+		// Preserve the status snapshot's version even when the finalizer already
+		// exists; adopting a newer version could overwrite a concurrent expiry.
+		if current.UID != br.UID || current.ResourceVersion != br.ResourceVersion {
+			return apierrors.NewConflict(capsulev1beta2.GroupVersion.WithResource("resourcepermits").GroupResource(), br.Name,
+				errors.New("ResourcePermit changed before finalizer update"))
+		}
+
 		finalizerName := meta.ControllerFinalizer
 		if controllerutil.ContainsFinalizer(current, finalizerName) {
 			log.V(5).Info("Finalizer already exists", "name", br.Name)
