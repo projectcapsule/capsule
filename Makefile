@@ -760,7 +760,7 @@ mockgen:
 	$(call go-install-tool,$(MOCKGEN),$(MOCKGEN_LOOKUP)@$(MOCKGEN_VERSION))
 
 GORELEASER          := $(LOCALBIN)/goreleaser
-GORELEASER_VERSION  := 2.18.0
+GORELEASER_VERSION  := 2.18.2
 GORELEASER_LOOKUP   := goreleaser/goreleaser
 goreleaser: ## Download goreleaser locally if necessary.
 		test -s $(GORELEASER) && $(GORELEASER) --version | grep -q $(GORELEASER_VERSION) ||  \
