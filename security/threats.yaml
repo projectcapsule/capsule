@@ -1,0 +1,449 @@
+# Copyright 2020-2026 Project Capsule Authors
+# SPDX-License-Identifier: Apache-2.0
+title: Capsule Namespace Profiling Threat Catalog
+metadata:
+  id: CAPSULE.THR
+  type: ThreatCatalog
+  gemara-version: "1.6.0"
+  version: "0.1.0"
+  draft: true
+  author:
+    id: codex
+    name: Codex
+    type: Software
+    description: Repository-derived draft prepared for review by Capsule maintainers.
+  description: |
+    Initial scoped threat assessment of the Capsule controller, namespace
+    profiling rules, admission, and shipped deployment and release configuration.
+    Scope, trust boundaries, assumptions, exclusions, and assessed runtime
+    revision are defined in the companion CAPSULE.CAP catalog. Threats describe
+    possible adverse scenarios, including scenarios with existing defenses;
+    they are not claims of confirmed vulnerabilities or an independent audit.
+    Current defenses describe source behavior. Residual risks include operator
+    configuration, trusted policy authors, asynchronous reconciliation, and
+    dependencies. Referenced tests are coverage evidence, not pass attestations.
+    Maintainers must review this draft before badge completion is submitted.
+  mapping-references:
+    - id: CAPSULE.CAP
+      title: Capsule Namespace Profiling Capability Catalog
+      version: "0.1.0"
+      url: https://raw.githubusercontent.com/projectcapsule/capsule/main/security/capabilities.yaml
+      description: Scope and capabilities exploited by the threats in this catalog.
+imports:
+  - reference-id: CAPSULE.CAP
+    entries:
+      - reference-id: CAPSULE.CAP01
+      - reference-id: CAPSULE.CAP02
+      - reference-id: CAPSULE.CAP03
+      - reference-id: CAPSULE.CAP04
+      - reference-id: CAPSULE.CAP05
+      - reference-id: CAPSULE.CAP06
+      - reference-id: CAPSULE.CAP07
+      - reference-id: CAPSULE.CAP08
+      - reference-id: CAPSULE.CAP09
+      - reference-id: CAPSULE.CAP10
+groups:
+  - id: ownership-and-authorization
+    title: Ownership and Authorization
+    description: Threats to tenant boundaries, request identity, and delegated authority.
+  - id: profile-integrity
+    title: Profile Integrity
+    description: Threats to namespace selection, rule composition, and admission enforcement.
+  - id: shared-resource-safety
+    title: Shared Resource Safety
+    description: Threats to replication, allocation, accounting, and resource lifecycle.
+  - id: operation-and-supply-chain
+    title: Operation and Supply Chain
+    description: Threats to availability, sensitive operational data, and trusted distribution.
+threats:
+  - id: CAPSULE.THR01
+    title: Unauthorized Namespace Assignment or Tenant Reassignment
+    group: ownership-and-authorization
+    description: |
+      A tenant owner or compromised requester supplies another tenant's label
+      or ownership metadata when creating or updating a namespace, seeking
+      access to that tenant's resources or a different effective profile.
+      Current defenses: namespace assignment checks requester ownership and
+      update handling preserves or validates the existing Tenant identity.
+      Evidence: `internal/webhook/namespace/mutation/assignment.go`,
+      `pkg/tenant/get_by.go`,
+      `e2e/namespace_selecting_non_owned_tenant_test.go`,
+      `e2e/config_namespace_hijacking_test.go`.
+      Residual risk: administrator reassignment is privileged behavior, and
+      deployments must route affected operations and subresources to the
+      relevant webhooks. User-controlled labels alone cannot establish trust.
+    capabilities:
+      - reference-id: CAPSULE.CAP
+        entries:
+          - reference-id: CAPSULE.CAP01
+  - id: CAPSULE.THR02
+    title: Stale Ownership Refers to a Recreated Tenant or Namespace
+    group: ownership-and-authorization
+    description: |
+      Deletion and recreation reuse a name while old references or cached
+      relationships remain. Treating a name as identity can transfer policy,
+      authorization, or destructive cleanup to the replacement object.
+      Current defenses: shared ownership helpers compare Tenant UIDs where
+      present, and cleanup uses authoritative identity checks and preconditions.
+      Evidence: `pkg/tenant/get_by.go`, `pkg/tenant/owner_reference.go`,
+      `pkg/tenant/namespace_cleanup.go`,
+      `e2e/tenant_lifecycle_admission_test.go`.
+      Residual risk: legacy empty-UID representations and individual consumers
+      require their own compatibility and identity review; this assessment
+      does not assert every name-based lookup has the same guarantees.
+    capabilities:
+      - reference-id: CAPSULE.CAP
+        entries:
+          - reference-id: CAPSULE.CAP01
+          - reference-id: CAPSULE.CAP08
+  - id: CAPSULE.THR03
+    title: Mutable Namespace Labels Select a Weaker Profile
+    group: profile-integrity
+    description: |
+      A requester allowed to edit namespace labels changes a profile selector
+      so restrictive rules stop matching or a permissive rule becomes selected.
+      The result can weaken enforcement without changing Tenant.spec.rules.
+      Current defenses: rule selection is explicit, namespace metadata can be
+      constrained by rules, and selection changes are reconciled per namespace.
+      Evidence: `pkg/tenant/rules.go`,
+      `internal/webhook/namespace/validation/rules_metadata.go`,
+      `e2e/rules_enforce_metadata_test.go`,
+      `e2e/rules_security_profiles_test.go`.
+      Residual risk: a selector is not an authorization boundary. Policy
+      authors must protect labels whose writers must not choose their profile.
+    capabilities:
+      - reference-id: CAPSULE.CAP
+        entries:
+          - reference-id: CAPSULE.CAP02
+          - reference-id: CAPSULE.CAP03
+  - id: CAPSULE.THR04
+    title: Rule Ordering or Audience Configuration Weakens Enforcement
+    group: profile-integrity
+    description: |
+      A policy author unintentionally selects an overly broad audience,
+      excludes an actor that must be constrained, or composes a later rule
+      that overrides the intended decision. Different namespaces then receive
+      an unexpected profile, or audit behavior is mistaken for enforcement.
+      Current defenses: effective rules preserve ordering, admission filters
+      audiences, and the existing evaluator defines allow, deny, and audit.
+      Evidence: `pkg/tenant/rules.go`,
+      `pkg/runtime/handlers/typed_tenant_ruleset.go`,
+      `pkg/ruleengine/enforce_evaluator.go`,
+      `e2e/rules_enforce_registry_test.go`.
+      Residual risk: valid policy syntax cannot establish policy intent.
+      Operators must verify composition and actor-specific behavior, including
+      different profiles within a tenant and effects on other tenants.
+    capabilities:
+      - reference-id: CAPSULE.CAP
+        entries:
+          - reference-id: CAPSULE.CAP02
+          - reference-id: CAPSULE.CAP03
+          - reference-id: CAPSULE.CAP04
+  - id: CAPSULE.THR05
+    title: Admission Uses Stale or Unauthorized Effective Rule State
+    group: profile-integrity
+    description: |
+      A requester with excessive RuleStatus permissions tampers with effective
+      rules, or a request arrives before a changed Tenant policy has propagated.
+      Admission may then use rules different from the intended current profile.
+      Current defenses: RuleStatus publication tracks observedGeneration,
+      admission reads through its supplied reader, and absent RuleStatus uses
+      a namespace-rendering fallback. Quotas are reconciled independently.
+      Evidence: `internal/controllers/rulestatus/manager.go`,
+      `pkg/runtime/handlers/typed_tenant_ruleset.go`, `pkg/tenant/rules.go`,
+      `e2e/observed_generation_test.go`.
+      Residual risk: a direct read of RuleStatus is not proof of synchronous
+      Tenant policy propagation. Protect RuleStatus spec and status through
+      RBAC and wait for the relevant generation before relying on a change.
+    capabilities:
+      - reference-id: CAPSULE.CAP
+        entries:
+          - reference-id: CAPSULE.CAP02
+          - reference-id: CAPSULE.CAP03
+  - id: CAPSULE.THR06
+    title: Webhook Selection or Early Allow Skips Required Checks
+    group: profile-integrity
+    description: |
+      An operator excludes a relevant resource, operation, actor, or subresource
+      through webhook selectors or conditions. Alternatively, a handler returns
+      an explicit allow before later required handlers run. An otherwise valid
+      Kubernetes request then avoids the intended Capsule enforcement.
+      Current defenses: registration and routing define handler order; the
+      chain continues on nil and terminates on any non-nil response.
+      Evidence: `cmd/controller/main.go`, `internal/webhook/router.go`,
+      `internal/webhook/router_test.go`, `charts/capsule/values.yaml`,
+      `e2e/rules_managed_label_test.go`.
+      Residual risk: configured exclusions and failure policies are operator
+      responsibilities. Changes to the composed chain must be tested across
+      operations, managed identities, and relevant subresources.
+    capabilities:
+      - reference-id: CAPSULE.CAP
+        entries:
+          - reference-id: CAPSULE.CAP03
+  - id: CAPSULE.THR07
+    title: Webhook Unavailability Disrupts Writes or Permits Policy Bypass
+    group: operation-and-supply-chain
+    description: |
+      A network failure, expired serving certificate, process failure, or
+      overloaded webhook prevents timely admission. Fail policies deny writes;
+      Ignore policies can admit requests without the intended checks.
+      Current defenses: the manager configures TLS, certificate handling and
+      readiness, and webhooks expose configurable timeouts and failure policies.
+      Evidence: `cmd/controller/main.go`, `charts/capsule/values.yaml`.
+      Residual risk: deployments must choose failure behavior and availability
+      appropriate to each webhook. Configuration and readiness alone do not
+      establish resilience to a real-cluster outage or load spike.
+    capabilities:
+      - reference-id: CAPSULE.CAP
+        entries:
+          - reference-id: CAPSULE.CAP03
+          - reference-id: CAPSULE.CAP09
+  - id: CAPSULE.THR08
+    title: Permission Distribution or Promotion Escalates an Actor
+    group: ownership-and-authorization
+    description: |
+      A tenant actor obtains an unintended RoleBinding, impersonates a promoted
+      service account, or manipulates promotion metadata to gain rights beyond
+      the namespace or tenant profile intended by administrators.
+      Current defenses: permission reconciliation and promotion use configured
+      roles and existing tenant/user identity handling; escalation scenarios
+      have dedicated tenant integration coverage.
+      Evidence: `internal/controllers/tenant/rolebindings.go`,
+      `internal/webhook/serviceaccounts/promotion.go`,
+      `internal/webhook/serviceaccounts/owner_promotion.go`,
+      `e2e/sa_prevent_privilege_escalation_test.go`.
+      Residual risk: trusted role definitions and deliberately granted rights
+      still determine the actor's authority. Capsule does not make excessive
+      upstream Kubernetes grants safe.
+    capabilities:
+      - reference-id: CAPSULE.CAP
+        entries:
+          - reference-id: CAPSULE.CAP04
+  - id: CAPSULE.THR09
+    title: Replication or Template References Cross Tenant Boundaries
+    group: shared-resource-safety
+    description: |
+      A resource author chooses a source or destination outside the intended
+      scope, or template context leaks another tenant's data. Secrets or policy
+      can be copied into an unauthorized namespace or pruned from the wrong one.
+      Current defenses: replication scopes include both tenant and namespace,
+      reference gathering carries configured selection constraints, and
+      replication tracks destination ownership and identity.
+      Evidence: `internal/controllers/resources/scoped_replication.go`,
+      `pkg/api/processor/processor.go`, `pkg/template/context.go`,
+      `e2e/replications_identity_test.go`.
+      Residual risk: globally authorized replication and cross-namespace
+      selection intentionally broaden scope. Operators must review source,
+      destination, adoption, force, and pruning authority together.
+    capabilities:
+      - reference-id: CAPSULE.CAP
+        entries:
+          - reference-id: CAPSULE.CAP05
+  - id: CAPSULE.THR10
+    title: Replication Executes with an Unexpected Privileged Identity
+    group: ownership-and-authorization
+    description: |
+      A resource author or misconfiguration selects an overprivileged service
+      account, or omits impersonation so replication executes with controller
+      authority. Capsule can become a deputy for writes the author cannot do.
+      Current defenses: TenantResource service accounts are resolved in the
+      resource's own namespace, and configured impersonation clients retain
+      their execution identity.
+      Evidence: `internal/controllers/resources/impersonation.go`,
+      `e2e/config_globaltenantresource_serviceaccount_test.go`.
+      Residual risk: no configured impersonation uses the controller identity;
+      global replication can explicitly choose a service account namespace.
+      Restrict resource authorship and impersonation grants accordingly.
+    capabilities:
+      - reference-id: CAPSULE.CAP
+        entries:
+          - reference-id: CAPSULE.CAP04
+          - reference-id: CAPSULE.CAP05
+  - id: CAPSULE.THR11
+    title: Shared Quota Accounting Is Bypassed or Misattributed
+    group: shared-resource-safety
+    description: |
+      Concurrent resource requests, stale usage, reassignment, or incorrect
+      namespace selection attribute consumption to the wrong scope or exceed
+      configured limits. One tenant can exhaust capacity available to others.
+      Current defenses: quotas have distinct namespace and tenant accounting
+      paths, and global native quota handling maintains a reservation ledger.
+      Evidence: `pkg/tenant/rule_quota.go`,
+      `internal/controllers/globalresourcequotas/ledger.go`,
+      `internal/controllers/customquotas/calculation.go`,
+      `e2e/rules_quota_admission_test.go`, `e2e/customquota_global_test.go`.
+      Residual risk: native and custom quotas have different consistency
+      behavior. Process-local caches cannot coordinate reservations across
+      replicas, and quotas do not themselves reserve physical cluster capacity.
+    capabilities:
+      - reference-id: CAPSULE.CAP
+        entries:
+          - reference-id: CAPSULE.CAP06
+  - id: CAPSULE.THR12
+    title: Resource Claims Consume Another Tenant's Allocation
+    group: shared-resource-safety
+    description: |
+      A claimant manipulates pool selection or lifecycle state, or concurrent
+      allocation assigns capacity incorrectly. The result can exhaust a shared
+      pool or make another tenant's resource available to the wrong namespace.
+      Current defenses: pool and claim reconciliation own allocation and
+      lifecycle state and have tenant integration scenarios.
+      Evidence: `internal/controllers/resourcepools/claim_controller.go`,
+      `internal/controllers/resourcepools/pool_controller.go`,
+      `e2e/pool_resourcepoolclaim_test.go`.
+      Residual risk: selectors and configured pool capacity express administrator
+      intent. Allocation fairness and resilience to concurrent claims require
+      deployment-specific validation rather than assuming policy isolation.
+    capabilities:
+      - reference-id: CAPSULE.CAP
+        entries:
+          - reference-id: CAPSULE.CAP07
+  - id: CAPSULE.THR13
+    title: Delegated Permits Exceed Template or Identity Authority
+    group: ownership-and-authorization
+    description: |
+      A permit requester supplies values that select an unintended template,
+      alter the generated resource, or exercise an execution identity outside
+      the permission administrators intended to delegate.
+      Current defenses: permit admission and controllers validate and reconcile
+      template selection and execution through the existing permit lifecycle.
+      Evidence: `internal/webhook/resourcepermit/resourcepermit_validating.go`,
+      `internal/controllers/resourcepermit/resourcepermit_controller.go`,
+      `e2e/resourcepermit_test.go`, `e2e/resourcepermit_lifecycle_test.go`.
+      Residual risk: templates are privileged policy inputs. Review parameter
+      constraints, generated kinds, target namespaces, and service account
+      rights before delegating a template to tenant actors.
+    capabilities:
+      - reference-id: CAPSULE.CAP
+        entries:
+          - reference-id: CAPSULE.CAP04
+          - reference-id: CAPSULE.CAP07
+  - id: CAPSULE.THR14
+    title: Cleanup Deletes Unintended Resources or Bypasses Finalizers
+    group: shared-resource-safety
+    description: |
+      An identity changes between discovery and deletion, or finalizer cleanup
+      applies to a resource outside the intended terminating namespace. Data
+      can be lost or an external controller's cleanup work abandoned.
+      Current defenses: cleanup checks namespace identity and Tenant ownership
+      with direct reads, protects deletes and patches with preconditions, and
+      retains Capsule lifecycle finalizers for their owning controllers.
+      Evidence: `pkg/tenant/namespace_cleanup.go`,
+      `internal/controllers/tenant/namespace_cleanup.go`,
+      `e2e/namespace_cleanup_test.go`, `e2e/tenant_finalization_test.go`.
+      Residual risk: eligible non-Capsule finalizers can be forcibly removed.
+      External resource disposal is therefore an operator consideration;
+      cleanup's application checks do not restrict the service account's RBAC.
+    capabilities:
+      - reference-id: CAPSULE.CAP
+        entries:
+          - reference-id: CAPSULE.CAP08
+          - reference-id: CAPSULE.CAP09
+  - id: CAPSULE.THR15
+    title: Controller Compromise Grants Broad Cluster Authority
+    group: operation-and-supply-chain
+    description: |
+      An attacker obtains controller credentials, code execution, or a malicious
+      controller image and uses its rights to read, alter, or delete resources
+      across tenants. This breaks namespace profile integrity and confidentiality.
+      Current defenses: the chart offers explicit strict RBAC and pod/container
+      security settings; application paths perform tenant ownership checks.
+      Evidence: `charts/capsule/templates/rbac.yaml`,
+      `charts/capsule/values.yaml`.
+      Residual risk: the default binding is cluster-admin. Strict mode still
+      grants cluster-wide generic read, delete, and patch capabilities for
+      cleanup, including custom resources. Those grants cannot be limited to
+      finalizers by Kubernetes RBAC. Protect the controller and its credentials
+      as a privileged part of the cluster trust boundary.
+    capabilities:
+      - reference-id: CAPSULE.CAP
+        entries:
+          - reference-id: CAPSULE.CAP09
+  - id: CAPSULE.THR16
+    title: Policy Evaluation or Reconciliation Exhausts Shared Capacity
+    group: operation-and-supply-chain
+    description: |
+      A policy author introduces expensive expressions, templates, selectors,
+      or large resource sets, or a tenant floods applicable requests. CPU,
+      memory, API round trips, or lock contention grow until admission times
+      out or other tenants' reconciliation is delayed.
+      Current defenses: shared compiled-artifact caches, indexed lookups,
+      request-local read caching, and performance benchmarks reduce repeated
+      work. API limits exist on some rule fields.
+      Evidence: `internal/cache/cel.go`,
+      `internal/webhook/utils/request_reader.go`,
+      `pkg/tenant/rules_bench_test.go`,
+      `internal/webhook/router_bench_test.go`.
+      Residual risk: caching is not a universal workload budget. Cold misses,
+      concurrent requests, cache invalidation, total working set, and actual
+      API latency need measurement with representative deployments.
+    capabilities:
+      - reference-id: CAPSULE.CAP
+        entries:
+          - reference-id: CAPSULE.CAP02
+          - reference-id: CAPSULE.CAP03
+          - reference-id: CAPSULE.CAP09
+  - id: CAPSULE.THR17
+    title: Operational Evidence Exposes Sensitive Tenant Information
+    group: operation-and-supply-chain
+    description: |
+      A user with access to events, logs, metrics, or traces learns another
+      tenant's identities, resource names, policy matches, or operational data.
+      Exported observability can cross the Kubernetes access-control boundary.
+      Current defenses: tracing is configurable, admission constructs defined
+      span attributes, and dry-run handling suppresses persistent audit events.
+      Evidence: `internal/webhook/router.go`, `cmd/controller/tracing.go`,
+      `e2e/rules_dry_run_events_test.go`.
+      Residual risk: traces include request identities and resource metadata.
+      Operators must scope access, retention, and export destinations; audit
+      events and diagnostic output are not confidentiality boundaries.
+    capabilities:
+      - reference-id: CAPSULE.CAP
+        entries:
+          - reference-id: CAPSULE.CAP09
+  - id: CAPSULE.THR18
+    title: An Admitted Workload Still Executes Unsafe or Replaced Content
+    group: profile-integrity
+    description: |
+      A workload author uses an unsafe security setting or an approved registry
+      tag whose content is later replaced. A Pod satisfying an incomplete
+      namespace profile can still compromise application data or runtime hosts.
+      Current defenses: rules can validate security profiles, workload targets,
+      registry references, and other workload properties, and apply typed
+      defaults to selected namespace profiles.
+      Evidence: `internal/webhook/rules/pods/validation/profiles.go`,
+      `internal/webhook/rules/pods/validation/registry.go`,
+      `e2e/rules_security_profiles_test.go`,
+      `e2e/rules_enforce_registry_test.go`.
+      Residual risk: registry matching is not image signature verification or
+      content inspection. Admission operates on Kubernetes objects; kubelets
+      pull and run images. Operators need appropriate runtime isolation,
+      Pod Security Admission, and artifact integrity controls.
+    capabilities:
+      - reference-id: CAPSULE.CAP
+        entries:
+          - reference-id: CAPSULE.CAP03
+  - id: CAPSULE.THR19
+    title: Source, Dependencies, or Release Workflows Are Compromised
+    group: operation-and-supply-chain
+    description: |
+      An attacker alters source, a Go dependency, a third-party action, or
+      release credentials so downstream installations execute malicious
+      controller code with broad cluster permissions.
+      Current defenses: workflow definitions pin direct external action
+      references, run security scans and tests, and request image/chart signing
+      and build provenance. Published instructions describe artifact verification.
+      Evidence: `.github/workflows/check-actions.yml`,
+      `.github/workflows/coverage.yml`, `.github/workflows/docker-publish.yml`,
+      `.github/workflows/helm-publish.yml`, `SECURITY.md`.
+      Residual risk: signatures identify an authorized build, not safe source.
+      Repository access controls, upstream dependency trust, secret handling,
+      and downstream verification require continued review. Nested action
+      references and downloaded tool artifacts require independent pinning
+      and verification. This assessment has not verified GitHub settings or
+      individual release attestations.
+    capabilities:
+      - reference-id: CAPSULE.CAP
+        entries:
+          - reference-id: CAPSULE.CAP09
+          - reference-id: CAPSULE.CAP10
