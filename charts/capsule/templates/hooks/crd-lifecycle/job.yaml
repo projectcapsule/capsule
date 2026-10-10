@@ -81,16 +81,14 @@ spec:
         {{- if $Values.securityContext.enabled }}
         securityContext: {{- omit $Values.securityContext "enabled" | toYaml | nindent 10 }}
         {{- end }}
-        command:
-        - sh
-        - -c
-        - |
-          set -o errexit ; set -o xtrace ; set -o nounset
-
-          # piping stderr to stdout means kubectl's errors are surfaced
-          # in the pod's logs.
-
-          kubectl apply --server-side=true --overwrite=true --force-conflicts=true --field-manager='capsule/crd-lifecycle' -f /data/ 2>&1
+        args:
+        - apply
+        - --server-side=true
+        - --overwrite=true
+        - --force-conflicts=true
+        - --field-manager=capsule/crd-lifecycle
+        - -f
+        - /data/
         volumeMounts:
 {{- range $path, $_ := .Files.Glob "crds/**.yaml" }}
         - name: {{ $path | base | trimSuffix ".yaml" | regexFind "[^_]+$" }}

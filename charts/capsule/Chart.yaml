@@ -42,6 +42,8 @@ annotations:
   artifacthub.io/changes: |
     - kind: fixed
       description: declare generic rule webhook side effects as NoneOnDryRun and suppress NetworkPolicy audit and denial Events for dry runs
+    - kind: changed
+      description: pass kubectl hook arguments through the configured image entrypoint
     - kind: added
       description: enforce PDB overlap, eviction allowance and unhealthy Pod policies through namespace workload rules
     - kind: added
