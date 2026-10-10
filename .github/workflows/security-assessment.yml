@@ -1,0 +1,46 @@
+name: Security assessment
+permissions: {}
+
+on:
+  pull_request:
+    paths:
+      - 'security/**'
+      - 'security-insights.yml'
+      - 'SECURITY-INSIGHTS.yml'
+      - 'hack/securityassessment/**'
+      - '.github/workflows/security-assessment.yml'
+      - 'Makefile'
+      - 'go.mod'
+      - 'go.sum'
+      - 'api/**'
+      - 'cmd/**'
+      - 'internal/**'
+      - 'pkg/**'
+      - 'e2e/**'
+      - 'charts/capsule/values.yaml'
+      - 'charts/capsule/templates/**'
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Test assessment validation
+        run: go test -race ./hack/securityassessment
+      - name: Validate Gemara and Security Insights
+        run: make security-assessment

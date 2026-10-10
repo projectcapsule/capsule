@@ -1,0 +1,196 @@
+# Copyright 2020-2026 Project Capsule Authors
+# SPDX-License-Identifier: Apache-2.0
+title: Capsule Namespace Profiling Capability Catalog
+metadata:
+  id: CAPSULE.CAP
+  type: CapabilityCatalog
+  gemara-version: "1.6.0"
+  version: "0.1.0"
+  draft: true
+  author:
+    id: codex
+    name: Codex
+    type: Software
+    description: Repository-derived draft prepared for review by Capsule maintainers.
+  description: |
+    Scope: the Capsule controller, admission server, shared rules API, and
+    shipped Helm configuration and release workflows in this repository.
+    Runtime source was assessed at revision
+    fdd503a84521d80c26779cb8a14f4df95f37c47d. Referenced tests include proposed
+    coverage accompanying this assessment; a reference does not attest a test run.
+
+    Namespace profiling is the composition of rules selected for each namespace.
+    Tenant membership supplies ownership, isolation, and distribution scope;
+    namespaces in the same tenant can have different effective profiles.
+    Tenant.spec.rules selects namespaces and defines mutation, enforcement,
+    permissions, and quotas. RuleStatus publishes effective admission rules;
+    permissions and quotas follow their own reconciliation paths.
+
+    Trust boundaries: authenticated Kubernetes requesters and the API server;
+    tenant owners and other tenants; policy authors and namespace label writers;
+    the API server and the webhook; cached state and authoritative API reads;
+    the controller's service account and impersonated service accounts; and
+    reviewed source, build workflows, registries, and downstream installations.
+    Cluster administrators and authorized policy authors are trusted to define
+    ownership and profiles. Tenant owners and workload authors may be malicious
+    or compromised within the permissions granted to them.
+
+    Assumptions: Kubernetes authentication and RBAC protect credentials and
+    policy resources. Operators protect profile selector labels when their
+    writers must not choose a weaker profile, and configure webhook selection
+    and failure policies for the required enforcement. Network isolation needs
+    a CNI that implements NetworkPolicy; pod isolation depends on Kubernetes
+    and the configured runtime, Pod Security Admission, and profiles.
+
+    Exclusions: capsule-proxy and other repositories, application behavior,
+    Kubernetes control-plane internals, CNI and storage driver internals, host
+    and container-runtime isolation, and a deployed cluster's configuration.
+    These are dependencies or integration boundaries, not assurances provided
+    by this assessment. Maintainer review and deployment-specific analysis
+    remain necessary before treating this draft as a completed assessment.
+groups:
+  - id: namespace-profiling
+    title: Namespace Profiling
+    description: Ownership, effective rules, admission, and permission distribution.
+  - id: resource-management
+    title: Resource Management
+    description: Replication, shared resource accounting, allocation, and lifecycle.
+  - id: operation-and-distribution
+    title: Operation and Distribution
+    description: Controller operation and delivery of trusted installation artifacts.
+capabilities:
+  - id: CAPSULE.CAP01
+    title: Tenant Namespace Ownership
+    group: namespace-profiling
+    description: |
+      Assign namespaces to authorized tenant owners, record Tenant ownership,
+      and preserve tenant identity during updates, deletion, and recreation.
+      Selection hints such as labels are inputs to ownership checks, rather
+      than authorization on their own. Ownership determines where profiles
+      can be distributed.
+      Implementation: `pkg/tenant/get_by.go`, `pkg/tenant/owner_reference.go`,
+      `internal/webhook/namespace/mutation/assignment.go`.
+      Coverage: `pkg/tenant/get_by_test.go`,
+      `e2e/namespace_selecting_non_owned_tenant_test.go`.
+  - id: CAPSULE.CAP02
+    title: Effective Namespace Rule Composition
+    group: namespace-profiling
+    description: |
+      Select Tenant.spec.rules by namespace labels, preserve rule ordering,
+      render namespace-specific templates, and publish effective mutation and
+      enforcement through RuleStatus.status.rules. Reconcile permissions and
+      quotas through their existing paths rather than admission status.
+      Implementation: `pkg/api/rules/rule_body_types.go`, `pkg/tenant/rules.go`,
+      `internal/controllers/tenant/rulestatus.go`,
+      `internal/controllers/rulestatus/manager.go`.
+      Coverage: `internal/controllers/tenant/rulestatus_test.go`,
+      `e2e/rules_security_profiles_test.go`.
+  - id: CAPSULE.CAP03
+    title: Namespace Resource Admission
+    group: namespace-profiling
+    description: |
+      Route admission requests, resolve tenant and applicable rules, filter
+      request audiences and conditions, apply typed mutations, and enforce
+      configured allow, deny, and audit behavior. Resource and subresource
+      registration determines which requests reach each handler.
+      Implementation: `internal/webhook/router.go`,
+      `pkg/runtime/handlers/typed_tenant_ruleset.go`,
+      `pkg/ruleengine/enforce_evaluator.go`,
+      `internal/webhook/rules/pods/validation/profiles.go`.
+      Coverage: `pkg/runtime/handlers/typed_tenant_ruleset_test.go`,
+      `e2e/rules_security_profiles_test.go`, `e2e/rules_dry_run_events_test.go`.
+  - id: CAPSULE.CAP04
+    title: Permission Distribution and Service Account Promotion
+    group: namespace-profiling
+    description: |
+      Reconcile namespace permissions and tenant owner bindings, and process
+      explicitly configured service account promotion. Distinguish users,
+      groups, service accounts, tenant owners, and Capsule administrators.
+      Implementation: `pkg/api/rules/permission_types.go`,
+      `internal/controllers/tenant/rolebindings.go`,
+      `internal/webhook/serviceaccounts/promotion.go`.
+      Coverage: `internal/controllers/tenant/rolebindings_test.go`,
+      `e2e/sa_prevent_privilege_escalation_test.go`.
+  - id: CAPSULE.CAP05
+    title: Scoped Resource Replication and Templating
+    group: resource-management
+    description: |
+      Select source resources, render templates, and reconcile replicas into
+      selected tenant namespaces using TenantResource and GlobalTenantResource.
+      Use a configured service account identity where requested, otherwise
+      the controller identity, and track ownership for update and pruning.
+      Implementation: `internal/controllers/resources/impersonation.go`,
+      `internal/controllers/resources/scoped_replication.go`,
+      `pkg/template/context.go`, `pkg/api/processor/processor.go`.
+      Coverage: `internal/controllers/resources/replication_context_test.go`,
+      `e2e/replications_identity_test.go`,
+      `e2e/config_globaltenantresource_serviceaccount_test.go`.
+  - id: CAPSULE.CAP06
+    title: Namespace and Tenant Resource Accounting
+    group: resource-management
+    description: |
+      Generate quotas for rule-selected namespaces and account for native and
+      custom resources using tenant and namespace scopes. Enforce configured
+      resource limits to constrain shared consumption.
+      Implementation: `pkg/tenant/rule_quota.go`,
+      `internal/controllers/tenant/globalresourcequotas.go`,
+      `internal/controllers/globalresourcequotas/controller.go`,
+      `internal/controllers/customquotas/calculation.go`.
+      Coverage: `pkg/tenant/rule_quota_test.go`,
+      `e2e/rules_quota_test.go`, `e2e/rules_quota_admission_test.go`.
+  - id: CAPSULE.CAP07
+    title: Resource Pool Allocation and Delegated Permits
+    group: resource-management
+    description: |
+      Allocate resources through ResourcePools and ResourcePoolClaims, and
+      reconcile resources requested through ResourcePermits and approved
+      templates. These operations support namespace behavior and must retain
+      tenant scope, template authorization, and intended execution identity.
+      Implementation: `internal/controllers/resourcepools/claim_controller.go`,
+      `internal/controllers/resourcepermit/resourcepermit_controller.go`,
+      `internal/webhook/resourcepermit/resourcepermit_validating.go`.
+      Coverage: `e2e/pool_resourcepoolclaim_test.go`,
+      `e2e/resourcepermit_test.go`, `e2e/resourcepermit_lifecycle_test.go`.
+  - id: CAPSULE.CAP08
+    title: Tenant and Namespace Lifecycle Cleanup
+    group: resource-management
+    description: |
+      Protect tenant deletion with finalizers, discover remaining owned
+      namespaces, and clean resources in terminating namespaces. Validate
+      ownership and object identity before destructive operations and retain
+      Capsule lifecycle finalizers for their owning controllers.
+      Implementation: `pkg/tenant/namespace_cleanup.go`,
+      `internal/controllers/tenant/namespace_cleanup.go`,
+      `internal/controllers/tenant/manager.go`.
+      Coverage: `pkg/tenant/namespace_cleanup_test.go`,
+      `internal/controllers/tenant/finalization_test.go`,
+      `e2e/namespace_cleanup_test.go`, `e2e/tenant_lifecycle_admission_test.go`.
+  - id: CAPSULE.CAP09
+    title: Privileged Controller and Webhook Operation
+    group: operation-and-distribution
+    description: |
+      Operate controllers, admission TLS, metrics and optional tracing with
+      Kubernetes clients, compiled artifact caches, and indexed lookups.
+      The shipped default controller binding uses cluster-admin. Strict RBAC
+      still grants generic cluster-wide read, delete, and patch permissions
+      needed for cleanup; application ownership checks do not narrow RBAC.
+      Implementation: `cmd/controller/main.go`, `internal/cache/cel.go`,
+      `internal/webhook/utils/request_reader.go`,
+      `charts/capsule/templates/rbac.yaml`, `charts/capsule/values.yaml`.
+      Coverage: `internal/cache/invalidation_test.go`,
+      `internal/webhook/utils/request_reader_test.go`,
+      `e2e/config_cel_cache_test.go`.
+  - id: CAPSULE.CAP10
+    title: Source and Release Artifact Distribution
+    group: operation-and-distribution
+    description: |
+      Build and distribute the controller image and Helm chart using GitHub
+      workflows, third-party actions and Go dependencies. Release workflows
+      request keyless signatures and SLSA provenance; users can follow
+      published verification instructions. Workflow configuration is evidence
+      of intended behavior, not verification of a specific published artifact.
+      Implementation: `.github/workflows/docker-publish.yml`,
+      `.github/workflows/helm-publish.yml`, `.github/workflows/coverage.yml`,
+      `go.mod`, `SECURITY.md`.
+      Coverage: `.github/workflows/check-actions.yml`,
+      `.github/workflows/releaser-dry-run.yml`.

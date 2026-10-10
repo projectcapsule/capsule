@@ -27,9 +27,16 @@ KUBERNETES_SUPPORTED_VERSION ?= "v1.36.1"
 OS_SUPPORTED_VERSION ?= "4.22.0-okd-scos.ec.10"
 
 ## Tool Binaries
+LOCALBIN ?= $(shell pwd)/bin
 KUBECTL ?= kubectl
 HELM ?= helm
 DEV_SETUP_TIMEOUT ?= 10m
+CUE ?= $(LOCALBIN)/cue
+CUE_VERSION := v0.17.1
+SECURITY_INSIGHTS_SCHEMA = $(LOCALBIN)/security-insights-v2.2.0.cue
+GEMARA_SCHEMA_DIR = $(LOCALBIN)/gemara-v1.6.0
+# Gemara v1.6.0 release commit; use source validation without a registry lookup.
+GEMARA_SCHEMA_COMMIT := 14a8b1c02e1b7152781c0af7b6bcd07012f9763c
 export LAPTOP_HOST_IP
 
 # Options for 'bundle-build'
@@ -63,6 +70,14 @@ test: gotestsum test-clean generate manifests mocks test-clean
 .PHONY: test-clean
 test-clean: ## Clean tests cache
 	@go clean -testcache
+
+# Validate published assessment shapes, then resolve the local evidence graph.
+.PHONY: security-assessment
+security-assessment: cue $(SECURITY_INSIGHTS_SCHEMA) $(GEMARA_SCHEMA_DIR)/.ready
+	$(CUE) vet -c -d '#CapabilityCatalog' $(GEMARA_SCHEMA_DIR)/*.cue security/capabilities.yaml
+	$(CUE) vet -c -d '#ThreatCatalog' $(GEMARA_SCHEMA_DIR)/*.cue security/threats.yaml
+	$(CUE) vet -c -d '#SecurityInsights' $(SECURITY_INSIGHTS_SCHEMA) security-insights.yml
+	go run ./hack/securityassessment
 
 # Reconciliation benchmarks use populated fake clients; no cluster is required.
 BENCH_FILTER ?= ^BenchmarkController
@@ -670,7 +685,6 @@ pull-upstream:
 	git fetch --all && git pull upstream
 
 ## Location to install dependencies to
-LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
@@ -692,6 +706,28 @@ helm-doc:
 ####################
 # -- Tools
 ####################
+.PHONY: cue
+cue: | $(LOCALBIN)
+	@test -s $(CUE) && $(CUE) version | grep -q '$(CUE_VERSION)' || \
+	GOBIN=$(LOCALBIN) go install cuelang.org/go/cmd/cue@$(CUE_VERSION)
+
+$(SECURITY_INSIGHTS_SCHEMA): | $(LOCALBIN)
+	curl --fail --silent --show-error --location --max-time 60 \
+		'https://raw.githubusercontent.com/ossf/security-insights/v2.2.0/spec/schema.cue' -o '$@.tmp'
+	@echo '4e4b61470b5484fc8969f2a8a77ffbe0712a7c8a870c2079188f246c14cd58b1  $@.tmp' | shasum -a 256 -c -
+	mv '$@.tmp' '$@'
+
+$(GEMARA_SCHEMA_DIR)/.ready: | $(LOCALBIN)
+	@set -eu; \
+	assessment_tmp=$$(mktemp -d '$(LOCALBIN)/gemara.XXXXXX'); \
+	trap 'rm -rf "$$assessment_tmp"' EXIT; \
+	curl --fail --silent --show-error --location --max-time 60 \
+		'https://github.com/gemaraproj/gemara/archive/$(GEMARA_SCHEMA_COMMIT).tar.gz' -o "$$assessment_tmp/source.tar.gz"; \
+	mkdir "$$assessment_tmp/schema"; \
+	tar -xzf "$$assessment_tmp/source.tar.gz" --strip-components=1 -C "$$assessment_tmp/schema"; \
+	touch "$$assessment_tmp/schema/.ready"; \
+	mv "$$assessment_tmp/schema" '$(GEMARA_SCHEMA_DIR)'
+
 CONTROLLER_GEN         := $(LOCALBIN)/controller-gen
 CONTROLLER_GEN_VERSION ?= v0.21.0
 CONTROLLER_GEN_LOOKUP  := kubernetes-sigs/controller-tools
