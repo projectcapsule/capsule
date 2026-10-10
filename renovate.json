@@ -47,11 +47,11 @@
       "customType": "regex",
       "fileMatch": ["^Makefile$"],
       "matchStrings": [
-        "(?<depName>[A-Z0-9_]+)_VERSION\\s*[:=?]+\\s*\"?(?<currentValue>[^\"\\r\\n]+)\"?[\\s\\S]*?(?<depName2>[A-Z0-9_]+)_LOOKUP\\s*[:=?]+\\s*\"?(?<lookupValue>[^\"\\r\\n]+)\"?(?:[\\s\\S]*?(?<depName3>[A-Z0-9_]+)_SOURCE\\s*[:=?]+\\s*\"?(?<sourceValue>[^\"\\r\\n]+)\"?)?"
+        "(?<depName>[A-Z0-9_]+)_VERSION\\s*[:=?]+\\s*\"?(?<currentValue>[^\"\\r\\n]+)\"?[\\r\\n]+\\s*(?<depName2>[A-Z0-9_]+)_LOOKUP\\s*[:=?]+\\s*\"?(?<lookupValue>[^\"\\r\\n]+)\"?(?:[\\r\\n]+\\s*(?<depName3>[A-Z0-9_]+)_RENOVATE\\s*[:=?]+\\s*\"?(?<renovateValue>[^\"\\r\\n]+)\"?)?(?:[\\r\\n]+\\s*(?<depName4>[A-Z0-9_]+)_SOURCE\\s*[:=?]+\\s*\"?(?<sourceValue>[^\"\\r\\n]+)\"?)?"
       ],
       "depNameTemplate": "{{lookupValue}}",
-      "datasourceTemplate": "{{#sourceValue}}{{sourceValue}}{{/sourceValue}}{{^sourceValue}}github-tags{{/sourceValue}}",
-      "lookupNameTemplate": "{{lookupValue}}",
+      "datasourceTemplate": "{{#if sourceValue}}{{sourceValue}}{{else}}github-tags{{/if}}",
+      "packageNameTemplate": "{{#if renovateValue}}{{renovateValue}}{{else}}{{lookupValue}}{{/if}}",
       "versioningTemplate": "semver"
     },
     {
