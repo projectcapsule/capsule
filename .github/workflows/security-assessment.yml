@@ -6,19 +6,7 @@ on:
     paths:
       - 'security/**'
       - 'security-insights.yml'
-      - 'SECURITY-INSIGHTS.yml'
-      - 'hack/securityassessment/**'
       - '.github/workflows/security-assessment.yml'
-      - 'Makefile'
-      - 'go.mod'
-      - 'go.sum'
-      - 'api/**'
-      - 'cmd/**'
-      - 'internal/**'
-      - 'pkg/**'
-      - 'e2e/**'
-      - 'charts/capsule/values.yaml'
-      - 'charts/capsule/templates/**'
   push:
     branches:
       - main
@@ -37,10 +25,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - name: Validate Security Insights
+        uses: revanite-io/security-insights-action@85c35a5b75f2772e0462323d7b4fcbab5fc1aff2 # v1.0.0
         with:
-          go-version-file: go.mod
-      - name: Test assessment validation
-        run: go test -race ./hack/securityassessment
-      - name: Validate Gemara and Security Insights
-        run: make security-assessment
+          file: security-insights.yml
+      - name: Validate official schemas
+        run: |
+          cue vet -d '#SecurityInsights' schema.cue security-insights.yml
+          cue vet -c -d '#CapabilityCatalog' github.com/gemaraproj/gemara@v1.6.0 security/capabilities.yaml
+          cue vet -c -d '#ThreatCatalog' github.com/gemaraproj/gemara@v1.6.0 security/threats.yaml

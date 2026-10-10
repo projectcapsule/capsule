@@ -16,8 +16,8 @@ metadata:
     Scope: the Capsule controller, admission server, shared rules API, and
     shipped Helm configuration and release workflows in this repository.
     Runtime source was assessed at revision
-    fdd503a84521d80c26779cb8a14f4df95f37c47d. Referenced tests include proposed
-    coverage accompanying this assessment; a reference does not attest a test run.
+    fdd503a84521d80c26779cb8a14f4df95f37c47d. Referenced tests are existing
+    coverage evidence; a reference does not attest a test run.
 
     Namespace profiling is the composition of rules selected for each namespace.
     Tenant membership supplies ownership, isolation, and distribution scope;
