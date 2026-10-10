@@ -25,10 +25,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - name: Validate Security Insights
-        uses: revanite-io/security-insights-action@85c35a5b75f2772e0462323d7b4fcbab5fc1aff2 # v1.0.0
+      - name: Setup CUE
+        uses: cue-lang/setup-cue@a93fa358375740cd8b0078f76355512b9208acb1 # v1.0.1
         with:
-          file: security-insights.yml
+          version: v0.17.1
+      - name: Download Security Insights schema
+        run: |
+          curl --fail --silent --show-error --location --max-time 60 \
+            https://raw.githubusercontent.com/ossf/security-insights/v2.2.0/spec/schema.cue \
+            --output schema.cue
+          echo '4e4b61470b5484fc8969f2a8a77ffbe0712a7c8a870c2079188f246c14cd58b1  schema.cue' | sha256sum --check
       - name: Validate official schemas
         run: |
           cue vet -d '#SecurityInsights' schema.cue security-insights.yml

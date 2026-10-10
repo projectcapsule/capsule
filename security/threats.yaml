@@ -430,16 +430,18 @@ threats:
       An attacker alters source, a Go dependency, a third-party action, or
       release credentials so downstream installations execute malicious
       controller code with broad cluster permissions.
-      Current defenses: workflows pin external actions, run security scans and
-      tests, and request image/chart signing and build provenance. Published
-      instructions describe artifact verification.
+      Current defenses: workflow definitions pin direct external action
+      references, run security scans and tests, and request image/chart signing
+      and build provenance. Published instructions describe artifact verification.
       Evidence: `.github/workflows/check-actions.yml`,
       `.github/workflows/coverage.yml`, `.github/workflows/docker-publish.yml`,
       `.github/workflows/helm-publish.yml`, `SECURITY.md`.
       Residual risk: signatures identify an authorized build, not safe source.
       Repository access controls, upstream dependency trust, secret handling,
-      and downstream verification require continued review. This assessment
-      has not verified GitHub settings or individual release attestations.
+      and downstream verification require continued review. Nested action
+      references and downloaded tool artifacts require independent pinning
+      and verification. This assessment has not verified GitHub settings or
+      individual release attestations.
     capabilities:
       - reference-id: CAPSULE.CAP
         entries:
