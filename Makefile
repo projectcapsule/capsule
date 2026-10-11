@@ -790,7 +790,7 @@ harpoon:
 		sudo bash -s -- --install-version $(HARPOON_VERSION) --install-dir $(LOCALBIN)
 
 GUM          := $(LOCALBIN)/gum
-GUM_VERSION  := 2.0.1
+GUM_VERSION  := 2.0.2
 GUM_LOOKUP   := charm.land/gum
 GUM_RENOVATE := charmbracelet/gum
 gum: ## Download gum locally if necessary.
