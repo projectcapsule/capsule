@@ -683,7 +683,7 @@ helm-plugin-schema:
 	@$(HELM) plugin install https://github.com/losisin/helm-values-schema-json.git --version $(HELM_SCHEMA_VERSION) --verify=false || true
 
 HELM_DOCS         := $(LOCALBIN)/helm-docs
-HELM_DOCS_VERSION := v1.14.1
+HELM_DOCS_VERSION := v1.14.2
 HELM_DOCS_LOOKUP  := norwoodj/helm-docs
 helm-doc:
 	@test -s $(HELM_DOCS) || \
