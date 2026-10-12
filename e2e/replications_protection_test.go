@@ -186,7 +186,7 @@ func exerciseSharedReplicationProtection(global bool, tenantName, baseNamespace,
 			// Tenant ownership labels are maintained by metadata admission.
 			// Vary only the markers involved in protection webhook selection.
 			expected := maps.Clone(original)
-			for _, key := range []string{meta.CreatedByCapsuleLabel, meta.NewManagedByCapsuleLabel, meta.ProtectedByCapsuleLabel, meta.ReplicationProtectionLabel, meta.ResourcePermitProtectionLabel} {
+			for _, key := range []string{meta.CreatedByCapsuleLabel, meta.NewManagedByCapsuleLabel, meta.ProtectedByCapsuleLabel, meta.ReplicationProtectionLabel, (meta.ProtectionLabelPrefix + "example-addon")} {
 				delete(expected, key)
 			}
 			maps.Copy(expected, marker)

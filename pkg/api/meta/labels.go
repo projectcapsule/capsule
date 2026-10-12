@@ -38,13 +38,12 @@ const (
 	ProtectedByCapsuleLabel = "projectcapsule.dev/protected-by"
 	// Independent protection markers allow different Capsule controllers to
 	// protect the same object without replacing each other's admission identity.
-	ProtectionLabelPrefix         = "protection.projectcapsule.dev/"
-	ReplicationProtectionLabel    = ProtectionLabelPrefix + "replications"
-	ResourcePermitProtectionLabel = ProtectionLabelPrefix + "resource-permit"
-	CustomResourcesLabel          = "projectcapsule.dev/custom-resources"
-	ResourceOriginLabel           = "projectcapsule.dev/resource-origin"
-	EventActorLabel               = "event.projectcapsule.dev/actor"
-	EventActorKindLabel           = "event.projectcapsule.dev/actor-kind"
+	ProtectionLabelPrefix      = "protection.projectcapsule.dev/"
+	ReplicationProtectionLabel = ProtectionLabelPrefix + "replications"
+	CustomResourcesLabel       = "projectcapsule.dev/custom-resources"
+	ResourceOriginLabel        = "projectcapsule.dev/resource-origin"
+	EventActorLabel            = "event.projectcapsule.dev/actor"
+	EventActorKindLabel        = "event.projectcapsule.dev/actor-kind"
 
 	NewManagedByCapsuleLabel = "projectcapsule.dev/managed-by"
 	ManagedByCapsuleLabel    = "capsule.clastix.io/managed-by"
@@ -96,7 +95,17 @@ func labelTriggers(obj client.Object, anno string, trigger string) bool {
 
 // SetFilteredLabels Removes given labels by key.
 func SetFilteredLabels(obj *unstructured.Unstructured, filter map[string]struct{}) {
-	if obj == nil || len(filter) == 0 {
+	setFilteredLabels(obj, filter, nil)
+}
+
+// SetFilteredLabelsWithPrefixes also removes labels belonging to reserved domains.
+// Read and publish the label map once, including for independent addon markers.
+func SetFilteredLabelsWithPrefixes(obj *unstructured.Unstructured, filter map[string]struct{}, prefixes []string) {
+	setFilteredLabels(obj, filter, prefixes)
+}
+
+func setFilteredLabels(obj *unstructured.Unstructured, filter map[string]struct{}, prefixes []string) {
+	if obj == nil || len(filter) == 0 && len(prefixes) == 0 {
 		return
 	}
 
@@ -105,9 +114,19 @@ func SetFilteredLabels(obj *unstructured.Unstructured, filter map[string]struct{
 		return
 	}
 
-	for k := range labels {
-		if _, reserved := filter[k]; reserved {
-			delete(labels, k)
+	for key := range labels {
+		if _, reserved := filter[key]; reserved {
+			delete(labels, key)
+
+			continue
+		}
+
+		for _, prefix := range prefixes {
+			if strings.HasPrefix(key, prefix) {
+				delete(labels, key)
+
+				break
+			}
 		}
 	}
 

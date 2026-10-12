@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -24,7 +25,7 @@ import (
 )
 
 func TestProtectionAllowsNamespaceCleanup(t *testing.T) {
-	for name, handler := range map[string]handlers.Handler{"replication": ReplicaHandler(), "resource-permit": ResourcePermitResourceHandler()} {
+	for name, handler := range map[string]handlers.Handler{"replication": ReplicaHandler()} {
 		for _, state := range []string{"active", "deleting", "terminating", "missing", "read error", "other namespace", "recreated", "cluster scoped", "nil reader"} {
 			for _, deleting := range []bool{false, true} {
 				t.Run(fmt.Sprintf("%s/%s/delete=%t", name, state, deleting), func(t *testing.T) {
@@ -66,12 +67,12 @@ func TestProtectionAllowsNamespaceCleanup(t *testing.T) {
 					if state == "cluster scoped" {
 						req.Namespace = ""
 					}
-					obj := protectedResourcePermitResource("system:serviceaccount:tenant-a:runner")
+					obj := &unstructured.Unstructured{}
 					obj.SetAPIVersion("v1")
 					obj.SetKind("ConfigMap")
 					obj.SetName(req.Name)
 					obj.SetNamespace(req.Namespace)
-					obj.SetLabels(map[string]string{meta.ReplicationProtectionLabel: meta.ValueTrue, meta.ResourcePermitProtectionLabel: meta.ValueTrue})
+					obj.SetLabels(map[string]string{meta.ReplicationProtectionLabel: meta.ValueTrue, (meta.ProtectionLabelPrefix + "example-addon"): meta.ValueTrue})
 					raw, err := json.Marshal(obj)
 					require.NoError(t, err)
 					req.Object = runtime.RawExtension{Raw: raw}
@@ -110,7 +111,7 @@ func TestProtectionAllowsNamespaceCleanup(t *testing.T) {
 }
 
 func TestProtectionDeletionPreservesAdmissionErrors(t *testing.T) {
-	for name, handler := range map[string]handlers.Handler{"replication": ReplicaHandler(), "resource-permit": ResourcePermitResourceHandler()} {
+	for name, handler := range map[string]handlers.Handler{"replication": ReplicaHandler()} {
 		t.Run(name, func(t *testing.T) {
 			c, req := replicationAdmissionFixture(t, false, false, 1)
 			req.OldObject.Raw = []byte("{")
@@ -126,7 +127,7 @@ func TestProtectionDeletionPreservesAdmissionErrors(t *testing.T) {
 func BenchmarkProtectionDeletion(b *testing.B) {
 	b.Setenv(configuration.EnvironmentServiceaccountName, "capsule")
 	b.Setenv(configuration.EnvironmentControllerNamespace, "capsule-system")
-	for name, handler := range map[string]handlers.Handler{"replication": ReplicaHandler(), "resource-permit": ResourcePermitResourceHandler()} {
+	for name, handler := range map[string]handlers.Handler{"replication": ReplicaHandler()} {
 		for _, state := range []string{"active", "terminating", "authorized", "controller"} {
 			for _, namespaces := range []int{1, 1000} {
 				b.Run(fmt.Sprintf("%s/%s/namespaces=%d", name, state, namespaces), func(b *testing.B) {
@@ -140,12 +141,12 @@ func BenchmarkProtectionDeletion(b *testing.B) {
 						name := fmt.Sprintf("unrelated-tenant-%d", i)
 						require.NoError(b, c.Create(b.Context(), &corev1.Namespace{Name: name, Labels: map[string]string{meta.TenantLabel: name}}))
 					}
-					obj := protectedResourcePermitResource("system:serviceaccount:tenant-a:runner")
+					obj := &unstructured.Unstructured{}
 					obj.SetAPIVersion("v1")
 					obj.SetKind("ConfigMap")
 					obj.SetName(req.Name)
 					obj.SetNamespace(req.Namespace)
-					obj.SetLabels(map[string]string{meta.ReplicationProtectionLabel: meta.ValueTrue, meta.ResourcePermitProtectionLabel: meta.ValueTrue})
+					obj.SetLabels(map[string]string{meta.ReplicationProtectionLabel: meta.ValueTrue, (meta.ProtectionLabelPrefix + "example-addon"): meta.ValueTrue})
 					obj.SetManagedFields([]metav1.ManagedFieldsEntry{{Manager: meta.ReplicationFieldOwnerPrefix("parent", "tenant-a") + "/tenant-a/tenant-a/0/raw-0/"}})
 					raw, err := json.Marshal(obj)
 					require.NoError(b, err)

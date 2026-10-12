@@ -32,7 +32,7 @@ func newManagedLabelReplication(name, tenant, namespace string) *capsulev1beta2.
 	return &capsulev1beta2.GlobalTenantResource{Name: name, Spec: capsulev1beta2.GlobalTenantResourceSpec{
 		Scope:          api.ResourceScopeNamespace,
 		TenantSelector: metav1.LabelSelector{MatchLabels: map[string]string{"example.org/managed-label-tenant": tenant}},
-		ServiceAccount: resourcePermitServiceAccountReference(namespace, name),
+		ServiceAccount: managedTargetServiceAccountReference(namespace, name),
 		TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
 			// A zero Duration is serialized as "0s", overriding the API default
 			// and disabling retries after protection waits for parent status.

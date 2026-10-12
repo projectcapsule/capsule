@@ -31,7 +31,7 @@ func skippedPolicyTarget(owner string, protected bool) *unstructured.Unstructure
 		labels[meta.ProtectedByCapsuleLabel] = testCreatedBy
 		obj.SetLabels(labels)
 		annotations := obj.GetAnnotations()
-		annotations[meta.ResourcePermitServiceAccountAnnotation] = "system:serviceaccount:test:old"
+		annotations["example.org/service-account"] = "system:serviceaccount:test:old"
 		obj.SetAnnotations(annotations)
 	}
 	field := managedField(owner)
@@ -49,7 +49,7 @@ func skippedPolicyManager(t testing.TB) Manager {
 	}
 	return Manager{Conditions: conditions, Metadata: Metadata{
 		CreatedByValue: testCreatedBy, ManagedByValue: testCreatedBy, ProtectedByValue: testCreatedBy,
-		ProtectedByServiceAccountAnnotation: meta.ResourcePermitServiceAccountAnnotation,
+		ProtectedByServiceAccountAnnotation: "example.org/service-account",
 		ProtectedByServiceAccount:           "system:serviceaccount:test:runner",
 	}}
 }
@@ -88,10 +88,10 @@ func TestSkippedConditionReconcilesProtection(t *testing.T) {
 				require.Equal(t, existing.GetAnnotations(), actual.GetAnnotations())
 			} else if tc.protect {
 				require.Equal(t, testCreatedBy, actual.GetLabels()[meta.ProtectedByCapsuleLabel])
-				require.Equal(t, m.Metadata.ProtectedByServiceAccount, actual.GetAnnotations()[meta.ResourcePermitServiceAccountAnnotation])
+				require.Equal(t, m.Metadata.ProtectedByServiceAccount, actual.GetAnnotations()["example.org/service-account"])
 			} else {
 				require.NotContains(t, actual.GetLabels(), meta.ProtectedByCapsuleLabel)
-				require.NotContains(t, actual.GetAnnotations(), meta.ResourcePermitServiceAccountAnnotation)
+				require.NotContains(t, actual.GetAnnotations(), "example.org/service-account")
 			}
 			if !tc.foreign {
 				require.True(t, result.LastApply.Equal(existing.GetManagedFields()[0].Time))
@@ -172,7 +172,7 @@ func TestDisownRemovesPolicyProtection(t *testing.T) {
 	require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(existing), actual))
 	require.NotContains(t, actual.GetLabels(), meta.NewManagedByCapsuleLabel)
 	require.NotContains(t, actual.GetLabels(), meta.ProtectedByCapsuleLabel)
-	require.NotContains(t, actual.GetAnnotations(), meta.ResourcePermitServiceAccountAnnotation)
+	require.NotContains(t, actual.GetAnnotations(), "example.org/service-account")
 	require.Equal(t, existing.Object["data"], actual.Object["data"])
 	require.Equal(t, "original", actual.GetLabels()["example.org/keep"])
 	require.Equal(t, "original", actual.GetAnnotations()["example.org/keep"])
@@ -204,7 +204,7 @@ func TestDisownPreservesSharedProtection(t *testing.T) {
 			require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(existing), actual))
 			require.NotContains(t, actual.GetLabels(), meta.NewManagedByCapsuleLabel)
 			require.NotContains(t, actual.GetLabels(), meta.ProtectedByCapsuleLabel)
-			require.NotContains(t, actual.GetAnnotations(), meta.ResourcePermitServiceAccountAnnotation)
+			require.NotContains(t, actual.GetAnnotations(), "example.org/service-account")
 		})
 	}
 }
@@ -237,10 +237,10 @@ func TestApplyRemovesProtectionFromPreviousSkip(t *testing.T) {
 				require.Equal(t, desired.Object["data"], actual.Object["data"])
 				if shared {
 					require.Equal(t, testCreatedBy, actual.GetLabels()[meta.ProtectedByCapsuleLabel])
-					require.Equal(t, m.Metadata.ProtectedByServiceAccount, actual.GetAnnotations()[meta.ResourcePermitServiceAccountAnnotation])
+					require.Equal(t, m.Metadata.ProtectedByServiceAccount, actual.GetAnnotations()["example.org/service-account"])
 				} else {
 					require.NotContains(t, actual.GetLabels(), meta.ProtectedByCapsuleLabel)
-					require.NotContains(t, actual.GetAnnotations(), meta.ResourcePermitServiceAccountAnnotation)
+					require.NotContains(t, actual.GetAnnotations(), "example.org/service-account")
 				}
 			})
 		}
@@ -329,7 +329,7 @@ func TestProtectionCleanupChecksResourceVersion(t *testing.T) {
 						current := configMap("guarded", nil)
 						require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(obj), current))
 						current.SetManagedFields(append(current.GetManagedFields(), managedField(meta.ResourceFieldOwner("concurrent"))))
-						current.SetAnnotations(map[string]string{"concurrent": "retained", meta.ResourcePermitServiceAccountAnnotation: "another-owner"})
+						current.SetAnnotations(map[string]string{"concurrent": "retained", "example.org/service-account": "another-owner"})
 						require.NoError(t, c.Update(ctx, current))
 					}
 					return c.Patch(ctx, obj, patch, opts...)
@@ -349,7 +349,7 @@ func TestProtectionCleanupChecksResourceVersion(t *testing.T) {
 			actual := configMap("guarded", nil)
 			require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(existing), actual))
 			require.Equal(t, testCreatedBy, actual.GetLabels()[meta.ProtectedByCapsuleLabel])
-			require.Equal(t, "another-owner", actual.GetAnnotations()[meta.ResourcePermitServiceAccountAnnotation])
+			require.Equal(t, "another-owner", actual.GetAnnotations()["example.org/service-account"])
 		})
 	}
 }
