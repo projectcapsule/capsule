@@ -25,22 +25,6 @@ func (w *replicasResourcesHandler) GetPath() string {
 	return "/generic/replications"
 }
 
-type resourcePermitResourcesHandler struct{}
-
-func GenericResourcePermitHandler() handlers.Webhook {
-	return &resourcePermitResourcesHandler{}
-}
-
-func (w *resourcePermitResourcesHandler) GetHandlers() []handlers.Handler {
-	return []handlers.Handler{
-		generic.ResourcePermitResourceHandler(),
-	}
-}
-
-func (w *resourcePermitResourcesHandler) GetPath() string {
-	return "/generic/resourcepermit"
-}
-
 type genericCustomResourcesHandler struct {
 	handlers []handlers.Handler
 }

@@ -298,26 +298,6 @@ threats:
       - reference-id: CAPSULE.CAP
         entries:
           - reference-id: CAPSULE.CAP07
-  - id: CAPSULE.THR13
-    title: Delegated Permits Exceed Template or Identity Authority
-    group: ownership-and-authorization
-    description: |
-      A permit requester supplies values that select an unintended template,
-      alter the generated resource, or exercise an execution identity outside
-      the permission administrators intended to delegate.
-      Current defenses: permit admission and controllers validate and reconcile
-      template selection and execution through the existing permit lifecycle.
-      Evidence: `internal/webhook/resourcepermit/resourcepermit_validating.go`,
-      `internal/controllers/resourcepermit/resourcepermit_controller.go`,
-      `e2e/resourcepermit_test.go`, `e2e/resourcepermit_lifecycle_test.go`.
-      Residual risk: templates are privileged policy inputs. Review parameter
-      constraints, generated kinds, target namespaces, and service account
-      rights before delegating a template to tenant actors.
-    capabilities:
-      - reference-id: CAPSULE.CAP
-        entries:
-          - reference-id: CAPSULE.CAP04
-          - reference-id: CAPSULE.CAP07
   - id: CAPSULE.THR14
     title: Cleanup Deletes Unintended Resources or Bypasses Finalizers
     group: shared-resource-safety

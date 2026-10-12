@@ -139,18 +139,14 @@ capabilities:
       Coverage: `pkg/tenant/rule_quota_test.go`,
       `e2e/rules_quota_test.go`, `e2e/rules_quota_admission_test.go`.
   - id: CAPSULE.CAP07
-    title: Resource Pool Allocation and Delegated Permits
+    title: Resource Pool Allocation
     group: resource-management
     description: |
-      Allocate resources through ResourcePools and ResourcePoolClaims, and
-      reconcile resources requested through ResourcePermits and approved
-      templates. These operations support namespace behavior and must retain
-      tenant scope, template authorization, and intended execution identity.
+      Allocate resources through ResourcePools and ResourcePoolClaims while
+      retaining tenant scope and namespace resource limits.
       Implementation: `internal/controllers/resourcepools/claim_controller.go`,
-      `internal/controllers/resourcepermit/resourcepermit_controller.go`,
-      `internal/webhook/resourcepermit/resourcepermit_validating.go`.
-      Coverage: `e2e/pool_resourcepoolclaim_test.go`,
-      `e2e/resourcepermit_test.go`, `e2e/resourcepermit_lifecycle_test.go`.
+      `internal/controllers/resourcepools/pool_controller.go`.
+      Coverage: `e2e/pool_resourcepoolclaim_test.go`.
   - id: CAPSULE.CAP08
     title: Tenant and Namespace Lifecycle Cleanup
     group: resource-management

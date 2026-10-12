@@ -211,11 +211,19 @@ func (m Manager) removeProtectionLabels(labels map[string]string) []clt.JSONPatc
 		return patches
 	}
 
-	// Restore the compatibility marker to a surviving controller.
-	for _, controller := range []string{meta.ValueControllerResourcePermit, meta.ValueControllerReplications} {
-		if controller != m.Metadata.ProtectedByValue && labels[meta.ProtectionLabelPrefix+controller] == meta.ValueTrue {
-			return append(patches, clt.AddLabelsPatch(labels, map[string]string{meta.ProtectedByCapsuleLabel: controller})...)
+	// Restore the compatibility marker to a surviving controller. Deterministic
+	// selection requires one label scan and no sorted temporary slice.
+	var survivor string
+
+	for key, value := range labels {
+		controller, protection := strings.CutPrefix(key, meta.ProtectionLabelPrefix)
+		if protection && controller != m.Metadata.ProtectedByValue && value == meta.ValueTrue && (survivor == "" || controller < survivor) {
+			survivor = controller
 		}
+	}
+
+	if survivor != "" {
+		return append(patches, clt.AddLabelsPatch(labels, map[string]string{meta.ProtectedByCapsuleLabel: survivor})...)
 	}
 
 	return append(patches, clt.PatchRemoveLabels(labels, []string{meta.ProtectedByCapsuleLabel})...)
@@ -230,15 +238,14 @@ func (m Manager) hasOtherProtectionOwners(owners map[string]struct{}, fieldOwner
 			continue
 		}
 
-		switch m.Metadata.ProtectedByValue {
-		case meta.ValueControllerReplications:
-			if strings.HasPrefix(owner, meta.ResourceFieldOwner("resourcepermit/")) {
-				continue
-			}
-		case meta.ValueControllerResourcePermit:
-			if !strings.HasPrefix(owner, meta.ResourceFieldOwner("")) {
-				continue
-			}
+		// Replication managers retain their established identities. Addons use
+		// namespaced resource-manager prefixes and have independent markers.
+		if m.Metadata.ProtectedByValue == meta.ValueControllerReplications && strings.HasPrefix(owner, meta.ResourceFieldOwner("")) {
+			continue
+		}
+
+		if prefix := m.Metadata.ProtectionFieldOwnerPrefix; prefix != "" && !strings.HasPrefix(owner, prefix) {
+			continue
 		}
 
 		return true

@@ -85,11 +85,4 @@ const (
 	// CustomQuotas.
 	ReasonUsageCalculationFailed = "UsageCalculationFailed"
 	ReasonQuotaExceeded          = "QuotaExceeded"
-
-	// ResourcePermits.
-	ReasonResourcePermitExpired      = "ResourcePermitExpired"
-	ReasonResourcePermitActivated    = "ResourcePermitActivated"
-	ReasonResourcePermitReviewNeeded = "ResourcePermitReviewNeeded"
-	ReasonResourcePermitApproved     = "ResourcePermitApproved"
-	ReasonResourcePermitDenied       = "ResourcePermitDenied"
 )

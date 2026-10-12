@@ -19,7 +19,7 @@ import (
 )
 
 func TestProtectionWebhookRegistration(t *testing.T) {
-	for _, hook := range []string{"replications", "resourcePermit"} {
+	for _, hook := range []string{"replications"} {
 		matches := protectionWebhookMatcher(t, hook)
 		cases := []struct {
 			name   string
@@ -31,11 +31,9 @@ func TestProtectionWebhookRegistration(t *testing.T) {
 			{"created only", map[string]string{meta.CreatedByCapsuleLabel: meta.ValueControllerReplications}, hook == "replications"},
 			{"managed only", map[string]string{meta.NewManagedByCapsuleLabel: meta.ValueControllerReplications}, hook == "replications"},
 			{"legacy replication protection", map[string]string{meta.ProtectedByCapsuleLabel: meta.ValueControllerReplications}, hook == "replications"},
-			{"legacy permit protection", map[string]string{meta.ProtectedByCapsuleLabel: meta.ValueControllerResourcePermit}, hook == "resourcePermit"},
 			{"replication protection", map[string]string{meta.ReplicationProtectionLabel: meta.ValueTrue}, hook == "replications"},
-			{"permit protection", map[string]string{meta.ResourcePermitProtectionLabel: meta.ValueTrue}, hook == "resourcePermit"},
-			{"both controllers", map[string]string{meta.ReplicationProtectionLabel: meta.ValueTrue, meta.ResourcePermitProtectionLabel: meta.ValueTrue}, true},
-			{"disabled markers", map[string]string{meta.ReplicationProtectionLabel: "false", meta.ResourcePermitProtectionLabel: "false"}, false},
+			{"both controllers", map[string]string{meta.ReplicationProtectionLabel: meta.ValueTrue, (meta.ProtectionLabelPrefix + "example-addon"): meta.ValueTrue}, true},
+			{"disabled markers", map[string]string{meta.ReplicationProtectionLabel: "false", (meta.ProtectionLabelPrefix + "example-addon"): "false"}, false},
 		}
 		for _, tc := range cases {
 			for _, operation := range []string{"update", "remove labels", "add labels", "delete", "create"} {
@@ -127,14 +125,14 @@ func protectionRegistrationObject(labels map[string]string) map[string]any {
 }
 
 func BenchmarkProtectionWebhookMatching(b *testing.B) {
-	for _, hook := range []string{"replications", "resourcePermit"} {
+	for _, hook := range []string{"replications"} {
 		for _, selected := range []bool{false, true} {
 			b.Run(fmt.Sprintf("hook=%s/selected=%t", hook, selected), func(b *testing.B) {
 				matches := protectionWebhookMatcher(b, hook)
 				fields := map[string]string{"example.org/unrelated": "value"}
 				if selected {
 					fields[meta.ReplicationProtectionLabel] = meta.ValueTrue
-					fields[meta.ResourcePermitProtectionLabel] = meta.ValueTrue
+					fields[(meta.ProtectionLabelPrefix + "example-addon")] = meta.ValueTrue
 				}
 				object := protectionRegistrationObject(fields)
 				b.ReportAllocs()

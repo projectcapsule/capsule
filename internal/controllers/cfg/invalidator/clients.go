@@ -160,19 +160,6 @@ func (r *CacheInvalidator) checkServiceAccountReferences(
 ) (ref bool, err error) {
 	key := serviceaccountindexer.ReferenceKey(sa.GetNamespace(), sa.GetName())
 
-	var requests capsulev1beta2.ResourcePermitList
-	if err := r.List(
-		ctx,
-		&requests,
-		client.MatchingFields{serviceaccountindexer.ReferenceFieldName: key},
-	); err != nil {
-		return false, err
-	}
-
-	if len(requests.Items) > 0 {
-		return true, nil
-	}
-
 	var gtr capsulev1beta2.GlobalTenantResourceList
 	if err := r.List(
 		ctx,

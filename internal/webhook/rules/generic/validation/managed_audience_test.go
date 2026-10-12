@@ -116,7 +116,7 @@ func TestManagedMetadataAdmissionRespectsAudience(t *testing.T) {
 					{name: "forged controller label", user: alice, key: "example.corp/rogue", value: "forbidden", managedLabel: meta.ValueController, wantBlocking: true},
 					{name: "forged resources label", user: alice, key: "example.corp/rogue", value: "forbidden", managedLabel: meta.ValueControllerResources, wantBlocking: true},
 					{name: "replication marker does not exempt metadata", user: alice, key: "example.corp/rogue", value: "forbidden", managedLabel: meta.ValueControllerReplications, wantBlocking: true},
-					{name: "permit marker does not exempt metadata", user: alice, key: "example.corp/rogue", value: "forbidden", managedLabel: meta.ValueControllerResourcePermit, wantBlocking: true},
+					{name: "permit marker does not exempt metadata", user: alice, key: "example.corp/rogue", value: "forbidden", managedLabel: "example-addon", wantBlocking: true},
 					{name: "other user cannot inherit exemption", user: bob, key: "example.corp/alice", value: "alice", wantBlocking: true},
 					{name: "other user empty value", user: bob, key: "example.corp/alice", wantBlocking: true},
 					{name: "first audience shared value", user: alice, key: "example.corp/shared", value: "alice"},
