@@ -30,9 +30,6 @@ project:
     - name: website
       url: https://github.com/projectcapsule/website
       comment: User documentation and project website; supports the runtime codebases.
-    - name: capsule-community
-      url: https://github.com/projectcapsule/capsule-community
-      comment: Community coordination and meeting materials; supports the runtime codebases.
   vulnerability-reporting:
     reports-accepted: true
     bug-bounty-available: false
