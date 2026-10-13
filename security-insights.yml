@@ -98,7 +98,7 @@ repository:
         name: Capsule namespace profiling Gemara threat assessment
         evidence: https://raw.githubusercontent.com/projectcapsule/capsule/main/security/threats.yaml
         comment: |
-          Initial draft in Gemara v1.6.0; maintainer review is pending. Scope,
+          Draft catalogs version 0.2.0 in Gemara v1.6.0; maintainer review is pending. Scope,
           trust boundaries, assessed runtime revision, and capabilities are at
           https://raw.githubusercontent.com/projectcapsule/capsule/main/security/capabilities.yaml.
           Threats identify existing defenses and residual risks; referenced tests
@@ -106,6 +106,10 @@ repository:
           date is omitted until this assessment is published. Historical prose
           self-assessment remains available at
           https://github.com/projectcapsule/capsule/blob/main/SELF_ASSESSMENT.md.
+          The threat catalog maps twelve published Capsule advisories and
+          records five Capsule Proxy advisories as unassessed integration risks.
+          Maintenance, validation, and review instructions are at
+          https://github.com/projectcapsule/capsule/blob/main/DEVELOPMENT.md#security-assessment.
     tools:
       - name: Gosec
         type: SAST
