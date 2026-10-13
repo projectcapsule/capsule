@@ -24,6 +24,9 @@ project:
     - name: capsule
       url: https://github.com/projectcapsule/capsule
       comment: Controller, namespace profiling rules, admission webhooks, and Helm chart.
+    - name: capsule-proxy
+      url: https://github.com/projectcapsule/capsule-proxy
+      comment: Additional Proxy components for Capsule.
   vulnerability-reporting:
     reports-accepted: true
     bug-bounty-available: false
@@ -68,7 +71,7 @@ repository:
       primary: false
       social: https://github.com/MaxFedotov
     - name: Oliver Bähler
-      primary: false
+      primary: true
       social: https://github.com/oliverbaehler
     - name: Massimiliano Giovagnoli
       primary: false
@@ -147,5 +150,5 @@ repository:
         comment: Controller images; docker-publish.yml requests signing, SBOM, and provenance generation.
       - uri: https://ghcr.io/projectcapsule/charts/capsule
         comment: OCI Helm chart; helm-publish.yml requests signing and provenance generation.
-      - uri: https://projectcapsule.github.io/charts
+      - uri: https://ghcr.io/projectcapsule/charts/
         comment: Helm chart repository published by helm-publish.yml.
