@@ -5,17 +5,52 @@ Our Makefile helps you with the development of new changes or fixes. [You may ha
 To execute your changes locally, you can run the binary locally. This will run just the capsule controller. We recommend [to setup a development environment](#development-environment) for a better development experience:
 
 ```bash
-make run
+make controller-dev-start
 ```
+
 ## Building
 
-You can build the docker image locally, Ko will be installed via go, so you don't need to install it manually.
+Use the Go toolchain declared in [go.mod](./go.mod). Go downloads the controller's
+module dependencies from [go.mod](./go.mod), with checksums recorded in
+[go.sum](./go.sum). Build the controller from the repository root:
+
+```bash
+go mod download
+go build -o bin/manager ./cmd/controller/
+```
+
+To build the container image locally, start a Docker daemon and run the target
+below. It installs the Ko version declared in the Makefile when needed.
 
 ```bash
 make ko-build-all
 ```
 
-This will push the build to your local docker images.
+This loads the image into the local Docker daemon.
+
+## Release process
+
+Pushing a tag beginning with `v`, such as `v<major>.<minor>.<patch>` or a
+`v<major>.<minor>.<patch>-rc.<number>` prerelease, starts the release workflows:
+
+- [Go Release](./.github/workflows/releaser.yml) uses the Go version in `go.mod`
+  and [GoReleaser configuration](./.goreleaser.yml) to build Linux controller
+  binaries for amd64 and arm64. It publishes archives, checksums, release notes,
+  and archive SBOMs to [GitHub Releases](https://github.com/projectcapsule/capsule/releases).
+  The configuration also requests Cosign signatures for release artifacts.
+- [Publish images](./.github/workflows/docker-publish.yml) scans the repository
+  with Trivy and builds the controller with Ko. It publishes images to
+  `ghcr.io/projectcapsule/capsule`, requests an SBOM and image signature, and
+  runs the SLSA container provenance workflow for the published digest.
+- [Publish charts](./.github/workflows/helm-publish.yml) derives the chart version
+  and application version from the tag. It publishes the Helm chart to
+  `ghcr.io/projectcapsule/charts/capsule` and the
+  [Helm repository](https://projectcapsule.github.io/charts). The OCI chart
+  workflow requests a signature and runs the SLSA container provenance workflow.
+
+Capsule Proxy is released through its own repository. See
+[SECURITY.md](./SECURITY.md#release-artifacts) for controller and chart verification
+commands, and [CHANGELOG.md](./CHANGELOG.md) for how release changes are recorded.
 
 ## Test
 
@@ -27,27 +62,34 @@ make test
 ```
 
 Chart rendering unit tests require Helm on `PATH` and the chart dependencies above.
+The [Coverage workflow](./.github/workflows/coverage.yml) runs the unit tests on
+pull requests targeting `main` and pushes to `main`.
 
 ## E2E Test
 
 **New changes always require dedicated E2E tests. E2E help us to ensure the quality of the code and it's functionality.**
 
-For E2E test we use the [ginkgo](https://github.com/onsi/ginkgo) framework. You can see all the test under [e2e](./e2e/).
-
-
-With the following command a new KinD cluster is created with the Kubernetes version `v1.20.7` (This can be done with any available Kubernetes version). A docker image is created and pushed and loaded into the KinD cluster. Then the E2E tests are executed against the KinD cluster.
+The [Ginkgo](https://github.com/onsi/ginkgo) suite in [e2e](./e2e/) requires a
+dedicated Kubernetes test cluster running the controller, CRDs, RBAC, and webhooks
+from the current checkout. Docker, Helm, and kubectl must be available. Prepare a
+KinD cluster using the Kubernetes version configured in the Makefile, run the
+tests for the affected components, and clean up afterward:
 
 ```bash
-make e2e/v1.20.7
+make e2e-build
+make e2e-exec FILTER='&& !skip && scheduler'
+make e2e-destroy
 ```
 
-You can also just run the e2e tests without the creation of a new kind cluster:
+`scheduler` is an example label. Replace it with the labels for the new feature
+and affected components, and check that the selection includes the intended
+tests. `e2e-exec` runs selected non-configuration tests in parallel, followed by
+selected `config` tests serially. To use an existing dedicated test cluster,
+install the current checkout before running the same scoped `e2e-exec` command.
 
-```
-make e2e-exec
-```
-
-The E2E tests are also executed via the [github workflow](./.github/workflows/e2e.yaml) on every PR and push to the main branch.
+The [e2e workflow](./.github/workflows/e2e.yml) runs the full suite for pull requests
+matching its path filters. Local runs should cover only the new tests and affected
+components.
 
 # Development Environment
 
@@ -300,8 +342,7 @@ kubectl patch crd capsuleconfigurations.capsule.clastix.io \
 When the Development Environment is set up, we can run Capsule controllers with webhooks outside of the Kubernetes cluster:
 
 ```bash
-$ export NAMESPACE=capsule-system && export TMPDIR=/tmp/ && export SERVICE_ACCOUNT=capsule
-$ go run .
+NAMESPACE=capsule-system SERVICE_ACCOUNT=capsule go run ./cmd/controller/
 ```
 
 To verify that, we can open a new console and create a new Tenant in a new shell:
@@ -319,7 +360,7 @@ spec:
 EOF
 ```
 
-We should see output and logs in the make run console.
+We should see output and logs from the local controller process.
 
 Now it's time to work through our familiar inner loop for development in our preferred IDE. For example, if you're using [Visual Studio Code](https://code.visualstudio.com/), this launch.json file can be a good start.
 

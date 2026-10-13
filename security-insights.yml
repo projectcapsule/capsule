@@ -3,7 +3,7 @@
 # Schema: https://github.com/ossf/security-insights/blob/v2.2.0/spec/schema.cue
 header:
   schema-version: "2.2.0"
-  last-updated: "2026-10-10"
+  last-updated: "2026-10-13"
   last-reviewed: "2026-10-10"
   url: https://raw.githubusercontent.com/projectcapsule/capsule/main/security-insights.yml
   comment: |
@@ -26,7 +26,10 @@ project:
       comment: Controller, namespace profiling rules, admission webhooks, and Helm chart.
     - name: capsule-proxy
       url: https://github.com/projectcapsule/capsule-proxy
-      comment: Additional Proxy components for Capsule.
+      comment: Optional Kubernetes API proxy for tenant users; developed and released separately.
+    - name: website
+      url: https://github.com/projectcapsule/website
+      comment: User documentation and project website; supports the runtime codebases.
   vulnerability-reporting:
     reports-accepted: true
     bug-bounty-available: false
@@ -49,7 +52,9 @@ project:
       - Unverified vulnerability scanner output without confirmation that Capsule is affected.
   documentation:
     design: https://github.com/projectcapsule/capsule/blob/main/security/capabilities.yaml
-    detailed-guide: https://projectcapsule.dev/
+    detailed-guide: https://projectcapsule.dev/docs/
+    quickstart-guide: https://projectcapsule.dev/docs/quickstart/
+    release-process: https://github.com/projectcapsule/capsule/blob/main/DEVELOPMENT.md#release-process
     code-of-conduct: https://github.com/projectcapsule/capsule/blob/main/CODE_OF_CONDUCT.md
     support-policy: https://github.com/projectcapsule/capsule/blob/main/CONTRIBUTING.md#supported-versions
     signature-verification: https://github.com/projectcapsule/capsule/blob/main/SECURITY.md#release-artifacts
@@ -84,6 +89,7 @@ repository:
     url: https://github.com/projectcapsule/capsule/blob/main/LICENSE
   documentation:
     contributing-guide: https://github.com/projectcapsule/capsule/blob/main/CONTRIBUTING.md
+    governance: https://github.com/projectcapsule/capsule/blob/main/GOVERNANCE.md
     dependency-management-policy: https://github.com/projectcapsule/capsule/blob/main/DEPENDENCY.md
     security-policy: https://github.com/projectcapsule/capsule/blob/main/SECURITY.md
   security:
@@ -120,12 +126,13 @@ repository:
           - default
         integration:
           adhoc: false
-          ci: false
+          ci: true
           release: true
         results: {}
         comment: |
-          docker-publish.yml scans the repository filesystem during image
-          release, selects HIGH and CRITICAL findings, and ignores unfixed
+          docker-build.yml scans the repository filesystem on selected pull
+          requests and uploads SARIF. docker-publish.yml scans during image
+          release. Both select HIGH and CRITICAL findings and ignore unfixed
           vulnerabilities. No published results URL is asserted here.
       - name: OpenSSF Scorecard
         type: other
