@@ -24,6 +24,9 @@ project:
     - name: capsule
       url: https://github.com/projectcapsule/capsule
       comment: Controller, namespace profiling rules, admission webhooks, and Helm chart.
+    - name: capsule-proxy
+      url: https://github.com/projectcapsule/capsule-proxy
+      comment: Additional Proxy components for Capsule.
   vulnerability-reporting:
     reports-accepted: true
     bug-bounty-available: false
@@ -68,7 +71,7 @@ repository:
       primary: false
       social: https://github.com/MaxFedotov
     - name: Oliver Bähler
-      primary: false
+      primary: true
       social: https://github.com/oliverbaehler
     - name: Massimiliano Giovagnoli
       primary: false
