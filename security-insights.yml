@@ -150,5 +150,5 @@ repository:
         comment: Controller images; docker-publish.yml requests signing, SBOM, and provenance generation.
       - uri: https://ghcr.io/projectcapsule/charts/capsule
         comment: OCI Helm chart; helm-publish.yml requests signing and provenance generation.
-      - uri: https://ghcr.io/projectcapsule/charts/
+      - uri: https://projectcapsule.github.io/charts
         comment: Helm chart repository published by helm-publish.yml.
