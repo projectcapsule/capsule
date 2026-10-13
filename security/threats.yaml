@@ -5,7 +5,7 @@ metadata:
   id: CAPSULE.THR
   type: ThreatCatalog
   gemara-version: "1.6.0"
-  version: "0.1.0"
+  version: "0.2.0"
   draft: true
   author:
     id: codex
@@ -13,7 +13,7 @@ metadata:
     type: Software
     description: Repository-derived draft prepared for review by Capsule maintainers.
   description: |
-    Initial scoped threat assessment of the Capsule controller, namespace
+    Scoped draft threat assessment of the Capsule controller, namespace
     profiling rules, admission, and shipped deployment and release configuration.
     Scope, trust boundaries, assumptions, exclusions, and assessed runtime
     revision are defined in the companion CAPSULE.CAP catalog. Threats describe
@@ -23,10 +23,49 @@ metadata:
     configuration, trusted policy authors, asynchronous reconciliation, and
     dependencies. Referenced tests are coverage evidence, not pass attestations.
     Maintainers must review this draft before badge completion is submitted.
+
+    Advisory snapshot: 2026-10-13. Historical advisory ranges and patch versions
+    below are reported by their publishers. Follow-up advisories demonstrate
+    incomplete fixes; a first patched version is not proof that every alternate
+    input path was protected. Current defenses refer to the assessed source,
+    and referenced tests require execution before they establish a passing
+    regression. Updating a draft does not establish maintainer approval.
+
+    Capsule Proxy implementation is excluded. Its published advisories identify
+    integration risks to request identity and confidentiality that adopters
+    must assess separately:
+    - GHSA-9cwv-cppx-mqjm / CVE-2022-23652: hop-by-hop Connection headers can
+      interfere with authenticated forwarding using privileged credentials.
+      The advisory reports affected versions <= v0.2.0 and names v0.2.1 as the
+      patch in its description.
+      https://github.com/projectcapsule/capsule-proxy/security/advisories/GHSA-9cwv-cppx-mqjm
+    - GHSA-fpvw-6m5v-hqfp / CVE-2023-48312: missing validation of the TokenReview
+      authentication result allows invalid or empty bearer tokens through.
+      The advisory reports affected versions <= 0.4.5 and patch 0.4.6.
+      https://github.com/projectcapsule/capsule-proxy/security/advisories/GHSA-fpvw-6m5v-hqfp
+    - GHSA-6758-979h-249x / CVE-2023-46254: same-named ServiceAccounts in
+      different namespaces are confused by cached owner resolution, exposing
+      other tenants' Namespace metadata. The advisory reports affected
+      versions <= 0.4.4 and patch 0.4.5.
+      https://github.com/projectcapsule/capsule-proxy/security/advisories/GHSA-6758-979h-249x
+    - GHSA-xm6f-mhqj-9592: ambiguous concatenation of subject kind, namespace,
+      and name creates RoleBinding index-key collisions and grants another
+      tenant's namespace read set. The advisory reports affected versions
+      <= 0.13.4 and patch 0.15.0. Including namespace in a key is insufficient
+      when distinct tuples can encode to the same string.
+      https://github.com/projectcapsule/capsule-proxy/security/advisories/GHSA-xm6f-mhqj-9592
+    - GHSA-pvhj-cqh2-rpq8: tenant-writable ProxySetting clusterResources can
+      self-grant reads served with the proxy ServiceAccount without ownership
+      or authorization checks. The advisory reports affected versions
+      <= 0.14.1 and patch 0.15.0. Default namespace disclosure and feature-gated
+      arbitrary cluster-scoped reads have different blast radii.
+      https://github.com/projectcapsule/capsule-proxy/security/advisories/GHSA-pvhj-cqh2-rpq8
+    These advisories do not establish current Proxy defenses. A project-wide
+    assessment needs a separately reviewed Proxy scope and source revision.
   mapping-references:
     - id: CAPSULE.CAP
       title: Capsule Namespace Profiling Capability Catalog
-      version: "0.1.0"
+      version: "0.2.0"
       url: https://raw.githubusercontent.com/projectcapsule/capsule/main/security/capabilities.yaml
       description: Scope and capabilities exploited by the threats in this catalog.
 imports:
@@ -65,10 +104,27 @@ threats:
       access to that tenant's resources or a different effective profile.
       Current defenses: namespace assignment checks requester ownership and
       update handling preserves or validates the existing Tenant identity.
+      Removal of an owner reference, injection of a tenant label into an
+      unowned system namespace, and reassignment of an existing owned namespace
+      must each be checked; protection of one representation cannot substitute
+      for the others.
       Evidence: `internal/webhook/namespace/mutation/assignment.go`,
       `pkg/tenant/get_by.go`,
       `e2e/namespace_selecting_non_owned_tenant_test.go`,
       `e2e/config_namespace_hijacking_test.go`.
+      Historical evidence:
+      - GHSA-x45c-cvp8-q4fm / CVE-2022-46167: a tenant ServiceAccount with patch
+        rights removes its Namespace owner reference and escapes enforcement.
+        Reported affected versions <= 0.1.2; patch 0.1.3.
+        https://github.com/projectcapsule/capsule/security/advisories/GHSA-x45c-cvp8-q4fm
+      - GHSA-mq69-4j5w-3qwp / CVE-2024-39690: namespace patching claims an
+        unowned system namespace. Repository advisory metadata names v0.7.0
+        as affected and v0.7.1 as patched.
+        https://github.com/projectcapsule/capsule/security/advisories/GHSA-mq69-4j5w-3qwp
+      - GHSA-fcpm-6mxq-m5vv / CVE-2025-55205: tenant-label injection into
+        system namespaces affects selectors and cross-tenant resource access.
+        Reported affected versions <= 0.10.3; patch 0.10.4.
+        https://github.com/projectcapsule/capsule/security/advisories/GHSA-fcpm-6mxq-m5vv
       Residual risk: administrator reassignment is privileged behavior, and
       deployments must route affected operations and subresources to the
       relevant webhooks. User-controlled labels alone cannot establish trust.
@@ -109,6 +165,18 @@ threats:
       `internal/webhook/namespace/validation/rules_metadata.go`,
       `e2e/rules_enforce_metadata_test.go`,
       `e2e/rules_security_profiles_test.go`.
+      Matching implementation is also part of profile integrity. A forbidden
+      key must remain denied under mixed-case lists and exact comparison;
+      sorting and searching with different orderings silently weakens policy.
+      Current legacy exact matching uses literal membership and does not sort
+      the caller-owned slice; rules have their own expression matching paths.
+      Evidence: `pkg/api/forbidden_list.go`, `pkg/api/forbidden_list_test.go`,
+      `pkg/api/runtime/expression.go`, `pkg/api/runtime/expression_test.go`.
+      Historical evidence: GHSA-gjw4-3v3v-rqxg / CVE-2026-61672 bypasses forbidden
+      namespace, Service, and Node metadata by mixing case-insensitive sorting
+      with byte-order search. Reported affected versions <= v0.13.6;
+      patch 0.13.7.
+      https://github.com/projectcapsule/capsule/security/advisories/GHSA-gjw4-3v3v-rqxg
       Residual risk: a selector is not an authorization boundary. Policy
       authors must protect labels whose writers must not choose their profile.
     capabilities:
@@ -170,9 +238,20 @@ threats:
       Kubernetes request then avoids the intended Capsule enforcement.
       Current defenses: registration and routing define handler order; the
       chain continues on nil and terminates on any non-nil response.
-      Evidence: `cmd/controller/main.go`, `internal/webhook/router.go`,
-      `internal/webhook/router_test.go`, `charts/capsule/values.yaml`,
-      `e2e/rules_managed_label_test.go`.
+      Evidence: `cmd/controller/main.go`, `pkg/runtime/webhook/router.go`,
+      `pkg/runtime/webhook/router_test.go`, `charts/capsule/values.yaml`,
+      `e2e/rules_managed_label_test.go`,
+      `e2e/config_namespace_hijacking_test.go`.
+      Historical evidence:
+      - GHSA-2ww6-hf35-mfjm / CVE-2026-30963: namespace status and finalize
+        updates bypass the ordinary Namespace webhook. Reported affected
+        versions < 0.12.5; patch 0.13.0. The advisory's reproduction discusses
+        both subresources, so registration and handler behavior need coverage.
+        https://github.com/projectcapsule/capsule/security/advisories/GHSA-2ww6-hf35-mfjm
+      - GHSA-gwxr-7h77-7777 / CVE-2026-55636: a singular namespace/finalize rule
+        leaves the plural namespaces/finalize endpoint unprotected after the
+        earlier fix. Reported affected versions >= 0.13.0; patch 0.13.6.
+        https://github.com/projectcapsule/capsule/security/advisories/GHSA-gwxr-7h77-7777
       Residual risk: configured exclusions and failure policies are operator
       responsibilities. Changes to the composed chain must be tested across
       operations, managed identities, and relevant subresources.
@@ -229,9 +308,25 @@ threats:
       Current defenses: replication scopes include both tenant and namespace,
       reference gathering carries configured selection constraints, and
       replication tracks destination ownership and identity.
-      Evidence: `internal/controllers/resources/scoped_replication.go`,
+      Resource scope must also be checked on every output path. Setting an
+      object's namespace does not constrain a cluster-scoped Kubernetes kind.
+      Current collection validates object scope before accumulation, including
+      raw objects and generator results; selected resources also check scope.
+      Evidence: `internal/controllers/resources/collect.go`,
+      `internal/controllers/resources/collect_test.go`,
+      `internal/controllers/resources/scoped_replication.go`,
       `pkg/api/processor/processor.go`, `pkg/template/context.go`,
-      `e2e/replications_identity_test.go`.
+      `e2e/replications_identity_test.go`,
+      `e2e/replications_tenantresource_test.go`.
+      Historical evidence:
+      - GHSA-qjjm-7j9w-pw72 / CVE-2026-22872: raw TenantResource objects create
+        ClusterRoles and webhooks with controller authority. Reported affected
+        versions <= v0.12.4; patch 0.13.0.
+        https://github.com/projectcapsule/capsule/security/advisories/GHSA-qjjm-7j9w-pw72
+      - GHSA-jr6p-8pjj-mfx6 / CVE-2026-65835: the first fix guards selected
+        resources but misses raw objects and generators. Reported affected
+        versions >= 0.13.0, <= 0.13.7; patch 0.13.8.
+        https://github.com/projectcapsule/capsule/security/advisories/GHSA-jr6p-8pjj-mfx6
       Residual risk: globally authorized replication and cross-namespace
       selection intentionally broaden scope. Operators must review source,
       destination, adoption, force, and pruning authority together.
@@ -351,9 +446,9 @@ threats:
       request-local read caching, and performance benchmarks reduce repeated
       work. API limits exist on some rule fields.
       Evidence: `internal/cache/cel.go`,
-      `internal/webhook/utils/request_reader.go`,
+      `pkg/runtime/webhook/utils/request_reader.go`,
       `pkg/tenant/rules_bench_test.go`,
-      `internal/webhook/router_bench_test.go`.
+      `pkg/runtime/webhook/router_bench_test.go`.
       Residual risk: caching is not a universal workload budget. Cold misses,
       concurrent requests, cache invalidation, total working set, and actual
       API latency need measurement with representative deployments.
@@ -372,7 +467,7 @@ threats:
       Exported observability can cross the Kubernetes access-control boundary.
       Current defenses: tracing is configurable, admission constructs defined
       span attributes, and dry-run handling suppresses persistent audit events.
-      Evidence: `internal/webhook/router.go`, `cmd/controller/tracing.go`,
+      Evidence: `pkg/runtime/webhook/router.go`, `cmd/controller/tracing.go`,
       `e2e/rules_dry_run_events_test.go`.
       Residual risk: traces include request identities and resource metadata.
       Operators must scope access, retention, and export destinations; audit
@@ -427,3 +522,79 @@ threats:
         entries:
           - reference-id: CAPSULE.CAP09
           - reference-id: CAPSULE.CAP10
+  - id: CAPSULE.THR20
+    title: Malformed Policy Input Disrupts Admission
+    group: operation-and-supply-chain
+    description: |
+      A policy author, administrator, or compromised authorized account stores
+      malformed expressions or regular expressions. Validation checks the wrong
+      field or the old object on UPDATE, or omits a configuration field. A later
+      request evaluates the invalid program and panics, returns an unexpected
+      error, or rejects all otherwise valid objects. A Tenant policy can affect
+      one tenant; global Node configuration can disrupt cluster infrastructure.
+      Current defenses: configuration and legacy Tenant regex validation check
+      the corresponding submitted fields; legacy forbidden matching returns
+      errors or fails closed for invalid patterns instead of using MustCompile.
+      Shared rules validation and compiled caches reject malformed expressions.
+      Evidence: `internal/webhook/cfg/validation.go`,
+      `internal/webhook/tenant/validation/forbidden_annotations_regex.go`,
+      `internal/webhook/tenant/validation/hostname_regex.go`,
+      `pkg/api/forbidden_list.go`, `pkg/api/forbidden_list_test.go`,
+      `e2e/config_node_user_metadata_test.go`,
+      `e2e/tenant_forbidden_annotations_regex_test.go`,
+      `e2e/ingress_hostnames_test.go`, `e2e/rules_security_profiles_test.go`.
+      Historical evidence:
+      - GHSA-gxjc-74v5-3vx3 / CVE-2026-61794: annotation validation compiles the
+        labels field, allowing an invalid annotations regex to reach namespace
+        admission. Reported affected versions v0.13.0 - v0.13.6; patch 0.13.7.
+        https://github.com/projectcapsule/capsule/security/advisories/GHSA-gxjc-74v5-3vx3
+      - GHSA-f94q-w3w8-cj67 / CVE-2026-61795: UPDATE validates the old Tenant
+        hostname regex, leaving subsequent Ingress operations blocked.
+        Reported affected versions v0.13.0 - v0.13.6; patch 0.13.7.
+        https://github.com/projectcapsule/capsule/security/advisories/GHSA-f94q-w3w8-cj67
+      - GHSA-68cj-mvg9-rgm2 / CVE-2026-65834: absent NodeMetadata regex
+        validation permits panic on Node admission with a cluster-wide blast
+        radius. Reported affected versions <= 0.13.7; patch 0.13.8.
+        https://github.com/projectcapsule/capsule/security/advisories/GHSA-68cj-mvg9-rgm2
+      Residual risk: syntax validation does not establish policy intent, bounded
+      evaluation cost, or availability. Review CREATE and UPDATE separately,
+      validate each field, and distinguish configuration errors from expected
+      denials. Trusted administrators can still intentionally deny all writes.
+    capabilities:
+      - reference-id: CAPSULE.CAP
+        entries:
+          - reference-id: CAPSULE.CAP02
+          - reference-id: CAPSULE.CAP03
+          - reference-id: CAPSULE.CAP09
+  - id: CAPSULE.THR21
+    title: Tenant Templates Read Controller Process Secrets
+    group: ownership-and-authorization
+    description: |
+      A tenant resource author invokes a template function that reads process
+      environment or other controller-only data and writes the result into an
+      object in their own namespace. Rendering runs inside the controller before
+      an impersonated client applies the output. Restricting the apply identity
+      cannot undo a disclosure that already happened during rendering.
+      Current defenses: the shared function map removes env, expandenv, and
+      expandEnv. Template parsing rejects these function names. Unit tests cover
+      rejection through rendering, and tenant e2e scenarios cover safe templates,
+      all three rejected spellings, namespace selection, cross-tenant isolation,
+      and repair after a rejected generator.
+      Evidence: `pkg/template/functions/funcmap.go`,
+      `pkg/template/functions/funcmap_age_test.go`, `pkg/template/render_test.go`,
+      `pkg/template/unstructured.go`, `internal/controllers/resources/collect.go`,
+      `e2e/replications_template_sandbox_test.go`.
+      Historical evidence: GHSA-2vqc-26cg-wpxg removes expandEnv but leaves the
+      lowercase sprig alias expandenv callable. The advisory reports affected
+      versions >= 0.13.0 and patch 0.14.4.
+      https://github.com/projectcapsule/capsule/security/advisories/GHSA-2vqc-26cg-wpxg
+      Residual risk: a function deny-list requires review when dependencies or
+      custom functions change. Explicitly supplied template context can contain
+      sensitive data authorized for collection; scoped gathering and careful
+      resource authorship remain necessary. This does not assess all possible
+      template effects or independently verify historical patched releases.
+    capabilities:
+      - reference-id: CAPSULE.CAP
+        entries:
+          - reference-id: CAPSULE.CAP05
+          - reference-id: CAPSULE.CAP09

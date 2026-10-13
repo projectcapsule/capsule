@@ -115,7 +115,7 @@ contributors to handle it.  The Maintainers will review who is assigned to this
 at least once a year.
 
 The Security Response Team is responsible for handling all reports of security
-holes and breaches according to the [security policy](TODO:Link to security.md).
+holes and breaches according to the [security policy](./SECURITY.md).
 
 ## Voting
 
