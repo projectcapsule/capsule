@@ -79,7 +79,7 @@ repository:
       primary: false
       social: https://github.com/MaxFedotov
     - name: Oliver Bähler
-      primary: false
+      primary: true
       social: https://github.com/oliverbaehler
     - name: Massimiliano Giovagnoli
       primary: false
