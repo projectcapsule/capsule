@@ -4,11 +4,9 @@
 package meta
 
 const (
-	ValueTrue                     string = "true"
-	ValueFalse                    string = "false"
-	ValueController               string = "controller"
-	ValueControllerResources      string = "resources"
-	ValueControllerReplications   string = "replications"
-	ValueControllerResourcePermit string = "resource-permit"
-	ValueAppResourcePermitManager string = "resource-permit-controller"
+	ValueTrue                   string = "true"
+	ValueFalse                  string = "false"
+	ValueController             string = "controller"
+	ValueControllerResources    string = "resources"
+	ValueControllerReplications string = "replications"
 )

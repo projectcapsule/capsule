@@ -34,20 +34,6 @@ func ResourceFieldOwner(fieldowner string) string {
 	return FieldManagerCapsulePrefix + "/resource/" + fieldowner
 }
 
-// ResourcePermitFieldOwner returns a stable field manager for a ResourcePermit.
-func ResourcePermitFieldOwner(obj metav1.Object) string {
-	identity := string(obj.GetUID())
-	if identity == "" {
-		hash := fnv.New64a()
-		_, _ = hash.Write([]byte(obj.GetNamespace()))
-		_, _ = hash.Write([]byte{0})
-		_, _ = hash.Write([]byte(obj.GetName()))
-		identity = strconv.FormatUint(hash.Sum64(), 36)
-	}
-
-	return ResourceFieldOwner("resourcepermit/" + identity)
-}
-
 // CapsuleFieldOwners returns the set of managers that start with the Capsule prefix.
 func CapsuleFieldOwners(obj *unstructured.Unstructured, prefix string) map[string]struct{} {
 	out := map[string]struct{}{}

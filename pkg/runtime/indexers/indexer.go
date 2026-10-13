@@ -19,7 +19,6 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers/ingress"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers/namespace"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers/resourcepool"
-	"github.com/projectcapsule/capsule/pkg/runtime/indexers/serviceaccount"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers/tenant"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantowner"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
@@ -47,8 +46,6 @@ func AddToManager(ctx context.Context, log logr.Logger, mgr manager.Manager) err
 		tenantresource.ProtectedItems{Obj: &capsulev1beta2.TenantResource{}},
 		tenantresource.GlobalDependencies{},
 		tenantresource.NamespacedDependencies{},
-		serviceaccount.ResourcePermitReference{},
-		serviceaccount.ResourcePermitFieldOwner{},
 		customquota.NamespacedTargetReference{},
 		customquota.NamespacedObjectUIDReference{},
 		customquota.GlobalTargetReference{},

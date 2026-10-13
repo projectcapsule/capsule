@@ -18,7 +18,6 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	serviceaccountindexer "github.com/projectcapsule/capsule/pkg/runtime/indexers/serviceaccount"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
 )
 
@@ -81,31 +80,6 @@ func TestReferenceProtectionOnDelete(t *testing.T) {
 		wantDenied string
 	}{
 		{name: "allows an unreferenced ServiceAccount"},
-		{
-			name: "denies an unexpired ResourcePermit reference",
-			objects: []client.Object{&capsulev1beta2.ResourcePermit{
-				Name: "temporary-access", Namespace: "team-a",
-				Status: capsulev1beta2.ResourcePermitStatus{
-					Phase: capsulev1beta2.ResourcePermitPhaseActive,
-					Request: &capsulev1beta2.ResourcePermitStatusRequest{
-						Impersonation: reference.DeepCopy(),
-					},
-				},
-			}},
-			wantDenied: "unexpired ResourcePermit team-a/temporary-access",
-		},
-		{
-			name: "allows an expired ResourcePermit reference",
-			objects: []client.Object{&capsulev1beta2.ResourcePermit{
-				Name: "expired-access", Namespace: "team-a",
-				Status: capsulev1beta2.ResourcePermitStatus{
-					Phase: capsulev1beta2.ResourcePermitPhaseExpired,
-					Request: &capsulev1beta2.ResourcePermitStatusRequest{
-						Impersonation: reference.DeepCopy(),
-					},
-				},
-			}},
-		},
 		{
 			name: "denies a GlobalTenantResource reference",
 			objects: []client.Object{&capsulev1beta2.GlobalTenantResource{
@@ -212,7 +186,7 @@ func TestReferenceProtectionOnDeleteInvalidIdentity(t *testing.T) {
 	}
 }
 
-func referenceProtectionFakeClient(t *testing.T, objects ...client.Object) client.Client {
+func referenceProtectionFakeClient(t testing.TB, objects ...client.Object) client.Client {
 	t.Helper()
 
 	scheme := runtime.NewScheme()
@@ -223,14 +197,12 @@ func referenceProtectionFakeClient(t *testing.T, objects ...client.Object) clien
 		t.Fatal(err)
 	}
 
-	resourcePermitIndexer := serviceaccountindexer.ResourcePermitReference{}
 	globalResourceIndexer := tenantresource.GlobalServiceAccount{}
 	tenantResourceIndexer := tenantresource.NamespacedServiceAccount{}
 
 	return fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(objects...).
-		WithIndex(resourcePermitIndexer.Object(), resourcePermitIndexer.Field(), resourcePermitIndexer.Func()).
 		WithIndex(globalResourceIndexer.Object(), globalResourceIndexer.Field(), globalResourceIndexer.Func()).
 		WithIndex(tenantResourceIndexer.Object(), tenantResourceIndexer.Field(), tenantResourceIndexer.Func()).
 		Build()

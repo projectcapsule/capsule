@@ -1,0 +1,151 @@
+# Copyright 2020-2026 Project Capsule Authors
+# SPDX-License-Identifier: Apache-2.0
+# Schema: https://github.com/ossf/security-insights/blob/v2.2.0/spec/schema.cue
+header:
+  schema-version: "2.2.0"
+  last-updated: "2026-10-10"
+  last-reviewed: "2026-10-10"
+  url: https://raw.githubusercontent.com/projectcapsule/capsule/main/security-insights.yml
+  comment: |
+    Repository-derived refresh for Security Slam. Security assessment content
+    is a draft pending maintainer review. Contacts and team membership come
+    from SECURITY.md and .github/maintainers.yaml. GitHub administrative access,
+    repository protection settings, and individual release attestations have
+    not been independently verified.
+project:
+  name: Capsule
+  homepage: https://projectcapsule.dev/
+  administrators:
+    - name: Capsule maintainers
+      primary: true
+      email: cncf-capsule-maintainers@lists.cncf.io
+      social: https://github.com/projectcapsule
+  repositories:
+    - name: capsule
+      url: https://github.com/projectcapsule/capsule
+      comment: Controller, namespace profiling rules, admission webhooks, and Helm chart.
+  vulnerability-reporting:
+    reports-accepted: true
+    bug-bounty-available: false
+    policy: https://github.com/projectcapsule/capsule/blob/main/SECURITY.md
+    contact:
+      name: Capsule maintainers
+      primary: true
+      email: cncf-capsule-maintainers@lists.cncf.io
+    comment: |
+      Submit a private vulnerability report through
+      https://github.com/projectcapsule/capsule/security/advisories/new.
+      SECURITY.md does not advertise a bug bounty; the false flag reflects
+      that documented position and needs maintainer confirmation before publication.
+      SECURITY.md describes reporting coverage across the projectcapsule
+      organization; the assessment linked below covers this repository only.
+    in-scope:
+      - Security vulnerabilities in repositories under the projectcapsule organization.
+    out-of-scope:
+      - Installation or configuration support requests and issues unrelated to security.
+      - Unverified vulnerability scanner output without confirmation that Capsule is affected.
+  documentation:
+    design: https://github.com/projectcapsule/capsule/blob/main/security/capabilities.yaml
+    detailed-guide: https://projectcapsule.dev/
+    code-of-conduct: https://github.com/projectcapsule/capsule/blob/main/CODE_OF_CONDUCT.md
+    support-policy: https://github.com/projectcapsule/capsule/blob/main/CONTRIBUTING.md#supported-versions
+    signature-verification: https://github.com/projectcapsule/capsule/blob/main/SECURITY.md#release-artifacts
+repository:
+  url: https://github.com/projectcapsule/capsule
+  status: active
+  accepts-change-request: true
+  accepts-automated-change-request: true
+  bug-fixes-only: false
+  no-third-party-packages: false
+  core-team:
+    - name: Adriano Pezzuto
+      primary: false
+      social: https://github.com/bsctl
+    - name: Dario Tranchitella
+      primary: false
+      social: https://github.com/prometherion
+    - name: Maksim Fedotov
+      primary: false
+      social: https://github.com/MaxFedotov
+    - name: Oliver Bähler
+      primary: false
+      social: https://github.com/oliverbaehler
+    - name: Massimiliano Giovagnoli
+      primary: false
+      social: https://github.com/maxgio92
+    - name: Hristo Hristov
+      primary: false
+      social: https://github.com/Svarrogh1337
+  license:
+    expression: Apache-2.0
+    url: https://github.com/projectcapsule/capsule/blob/main/LICENSE
+  documentation:
+    contributing-guide: https://github.com/projectcapsule/capsule/blob/main/CONTRIBUTING.md
+    dependency-management-policy: https://github.com/projectcapsule/capsule/blob/main/DEPENDENCY.md
+    security-policy: https://github.com/projectcapsule/capsule/blob/main/SECURITY.md
+  security:
+    assessments:
+      self:
+        name: Capsule namespace profiling Gemara threat assessment
+        evidence: https://raw.githubusercontent.com/projectcapsule/capsule/main/security/threats.yaml
+        comment: |
+          Initial draft in Gemara v1.6.0; maintainer review is pending. Scope,
+          trust boundaries, assessed runtime revision, and capabilities are at
+          https://raw.githubusercontent.com/projectcapsule/capsule/main/security/capabilities.yaml.
+          Threats identify existing defenses and residual risks; referenced tests
+          indicate coverage and do not attest passing execution. Publication
+          date is omitted until this assessment is published. Historical prose
+          self-assessment remains available at
+          https://github.com/projectcapsule/capsule/blob/main/SELF_ASSESSMENT.md.
+    tools:
+      - name: Gosec
+        type: SAST
+        version: v2.29.0
+        rulesets:
+          - default
+        integration:
+          adhoc: false
+          ci: true
+          release: false
+        results: {}
+        comment: |
+          coverage.yml runs Gosec and uploads SARIF. The scanner uses -no-fail;
+          this records execution, not a security findings merge gate.
+      - name: Trivy
+        type: SCA
+        rulesets:
+          - default
+        integration:
+          adhoc: false
+          ci: false
+          release: true
+        results: {}
+        comment: |
+          docker-publish.yml scans the repository filesystem during image
+          release, selects HIGH and CRITICAL findings, and ignores unfixed
+          vulnerabilities. No published results URL is asserted here.
+      - name: OpenSSF Scorecard
+        type: other
+        rulesets:
+          - default
+        integration:
+          adhoc: true
+          ci: true
+          release: false
+        results: {}
+        comment: |
+          scorecard.yml runs on a weekly schedule and main-branch pushes,
+          publishes results, and uploads SARIF. Configuration does not attest
+          the current score or repository protection settings.
+  release:
+    automated-pipeline: true
+    changelog: https://github.com/projectcapsule/capsule/blob/main/CHANGELOG.md
+    distribution-points:
+      - uri: https://github.com/projectcapsule/capsule/releases
+        comment: Tagged project releases.
+      - uri: https://ghcr.io/projectcapsule/capsule
+        comment: Controller images; docker-publish.yml requests signing, SBOM, and provenance generation.
+      - uri: https://ghcr.io/projectcapsule/charts/capsule
+        comment: OCI Helm chart; helm-publish.yml requests signing and provenance generation.
+      - uri: https://projectcapsule.github.io/charts
+        comment: Helm chart repository published by helm-publish.yml.

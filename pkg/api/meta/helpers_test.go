@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/projectcapsule/capsule/pkg/api/meta"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -17,6 +16,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 func TestReleaseAndReconcileAnnotations(t *testing.T) {
@@ -132,21 +133,8 @@ func TestManagerAndNameHelpers(t *testing.T) {
 	if got := meta.ResourceControllerFieldOwnerPrefix(); got != "projectcapsule.dev/resource/controller" {
 		t.Fatalf("ResourceControllerFieldOwnerPrefix() = %q", got)
 	}
-	if got := meta.ResourceFieldOwner("resourcepermit/id"); got != "projectcapsule.dev/resource/resourcepermit/id" {
+	if got := meta.ResourceFieldOwner("example-addon/id"); got != "projectcapsule.dev/resource/example-addon/id" {
 		t.Fatalf("ResourceFieldOwner() = %q", got)
-	}
-	withUID := &corev1.ConfigMap{
-		Name: "request", Namespace: "default", UID: types.UID("request-uid")}
-	if got := meta.ResourcePermitFieldOwner(withUID); got != "projectcapsule.dev/resource/resourcepermit/request-uid" {
-		t.Fatalf("ResourcePermitFieldOwner() = %q", got)
-	}
-	withoutUID := &corev1.ConfigMap{Name: "request", Namespace: "default"}
-	got := meta.ResourcePermitFieldOwner(withoutUID)
-	if got != meta.ResourcePermitFieldOwner(withoutUID.DeepCopy()) {
-		t.Fatalf("ResourcePermitFieldOwner() is not deterministic: %q", got)
-	}
-	if len(got) > 128 {
-		t.Fatalf("ResourcePermitFieldOwner() length = %d, want <= 128", len(got))
 	}
 	if got := meta.NameForManagedRuleStatus(); got != "capsule-managed-rules" {
 		t.Fatalf("NameForManagedRuleStatus() = %q", got)
@@ -238,4 +226,14 @@ func TestHelpersSchemeImport(t *testing.T) {
 	if err := corev1.AddToScheme(scheme); err != nil {
 		t.Fatalf("adding core scheme: %v", err)
 	}
+}
+
+func TestFilterIndependentProtectionMarkers(t *testing.T) {
+	obj := &unstructured.Unstructured{}
+	obj.SetLabels(map[string]string{meta.CreatedByCapsuleLabel: "forged", meta.ProtectionLabelPrefix + "addon-a": "true", meta.ProtectionLabelPrefix + "addon-b": "true", "example.org/keep": "yes"})
+	meta.SetFilteredLabelsWithPrefixes(obj, map[string]struct{}{meta.CreatedByCapsuleLabel: {}}, []string{meta.ProtectionLabelPrefix})
+	if got := obj.GetLabels(); !reflect.DeepEqual(got, map[string]string{"example.org/keep": "yes"}) {
+		t.Fatalf("filtered labels=%v", got)
+	}
+	meta.SetFilteredLabelsWithPrefixes(nil, nil, []string{meta.ProtectionLabelPrefix})
 }

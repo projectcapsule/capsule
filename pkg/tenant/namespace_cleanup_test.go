@@ -442,13 +442,16 @@ func (r *populatedCleanupResource) Patch(_ context.Context, name string, _ types
 	return r.objects[name].DeepCopy(), nil
 }
 func BenchmarkNamespaceCleanupPopulated(b *testing.B) {
-	for _, mode := range []string{"already-deleting-no-finalizers", "already-deleting-with-finalizers", "needs-delete", "capsule-lifecycle"} {
+	for _, mode := range []string{"already-deleting-no-finalizers", "already-deleting-with-finalizers", "needs-delete", "capsule-lifecycle", "addon-lifecycle"} {
 		for _, count := range []int{1, 100, 1000} {
 			b.Run(fmt.Sprintf("%s/objects=%d", mode, count), func(b *testing.B) {
 				ns := cleanupNamespace()
 				gvr := cleanupGVR
-				if mode == "capsule-lifecycle" {
-					gvr = capsulev1beta2.GroupVersion.WithResource("resourcepermits")
+				if mode == "capsule-lifecycle" || mode == "addon-lifecycle" {
+					gvr = capsulev1beta2.GroupVersion.WithResource("addonresources")
+					if mode == "addon-lifecycle" {
+						gvr.Group = "addons.projectcapsule.dev"
+					}
 				}
 				reader := &cleanupReader{current: ns}
 				resources := &populatedCleanupResource{list: &unstructured.UnstructuredList{}, objects: map[string]*unstructured.Unstructured{}}
@@ -462,9 +465,9 @@ func BenchmarkNamespaceCleanupPopulated(b *testing.B) {
 					if mode != "already-deleting-with-finalizers" {
 						obj.SetFinalizers(nil)
 					}
-					if mode == "capsule-lifecycle" {
+					if mode == "capsule-lifecycle" || mode == "addon-lifecycle" {
 						obj.SetAPIVersion(gvr.GroupVersion().String())
-						obj.SetKind("ResourcePermit")
+						obj.SetKind("AddonResource")
 						obj.SetFinalizers([]string{meta.ControllerFinalizer})
 					}
 					resources.list.Items = append(resources.list.Items, *obj)
@@ -499,18 +502,21 @@ func BenchmarkNamespaceCleanupPopulated(b *testing.B) {
 }
 
 func TestCleanupPreservesCapsuleLifecycleFinalizers(t *testing.T) {
-	for _, mode := range []string{"permit", "permit-mixed", "legacy-resource", "added-after-list", "foreign-api"} {
+	for _, mode := range []string{"core", "core-mixed", "addon", "addon-mixed", "legacy-resource", "added-after-list", "foreign-api"} {
 		t.Run(mode, func(t *testing.T) {
 			ns := cleanupNamespace()
-			gvr := capsulev1beta2.GroupVersion.WithResource("resourcepermits")
+			gvr := capsulev1beta2.GroupVersion.WithResource("addonresources")
+			if mode == "addon" || mode == "addon-mixed" {
+				gvr.Group = "addons.projectcapsule.dev"
+			}
 			obj := cleanupObject(ns.Name, "held")
 			obj.SetAPIVersion(gvr.GroupVersion().String())
-			obj.SetKind("ResourcePermit")
+			obj.SetKind("AddonResource")
 			obj.SetDeletionTimestamp(ns.DeletionTimestamp)
 			obj.SetFinalizers([]string{meta.ControllerFinalizer})
 			want := []string{meta.ControllerFinalizer}
 			switch mode {
-			case "permit-mixed":
+			case "core-mixed", "addon-mixed":
 				obj.SetFinalizers([]string{meta.ControllerFinalizer, "example.com/hold"})
 			case "legacy-resource":
 				gvr.Resource = "tenantresources"
@@ -584,9 +590,9 @@ func TestCleanupPreservesCapsuleLifecycleFinalizers(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if mode == "permit" {
+			if mode == "core" || mode == "addon" {
 				if changed || patches != 0 || reader.calls != 1 {
-					t.Fatalf("unchanged permit: changed=%v patches=%d namespace GETs=%d", changed, patches, reader.calls)
+					t.Fatalf("unchanged lifecycle resource: changed=%v patches=%d namespace GETs=%d", changed, patches, reader.calls)
 				}
 			} else if !changed || patches != 1 {
 				t.Fatalf("changed=%v patches=%d", changed, patches)
@@ -621,9 +627,9 @@ func TestCleanupChecksNamespaceOnlyForWrites(t *testing.T) {
 				obj.SetFinalizers(nil)
 				expectedReads = 2
 			case "capsule-finalizer":
-				gvr = capsulev1beta2.GroupVersion.WithResource("resourcepermits")
+				gvr = capsulev1beta2.GroupVersion.WithResource("addonresources")
 				obj.SetAPIVersion(gvr.GroupVersion().String())
-				obj.SetKind("ResourcePermit")
+				obj.SetKind("AddonResource")
 				obj.SetFinalizers([]string{meta.ControllerFinalizer})
 			}
 			dyn := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{gvr: obj.GetKind() + "List"}, obj)

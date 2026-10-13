@@ -17,7 +17,7 @@ const (
 	JSONSchemaFormWidgetKubernetesResource JSONSchemaFormWidget = "kubernetes-resource"
 
 	// JSONSchemaFormRequestNamespace resolves to the namespace in which the
-	// ResourcePermit is being created.
+	// RenderedResource is being created.
 	JSONSchemaFormRequestNamespace = "request"
 
 	// JSONSchemaFormAllNamespaces lists a namespaced GVK across all namespaces.
@@ -59,9 +59,9 @@ type KubernetesResourceFormSource struct {
 	Kind string `json:"kind"`
 
 	// Namespace controls the list scope for namespaced resources. "request"
-	// selects the ResourcePermit namespace, "*" selects all namespaces, and any
+	// selects the RenderedResource namespace, "*" selects all namespaces, and any
 	// other value selects that literal namespace. When omitted, form consumers
-	// use the ResourcePermit namespace for namespaced GVKs and cluster scope for
+	// use the RenderedResource namespace for namespaced GVKs and cluster scope for
 	// cluster-scoped GVKs.
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
@@ -88,7 +88,7 @@ type KubernetesResourceFormOption struct {
 	// +optional
 	LabelTemplate string `json:"labelTemplate,omitempty"`
 
-	// ValueTemplate renders the value stored in the ResourcePermit parameters. It
+	// ValueTemplate renders the value stored in the RenderedResource parameters. It
 	// defaults to "{{ .metadata.name }}".
 	// +optional
 	ValueTemplate string `json:"valueTemplate,omitempty"`

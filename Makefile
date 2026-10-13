@@ -76,15 +76,6 @@ bench-controllers:
 manager: generate golint
 	go build -o bin/manager
 
-# Build kubectl Capsule plugin binary
-.PHONY: kubectl-capsule
-kubectl-capsule:
-	@mkdir -p bin
-	go build -o bin/kubectl-capsule ./cmd/cli
-	@echo ""
-	@echo "Run the kubectl plugin with:"
-	@echo '  PATH="$(CURDIR)/bin:$$PATH" kubectl capsule --help'
-
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate manifests
 	go run .
@@ -246,8 +237,6 @@ dev-setup: dev-setup-flux-handoff
 		--set 'certManager.generateCertificates=false' \
 		--set 'tls.enableController=false' \
 		--set 'tls.create=false' \
-		--set rbac.resourcepermits.create=true \
-		--set-string 'rbac.resourcepermits.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set rbac.resources.create=true \
 		--set-string 'rbac.resources.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set rbac.resourcepoolclaims.create=true \
@@ -557,8 +546,6 @@ e2e-install: helm-controller-version ko-build-all dev-install-gw-api-crds
 		--set 'manager.options.leaderElection.leaseDuration=60s' \
 		--set 'manager.options.leaderElection.renewDeadline=40s' \
 		--set 'manager.rbac.minimal=true' \
-		--set rbac.resourcepermits.create=true \
-		--set-string 'rbac.resourcepermits.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set rbac.resources.create=true \
 		--set-string 'rbac.resources.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set rbac.resourcepoolclaims.create=true \
@@ -752,9 +739,10 @@ apidocs-gen: ## Download crdoc locally if necessary.
 	@test -s $(APIDOCS_GEN) && $(APIDOCS_GEN) --version | grep -q $(APIDOCS_GEN_VERSION) || \
 	$(call go-install-tool,$(APIDOCS_GEN),fybrik.io/crdoc@$(APIDOCS_GEN_VERSION))
 
-MOCKGEN         := $(LOCALBIN)/mockgen
-MOCKGEN_VERSION := v0.6.0
-MOCKGEN_LOOKUP  := go.uber.org/mock/mockgen
+MOCKGEN          := $(LOCALBIN)/mockgen
+MOCKGEN_VERSION  := v0.6.0
+MOCKGEN_LOOKUP   := go.uber.org/mock/mockgen
+MOCKGEN_RENOVATE := uber-go/mock
 mockgen:
 	@test -s $(MOCKGEN) && $(MOCKGEN) -version | grep -q $(MOCKGEN_VERSION) || \
 	$(call go-install-tool,$(MOCKGEN),$(MOCKGEN_LOOKUP)@$(MOCKGEN_VERSION))
@@ -788,9 +776,10 @@ harpoon:
 	@curl -s https://raw.githubusercontent.com/alegrey91/harpoon/main/install | \
 		sudo bash -s -- --install-version $(HARPOON_VERSION) --install-dir $(LOCALBIN)
 
-GUM         := $(LOCALBIN)/gum
-GUM_VERSION := 2.0.1
-GUM_LOOKUP  := charm.land/gum
+GUM          := $(LOCALBIN)/gum
+GUM_VERSION  := 2.0.2
+GUM_LOOKUP   := charm.land/gum
+GUM_RENOVATE := charmbracelet/gum
 gum: ## Download gum locally if necessary.
 		test -s $(GUM) && $(GUM) --version | grep -q $(GUM_VERSION) ||  \
 	$(call go-install-tool,$(GUM),$(GUM_LOOKUP)/v2@v$(GUM_VERSION))
