@@ -211,7 +211,7 @@ func TestCleanupRejectsForgedReplicationOwners(t *testing.T) {
 }
 
 func TestReplicationOwnerLookupGate(t *testing.T) {
-	for _, manager := range []string{testFieldOwner, "kubectl", meta.ResourceFieldOwner("resourcepermit/peer")} {
+	for _, manager := range []string{testFieldOwner, "kubectl", meta.ResourceFieldOwner("example-addon/peer")} {
 		t.Run(manager, func(t *testing.T) {
 			m := Manager{ReplicationOwners: func(context.Context, *unstructured.Unstructured, string) (map[string]struct{}, error) {
 				t.Fatal("unexpected replication lookup")

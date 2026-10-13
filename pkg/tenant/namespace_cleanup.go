@@ -226,7 +226,7 @@ func cleanupResourceType(ctx context.Context, dyn dynamic.Interface, gvr schema.
 	// Capsule lifecycle controllers must finish their own cleanup, including
 	// targets outside this namespace, before their resources can disappear.
 	var retainedFinalizers map[string]struct{}
-	if gvr.Group == capsulev1beta2.GroupVersion.Group {
+	if gvr.Group == capsulev1beta2.GroupVersion.Group || gvr.Group == "addons.projectcapsule.dev" {
 		retainedFinalizers = map[string]struct{}{
 			meta.ControllerFinalizer: {}, meta.LegacyResourceFinalizer: {},
 		}

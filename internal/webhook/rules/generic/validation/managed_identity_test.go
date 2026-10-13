@@ -39,7 +39,7 @@ func TestManagedMetadataExemptionRequiresControllerIdentity(t *testing.T) {
 
 	for _, kind := range []string{"Namespace", "Pod"} {
 		for _, op := range []admissionv1.Operation{admissionv1.Create, admissionv1.Update} {
-			for _, label := range []string{"", meta.ValueController, meta.ValueControllerResources, meta.ValueControllerReplications, meta.ValueControllerResourcePermit} {
+			for _, label := range []string{"", meta.ValueController, meta.ValueControllerResources, meta.ValueControllerReplications, "example-addon"} {
 				for _, actor := range []struct {
 					name       string
 					info       authenticationv1.UserInfo

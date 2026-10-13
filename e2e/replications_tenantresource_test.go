@@ -137,10 +137,6 @@ var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace
 		exerciseReplicationPolicies(false, tnt.Name, baseNamespace, targetNamespaces[0], targetNamespaces[1], tenantOwner)
 	})
 
-	It("composes replication and ResourcePermit protection", Label("protection-composition"), func() {
-		exerciseMixedProtection(false, tnt.Name, baseNamespace, targetNamespaces[0], targetNamespaces[1], tenantOwner)
-	})
-
 	It("preserves explicit policies after a partial first apply", Label("policy-metadata-failure", "policy-first-apply-failure"), func() {
 		exerciseInitialReplicationPolicyFailure(false, tnt.Name, baseNamespace, targetNamespaces[0], targetNamespaces[1], tenantOwner)
 	})

@@ -51,10 +51,6 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 		exerciseReplicationPolicies(true, tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner)
 	})
 
-	It("composes replication and ResourcePermit protection", Label("protection-composition"), func() {
-		exerciseMixedProtection(true, tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner)
-	})
-
 	It("preserves explicit policies after a partial first apply", Label("policy-metadata-failure", "policy-first-apply-failure"), func() {
 		exerciseInitialReplicationPolicyFailure(true, tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner)
 	})
