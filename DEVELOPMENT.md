@@ -91,6 +91,68 @@ The [e2e workflow](./.github/workflows/e2e.yml) runs the full suite for pull req
 matching its path filters. Local runs should cover only the new tests and affected
 components.
 
+## Security assessment
+
+The [capability catalog](./security/capabilities.yaml) and
+[threat catalog](./security/threats.yaml) describe the controller, admission,
+namespace rules, resource management, and this repository's installation and
+release boundaries. They use Gemara 1.6.0 and are linked from
+[Security Insights](./security-insights.yml). Capsule Proxy internals are outside
+this assessment; its published advisories inform the integration boundaries.
+
+Review the catalogs when changing rules or selectors, authorization, namespace
+ownership or lifecycle, admission registration, caching, templating, resource
+replication, controller privileges, dependencies, or release workflows. Also
+review them when a new security advisory is published. Trace the affected
+namespace profiles, tenant boundaries, identities, data flows, entry points,
+mitigations, and remaining risks through the current implementation and tests.
+Check alternate representations, operations, subresources, and generator/raw
+resource paths: the advisory history includes incomplete fixes.
+
+Check the published advisories for both
+[Capsule](https://github.com/projectcapsule/capsule/security/advisories) and
+[Capsule Proxy](https://github.com/projectcapsule/capsule-proxy/security/advisories).
+Record each relevant advisory's attack path, affected and patched versions as
+reported by its publisher, link, current mitigation evidence, and residual risk
+in the appropriate threat description. Keep historical version claims distinct
+from conclusions about the assessed revision. Do not claim a released fix was
+verified solely because a current source guard exists.
+
+Keep capability and threat IDs stable; do not reuse removed IDs. Update both
+catalog versions and the capability mapping reference when publishing a revised
+assessment. Refresh the assessed source revision only after reviewing its runtime
+changes. Verify every implementation and test path, and keep scope, trust
+assumptions, exclusions, and the Security Insights assessment comment consistent.
+
+Use CUE v0.17.1, as pinned by the
+[security assessment workflow](./.github/workflows/security-assessment.yml), to
+validate the catalogs from the repository root:
+
+```bash
+cue vet -c -d '#CapabilityCatalog' github.com/gemaraproj/gemara@v1.6.0 security/capabilities.yaml
+cue vet -c -d '#ThreatCatalog' github.com/gemaraproj/gemara@v1.6.0 security/threats.yaml
+```
+
+The workflow also validates Security Insights against its checksum-verified
+v2.2.0 schema. Schema validation checks structure; reviewers must check the
+completeness of capability coverage and the accuracy of threats and evidence.
+Run the relevant unit and scoped tenant e2e tests when adding or changing
+mitigation claims. For the template environment-access regression coverage:
+
+```bash
+go test -race ./pkg/template/...
+make e2e-exec FILTER='&& !skip && template-sandbox'
+```
+
+Both catalogs remain drafts until maintainers provide detailed human review of
+the scope, capability coverage, threat mappings, advisory history, mitigations,
+and residual risks. Record the reviewers, review date, assessed revision, and
+decisions in the review pull request. Address their findings before setting
+`metadata.draft` to `false`, recording the actual assessment publication date,
+and updating the corresponding Security Insights dates and comment. Preserve
+authorship credit. Passing validation or adding these instructions alone does
+not complete the assessment or establish Inspector badge readiness.
+
 # Development Environment
 
 During development, we prefer that the code is running within our IDE locally, instead of running as the normal Pod(s) within the Kubernetes cluster.
