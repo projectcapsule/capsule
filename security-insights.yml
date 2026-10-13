@@ -111,6 +111,29 @@ repository:
           Maintenance, validation, and review instructions are at
           https://github.com/projectcapsule/capsule/blob/main/DEVELOPMENT.md#security-assessment.
     tools:
+      - name: OSPS Baseline Scanner
+        type: other
+        rulesets:
+          - osps-baseline-2026-08
+        integration:
+          adhoc: false
+          ci: true
+          release: false
+        results:
+          ci:
+            name: OSPS Baseline evaluation
+            predicate-uri: https://github.com/revanite-io/osps-baseline-action
+            location: https://github.com/projectcapsule/capsule/actions/workflows/osps-baseline.yml
+        comment: |
+          osps-baseline.yml configures weekly, main-branch push, and manual
+          Maturity Level 1 evaluations using a SHA-pinned action and its
+          digest-pinned scanner image. It requires the PVTR_GITHUB_TOKEN
+          Actions secret with repository-scoped read access to settings.
+          Full results are available in the job summary and retained as
+          workflow artifacts for 30 days; failed controls are uploaded as SARIF.
+          Failed controls do not fail the job, while scanner execution and
+          missing-artifact errors do. Configuration does not attest a passing
+          assessment or a completed live run.
       - name: Gosec
         type: SAST
         version: v2.29.0
