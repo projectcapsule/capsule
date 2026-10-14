@@ -3,7 +3,7 @@
 # Schema: https://github.com/ossf/security-insights/blob/v2.2.0/spec/schema.cue
 header:
   schema-version: "2.2.0"
-  last-updated: "2026-10-13"
+  last-updated: "2026-10-14"
   last-reviewed: "2026-10-10"
   url: https://raw.githubusercontent.com/projectcapsule/capsule/main/security-insights.yml
   comment: |
@@ -134,6 +134,32 @@ repository:
           Failed controls do not fail the job, while scanner execution and
           missing-artifact errors do. Configuration does not attest a passing
           assessment or a completed live run.
+      - name: Privateer grc.store Publisher
+        type: other
+        rulesets:
+          - osps-baseline-2026-08
+        integration:
+          adhoc: false
+          ci: true
+          release: false
+        results:
+          ci:
+            name: Published OSPS Baseline evaluations
+            predicate-uri: https://github.com/revanite-io/pvtr-publish-results
+            location: https://github.com/projectcapsule/capsule/actions/workflows/osps-baseline-publish.yml
+        comment: |
+          osps-baseline-publish.yml configures weekly and manual Privateer
+          evaluations using the trusted pvtr-publish-results workflow at v1.
+          Publishing uses OIDC; scanning uses the read-only PVTR_GITHUB_TOKEN
+          Actions secret. GRC_NAMESPACE and GRC_RESULTS_LICENSE Actions
+          variables select the namespace and SPDX results license. The namespace
+          must trust projectcapsule/capsule as a publisher on refs/heads/main.
+          The caller versions the target with the workflow run's commit SHA.
+          Manual dry runs retain bundles without publishing. Failed Baseline
+          controls can be published; execution and publication errors fail.
+          Until a namespace and verified target exist, the results link points
+          to the publishing workflow. After the first successful publish,
+          replace it with https://grc.store/targets/<namespace>/capsule.
       - name: Gosec
         type: SAST
         version: v2.29.0

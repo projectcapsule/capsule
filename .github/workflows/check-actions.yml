@@ -21,5 +21,7 @@ jobs:
         with:
           # slsa-github-generator requires using a semver tag for reusable workflows.
           # See: https://github.com/slsa-framework/slsa-github-generator#referencing-slsa-builders-and-generators
+          # grc.store also requires the publisher's v1 tag in its OIDC identity.
           allowlist: |
             slsa-framework/slsa-github-generator
+            revanite-io/pvtr-publish-results
