@@ -25,7 +25,7 @@ jobs:
       security-events: write
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Check scanner token
@@ -50,7 +50,7 @@ jobs:
           fail-on-error: 'false'
       - name: Upload assessment results
         if: ${{ always() && steps.scan.outcome != 'skipped' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: osps-baseline-results-${{ github.run_number }}-${{ github.run_attempt }}
           path: evaluation_results/

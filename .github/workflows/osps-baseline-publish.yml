@@ -60,7 +60,7 @@ jobs:
       contents: read
       id-token: write
     # grc.store verifies the publisher identity at refs/tags/v1.
-    uses: revanite-io/pvtr-publish-results/.github/workflows/publish.yml@v1
+    uses: revanite-io/pvtr-publish-results/.github/workflows/publish.yml@0cbfef2f58ea147021d3657d7b18ed89920f2f6d # v1
     with:
       target: ${{ needs.configure.outputs.target }}
       license: ${{ needs.configure.outputs.license }}
