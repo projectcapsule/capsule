@@ -1,0 +1,58 @@
+# Copyright 2020-2026 Project Capsule Authors
+# SPDX-License-Identifier: Apache-2.0
+name: OSPS Baseline
+permissions: {}
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '17 9 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  assess:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check scanner token
+        env:
+          PVTR_GITHUB_TOKEN: ${{ secrets.PVTR_GITHUB_TOKEN }}
+        run: |
+          if [ -z "$PVTR_GITHUB_TOKEN" ]; then
+            echo '::error::Configure the PVTR_GITHUB_TOKEN Actions secret with repository-scoped, read-only access to Actions, Administration, Code scanning alerts, and Contents.'
+            exit 1
+          fi
+      - name: OSPS Baseline scan
+        id: scan
+        uses: revanite-io/osps-baseline-action@1af7ff8b44af83f120b20cc5f63b877286849257 # v1.5.2
+        with:
+          owner: ${{ github.repository_owner }}
+          repo: ${{ github.event.repository.name }}
+          token: ${{ secrets.PVTR_GITHUB_TOKEN }}
+          catalog: osps-baseline-2026-08
+          upload-sarif: 'true'
+          sarif-only-failures: 'true'
+          # Mechanizer requires a recurring evaluation, including failed controls.
+          fail-on-error: 'false'
+      - name: Upload assessment results
+        if: ${{ always() && steps.scan.outcome != 'skipped' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: osps-baseline-results-${{ github.run_number }}-${{ github.run_attempt }}
+          path: evaluation_results/
+          if-no-files-found: error
+          retention-days: 30

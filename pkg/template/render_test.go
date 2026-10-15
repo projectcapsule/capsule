@@ -182,6 +182,38 @@ func TestRenderTemplateBytes_DoesNotMutateInput(t *testing.T) {
 	}
 }
 
+func TestRenderTemplateBytesRejectsEnvironmentFunctions(t *testing.T) {
+	// A fixture makes a restored unsafe function return data instead of silently
+	// producing an empty string. No controller or developer credentials are read.
+	t.Setenv("CAPSULE_TEMPLATE_SANDBOX_TEST", "fixture-secret")
+
+	for _, function := range []string{"env", "expandenv", "expandEnv"} {
+		t.Run(function, func(t *testing.T) {
+			argument := "$CAPSULE_TEMPLATE_SANDBOX_TEST"
+			if function == "env" {
+				argument = "CAPSULE_TEMPLATE_SANDBOX_TEST"
+			}
+			input := []byte(`{{ ` + function + ` "` + argument + `" }}`)
+			original := append([]byte(nil), input...)
+			got, err := RenderTemplateBytes(nil, MissingKeyOption("error"), input)
+			if err == nil || !strings.Contains(err.Error(), `function "`+function+`" not defined`) {
+				t.Fatalf("RenderTemplateBytes() = %q, %v; want undefined environment function", got, err)
+			}
+			if got != nil {
+				t.Fatalf("rejected template returned rendered data: %q", got)
+			}
+			if !bytes.Equal(input, original) {
+				t.Fatalf("rejected template mutated input: %q", input)
+			}
+		})
+	}
+
+	got, err := RenderTemplateBytes(map[string]any{"value": "tenant-input"}, MissingKeyOption("error"), []byte(`{{ .value | upper }}`))
+	if err != nil || string(got) != "TENANT-INPUT" {
+		t.Fatalf("safe template = %q, %v; want TENANT-INPUT", got, err)
+	}
+}
+
 func TestWithLineNumbers(t *testing.T) {
 	t.Parallel()
 
