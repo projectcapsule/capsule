@@ -5,19 +5,25 @@ metadata:
   id: CAPSULE.CAP
   type: CapabilityCatalog
   gemara-version: "1.6.0"
-  version: "0.2.0"
-  draft: true
+  version: "0.3.0"
+  date: "2026-10-15T07:07:09Z"
+  draft: false
   author:
     id: codex
     name: Codex
     type: Software
-    description: Repository-derived draft prepared for review by Capsule maintainers.
+    description: Repository-derived assessment; maintainer approval is recorded below.
   description: |
     Scope: the Capsule controller, admission server, shared rules API, and
     shipped Helm configuration and release workflows in this repository.
     Runtime source was assessed at revision
     9429803a3eb9e4be89768809e5b73286eeb56b3b. Referenced tests are existing
     coverage evidence; a reference does not attest a test run.
+
+    Maintainer approval: Oliver Bähler (https://github.com/oliverbaehler)
+    approved version 0.3.0 for publication on 2026-10-15. The metadata date
+    records when this approval took effect, not publication. Approval retains
+    the assessed runtime revision, scope, assumptions, and limitations below.
 
     Namespace profiling is the composition of rules selected for each namespace.
     Tenant membership supplies ownership, isolation, and distribution scope;
@@ -46,8 +52,8 @@ metadata:
     Kubernetes control-plane internals, CNI and storage driver internals, host
     and container-runtime isolation, and a deployed cluster's configuration.
     These are dependencies or integration boundaries, not assurances provided
-    by this assessment. Maintainer review and deployment-specific analysis
-    remain necessary before treating this draft as a completed assessment.
+    by this assessment. Deployment-specific analysis remains necessary for
+    configurations and components outside this scope.
 
     Published advisory descriptions were reviewed on 2026-10-13: twelve for
     Capsule and five for Capsule Proxy. The companion threat catalog records

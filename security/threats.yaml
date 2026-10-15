@@ -5,15 +5,16 @@ metadata:
   id: CAPSULE.THR
   type: ThreatCatalog
   gemara-version: "1.6.0"
-  version: "0.2.0"
-  draft: true
+  version: "0.3.0"
+  date: "2026-10-15T07:07:09Z"
+  draft: false
   author:
     id: codex
     name: Codex
     type: Software
-    description: Repository-derived draft prepared for review by Capsule maintainers.
+    description: Repository-derived assessment; maintainer approval is recorded below.
   description: |
-    Scoped draft threat assessment of the Capsule controller, namespace
+    Scoped threat assessment of the Capsule controller, namespace
     profiling rules, admission, and shipped deployment and release configuration.
     Scope, trust boundaries, assumptions, exclusions, and assessed runtime
     revision are defined in the companion CAPSULE.CAP catalog. Threats describe
@@ -22,14 +23,19 @@ metadata:
     Current defenses describe source behavior. Residual risks include operator
     configuration, trusted policy authors, asynchronous reconciliation, and
     dependencies. Referenced tests are coverage evidence, not pass attestations.
-    Maintainers must review this draft before badge completion is submitted.
+
+    Maintainer approval: Oliver Bähler (https://github.com/oliverbaehler)
+    approved version 0.3.0 for publication on 2026-10-15. The metadata date
+    records when this approval took effect, not publication. Approval retains
+    the assessed runtime revision, scope, assumptions, and limitations of this
+    assessment.
 
     Advisory snapshot: 2026-10-13. Historical advisory ranges and patch versions
     below are reported by their publishers. Follow-up advisories demonstrate
     incomplete fixes; a first patched version is not proof that every alternate
     input path was protected. Current defenses refer to the assessed source,
     and referenced tests require execution before they establish a passing
-    regression. Updating a draft does not establish maintainer approval.
+    regression.
 
     Capsule Proxy implementation is excluded. Its published advisories identify
     integration risks to request identity and confidentiality that adopters
@@ -65,7 +71,7 @@ metadata:
   mapping-references:
     - id: CAPSULE.CAP
       title: Capsule Namespace Profiling Capability Catalog
-      version: "0.2.0"
+      version: "0.3.0"
       url: https://raw.githubusercontent.com/projectcapsule/capsule/main/security/capabilities.yaml
       description: Scope and capabilities exploited by the threats in this catalog.
 imports:

@@ -60,8 +60,10 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    # grc.store verifies the publisher identity at refs/tags/v1.
-    uses: revanite-io/pvtr-publish-results/.github/workflows/publish.yml@0cbfef2f58ea147021d3657d7b18ed89920f2f6d # v1
+    # Keep @v1: grc.store requires refs/tags/v1 in the OIDC signer identity.
+    # Do not change this tag or pin it to a commit SHA; publishing will fail.
+    # https://github.com/revanite-io/pvtr-publish-results#calling-it
+    uses: revanite-io/pvtr-publish-results/.github/workflows/publish.yml@v1 # zizmor: ignore[unpinned-uses]
     with:
       target: ${{ needs.configure.outputs.target }}
       license: ${{ needs.configure.outputs.license }}
