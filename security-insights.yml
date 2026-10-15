@@ -45,11 +45,12 @@ project:
       that documented position and needs maintainer confirmation before publication.
       SECURITY.md describes reporting coverage across the projectcapsule
       organization; the assessment linked below covers this repository only.
-    in-scope:
-      - Security vulnerabilities in repositories under the projectcapsule organization.
-    out-of-scope:
-      - Installation or configuration support requests and issues unrelated to security.
-      - Unverified vulnerability scanner output without confirmation that Capsule is affected.
+      Reports cover security vulnerabilities in repositories under the
+      projectcapsule organization. Installation or configuration support
+      requests and issues unrelated to security are out of scope, as are
+      unverified scanner reports without confirmation that Capsule is affected.
+      Scope is recorded here because the scanner's si-tooling v2.2.0 parser
+      cannot read the schema's in-scope and out-of-scope lists.
   documentation:
     design: https://github.com/projectcapsule/capsule/blob/main/security/capabilities.yaml
     detailed-guide: https://projectcapsule.dev/docs/
