@@ -3,7 +3,7 @@
 # Schema: https://github.com/ossf/security-insights/blob/v2.2.0/spec/schema.cue
 header:
   schema-version: "2.2.0"
-  last-updated: "2026-10-14"
+  last-updated: "2026-10-15"
   last-reviewed: "2026-10-10"
   url: https://raw.githubusercontent.com/projectcapsule/capsule/main/security-insights.yml
   comment: |
@@ -149,8 +149,9 @@ repository:
             predicate-uri: https://github.com/revanite-io/pvtr-publish-results
             location: https://github.com/projectcapsule/capsule/actions/workflows/osps-baseline-publish.yml
         comment: |
-          osps-baseline-publish.yml configures weekly and manual Privateer
-          evaluations using the trusted pvtr-publish-results workflow at v1.
+          osps-baseline-publish.yml configures daily Privateer evaluations at
+          10:00 Europe/Zurich and manual runs using the trusted
+          pvtr-publish-results workflow at v1.
           Publishing uses OIDC; scanning uses the read-only PVTR_GITHUB_TOKEN
           Actions secret. GRC_NAMESPACE and GRC_RESULTS_LICENSE Actions
           variables select the namespace and SPDX results license. The namespace
