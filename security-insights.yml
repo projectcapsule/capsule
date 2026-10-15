@@ -4,12 +4,13 @@
 header:
   schema-version: "2.2.0"
   last-updated: "2026-10-15"
-  last-reviewed: "2026-10-10"
+  last-reviewed: "2026-10-15"
   url: https://raw.githubusercontent.com/projectcapsule/capsule/main/security-insights.yml
   comment: |
-    Repository-derived refresh for Security Slam. Security assessment content
-    is a draft pending maintainer review. Contacts and team membership come
-    from SECURITY.md and .github/maintainers.yaml. GitHub administrative access,
+    Repository-derived refresh for Security Slam. The scoped security
+    assessment was approved by maintainer Oliver Bähler on 2026-10-15.
+    Contacts and team membership come from SECURITY.md and
+    .github/maintainers.yaml. GitHub administrative access,
     repository protection settings, and individual release attestations have
     not been independently verified.
 project:
@@ -99,13 +100,15 @@ repository:
         name: Capsule namespace profiling Gemara threat assessment
         evidence: https://raw.githubusercontent.com/projectcapsule/capsule/main/security/threats.yaml
         comment: |
-          Draft catalogs version 0.2.0 in Gemara v1.6.0; maintainer review is pending. Scope,
-          trust boundaries, assessed runtime revision, and capabilities are at
+          Catalogs version 0.3.0 in Gemara v1.6.0 were approved for publication
+          by maintainer Oliver Bähler (https://github.com/oliverbaehler) on
+          2026-10-15. Scope, trust boundaries, assessed runtime revision, and
+          capabilities are at
           https://raw.githubusercontent.com/projectcapsule/capsule/main/security/capabilities.yaml.
           Threats identify existing defenses and residual risks; referenced tests
           indicate coverage and do not attest passing execution. Publication
-          date is omitted until this assessment is published. Historical prose
-          self-assessment remains available at
+          date is omitted until the approved assessment is published.
+          Historical prose self-assessment remains available at
           https://github.com/projectcapsule/capsule/blob/main/SELF_ASSESSMENT.md.
           The threat catalog maps twelve published Capsule advisories and
           records five Capsule Proxy advisories as unassessed integration risks.
