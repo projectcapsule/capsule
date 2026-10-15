@@ -6,7 +6,7 @@ permissions: {}
 on:
   # The hub accepts one result per target/catalog every ten minutes.
   schedule:
-    - cron: '0 22 * * *'
+    - cron: '0 10 * * *'
       timezone: Europe/Zurich
   workflow_dispatch:
     inputs:
