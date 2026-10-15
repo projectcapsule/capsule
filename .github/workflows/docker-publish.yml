@@ -63,7 +63,7 @@ jobs:
       packages: write   # To upload assets to release.
       actions: read     # To read the workflow path.
     # NOTE: The container generator workflow is not officially released as GA.
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0 # zizmor: ignore[unpinned-uses]
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@f7dd8c54c2067bafc12ca7a55595d5ee9b75204a # v2.1.0 # zizmor: ignore[unpinned-uses]
     with:
       image: ghcr.io/${{ github.repository_owner }}/capsule
       digest: "${{ needs.publish-images.outputs.capsule-digest }}"
