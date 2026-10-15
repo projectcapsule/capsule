@@ -27,8 +27,10 @@ func TestFuncMaps(t *testing.T) {
 	}
 
 	extra := ExtraFuncMap()
-	if extra["env"] != nil || extra["expandEnv"] != nil {
-		t.Fatalf("ExtraFuncMap() should remove unsafe env functions")
+	for _, name := range []string{"env", "expandenv", "expandEnv"} {
+		if extra[name] != nil {
+			t.Fatalf("ExtraFuncMap() exposes unsafe function %q", name)
+		}
 	}
 	if extra["generateAgeKey"] == nil {
 		t.Fatalf("ExtraFuncMap() missing custom function")

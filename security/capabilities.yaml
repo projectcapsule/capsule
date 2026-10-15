@@ -5,19 +5,25 @@ metadata:
   id: CAPSULE.CAP
   type: CapabilityCatalog
   gemara-version: "1.6.0"
-  version: "0.1.0"
-  draft: true
+  version: "0.3.0"
+  date: "2026-10-15T07:07:09Z"
+  draft: false
   author:
     id: codex
     name: Codex
     type: Software
-    description: Repository-derived draft prepared for review by Capsule maintainers.
+    description: Repository-derived assessment; maintainer approval is recorded below.
   description: |
     Scope: the Capsule controller, admission server, shared rules API, and
     shipped Helm configuration and release workflows in this repository.
     Runtime source was assessed at revision
-    fdd503a84521d80c26779cb8a14f4df95f37c47d. Referenced tests are existing
+    9429803a3eb9e4be89768809e5b73286eeb56b3b. Referenced tests are existing
     coverage evidence; a reference does not attest a test run.
+
+    Maintainer approval: Oliver Bähler (https://github.com/oliverbaehler)
+    approved version 0.3.0 for publication on 2026-10-15. The metadata date
+    records when this approval took effect, not publication. Approval retains
+    the assessed runtime revision, scope, assumptions, and limitations below.
 
     Namespace profiling is the composition of rules selected for each namespace.
     Tenant membership supplies ownership, isolation, and distribution scope;
@@ -46,8 +52,22 @@ metadata:
     Kubernetes control-plane internals, CNI and storage driver internals, host
     and container-runtime isolation, and a deployed cluster's configuration.
     These are dependencies or integration boundaries, not assurances provided
-    by this assessment. Maintainer review and deployment-specific analysis
-    remain necessary before treating this draft as a completed assessment.
+    by this assessment. Deployment-specific analysis remains necessary for
+    configurations and components outside this scope.
+
+    Published advisory descriptions were reviewed on 2026-10-13: twelve for
+    Capsule and five for Capsule Proxy. The companion threat catalog records
+    historical attack paths and publisher-reported affected and patched
+    versions. These are historical evidence, not assertions that the assessed
+    source or every deployed version remains vulnerable, or that every patch
+    and released artifact has been independently verified.
+
+    Proxy integration risks remain outside the implementation assessment:
+    authentication must establish the requester before privileged forwarding;
+    forwarded headers must preserve identity; subject indexes must distinguish
+    kind, namespace, and name; and tenant-writable configuration must not grant
+    cluster-scoped read access. Proxy advisory references are recorded in the
+    companion catalog so this exclusion does not hide those known boundaries.
 groups:
   - id: namespace-profiling
     title: Namespace Profiling
@@ -93,7 +113,7 @@ capabilities:
       request audiences and conditions, apply typed mutations, and enforce
       configured allow, deny, and audit behavior. Resource and subresource
       registration determines which requests reach each handler.
-      Implementation: `internal/webhook/router.go`,
+      Implementation: `pkg/runtime/webhook/router.go`,
       `pkg/runtime/handlers/typed_tenant_ruleset.go`,
       `pkg/ruleengine/enforce_evaluator.go`,
       `internal/webhook/rules/pods/validation/profiles.go`.
@@ -171,10 +191,10 @@ capabilities:
       still grants generic cluster-wide read, delete, and patch permissions
       needed for cleanup; application ownership checks do not narrow RBAC.
       Implementation: `cmd/controller/main.go`, `internal/cache/cel.go`,
-      `internal/webhook/utils/request_reader.go`,
+      `pkg/runtime/webhook/utils/request_reader.go`,
       `charts/capsule/templates/rbac.yaml`, `charts/capsule/values.yaml`.
       Coverage: `internal/cache/invalidation_test.go`,
-      `internal/webhook/utils/request_reader_test.go`,
+      `pkg/runtime/webhook/utils/request_reader_test.go`,
       `e2e/config_cel_cache_test.go`.
   - id: CAPSULE.CAP10
     title: Source and Release Artifact Distribution

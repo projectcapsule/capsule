@@ -71,7 +71,7 @@ For routine reports, response times could be affected by weekends, holidays, bre
 
 ## Security Contacts
 
-[Maintainers](.github/maintainers.yaml) of this project are responsible for the security of the project as outlined in this policy.
+[Maintainers](./.github/maintainers.yaml) of this project are responsible for the security of the project as outlined in this policy.
 
 # Release Artifacts
 
@@ -89,7 +89,7 @@ To verify artifacts you need to have [cosign installed](https://github.com/sigst
 
 To verify the signature of the docker image, run the following command. Replace `<release_tag>` with an [available release tag](https://github.com/projectcapsule/capsule/pkgs/container/capsule):
 
-    COSIGN_REPOSITORY=ghcr.io/projectcapsule/charts/capsule cosign verify ghcr.io/projectcapsule/capsule:<release_tag> \
+    COSIGN_REPOSITORY=ghcr.io/projectcapsule/capsule cosign verify ghcr.io/projectcapsule/capsule:<release_tag> \
       --certificate-identity-regexp="https://github.com/projectcapsule/capsule/.github/workflows/docker-publish.yml@refs/tags/*" \
       --certificate-oidc-issuer="https://token.actions.githubusercontent.com" | jq
 
