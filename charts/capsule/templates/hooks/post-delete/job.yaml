@@ -76,13 +76,11 @@ spec:
         - name: post-delete-job
           image: {{ include "capsule.jobsFullyQualifiedDockerImage" . }}
           imagePullPolicy: {{ $Values.image.pullPolicy }}
-          command:
-          - "/bin/sh"
-          - "-c"
-          - |
-              set -o errexit ; set -o xtrace ; set -o nounset
-              kubectl delete mutatingwebhookconfigurations.admissionregistration.k8s.io {{ include "capsule.fullname" $ }}-dynamic-webhook --ignore-not-found
-              kubectl delete validatingwebhookconfigurations.admissionregistration.k8s.io {{ include "capsule.fullname" $ }}-dynamic-webhook --ignore-not-found
+          args:
+            - delete
+            - --ignore-not-found=true
+            - mutatingwebhookconfigurations.admissionregistration.k8s.io/{{ include "capsule.fullname" $ }}-dynamic-webhook
+            - validatingwebhookconfigurations.admissionregistration.k8s.io/{{ include "capsule.fullname" $ }}-dynamic-webhook
           {{- if $Values.securityContext.enabled }}
           securityContext: {{- omit $Values.securityContext "enabled" | toYaml | nindent 12 }}
           {{- end }}
