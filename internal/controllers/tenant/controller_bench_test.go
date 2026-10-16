@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	nodev1 "k8s.io/api/node/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
@@ -53,6 +54,11 @@ func BenchmarkControllerTenant(b *testing.B) {
 					},
 				}
 				other := &capsulev1beta2.Tenant{Name: "tenant-b", UID: "tenant-b-uid"}
+				if kind == "tenant" {
+					tnt.Spec.NetworkPolicies.Items = []networkingv1.NetworkPolicySpec{{PodSelector: metav1.LabelSelector{}}}
+					tnt.Spec.LimitRanges.Items = []corev1.LimitRangeSpec{{Limits: []corev1.LimitRangeItem{{Type: corev1.LimitTypeContainer, DefaultRequest: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("10m")}}}}}
+					tnt.Spec.Rules[0].NamespaceRuleBodyNamespace = &rules.NamespaceRuleBodyNamespace{Quota: []rules.ResourceQuotaRule{{Name: "compute", Hard: corev1.ResourceList{corev1.ResourceRequestsCPU: resource.MustParse("100")}}}}
+				}
 				objects := []client.Object{other, cleanupOwnedNamespace(other, "unrelated", false)}
 				switch kind {
 				case "namespace-cleanup-missing-tenant":

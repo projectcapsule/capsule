@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	nodev1 "k8s.io/api/node/v1"
@@ -343,7 +344,6 @@ func (r *Manager) Reconcile(ctx context.Context, request ctrl.Request) (result c
 	return reconcile.Result{}, reconcileError
 }
 
-//nolint:staticcheck
 func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *capsulev1beta2.Tenant) (err error) {
 	var errs []error
 
@@ -379,43 +379,50 @@ func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *caps
 		errs = append(errs, fmt.Errorf("namespace(s) had reconciliation errors: %w", err))
 	}
 
+	// Publish namespace rules and metadata before granting access. Owner and
+	// profile RoleBindings must not wait for unrelated resource provisioning.
+	if err = r.runPhase(log, "role_bindings", func() error { return r.syncRoleBindings(ctx, log, instance) }); err != nil {
+		errs = append(errs, fmt.Errorf("cannot sync rolebindings items: %w", err))
+	}
+
 	// Ensuring Metadata.
 	err = r.runPhase(log, "metadata", func() error { return r.ensureMetadata(ctx, instance) })
 	if err != nil {
 		errs = append(errs, fmt.Errorf("cannot ensure metadata: %w", err))
 	}
 
-	log.V(4).Info("starting processing of Network Policies")
+	// These phases read the reconciled Tenant and write different child kinds.
+	// Bound concurrency because each phase also has namespace workers. Preserve
+	// every phase's error without canceling independent work on the first failure.
+	resourcePhases := []struct {
+		name    string
+		message string
+		run     func() error
+	}{
+		{"network_policies", "cannot sync networkPolicy items", func() error { return r.syncNetworkPolicies(ctx, log, instance) }},
+		{"limit_ranges", "cannot sync limitrange items", func() error { return r.syncLimitRanges(ctx, log, instance) }},
+		{"resource_quotas", "cannot sync resourcequota items", func() error { return r.syncResourceQuotas(ctx, log, instance) }},
+		{"global_resource_quotas", "cannot sync rule global resource quotas", func() error { return r.syncGlobalResourceQuotas(ctx, instance) }},
+	}
+	phaseErrors := make([]error, len(resourcePhases))
+	group := new(errgroup.Group)
+	group.SetLimit(2)
 
-	if err = r.runPhase(log, "network_policies", func() error { return r.syncNetworkPolicies(ctx, log, instance) }); err != nil {
-		errs = append(errs, fmt.Errorf("cannot sync networkPolicy items: %w", err))
+	for i, phase := range resourcePhases {
+		group.Go(func() error {
+			if phaseErr := r.runPhase(log, phase.name, phase.run); phaseErr != nil {
+				phaseErrors[i] = fmt.Errorf("%s: %w", phase.message, phaseErr)
+			}
+
+			return nil
+		})
 	}
 
-	//nolint:staticcheck
-	log.V(4).Info("starting processing of Limit Ranges", "items", len(instance.Spec.LimitRanges.Items))
+	_ = group.Wait()
 
-	if err = r.runPhase(log, "limit_ranges", func() error { return r.syncLimitRanges(ctx, log, instance) }); err != nil {
-		errs = append(errs, fmt.Errorf("cannot sync limitrange items: %w", err))
-	}
+	errs = append(errs, phaseErrors...)
 
-	log.V(4).Info("starting processing of Resource Quotas", "items", len(instance.Spec.ResourceQuota.Items))
-
-	if err = r.runPhase(log, "resource_quotas", func() error { return r.syncResourceQuotas(ctx, log, instance) }); err != nil {
-		errs = append(errs, fmt.Errorf("cannot sync resourcequota items: %w", err))
-	}
-
-	log.V(4).Info("starting processing of rule GlobalResourceQuotas")
-
-	if err = r.runPhase(log, "global_resource_quotas", func() error { return r.syncGlobalResourceQuotas(ctx, instance) }); err != nil {
-		errs = append(errs, fmt.Errorf("cannot sync rule global resource quotas: %w", err))
-	}
-
-	log.V(4).Info("ensuring RoleBindings for Owners and Tenant")
-
-	if err = r.runPhase(log, "role_bindings", func() error { return r.syncRoleBindings(ctx, log, instance) }); err != nil {
-		errs = append(errs, fmt.Errorf("cannot sync rolebindings items: %w", err))
-	}
-
+	// Usage recounts must observe resources produced by all preceding phases.
 	log.V(4).Info("ensuring limit resources count is updated")
 
 	if err = r.runPhase(log, "custom_quota_usage", func() error { return r.syncCustomResourceQuotaUsages(ctx, instance) }); err != nil {
