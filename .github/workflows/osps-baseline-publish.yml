@@ -60,6 +60,8 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      # Required by the upstream report job, even when upload-sarif is false.
+      security-events: write
     # Keep @v1: grc.store requires refs/tags/v1 in the OIDC signer identity.
     # Do not change this tag or pin it to a commit SHA; publishing will fail.
     # https://github.com/revanite-io/pvtr-publish-results#calling-it
