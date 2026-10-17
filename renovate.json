@@ -2,7 +2,9 @@
   "minimumReleaseAge": null,
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended", ":dependencyDashboard", "helpers:pinGitHubActionDigests"],
-  "baseBranches": ["main"],
+  "baseBranchPatterns": [
+    "main"
+  ],
   "prHourlyLimit": 0,
   "prConcurrentLimit": 0,
   "branchConcurrentLimit": 0,
@@ -13,13 +15,19 @@
   "ignorePaths": ["docs"],
   "labels": ["renovate"],
   "flux": {
-    "fileMatch": ["^.*flux\\.yaml$"]
+    "managerFilePatterns": [
+      "/^.*flux\\.yaml$/"
+    ]
   },
   "packageRules": [
     {
       "matchManagers": ["github-actions", "flux"],
       "groupName": "all-ci-updates",
-      "updateTypes": ["major", "minor", "patch"]
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch"
+      ]
     },
     {
       "matchManagers": ["github-actions"],
@@ -40,7 +48,7 @@
         "gomod",
         "dockerfile",
         "docker-compose",
-        "regex"
+        "custom.regex"
       ],
       "minimumReleaseAge": "14 days"
     },
@@ -52,7 +60,9 @@
   "customManagers": [
     {
       "customType": "regex",
-      "fileMatch": ["^Makefile$"],
+      "managerFilePatterns": [
+        "/^Makefile$/"
+      ],
       "matchStrings": [
         "(?<depName>[A-Z0-9_]+)_VERSION\\s*[:=?]+\\s*\"?(?<currentValue>[^\"\\r\\n]+)\"?[\\r\\n]+\\s*(?<depName2>[A-Z0-9_]+)_LOOKUP\\s*[:=?]+\\s*\"?(?<lookupValue>[^\"\\r\\n]+)\"?(?:[\\r\\n]+\\s*(?<depName3>[A-Z0-9_]+)_RENOVATE\\s*[:=?]+\\s*\"?(?<renovateValue>[^\"\\r\\n]+)\"?)?(?:[\\r\\n]+\\s*(?<depName4>[A-Z0-9_]+)_SOURCE\\s*[:=?]+\\s*\"?(?<sourceValue>[^\"\\r\\n]+)\"?)?"
       ],
@@ -63,13 +73,15 @@
     },
     {
       "customType": "regex",
-      "fileMatch": [".*\\.pre-commit-config\\.ya?ml$"],
+      "managerFilePatterns": [
+        "/.*\\.pre-commit-config\\.ya?ml$/"
+      ],
       "matchStrings": [
         "repo:\\s*https://github\\.com/(?<lookupValue>[^/]+/[^\\s]+)[\\s\\S]*?rev:\\s*(?<currentValue>v?\\d+\\.\\d+\\.\\d+)"
       ],
       "depNameTemplate": "{{lookupValue}}",
       "datasourceTemplate": "github-tags",
-      "lookupNameTemplate": "{{lookupValue}}",
+      "packageNameTemplate": "{{lookupValue}}",
       "versioningTemplate": "semver"
     }
   ]
