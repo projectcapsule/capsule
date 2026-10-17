@@ -42,6 +42,13 @@ project:
     comment: |
       Submit a private vulnerability report through
       https://github.com/projectcapsule/capsule/security/advisories/new.
+      SECURITY.md records the Linux Foundation CRA stewardship statement
+      for Capsule's intended commercial use and emergency reporting process.
+      Prefix emergency report titles with URGENT; if GitHub private reporting
+      is unavailable or affected by an incident, contact
+      steward@linuxfoundation.org privately. Maintainer escalation instructions
+      for actively exploited vulnerabilities and severe incidents are at
+      https://github.com/projectcapsule/capsule/blob/main/CONTRIBUTING.md#cra-stewardship-and-security-escalation.
       SECURITY.md does not advertise a bug bounty; the false flag reflects
       that documented position and needs maintainer confirmation before publication.
       SECURITY.md describes reporting coverage across the projectcapsule
