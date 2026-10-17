@@ -56,17 +56,19 @@ and [replication documentation](https://projectcapsule.dev/docs/replications/).
 | global.jobs.kubectl.nodeSelector | object | `{}` | Set the node selector |
 | global.jobs.kubectl.podAnnotations | object | `{}` | Annotations to add to the job pod |
 | global.jobs.kubectl.podLabels | object | `{}` | Labels to add to the job pod |
-| global.jobs.kubectl.podSecurityContext | object | `{"enabled":true,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for the job pods. |
+| global.jobs.kubectl.podSecurityContext | object | `{"enabled":true,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for the job pods. Ignored when `global.openshift.enabled` is set, unless `jobs.podSecurityContext.enabled` is set explicitly. |
 | global.jobs.kubectl.priorityClassName | string | `""` | Set a pod priorityClassName |
 | global.jobs.kubectl.resources | object | `{}` | Job resources |
 | global.jobs.kubectl.restartPolicy | string | `"Never"` | Set the restartPolicy |
-| global.jobs.kubectl.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"enabled":true,"readOnlyRootFilesystem":true,"runAsGroup":1002,"runAsNonRoot":true,"runAsUser":1002}` | Security context for the job containers. |
+| global.jobs.kubectl.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"enabled":true,"readOnlyRootFilesystem":true,"runAsGroup":1002,"runAsNonRoot":true,"runAsUser":1002}` | Security context for the job containers. Ignored when `global.openshift.enabled` is set, unless `jobs.securityContext.enabled` is set explicitly. |
 | global.jobs.kubectl.tolerations | list | `[]` | Set list of tolerations |
 | global.jobs.kubectl.topologySpreadConstraints | list | `[]` | Set Topology Spread Constraints |
 | global.jobs.kubectl.ttlSecondsAfterFinished | int | `60` | Sets the ttl in seconds after a finished certgen job is deleted. Set to -1 to never delete. |
 | global.jobs.postDelete.enabled | bool | `true` | Enable Post Delete Job to remove Capsule's mutating and validating webhook configurations |
 | global.jobs.postInstall.enabled | bool | `true` | Enable Post Install Job |
 | global.jobs.preDelete.enabled | bool | `true` | Enable Pre Delete Job |
+| global.openshift.enabled | bool | `false` | Run on OpenShift. Unless set explicitly, the pod/container securityContexts of the controller and jobs are omitted (so the SCC assigns UID, fsGroup and SELinux level) and the `openshift.io/required-scc` annotation is added to all pods. |
+| global.openshift.requiredScc | string | `"restricted-v2"` | SCC requested on all pods through the `openshift.io/required-scc` annotation |
 
 ### General Parameters
 
@@ -86,9 +88,10 @@ and [replication documentation](https://projectcapsule.dev/docs/replications/).
 | imagePullSecrets | list | `[]` | Configuration for `imagePullSecrets` so that you can use a private images registry. |
 | jobs | object | `{}` | Deprecated, use .global.jobs.kubectl instead |
 | nodeSelector | object | `{}` | Set the node selector for the Capsule pod |
+| openshift.etcdEncryption.enabled | bool | `false` | Exclude the kube-storage-version-migrator from the replications webhook (required when etcd encryption is enabled on OpenShift) |
 | podAnnotations | object | `{}` | Annotations to add to the capsule pod. |
 | podLabels | object | `{}` | Labels to add to the capsule pod. |
-| podSecurityContext | object | `{"enabled":true,"runAsGroup":1002,"runAsNonRoot":true,"runAsUser":1002,"seccompProfile":{"type":"RuntimeDefault"}}` | Set the securityContext for the Capsule pod |
+| podSecurityContext | object | `{"enabled":null,"runAsGroup":1002,"runAsNonRoot":true,"runAsUser":1002,"seccompProfile":{"type":"RuntimeDefault"}}` | Set the securityContext for the Capsule pod. `enabled: null` means enabled, unless `global.openshift.enabled` is set. |
 | ports | list | `[]` | Set additional ports for the deployment |
 | priorityClassName | string | `""` | Set the priority class name of the Capsule pod |
 | proxy.enabled | bool | `false` | Enable Installation of Capsule Proxy |
@@ -96,7 +99,7 @@ and [replication documentation](https://projectcapsule.dev/docs/replications/).
 | rbac.resourcepoolclaims | object | `{"create":false,"labels":{}}` | Allow the creation of ResourcePoolClaims |
 | rbac.resources | object | `{"create":false,"labels":{}}` | Allow the creation of TenantResources |
 | replicaCount | int | `1` | Set the replica count for capsule pod |
-| securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"enabled":true,"readOnlyRootFilesystem":true}` | Set the securityContext for the Capsule container |
+| securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"enabled":null,"readOnlyRootFilesystem":true}` | Set the securityContext for the Capsule container. `enabled: null` means enabled, unless `global.openshift.enabled` is set. |
 | serviceAccount.annotations | object | `{}` | Annotations to add to the service account. |
 | serviceAccount.create | bool | `true` | Specifies whether a service account should be created. |
 | serviceAccount.imagePullSecrets | list | `[]` |  |

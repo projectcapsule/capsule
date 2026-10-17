@@ -3,6 +3,12 @@
 # Declare variables to be passed into your templates.
 
 global:
+  # Global Values for OpenShift (shared with the capsule-proxy subchart)
+  openshift:
+    # -- Run on OpenShift. Unless set explicitly, the pod/container securityContexts of the controller and jobs are omitted (so the SCC assigns UID, fsGroup and SELinux level) and the `openshift.io/required-scc` annotation is added to all pods.
+    enabled: false
+    # -- SCC requested on all pods through the `openshift.io/required-scc` annotation
+    requiredScc: restricted-v2
   jobs:
     postInstall:
       # -- Enable Post Install Job
@@ -39,14 +45,14 @@ global:
       ttlSecondsAfterFinished: 60
       # @schema type: object
       # @schema additionalProperties: true
-      # -- Security context for the job pods.
+      # -- Security context for the job pods. Ignored when `global.openshift.enabled` is set, unless `jobs.podSecurityContext.enabled` is set explicitly.
       podSecurityContext:
         enabled: true
         seccompProfile:
           type: "RuntimeDefault"
       # @schema type: object
       # @schema additionalProperties: true
-      # -- Security context for the job containers.
+      # -- Security context for the job containers. Ignored when `global.openshift.enabled` is set, unless `jobs.securityContext.enabled` is set explicitly.
       securityContext:
         enabled: true
         allowPrivilegeEscalation: false
@@ -71,6 +77,12 @@ global:
       priorityClassName: ""
       # -- Backofflimit for jobs
       backoffLimit: 4
+
+# OpenShift specific settings
+openshift:
+  etcdEncryption:
+    # -- Exclude the kube-storage-version-migrator from the replications webhook (required when etcd encryption is enabled on OpenShift)
+    enabled: false
 
 # Manage CRD Lifecycle
 crds:
@@ -431,9 +443,10 @@ priorityClassName: '' # system-cluster-critical
 
 # @schema type: object
 # @schema additionalProperties: true
-# -- Set the securityContext for the Capsule pod
+# -- Set the securityContext for the Capsule pod. `enabled: null` means enabled, unless `global.openshift.enabled` is set.
 podSecurityContext:
-  enabled: true
+  # @schema type:[boolean, null]
+  enabled:
   seccompProfile:
     type: "RuntimeDefault"
   runAsGroup: 1002
@@ -442,9 +455,10 @@ podSecurityContext:
 
 # @schema type: object
 # @schema additionalProperties: true
-# -- Set the securityContext for the Capsule container
+# -- Set the securityContext for the Capsule container. `enabled: null` means enabled, unless `global.openshift.enabled` is set.
 securityContext:
-  enabled: true
+  # @schema type:[boolean, null]
+  enabled:
   capabilities:
     drop:
     - ALL
