@@ -22,7 +22,7 @@ spec:
   chart:
     spec:
       chart: dex
-      version: "0.24.1"
+      version: "0.25.2"
       sourceRef:
         kind: HelmRepository
         name: dex
