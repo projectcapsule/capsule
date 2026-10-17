@@ -724,6 +724,7 @@ spec:
         {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
+        {{- include "capsule.openshiftEtcdEncryptionMatchConditions" $ | nindent 10 }}
         rules:
           {{- toYaml .rules | nindent 10 }}
         sideEffects: None

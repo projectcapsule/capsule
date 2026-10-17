@@ -4,6 +4,7 @@ metadata:
     {{- with .Values.podAnnotations }}
       {{- toYaml . | nindent 4 }}
     {{- end }}
+    {{- include "capsule.openshiftAnnotations" . | nindent 4 }}
     {{- if .Values.crds.install }}
     projectcapsule.dev/crds-size-hash: {{ include "capsule.crdsSizeHash" . | quote }}
     {{- end }}
@@ -18,11 +19,11 @@ spec:
     {{- toYaml . | nindent 4 }}
   {{- end }}
   serviceAccountName: {{ include "capsule.serviceAccountName" . }}
-  {{- if .Values.podSecurityContext.enabled }}
+  {{- if include "capsule.securityContextEnabled" (dict "enabled" .Values.podSecurityContext.enabled "root" .) }}
   securityContext: {{- omit .Values.podSecurityContext "enabled" | toYaml | nindent 4 }}
   {{- end }}
-  {{- if not .Values.manager.hostUsers }}
-  hostUsers: {{ .Values.manager.hostUsers }}
+  {{- if include "capsule.hostUsersDisabled" (dict "hostUsers" .Values.manager.hostUsers "root" .) }}
+  hostUsers: false
   {{- end }}
   {{- if .Values.manager.hostNetwork }}
   hostNetwork: true
@@ -173,7 +174,7 @@ spec:
       {{- if .Values.manager.securityContext }}
       securityContext:
         {{- omit .Values.manager.securityContext "enabled" | toYaml | nindent 8 }}
-      {{- else if .Values.securityContext.enabled }}
+      {{- else if include "capsule.securityContextEnabled" (dict "enabled" .Values.securityContext.enabled "root" .) }}
       securityContext:
         {{- omit .Values.securityContext "enabled" | toYaml | nindent 8 }}
       {{- end }}
