@@ -33,6 +33,7 @@ spec:
         {{- with $.Values.podAnnotations }}
           {{- toYaml . | nindent 8 }}
         {{- end }}
+        {{- include "capsule.openshiftAnnotations" $ | nindent 8 }}
       labels:
         app.kubernetes.io/component: {{ include "capsule.pre-delete.component" . | quote }}
         app.kubernetes.io/name: {{ include "capsule.pre-delete.component" . | quote }}
@@ -45,7 +46,7 @@ spec:
         {{- end }}
     spec:
       restartPolicy: {{ $Values.restartPolicy }}
-      {{- if $Values.podSecurityContext.enabled }}
+      {{- if include "capsule.jobSecurityContextEnabled" (dict "key" "podSecurityContext" "values" $Values "root" $) }}
       securityContext: {{- omit $Values.podSecurityContext "enabled" | toYaml | nindent 8 }}
       {{- end }}
       {{- with $Values.nodeSelector }}
@@ -87,7 +88,7 @@ spec:
             - clusterroles.rbac.authorization.k8s.io/capsule-namespace-provisioner
             - clusterrolebindings.rbac.authorization.k8s.io/capsule-namespace-deleter
             - clusterrolebindings.rbac.authorization.k8s.io/capsule-namespace-provisioner
-          {{- if $Values.securityContext.enabled }}
+          {{- if include "capsule.jobSecurityContextEnabled" (dict "key" "securityContext" "values" $Values "root" $) }}
           securityContext: {{- omit $Values.securityContext "enabled" | toYaml | nindent 12 }}
           {{- end }}
           {{- with $Values.resources }}
