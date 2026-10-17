@@ -47,6 +47,7 @@ and [replication documentation](https://projectcapsule.dev/docs/replications/).
 | global.jobs.kubectl.affinity | object | `{}` | Set affinity rules |
 | global.jobs.kubectl.annotations | object | `{}` | Annotations to add to the job. |
 | global.jobs.kubectl.backoffLimit | int | `4` | Backofflimit for jobs |
+| global.jobs.kubectl.hostUsers | bool | `true` | Don't use Host Users (User Namespaces) for the job pods. Always disabled when `global.openshift.requiredScc` is `restricted-v3`. |
 | global.jobs.kubectl.image.pullPolicy | string | `"IfNotPresent"` | Set the image pull policy of the helm chart job |
 | global.jobs.kubectl.image.registry | string | `"docker.io"` | Set the image repository of the helm chart job |
 | global.jobs.kubectl.image.repository | string | `"clastix/kubectl"` | Set the image repository of the helm chart job |
@@ -68,7 +69,7 @@ and [replication documentation](https://projectcapsule.dev/docs/replications/).
 | global.jobs.postInstall.enabled | bool | `true` | Enable Post Install Job |
 | global.jobs.preDelete.enabled | bool | `true` | Enable Pre Delete Job |
 | global.openshift.enabled | bool | `false` | Run on OpenShift. Unless set explicitly, the pod/container securityContexts of the controller and jobs are omitted (so the SCC assigns UID, fsGroup and SELinux level) and the `openshift.io/required-scc` annotation is added to all pods. |
-| global.openshift.requiredScc | string | `"restricted-v2"` | SCC requested on all pods through the `openshift.io/required-scc` annotation |
+| global.openshift.requiredScc | string | `"restricted-v2"` | SCC requested on all pods through the `openshift.io/required-scc` annotation. With `restricted-v3`, hostUsers is disabled on all pods. |
 
 ### General Parameters
 

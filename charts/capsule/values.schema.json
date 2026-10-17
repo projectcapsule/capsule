@@ -122,6 +122,10 @@
                                     "description": "Backofflimit for jobs",
                                     "type": "integer"
                                 },
+                                "hostUsers": {
+                                    "description": "Don't use Host Users (User Namespaces) for the job pods. Always disabled when `global.openshift.requiredScc` is `restricted-v3`.",
+                                    "type": "boolean"
+                                },
                                 "image": {
                                     "type": "object",
                                     "properties": {
@@ -280,7 +284,7 @@
                             "type": "boolean"
                         },
                         "requiredScc": {
-                            "description": "SCC requested on all pods through the `openshift.io/required-scc` annotation",
+                            "description": "SCC requested on all pods through the `openshift.io/required-scc` annotation. With `restricted-v3`, hostUsers is disabled on all pods.",
                             "type": "string"
                         }
                     }

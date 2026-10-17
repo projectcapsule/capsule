@@ -7,7 +7,7 @@ global:
   openshift:
     # -- Run on OpenShift. Unless set explicitly, the pod/container securityContexts of the controller and jobs are omitted (so the SCC assigns UID, fsGroup and SELinux level) and the `openshift.io/required-scc` annotation is added to all pods.
     enabled: false
-    # -- SCC requested on all pods through the `openshift.io/required-scc` annotation
+    # -- SCC requested on all pods through the `openshift.io/required-scc` annotation. With `restricted-v3`, hostUsers is disabled on all pods.
     requiredScc: restricted-v2
   jobs:
     postInstall:
@@ -41,6 +41,8 @@ global:
       annotations: {}
       # -- Set the restartPolicy
       restartPolicy: Never
+      # -- Don't use Host Users (User Namespaces) for the job pods. Always disabled when `global.openshift.requiredScc` is `restricted-v3`.
+      hostUsers: true
       # -- Sets the ttl in seconds after a finished certgen job is deleted. Set to -1 to never delete.
       ttlSecondsAfterFinished: 60
       # @schema type: object

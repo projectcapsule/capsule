@@ -22,8 +22,8 @@ spec:
   {{- if include "capsule.securityContextEnabled" (dict "enabled" .Values.podSecurityContext.enabled "root" .) }}
   securityContext: {{- omit .Values.podSecurityContext "enabled" | toYaml | nindent 4 }}
   {{- end }}
-  {{- if not .Values.manager.hostUsers }}
-  hostUsers: {{ .Values.manager.hostUsers }}
+  {{- if include "capsule.hostUsersDisabled" (dict "hostUsers" .Values.manager.hostUsers "root" .) }}
+  hostUsers: false
   {{- end }}
   {{- if .Values.manager.hostNetwork }}
   hostNetwork: true
