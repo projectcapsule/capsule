@@ -33,7 +33,9 @@ spec:
         {{- with $.Values.podAnnotations }}
           {{- toYaml . | nindent 8 }}
         {{- end }}
-        {{- include "capsule.openshiftAnnotations" $ | nindent 8 }}
+        {{- with include "capsule.openshiftAnnotations" $ }}
+          {{- . | nindent 8 }}
+        {{- end }}
       labels:
         app.kubernetes.io/component: {{ include "capsule.post-install.component" . | quote }}
         app.kubernetes.io/name: {{ include "capsule.post-install.component" . | quote }}

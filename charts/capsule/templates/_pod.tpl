@@ -4,7 +4,9 @@ metadata:
     {{- with .Values.podAnnotations }}
       {{- toYaml . | nindent 4 }}
     {{- end }}
-    {{- include "capsule.openshiftAnnotations" . | nindent 4 }}
+    {{- with include "capsule.openshiftAnnotations" . }}
+      {{- . | nindent 4 }}
+    {{- end }}
     {{- if .Values.crds.install }}
     projectcapsule.dev/crds-size-hash: {{ include "capsule.crdsSizeHash" . | quote }}
     {{- end }}
