@@ -13,6 +13,7 @@ import (
 	"github.com/go-logr/logr"
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -141,6 +142,14 @@ func (r *validatingReconciler) reconcileValidatingConfiguration(
 		maps.Copy(annotations, cfg.Annotations)
 
 		obj.SetAnnotations(annotations)
+
+		if err := admission.PreserveNamespaceSelectors(annotations, obj.Webhooks, desiredHooks,
+			func(hook *admissionv1.ValidatingWebhook) (string, **metav1.LabelSelector) {
+				return hook.Name, &hook.NamespaceSelector
+			},
+		); err != nil {
+			return err
+		}
 
 		// Preserve existing CA Information (cert-manager)
 		existingCABundles := validatingWebhookCABundlesByName(obj.Webhooks)
