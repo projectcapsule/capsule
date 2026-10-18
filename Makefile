@@ -613,8 +613,7 @@ e2e-install-openshift: helm-controller-version ko-build-all
 		--set 'webhooks.hooks.nodes.enabled=true' \
 		--set "webhooks.exclusive=true"\
 		--set "manager.options.logLevel=debug"\
-		--set "jobs.podSecurityContext.enabled=false"\
-		--set "jobs.securityContext.enabled=false"\
+		--set 'global.openshift.enabled=true' \
 		--set 'webhooks.hooks.calculations.enabled=true' \
 		--set-string 'webhooks.hooks.calculations.rules[0].apiGroups[0]=' \
 		--set 'webhooks.hooks.calculations.rules[0].apiVersions[0]=v1' \
