@@ -14,7 +14,7 @@
   <a href="https://www.bestpractices.dev/projects/5601">
     <img src="https://www.bestpractices.dev/projects/5601/badge"/>
   </a>
-  <a href="https://api.securityscorecards.dev/projects/github.com/projectcapsule/capsule/badge">
+  <a href="https://securityscorecards.dev/viewer/?uri=github.com%2Fprojectcapsule%2Fcapsule">
     <img src="https://api.securityscorecards.dev/projects/github.com/projectcapsule/capsule/badge"/>
   </a>
   <a href="https://artifacthub.io/packages/search?repo=projectcapsule">
