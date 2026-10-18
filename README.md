@@ -1,7 +1,7 @@
 
 <p align="left">
   <a href="https://grc.store/targets/capsule/capsule">
-    <img src="assets/badges/osps-baseline.svg" alt="OSPS Baseline results on grc.store"/>
+    <img src="https://img.shields.io/badge/OSPS_Baseline-results-blue" alt="OSPS Baseline results on grc.store"/>
   </a>
   <img src="https://img.shields.io/github/license/clastix/capsule"/>
   <img src="https://img.shields.io/github/go-mod/go-version/clastix/capsule"/>
