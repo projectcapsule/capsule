@@ -712,7 +712,7 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
+        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions $.Values.openshift.etcdEncryption.enabled }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
