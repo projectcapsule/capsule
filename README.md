@@ -1,9 +1,9 @@
 
 <p align="left">
-  <img src="https://img.shields.io/github/license/clastix/capsule"/>
-  <img src="https://img.shields.io/github/go-mod/go-version/clastix/capsule"/>
+  <img src="https://img.shields.io/github/license/projectcapsule/capsule"/>
+  <img src="https://img.shields.io/github/go-mod/go-version/projectcapsule/capsule"/>
   <a href="https://github.com/projectcapsule/capsule/releases">
-    <img src="https://img.shields.io/github/v/release/clastix/capsule"/>
+    <img src="https://img.shields.io/github/v/release/projectcapsule/capsule"/>
   </a>
   <a href="https://charmhub.io/capsule-k8s">
     <img src="https://charmhub.io/capsule-k8s/badge.svg"/>
