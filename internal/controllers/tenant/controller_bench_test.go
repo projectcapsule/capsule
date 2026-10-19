@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	nodev1 "k8s.io/api/node/v1"
@@ -28,6 +29,51 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 )
+
+func BenchmarkControllerNamespaceProvisioning(b *testing.B) {
+	for _, tenants := range []int{1, 16} {
+		for _, count := range []int{1, 32} {
+			b.Run(fmt.Sprintf("tenants=%d/namespaces=%d", tenants, count), func(b *testing.B) {
+				tnt := &capsulev1beta2.Tenant{Name: "tenant-a", UID: "tenant-a-uid",
+					Status: capsulev1beta2.TenantStatus{Owners: rbac.OwnerStatusListSpec{{Kind: rbac.UserOwner, Name: "alice", ClusterRoles: []string{"admin"}}}},
+					Spec: capsulev1beta2.TenantSpec{Rules: []*rules.NamespaceRuleBodyTenant{{
+						NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"profile": "reader"}},
+						Permissions: rules.NamespaceRulePermissionBody{Bindings: []rbac.AdditionalRoleBindingsSpec{{
+							ClusterRoleName: "view", Subjects: []rbacv1.Subject{{Kind: "User", Name: "reader"}},
+						}}},
+					}}},
+				}
+				objects := []client.Object{tnt}
+				for i := range count {
+					ns := cleanupOwnedNamespace(tnt, fmt.Sprintf("team-%d", i), false)
+					if i%2 == 0 {
+						ns.Labels["profile"] = "reader"
+					}
+					objects = append(objects, ns)
+				}
+				for i := 1; i < tenants; i++ {
+					other := &capsulev1beta2.Tenant{Name: fmt.Sprintf("unrelated-%d", i), UID: types.UID(fmt.Sprintf("unrelated-%d", i))}
+					objects = append(objects, other, cleanupOwnedNamespace(other, other.Name+"-ns", false))
+				}
+				r, _ := namespaceCleanupFixture(b, objects...)
+				calls := &mockclient.CallCounter{}
+				r.Client = interceptor.NewClient(provisioningDefaultingClient(r.Client.(client.WithWatch)), calls.Interceptors())
+				r.reader = r.Client
+				if err := r.reconcileActiveTenantNamespaces(b.Context(), logr.Discard(), tnt); err != nil {
+					b.Fatal(err)
+				}
+				calls.Reset()
+				b.ReportAllocs()
+				for b.Loop() {
+					if err := r.reconcileActiveTenantNamespaces(b.Context(), logr.Discard(), tnt); err != nil {
+						b.Fatal(err)
+					}
+				}
+				calls.Report(b)
+			})
+		}
+	}
+}
 
 func BenchmarkControllerTenant(b *testing.B) {
 	for _, kind := range []string{"tenant", "resource-quotas", "namespace-cleanup", "namespace-cleanup-missing-tenant", "namespace-cleanup-recreated-tenant"} {
@@ -89,7 +135,7 @@ func BenchmarkControllerTenant(b *testing.B) {
 				}
 				calls := &mockclient.CallCounter{}
 				base := r.Client
-				c := interceptor.NewClient(base.(client.WithWatch), calls.Interceptors())
+				c := interceptor.NewClient(provisioningDefaultingClient(base.(client.WithWatch)), calls.Interceptors())
 				r.Client = c
 				r.reader = c
 				var controller reconcile.Reconciler = r

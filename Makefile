@@ -29,6 +29,8 @@ OS_SUPPORTED_VERSION ?= "4.22.0-okd-scos.ec.10"
 ## Tool Binaries
 KUBECTL ?= kubectl
 HELM ?= helm
+# Mike Farah yq v4, used for enterprise chart packaging.
+YQ ?= yq
 DEV_SETUP_TIMEOUT ?= 10m
 export LAPTOP_HOST_IP
 
@@ -344,10 +346,22 @@ wait-for-helmreleases:
 ENTERPRISE_VERSION  ?= "dirty"
 ENTERPRISE_REGISTRY ?= "registry.projectcapsule.dev"
 
+.PHONY: enterprise-chart enterprise-release enterprise-prerelease
+enterprise-chart:
+	# Remove the proxy before resolving dependencies; keep the community chart intact.
+	@set -eu; \
+	chart_dir=$$(mktemp -d); \
+	trap 'rm -rf "$$chart_dir"' EXIT; \
+	cp -R ./charts/capsule "$$chart_dir/capsule"; \
+	$(YQ) -i '.dependencies |= map(select(.name != "capsule-proxy"))' "$$chart_dir/capsule/Chart.yaml"; \
+	rm -rf "$$chart_dir/capsule/charts" "$$chart_dir/capsule/Chart.lock"; \
+	$(HELM) dependency update "$$chart_dir/capsule" --skip-refresh; \
+	$(HELM) package "$$chart_dir/capsule" --app-version=$(ENTERPRISE_VERSION) --version=$(ENTERPRISE_VERSION) --destination ./builds/
+
 enterprise-release:
 	mkdir -p ./builds
 	$(MAKE) CAPSULE_IMG=$(ENTERPRISE_REGISTRY)/enterprise/capsule VERSION=v$(ENTERPRISE_VERSION) ko-publish-capsule
-	$(HELM) package ./charts/capsule --app-version=$(ENTERPRISE_VERSION) --version=$(ENTERPRISE_VERSION) --destination ./builds/
+	$(MAKE) enterprise-chart
 	$(HELM) push ./builds/capsule-$(ENTERPRISE_VERSION).tgz oci://$(ENTERPRISE_REGISTRY)/charts/
 	$(MAKE) deploy-enterprise
 	rm -rf ./builds
@@ -378,7 +392,7 @@ deploy-enterprise:
 enterprise-prerelease:
 	mkdir -p ./builds
 	$(MAKE) CAPSULE_IMG=$(ENTERPRISE_REGISTRY)/prereleases/capsule VERSION=v$(ENTERPRISE_VERSION) ko-publish-capsule
-	$(HELM) package ./charts/capsule --app-version=$(ENTERPRISE_VERSION) --version=$(ENTERPRISE_VERSION) --destination ./builds/
+	$(MAKE) enterprise-chart
 	$(HELM) push ./builds/capsule-$(ENTERPRISE_VERSION).tgz oci://$(ENTERPRISE_REGISTRY)/charts/prereleases/
 	$(MAKE) deploy-enterprise-prerelease
 	rm -rf ./builds

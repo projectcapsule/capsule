@@ -97,13 +97,9 @@ func TestDisruptionBudgetProfilesThroughAdmissionChain(t *testing.T) {
 							} else {
 								require.Nil(t, response)
 							}
-							expectedGets := int64(3)
-							if !statusPresent {
-								// Tenant-rule fallback reads namespace labels through the cached
-								// client to resolve the selector; this is existing pipeline work.
-								expectedGets++
-							}
-							require.Equal(t, expectedGets, cl.gets.Load(), "reuse tenant/ruleset resolution")
+							// The request reader reuses the authoritative namespace read,
+							// including the Tenant-rule fallback when RuleStatus is absent.
+							require.Equal(t, int64(3), cl.gets.Load(), "reuse tenant/ruleset resolution")
 							if denied {
 								require.Equal(t, int64(1), cl.lists.Load())
 							} else {
@@ -274,7 +270,7 @@ func BenchmarkDisruptionBudgetUnchangedStatus(b *testing.B) {
 			chain := Register(nil, nil, nil, nil, nil).GetHandlers()
 			if mode == "baseline-route" {
 				// Original routing predicate before status label checks were added.
-				chain[0].(*matchingHandler).predicate = matchesGenericMetadataRequest
+				chain[0] = budgetBenchmarkHandler(matchesGenericMetadataRequest)
 			}
 			b.ReportAllocs()
 			b.ResetTimer()

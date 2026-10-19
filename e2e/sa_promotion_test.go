@@ -887,5 +887,32 @@ var _ = Describe("Promoting ServiceAccounts", Ordered, Label("config", "permissi
 
 		expectRoleBindingForPromotion(stage.Name, "prod-view", sa)
 		expectRoleBindingForPromotion(stage.Name, "prod-edit", sa)
+
+		By("keeping identical promotion profiles isolated across Tenants")
+		other := &capsulev1beta2.Tenant{Name: tnt.Name + "-other", Labels: map[string]string{"env": "e2e"}, Spec: *tnt.Spec.DeepCopy()}
+		other.Spec.Owners = rbac.OwnerListSpec{{Kind: rbac.UserOwner, Name: other.Name}}
+		Expect(k8sClient.Create(context.Background(), other)).To(Succeed())
+		DeferCleanup(EventuallyDeletion, other)
+		TenantReady(other, metav1.ConditionTrue, defaultTimeoutInterval)
+		foreign := NewNamespace("", map[string]string{meta.TenantLabel: other.Name, "environment": "prod"})
+		NamespaceCreation(foreign, other.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceReady(other, foreign, 1)
+		target := &corev1.ConfigMap{Name: "promotion-isolation", Namespace: foreign.Name}
+		foreignOwner := impersonationClient(other.Name, withDefaultGroups(nil))
+		Expect(foreignOwner.Create(context.Background(), target)).To(Succeed())
+		promoted := impersonationClient("system:serviceaccount:"+sa.Namespace+":"+sa.Name, []string{"system:authenticated", "system:serviceaccounts", "system:serviceaccounts:" + sa.Namespace})
+		local := &corev1.ConfigMap{Name: target.Name, Namespace: prod.Name}
+		Expect(ownerClient.Create(context.Background(), local)).To(Succeed())
+		Eventually(func() error {
+			return promoted.Get(context.Background(), client.ObjectKeyFromObject(local), &corev1.ConfigMap{})
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		denied := promoted.Get(context.Background(), client.ObjectKeyFromObject(target), &corev1.ConfigMap{})
+		Expect(apierrors.IsForbidden(denied)).To(BeTrue())
+		Expect(denied).To(MatchError(ContainSubstring(`cannot get resource "configmaps"`)))
+		currentOther := &capsulev1beta2.Tenant{}
+		Expect(k8sClient.Get(context.Background(), client.ObjectKeyFromObject(other), currentOther)).To(Succeed())
+		for _, promotion := range currentOther.Status.Promotions {
+			Expect(promotion.Name).NotTo(Equal("system:serviceaccount:" + sa.Namespace + ":" + sa.Name))
+		}
 	})
 })

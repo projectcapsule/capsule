@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -36,6 +37,9 @@ func BenchmarkTenantNamespaceChurn(b *testing.B) {
 				b.Run(fmt.Sprintf("tenants=%d/terminating=%d/resourceTypes=%d", tenants, terminating, resources), func(b *testing.B) {
 					scheme := runtime.NewScheme()
 					if err := corev1.AddToScheme(scheme); err != nil {
+						b.Fatal(err)
+					}
+					if err := rbacv1.AddToScheme(scheme); err != nil {
 						b.Fatal(err)
 					}
 					if err := capsulev1beta2.AddToScheme(scheme); err != nil {

@@ -6,6 +6,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -28,7 +29,7 @@ import (
 )
 
 var _ = Describe("namespace RBAC provisioning", Label("namespace-rbac-priority", "rolebindings", "namespace", "rules"), func() {
-	It("provisions owner access and selected permissions with independent resource policies and tenant isolation", func() {
+	It("provisions concurrent namespace profiles with owner access, selected permissions, resource policies and tenant isolation", func() {
 		ctx := context.Background()
 		admin, err := kubernetes.NewForConfig(cfg)
 		Expect(err).NotTo(HaveOccurred())
@@ -95,7 +96,7 @@ var _ = Describe("namespace RBAC provisioning", Label("namespace-rbac-priority",
 					if err == nil {
 						Fail("owner access became available before namespace enforcement")
 					}
-					g.Expect(apierrors.IsForbidden(err)).To(BeTrue())
+					g.Expect(apierrors.IsForbidden(err)).To(BeTrue(), "%v", err)
 					g.Expect(err).To(MatchError(ContainSubstring("denied by namespace rule")))
 				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 				Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(service), &corev1.Service{}))).To(BeTrue())
@@ -107,9 +108,27 @@ var _ = Describe("namespace RBAC provisioning", Label("namespace-rbac-priority",
 			Expect(owner.Get(ctx, client.ObjectKeyFromObject(cm), stored)).To(Succeed())
 			return ns
 		}
-		selected, plain, foreign := createNamespace(a, "reader"), createNamespace(a, "plain"), createNamespace(b, "reader")
-		TenantNamespaceReady(a, selected, 2)
-		TenantNamespaceReady(b, foreign, 1)
+		// Exercise concurrent namespace provisioning both within a Tenant and
+		// across Tenants, checking enforcement on the first owner write above.
+		profiles := []struct {
+			tenant *capsulev1beta2.Tenant
+			name   string
+		}{{a, "reader"}, {a, "plain"}, {b, "reader"}}
+		for range 2 {
+			profiles = append(profiles, profiles...)
+		}
+		namespaces := make([]*corev1.Namespace, len(profiles))
+		var provision sync.WaitGroup
+		for i, profile := range profiles {
+			provision.Go(func() {
+				defer GinkgoRecover()
+				namespaces[i] = createNamespace(profile.tenant, profile.name)
+			})
+		}
+		provision.Wait()
+		selected, plain, foreign := namespaces[0], namespaces[1], namespaces[2]
+		TenantNamespaceReady(a, selected, 8)
+		TenantNamespaceReady(b, foreign, 4)
 		reader := impersonationClient(readerName, []string{"system:authenticated"})
 		Eventually(func() error {
 			return reader.Get(ctx, client.ObjectKey{Namespace: selected.Name, Name: "owner-access"}, &corev1.ConfigMap{})
@@ -122,7 +141,7 @@ var _ = Describe("namespace RBAC provisioning", Label("namespace-rbac-priority",
 		ownerA := impersonationClient(a.Spec.Owners[0].Name, withDefaultGroups(nil))
 		cross := &corev1.ConfigMap{Name: "cross-tenant", Namespace: foreign.Name}
 		err = ownerA.Create(ctx, cross)
-		Expect(apierrors.IsForbidden(err)).To(BeTrue())
+		Expect(apierrors.IsForbidden(err)).To(BeTrue(), "%v", err)
 		Expect(err).To(MatchError(ContainSubstring(`cannot create resource "configmaps"`)))
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(cross), &corev1.ConfigMap{}))).To(BeTrue())
 
@@ -135,6 +154,10 @@ var _ = Describe("namespace RBAC provisioning", Label("namespace-rbac-priority",
 			policies := &networkingv1.NetworkPolicyList{}
 			g.Expect(k8sClient.List(ctx, policies, client.InNamespace(selected.Name))).To(Succeed())
 			g.Expect(policies.Items).To(HaveLen(1))
+			g.Expect(policies.Items[0].Spec.PolicyTypes).To(Equal([]networkingv1.PolicyType{networkingv1.PolicyTypeIngress}))
+			foreignPolicies := &networkingv1.NetworkPolicyList{}
+			g.Expect(k8sClient.List(ctx, foreignPolicies, client.InNamespace(foreign.Name))).To(Succeed())
+			g.Expect(foreignPolicies.Items).To(BeEmpty(), "Tenant A policies must not appear in Tenant B")
 			limits := &corev1.LimitRangeList{}
 			g.Expect(k8sClient.List(ctx, limits, client.InNamespace(selected.Name))).To(Succeed())
 			g.Expect(limits.Items).To(HaveLen(1))
@@ -151,9 +174,99 @@ var _ = Describe("namespace RBAC provisioning", Label("namespace-rbac-priority",
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		service := &corev1.Service{Name: "forbidden", Namespace: selected.Name, Spec: corev1.ServiceSpec{Type: corev1.ServiceTypeNodePort, Ports: []corev1.ServicePort{{Port: 80}}}}
 		err = ownerA.Create(ctx, service)
-		Expect(apierrors.IsForbidden(err)).To(BeTrue())
+		Expect(apierrors.IsForbidden(err)).To(BeTrue(), "%v", err)
 		Expect(err).To(MatchError(ContainSubstring("denied by namespace rule")))
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(service), &corev1.Service{}))).To(BeTrue())
+
+		By("enforcing the profile while effective RuleStatus publication is pending")
+		statusKey := client.ObjectKey{Namespace: selected.Name, Name: meta.NameForManagedRuleStatus()}
+		published := &capsulev1beta2.RuleStatus{}
+		Expect(k8sClient.Get(ctx, statusKey, published)).To(Succeed())
+		restored := false
+		restoreStatus := func() {
+			if restored {
+				return
+			}
+			Eventually(func() error {
+				current := &capsulev1beta2.RuleStatus{}
+				if err := k8sClient.Get(ctx, statusKey, current); err != nil {
+					return err
+				}
+				current.Status.Rules = published.Status.Rules
+				current.Status.ObservedGeneration = published.Status.ObservedGeneration
+				return k8sClient.Status().Update(ctx, current)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			restored = true
+		}
+		DeferCleanup(restoreStatus)
+		Eventually(func() error {
+			current := &capsulev1beta2.RuleStatus{}
+			if err := k8sClient.Get(ctx, statusKey, current); err != nil {
+				return err
+			}
+			current.Status.Rules = nil
+			current.Status.ObservedGeneration = 0
+			return k8sClient.Status().Update(ctx, current)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		pendingService := service.DeepCopy()
+		pendingService.Name = "forbidden-pending"
+		err = ownerA.Create(ctx, pendingService)
+		Expect(apierrors.IsForbidden(err)).To(BeTrue(), "%v", err)
+		Expect(err).To(MatchError(ContainSubstring("denied by namespace rule")))
+		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(pendingService), &corev1.Service{}))).To(BeTrue())
+		pendingConfig := &corev1.ConfigMap{Name: "allowed-pending", Namespace: selected.Name, Labels: map[string]string{"env": "e2e"}}
+		Expect(ownerA.Create(ctx, pendingConfig)).To(Succeed())
+		Expect(ownerA.Get(ctx, client.ObjectKeyFromObject(pendingConfig), &corev1.ConfigMap{})).To(Succeed())
+		restoreStatus()
+
+		// Capture stable common resources before exercising another full revision.
+		stableBindings := &rbacv1.RoleBindingList{}
+		Expect(k8sClient.List(ctx, stableBindings, client.InNamespace(selected.Name))).To(Succeed())
+		var common *rbacv1.RoleBinding
+		for i := range stableBindings.Items {
+			if stableBindings.Items[i].RoleRef.Name == "admin" {
+				common = &stableBindings.Items[i]
+				break
+			}
+		}
+		Expect(common).NotTo(BeNil())
+		stablePolicies := &networkingv1.NetworkPolicyList{}
+		Expect(k8sClient.List(ctx, stablePolicies, client.InNamespace(selected.Name))).To(Succeed())
+		Expect(stablePolicies.Items).To(HaveLen(1))
+		beforePolicy := stablePolicies.Items[0].DeepCopy()
+		By("composing a non-selected profile without rewriting unchanged RBAC or defaulted policies")
+		nonSelectedUser := a.Name + "-non-selected"
+		Eventually(func() error {
+			current := &capsulev1beta2.Tenant{}
+			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(a), current); err != nil {
+				return err
+			}
+			if len(current.Spec.Rules) == 1 {
+				current.Spec.Rules = append(current.Spec.Rules, &rules.NamespaceRuleBodyTenant{
+					NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"profile": "absent"}},
+					Permissions:       rules.NamespaceRulePermissionBody{Bindings: []rbac.AdditionalRoleBindingsSpec{{ClusterRoleName: "view", Subjects: []rbacv1.Subject{{Kind: rbacv1.UserKind, APIGroup: rbacv1.GroupName, Name: nonSelectedUser}}}}},
+				})
+			}
+			return k8sClient.Update(ctx, current)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Eventually(func(g Gomega) {
+			current := &capsulev1beta2.Tenant{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(a), current)).To(Succeed())
+			g.Expect(current.Status.ObservedGeneration).To(Equal(current.Generation))
+			ready := current.Status.Conditions.GetConditionByType(meta.ReadyCondition)
+			g.Expect(ready).NotTo(BeNil())
+			g.Expect(ready.Status).To(Equal(metav1.ConditionTrue))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		storedBinding := &rbacv1.RoleBinding{}
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(common), storedBinding)).To(Succeed())
+		Expect(storedBinding.ResourceVersion).To(Equal(common.ResourceVersion), "unchanged common binding was rewritten")
+		storedPolicy := &networkingv1.NetworkPolicy{}
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(beforePolicy), storedPolicy)).To(Succeed())
+		Expect(storedPolicy.ResourceVersion).To(Equal(beforePolicy.ResourceVersion), "defaulted policy was rewritten")
+		excluded := impersonationClient(nonSelectedUser, []string{"system:authenticated"})
+		denied := excluded.Get(ctx, client.ObjectKey{Namespace: selected.Name, Name: "owner-access"}, &corev1.ConfigMap{})
+		Expect(apierrors.IsForbidden(denied)).To(BeTrue(), "%v", denied)
+		Expect(denied).To(MatchError(ContainSubstring(`cannot get resource "configmaps"`)))
 
 		By("adding and removing permission profiles when namespace labels change")
 		for _, profile := range []string{"reader", "plain"} {
@@ -170,7 +283,7 @@ var _ = Describe("namespace RBAC provisioning", Label("namespace-rbac-priority",
 				if profile == "reader" {
 					g.Expect(err).NotTo(HaveOccurred())
 				} else {
-					g.Expect(apierrors.IsForbidden(err)).To(BeTrue())
+					g.Expect(apierrors.IsForbidden(err)).To(BeTrue(), "%v", err)
 					g.Expect(err).To(MatchError(ContainSubstring(`cannot get resource "configmaps"`)))
 				}
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())

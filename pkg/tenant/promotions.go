@@ -17,6 +17,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
+	"github.com/projectcapsule/capsule/pkg/api/rules"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 	"github.com/projectcapsule/capsule/pkg/users"
@@ -33,6 +34,11 @@ func CollectPromotions(
 	}
 
 	promotions = rbac.PromotionStatusListSpec{}
+	if !slices.ContainsFunc(tnt.Spec.Rules, func(rule *rules.NamespaceRuleBodyTenant) bool {
+		return rule != nil && len(rule.Permissions.Promotions) > 0
+	}) {
+		return promotions, nil
+	}
 
 	promoReq, err := labels.NewRequirement(meta.ServiceAccountPromotionLabel, selection.Equals, []string{meta.ValueTrue})
 	if err != nil {
@@ -41,12 +47,16 @@ func CollectPromotions(
 
 	staticSel := labels.NewSelector().Add(*promoReq)
 
-	namespaces, err := tnt.GetNamespaceObjects(ctx, c)
+	namespaces, err := promotionNamespaceObjects(ctx, c, tnt)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, ruleset := range tnt.Spec.Rules {
+		if ruleset == nil || len(ruleset.Permissions.Promotions) == 0 {
+			continue
+		}
+
 		var namespaceSelector labels.Selector
 
 		if ruleset.NamespaceSelector != nil {
@@ -75,6 +85,10 @@ func CollectPromotions(
 		}
 
 		for _, promotion := range ruleset.Permissions.Promotions {
+			if promotion == nil {
+				continue
+			}
+
 			combinedSel := staticSel
 
 			if promotion.Selector != nil {
@@ -124,4 +138,26 @@ func appendTargetNamespace(targets []string, namespace string) []string {
 	}
 
 	return append(result, namespace)
+}
+
+func promotionNamespaceObjects(ctx context.Context, c client.Reader, tnt *capsulev1beta2.Tenant) ([]corev1.Namespace, error) {
+	list := &corev1.NamespaceList{}
+	if err := c.List(ctx, list, client.MatchingFields{NamespaceOwnerReferenceIndexerFieldName: tnt.Name}); err != nil {
+		return nil, err
+	}
+
+	names := make(map[string]struct{}, len(tnt.Status.Namespaces))
+	for _, name := range tnt.Status.Namespaces {
+		names[name] = struct{}{}
+	}
+
+	list.Items = slices.DeleteFunc(list.Items, func(ns corev1.Namespace) bool {
+		if _, ok := names[ns.Name]; !ok {
+			return true
+		}
+
+		return !slices.ContainsFunc(ns.OwnerReferences, func(ref metav1.OwnerReference) bool { return IsTenantOwnerReferenceForTenant(ref, tnt) })
+	})
+
+	return list.Items, nil
 }

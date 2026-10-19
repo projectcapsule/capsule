@@ -15,6 +15,8 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	ktesting "k8s.io/client-go/testing"
@@ -24,7 +26,168 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
+	"github.com/projectcapsule/capsule/pkg/api/rules"
 )
+
+func TestNamespacePermissionsReuseTheProfileNamespace(t *testing.T) {
+	tnt := &capsulev1beta2.Tenant{Name: "tenant-a", UID: "tenant-a-uid", Spec: capsulev1beta2.TenantSpec{
+		Rules: []*rules.NamespaceRuleBodyTenant{{
+			NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"profile": "reader"}},
+			Permissions: rules.NamespaceRulePermissionBody{Bindings: []rbac.AdditionalRoleBindingsSpec{{
+				ClusterRoleName: "view", Subjects: []rbacv1.Subject{{Kind: "User", Name: "reader"}},
+			}}},
+		}},
+	}}
+	ns := cleanupOwnedNamespace(tnt, "selected", false)
+	ns.Labels["profile"] = "reader"
+	r, _ := namespaceCleanupFixture(t, tnt, ns)
+	var reads atomic.Int32
+	r.Client = interceptor.NewClient(r.Client.(client.WithWatch), interceptor.Funcs{
+		Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+			if _, ok := obj.(*corev1.Namespace); ok {
+				reads.Add(1)
+			}
+			return c.Get(ctx, key, obj, opts...)
+		},
+	})
+	if err := r.reconcileActiveTenantNamespaces(t.Context(), logr.Discard(), tnt); err != nil {
+		t.Fatal(err)
+	}
+	if reads.Load() != 1 {
+		t.Fatalf("expected only the metadata update's Namespace GET, got %d", reads.Load())
+	}
+	assertBindingSubject(t, t.Context(), r.Client, ns.Name, "reader", true)
+}
+
+func TestNamespaceProvisioningBoundsWorkersAndHonorsCancellation(t *testing.T) {
+	for _, phase := range []string{"profile", "bindings"} {
+		t.Run(phase, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			tnt := &capsulev1beta2.Tenant{Name: "tenant-a", UID: "tenant-a-uid", Status: capsulev1beta2.TenantStatus{
+				Owners: rbac.OwnerStatusListSpec{{Kind: rbac.UserOwner, Name: "alice", ClusterRoles: []string{"admin"}}},
+			}}
+			objects := []client.Object{tnt}
+			for i := range 16 {
+				objects = append(objects, cleanupOwnedNamespace(tnt, fmt.Sprintf("team-%d", i), false))
+			}
+			r, _ := namespaceCleanupFixture(t, objects...)
+			base := r.Client
+			var active, maximum atomic.Int32
+			started := make(chan struct{}, 16)
+			r.Client = interceptor.NewClient(base.(client.WithWatch), interceptor.Funcs{
+				Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+					_, profile := obj.(*capsulev1beta2.RuleStatus)
+					_, binding := obj.(*rbacv1.RoleBinding)
+					if (phase == "profile" && profile) || (phase == "bindings" && binding) {
+						current := active.Add(1)
+						defer active.Add(-1)
+						for previous := maximum.Load(); current > previous; previous = maximum.Load() {
+							if maximum.CompareAndSwap(previous, current) {
+								break
+							}
+						}
+						started <- struct{}{}
+						<-ctx.Done()
+						return ctx.Err()
+					}
+					return c.Create(ctx, obj, opts...)
+				},
+			})
+			done := make(chan error, 1)
+			go func() { done <- r.reconcileActiveTenantNamespaces(ctx, logr.Discard(), tnt) }()
+			for range 8 {
+				select {
+				case <-started:
+				case <-ctx.Done():
+					t.Error("namespace workers did not fill the bounded pool")
+				}
+			}
+			cancel()
+			if err := <-done; !errors.Is(err, context.Canceled) {
+				t.Fatalf("namespace cancellation was lost: %v", err)
+			}
+			if maximum.Load() != 8 || active.Load() != 0 {
+				t.Fatalf("unexpected worker concurrency: maximum=%d active=%d", maximum.Load(), active.Load())
+			}
+			for _, obj := range objects[1:] {
+				assertBindingSubject(t, t.Context(), base, obj.GetName(), "alice", false)
+			}
+		})
+	}
+}
+
+func TestNamespaceRoleBindingsDoNotWaitForAnotherNamespace(t *testing.T) {
+	for _, failSlow := range []bool{false, true} {
+		t.Run(fmt.Sprintf("failed_sibling=%t", failSlow), func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			tnt := &capsulev1beta2.Tenant{Name: "tenant-a", UID: "tenant-a-uid", Spec: capsulev1beta2.TenantSpec{
+				Owners: rbac.OwnerListSpec{{Kind: rbac.UserOwner, Name: "alice", ClusterRoles: []string{"admin"}}},
+			}}
+			fast, slow := cleanupOwnedNamespace(tnt, "fast", false), cleanupOwnedNamespace(tnt, "slow", false)
+			other := &capsulev1beta2.Tenant{Name: "tenant-b", UID: "tenant-b-uid"}
+			foreign := cleanupOwnedNamespace(other, "foreign", false)
+			r, _ := namespaceCleanupFixture(t, tnt, fast, slow, other, foreign)
+			base := r.Client
+			blocked, release, granted := make(chan struct{}), make(chan struct{}), make(chan struct{})
+			var blockOnce, grantOnce sync.Once
+			slowErr := errors.New("slow namespace profile failed")
+			r.Client = interceptor.NewClient(base.(client.WithWatch), interceptor.Funcs{
+				Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+					if _, ok := obj.(*capsulev1beta2.RuleStatus); ok && obj.GetNamespace() == slow.Name {
+						blockOnce.Do(func() { close(blocked) })
+						select {
+						case <-release:
+						case <-ctx.Done():
+							return ctx.Err()
+						}
+						if failSlow {
+							return slowErr
+						}
+					}
+					if err := c.Create(ctx, obj, opts...); err != nil {
+						return err
+					}
+					if _, ok := obj.(*rbacv1.RoleBinding); ok && obj.GetNamespace() == fast.Name {
+						grantOnce.Do(func() { close(granted) })
+					}
+					return nil
+				},
+			})
+			done := make(chan error, 1)
+			go func() { done <- r.reconcile(ctx, logr.Discard(), tnt.DeepCopy()) }()
+			defer func() {
+				close(release)
+				err := <-done
+				if failSlow {
+					if !errors.Is(err, slowErr) {
+						t.Errorf("namespace error was lost: %v", err)
+					}
+					assertBindingSubject(t, ctx, base, slow.Name, "alice", false)
+				} else if err != nil {
+					t.Errorf("namespace provisioning failed: %v", err)
+				} else {
+					assertBindingSubject(t, ctx, base, slow.Name, "alice", true)
+				}
+			}()
+			for _, ready := range []<-chan struct{}{blocked, granted} {
+				select {
+				case <-ready:
+				case <-ctx.Done():
+					t.Fatal("fast namespace RBAC waited for an unrelated namespace profile")
+				}
+			}
+			status := &capsulev1beta2.RuleStatus{}
+			if err := base.Get(ctx, client.ObjectKey{Namespace: fast.Name, Name: meta.NameForManagedRuleStatus()}, status); err != nil {
+				t.Fatalf("RBAC preceded its own namespace profile: %v", err)
+			}
+			assertBindingSubject(t, ctx, base, fast.Name, "alice", true)
+			assertBindingSubject(t, ctx, base, slow.Name, "alice", false)
+			assertBindingSubject(t, ctx, base, foreign.Name, "alice", false)
+		})
+	}
+}
 
 func TestRoleBindingsPrecedeResourceProvisioning(t *testing.T) {
 	tnt := &capsulev1beta2.Tenant{Name: "tenant-a", UID: "tenant-a-uid", Spec: capsulev1beta2.TenantSpec{

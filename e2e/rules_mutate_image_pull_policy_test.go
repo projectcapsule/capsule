@@ -10,6 +10,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -189,6 +190,33 @@ var _ = Describe("image pull policy mutation", Label("tenant", "rules", "workloa
 		waitProfile(selected, 0, 0)
 		addDebug("debug-second", corev1.PullAlways, corev1.PullNever)
 		verify(bPod, corev1.PullNever, corev1.PullNever)
+
+		By("allowing Pod status updates without applying workload mutations")
+		statusRole := &rbacv1.Role{ObjectMeta: metav1.ObjectMeta{Name: "pod-status", Namespace: selected.Name}, Rules: []rbacv1.PolicyRule{{APIGroups: []string{""}, Resources: []string{"pods/status"}, Verbs: []string{"update"}}}}
+		Expect(k8sClient.Create(ctx, statusRole)).To(Succeed())
+		Expect(k8sClient.Create(ctx, &rbacv1.RoleBinding{ObjectMeta: metav1.ObjectMeta{Name: statusRole.Name, Namespace: selected.Name}, RoleRef: rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "Role", Name: statusRole.Name}, Subjects: []rbacv1.Subject{{Kind: "User", APIGroup: rbacv1.GroupName, Name: tenants[0].Spec.Owners[0].Name}}})).To(Succeed())
+		Eventually(func(g Gomega) {
+			current := &corev1.Pod{}
+			g.Expect(owners[0].Get(ctx, client.ObjectKeyFromObject(pod), current)).To(Succeed())
+			condition := corev1.PodCondition{Type: "CapsuleMutationSkipTest", Status: corev1.ConditionTrue}
+			replaced := false
+			for i := range current.Status.Conditions {
+				if current.Status.Conditions[i].Type == condition.Type {
+					current.Status.Conditions[i] = condition
+					replaced = true
+				}
+			}
+			if !replaced {
+				current.Status.Conditions = append(current.Status.Conditions, condition)
+			}
+			g.Expect(owners[0].Status().Update(ctx, current)).To(Succeed())
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Eventually(func(g Gomega) {
+			current := &corev1.Pod{}
+			g.Expect(owners[0].Get(ctx, client.ObjectKeyFromObject(pod), current)).To(Succeed())
+			g.Expect(current.Status.Conditions).To(ContainElement(HaveField("Type", corev1.PodConditionType("CapsuleMutationSkipTest"))))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		verify(pod, corev1.PullAlways, corev1.PullAlways)
 
 		By("applying label changes to future Pods without rewriting existing Pods")
 		Eventually(func(g Gomega) {

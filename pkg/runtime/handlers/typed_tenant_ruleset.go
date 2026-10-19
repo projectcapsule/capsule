@@ -93,7 +93,7 @@ func (h *TypedTenantWithRulesetHandler[T]) OnCreate(
 			return ErroredResponse(err)
 		}
 
-		ruleBlocks, err := h.resolveRuleset(ctx, c, req.Namespace, tnt, <-rulesetResult)
+		ruleBlocks, err := h.resolveRuleset(ctx, c, reader, req.Namespace, tnt, <-rulesetResult)
 		if err != nil {
 			return ErroredResponse(err)
 		}
@@ -149,7 +149,7 @@ func (h *TypedTenantWithRulesetHandler[T]) OnUpdate(
 			return ErroredResponse(err)
 		}
 
-		ruleBlocks, err := h.resolveRuleset(ctx, c, req.Namespace, tnt, <-rulesetResult)
+		ruleBlocks, err := h.resolveRuleset(ctx, c, reader, req.Namespace, tnt, <-rulesetResult)
 		if err != nil {
 			return ErroredResponse(err)
 		}
@@ -212,7 +212,10 @@ func (h *TypedTenantWithRulesetHandler[T]) readRulesetAsync(
 		case err == nil:
 			result <- rulesetReadResult{
 				rules: rs.Status.Rules,
-				found: true,
+				// A newly published spec can precede its effective status. Use
+				// the existing namespace-rendering fallback until this generation
+				// has been processed, rather than allowing with an empty ruleset.
+				found: rs.Status.ObservedGeneration == rs.Generation,
 			}
 		case apierrors.IsNotFound(err):
 			result <- rulesetReadResult{}
@@ -229,6 +232,7 @@ func (h *TypedTenantWithRulesetHandler[T]) readRulesetAsync(
 func (h *TypedTenantWithRulesetHandler[T]) resolveRuleset(
 	ctx context.Context,
 	c client.Client,
+	reader client.Reader,
 	namespace string,
 	tnt *capsulev1beta2.Tenant,
 	result rulesetReadResult,
@@ -242,7 +246,9 @@ func (h *TypedTenantWithRulesetHandler[T]) resolveRuleset(
 	}
 
 	ns := &corev1.Namespace{}
-	if err := c.Get(ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
+	// Reuse the authoritative request snapshot already read for tenant
+	// resolution. The router's request reader deduplicates this lookup.
+	if err := reader.Get(ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
 		return nil, err
 	}
 

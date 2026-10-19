@@ -138,7 +138,9 @@ func (r *Manager) runGarbageCollection(
 			return err
 		}
 
-		if ns.DeletionTimestamp != nil {
+		if ns.DeletionTimestamp != nil || namespaceOwnedByTenant(ns, tnt) {
+			// A namespace may have been provisioned by its own queue after this
+			// Tenant pass captured membership. Status lag must not revoke its access.
 			return nil
 		}
 

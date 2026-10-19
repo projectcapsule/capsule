@@ -221,7 +221,7 @@ func TestGetTenantByLabelsAndUser(t *testing.T) {
 	}
 }
 
-func tenantFakeClient(t *testing.T, objects ...client.Object) client.Client {
+func tenantFakeClient(t testing.TB, objects ...client.Object) client.Client {
 	t.Helper()
 
 	scheme := runtime.NewScheme()
@@ -235,6 +235,15 @@ func tenantFakeClient(t *testing.T, objects ...client.Object) client.Client {
 	return fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(objects...).
+		WithIndex(&corev1.Namespace{}, tenant.NamespaceOwnerReferenceIndexerFieldName, func(obj client.Object) []string {
+			var names []string
+			for _, ref := range obj.GetOwnerReferences() {
+				if tenant.IsTenantOwnerReference(ref) {
+					names = append(names, ref.Name)
+				}
+			}
+			return names
+		}).
 		WithIndex(&capsulev1beta2.Tenant{}, ".status.namespaces", func(obj client.Object) []string {
 			return obj.(*capsulev1beta2.Tenant).Status.Namespaces
 		}).

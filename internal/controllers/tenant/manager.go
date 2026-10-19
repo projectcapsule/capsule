@@ -52,8 +52,9 @@ import (
 type Manager struct {
 	client.Client
 
-	reader        client.Reader
-	cleanupReader client.Reader
+	reader             client.Reader
+	cleanupReader      client.Reader
+	provisioningReader client.Reader
 
 	DiscoveryClient discovery.DiscoveryInterface
 	DynamicClient   dynamic.Interface
@@ -67,9 +68,11 @@ type Manager struct {
 
 	discoveryCache cache.DiscoveryNamespacedResourceCache
 
-	resourceQuotaSyncMu sync.Mutex
-	resourceQuotaSyncs  map[string]*tenantResourceQuotaSync
-	ruleStatusWrites    *lru.Cache
+	resourceQuotaSyncMu     sync.Mutex
+	resourceQuotaSyncs      map[string]*tenantResourceQuotaSync
+	ruleStatusWrites        *lru.Cache
+	namespaceProvisioningMu sync.Mutex
+	namespaceProvisioning   map[string]*namespaceProvisioningSync
 }
 
 type supportedClasses struct {
@@ -249,6 +252,10 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 		return err
 	}
 
+	if err := r.setupNamespaceProvisioningController(mgr, ctrlConfig); err != nil {
+		return err
+	}
+
 	return r.setupNamespaceCleanupController(mgr, ctrlConfig)
 }
 
@@ -379,10 +386,12 @@ func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *caps
 		errs = append(errs, fmt.Errorf("namespace(s) had reconciliation errors: %w", err))
 	}
 
-	// Publish namespace rules and metadata before granting access. Owner and
-	// profile RoleBindings must not wait for unrelated resource provisioning.
-	if err = r.runPhase(log, "role_bindings", func() error { return r.syncRoleBindings(ctx, log, instance) }); err != nil {
-		errs = append(errs, fmt.Errorf("cannot sync rolebindings items: %w", err))
+	// Namespace workers have already provisioned their own bindings. Clean up
+	// departed namespaces after the complete membership status is available.
+	if err = r.runPhase(log, "role_binding_cleanup", func() error {
+		return r.runGarbageCollection(ctx, instance, &rbacv1.RoleBinding{})
+	}); err != nil {
+		errs = append(errs, fmt.Errorf("cannot clean up rolebindings: %w", err))
 	}
 
 	// Ensuring Metadata.

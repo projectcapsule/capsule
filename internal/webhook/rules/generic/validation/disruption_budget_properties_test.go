@@ -302,9 +302,9 @@ func BenchmarkDisruptionBudgetProperties(b *testing.B) {
 					cl := &typeAdmissionClient{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()}
 					chain := Register(nil, nil, nil, nil, nil).GetHandlers()
 					if mode == "scale-baseline" {
-						chain[0].(*matchingHandler).predicate = func(req admission.Request) bool {
+						chain[0] = budgetBenchmarkHandler(func(req admission.Request) bool {
 							return matchesGenericMetadataRequest(req) || matchesBudgetPodStatus(req)
-						}
+						})
 					}
 					decoder := admission.NewDecoder(scheme)
 					run := func(req admission.Request) {
