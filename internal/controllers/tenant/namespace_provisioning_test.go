@@ -188,7 +188,7 @@ func TestNamespaceProvisioningQueueOwnershipAndReadiness(t *testing.T) {
 	}
 }
 
-func TestNamespaceQueueSkipsBusyKeysAndRefreshesOwnersOnRetry(t *testing.T) {
+func TestNamespaceQueueSkipsBusyKeysAndRefreshesSpecOwnersOnRetry(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 	tnt := provisioningTenant()
@@ -211,7 +211,13 @@ func TestNamespaceQueueSkipsBusyKeysAndRefreshesOwnersOnRetry(t *testing.T) {
 	if err := r.Get(ctx, client.ObjectKeyFromObject(tnt), latest); err != nil {
 		t.Fatal(err)
 	}
-	latest.Status.Owners = rbac.OwnerStatusListSpec{{Kind: rbac.UserOwner, Name: "bob", ClusterRoles: []string{"view"}}}
+	latest.Spec.Owners = rbac.OwnerListSpec{{Kind: rbac.UserOwner, Name: "bob", ClusterRoles: []string{"view"}}}
+	latest.Generation++
+	if err := r.Update(ctx, latest); err != nil {
+		t.Fatal(err)
+	}
+	latest.Status.ObservedGeneration = latest.Generation
+	latest.Status.Owners = latest.Spec.Owners.ToStatusOwners()
 	if err := r.Status().Update(ctx, latest); err != nil {
 		t.Fatal(err)
 	}

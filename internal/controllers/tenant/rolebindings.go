@@ -39,7 +39,8 @@ type namespaceRoleBindingRule struct {
 }
 
 func prepareNamespaceRoleBindings(tenant *capsulev1beta2.Tenant) namespaceRoleBindingPlan {
-	plan := prepareNamespaceProvisioningRoleBindings(tenant)
+	plan := prepareNamespaceRoleBindingRules(tenant)
+	plan.addCommonBindings(tenant.GetRoleBindings())
 	plan.prune = true
 	plan.promotions = map[string]map[string]rbac.AdditionalRoleBindingsSpec{}
 
@@ -56,16 +57,29 @@ func prepareNamespaceRoleBindings(tenant *capsulev1beta2.Tenant) namespaceRoleBi
 	return plan
 }
 
-// The fast queue grants only spec-selected permissions. Persisted promotions can
-// refer to an old namespace profile or UID. Leave their evaluation and all pruning
-// to the Tenant queue, including valid grants that it has already installed.
+// The fast queue grants only spec-selected permissions. Dynamic owners and
+// promotions can lose eligibility without changing Tenant generation. Leave
+// their evaluation and all pruning to the Tenant queue.
 func prepareNamespaceProvisioningRoleBindings(tenant *capsulev1beta2.Tenant) namespaceRoleBindingPlan {
-	plan := namespaceRoleBindingPlan{
-		common: map[string]rbac.AdditionalRoleBindingsSpec{},
+	plan := prepareNamespaceRoleBindingRules(tenant)
+	for _, owner := range tenant.Spec.Owners {
+		plan.addCommonBindings(owner.ToAdditionalRolebindings())
 	}
 
-	for _, binding := range tenant.GetRoleBindings() {
-		plan.common[utils.RoleBindingHashFunc(binding)] = binding
+	plan.addCommonBindings(tenant.Spec.AdditionalRoleBindings)
+
+	return plan
+}
+
+func (p *namespaceRoleBindingPlan) addCommonBindings(bindings []rbac.AdditionalRoleBindingsSpec) {
+	for _, binding := range bindings {
+		p.common[utils.RoleBindingHashFunc(binding)] = binding
+	}
+}
+
+func prepareNamespaceRoleBindingRules(tenant *capsulev1beta2.Tenant) namespaceRoleBindingPlan {
+	plan := namespaceRoleBindingPlan{
+		common: map[string]rbac.AdditionalRoleBindingsSpec{},
 	}
 
 	for i, rule := range tenant.Spec.Rules {

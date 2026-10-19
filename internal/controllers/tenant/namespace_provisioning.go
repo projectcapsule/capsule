@@ -89,9 +89,22 @@ func (r *Manager) reconcileNamespaceProvisioning(ctx context.Context, request re
 		}
 
 		plan := prepareNamespaceProvisioningRoleBindings(tnt)
-		_, err := r.provisionNamespaceLocked(ctx, ctrl.LoggerFrom(ctx), ns, tnt, &plan)
+		bindings, bindingErr := plan.forNamespace(ns)
+		log := ctrl.LoggerFrom(ctx)
 
-		return err
+		// Only the Tenant queue records managed metadata in status.spaces.
+		// Leave Namespace writes there so no cleanup inventory can be lost.
+		if err := r.reconcileRuleStatus(ctx, log, tnt, tnt, ns); err != nil {
+			return err
+		}
+
+		if bindingErr != nil {
+			return bindingErr
+		}
+
+		return r.runPhase(log, "namespace_role_bindings", func() error {
+			return r.syncAdditionalRoleBinding(ctx, log, tnt, ns.Name, bindings, false)
+		})
 	})
 
 	if !acquired && err == nil {
@@ -206,7 +219,7 @@ func (r *Manager) provisionNamespace(
 	return stat, err
 }
 
-// Both callers hold the namespace key and pass an immutable evaluated Tenant.
+// Tenant workers hold the namespace key and pass an immutable evaluated Tenant.
 func (r *Manager) provisionNamespaceLocked(ctx context.Context, log logr.Logger, ns *corev1.Namespace, snapshot *capsulev1beta2.Tenant, plan *namespaceRoleBindingPlan) (*capsulev1beta2.TenantStatusNamespaceItem, error) {
 	// Select permissions from exactly the namespace snapshot used to render
 	// enforcement, before metadata reconciliation changes its labels.
