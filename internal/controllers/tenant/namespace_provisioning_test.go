@@ -12,8 +12,10 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -22,7 +24,65 @@ import (
 	mockclient "github.com/projectcapsule/capsule/internal/mocks/client"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
+	"github.com/projectcapsule/capsule/pkg/api/rules"
 )
+
+func TestNamespaceQueueDefersPromotionsAndPreservesExistingGrants(t *testing.T) {
+	for _, mode := range []string{"recreated", "relabeled", "existing-grant"} {
+		t.Run(mode, func(t *testing.T) {
+			tnt := provisioningTenant()
+			source := cleanupOwnedNamespace(tnt, "source", false)
+			source.Labels["profile"] = "privileged"
+			ns := cleanupOwnedNamespace(tnt, "target", false)
+			ns.Labels["profile"] = "plain"
+			if mode == "existing-grant" {
+				ns.Labels["profile"] = "privileged"
+			}
+			tnt.Status.Namespaces = []string{source.Name, ns.Name}
+			status := &capsulev1beta2.TenantStatusNamespaceItem{Name: ns.Name, UID: ns.UID, Conditions: meta.ConditionList{{Type: meta.ReadyCondition, Status: metav1.ConditionFalse, Reason: meta.PermissionsFailedReason}}}
+			if mode == "recreated" {
+				status.UID = "previous-namespace-uid"
+				status.Conditions = meta.ConditionList{meta.NewReadyCondition(ns)}
+			}
+			tnt.Status.Spaces = []*capsulev1beta2.TenantStatusNamespaceItem{status}
+			tnt.Spec.Rules = []*rules.NamespaceRuleBodyTenant{{
+				NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"profile": "privileged"}},
+				Permissions:       rules.NamespaceRulePermissionBody{Promotions: []*rules.NamespaceRulePromotionRule{{ClusterRoles: []string{"view"}}}},
+			}}
+			promotion := rbac.PromotionSpec{ClusterRoles: []string{"view"}, Targets: []string{ns.Name}}
+			promotion.Kind, promotion.Name = rbac.ServiceAccountOwner, "system:serviceaccount:source:promoted"
+			tnt.Status.Promotions = rbac.PromotionStatusListSpec{promotion}
+			sa := &corev1.ServiceAccount{Name: "promoted", Namespace: source.Name, Labels: map[string]string{meta.ServiceAccountPromotionLabel: meta.ValueTrue}}
+			other := &capsulev1beta2.Tenant{Name: "tenant-b", UID: "tenant-b-uid"}
+			foreign := cleanupOwnedNamespace(other, "foreign", false)
+			r, _ := namespaceCleanupFixture(t, tnt, source, ns, sa, other, foreign)
+			if mode == "existing-grant" {
+				plan := prepareNamespaceRoleBindings(tnt)
+				if _, err := r.provisionNamespace(t.Context(), logr.Discard(), ns, tnt, &plan); err != nil {
+					t.Fatal(err)
+				}
+				assertBindingSubject(t, t.Context(), r.Client, ns.Name, "promoted", true)
+			}
+			if _, err := r.reconcileNamespaceProvisioning(t.Context(), reconcile.Request{NamespacedName: client.ObjectKeyFromObject(ns)}); err != nil {
+				t.Fatal(err)
+			}
+			assertBindingSubject(t, t.Context(), r.Client, ns.Name, "alice", true)
+			assertBindingSubject(t, t.Context(), r.Client, ns.Name, "promoted", mode == "existing-grant")
+			assertBindingSubject(t, t.Context(), r.Client, foreign.Name, "promoted", false)
+			// The Tenant queue recomputes selectors, preserves valid grants and
+			// records the current namespace UID after recreation.
+			snapshot := tnt.DeepCopy()
+			if err := r.reconcile(t.Context(), logr.Discard(), snapshot); err != nil {
+				t.Fatal(err)
+			}
+			assertBindingSubject(t, t.Context(), r.Client, ns.Name, "promoted", mode == "existing-grant")
+			assertBindingSubject(t, t.Context(), r.Client, source.Name, "promoted", true)
+			if got := snapshot.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{Name: ns.Name}); got == nil || got.UID != ns.UID {
+				t.Fatalf("namespace recreation retained stale UID: %+v", got)
+			}
+		})
+	}
+}
 
 func TestNamespaceQueueProvisionsWhileTenantResourceWorkIsBlocked(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)

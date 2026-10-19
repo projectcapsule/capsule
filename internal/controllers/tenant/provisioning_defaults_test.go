@@ -9,8 +9,10 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -136,8 +138,72 @@ func TestNetworkPolicyClientResponsesCannotMutateTenantProfiles(t *testing.T) {
 	}
 }
 
+func TestLimitRangeClientResponsesCannotMutateTenantProfiles(t *testing.T) {
+	for _, operation := range []string{"create", "update"} {
+		t.Run(operation, func(t *testing.T) {
+			tnt := provisioningTenant()
+			tnt.Spec.LimitRanges.Items = []corev1.LimitRangeSpec{{Limits: []corev1.LimitRangeItem{{
+				Type:    corev1.LimitTypeContainer,
+				Default: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+			}}}}
+			r, _ := namespaceCleanupFixture(t, tnt)
+			before := tnt.DeepCopy()
+			mutateResponse := func(obj client.Object) {
+				if limit, ok := obj.(*corev1.LimitRange); ok {
+					limit.Spec.Limits[0].Default[corev1.ResourceCPU] = resource.MustParse("2")
+					limit.Spec.Limits[0].Max = corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("1Gi")}
+				}
+			}
+			base := r.Client
+			if operation == "update" {
+				for _, ns := range []string{"namespace-a", "namespace-b"} {
+					if err := base.Create(t.Context(), &corev1.LimitRange{Name: "capsule-tenant-a-0", Namespace: ns}); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			r.Client = interceptor.NewClient(base.(client.WithWatch), interceptor.Funcs{
+				Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+					if err := c.Create(ctx, obj, opts...); err != nil {
+						return err
+					}
+					mutateResponse(obj)
+					return nil
+				},
+				Update: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
+					if err := c.Update(ctx, obj, opts...); err != nil {
+						return err
+					}
+					mutateResponse(obj)
+					return nil
+				},
+			})
+			if err := runForNamespaces(t.Context(), []string{"namespace-a", "namespace-b"}, func(ctx context.Context, ns string) error {
+				// Quota reconciliation also copies this shared Tenant concurrently.
+				_ = tnt.DeepCopy()
+				return r.syncLimitRange(ctx, logr.Discard(), tnt, ns, []string{"0"})
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(tnt, before) {
+				t.Fatal("LimitRange client responses mutated the shared Tenant")
+			}
+			for _, ns := range []string{"namespace-a", "namespace-b"} {
+				stored := &corev1.LimitRange{}
+				if err := base.Get(t.Context(), client.ObjectKey{Name: "capsule-tenant-a-0", Namespace: ns}, stored); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(stored.Spec, before.Spec.LimitRanges.Items[0]) {
+					t.Fatalf("another namespace's response changed persisted defaults: %+v", stored.Spec)
+				}
+			}
+		})
+	}
+}
+
 func provisioningTenant() *capsulev1beta2.Tenant {
-	return &capsulev1beta2.Tenant{Name: "tenant-a", UID: "tenant-a-uid", Generation: 1,
+	return &capsulev1beta2.Tenant{
+		Name: "tenant-a", UID: "tenant-a-uid", Generation: 1,
 		Spec:   capsulev1beta2.TenantSpec{Owners: rbac.OwnerListSpec{{Kind: rbac.UserOwner, Name: "alice", ClusterRoles: []string{"admin"}}}},
 		Status: capsulev1beta2.TenantStatus{ObservedGeneration: 1, Owners: rbac.OwnerStatusListSpec{{Kind: rbac.UserOwner, Name: "alice", ClusterRoles: []string{"admin"}}}},
 	}

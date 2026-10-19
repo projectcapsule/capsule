@@ -299,6 +299,10 @@ func (r *Manager) reconcileNamespace(
 	metaStatus := &capsulev1beta2.TenantStatusNamespaceMetadata{}
 
 	instance := tnt.Status.GetInstance(stat)
+	if instance != nil && instance.UID != namespace.UID {
+		instance = nil
+	}
+
 	if instance != nil {
 		stat = instance.DeepCopy()
 	}

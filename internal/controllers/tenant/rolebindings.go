@@ -29,6 +29,7 @@ type namespaceRoleBindingPlan struct {
 	common     map[string]rbac.AdditionalRoleBindingsSpec
 	rules      []namespaceRoleBindingRule
 	promotions map[string]map[string]rbac.AdditionalRoleBindingsSpec
+	prune      bool
 }
 
 type namespaceRoleBindingRule struct {
@@ -38,9 +39,29 @@ type namespaceRoleBindingRule struct {
 }
 
 func prepareNamespaceRoleBindings(tenant *capsulev1beta2.Tenant) namespaceRoleBindingPlan {
+	plan := prepareNamespaceProvisioningRoleBindings(tenant)
+	plan.prune = true
+	plan.promotions = map[string]map[string]rbac.AdditionalRoleBindingsSpec{}
+
+	for _, promotion := range tenant.GetPromotionRoleBindings() {
+		namespace := string(promotion.Namespace)
+		if plan.promotions[namespace] == nil {
+			plan.promotions[namespace] = map[string]rbac.AdditionalRoleBindingsSpec{}
+		}
+
+		binding := promotion.AdditionalRoleBindingsSpec
+		plan.promotions[namespace][utils.RoleBindingHashFunc(binding)] = binding
+	}
+
+	return plan
+}
+
+// The fast queue grants only spec-selected permissions. Persisted promotions can
+// refer to an old namespace profile or UID. Leave their evaluation and all pruning
+// to the Tenant queue, including valid grants that it has already installed.
+func prepareNamespaceProvisioningRoleBindings(tenant *capsulev1beta2.Tenant) namespaceRoleBindingPlan {
 	plan := namespaceRoleBindingPlan{
-		common:     map[string]rbac.AdditionalRoleBindingsSpec{},
-		promotions: map[string]map[string]rbac.AdditionalRoleBindingsSpec{},
+		common: map[string]rbac.AdditionalRoleBindingsSpec{},
 	}
 
 	for _, binding := range tenant.GetRoleBindings() {
@@ -60,16 +81,6 @@ func prepareNamespaceRoleBindings(tenant *capsulev1beta2.Tenant) namespaceRoleBi
 		plan.rules = append(plan.rules, namespaceRoleBindingRule{
 			index: i, selector: rule.NamespaceSelector, bindings: bindings,
 		})
-	}
-
-	for _, promotion := range tenant.GetPromotionRoleBindings() {
-		namespace := string(promotion.Namespace)
-		if plan.promotions[namespace] == nil {
-			plan.promotions[namespace] = map[string]rbac.AdditionalRoleBindingsSpec{}
-		}
-
-		binding := promotion.AdditionalRoleBindingsSpec
-		plan.promotions[namespace][utils.RoleBindingHashFunc(binding)] = binding
 	}
 
 	return plan
@@ -102,6 +113,7 @@ func (r *Manager) syncAdditionalRoleBinding(
 	tenant *capsulev1beta2.Tenant,
 	ns string,
 	bindings map[string]rbac.AdditionalRoleBindingsSpec,
+	prune bool,
 ) (err error) {
 	keys := []string{}
 
@@ -170,6 +182,10 @@ func (r *Manager) syncAdditionalRoleBinding(
 		log.V(4).Info("RoleBinding sync result", "result", result, "name", target.Name, "namespace", target.Namespace)
 	}
 
-	// Prune at finish to prevent gaps
+	if !prune {
+		return nil
+	}
+
+	// Prune at finish to prevent gaps.
 	return r.pruningResources(ctx, ns, keys, &rbacv1.RoleBinding{})
 }

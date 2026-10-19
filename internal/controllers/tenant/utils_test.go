@@ -42,6 +42,25 @@ func TestReadyTenantNamespaces(t *testing.T) {
 					}},
 				},
 				{
+					Name:       "permissions-failed",
+					Conditions: meta.ConditionList{{Type: meta.ReadyCondition, Status: metav1.ConditionFalse, Reason: meta.PermissionsFailedReason}},
+				},
+				{
+					Name:       "profile-failed",
+					Conditions: meta.ConditionList{{Type: meta.ReadyCondition, Status: metav1.ConditionFalse, Reason: meta.FailedReason}},
+				},
+				{
+					Name:       "unknown-permissions",
+					Conditions: meta.ConditionList{{Type: meta.ReadyCondition, Status: metav1.ConditionUnknown, Reason: meta.PermissionsFailedReason}},
+				},
+				{
+					Name: "terminating-permissions-failed",
+					Conditions: meta.ConditionList{
+						{Type: meta.ReadyCondition, Status: metav1.ConditionFalse, Reason: meta.PermissionsFailedReason},
+						{Type: meta.TerminatingCondition, Status: metav1.ConditionTrue},
+					},
+				},
+				{
 					Name: "terminating",
 					Conditions: meta.ConditionList{{
 						Type:   meta.TerminatingCondition,
@@ -53,8 +72,8 @@ func TestReadyTenantNamespaces(t *testing.T) {
 	}
 
 	got := readyTenantNamespaces(tenant)
-	if len(got) != 2 || got[0] != "without-condition" || got[1] != "ready" {
-		t.Fatalf("readyTenantNamespaces() = %v, want [without-condition ready]", got)
+	if len(got) != 3 || got[0] != "without-condition" || got[1] != "ready" || got[2] != "permissions-failed" {
+		t.Fatalf("readyTenantNamespaces() = %v, want [without-condition ready permissions-failed]", got)
 	}
 }
 
@@ -125,7 +144,8 @@ func TestRunGarbageCollection(t *testing.T) {
 				&corev1.Namespace{
 					Name:              "terminating",
 					DeletionTimestamp: &now,
-					Finalizers:        []string{"test.projectcapsule.dev/finalizer"}},
+					Finalizers:        []string{"test.projectcapsule.dev/finalizer"},
+				},
 			}
 
 			managedLabels := map[string]string{

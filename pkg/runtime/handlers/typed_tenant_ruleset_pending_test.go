@@ -52,7 +52,8 @@ func pendingRulesFixture(tb testing.TB, state string, tenants, count int) (clien
 		objects = append(objects, &capsulev1beta2.Tenant{Name: fmt.Sprintf("tenant-%d", i), UID: types.UID(fmt.Sprintf("tenant-%d-uid", i))})
 	}
 	for _, name := range []string{"selected", "plain", "foreign"} {
-		ns := &corev1.Namespace{Name: name, UID: types.UID(name), Labels: map[string]string{"profile": "guarded"},
+		ns := &corev1.Namespace{
+			Name: name, UID: types.UID(name), Labels: map[string]string{"profile": "guarded"},
 			OwnerReferences: []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: tnt.Name, UID: tnt.UID}},
 		}
 		if name == "plain" {
@@ -91,7 +92,8 @@ func pendingRulesRequest(tb testing.TB, namespace string, operation admissionv1.
 	tb.Helper()
 	raw, err := json.Marshal(&corev1.Service{Name: "service", Namespace: namespace, Spec: corev1.ServiceSpec{Type: serviceType, Ports: []corev1.ServicePort{{Port: 80}}}})
 	require.NoError(tb, err)
-	return admission.Request{Operation: operation, Namespace: namespace, Name: "service",
+	return admission.Request{
+		Operation: operation, Namespace: namespace, Name: "service",
 		Kind: metav1.GroupVersionKind{Version: "v1", Kind: "Service"}, Object: runtime.RawExtension{Raw: raw}, OldObject: runtime.RawExtension{Raw: raw},
 	}
 }
@@ -126,11 +128,7 @@ func TestRulesetAdmissionEnforcesPendingProfiles(t *testing.T) {
 					} else {
 						require.Nil(t, response, "allowed requests must continue the handler chain")
 					}
-					want := 2 // Tenant resolution plus the existing fallback read.
-					if state == "current" {
-						want = 1
-					}
-					require.Equal(t, want, reads)
+					require.Equal(t, 1, reads, "fallback must reuse the ownership snapshot")
 				}
 			})
 		}
@@ -138,17 +136,24 @@ func TestRulesetAdmissionEnforcesPendingProfiles(t *testing.T) {
 }
 
 func TestPendingRulesetReadErrorsDoNotAllowRequests(t *testing.T) {
-	for _, target := range []string{"ruleset", "fallback"} {
+	for _, target := range []string{"ruleset", "namespace", "tenant"} {
 		t.Run(target, func(t *testing.T) {
 			cl, handler := pendingRulesFixture(t, "pending", 2, 1)
 			readErr := errors.New("profile reader unavailable")
-			var namespaces, reads atomic.Int32
+			var reads atomic.Int32
+			rulesetDone := make(chan struct{})
 			reader := interceptor.NewClient(cl, interceptor.Funcs{Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 				reads.Add(1)
-				if _, ok := obj.(*capsulev1beta2.RuleStatus); ok && target == "ruleset" {
+				if _, ok := obj.(*capsulev1beta2.RuleStatus); ok {
+					defer close(rulesetDone)
+					if target == "ruleset" {
+						return readErr
+					}
+				}
+				if _, ok := obj.(*corev1.Namespace); ok && target == "namespace" {
 					return readErr
 				}
-				if _, ok := obj.(*corev1.Namespace); ok && namespaces.Add(1) == 2 && target == "fallback" {
+				if _, ok := obj.(*capsulev1beta2.Tenant); ok && target == "tenant" {
 					return readErr
 				}
 				return c.Get(ctx, key, obj, opts...)
@@ -156,6 +161,7 @@ func TestPendingRulesetReadErrorsDoNotAllowRequests(t *testing.T) {
 			fn := handler.OnCreate(reader, reader, admission.NewDecoder(cl.Scheme()), events.NewDiscardRecorder())
 			req := pendingRulesRequest(t, "selected", admissionv1.Create, corev1.ServiceTypeNodePort)
 			response := fn(t.Context(), req)
+			<-rulesetDone
 			require.NotNil(t, response)
 			require.False(t, response.Allowed)
 			require.Contains(t, response.Result.Message, readErr.Error())
@@ -183,10 +189,9 @@ func TestPendingRulesetReusesAuthoritativeNamespaceSnapshot(t *testing.T) {
 	cached := fake.NewClientBuilder().WithScheme(cl.Scheme()).WithObjects(stale).Build()
 	for _, operation := range []admissionv1.Operation{admissionv1.Create, admissionv1.Update} {
 		namespaces.Store(0)
-		requestReader := webhookutils.NewRequestCachingReader(reader)
-		fn := handler.OnCreate(cached, requestReader, admission.NewDecoder(cl.Scheme()), events.NewDiscardRecorder())
+		fn := handler.OnCreate(cached, reader, admission.NewDecoder(cl.Scheme()), events.NewDiscardRecorder())
 		if operation == admissionv1.Update {
-			fn = handler.OnUpdate(cached, requestReader, admission.NewDecoder(cl.Scheme()), events.NewDiscardRecorder())
+			fn = handler.OnUpdate(cached, reader, admission.NewDecoder(cl.Scheme()), events.NewDiscardRecorder())
 		}
 		response := fn(t.Context(), pendingRulesRequest(t, "selected", operation, corev1.ServiceTypeNodePort))
 		require.NotNil(t, response)

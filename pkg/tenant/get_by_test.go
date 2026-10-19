@@ -8,11 +8,6 @@ import (
 	"reflect"
 	"testing"
 
-	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/api/rbac"
-	"github.com/projectcapsule/capsule/pkg/tenant"
-	"github.com/projectcapsule/capsule/pkg/users"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,6 +15,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
+	"github.com/projectcapsule/capsule/pkg/tenant"
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 func TestTenantByStatusNamespace(t *testing.T) {
@@ -72,10 +73,12 @@ func TestGetTenantByNamespace(t *testing.T) {
 		tnt,
 		&corev1.Namespace{
 			Name:            "ns-a",
-			OwnerReferences: []metav1.OwnerReference{tenantOwnerReference("tenant-a", "tenant-uid")}},
+			OwnerReferences: []metav1.OwnerReference{tenantOwnerReference("tenant-a", "tenant-uid")},
+		},
 		&corev1.Namespace{
 			Name:            "ns-mismatch",
-			OwnerReferences: []metav1.OwnerReference{tenantOwnerReference("tenant-a", "other-uid")}},
+			OwnerReferences: []metav1.OwnerReference{tenantOwnerReference("tenant-a", "other-uid")},
+		},
 		&corev1.Namespace{Name: "ns-unowned"},
 	)
 
@@ -113,6 +116,51 @@ func TestGetTenantByNamespace(t *testing.T) {
 
 	if _, err = tenant.GetTenantByNamespace(ctx, cl, "ns-mismatch"); err == nil {
 		t.Fatalf("GetTenantByNamespace() expected UID mismatch error")
+	}
+}
+
+func TestGetTenantByNamespaceWithSnapshot(t *testing.T) {
+	for _, mode := range []string{"owned", "unowned", "missing-tenant", "missing-namespace", "foreign-uid"} {
+		t.Run(mode, func(t *testing.T) {
+			tnt := tenantObject("tenant-a", withUID("tenant-uid"))
+			ns := &corev1.Namespace{Name: "selected", Labels: map[string]string{"profile": "guarded"}, OwnerReferences: []metav1.OwnerReference{tenantOwnerReference(tnt.Name, tnt.UID)}}
+			objects := []client.Object{tnt, ns}
+			switch mode {
+			case "unowned":
+				ns.OwnerReferences = nil
+			case "missing-tenant":
+				objects = []client.Object{ns}
+			case "missing-namespace":
+				objects = []client.Object{tnt}
+			case "foreign-uid":
+				ns.OwnerReferences[0].UID = "foreign-uid"
+			}
+			cl := tenantFakeClient(t, objects...)
+			got, snapshot, err := tenant.GetTenantByNamespaceWithSnapshot(t.Context(), cl, ns.Name)
+			if (err != nil) != (mode == "foreign-uid") {
+				t.Fatalf("unexpected owner resolution error: %v", err)
+			}
+			if (got != nil) != (mode == "owned") {
+				t.Fatalf("wrong tenant resolution: %+v", got)
+			}
+			if mode == "missing-namespace" {
+				if snapshot != nil {
+					t.Fatal("missing namespace returned a snapshot")
+				}
+				return
+			}
+			if snapshot == nil || snapshot.Name != ns.Name || snapshot.Labels["profile"] != "guarded" {
+				t.Fatalf("lost namespace snapshot: %+v", snapshot)
+			}
+			snapshot.Labels["profile"] = "changed"
+			stored := &corev1.Namespace{}
+			if err := cl.Get(t.Context(), client.ObjectKeyFromObject(ns), stored); err != nil {
+				t.Fatal(err)
+			}
+			if stored.Labels["profile"] != "guarded" {
+				t.Fatal("caller mutated the reader's namespace object")
+			}
+		})
 	}
 }
 
@@ -190,7 +238,8 @@ func TestGetTenantByLabelsAndUser(t *testing.T) {
 	)
 
 	got, err := tenant.GetTenantByLabels(ctx, cl, &corev1.Namespace{
-		Labels: map[string]string{meta.TenantLabel: "tenant-a"}})
+		Labels: map[string]string{meta.TenantLabel: "tenant-a"},
+	})
 	if err != nil {
 		t.Fatalf("GetTenantByLabels() unexpected error: %v", err)
 	}
@@ -199,7 +248,8 @@ func TestGetTenantByLabelsAndUser(t *testing.T) {
 	}
 
 	got, err = tenant.GetTenantByLabelsAndUser(ctx, cl, nil, &corev1.Namespace{
-		Labels: map[string]string{meta.TenantLabel: "tenant-a"}}, users.NewAdmissionUser(users.AdmissionUserUnknown, authenticationv1.UserInfo{Username: "alice"}))
+		Labels: map[string]string{meta.TenantLabel: "tenant-a"},
+	}, users.NewAdmissionUser(users.AdmissionUserUnknown, authenticationv1.UserInfo{Username: "alice"}))
 	if err != nil {
 		t.Fatalf("GetTenantByLabelsAndUser() unexpected error: %v", err)
 	}
@@ -208,7 +258,8 @@ func TestGetTenantByLabelsAndUser(t *testing.T) {
 	}
 
 	if _, err = tenant.GetTenantByLabelsAndUser(ctx, cl, nil, &corev1.Namespace{
-		Labels: map[string]string{meta.TenantLabel: "tenant-a"}}, users.NewAdmissionUser(users.AdmissionUserUnknown, authenticationv1.UserInfo{Username: "bob"})); err == nil {
+		Labels: map[string]string{meta.TenantLabel: "tenant-a"},
+	}, users.NewAdmissionUser(users.AdmissionUserUnknown, authenticationv1.UserInfo{Username: "bob"})); err == nil {
 		t.Fatalf("GetTenantByLabelsAndUser() expected non-owner error")
 	}
 

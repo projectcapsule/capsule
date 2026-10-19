@@ -139,6 +139,7 @@ func TestSyncAdditionalRoleBindingDoesNotMutateSpecMetadata(t *testing.T) {
 		tenant,
 		"green-app",
 		map[string]rbac.AdditionalRoleBindingsSpec{"hash": binding},
+		true,
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -167,7 +168,7 @@ func TestRoleBindingClientResponsesCannotMutateSharedSubjects(t *testing.T) {
 	desired := rbac.AdditionalRoleBindingsSpec{ClusterRoleName: "view", Subjects: []rbacv1.Subject{{Kind: rbacv1.UserKind, Name: "alice", APIGroup: rbacv1.GroupName}}}
 	bindings := map[string]rbac.AdditionalRoleBindingsSpec{"hash": desired}
 	for _, namespace := range []string{"namespace-a", "namespace-b"} {
-		if err := r.syncAdditionalRoleBinding(t.Context(), logr.Discard(), tnt, namespace, bindings); err != nil {
+		if err := r.syncAdditionalRoleBinding(t.Context(), logr.Discard(), tnt, namespace, bindings, true); err != nil {
 			t.Fatal(err)
 		}
 		if desired.Subjects[0].Name != "alice" || bindings["hash"].Subjects[0].Name != "alice" {

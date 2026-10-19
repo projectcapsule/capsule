@@ -88,7 +88,7 @@ func (r *Manager) reconcileNamespaceProvisioning(ctx context.Context, request re
 			}
 		}
 
-		plan := prepareNamespaceRoleBindings(tnt)
+		plan := prepareNamespaceProvisioningRoleBindings(tnt)
 		_, err := r.provisionNamespaceLocked(ctx, ctrl.LoggerFrom(ctx), ns, tnt, &plan)
 
 		return err
@@ -219,13 +219,13 @@ func (r *Manager) provisionNamespaceLocked(ctx context.Context, log logr.Logger,
 
 	if bindingErr == nil {
 		bindingErr = r.runPhase(log, "namespace_role_bindings", func() error {
-			return r.syncAdditionalRoleBinding(ctx, log, snapshot, ns.Name, bindings)
+			return r.syncAdditionalRoleBinding(ctx, log, snapshot, ns.Name, bindings, plan.prune)
 		})
 	}
 
 	if bindingErr != nil {
 		ready := meta.NewReadyCondition(ns)
-		ready.Status, ready.Reason, ready.Message = metav1.ConditionFalse, meta.FailedReason, fmt.Sprintf("Failed to reconcile namespace permissions: %v", bindingErr)
+		ready.Status, ready.Reason, ready.Message = metav1.ConditionFalse, meta.PermissionsFailedReason, fmt.Sprintf("Failed to reconcile namespace permissions: %v", bindingErr)
 		stat.Conditions.UpdateConditionByType(ready)
 	}
 

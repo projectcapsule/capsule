@@ -16,6 +16,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -24,10 +25,84 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 )
+
+func TestResourcePoliciesConvergeAfterPermissionFailures(t *testing.T) {
+	for _, phase := range []string{"bindings", "pruning", "profile"} {
+		t.Run(phase, func(t *testing.T) {
+			tnt := provisioningTenant()
+			tnt.Spec.NetworkPolicies.Items = []networkingv1.NetworkPolicySpec{{PodSelector: metav1.LabelSelector{}}}
+			tnt.Spec.LimitRanges.Items = []corev1.LimitRangeSpec{{Limits: []corev1.LimitRangeItem{{Type: corev1.LimitTypeContainer, DefaultRequest: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("10m")}}}}}
+			tnt.Spec.ResourceQuota = api.ResourceQuotaSpec{Scope: api.ResourceQuotaScopeNamespace, Items: []corev1.ResourceQuotaSpec{{Hard: corev1.ResourceList{corev1.ResourceConfigMaps: resource.MustParse("10")}}}}
+			ns := cleanupOwnedNamespace(tnt, "selected", false)
+			other := &capsulev1beta2.Tenant{Name: "tenant-b", UID: "tenant-b-uid"}
+			foreign := cleanupOwnedNamespace(other, "foreign", false)
+			r, _ := namespaceCleanupFixture(t, tnt, ns, other, foreign)
+			base := r.Client
+			failure := errors.New("injected " + phase + " failure")
+			r.Client = interceptor.NewClient(base.(client.WithWatch), interceptor.Funcs{
+				Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+					_, binding := obj.(*rbacv1.RoleBinding)
+					_, profile := obj.(*capsulev1beta2.RuleStatus)
+					if (binding && phase == "bindings") || (profile && phase == "profile") {
+						return failure
+					}
+					return c.Create(ctx, obj, opts...)
+				},
+				List: func(ctx context.Context, c client.WithWatch, obj client.ObjectList, opts ...client.ListOption) error {
+					if _, ok := obj.(*rbacv1.RoleBindingList); ok && phase == "pruning" {
+						return failure
+					}
+					return c.List(ctx, obj, opts...)
+				},
+			})
+			snapshot := tnt.DeepCopy()
+			if err := r.reconcile(t.Context(), logr.Discard(), snapshot); !errors.Is(err, failure) {
+				t.Fatalf("lost reconciliation failure: %v", err)
+			}
+			status := snapshot.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{Name: ns.Name})
+			ready := status.Conditions.GetConditionByType(meta.ReadyCondition)
+			wantReason := meta.PermissionsFailedReason
+			wantResources := 1
+			if phase == "profile" {
+				wantReason, wantResources = meta.FailedReason, 0
+			}
+			if ready == nil || ready.Status != metav1.ConditionFalse || ready.Reason != wantReason {
+				t.Fatalf("wrong failure condition: %+v", ready)
+			}
+			policies, limits, quotas := &networkingv1.NetworkPolicyList{}, &corev1.LimitRangeList{}, &corev1.ResourceQuotaList{}
+			for _, list := range []client.ObjectList{policies, limits, quotas} {
+				if err := base.List(t.Context(), list, client.InNamespace(ns.Name)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if len(policies.Items) != wantResources || len(limits.Items) != wantResources || len(quotas.Items) != wantResources {
+				t.Fatalf("resource phases blocked by %s: policies=%d limits=%d quotas=%d", phase, len(policies.Items), len(limits.Items), len(quotas.Items))
+			}
+			assertBindingSubject(t, t.Context(), base, foreign.Name, "alice", false)
+			foreignPolicies := &networkingv1.NetworkPolicyList{}
+			if err := base.List(t.Context(), foreignPolicies, client.InNamespace(foreign.Name)); err != nil {
+				t.Fatal(err)
+			}
+			if len(foreignPolicies.Items) != 0 {
+				t.Fatal("Tenant A policies leaked to Tenant B")
+			}
+			r.Client = base
+			if err := r.reconcile(t.Context(), logr.Discard(), snapshot); err != nil {
+				t.Fatal(err)
+			}
+			ready = snapshot.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{Name: ns.Name}).Conditions.GetConditionByType(meta.ReadyCondition)
+			if ready == nil || ready.Status != metav1.ConditionTrue {
+				t.Fatalf("permissions did not recover: %+v", ready)
+			}
+			assertBindingSubject(t, t.Context(), base, ns.Name, "alice", true)
+		})
+	}
+}
 
 func TestNamespacePermissionsReuseTheProfileNamespace(t *testing.T) {
 	tnt := &capsulev1beta2.Tenant{Name: "tenant-a", UID: "tenant-a-uid", Spec: capsulev1beta2.TenantSpec{
