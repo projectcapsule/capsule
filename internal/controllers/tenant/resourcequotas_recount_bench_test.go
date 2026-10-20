@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	mockclient "github.com/projectcapsule/capsule/internal/mocks/client"
@@ -20,6 +21,14 @@ import (
 )
 
 func BenchmarkLegacyQuotaRecount(b *testing.B) {
+	benchmarkLegacyQuotaRecount(b, false)
+}
+
+func BenchmarkLegacyQuotaRecoveryQueue(b *testing.B) {
+	benchmarkLegacyQuotaRecount(b, true)
+}
+
+func benchmarkLegacyQuotaRecount(b *testing.B, queue bool) {
 	for _, unrelated := range []int{0, 127} {
 		for _, namespaces := range []int{1, 16} {
 			for _, coordination := range []struct{ pending, deleting int }{{}, {pending: 16}, {deleting: 16}, {pending: 16, deleting: 16}} {
@@ -65,14 +74,21 @@ func BenchmarkLegacyQuotaRecount(b *testing.B) {
 					calls := &mockclient.CallCounter{}
 					c := interceptor.NewClient(r.Client.(client.WithWatch), calls.Interceptors())
 					r.Client, r.reader = c, c
-					if err := r.syncCustomResourceQuotaUsages(b.Context(), tnt); err != nil {
+					run := func() error { return r.syncCustomResourceQuotaUsages(b.Context(), tnt) }
+					if queue {
+						run = func() error {
+							_, err := r.reconcileResourceQuotas(b.Context(), reconcile.Request{Name: tnt.Name})
+							return err
+						}
+					}
+					if err := run(); err != nil {
 						b.Fatal(err)
 					}
 					calls.Reset()
 					b.ReportAllocs()
 					b.ResetTimer()
 					for b.Loop() {
-						if err := r.syncCustomResourceQuotaUsages(b.Context(), tnt); err != nil {
+						if err := run(); err != nil {
 							b.Fatal(err)
 						}
 					}

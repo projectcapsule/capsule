@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	admissionv1 "k8s.io/api/admission/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -26,6 +27,96 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
+
+func TestLegacyQuotaDeleteRenewsEachAdmissionAttempt(t *testing.T) {
+	for _, mode := range []string{"new-attempt", "same-live-attempt", "same-expired-attempt", "unknown-object-uid", "dry-run"} {
+		t.Run(mode, func(t *testing.T) {
+			c := legacyQuotaFixture(t, 2)
+			req := legacyQuotaRequest(admissionv1.Delete)
+			req.UID = "first-delete"
+			if mode == "unknown-object-uid" {
+				req.OldObject = quotaTestObject(req.Namespace, req.Name, "")
+			}
+			require.Nil(t, invokeLegacyQuota(t.Context(), c, c, req))
+			current := &capsulev1beta2.Tenant{}
+			require.NoError(t, c.Get(t.Context(), client.ObjectKey{Name: "tenant-0"}, current))
+			state, err := tenant.ReadLegacyQuotaReservations(current.Annotations)
+			require.NoError(t, err)
+			now := metav1.Now()
+			old := &state.Deleting[quotaTestResource][0]
+			old.CreatedAt = metav1.NewTime(now.Add(-119 * time.Second))
+			expiry := metav1.NewTime(now.Add(time.Second))
+			if mode == "same-live-attempt" {
+				expiry = metav1.NewTime(now.Add(30 * time.Second))
+			}
+			if mode == "same-expired-attempt" {
+				expiry = metav1.NewTime(now.Add(-time.Second))
+			}
+			old.ExpiresAt = &expiry
+			require.NoError(t, tenant.WriteLegacyQuotaReservations(current.Annotations, state))
+			require.NoError(t, c.Update(t.Context(), current))
+			before := current.DeepCopy()
+			if mode != "same-live-attempt" && mode != "same-expired-attempt" {
+				req.UID = "next-delete"
+			}
+			if mode == "dry-run" {
+				req.DryRun = new(true)
+			}
+			require.Nil(t, invokeLegacyQuota(t.Context(), c, c, req))
+			require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(current), current))
+			if mode == "same-live-attempt" || mode == "dry-run" {
+				require.Equal(t, before, current)
+				return
+			}
+			state, err = tenant.ReadLegacyQuotaReservations(current.Annotations)
+			require.NoError(t, err)
+			require.Len(t, state.Deleting[quotaTestResource], 1, "renewal must remain bounded per object")
+			renewed := state.Deleting[quotaTestResource][0]
+			require.Equal(t, string(req.UID), renewed.ID)
+			require.True(t, renewed.ExpiresAt.After(now.Add(119*time.Second)), "new attempts need a full deletion window")
+			require.Equal(t, "1", current.Annotations[capsulev1beta2.UsedAnnotationForResource(quotaTestResource)])
+			foreign := &capsulev1beta2.Tenant{}
+			require.NoError(t, c.Get(t.Context(), client.ObjectKey{Name: "tenant-1"}, foreign))
+			require.NotContains(t, foreign.Annotations, tenant.LegacyQuotaReservationsAnnotation)
+		})
+	}
+}
+
+func TestLegacyQuotaAdmissionRespectsCompleteAnnotationBudget(t *testing.T) {
+	for _, operation := range []admissionv1.Operation{admissionv1.Create, admissionv1.Delete} {
+		t.Run(string(operation), func(t *testing.T) {
+			base := legacyQuotaFixture(t, 2)
+			current := &capsulev1beta2.Tenant{}
+			require.NoError(t, base.Get(t.Context(), client.ObjectKey{Name: "tenant-0"}, current))
+			current.Annotations[capsulev1beta2.LimitAnnotationForResource(quotaTestResource)] = "11"
+			current.Annotations[capsulev1beta2.UsedAnnotationForResource(quotaTestResource)] = "9"
+			size := len("unrelated.example.com/padding")
+			for key, value := range current.Annotations {
+				size += len(key) + len(value)
+			}
+			current.Annotations["unrelated.example.com/padding"] = strings.Repeat("x", apivalidation.TotalAnnotationSizeLimitB-size)
+			require.NoError(t, apivalidation.ValidateAnnotationsSize(current.Annotations))
+			require.NoError(t, base.Update(t.Context(), current))
+			before := current.DeepCopy()
+			writes := 0
+			c := interceptor.NewClient(base, interceptor.Funcs{Update: func(ctx context.Context, cl client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
+				writes++
+				require.NoError(t, apivalidation.ValidateAnnotationsSize(obj.GetAnnotations()), "oversized metadata must be caught before API I/O")
+				return cl.Update(ctx, obj, opts...)
+			}})
+			response := invokeLegacyQuota(t.Context(), c, c, legacyQuotaRequest(operation))
+			if operation == admissionv1.Create {
+				require.NotNil(t, response)
+				require.Contains(t, response.Result.Message, "capacity exceeded")
+			} else {
+				require.Nil(t, response, "full metadata must not prevent deletion")
+			}
+			require.Zero(t, writes)
+			require.NoError(t, base.Get(t.Context(), client.ObjectKeyFromObject(current), current))
+			require.Equal(t, before, current)
+		})
+	}
+}
 
 func TestLegacyQuotaObjectUIDAndDeleteSafety(t *testing.T) {
 	for _, mode := range []string{"changed-create-uid", "changed-name", "wrong-namespace", "delete-older", "delete-matching", "delete-unknown", "duplicate-delete", "dry-run", "malformed-old", "capacity-delete", "capacity-create"} {

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"time"
 
+	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -112,9 +113,7 @@ func WriteLegacyQuotaReservations(annotations map[string]string, reservations *L
 	}
 
 	if count == 0 && len(reservations.Namespaces) == 0 {
-		delete(annotations, LegacyQuotaReservationsAnnotation)
-
-		return nil
+		return writeLegacyQuotaState(annotations, "")
 	}
 	// Bound admission work and leave room for the Tenant's existing annotations.
 	if count > 1024 {
@@ -130,7 +129,29 @@ func WriteLegacyQuotaReservations(annotations map[string]string, reservations *L
 		return fmt.Errorf("%w: legacy quota reservations exceed metadata budget; retry after reconciliation", ErrLegacyQuotaStateCapacity)
 	}
 
-	annotations[LegacyQuotaReservationsAnnotation] = string(value)
+	return writeLegacyQuotaState(annotations, string(value))
+}
+
+func writeLegacyQuotaState(annotations map[string]string, value string) error {
+	previous, existed := annotations[LegacyQuotaReservationsAnnotation]
+
+	if value == "" {
+		delete(annotations, LegacyQuotaReservationsAnnotation)
+	} else {
+		annotations[LegacyQuotaReservationsAnnotation] = value
+	}
+
+	// Kubernetes counts every annotation key and value. Callers prepare usage
+	// updates before this write, so validation includes the complete final map.
+	if err := apivalidation.ValidateAnnotationsSize(annotations); err != nil {
+		if existed {
+			annotations[LegacyQuotaReservationsAnnotation] = previous
+		} else {
+			delete(annotations, LegacyQuotaReservationsAnnotation)
+		}
+
+		return fmt.Errorf("%w: total Tenant annotations exceed metadata budget: %w", ErrLegacyQuotaStateCapacity, err)
+	}
 
 	return nil
 }

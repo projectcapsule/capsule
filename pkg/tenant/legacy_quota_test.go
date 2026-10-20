@@ -4,16 +4,64 @@
 package tenant
 
 import (
+	"maps"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
+
+func TestLegacyQuotaTotalAnnotationBudget(t *testing.T) {
+	for _, mode := range []string{"below", "exact", "over", "replace", "remove", "usage-growth"} {
+		t.Run(mode, func(t *testing.T) {
+			state, err := ReadLegacyQuotaReservations(nil)
+			require.NoError(t, err)
+			state.Pending["widgets.example.com_v1"] = []LegacyQuotaReservation{testLegacyReservation(time.Now())}
+			annotations := map[string]string{"used": "9"}
+			require.NoError(t, WriteLegacyQuotaReservations(annotations, state))
+			size := len("unrelated.example.com/padding")
+			for key, value := range annotations {
+				size += len(key) + len(value)
+			}
+			padding := apivalidation.TotalAnnotationSizeLimitB - size
+			if mode == "below" {
+				padding--
+			}
+			if mode == "over" {
+				padding++
+			}
+			annotations["unrelated.example.com/padding"] = strings.Repeat("x", padding)
+			if mode == "replace" {
+				annotations[LegacyQuotaReservationsAnnotation] = "{}"
+			}
+			if mode == "remove" {
+				clear(state.Pending)
+			}
+			if mode == "usage-growth" {
+				annotations["used"] = "10"
+			}
+			before := maps.Clone(annotations)
+			err = WriteLegacyQuotaReservations(annotations, state)
+			if mode == "over" || mode == "usage-growth" {
+				require.ErrorIs(t, err, ErrLegacyQuotaStateCapacity)
+				require.Equal(t, before, annotations, "failed preflight must restore the previous reservation value")
+			} else {
+				require.NoError(t, err)
+				require.NoError(t, apivalidation.ValidateAnnotationsSize(annotations))
+				if mode == "remove" {
+					require.NotContains(t, annotations, LegacyQuotaReservationsAnnotation)
+				}
+			}
+			require.Equal(t, before["unrelated.example.com/padding"], annotations["unrelated.example.com/padding"])
+		})
+	}
+}
 
 func testLegacyReservation(now time.Time) LegacyQuotaReservation {
 	expires := metav1.NewTime(now.Add(2 * time.Minute))

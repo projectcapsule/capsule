@@ -110,12 +110,11 @@ func (r *resourceCounterHandler) OnCreate(
 			})
 
 			reservations.Namespaces[ns.Name] = ns.UID
+			tnt.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)] = fmt.Sprintf("%d", used+1)
 
 			if err := tenant.WriteLegacyQuotaReservations(tnt.Annotations, reservations); err != nil {
 				return false, err
 			}
-
-			tnt.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)] = fmt.Sprintf("%d", used+1)
 
 			return true, nil
 		})
@@ -171,41 +170,13 @@ func (r *resourceCounterHandler) OnDelete(
 				return false, err
 			}
 
-			for _, pending := range reservations.Deleting[kgv] {
-				if pending.NamespaceUID == ns.UID && pending.ObjectRef.Namespace == req.Namespace && pending.ObjectRef.Name == object.Name && pending.ObjectRef.UID == object.UID {
-					return false, nil
-				}
+			if !trackLegacyQuotaDeletion(reservations, kgv, ns.UID, req, object) {
+				return false, nil
 			}
 
-			active := reservations.Pending[kgv][:0]
-
-			for _, pending := range reservations.Pending[kgv] {
-				if object.UID == "" || pending.NamespaceUID != ns.UID || pending.ObjectRef.Namespace != req.Namespace || pending.ObjectRef.Name != object.Name || pending.ObjectRef.UID != object.UID {
-					active = append(active, pending)
-				}
-			}
-
-			reservations.Pending[kgv] = active
-			if reservations.Deleting == nil {
-				reservations.Deleting = make(map[string][]tenant.LegacyQuotaDeletion)
-			}
-
-			now := metav1.Now()
-			expires := metav1.NewTime(now.Add(2 * time.Minute))
-
-			id := string(req.UID)
-			if id == "" {
-				id = string(uuid.NewUUID())
-			}
-
-			reservations.Deleting[kgv] = append(reservations.Deleting[kgv], tenant.LegacyQuotaDeletion{
-				ID: id, CreatedAt: now,
-				ObjectRef:    capsulev1beta2.QuantityLedgerObjectRef{APIGroup: req.Resource.Group, APIVersion: req.Resource.Version, Kind: req.Kind.Kind, Namespace: req.Namespace, Name: object.Name, UID: object.UID},
-				NamespaceUID: ns.UID, ExpiresAt: &expires,
-			})
 			if err := tenant.WriteLegacyQuotaReservations(tnt.Annotations, reservations); err != nil {
-				// Existing bounded coordination work already schedules recounts.
-				// A full hint queue must not prevent deleting an object to free quota.
+				// Configured limits keep the independent quota queue recounting
+				// even when tracking cannot fit or all existing entries drain.
 				if errors.Is(err, tenant.ErrLegacyQuotaStateCapacity) {
 					return false, nil
 				}
@@ -221,6 +192,59 @@ func (r *resourceCounterHandler) OnDelete(
 
 		return nil
 	}
+}
+
+func trackLegacyQuotaDeletion(reservations *tenant.LegacyQuotaReservations, kgv string, namespaceUID types.UID, req admission.Request, object *metav1.PartialObjectMetadata) bool {
+	now := metav1.Now()
+
+	id := string(req.UID)
+	if id == "" {
+		id = string(uuid.NewUUID())
+	}
+
+	index := -1
+
+	for i, pending := range reservations.Deleting[kgv] {
+		if pending.NamespaceUID == namespaceUID && pending.ObjectRef.Namespace == req.Namespace && pending.ObjectRef.Name == object.Name && pending.ObjectRef.UID == object.UID {
+			if pending.ID == id && pending.ExpiresAt.After(now.Time) {
+				return false
+			}
+
+			index = i
+
+			break
+		}
+	}
+
+	active := reservations.Pending[kgv][:0]
+
+	for _, pending := range reservations.Pending[kgv] {
+		if object.UID == "" || pending.NamespaceUID != namespaceUID || pending.ObjectRef.Namespace != req.Namespace || pending.ObjectRef.Name != object.Name || pending.ObjectRef.UID != object.UID {
+			active = append(active, pending)
+		}
+	}
+
+	reservations.Pending[kgv] = active
+
+	expires := metav1.NewTime(now.Add(2 * time.Minute))
+
+	entry := tenant.LegacyQuotaDeletion{
+		ID: id, CreatedAt: now,
+		ObjectRef:    capsulev1beta2.QuantityLedgerObjectRef{APIGroup: req.Resource.Group, APIVersion: req.Resource.Version, Kind: req.Kind.Kind, Namespace: req.Namespace, Name: object.Name, UID: object.UID},
+		NamespaceUID: namespaceUID, ExpiresAt: &expires,
+	}
+	if index >= 0 {
+		// A new admission attempt gets a full window without growing state.
+		reservations.Deleting[kgv][index] = entry
+	} else {
+		if reservations.Deleting == nil {
+			reservations.Deleting = make(map[string][]tenant.LegacyQuotaDeletion)
+		}
+
+		reservations.Deleting[kgv] = append(reservations.Deleting[kgv], entry)
+	}
+
+	return true
 }
 
 func legacyQuotaAdmissionObject(req admission.Request, decoder admission.Decoder, deleted bool) (*metav1.PartialObjectMetadata, error) {

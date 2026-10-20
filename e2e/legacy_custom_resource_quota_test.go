@@ -15,6 +15,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -41,7 +42,7 @@ var _ = Describe("legacy quota during namespace provisioning", Label("resourcequ
 		DeferCleanup(func() { Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, crd))).To(Succeed()) })
 		// Kubernetes' built-in admin role needs this CRD's permissions aggregated
 		// before a real Tenant owner can exercise its admission policy.
-		role := &rbacv1.ClusterRole{Name: name, Labels: map[string]string{"env": "e2e", "rbac.authorization.k8s.io/aggregate-to-admin": "true"}, Rules: []rbacv1.PolicyRule{{APIGroups: []string{group}, Resources: []string{"widgets"}, Verbs: []string{"create", "get", "list", "delete"}}}}
+		role := &rbacv1.ClusterRole{Name: name, Labels: map[string]string{"env": "e2e", "rbac.authorization.k8s.io/aggregate-to-admin": "true"}, Rules: []rbacv1.PolicyRule{{APIGroups: []string{group}, Resources: []string{"widgets"}, Verbs: []string{"create", "get", "list", "update", "delete"}}}}
 		Expect(k8sClient.Create(ctx, role)).To(Succeed())
 		DeferCleanup(func() { Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, role))).To(Succeed()) })
 		Eventually(func(g Gomega) {
@@ -308,6 +309,152 @@ var _ = Describe("legacy quota during namespace provisioning", Label("resourcequ
 		_, err = admin.Resource(resource).Namespace(allowedNS.Name).Get(ctx, "over-remaining-reservation", metav1.GetOptions{})
 		Expect(apierrors.IsNotFound(err)).To(BeTrue(), "denied object must not persist")
 		currentA := &capsulev1beta2.Tenant{}
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(a), currentA)).To(Succeed())
+		Expect(currentA.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)]).To(Equal("0"))
+
+		By("renewing a later DELETE attempt without growing per-object tracking")
+		Expect(bClient.Resource(resource).Namespace(allowedNS.Name).Delete(ctx, "after-older-delete", metav1.DeleteOptions{})).To(Succeed())
+		Eventually(func() error {
+			current := &capsulev1beta2.Tenant{}
+			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(b), current); err != nil {
+				return err
+			}
+			state, err := capsuletenant.ReadLegacyQuotaReservations(current.Annotations)
+			if err != nil {
+				return err
+			}
+			for i := range state.Pending[kgv] {
+				state.Pending[kgv][i].ExpiresAt = new(metav1.NewTime(time.Now().Add(-time.Minute)))
+			}
+			current.Annotations[capsulev1beta2.LimitAnnotationForResource(kgv)] = "1"
+			if err := capsuletenant.WriteLegacyQuotaReservations(current.Annotations, state); err != nil {
+				return err
+			}
+			return k8sClient.Update(ctx, current)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		expectSettledUsage := func(used string) {
+			Eventually(func(g Gomega) {
+				current := &capsulev1beta2.Tenant{}
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(b), current)).To(Succeed())
+				g.Expect(current.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)]).To(Equal(used))
+				state, err := capsuletenant.ReadLegacyQuotaReservations(current.Annotations)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(state.Pending[kgv]).To(BeEmpty())
+				g.Expect(state.Deleting[kgv]).To(BeEmpty())
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		}
+		expectSettledUsage("0")
+		retained := object("retry-delete")
+		retained.SetFinalizers([]string{"e2e.projectcapsule.dev/hold"})
+		retained, err = bClient.Resource(resource).Namespace(allowedNS.Name).Create(ctx, retained, metav1.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		DeferCleanup(func() {
+			Eventually(func() error {
+				current, err := admin.Resource(resource).Namespace(allowedNS.Name).Get(ctx, retained.GetName(), metav1.GetOptions{})
+				if apierrors.IsNotFound(err) {
+					return nil
+				}
+				if err != nil {
+					return err
+				}
+				current.SetFinalizers(nil)
+				_, err = admin.Resource(resource).Namespace(allowedNS.Name).Update(ctx, current, metav1.UpdateOptions{})
+				return err
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		})
+		expectSettledUsage("1")
+		var priorAttempt metav1.Time
+		Eventually(func() error {
+			current, ns := &capsulev1beta2.Tenant{}, &corev1.Namespace{}
+			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(b), current); err != nil {
+				return err
+			}
+			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(allowedNS), ns); err != nil {
+				return err
+			}
+			state, err := capsuletenant.ReadLegacyQuotaReservations(current.Annotations)
+			if err != nil {
+				return err
+			}
+			priorAttempt = metav1.Now()
+			expires := metav1.NewTime(priorAttempt.Add(30 * time.Second))
+			state.Deleting = map[string][]capsuletenant.LegacyQuotaDeletion{kgv: {{ID: "earlier-rejected-delete", NamespaceUID: ns.UID, CreatedAt: metav1.NewTime(priorAttempt.Add(-90 * time.Second)), ExpiresAt: &expires, ObjectRef: capsulev1beta2.QuantityLedgerObjectRef{Namespace: ns.Name, Name: retained.GetName(), UID: retained.GetUID()}}}}
+			if err := capsuletenant.WriteLegacyQuotaReservations(current.Annotations, state); err != nil {
+				return err
+			}
+			return k8sClient.Update(ctx, current)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		_, err = bClient.Resource(resource).Namespace(allowedNS.Name).Create(ctx, object("before-delete-commits"), metav1.CreateOptions{})
+		Expect(err).To(MatchError(ContainSubstring("has reached quota limit of 1 items")))
+		_, err = admin.Resource(resource).Namespace(allowedNS.Name).Get(ctx, "before-delete-commits", metav1.GetOptions{})
+		Expect(apierrors.IsNotFound(err)).To(BeTrue(), "%v", err)
+		Expect(bClient.Resource(resource).Namespace(allowedNS.Name).Delete(ctx, retained.GetName(), metav1.DeleteOptions{})).To(Succeed())
+		Eventually(func(g Gomega) {
+			current := &capsulev1beta2.Tenant{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(b), current)).To(Succeed())
+			state, err := capsuletenant.ReadLegacyQuotaReservations(current.Annotations)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(state.Deleting[kgv]).To(HaveLen(1))
+			g.Expect(state.Deleting[kgv][0].ID).NotTo(Equal("earlier-rejected-delete"))
+			g.Expect(state.Deleting[kgv][0].ExpiresAt.After(priorAttempt.Add(119 * time.Second))).To(BeTrue())
+			g.Expect(state.Deleting[kgv][0].ObjectRef.UID).To(Equal(retained.GetUID()))
+			persisted, err := bClient.Resource(resource).Namespace(allowedNS.Name).Get(ctx, retained.GetName(), metav1.GetOptions{})
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(persisted.GetDeletionTimestamp()).NotTo(BeNil())
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Eventually(func() error {
+			current, err := bClient.Resource(resource).Namespace(allowedNS.Name).Get(ctx, retained.GetName(), metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			current.SetFinalizers(nil)
+			_, err = bClient.Resource(resource).Namespace(allowedNS.Name).Update(ctx, current, metav1.UpdateOptions{})
+			return err
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		expectSettledUsage("0")
+
+		By("recovering quota after DELETE when the complete annotation budget is full")
+		_, err = bClient.Resource(resource).Namespace(allowedNS.Name).Create(ctx, object("full-metadata"), metav1.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		expectSettledUsage("1")
+		const paddingKey = "e2e.projectcapsule.dev/padding"
+		removePadding := func() error {
+			current := &capsulev1beta2.Tenant{}
+			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(b), current); err != nil {
+				return client.IgnoreNotFound(err)
+			}
+			if _, exists := current.Annotations[paddingKey]; !exists {
+				return nil
+			}
+			delete(current.Annotations, paddingKey)
+			return k8sClient.Update(ctx, current)
+		}
+		DeferCleanup(func() { Eventually(removePadding, defaultTimeoutInterval, defaultPollInterval).Should(Succeed()) })
+		Eventually(func() error {
+			current := &capsulev1beta2.Tenant{}
+			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(b), current); err != nil {
+				return err
+			}
+			delete(current.Annotations, paddingKey)
+			size := len(paddingKey)
+			for key, value := range current.Annotations {
+				size += len(key) + len(value)
+			}
+			current.Annotations[paddingKey] = strings.Repeat("x", apivalidation.TotalAnnotationSizeLimitB-size)
+			return k8sClient.Update(ctx, current)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Expect(bClient.Resource(resource).Namespace(allowedNS.Name).Delete(ctx, "full-metadata", metav1.DeleteOptions{})).To(Succeed())
+		_, err = bClient.Resource(resource).Namespace(allowedNS.Name).Get(ctx, "full-metadata", metav1.GetOptions{})
+		Expect(apierrors.IsNotFound(err)).To(BeTrue(), "%v", err)
+		expectSettledUsage("0")
+		_, err = bClient.Resource(resource).Namespace(allowedNS.Name).Create(ctx, object("metadata-capacity"), metav1.CreateOptions{})
+		Expect(err).To(MatchError(ContainSubstring("capacity exceeded")))
+		_, err = admin.Resource(resource).Namespace(allowedNS.Name).Get(ctx, "metadata-capacity", metav1.GetOptions{})
+		Expect(apierrors.IsNotFound(err)).To(BeTrue(), "%v", err)
+		Eventually(removePadding, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		_, err = bClient.Resource(resource).Namespace(allowedNS.Name).Create(ctx, object("after-metadata-recovery"), metav1.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		expectSettledUsage("1")
 		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(a), currentA)).To(Succeed())
 		Expect(currentA.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)]).To(Equal("0"))
 		TenantNamespaceReady(a, deniedNS, 1)
