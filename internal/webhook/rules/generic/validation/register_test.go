@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
@@ -163,4 +164,8 @@ func requestWithKind(group, kind string) admission.Request {
 			Version: "v1",
 			Kind:    kind,
 		}}
+}
+
+func budgetBenchmarkHandler(matches func(admission.Request) bool) handlers.Handler {
+	return matchingRequest(matches, genericHandler(nil, GenericRules(nil, nil), &disruptionBudgetRules{selectors: cache.NewLabelSelectorCache()}))
 }

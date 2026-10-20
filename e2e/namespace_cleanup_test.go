@@ -40,7 +40,8 @@ var _ = Describe("namespace cleanup and provisioning", Label("namespace-cleanup"
 				NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"profile": "guarded"}},
 				NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{
 					Action: rules.ActionTypeDeny,
-					Metadata: []rules.MetadataRule{{APIGroups: []string{"v1"}, Kinds: []string{"ConfigMap"},
+					Metadata: []rules.MetadataRule{{
+						APIGroups: []string{"v1"}, Kinds: []string{"ConfigMap"},
 						Labels: map[string]rules.MetadataValueRule{blockedLabel: {Values: []apiRuntime.ExpressionMatch{{Exact: []string{"true"}}}}},
 					}},
 				}},
@@ -72,7 +73,8 @@ var _ = Describe("namespace cleanup and provisioning", Label("namespace-cleanup"
 			if blocked {
 				labels[blockedLabel] = "true"
 			}
-			cm := &corev1.ConfigMap{Name: "held", Namespace: ns.Name, Labels: labels,
+			cm := &corev1.ConfigMap{
+				Name: "held", Namespace: ns.Name, Labels: labels,
 				Finalizers: []string{"e2e.projectcapsule.dev/hold-object"}, Data: map[string]string{"tenant": ns.Name},
 			}
 			Expect(c.Create(ctx, cm)).To(Succeed())
@@ -124,6 +126,11 @@ var _ = Describe("namespace cleanup and provisioning", Label("namespace-cleanup"
 		Expect(held.Finalizers).To(ContainElement("e2e.projectcapsule.dev/hold-object"))
 
 		By("requiring controller finalizer removal to preserve resource metadata")
+		// Strict controller RBAC uses patch for cleanup. Grant this test's Update
+		// only on the held object so its denial reaches metadata admission.
+		controllerUpdate := &rbacv1.Role{Name: "controller-update-held", Namespace: selected.Name, Rules: []rbacv1.PolicyRule{{APIGroups: []string{""}, Resources: []string{"configmaps"}, ResourceNames: []string{held.Name}, Verbs: []string{"update"}}}}
+		Expect(k8sClient.Create(ctx, controllerUpdate)).To(Succeed())
+		Expect(k8sClient.Create(ctx, &rbacv1.RoleBinding{Name: controllerUpdate.Name, Namespace: selected.Name, RoleRef: rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "Role", Name: controllerUpdate.Name}, Subjects: []rbacv1.Subject{{Kind: rbacv1.ServiceAccountKind, Namespace: ControllerNamespace, Name: ControllerServiceAccount}}})).To(Succeed())
 		controller := impersonationClient(ControllerServiceAccountFull, nil)
 		Eventually(func() error {
 			current := &corev1.ConfigMap{}
@@ -212,7 +219,8 @@ var _ = Describe("namespace cleanup and provisioning", Label("namespace-cleanup"
 				return k8sClient.Update(ctx, current)
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			for j := range 64 {
-				cm := &corev1.ConfigMap{Name: fmt.Sprintf("held-%d", j), Namespace: ns.Name,
+				cm := &corev1.ConfigMap{
+					Name: fmt.Sprintf("held-%d", j), Namespace: ns.Name,
 					Labels: map[string]string{"env": "e2e", "termination-batch": prefix}, Finalizers: []string{"e2e.projectcapsule.dev/hold-content"},
 					Data: map[string]string{"payload": strings.Repeat("x", 16*1024)},
 				}

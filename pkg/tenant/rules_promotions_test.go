@@ -144,11 +144,11 @@ func TestCollectPromotions(t *testing.T) {
 	}}
 
 	cl := tenantFakeClient(t,
-		&corev1.Namespace{Name: "ns-a", Labels: map[string]string{
+		&corev1.Namespace{Name: "ns-a", OwnerReferences: []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: tnt.Name, UID: tnt.UID}}, Labels: map[string]string{
 			corev1.LabelMetadataName: "ns-a",
 			"env":                    "prod",
 		}},
-		&corev1.Namespace{Name: "ns-b", Labels: map[string]string{
+		&corev1.Namespace{Name: "ns-b", OwnerReferences: []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: tnt.Name, UID: tnt.UID}}, Labels: map[string]string{
 			corev1.LabelMetadataName: "ns-b",
 			"env":                    "dev",
 		}},

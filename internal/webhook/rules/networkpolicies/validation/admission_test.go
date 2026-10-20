@@ -156,13 +156,9 @@ func TestNetworkPolicyAdmissionProfilesReadsAndFallback(t *testing.T) {
 							} else {
 								require.Nil(t, response)
 							}
-							wantGets := int64(3)
-							if !status {
-								// Each existing typed wrapper reconstructs missing status with
-								// a Namespace read from the manager's cached client.
-								wantGets += 2
-							}
-							require.Equal(t, wantGets, cl.gets.Load(), "direct request reads remain shared")
+							// Fallback rendering reuses the Namespace snapshot from tenant
+							// resolution, so both paths share the same three request reads.
+							require.Equal(t, int64(3), cl.gets.Load(), "Namespace, Tenant and RuleStatus reads remain shared")
 							require.Zero(t, cl.lists.Load())
 						}
 					}

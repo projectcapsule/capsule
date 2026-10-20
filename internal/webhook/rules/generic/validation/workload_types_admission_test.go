@@ -103,7 +103,8 @@ func TestTemplateAdmissionSharesRequestReads(t *testing.T) {
 	require.Zero(t, cl.gets.Load(), "excluded requests skip resolution")
 	bridge := &templateBridge{next: podvalidation.TemplateRules(nil, nil, nil)}
 	req := requestWithKind("apps", "Deployment")
-	for _, body := range []*rules.NamespaceRuleBodyNamespace{nil,
+	for _, body := range []*rules.NamespaceRuleBodyNamespace{
+		nil,
 		{Enforce: typePolicy(rules.ActionTypeDeny, rules.ValidateDeployment)},
 		{Enforce: &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: []rules.WorkloadValidationTarget{rules.ValidateJob}, Placement: rules.WorkloadPlacementEnforcement{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"batch"}}}}}}},
 	} {
@@ -245,11 +246,7 @@ func TestWorkloadTypeAdmissionProfilesAndReads(t *testing.T) {
 							require.Nil(t, response)
 							require.Equal(t, 1, spy.calls, "allows must continue the chain")
 						}
-						wantReads := int64(4)
-						if statusPresent {
-							wantReads = 3
-						}
-						require.Equal(t, wantReads, cl.gets.Load())
+						require.EqualValues(t, 3, cl.gets.Load(), "fallback reuses the ownership Namespace snapshot")
 						require.Zero(t, cl.lists.Load())
 					})
 				}

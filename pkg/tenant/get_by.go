@@ -101,13 +101,25 @@ func GetTenantByNamespace(
 	r client.Reader,
 	namespace string,
 ) (*capsulev1beta2.Tenant, error) {
+	tnt, _, err := GetTenantByNamespaceWithSnapshot(ctx, r, namespace)
+
+	return tnt, err
+}
+
+// GetTenantByNamespaceWithSnapshot also returns the namespace used to resolve
+// ownership. Callers can evaluate its profile without a second, inconsistent read.
+func GetTenantByNamespaceWithSnapshot(
+	ctx context.Context,
+	r client.Reader,
+	namespace string,
+) (*capsulev1beta2.Tenant, *corev1.Namespace, error) {
 	var ns corev1.Namespace
 	if err := r.Get(ctx, client.ObjectKey{Name: namespace}, &ns); err != nil {
 		if apierrors.IsNotFound(err) {
-			return nil, nil
+			return nil, nil, nil
 		}
 
-		return nil, err
+		return nil, nil, err
 	}
 
 	for _, or := range ns.GetOwnerReferences() {
@@ -118,23 +130,23 @@ func GetTenantByNamespace(
 		tnt := &capsulev1beta2.Tenant{}
 		if err := r.Get(ctx, client.ObjectKey{Name: or.Name}, tnt); err != nil {
 			if apierrors.IsNotFound(err) {
-				return nil, nil
+				return nil, &ns, nil
 			}
 
-			return nil, err
+			return nil, &ns, err
 		}
 
 		if or.UID != "" && tnt.UID != or.UID {
-			return nil, fmt.Errorf(
+			return nil, &ns, fmt.Errorf(
 				"tenant ownerReference UID mismatch for %q: namespace references UID %q but tenant has UID %q",
 				or.Name, or.UID, tnt.UID,
 			)
 		}
 
-		return tnt, nil
+		return tnt, &ns, nil
 	}
 
-	return nil, nil
+	return nil, &ns, nil
 }
 
 func GetTenantNameByOwnerreferences(

@@ -68,7 +68,16 @@ func (r *Manager) syncNetworkPolicy(ctx context.Context, log logr.Logger, tenant
 			delete(labels, meta.TenantLabel)
 
 			target.SetLabels(labels)
-			target.Spec = spec
+			// Client responses may populate nested maps and slices.
+			target.Spec = *spec.DeepCopy()
+			// Match Kubernetes defaulting of embedded legacy specs. Replacing the
+			// defaulted value with nil would cause an update on every Tenant pass.
+			if len(target.Spec.PolicyTypes) == 0 {
+				target.Spec.PolicyTypes = []networkingv1.PolicyType{networkingv1.PolicyTypeIngress}
+				if len(target.Spec.Egress) > 0 {
+					target.Spec.PolicyTypes = append(target.Spec.PolicyTypes, networkingv1.PolicyTypeEgress)
+				}
+			}
 
 			return controllerutil.SetControllerReference(tenant, target, r.Scheme())
 		})

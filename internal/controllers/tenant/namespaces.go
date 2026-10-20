@@ -203,6 +203,7 @@ func (r *Manager) reconcileActiveTenantNamespaces(
 	// immutable snapshot for all namespace workers so their status updates do
 	// not race with template conversion.
 	templateTenant := tnt.DeepCopy()
+	roleBindings := prepareNamespaceRoleBindings(tnt)
 
 	oldStatus := make(map[string]struct{}, len(tnt.Status.Spaces))
 	for i := range tnt.Status.Spaces {
@@ -219,7 +220,7 @@ func (r *Manager) reconcileActiveTenantNamespaces(
 		ns := list.Items[i].DeepCopy()
 
 		group.Go(func() error {
-			stat, err := r.reconcileNamespace(ctx, log, ns, tnt, templateTenant)
+			stat, err := r.provisionNamespace(ctx, log, ns, templateTenant, &roleBindings)
 			if stat != nil {
 				results <- stat
 			}
@@ -298,8 +299,12 @@ func (r *Manager) reconcileNamespace(
 	metaStatus := &capsulev1beta2.TenantStatusNamespaceMetadata{}
 
 	instance := tnt.Status.GetInstance(stat)
+	if instance != nil && instance.UID != namespace.UID {
+		instance = nil
+	}
+
 	if instance != nil {
-		stat = instance
+		stat = instance.DeepCopy()
 	}
 
 	// Always update tenant status condition after reconciliation.
@@ -432,7 +437,7 @@ func (r *Manager) reconcileNamespaceMetadata(
 
 		// Cleanup old Metadata.
 		instance := tnt.Status.GetInstance(stat)
-		if instance != nil && instance.Metadata != nil {
+		if instance != nil && instance.UID == ns.UID && instance.Metadata != nil {
 			for label := range instance.Metadata.Labels {
 				if _, ok := managedLabels[label]; ok {
 					continue

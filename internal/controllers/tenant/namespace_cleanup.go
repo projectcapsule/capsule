@@ -30,12 +30,7 @@ func (r *Manager) setupNamespaceCleanupController(mgr ctrl.Manager, config utils
 	// write. Give those reads a separate client so a deletion batch cannot drain
 	// the namespace-read token bucket used by admission and Tenant provisioning.
 	// Keep the existing configured QPS/burst and reuse the manager's transport.
-	cleanupConfig := rest.CopyConfig(mgr.GetConfig())
-	cleanupConfig.RateLimiter = nil
-
-	cleanupClient, err := client.New(cleanupConfig, client.Options{
-		Scheme: mgr.GetScheme(), Mapper: mgr.GetRESTMapper(), HTTPClient: mgr.GetHTTPClient(),
-	})
+	cleanupClient, err := isolatedNamespaceReader(mgr)
 	if err != nil {
 		return fmt.Errorf("create namespace cleanup reader: %w", err)
 	}
@@ -106,4 +101,13 @@ func (r *Manager) reconcileNamespaceCleanup(ctx context.Context, request reconci
 	}
 
 	return reconcile.Result{RequeueAfter: namespaceCleanupRetryPeriod}, nil
+}
+
+// Separate configured token buckets keep bulk authoritative namespace reads
+// from consuming the admission reader's budget. Reuse transport and limits.
+func isolatedNamespaceReader(mgr ctrl.Manager) (client.Client, error) {
+	config := rest.CopyConfig(mgr.GetConfig())
+	config.RateLimiter = nil
+
+	return client.New(config, client.Options{Scheme: mgr.GetScheme(), Mapper: mgr.GetRESTMapper(), HTTPClient: mgr.GetHTTPClient()})
 }
