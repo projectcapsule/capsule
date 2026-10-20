@@ -5,6 +5,8 @@ package e2e
 
 import (
 	"context"
+	cryptorand "crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"testing"
 
@@ -12,6 +14,7 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -53,6 +56,16 @@ func TestAPIs(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter)))
+
+	// k8s.io/apimachinery/pkg/util/rand seeds its source from the wall clock at
+	// package init. Ginkgo starts the parallel processes close enough together
+	// that two of them can receive the same seed and then draw identical names
+	// (NewNamespace, per-spec suffixes) at the same ordinal, which lets one spec
+	// delete another spec's objects. Reseed every process uniquely.
+	var seed [8]byte
+	_, seedErr := cryptorand.Read(seed[:])
+	Expect(seedErr).ToNot(HaveOccurred())
+	rand.Seed(int64(binary.LittleEndian.Uint64(seed[:])) ^ int64(GinkgoParallelProcess()))
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
