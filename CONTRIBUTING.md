@@ -30,6 +30,31 @@ When creating a pull request, please visit:
 
 The following guidelines outline the semantics and processes which apply to technical contributions to the project.
 
+## CRA stewardship and security escalation
+
+Capsule follows the Linux Foundation CRA stewardship framework for software
+intended for commercial use. The [security policy](SECURITY.md#cra-stewardship)
+records the stewardship statement and private vulnerability reporting process.
+
+Maintainers must immediately notify the LF CRA steward at
+[steward@linuxfoundation.org](mailto:steward@linuxfoundation.org) when they learn of:
+
+- **Actively exploited vulnerabilities:** vulnerabilities for which the project
+  has reliable evidence that a malicious actor has exploited them.
+- **Severe incidents:** security compromises of the project's own IT
+  infrastructure, such as its repository accounts, build systems, or release
+  infrastructure.
+
+Send the escalation privately, including the affected components or versions,
+known impact, evidence of exploitation or compromise, remediation status, and
+a link to the private advisory when available. Do not include credentials or
+other unnecessary sensitive data.
+
+Ordinary vulnerabilities without evidence of exploitation follow the normal
+private reporting and remediation process and do not require CRA escalation.
+Remediation must never wait for an escalation decision or a response from the
+steward: continue investigation, containment, and fixes while coordinating.
+
 ## Supported Versions
 Versions follow [Semantic Versioning](https://semver.org/) terminology and are expressed as `x.y.z`:
 

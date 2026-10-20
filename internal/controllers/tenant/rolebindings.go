@@ -7,12 +7,13 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"slices"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -21,109 +22,103 @@ import (
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
-// Sync the dynamic Tenant Owner specific cluster-roles and additional Role Bindings, which can be used in many ways:
-// applying Pod Security Policies or giving access to CRDs or specific API groups.
-func (r *Manager) syncRoleBindings(ctx context.Context, log logr.Logger, tenant *capsulev1beta2.Tenant) (err error) {
-	if err := r.runGarbageCollection(ctx, tenant, &rbacv1.RoleBinding{}); err != nil {
-		return err
-	}
+// namespaceRoleBindingPlan is immutable and shared by the namespace workers in
+// one reconciliation. Hash bindings once, then select each namespace's profile
+// from the same Namespace snapshot used to render its enforcement rules.
+type namespaceRoleBindingPlan struct {
+	common     map[string]rbac.AdditionalRoleBindingsSpec
+	rules      []namespaceRoleBindingRule
+	promotions map[string]map[string]rbac.AdditionalRoleBindingsSpec
+	prune      bool
+}
 
-	namespaceBindings := map[string]map[string]rbac.AdditionalRoleBindingsSpec{}
+type namespaceRoleBindingRule struct {
+	index    int
+	selector *metav1.LabelSelector
+	bindings map[string]rbac.AdditionalRoleBindingsSpec
+}
 
-	for _, ns := range tenant.Status.Spaces {
-		namespace := ns.Name
+func prepareNamespaceRoleBindings(tenant *capsulev1beta2.Tenant) namespaceRoleBindingPlan {
+	plan := prepareNamespaceRoleBindingRules(tenant)
+	plan.addCommonBindings(tenant.GetRoleBindings())
+	plan.prune = true
+	plan.promotions = map[string]map[string]rbac.AdditionalRoleBindingsSpec{}
 
-		if _, ok := namespaceBindings[namespace]; !ok {
-			namespaceBindings[namespace] = map[string]rbac.AdditionalRoleBindingsSpec{}
+	for _, promotion := range tenant.GetPromotionRoleBindings() {
+		namespace := string(promotion.Namespace)
+		if plan.promotions[namespace] == nil {
+			plan.promotions[namespace] = map[string]rbac.AdditionalRoleBindingsSpec{}
 		}
+
+		binding := promotion.AdditionalRoleBindingsSpec
+		plan.promotions[namespace][utils.RoleBindingHashFunc(binding)] = binding
 	}
 
-	for _, binding := range tenant.GetRoleBindings() {
-		hash := utils.RoleBindingHashFunc(binding)
+	return plan
+}
 
-		for namespace := range namespaceBindings {
-			namespaceBindings[namespace][hash] = binding
-		}
+// The fast queue grants only spec-selected permissions. Dynamic owners and
+// promotions can lose eligibility without changing Tenant generation. Leave
+// their evaluation and all pruning to the Tenant queue.
+func prepareNamespaceProvisioningRoleBindings(tenant *capsulev1beta2.Tenant) namespaceRoleBindingPlan {
+	plan := prepareNamespaceRoleBindingRules(tenant)
+	for _, owner := range tenant.Spec.Owners {
+		plan.addCommonBindings(owner.ToAdditionalRolebindings())
 	}
 
-	nsCache := make(map[string]*corev1.Namespace, len(namespaceBindings))
+	plan.addCommonBindings(tenant.Spec.AdditionalRoleBindings)
+
+	return plan
+}
+
+func (p *namespaceRoleBindingPlan) addCommonBindings(bindings []rbac.AdditionalRoleBindingsSpec) {
+	for _, binding := range bindings {
+		p.common[utils.RoleBindingHashFunc(binding)] = binding
+	}
+}
+
+func prepareNamespaceRoleBindingRules(tenant *capsulev1beta2.Tenant) namespaceRoleBindingPlan {
+	plan := namespaceRoleBindingPlan{
+		common: map[string]rbac.AdditionalRoleBindingsSpec{},
+	}
 
 	for i, rule := range tenant.Spec.Rules {
 		if rule == nil || len(rule.Permissions.Bindings) == 0 {
 			continue
 		}
 
-		// A rule without a selector applies to every tenant namespace and does not
-		// require resolving Namespace objects.
-		if rule.NamespaceSelector == nil {
-			for namespace := range namespaceBindings {
-				for _, binding := range rule.Permissions.Bindings {
-					hash := utils.RoleBindingHashFunc(binding)
-
-					namespaceBindings[namespace][hash] = binding
-				}
-			}
-
-			continue
+		bindings := make(map[string]rbac.AdditionalRoleBindingsSpec, len(rule.Permissions.Bindings))
+		for _, binding := range rule.Permissions.Bindings {
+			bindings[utils.RoleBindingHashFunc(binding)] = binding
 		}
 
-		for namespace := range namespaceBindings {
-			ns, ok := nsCache[namespace]
-			if !ok {
-				ns = &corev1.Namespace{}
-				if err := r.Get(ctx, client.ObjectKey{Name: namespace}, ns); err != nil {
-					if apierrors.IsNotFound(err) {
-						// Cache missing namespaces as well to avoid repeating the GET for
-						// subsequent selector-based rules in this reconciliation.
-						nsCache[namespace] = nil
+		plan.rules = append(plan.rules, namespaceRoleBindingRule{
+			index: i, selector: rule.NamespaceSelector, bindings: bindings,
+		})
+	}
 
-						continue
-					}
+	return plan
+}
 
-					return fmt.Errorf("get namespace %q for rules[%d]: %w", namespace, i, err)
-				}
+func (p namespaceRoleBindingPlan) forNamespace(ns *corev1.Namespace) (map[string]rbac.AdditionalRoleBindingsSpec, error) {
+	bindings := maps.Clone(p.common)
 
-				nsCache[namespace] = ns
-			}
+	// Keep selector-based and selectorless rules in their original order: later rules
+	// may override metadata on an otherwise identical binding.
+	for _, rule := range p.rules {
+		matches, err := utils.IsNamespaceSelectedBySelector(ns, rule.selector)
+		if err != nil {
+			return nil, fmt.Errorf("invalid namespaceSelector in rules[%d]: %w", rule.index, err)
+		}
 
-			if ns == nil {
-				continue
-			}
-
-			matches, err := utils.IsNamespaceSelectedBySelector(ns, rule.NamespaceSelector)
-			if err != nil {
-				return fmt.Errorf("invalid namespaceSelector in rules[%d]: %w", i, err)
-			}
-
-			if !matches {
-				continue
-			}
-
-			for _, binding := range rule.Permissions.Bindings {
-				hash := utils.RoleBindingHashFunc(binding)
-				namespaceBindings[namespace][hash] = binding
-			}
+		if matches {
+			maps.Copy(bindings, rule.bindings)
 		}
 	}
 
-	// Does not target all namespaces
-	for _, promotion := range tenant.GetPromotionRoleBindings() {
-		namespace := string(promotion.Namespace)
+	maps.Copy(bindings, p.promotions[ns.Name])
 
-		if _, ok := namespaceBindings[namespace]; !ok {
-			// Ignore namespaces that are not part of the tenant.
-			continue
-		}
-
-		binding := promotion.AdditionalRoleBindingsSpec
-		hash := utils.RoleBindingHashFunc(binding)
-
-		namespaceBindings[namespace][hash] = binding
-	}
-
-	return runForTenantNamespaces(ctx, tenant, func(ctx context.Context, namespace string) error {
-		return r.syncAdditionalRoleBinding(ctx, log, tenant, namespace, namespaceBindings[namespace])
-	})
+	return bindings, nil
 }
 
 func (r *Manager) syncAdditionalRoleBinding(
@@ -132,6 +127,7 @@ func (r *Manager) syncAdditionalRoleBinding(
 	tenant *capsulev1beta2.Tenant,
 	ns string,
 	bindings map[string]rbac.AdditionalRoleBindingsSpec,
+	prune bool,
 ) (err error) {
 	keys := []string{}
 
@@ -153,6 +149,9 @@ func (r *Manager) syncAdditionalRoleBinding(
 
 			maps.Copy(target.Labels, roleBinding.Labels)
 
+			// Admission stamps both membership labels. Retain the same desired
+			// labels so a steady-state sync does not rewrite every binding.
+			target.Labels[meta.ManagedByCapsuleLabel] = tenant.Name
 			target.Labels[meta.NewTenantLabel] = tenant.Name
 			target.Labels[meta.RolebindingLabel] = hash
 			target.Labels[meta.NewManagedByCapsuleLabel] = meta.ValueController
@@ -168,7 +167,14 @@ func (r *Manager) syncAdditionalRoleBinding(
 				Name:     roleBinding.ClusterRoleName,
 			}
 
-			target.Subjects = roleBinding.Subjects
+			// Client writes decode API responses into target. Keep that mutable
+			// Subject slice separate from the immutable plan shared by workers.
+			target.Subjects = slices.Clone(roleBinding.Subjects)
+			for i, subject := range target.Subjects {
+				if subject.APIGroup == "" && (subject.Kind == rbacv1.UserKind || subject.Kind == rbacv1.GroupKind) {
+					target.Subjects[i].APIGroup = rbacv1.GroupName
+				}
+			}
 
 			return controllerutil.SetControllerReference(tenant, target, r.Scheme())
 		})
@@ -190,6 +196,10 @@ func (r *Manager) syncAdditionalRoleBinding(
 		log.V(4).Info("RoleBinding sync result", "result", result, "name", target.Name, "namespace", target.Namespace)
 	}
 
-	// Prune at finish to prevent gaps
+	if !prune {
+		return nil
+	}
+
+	// Prune at finish to prevent gaps.
 	return r.pruningResources(ctx, ns, keys, &rbacv1.RoleBinding{})
 }

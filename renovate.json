@@ -2,7 +2,9 @@
   "minimumReleaseAge": null,
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended", ":dependencyDashboard", "helpers:pinGitHubActionDigests"],
-  "baseBranches": ["main"],
+  "baseBranchPatterns": [
+    "main"
+  ],
   "prHourlyLimit": 0,
   "prConcurrentLimit": 0,
   "branchConcurrentLimit": 0,
@@ -13,13 +15,19 @@
   "ignorePaths": ["docs"],
   "labels": ["renovate"],
   "flux": {
-    "fileMatch": ["^.*flux\\.yaml$"]
+    "managerFilePatterns": [
+      "/^.*flux\\.yaml$/"
+    ]
   },
   "packageRules": [
     {
       "matchManagers": ["github-actions", "flux"],
       "groupName": "all-ci-updates",
-      "updateTypes": ["major", "minor", "patch"]
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch"
+      ]
     },
     {
       "matchManagers": ["github-actions"],
@@ -40,16 +48,38 @@
         "gomod",
         "dockerfile",
         "docker-compose",
-        "regex"
+        "custom.regex"
       ],
       "minimumReleaseAge": "14 days"
     },
     {
       "matchManagers": ["helmv3","helm-values"],
       "minimumReleaseAge": null
+    },
+    {
+      "description": "MicroShift: each tracked version line only receives updates from its own minor",
+      "matchDepTypes": ["microshift-4.21"],
+      "allowedVersions": "/^4\\.21\\./"
+    },
+    {
+      "matchDepTypes": ["microshift-4.22"],
+      "allowedVersions": "/^4\\.22\\./"
     }
   ],
   "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^Makefile$/"
+      ],
+      "matchStrings": [
+        "MICROSHIFT_TAG_(?<minor>\\d+\\.\\d+)\\s*:=\\s*(?<currentValue>\\S+)"
+      ],
+      "depNameTemplate": "microshift-io/microshift",
+      "depTypeTemplate": "microshift-{{{minor}}}",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.\\d+(?:_(?<build>\\d+))?_g[0-9a-f]+_\\d+\\.\\d+\\.\\d+_okd_scos\\.(?:ec\\.)?(?<patch>\\d+)$"
+    },
     {
       "customType": "regex",
       "fileMatch": ["^Makefile$"],
@@ -63,13 +93,15 @@
     },
     {
       "customType": "regex",
-      "fileMatch": [".*\\.pre-commit-config\\.ya?ml$"],
+      "managerFilePatterns": [
+        "/.*\\.pre-commit-config\\.ya?ml$/"
+      ],
       "matchStrings": [
         "repo:\\s*https://github\\.com/(?<lookupValue>[^/]+/[^\\s]+)[\\s\\S]*?rev:\\s*(?<currentValue>v?\\d+\\.\\d+\\.\\d+)"
       ],
       "depNameTemplate": "{{lookupValue}}",
       "datasourceTemplate": "github-tags",
-      "lookupNameTemplate": "{{lookupValue}}",
+      "packageNameTemplate": "{{lookupValue}}",
       "versioningTemplate": "semver"
     }
   ]

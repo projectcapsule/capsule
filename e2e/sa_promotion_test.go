@@ -835,6 +835,111 @@ var _ = Describe("Promoting ServiceAccounts", Ordered, Label("config", "permissi
 		expectPromotionTargets(tnt.GetName(), sa, []string{"prod-view"}, []string{prod.Name})
 	})
 
+	It("revokes profile promotions after label changes and namespace recreation", func() {
+		ctx := context.Background()
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec.AllowServiceAccountPromotion = true
+		})
+		owner := impersonationClient(tnt.Spec.Owners[0].Name, withDefaultGroups(nil))
+		source := NewNamespace("", map[string]string{meta.TenantLabel: tnt.Name, "environment": "prod"})
+		target := NewNamespace("", map[string]string{meta.TenantLabel: tnt.Name, "environment": "prod"})
+		for _, ns := range []*corev1.Namespace{source, target} {
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		}
+		TenantNamespaceReady(tnt, target, 2)
+		// Grant the fixture actor only the Namespace update permission needed
+		// for this profile change; ordinary owner roles do not include it.
+		profileRole := &rbacv1.ClusterRole{Name: tnt.Name + "-profile-update", Rules: []rbacv1.PolicyRule{{
+			APIGroups: []string{""}, Resources: []string{"namespaces"}, ResourceNames: []string{target.Name}, Verbs: []string{"get", "update"},
+		}}}
+		Expect(k8sClient.Create(ctx, profileRole)).To(Succeed())
+		DeferCleanup(EventuallyDeletion, profileRole)
+		profileBinding := &rbacv1.ClusterRoleBinding{
+			Name: profileRole.Name, RoleRef: rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "ClusterRole", Name: profileRole.Name},
+			Subjects: []rbacv1.Subject{{Kind: rbacv1.UserKind, APIGroup: rbacv1.GroupName, Name: tnt.Spec.Owners[0].Name}},
+		}
+		Expect(k8sClient.Create(ctx, profileBinding)).To(Succeed())
+		DeferCleanup(EventuallyDeletion, profileBinding)
+		other := &capsulev1beta2.Tenant{Name: tnt.Name + "-other", Labels: map[string]string{"env": "e2e"}, Spec: capsulev1beta2.TenantSpec{Owners: rbac.OwnerListSpec{{Kind: rbac.UserOwner, Name: tnt.Name + "-other"}}}}
+		Expect(k8sClient.Create(ctx, other)).To(Succeed())
+		DeferCleanup(EventuallyDeletion, other)
+		TenantReady(other, metav1.ConditionTrue, defaultTimeoutInterval)
+		foreign := NewNamespace("", map[string]string{meta.TenantLabel: other.Name, "environment": "prod"})
+		NamespaceCreation(foreign, other.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceReady(other, foreign, 1)
+		sa := &corev1.ServiceAccount{Name: "profile-reader", Namespace: source.Name}
+		Expect(owner.Create(ctx, sa)).To(Succeed())
+		expectBindings := func(present bool, role string, namespaces ...string) {
+			for _, namespace := range namespaces {
+				if present {
+					expectRoleBindingForPromotion(namespace, role, sa)
+				} else {
+					expectNoRoleBindingForPromotion(namespace, role, sa)
+				}
+			}
+		}
+		Eventually(func() error { return promoteServiceAccount(owner, sa, nil) }, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		expectBindings(true, "prod-view", source.Name, target.Name)
+		promoted := impersonationClient("system:serviceaccount:"+sa.Namespace+":"+sa.Name, []string{"system:authenticated", "system:serviceaccounts", "system:serviceaccounts:" + sa.Namespace})
+		secret := &corev1.Secret{Name: "profile-secret", Namespace: target.Name, StringData: map[string]string{"value": "test"}}
+		Expect(owner.Create(ctx, secret)).To(Succeed())
+		Eventually(func() error { return promoted.Get(ctx, client.ObjectKeyFromObject(secret), &corev1.Secret{}) }, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Eventually(func() error {
+			current := &corev1.Namespace{}
+			if err := owner.Get(ctx, client.ObjectKeyFromObject(target), current); err != nil {
+				return err
+			}
+			current.Labels["environment"] = "dev"
+			return owner.Update(ctx, current)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		expectPromotionTargets(tnt.Name, sa, []string{"prod-view"}, []string{source.Name})
+		expectBindings(false, "prod-view", target.Name)
+		Eventually(func(g Gomega) {
+			err := promoted.Get(ctx, client.ObjectKeyFromObject(secret), &corev1.Secret{})
+			g.Expect(apierrors.IsForbidden(err)).To(BeTrue(), "%v", err)
+			g.Expect(err).To(MatchError(ContainSubstring(`cannot get resource "secrets"`)))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		By("recreating the same namespace name with a different profile")
+		Eventually(func() error {
+			current := &corev1.Namespace{}
+			if err := owner.Get(ctx, client.ObjectKeyFromObject(target), current); err != nil {
+				return err
+			}
+			current.Labels["environment"] = "prod"
+			return owner.Update(ctx, current)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		expectBindings(true, "prod-view", target.Name)
+		previous := &corev1.Namespace{}
+		Expect(owner.Get(ctx, client.ObjectKeyFromObject(target), previous)).To(Succeed())
+		ForceDeleteNamespace(ctx, target.Name)
+		recreated := NewNamespace(target.Name, map[string]string{meta.TenantLabel: tnt.Name, "environment": "dev"})
+		NamespaceCreation(recreated, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceReady(tnt, recreated, 2)
+		Eventually(func(g Gomega) {
+			current := &corev1.Namespace{}
+			g.Expect(owner.Get(ctx, client.ObjectKeyFromObject(recreated), current)).To(Succeed())
+			g.Expect(current.UID).NotTo(Equal(previous.UID))
+			currentTenant := &capsulev1beta2.Tenant{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(tnt), currentTenant)).To(Succeed())
+			g.Expect(currentTenant.Status.ObservedGeneration).To(Equal(currentTenant.Generation))
+			status := currentTenant.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{Name: current.Name})
+			g.Expect(status).NotTo(BeNil())
+			g.Expect(status.UID).To(Equal(current.UID))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		expectBindings(true, "view", recreated.Name)
+		expectPromotionTargets(tnt.Name, sa, []string{"prod-view"}, []string{source.Name})
+		expectBindings(false, "prod-view", recreated.Name, foreign.Name)
+		secret = &corev1.Secret{Name: "profile-secret", Namespace: recreated.Name, StringData: map[string]string{"value": "test"}}
+		Expect(owner.Create(ctx, secret)).To(Succeed())
+		for _, ns := range []string{recreated.Name, foreign.Name} {
+			err := promoted.Get(ctx, client.ObjectKey{Namespace: ns, Name: secret.Name}, &corev1.Secret{})
+			Expect(apierrors.IsForbidden(err)).To(BeTrue(), "%v", err)
+			Expect(err).To(MatchError(ContainSubstring(`cannot get resource "secrets"`)))
+		}
+		expectBindings(true, "prod-view", source.Name)
+	})
+
 	It("creates RoleBindings only in targeted namespaces", func() {
 		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
 			configuration.Spec.AllowServiceAccountPromotion = true
@@ -887,5 +992,32 @@ var _ = Describe("Promoting ServiceAccounts", Ordered, Label("config", "permissi
 
 		expectRoleBindingForPromotion(stage.Name, "prod-view", sa)
 		expectRoleBindingForPromotion(stage.Name, "prod-edit", sa)
+
+		By("keeping identical promotion profiles isolated across Tenants")
+		other := &capsulev1beta2.Tenant{Name: tnt.Name + "-other", Labels: map[string]string{"env": "e2e"}, Spec: *tnt.Spec.DeepCopy()}
+		other.Spec.Owners = rbac.OwnerListSpec{{Kind: rbac.UserOwner, Name: other.Name}}
+		Expect(k8sClient.Create(context.Background(), other)).To(Succeed())
+		DeferCleanup(EventuallyDeletion, other)
+		TenantReady(other, metav1.ConditionTrue, defaultTimeoutInterval)
+		foreign := NewNamespace("", map[string]string{meta.TenantLabel: other.Name, "environment": "prod"})
+		NamespaceCreation(foreign, other.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceReady(other, foreign, 1)
+		target := &corev1.ConfigMap{Name: "promotion-isolation", Namespace: foreign.Name}
+		foreignOwner := impersonationClient(other.Name, withDefaultGroups(nil))
+		Expect(foreignOwner.Create(context.Background(), target)).To(Succeed())
+		promoted := impersonationClient("system:serviceaccount:"+sa.Namespace+":"+sa.Name, []string{"system:authenticated", "system:serviceaccounts", "system:serviceaccounts:" + sa.Namespace})
+		local := &corev1.ConfigMap{Name: target.Name, Namespace: prod.Name}
+		Expect(ownerClient.Create(context.Background(), local)).To(Succeed())
+		Eventually(func() error {
+			return promoted.Get(context.Background(), client.ObjectKeyFromObject(local), &corev1.ConfigMap{})
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		denied := promoted.Get(context.Background(), client.ObjectKeyFromObject(target), &corev1.ConfigMap{})
+		Expect(apierrors.IsForbidden(denied)).To(BeTrue())
+		Expect(denied).To(MatchError(ContainSubstring(`cannot get resource "configmaps"`)))
+		currentOther := &capsulev1beta2.Tenant{}
+		Expect(k8sClient.Get(context.Background(), client.ObjectKeyFromObject(other), currentOther)).To(Succeed())
+		for _, promotion := range currentOther.Status.Promotions {
+			Expect(promotion.Name).NotTo(Equal("system:serviceaccount:" + sa.Namespace + ":" + sa.Name))
+		}
 	})
 })

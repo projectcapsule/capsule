@@ -74,7 +74,8 @@ func (r *Manager) syncLimitRange(
 			delete(labels, meta.TenantLabel)
 
 			target.SetLabels(labels)
-			target.Spec = spec
+			// API responses must not mutate the Tenant shared by resource phases.
+			target.Spec = *spec.DeepCopy()
 
 			return controllerutil.SetControllerReference(tenant, target, r.Scheme())
 		})
