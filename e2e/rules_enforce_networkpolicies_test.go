@@ -270,7 +270,7 @@ var _ = Describe("NetworkPolicy CIDR namespace profiles", Label("tenant", "rules
 						}
 					}
 				}
-			}, 3*defaultPollInterval, defaultPollInterval).Should(Succeed())
+			}, 6*time.Second, defaultPollInterval).Should(Succeed())
 
 			By("subtracting large exception lists while preserving protected ranges")
 			large := policy(restricted, "large-exceptions", "10.0.0.0/8")

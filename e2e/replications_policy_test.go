@@ -24,8 +24,11 @@ import (
 )
 
 // Shared scenarios run inside both existing replication suites and their tenant fixtures.
-func exerciseReplicationPolicies(global bool, tenantName, baseNamespace, targetNamespace, excludedNamespace string, owner rbac.UserSpec) {
+// A nil tenantSelector exercises a namespaced TenantResource in baseNamespace; a non-nil
+// one exercises a GlobalTenantResource selecting the caller's tenant.
+func exerciseReplicationPolicies(tenantSelector *metav1.LabelSelector, tenantName, baseNamespace, targetNamespace, excludedNamespace string, owner rbac.UserSpec) {
 	ctx := context.Background()
+	global := tenantSelector != nil
 	selected := []string{targetNamespace}
 	if global {
 		// This namespace matches the block selector but belongs to an unselected tenant.
@@ -56,9 +59,9 @@ func exerciseReplicationPolicies(global bool, tenantName, baseNamespace, targetN
 	var spec *capsulev1beta2.TenantResourceCommonSpec
 	var status *capsulev1beta2.TenantResourceCommonStatus
 	if global {
-		resource := &capsulev1beta2.GlobalTenantResource{Name: "gtr-block-policies", Spec: capsulev1beta2.GlobalTenantResourceSpec{
+		resource := &capsulev1beta2.GlobalTenantResource{Name: "gtr-block-policies-" + tenantName, Spec: capsulev1beta2.GlobalTenantResourceSpec{
 			Scope:          api.ResourceScopeNamespace,
-			TenantSelector: metav1.LabelSelector{MatchLabels: map[string]string{"energy": "solar"}}, TenantResourceCommonSpec: common,
+			TenantSelector: *tenantSelector, TenantResourceCommonSpec: common,
 		}}
 		parent, spec, status = resource, &resource.Spec.TenantResourceCommonSpec, &resource.Status.TenantResourceCommonStatus
 	} else {
@@ -76,6 +79,7 @@ func exerciseReplicationPolicies(global bool, tenantName, baseNamespace, targetN
 	}
 	Expect(k8sClient.Create(ctx, &corev1.ConfigMap{Name: "policy-conflict", Namespace: excludedNamespace, Data: map[string]string{"mode": "excluded"}})).To(Succeed())
 	Expect(k8sClient.Create(ctx, parent)).To(Succeed())
+	DeferCleanup(func() { ignoreNotFound(k8sClient.Delete(ctx, parent)) })
 	By("retaining deprecated fields while converting only the missing policy")
 	Expect(spec.Settings.Adopt).To(Equal(new(true)))
 	Expect(spec.Settings.Force).To(Equal(new(true)))

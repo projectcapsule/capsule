@@ -41,12 +41,17 @@ import (
 )
 
 const (
-	defaultTimeoutInterval                    = 80 * time.Second
-	defaultTerminationTimeoutInterval         = 120 * time.Second
-	defaultPollInterval                       = 2 * time.Second
-	defaultConfigurationName                  = "default"
-	e2eClientQPS                      float32 = 1000
-	e2eClientBurst                    int     = 2000
+	defaultTimeoutInterval            = 80 * time.Second
+	defaultTerminationTimeoutInterval = 120 * time.Second
+	// Polling at 500ms keeps the gap between a reconcile and its detection small;
+	// waits that must span a fixed window pass an explicit duration instead.
+	defaultPollInterval      = 500 * time.Millisecond
+	defaultConfigurationName = "default"
+	// e2eRunLabel marks cluster-scoped objects with the unique prefix of the
+	// spec that created them, so concurrent specs can clean up only their own.
+	e2eRunLabel            = "e2e.projectcapsule.dev/run"
+	e2eClientQPS   float32 = 1000
+	e2eClientBurst int     = 2000
 )
 
 func tuneE2ERestConfig(c *rest.Config) *rest.Config {

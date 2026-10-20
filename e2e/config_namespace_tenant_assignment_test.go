@@ -68,9 +68,8 @@ var _ = Describe("Capsule administrators changing existing Namespace tenant assi
 
 			originalConfigurationSpec = configuration.Spec.DeepCopy()
 
-		})
-
-		JustBeforeEach(func() {
+			// No spec mutates the Tenants or the administrator, so the fixture is
+			// created once for the container.
 			ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
 				configuration.Spec.Administrators = rbac.UserListSpec{administrator}
 			})
@@ -83,14 +82,14 @@ var _ = Describe("Capsule administrators changing existing Namespace tenant assi
 				}).Should(Succeed())
 				TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 			}
-		})
 
-		JustAfterEach(func() {
-			EventuallyDeletion(tenantA)
-			EventuallyDeletion(tenantB)
+			DeferCleanup(func() {
+				EventuallyDeletion(tenantA)
+				EventuallyDeletion(tenantB)
 
-			ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
-				configuration.Spec = *originalConfigurationSpec
+				ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+					configuration.Spec.Administrators = originalConfigurationSpec.Administrators
+				})
 			})
 		})
 

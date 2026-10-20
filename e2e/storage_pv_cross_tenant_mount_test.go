@@ -6,6 +6,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -196,7 +197,7 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Ordered, Labe
 			}
 
 			return k8sClient.Create(context.Background(), &pvc)
-		}, defaultTimeoutInterval, defaultPollInterval).Should(HaveOccurred())
+		}, 5*time.Second, defaultPollInterval).Should(HaveOccurred())
 	})
 
 	It("should repair empty and stale Tenant labels on claimed PersistentVolumes", Label("skip-on-openshift"), func() {

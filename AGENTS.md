@@ -498,8 +498,8 @@ and `go.mod` instead of independently selecting newer tools.
 | Scoped local e2e | `make e2e-exec FILTER='&& !skip && scheduler'`. Replace the example label with the new feature/impacted component selection. Runs selected non-configuration tests in parallel, then selected configuration tests serially. Ensure the cluster runs the current changes. |
 | Scoped configuration e2e | `make e2e-exec-config FILTER='&& !skip && feature-label'`. Replace `feature-label` with the relevant existing label. |
 | Scoped OpenShift e2e | Prepare with `make e2e-build-openshift`, then use `make e2e-exec FILTER='&& !skip && !skip-on-openshift && feature-label'` for impacted platform behavior, replacing `feature-label`. |
-| Full e2e in GitHub Actions | `make e2e` and `make e2e-openshift` are the full-suite CI entry points; local execution uses the scoped commands above. |
-| Local e2e cleanup | `make e2e-destroy` or `make e2e-destroy-openshift` after preserving observations and completing the relevant run. |
+| Full e2e in GitHub Actions | `make e2e-dual` (two KinD clusters: the serial `config` specs run on the second one concurrently with the parallel specs) and `make e2e-openshift` are the full-suite CI entry points; `make e2e` runs the same suite on a single cluster; local execution uses the scoped commands above. `E2E_PROCS=<n>` overrides the number of parallel Ginkgo processes. |
+| Local e2e cleanup | `make e2e-destroy` (also removes a leftover `e2e-dual` config cluster) or `make e2e-destroy-openshift` after preserving observations and completing the relevant run. |
 | Focused benchmarks | `go test ./path/to/changed/package -run '^$' -bench 'BenchmarkName' -benchmem -count=5` (replace path/name). |
 | Existing benchmark examples | `go test ./pkg/tenant ./internal/controllers/resources -run '^$' -bench . -benchmem -count=5`. |
 | Existing chart checks | `make helm-lint`; use `make helm-test` for installation behavior. Running existing checks does not require adding chart tests. |

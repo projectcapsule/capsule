@@ -111,8 +111,14 @@ var _ = Describe("terminating namespace with guardrails", Ordered, Label("namesp
 				err := k8sClient.Get(ctx, types.NamespacedName{Name: nsName}, ns)
 				g.Expect(err).ToNot(HaveOccurred())
 
-				VerifyTenantRoleBindings(tnt)
-			}, 10*time.Second, defaultPollInterval).Should(Succeed())
+				// Check the live Tenant: the fixture copy has no status namespaces,
+				// which would make the RoleBinding verification vacuous.
+				current := &capsulev1beta2.Tenant{}
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: tnt.GetName()}, current)).To(Succeed())
+				g.Expect(current.Status.Namespaces).To(ContainElement(nsName))
+
+				VerifyTenantRoleBindings(current)
+			}, 4*time.Second, defaultPollInterval).Should(Succeed())
 		})
 
 		By("while namespace is terminating, verify tenant still exists and has controller finalizer", func() {
@@ -122,7 +128,7 @@ var _ = Describe("terminating namespace with guardrails", Ordered, Label("namesp
 				g.Expect(controllerutil.ContainsFinalizer(cur, meta.ControllerFinalizer)).To(BeTrue(),
 					"tenant should still have controller finalizer while a namespace is terminating",
 				)
-			}, 10*time.Second, defaultPollInterval).Should(Succeed())
+			}, 4*time.Second, defaultPollInterval).Should(Succeed())
 		})
 
 		By("removing the pod finalizer to unblock namespace deletion", func() {

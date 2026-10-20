@@ -39,7 +39,7 @@ jobs:
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
 
       - name: e2e
-        run: sudo make e2e
+        run: sudo make e2e-dual
 
   e2e-openshift-CE:
     name: E2E OpenShift Testing (CE)
@@ -85,7 +85,7 @@ jobs:
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
 
       - name: e2e (Enterprise)
-        run: sudo KUBERNETES_SUPPORTED_VERSION=${{ matrix.k8s-version }} make e2e
+        run: sudo KUBERNETES_SUPPORTED_VERSION=${{ matrix.k8s-version }} make e2e-dual
 
   e2e-openshift:
     name: E2E Testing (OpenShift)

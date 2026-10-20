@@ -135,7 +135,7 @@ dev-build: kind
 
 .PHONY: dev-destroy
 dev-destroy: kind
-	$(KIND) delete cluster --name capsule
+	$(KIND) delete cluster --name $(CLUSTER_NAME)
 
 # Target used to install Flux. Overridden on OpenShift so that dependents (e.g. cert-manager)
 # never re-apply the vanilla Flux manifests over the SCC-compatible overlay.
@@ -538,6 +538,9 @@ e2e-build: kind
 .PHONY: e2e-install
 e2e-install: helm-controller-version ko-build-all dev-install-gw-api-crds
 	$(MAKE) e2e-load-image CLUSTER_NAME=$(CLUSTER_NAME) IMAGE=$(CAPSULE_IMG) VERSION=$(VERSION)
+	# Replace a stale charts/capsule/charts/*.tgz: an archive that does not match
+	# Chart.lock is rendered unconditionally, ignoring proxy.enabled.
+	$(HELM) dependency build ./charts/capsule
 	$(KUBECTL) label clusterrole admin projectcapsule.dev/aggregate-to-controller=true
 	$(HELM) upgrade \
 	    --dependency-update \
@@ -651,17 +654,79 @@ e2e-load-image-openshift: minc
 	docker exec microshift sh -c 'podman load -i /tmp/capsule.tar'
 	rm -rf capsule.tar
 
+# Number of Ginkgo processes for the parallel phase. Leave empty to let Ginkgo
+# auto-detect it (NumCPU, minus one on machines with more than four CPUs).
+E2E_PROCS ?=
+GINKGO_PARALLEL_FLAGS = $(if $(E2E_PROCS),--procs=$(E2E_PROCS),-p)
+
+# The suite runs in two phases:
+#   1. every spec NOT labelled "config" runs in parallel (Ordered containers are
+#      the unit of scheduling, so keep them small or avoid them);
+#   2. the "config" specs mutate the cluster-wide CapsuleConfiguration and run
+#      serially, on one Ginkgo process, after the parallel phase.
 .PHONY: e2e-exec
 e2e-exec: ginkgo
-	$(GINKGO) -v -p -tags e2e --label-filter="!config $(FILTER)" ./e2e
+	$(GINKGO) -v $(GINKGO_PARALLEL_FLAGS) -tags e2e --label-filter="!config $(FILTER)" ./e2e
 	$(MAKE) e2e-exec-config
 
 .PHONY: e2e-exec-config
 e2e-exec-config: ginkgo
-	$(GINKGO) -v  -tags e2e --label-filter="config $(FILTER)" ./e2e
+	$(GINKGO) -v -tags e2e --label-filter="config $(FILTER)" ./e2e
 
+# -- Dual-cluster e2e
+#
+# The "config" specs only need to be isolated from the other specs, not to wait
+# for them. e2e-dual brings up a second kind cluster and runs the serial config
+# phase there while the parallel phase runs on the first cluster, so the wall
+# time is max(parallel, config) instead of parallel + config.
+E2E_CONFIG_CLUSTER_NAME ?= $(CLUSTER_NAME)-config
+E2E_CONFIG_KUBECONFIG   ?= $(SRC_ROOT)/.e2e-config.kubeconfig
+E2E_LOG_DIR             ?= $(SRC_ROOT)/.e2e-logs
+
+# The clusters are always destroyed, also when the specs fail (the exit code of
+# the specs is preserved). Set E2E_KEEP_CLUSTERS=1 to keep them for debugging.
+.PHONY: e2e-dual
+e2e-dual: ginkgo
+	@$(MAKE) e2e-dual-build && $(MAKE) e2e-exec-dual; rc=$$?; \
+	if [ -z "$(E2E_KEEP_CLUSTERS)" ]; then $(MAKE) e2e-dual-destroy; fi; \
+	exit $$rc
+
+# The image is built once; the two kind clusters are created concurrently and
+# then Capsule is installed into each of them.
+.PHONY: e2e-dual-build
+e2e-dual-build: kind ko-build-all
+	@$(MAKE) dev-build & P1=$$!; \
+	KUBECONFIG=$(E2E_CONFIG_KUBECONFIG) $(MAKE) dev-build CLUSTER_NAME=$(E2E_CONFIG_CLUSTER_NAME) & P2=$$!; \
+	wait $$P1 && wait $$P2
+	$(MAKE) e2e-install
+	KUBECONFIG=$(E2E_CONFIG_KUBECONFIG) $(MAKE) e2e-install CLUSTER_NAME=$(E2E_CONFIG_CLUSTER_NAME)
+
+# Both phases run the same precompiled test binary. The config phase writes to a
+# log file that is printed once it finishes, so the two outputs do not interleave.
+.PHONY: e2e-exec-dual
+e2e-exec-dual: ginkgo
+	@mkdir -p $(E2E_LOG_DIR)
+	$(GINKGO) build -tags e2e ./e2e
+	@echo "Running the config specs on cluster $(E2E_CONFIG_CLUSTER_NAME) (log: $(E2E_LOG_DIR)/config.log) while the parallel specs run on cluster $(CLUSTER_NAME)"
+	@KUBECONFIG=$(E2E_CONFIG_KUBECONFIG) $(GINKGO) -v --label-filter="config $(FILTER)" ./e2e/e2e.test > $(E2E_LOG_DIR)/config.log 2>&1 & \
+	CONFIG_PID=$$!; \
+	$(GINKGO) -v $(GINKGO_PARALLEL_FLAGS) --label-filter="!config $(FILTER)" ./e2e/e2e.test; PARALLEL_RC=$$?; \
+	wait $$CONFIG_PID; CONFIG_RC=$$?; \
+	echo "==== config phase output (cluster $(E2E_CONFIG_CLUSTER_NAME)) ===="; cat $(E2E_LOG_DIR)/config.log; \
+	echo "==== parallel phase exit code: $$PARALLEL_RC, config phase exit code: $$CONFIG_RC ===="; \
+	test $$PARALLEL_RC -eq 0 && test $$CONFIG_RC -eq 0
+
+.PHONY: e2e-dual-destroy
+e2e-dual-destroy: kind
+	-$(KIND) delete cluster --name $(CLUSTER_NAME)
+	-$(KIND) delete cluster --name $(E2E_CONFIG_CLUSTER_NAME)
+	rm -f $(E2E_CONFIG_KUBECONFIG)
+
+# Also removes a leftover dual-cluster config cluster, if any.
 .PHONY: e2e-destroy
 e2e-destroy: dev-destroy
+	-$(KIND) delete cluster --name $(E2E_CONFIG_CLUSTER_NAME)
+	rm -f $(E2E_CONFIG_KUBECONFIG)
 
 ####################
 # -- Helpers
@@ -721,9 +786,11 @@ minc:
 KIND         := $(LOCALBIN)/kind
 KIND_VERSION := v0.32.0
 KIND_LOOKUP  := kubernetes-sigs/kind
+# `kind version` prints "kind v0.32.0 ..."; a binary of another version is
+# replaced, since go-install-tool skips existing files.
 kind:
-	@test -s $(KIND) && $(KIND) --version | grep -q $(KIND_VERSION) || \
-	$(call go-install-tool,$(KIND),sigs.k8s.io/kind/cmd/kind@$(KIND_VERSION))
+	@test -s $(KIND) && $(KIND) version | grep -q "$(KIND_VERSION)" || \
+	{ rm -f $(KIND) && $(call go-install-tool,$(KIND),sigs.k8s.io/kind/cmd/kind@$(KIND_VERSION)); }
 
 KO           := $(LOCALBIN)/ko
 KO_VERSION   := v0.19.1

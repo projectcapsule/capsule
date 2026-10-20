@@ -88,8 +88,17 @@ selected `config` tests serially. To use an existing dedicated test cluster,
 install the current checkout before running the same scoped `e2e-exec` command.
 
 The [e2e workflow](./.github/workflows/e2e.yml) runs the full suite for pull requests
-matching its path filters. Local runs should cover only the new tests and affected
-components.
+matching its path filters with `make e2e-dual`: the `config` specs, which mutate
+the cluster-wide `CapsuleConfiguration` and therefore run serially, execute on a
+second KinD cluster at the same time as the parallel specs. `make e2e` runs the
+same suite on a single cluster, and `E2E_PROCS=<n>` overrides the number of
+parallel Ginkgo processes. Local runs should cover only the new tests and
+affected components.
+
+Keep new specs cheap to schedule: an `Ordered` container is one indivisible unit
+of work on a single Ginkgo process, so prefer independent specs with per-spec
+random names (`rand.String`, `NewNamespace("")`) over `Ordered` containers, and
+only add the `config` label to specs that really change the `CapsuleConfiguration`.
 
 ## Security assessment
 

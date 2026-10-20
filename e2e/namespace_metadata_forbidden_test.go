@@ -64,7 +64,9 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 		Kind: "User",
 	}
 
-	JustBeforeEach(func() {
+	// The three specs never mutate the Tenant and use distinct namespace names,
+	// so the Tenant and the administrators setting are created once.
+	BeforeAll(func() {
 		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: defaultConfigurationName}, originConfig)).To(Succeed())
 
 		EventuallyCreation(func() error {
@@ -80,7 +82,7 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 		})
 	})
 
-	JustAfterEach(func() {
+	AfterAll(func() {
 		EventuallyDeletion(tnt)
 
 		Eventually(func() error {
@@ -316,7 +318,7 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 				_, err := cs.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
 
 				return err
-			}, 10*time.Second, time.Second).ShouldNot(Succeed())
+			}, 3*time.Second, time.Second).ShouldNot(Succeed())
 		})
 
 		By("specifying forbidden labels using regex match", func() {
@@ -372,7 +374,7 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 				_, err := cs.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
 
 				return err
-			}, 10*time.Second, time.Second).ShouldNot(Succeed())
+			}, 3*time.Second, time.Second).ShouldNot(Succeed())
 		})
 
 		By("specifying forbidden annotations using regex match", func() {
@@ -400,7 +402,7 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 				_, err := cs.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
 
 				return err
-			}, 10*time.Second, time.Second).ShouldNot(Succeed())
+			}, 3*time.Second, time.Second).ShouldNot(Succeed())
 		})
 
 		By("specifying forbidden-prefix labels that are not managed by Capsule", func() {
@@ -428,7 +430,7 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 				_, err := cs.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
 
 				return err
-			}, 10*time.Second, time.Second).ShouldNot(Succeed())
+			}, 3*time.Second, time.Second).ShouldNot(Succeed())
 		})
 
 		By("specifying forbidden-prefix annotations that are not managed by Capsule", func() {
@@ -456,7 +458,7 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 				_, err := cs.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
 
 				return err
-			}, 10*time.Second, time.Second).ShouldNot(Succeed())
+			}, 3*time.Second, time.Second).ShouldNot(Succeed())
 		})
 
 		By("restoring a Capsule-managed forbidden-prefix label value on update", func() {

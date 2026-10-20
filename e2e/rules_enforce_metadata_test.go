@@ -17,6 +17,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -29,19 +30,22 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
-var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("tenant", "rules", "enforce", "metadata", "generic"), func() {
+var _ = Describe("enforcing generic metadata namespace rules", Label("tenant", "rules", "enforce", "metadata", "generic"), func() {
 	const (
-		ownerName             = "e2e-rules-metadata"
-		secondOwnerName       = "e2e-rules-metadata-second"
 		ownerLabel            = "example.corp/label-a"
 		secondOwnerLabel      = "example.corp/label-b"
 		ownerAnnotation       = "example.corp/annotation-a"
 		secondOwnerAnnotation = "example.corp/annotation-b"
 	)
 
+	// The owner and tenant names are unique per spec so the specs of this
+	// container can run concurrently on different Ginkgo processes.
 	var (
-		tnt         *capsulev1beta2.Tenant
-		tenantRules []*rules.NamespaceRuleBodyTenant
+		suffix          string
+		ownerName       string
+		secondOwnerName string
+		tnt             *capsulev1beta2.Tenant
+		tenantRules     []*rules.NamespaceRuleBodyTenant
 	)
 
 	metadataByExpression := func(expression string) runtime.ExpressionMatch {
@@ -233,7 +237,7 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 
 	newTenant := func() *capsulev1beta2.Tenant {
 		return &capsulev1beta2.Tenant{
-			Name: "e2e-rule-metadata",
+			Name: "e2e-rule-metadata-" + suffix,
 			Labels: map[string]string{
 				"env": "e2e",
 			},
@@ -840,6 +844,11 @@ var _ = Describe("enforcing generic metadata namespace rules", Ordered, Label("t
 	}
 
 	BeforeEach(func() {
+		// The rule audiences built below reference the owner names, so the
+		// per-spec names must exist before baseTenantRules runs.
+		suffix = rand.String(6)
+		ownerName = "e2e-rules-metadata-" + suffix
+		secondOwnerName = "e2e-rules-metadata-second-" + suffix
 		tenantRules = baseTenantRules()
 	})
 

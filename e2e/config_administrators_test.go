@@ -55,7 +55,9 @@ var _ = Describe("Administrators", Ordered, Label("namespace", "permissions", "a
 		Kind: "User",
 	}
 
-	JustBeforeEach(func() {
+	// No spec mutates the Tenants or the administrators list, so the fixture is
+	// created once for the container and only the administrators are restored.
+	BeforeAll(func() {
 		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: defaultConfigurationName}, originConfig)).To(Succeed())
 
 		for _, tnt := range []*capsulev1beta2.Tenant{tnt1, tnt2} {
@@ -72,23 +74,15 @@ var _ = Describe("Administrators", Ordered, Label("namespace", "permissions", "a
 			configuration.Spec.Administrators = []rbac.UserSpec{admin}
 		})
 
-	})
-
-	JustAfterEach(func() {
-		for _, tnt := range []*capsulev1beta2.Tenant{tnt1, tnt2} {
-			EventuallyDeletion(tnt)
-		}
-
-		Eventually(func() error {
-			c := &capsulev1beta2.CapsuleConfiguration{}
-			if err := k8sClient.Get(context.Background(), client.ObjectKey{Name: originConfig.Name}, c); err != nil {
-				return err
+		DeferCleanup(func() {
+			for _, tnt := range []*capsulev1beta2.Tenant{tnt1, tnt2} {
+				EventuallyDeletion(tnt)
 			}
-			// Apply the initial configuration from originConfig to c
-			c.Spec = originConfig.Spec
-			return k8sClient.Update(context.Background(), c)
-		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
+			ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+				configuration.Spec.Administrators = originConfig.Spec.Administrators
+			})
+		})
 	})
 
 	It("interaction with non-tenant namespaces", func() {

@@ -37,3 +37,6 @@ hack/generated/
 kind.yaml
 capsule-seccomp.json
 kubeconfig.yaml
+
+# dual-cluster e2e logs (the kubeconfig is covered by **/*.kubeconfig)
+.e2e-logs/
