@@ -75,7 +75,7 @@ jobs:
         loglevel: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run && 'trace' || 'info' }}
         targets:
           capsule:
-            plugin: ossf/pvtr-github-repo-scanner
+            plugin: openssf/github-repo
             policy:
               catalogs:
                 - osps-baseline-2026-08

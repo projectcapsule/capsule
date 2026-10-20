@@ -3,7 +3,7 @@
 # Schema: https://github.com/ossf/security-insights/blob/v2.2.0/spec/schema.cue
 header:
   schema-version: "2.2.0"
-  last-updated: "2026-10-15"
+  last-updated: "2026-10-17"
   last-reviewed: "2026-10-15"
   url: https://raw.githubusercontent.com/projectcapsule/capsule/main/security-insights.yml
   comment: |
@@ -42,6 +42,13 @@ project:
     comment: |
       Submit a private vulnerability report through
       https://github.com/projectcapsule/capsule/security/advisories/new.
+      SECURITY.md records the Linux Foundation CRA stewardship statement
+      for Capsule's intended commercial use and emergency reporting process.
+      Prefix emergency report titles with URGENT; if GitHub private reporting
+      is unavailable or affected by an incident, contact
+      steward@linuxfoundation.org privately. Maintainer escalation instructions
+      for actively exploited vulnerabilities and severe incidents are at
+      https://github.com/projectcapsule/capsule/blob/main/CONTRIBUTING.md#cra-stewardship-and-security-escalation.
       SECURITY.md does not advertise a bug bounty; the false flag reflects
       that documented position and needs maintainer confirmation before publication.
       SECURITY.md describes reporting coverage across the projectcapsule
@@ -114,6 +121,9 @@ repository:
           records five Capsule Proxy advisories as unassessed integration risks.
           Maintenance, validation, and review instructions are at
           https://github.com/projectcapsule/capsule/blob/main/DEVELOPMENT.md#security-assessment.
+          OSPS Baseline Level 1 evidence, the published evaluation, and the
+          build-workflow review are at
+          https://github.com/projectcapsule/capsule/blob/main/security/osps-baseline.md.
     tools:
       - name: OSPS Baseline Scanner
         type: other
@@ -150,7 +160,7 @@ repository:
           ci:
             name: Published OSPS Baseline evaluations
             predicate-uri: https://github.com/revanite-io/pvtr-publish-results
-            location: https://github.com/projectcapsule/capsule/actions/workflows/osps-baseline-publish.yml
+            location: https://grc.store/targets/capsule/capsule
         comment: |
           osps-baseline-publish.yml configures daily Privateer evaluations at
           10:00 Europe/Zurich and manual runs using the trusted
@@ -162,9 +172,11 @@ repository:
           The caller versions the target with the workflow run's commit SHA.
           Manual dry runs retain bundles without publishing. Failed Baseline
           controls can be published; execution and publication errors fail.
-          Until a namespace and verified target exist, the results link points
-          to the publishing workflow. After the first successful publish,
-          replace it with https://grc.store/targets/<namespace>/capsule.
+          Capsule is a CNCF Sandbox project; the Defender submission targets
+          OSPS Baseline Level 1. The verified run published on 2026-10-17
+          passed all 24 active Level 1 requirements; OSPS-BR-01.02 is retired.
+          Source revision, the immutable result, and control evidence are at
+          https://github.com/projectcapsule/capsule/blob/main/security/osps-baseline.md.
       - name: Gosec
         type: SAST
         version: v2.29.0

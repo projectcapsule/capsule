@@ -2,6 +2,14 @@
 
 The Capsule community has adopted this security disclosures and response policy to ensure we responsibly handle critical issues.
 
+## CRA stewardship
+
+Capsule releases software intended for use in commercial products, including enterprise offerings.
+
+CRA stewardship: This project is supported under the Linux Foundation CRA stewardship framework, as described at https://www.linuxfoundation.org/security. Security vulnerabilities should be reported through the mechanisms described below, which we will coordinate with our CRA steward. For actively exploited vulnerabilities and severe incidents that may require CRA escalation, please use the project's emergency security reporting mechanisms as appropriate.
+
+This process follows [LF-Supported Projects and CRA Readiness](https://openssf.org/wp-content/uploads/2026/09/LF-Supported-Projects-and-CRA-Readiness-2026-09-10.pdf).
+
 ## Bulletins
 
 For information regarding the security of this project please join our [slack channel](https://kubernetes.slack.com/archives/C03GETTJQRL).
@@ -40,9 +48,26 @@ Describe the issue in English, ideally with some example configuration or code w
 
 If the issue is confirmed as a vulnerability, we will open a Security Advisory and acknowledge your contributions as part of it.
 
-## Reponse
+### Emergency security reports
 
-Response times could be affected by weekends, holidays, breaks or time zone differences. That said, the security response team will endeavour to reply as soon as possible, ideally within 5 working days.
+If you have reliable evidence that a malicious actor has exploited a vulnerability,
+or that the project's own IT infrastructure has been compromised, submit a
+[private vulnerability report via GitHub](https://github.com/projectcapsule/capsule/security/advisories/new)
+immediately and prefix the report title with `URGENT`. Include the affected
+components or versions, evidence of exploitation or compromise, and any known
+mitigations. Keep sensitive details in the private report rather than public
+issues or Slack channels.
+
+If GitHub private reporting is unavailable or affected by the incident, contact
+the LF CRA steward privately at [steward@linuxfoundation.org](mailto:steward@linuxfoundation.org).
+
+Maintainers must follow the [CRA escalation process](CONTRIBUTING.md#cra-stewardship-and-security-escalation)
+without delay and continue investigation, containment, and remediation while
+coordinating with the steward.
+
+## Response
+
+For routine reports, response times could be affected by weekends, holidays, breaks or time zone differences. That said, the security response team will endeavour to reply as soon as possible, ideally within 5 working days. Emergency reports follow the escalation process above.
 
 ## Security Contacts
 
