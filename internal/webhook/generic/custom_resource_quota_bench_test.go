@@ -5,20 +5,24 @@ package generic
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	mockclient "github.com/projectcapsule/capsule/internal/mocks/client"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
 func BenchmarkLegacyQuotaAdmission(b *testing.B) {
 	for _, tenants := range []int{1, 16, 128} {
-		for _, outcome := range []string{"allow", "deny", "delete", "unlimited", "skip"} {
+		for _, outcome := range []string{"allow", "deny", "delete", "unlimited", "skip", "generated-allow", "generated-deny"} {
 			for _, parallel := range []bool{false, true} {
 				b.Run(fmt.Sprintf("tenants=%d/%s/parallel=%v", tenants, outcome, parallel), func(b *testing.B) {
 					base := legacyQuotaFixture(b, tenants)
@@ -32,7 +36,8 @@ func BenchmarkLegacyQuotaAdmission(b *testing.B) {
 					if err := base.Status().Update(b.Context(), tnt); err != nil {
 						b.Fatal(err)
 					}
-					switch outcome {
+					behavior := strings.TrimPrefix(outcome, "generated-")
+					switch behavior {
 					case "deny":
 						tnt.Annotations[capsulev1beta2.LimitAnnotationForResource(quotaTestResource)] = "0"
 					case "unlimited":
@@ -54,9 +59,20 @@ func BenchmarkLegacyQuotaAdmission(b *testing.B) {
 					if outcome == "skip" {
 						req.Operation = admissionv1.Update
 					}
+					invoke := func() *admission.Response { return invokeLegacyQuota(b.Context(), c, c, req) }
+					if strings.HasPrefix(outcome, "generated-") {
+						req.Name = ""
+						raw, err := json.Marshal(map[string]any{"apiVersion": "example.com/v1", "kind": "Widget", "metadata": map[string]any{"name": "widget-generated", "generateName": "widget-", "namespace": req.Namespace}})
+						if err != nil {
+							b.Fatal(err)
+						}
+						req.Object.Raw = raw
+						onCreate := ResourceCounterHandler(c).OnCreate(c, c, admission.NewDecoder(c.Scheme()), events.NewDiscardRecorder())
+						invoke = func() *admission.Response { return onCreate(b.Context(), req) }
+					}
 					run := func() {
-						response := invokeLegacyQuota(b.Context(), c, c, req)
-						if outcome == "deny" {
+						response := invoke()
+						if behavior == "deny" {
 							if response == nil || response.Allowed {
 								b.Error("quota denial missing")
 							}
@@ -83,6 +99,38 @@ func BenchmarkLegacyQuotaAdmission(b *testing.B) {
 					calls.Report(b)
 				})
 			}
+		}
+	}
+}
+
+func BenchmarkLegacyQuotaGeneratedObjectSize(b *testing.B) {
+	for _, tenants := range []int{1, 128} {
+		for _, payload := range []int{1024, 65536} {
+			b.Run(fmt.Sprintf("tenants=%d/payloadBytes=%d", tenants, payload), func(b *testing.B) {
+				base := legacyQuotaFixture(b, tenants)
+				writer := interceptor.NewClient(base, interceptor.Funcs{Update: func(context.Context, client.WithWatch, client.Object, ...client.UpdateOption) error { return nil }})
+				calls := &mockclient.CallCounter{}
+				c := interceptor.NewClient(writer, calls.Interceptors())
+				req := legacyQuotaRequest(admissionv1.Create)
+				req.Name, req.UID = "", "generated-request"
+				raw, err := json.Marshal(map[string]any{
+					"apiVersion": "example.com/v1", "kind": "Widget",
+					"metadata": map[string]any{"name": "widget-generated", "generateName": "widget-", "namespace": req.Namespace},
+					"spec":     map[string]any{"payload": strings.Repeat("x", payload)},
+				})
+				if err != nil {
+					b.Fatal(err)
+				}
+				req.Object.Raw = raw
+				onCreate := ResourceCounterHandler(c).OnCreate(c, c, admission.NewDecoder(c.Scheme()), events.NewDiscardRecorder())
+				b.ReportAllocs()
+				for b.Loop() {
+					if response := onCreate(b.Context(), req); response != nil {
+						b.Fatalf("unexpected response: %+v", response)
+					}
+				}
+				calls.Report(b)
+			})
 		}
 	}
 }

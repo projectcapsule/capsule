@@ -195,6 +195,47 @@ var _ = Describe("legacy quota during namespace provisioning", Label("resourcequ
 		Expect(err).NotTo(HaveOccurred())
 		_, err = bClient.Resource(resource).Namespace(allowedNS.Name).Get(ctx, "after-expiry", metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
+
+		By("counting generated names once so two objects fit a quota of two")
+		Expect(bClient.Resource(resource).Namespace(allowedNS.Name).Delete(ctx, "after-expiry", metav1.DeleteOptions{})).To(Succeed())
+		Eventually(func() error {
+			current := &capsulev1beta2.Tenant{}
+			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(b), current); err != nil {
+				return err
+			}
+			current.Annotations[capsulev1beta2.LimitAnnotationForResource(kgv)] = "2"
+			return k8sClient.Update(ctx, current)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Eventually(func(g Gomega) {
+			current := &capsulev1beta2.Tenant{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(b), current)).To(Succeed())
+			g.Expect(current.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)]).To(Equal("0"))
+			state, err := capsuletenant.ReadLegacyQuotaReservations(current.Annotations)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(state.Pending[kgv]).To(BeEmpty())
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		generated := func() *unstructured.Unstructured { obj := object(""); obj.SetGenerateName("generated-"); return obj }
+		firstGenerated, err := bClient.Resource(resource).Namespace(allowedNS.Name).Create(ctx, generated(), metav1.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(firstGenerated.GetName()).To(HavePrefix("generated-"))
+		Eventually(func(g Gomega) {
+			current := &capsulev1beta2.Tenant{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(b), current)).To(Succeed())
+			state, err := capsuletenant.ReadLegacyQuotaReservations(current.Annotations)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(state.Pending[kgv]).To(BeEmpty(), "recount must match the persisted generated name")
+			g.Expect(current.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)]).To(Equal("1"))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		secondGenerated, err := bClient.Resource(resource).Namespace(allowedNS.Name).Create(ctx, generated(), metav1.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(secondGenerated.GetName()).NotTo(Equal(firstGenerated.GetName()))
+		_, err = bClient.Resource(resource).Namespace(allowedNS.Name).Create(ctx, generated(), metav1.CreateOptions{})
+		Expect(err).To(MatchError(ContainSubstring("has reached quota limit of 2 items")))
+		_, err = aClient.Resource(resource).Namespace(allowedNS.Name).Create(ctx, generated(), metav1.CreateOptions{})
+		Expect(apierrors.IsForbidden(err)).To(BeTrue(), "generated names must preserve tenant isolation: %v", err)
+		persisted, err := bClient.Resource(resource).Namespace(allowedNS.Name).List(ctx, metav1.ListOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(persisted.Items).To(HaveLen(2), "denied generated-name requests must not persist")
 		currentA := &capsulev1beta2.Tenant{}
 		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(a), currentA)).To(Succeed())
 		Expect(currentA.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)]).To(Equal("0"))

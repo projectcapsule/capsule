@@ -121,7 +121,13 @@ var _ = Describe("namespace profile permission revocation", Label("namespace-rba
 			Expect(apierrors.IsForbidden(err)).To(BeTrue(), "%v", err)
 			Expect(err).To(MatchError(ContainSubstring(`cannot get resource "configmaps"`)))
 		}
-		expectDenied(oldReader, selected.Name)
+		// Storage deletion precedes propagation to the API server's RBAC
+		// informer. Wait only for this previously authorized identity to converge.
+		Eventually(func(g Gomega) {
+			err := probe(oldReader, selected.Name)
+			g.Expect(apierrors.IsForbidden(err)).To(BeTrue(), "%v", err)
+			g.Expect(err).To(MatchError(ContainSubstring(`cannot get resource "configmaps"`)))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		expectDenied(newReader, selected.Name)
 		expectDenied(newReader, plain.Name)
 		expectDenied(keeperReader, foreign.Name)

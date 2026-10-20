@@ -5,6 +5,7 @@ package generic
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -381,6 +382,108 @@ func TestLegacyQuotaReservationAdmission(t *testing.T) {
 				require.Empty(t, state.Pending)
 				require.Equal(t, "1", current.Annotations[capsulev1beta2.UsedAnnotationForResource(quotaTestResource)])
 			}
+		})
+	}
+}
+
+type quotaCountingDecoder struct {
+	admission.Decoder
+	calls int
+}
+
+func (d *quotaCountingDecoder) Decode(req admission.Request, into runtime.Object) error {
+	d.calls++
+	return d.Decoder.Decode(req, into)
+}
+
+func TestLegacyQuotaGeneratedNameIdentity(t *testing.T) {
+	for _, mode := range []string{"create", "retry", "conflict", "dry-run", "malformed", "missing-name", "unlimited", "subresource", "cluster-scoped"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx := t.Context()
+			base := legacyQuotaFixture(t, 2)
+			req := legacyQuotaRequest(admissionv1.Create)
+			req.Name, req.UID = "", "generated-request"
+			raw, err := json.Marshal(map[string]any{"apiVersion": "example.com/v1", "kind": "Widget", "metadata": map[string]any{"name": "widget-generated", "namespace": req.Namespace, "generateName": "widget-"}})
+			require.NoError(t, err)
+			req.Object.Raw = raw
+			switch mode {
+			case "dry-run":
+				req.DryRun = new(true)
+			case "malformed":
+				req.Object.Raw = []byte(`{"metadata":`)
+			case "missing-name":
+				req.Object.Raw = []byte(`{"apiVersion":"example.com/v1","kind":"Widget","metadata":{"generateName":"widget-"}}`)
+			case "unlimited":
+				current := &capsulev1beta2.Tenant{}
+				require.NoError(t, base.Get(ctx, client.ObjectKey{Name: "tenant-0"}, current))
+				delete(current.Annotations, capsulev1beta2.LimitAnnotationForResource(quotaTestResource))
+				require.NoError(t, base.Update(ctx, current))
+			case "subresource":
+				req.SubResource = "status"
+			case "cluster-scoped":
+				req.Namespace = ""
+			}
+			writes, reads := 0, 0
+			c := interceptor.NewClient(base, interceptor.Funcs{Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				reads++
+				return c.Get(ctx, key, obj, opts...)
+			}, List: func(context.Context, client.WithWatch, client.ObjectList, ...client.ListOption) error {
+				t.Fatal("generated-name admission must not list resources")
+				return nil
+			}, Update: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
+				writes++
+				if mode == "conflict" && writes == 1 {
+					return apierrors.NewConflict(schema.GroupResource{Resource: "tenants"}, "tenant-0", errors.New("retry"))
+				}
+				return c.Update(ctx, obj, opts...)
+			}})
+			decoder := &quotaCountingDecoder{Decoder: admission.NewDecoder(c.Scheme())}
+			onCreate := ResourceCounterHandler(c).OnCreate(c, c, decoder, events.NewDiscardRecorder())
+			response := onCreate(ctx, req)
+			if mode == "malformed" || mode == "missing-name" {
+				require.NotNil(t, response)
+				require.False(t, response.Allowed)
+				if mode == "missing-name" {
+					require.Contains(t, response.Result.Message, "without a name")
+				}
+			} else {
+				require.Nil(t, response)
+			}
+			if mode == "retry" {
+				require.Nil(t, onCreate(ctx, req))
+				require.Equal(t, 1, writes, "the same generated-name admission must not reserve twice")
+			}
+			wantDecodes := 1
+			if mode == "retry" {
+				wantDecodes = 2
+			}
+			if mode == "unlimited" || mode == "subresource" || mode == "cluster-scoped" {
+				wantDecodes = 0
+			}
+			require.Equal(t, wantDecodes, decoder.calls, "decode once per request, including conflict retries")
+			wantReads := 2
+			if mode == "retry" || mode == "conflict" {
+				wantReads = 4
+			}
+			if mode == "subresource" || mode == "cluster-scoped" {
+				wantReads = 0
+			}
+			require.Equal(t, wantReads, reads, "object identity resolution must not add API reads")
+			current := &capsulev1beta2.Tenant{}
+			require.NoError(t, base.Get(ctx, client.ObjectKey{Name: "tenant-0"}, current))
+			state, err := tenant.ReadLegacyQuotaReservations(current.Annotations)
+			require.NoError(t, err)
+			if mode == "create" || mode == "retry" || mode == "conflict" {
+				require.Len(t, state.Pending[quotaTestResource], 1)
+				require.Equal(t, "widget-generated", state.Pending[quotaTestResource][0].ObjectRef.Name)
+				require.Equal(t, req.Namespace, state.Pending[quotaTestResource][0].ObjectRef.Namespace)
+				require.Equal(t, "2", current.Annotations[capsulev1beta2.UsedAnnotationForResource(quotaTestResource)])
+			} else {
+				require.Empty(t, state.Pending)
+				require.Zero(t, writes)
+			}
+			require.NoError(t, base.Get(ctx, client.ObjectKey{Name: "tenant-1"}, current))
+			require.Equal(t, "1", current.Annotations[capsulev1beta2.UsedAnnotationForResource(quotaTestResource)])
 		})
 	}
 }

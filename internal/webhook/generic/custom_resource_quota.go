@@ -35,13 +35,15 @@ func ResourceCounterHandler(_ client.Client) handlers.Handler {
 func (r *resourceCounterHandler) OnCreate(
 	c client.Client,
 	reader client.Reader,
-	_ admission.Decoder,
+	decoder admission.Decoder,
 	recorder events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		kgv := fmt.Sprintf("%s.%s_%s", req.Resource.Resource, req.Resource.Group, req.Resource.Version)
 
 		var limit int64
+
+		name := req.Name
 
 		tnt, err := r.updateUsage(ctx, c, reader, req, func(tnt *capsulev1beta2.Tenant, ns *corev1.Namespace) (bool, error) {
 			var limitErr error
@@ -51,6 +53,21 @@ func (r *resourceCounterHandler) OnCreate(
 				}
 
 				return false, limitErr
+			}
+
+			// Generated-name CREATEs can omit request.name even though the
+			// object already has its final name. Decode only those limited
+			// requests, once across conflict retries, to identify the reservation.
+			if name == "" {
+				obj := &metav1.PartialObjectMetadata{}
+				if err := decoder.Decode(req, obj); err != nil {
+					return false, err
+				}
+
+				name = obj.Name
+				if name == "" {
+					return false, errors.New("cannot reserve quota for a resource without a name")
+				}
 			}
 
 			reservations, err := tenant.ReadLegacyQuotaReservations(tnt.Annotations)
@@ -63,7 +80,7 @@ func (r *resourceCounterHandler) OnCreate(
 			used, _ := capsulev1beta2.GetUsedResourceFromTenant(*tnt, kgv)
 
 			for _, pending := range reservations.Pending[kgv] {
-				if req.UID != "" && pending.ID == string(req.UID) && pending.NamespaceUID == ns.UID && pending.ObjectRef.Namespace == req.Namespace && pending.ObjectRef.Name == req.Name && pending.ExpiresAt.After(now.Time) {
+				if req.UID != "" && pending.ID == string(req.UID) && pending.NamespaceUID == ns.UID && pending.ObjectRef.Namespace == req.Namespace && pending.ObjectRef.Name == name && pending.ExpiresAt.After(now.Time) {
 					if used > limit {
 						return false, caperrors.NewCustomResourceQuotaError(kgv, limit)
 					}
@@ -85,7 +102,7 @@ func (r *resourceCounterHandler) OnCreate(
 
 			reservations.Pending[kgv] = append(reservations.Pending[kgv], tenant.LegacyQuotaReservation{
 				ID: id, Usage: *resource.NewQuantity(1, resource.DecimalSI), CreatedAt: now, UpdatedAt: now, ExpiresAt: &expires,
-				ObjectRef: capsulev1beta2.QuantityLedgerObjectRef{APIGroup: req.Resource.Group, APIVersion: req.Resource.Version, Kind: req.Kind.Kind, Namespace: req.Namespace, Name: req.Name}, NamespaceUID: ns.UID,
+				ObjectRef: capsulev1beta2.QuantityLedgerObjectRef{APIGroup: req.Resource.Group, APIVersion: req.Resource.Version, Kind: req.Kind.Kind, Namespace: req.Namespace, Name: name}, NamespaceUID: ns.UID,
 			})
 
 			reservations.Namespaces[ns.Name] = ns.UID
@@ -105,7 +122,7 @@ func (r *resourceCounterHandler) OnCreate(
 					corev1.EventTypeWarning,
 					events.ReasonOverprovision,
 					events.ActionValidationDenied,
-					fmt.Sprintf("Resource %s/%s in API group %s cannot be created, limit usage of %d has been reached", req.Namespace, req.Name, kgv, limit),
+					fmt.Sprintf("Resource %s/%s in API group %s cannot be created, limit usage of %d has been reached", req.Namespace, name, kgv, limit),
 				).
 					WithRelated(tnt).
 					WithTenantLabel(tnt).

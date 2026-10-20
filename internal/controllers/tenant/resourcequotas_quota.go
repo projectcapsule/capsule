@@ -230,6 +230,11 @@ type (
 )
 
 func countLegacyQuotaResources(ctx context.Context, dyn dynamic.Interface, namespaces map[string]*corev1.Namespace, gvr schema.GroupVersionResource, pending []capsuletenant.LegacyQuotaReservation) (legacyQuotaCount, error) {
+	// A resource can commit after its namespace was listed without changing the
+	// Tenant version. Keep reservations live at the start of this count even if
+	// they expire while the remaining namespaces are being enumerated.
+	now := metav1.Now()
+
 	result := legacyQuotaCount{}
 	// Retain identities only for pending requests, not for every counted object.
 	wanted := make(map[legacyQuotaObject]struct{}, len(pending))
@@ -263,8 +268,6 @@ func countLegacyQuotaResources(ctx context.Context, dyn dynamic.Interface, names
 			}
 		}
 	}
-
-	now := metav1.Now()
 
 	for _, entry := range pending {
 		ns := namespaces[entry.ObjectRef.Namespace]
