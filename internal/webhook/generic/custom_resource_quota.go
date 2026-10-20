@@ -5,9 +5,9 @@ package generic
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
@@ -22,14 +22,10 @@ import (
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
-type resourceCounterHandler struct {
-	client client.Client
-}
+type resourceCounterHandler struct{}
 
-func ResourceCounterHandler(client client.Client) handlers.Handler {
-	return &resourceCounterHandler{
-		client: client,
-	}
+func ResourceCounterHandler(_ client.Client) handlers.Handler {
+	return &resourceCounterHandler{}
 }
 
 func (r *resourceCounterHandler) OnCreate(
@@ -39,47 +35,31 @@ func (r *resourceCounterHandler) OnCreate(
 	recorder events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		var tntName string
-
-		var err error
-		if tntName, err = r.getTenantName(ctx, c, req); err != nil {
-			return ad.ErroredResponse(err)
-		}
-
-		if len(tntName) == 0 {
-			return nil
-		}
-
 		kgv := fmt.Sprintf("%s.%s_%s", req.Resource.Resource, req.Resource.Group, req.Resource.Version)
-
-		tnt := &capsulev1beta2.Tenant{}
 
 		var limit int64
 
-		err = retry.RetryOnConflict(retry.DefaultRetry, func() (retryErr error) {
-			if retryErr = reader.Get(ctx, types.NamespacedName{Name: tntName}, tnt); err != nil {
-				return retryErr
-			}
-
-			if limit, retryErr = capsulev1beta2.GetLimitResourceFromTenant(*tnt, kgv); retryErr != nil {
-				if errors.As(err, &capsulev1beta2.NonLimitedResourceError{}) {
-					return nil
+		tnt, err := r.updateUsage(ctx, c, reader, req, func(tnt *capsulev1beta2.Tenant) (bool, error) {
+			var limitErr error
+			if limit, limitErr = capsulev1beta2.GetLimitResourceFromTenant(*tnt, kgv); limitErr != nil {
+				if _, ok := errors.AsType[*capsulev1beta2.NonLimitedResourceError](limitErr); ok {
+					return false, nil
 				}
 
-				return err
+				return false, limitErr
 			}
 
 			used, _ := capsulev1beta2.GetUsedResourceFromTenant(*tnt, kgv)
 			if used >= limit {
-				return caperrors.NewCustomResourceQuotaError(kgv, limit)
+				return false, caperrors.NewCustomResourceQuotaError(kgv, limit)
 			}
 
 			tnt.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)] = fmt.Sprintf("%d", used+1)
 
-			return c.Update(ctx, tnt)
+			return true, nil
 		})
 		if err != nil {
-			if errors.As(err, &caperrors.CustomResourceQuotaError{}) {
+			if _, ok := errors.AsType[*caperrors.CustomResourceQuotaError](err); ok {
 				recorder.LabeledEvent(
 					tnt,
 					corev1.EventTypeWarning,
@@ -107,38 +87,18 @@ func (r *resourceCounterHandler) OnDelete(
 	_ events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		var tntName string
-
-		var err error
-		if tntName, err = r.getTenantName(ctx, c, req); err != nil {
-			return ad.ErroredResponse(err)
-		}
-
-		if len(tntName) == 0 {
-			return nil
-		}
-
 		kgv := fmt.Sprintf("%s.%s_%s", req.Resource.Resource, req.Resource.Group, req.Resource.Version)
 
-		err = retry.RetryOnConflict(retry.DefaultRetry, func() (retryErr error) {
-			tnt := &capsulev1beta2.Tenant{}
-			if retryErr = reader.Get(ctx, types.NamespacedName{Name: tntName}, tnt); err != nil {
-				return retryErr
-			}
-
-			if tnt.Annotations == nil {
-				return retryErr
-			}
-
+		_, err := r.updateUsage(ctx, c, reader, req, func(tnt *capsulev1beta2.Tenant) (bool, error) {
 			if _, ok := tnt.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)]; !ok {
-				return retryErr
+				return false, nil
 			}
 
 			used, _ := capsulev1beta2.GetUsedResourceFromTenant(*tnt, kgv)
 
 			tnt.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)] = fmt.Sprintf("%d", used-1)
 
-			return c.Update(ctx, tnt)
+			return true, nil
 		})
 		if err != nil {
 			return ad.ErroredResponse(err)
@@ -159,19 +119,61 @@ func (r *resourceCounterHandler) OnUpdate(
 	}
 }
 
-func (r *resourceCounterHandler) getTenantName(
+// Resolve ownership through the API reader: namespace membership in Tenant status
+// can lag behind the permission queue. Each conflict retry refreshes both objects,
+// without issuing another Tenant GET on the successful first attempt.
+func (r *resourceCounterHandler) updateUsage(
 	ctx context.Context,
 	clt client.Client,
+	reader client.Reader,
 	req admission.Request,
-) (string, error) {
-	tnt, err := tenant.TenantByStatusNamespace(ctx, clt, req.Namespace)
-	if err != nil {
-		return "", err
+	mutate func(*capsulev1beta2.Tenant) (bool, error),
+) (*capsulev1beta2.Tenant, error) {
+	if req.Namespace == "" || req.SubResource != "" {
+		return nil, nil
 	}
 
-	if tnt == nil {
-		return "", nil
+	var original, current *capsulev1beta2.Tenant
+
+	var namespaceUID types.UID
+
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var err error
+
+		var ns *corev1.Namespace
+
+		current, ns, err = tenant.GetTenantByNamespaceWithSnapshot(ctx, reader, req.Namespace)
+		if err != nil {
+			return err
+		}
+
+		if original != nil && (current == nil || current.Name != original.Name || current.UID != original.UID || ns.UID != namespaceUID) {
+			return fmt.Errorf("namespace %q tenant ownership changed while updating quota usage", req.Namespace)
+		}
+
+		if current == nil {
+			if ns != nil {
+				if _, owned := tenant.GetTenantNameByOwnerreferences(ns.OwnerReferences); owned {
+					return fmt.Errorf("cannot resolve tenant owner for namespace %q", req.Namespace)
+				}
+			}
+
+			return nil
+		}
+
+		original = current
+		namespaceUID = ns.UID
+
+		changed, err := mutate(current)
+		if err != nil || !changed || (req.DryRun != nil && *req.DryRun) {
+			return err
+		}
+
+		return clt.Update(ctx, current)
+	})
+	if err == nil {
+		err = ctx.Err()
 	}
 
-	return tnt.GetName(), nil
+	return current, err
 }

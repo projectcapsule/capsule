@@ -216,6 +216,20 @@ func (r *Manager) provisionNamespace(
 		return err
 	})
 
+	if err != nil && stat == nil {
+		// A transient read or lock error is not evidence that this namespace
+		// disappeared. Retain its cleanup inventory until a successful retry;
+		// never carry inventory across namespace recreation.
+		stat = &capsulev1beta2.TenantStatusNamespaceItem{Name: expected.Name, UID: expected.UID}
+		if previous := snapshot.Status.GetInstance(stat); previous != nil && previous.UID == expected.UID {
+			stat = previous.DeepCopy()
+		}
+
+		ready := meta.NewReadyCondition(expected)
+		ready.Status, ready.Reason, ready.Message = metav1.ConditionFalse, meta.FailedReason, fmt.Sprintf("Failed to provision namespace: %v", err)
+		stat.Conditions.UpdateConditionByType(ready)
+	}
+
 	return stat, err
 }
 

@@ -437,7 +437,7 @@ func (r *Manager) reconcileNamespaceMetadata(
 
 		// Cleanup old Metadata.
 		instance := tnt.Status.GetInstance(stat)
-		if instance != nil && instance.Metadata != nil {
+		if instance != nil && instance.UID == ns.UID && instance.Metadata != nil {
 			for label := range instance.Metadata.Labels {
 				if _, ok := managedLabels[label]; ok {
 					continue

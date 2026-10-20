@@ -5,6 +5,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -90,7 +91,7 @@ var _ = Describe("namespace provisioning regressions", Label("namespace-rbac-pri
 		Expect(apierrors.IsForbidden(err)).To(BeTrue(), "explicit permissions must not cross tenants: %v", err)
 	})
 
-	It("tracks managed namespace metadata through policy removal and profile changes", func() {
+	It("tracks managed namespace metadata through failed status, policy removal and profile changes", func() {
 		ctx := context.Background()
 		name := "e2e-metadata-inventory-" + rand.String(6)
 		managedKey := "provisioning.capsule.dev/managed"
@@ -135,6 +136,24 @@ var _ = Describe("namespace provisioning regressions", Label("namespace-rbac-pri
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		}
 		expectMetadata("first")
+		// Seed a failed provisioning result with its existing cleanup inventory.
+		// Controller unit tests inject the transient Namespace read itself.
+		Eventually(func() error {
+			current := &capsulev1beta2.Tenant{}
+			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(a), current); err != nil {
+				return err
+			}
+			instance := current.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{Name: selected.Name})
+			if instance == nil || instance.Metadata == nil {
+				return fmt.Errorf("namespace inventory is not ready")
+			}
+			ready := instance.Conditions.GetConditionByType(meta.ReadyCondition)
+			if ready == nil {
+				return fmt.Errorf("namespace condition is not ready")
+			}
+			ready.Status, ready.Reason, ready.Message = metav1.ConditionFalse, meta.FailedReason, "transient namespace read failed"
+			return k8sClient.Status().Update(ctx, current)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		updateMetadata := func(items []api.AdditionalMetadataSelectorSpec) {
 			Eventually(func() error {
 				current := &capsulev1beta2.Tenant{}
@@ -160,5 +179,49 @@ var _ = Describe("namespace provisioning regressions", Label("namespace-rbac-pri
 			return k8sClient.Update(ctx, current)
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		expectMetadata("")
+
+		// Recreate the namespace, then model delayed status from its previous
+		// lifetime. That inventory must not remove the new owner's metadata.
+		previous := &corev1.Namespace{}
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(selected), previous)).To(Succeed())
+		EventuallyDeletion(previous)
+		recreated := NewNamespace(selected.Name, map[string]string{meta.TenantLabel: a.Name, "profile": "plain", managedKey: "user", "user.capsule.dev/keep": "yes"})
+		recreated.Annotations = map[string]string{managedKey: "user"}
+		NamespaceCreation(recreated, a.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceReady(a, recreated, 2)
+		Eventually(func() error {
+			current := &capsulev1beta2.Tenant{}
+			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(a), current); err != nil {
+				return err
+			}
+			instance := current.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{Name: recreated.Name})
+			if instance == nil {
+				return fmt.Errorf("recreated namespace inventory is not ready")
+			}
+			instance.UID = previous.UID
+			instance.Metadata = &capsulev1beta2.TenantStatusNamespaceMetadata{Labels: map[string]string{managedKey: "second"}, Annotations: map[string]string{managedKey: "second"}}
+			return k8sClient.Status().Update(ctx, current)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Eventually(func() error {
+			current := &capsulev1beta2.Tenant{}
+			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(a), current); err != nil {
+				return err
+			}
+			current.Spec.NamespaceOptions.Quota = new(int32(100))
+			return k8sClient.Update(ctx, current)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Eventually(func(g Gomega) {
+			actual := &corev1.Namespace{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(recreated), actual)).To(Succeed())
+			g.Expect(actual.UID).NotTo(Equal(previous.UID))
+			g.Expect(actual.Labels).To(HaveKeyWithValue(managedKey, "user"))
+			g.Expect(actual.Annotations).To(HaveKeyWithValue(managedKey, "user"))
+			current := &capsulev1beta2.Tenant{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(a), current)).To(Succeed())
+			g.Expect(current.Status.ObservedGeneration).To(Equal(current.Generation))
+			inventory := current.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{Name: actual.Name})
+			g.Expect(inventory).NotTo(BeNil())
+			g.Expect(inventory.UID).To(Equal(actual.UID))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 })
