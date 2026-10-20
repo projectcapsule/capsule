@@ -47,6 +47,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
+	tenantutils "github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 type Manager struct {
@@ -348,7 +349,7 @@ func (r *Manager) Reconcile(ctx context.Context, request ctrl.Request) (result c
 		return reconcile.Result{RequeueAfter: 2 * time.Second}, nil
 	}
 
-	return reconcile.Result{}, reconcileError
+	return reconcile.Result{RequeueAfter: tenantutils.LegacyQuotaRequeueAfter(instance.Annotations, time.Now())}, reconcileError
 }
 
 func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *capsulev1beta2.Tenant) (err error) {

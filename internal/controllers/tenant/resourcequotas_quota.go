@@ -6,157 +6,313 @@ package tenant
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
+	"strconv"
 	"strings"
-	"sync"
 
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/retry"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
-	"github.com/projectcapsule/capsule/pkg/api/meta"
+	capsuletenant "github.com/projectcapsule/capsule/pkg/tenant"
 )
 
-func (r *Manager) syncCustomResourceQuotaUsages(ctx context.Context, tenant *capsulev1beta2.Tenant) error {
-	if tenant.DeletionTimestamp != nil {
+type legacyQuotaResource struct {
+	key string
+	gvr schema.GroupVersionResource
+}
+
+func legacyQuotaResources(tnt *capsulev1beta2.Tenant) []legacyQuotaResource {
+	var resources []legacyQuotaResource
+
+	for annotation := range tnt.Annotations {
+		key, ok := strings.CutPrefix(annotation, capsulev1beta2.ResourceQuotaAnnotationPrefix+"/")
+		if !ok {
+			continue
+		}
+
+		kindGroup, version, ok := strings.Cut(key, "_")
+
+		kind, group, valid := strings.Cut(kindGroup, ".")
+
+		if !ok || !valid || kind == "" || version == "" {
+			continue
+		}
+
+		resources = append(resources, legacyQuotaResource{key: key, gvr: schema.GroupVersionResource{Group: group, Version: version, Resource: kind}})
+	}
+
+	slices.SortFunc(resources, func(a, b legacyQuotaResource) int { return strings.Compare(a.key, b.key) })
+
+	return resources
+}
+
+func (r *Manager) syncCustomResourceQuotaUsages(ctx context.Context, snapshot *capsulev1beta2.Tenant) error {
+	if snapshot.DeletionTimestamp != nil || (len(legacyQuotaResources(snapshot)) == 0 && snapshot.Annotations[capsuletenant.LegacyQuotaReservationsAnnotation] == "") {
 		return nil
 	}
 
-	type resource struct {
-		kind    string
-		group   string
-		version string
+	reader := r.reader
+	if reader == nil {
+		reader = r.Client
+	}
+	// Fence the entire count with the version read BEFORE enumeration. A write
+	// retry must recount, rather than apply an old count to a newer reservation.
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		current := &capsulev1beta2.Tenant{}
+		if err := reader.Get(ctx, client.ObjectKeyFromObject(snapshot), current); err != nil {
+			return client.IgnoreNotFound(err)
+		}
+
+		if current.UID != snapshot.UID || current.DeletionTimestamp != nil {
+			return nil
+		}
+
+		before := maps.Clone(current.Annotations)
+
+		reservations, err := capsuletenant.ReadLegacyQuotaReservations(current.Annotations)
+		if err != nil {
+			return err
+		}
+
+		if err := r.recountLegacyQuotaResources(ctx, reader, current, reservations, legacyQuotaResources(current)); err != nil {
+			return err
+		}
+
+		if err := capsuletenant.WriteLegacyQuotaReservations(current.Annotations, reservations); err != nil {
+			return err
+		}
+
+		if maps.Equal(before, current.Annotations) {
+			return nil
+		}
+
+		return r.Update(ctx, current)
+	})
+}
+
+func (r *Manager) recountLegacyQuotaResources(ctx context.Context, reader client.Reader, current *capsulev1beta2.Tenant, reservations *capsuletenant.LegacyQuotaReservations, resources []legacyQuotaResource) error {
+	configured := make(map[string]struct{}, len(resources))
+	for _, res := range resources {
+		configured[res.key] = struct{}{}
 	}
 
-	resourceList := make([]resource, 0, len(tenant.GetAnnotations()))
-
-	for k := range tenant.GetAnnotations() {
-		if !strings.HasPrefix(k, meta.ResourceQuotaAnnotationPrefix) {
-			continue
+	for key := range reservations.Pending {
+		if _, ok := configured[key]; !ok {
+			delete(reservations.Pending, key)
 		}
-
-		parts := strings.Split(k, "/")
-		if len(parts) != 2 {
-			r.Log.V(4).Info("non well-formed Resource Limit annotation", "key", k)
-
-			continue
-		}
-
-		parts = strings.Split(parts[1], "_")
-
-		if len(parts) != 2 {
-			r.Log.V(4).Info("non well-formed Resource Limit annotation, cannot retrieve version", "key", k)
-
-			continue
-		}
-
-		groupKindParts := strings.Split(parts[0], ".")
-		if len(groupKindParts) < 2 {
-			r.Log.V(4).Info("non well-formed Resource Limit annotation, cannot retrieve kind and group", "key", k)
-
-			continue
-		}
-
-		resourceList = append(resourceList, resource{
-			kind:    groupKindParts[0],
-			group:   strings.Join(groupKindParts[1:], "."),
-			version: parts[1],
-		})
 	}
 
-	if len(resourceList) == 0 {
+	for key := range reservations.Deleting {
+		if _, ok := configured[key]; !ok {
+			delete(reservations.Deleting, key)
+		}
+	}
+
+	if len(resources) == 0 {
+		clear(reservations.Namespaces)
+
 		return nil
 	}
 
-	errGroup := new(errgroup.Group)
-
-	usedMap := make(map[string]int)
-	usedMapMu := sync.Mutex{}
-
-	defer func() {
-		for gvk, used := range usedMap {
-			err := retry.RetryOnConflict(retry.DefaultBackoff, func() (retryErr error) {
-				tnt := &capsulev1beta2.Tenant{}
-				if retryErr = r.Get(ctx, types.NamespacedName{Name: tenant.GetName()}, tnt); retryErr != nil {
-					return retryErr
-				}
-
-				if tnt.GetAnnotations() == nil {
-					tnt.Annotations = make(map[string]string)
-				}
-
-				tnt.Annotations[capsulev1beta2.UsedAnnotationForResource(gvk)] = fmt.Sprintf("%d", used)
-
-				return r.Update(ctx, tnt)
-			})
-			if err != nil {
-				r.Log.Error(err, "cannot update custom Resource Quota", "GVK", gvk)
-			}
-		}
-	}()
-
-	dynamicClient := r.DynamicClient
-	if dynamicClient == nil {
-		dynamicClient = dynamic.NewForConfigOrDie(r.RESTConfig)
+	namespaces, lookupErr := r.legacyQuotaNamespaces(ctx, reader, current, reservations)
+	if lookupErr != nil {
+		return lookupErr
 	}
 
-	namespaces := readyTenantNamespaces(tenant)
+	for name, uid := range reservations.Namespaces {
+		ns := namespaces[name]
 
-	for _, item := range resourceList {
-		res := item
-		key := fmt.Sprintf("%s.%s_%s", res.kind, res.group, res.version)
+		status := current.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{Name: name, UID: uid})
 
-		errGroup.Go(func() (scopeErr error) {
-			var used int
+		if ns == nil || ns.UID != uid || (status != nil && status.UID == uid) {
+			delete(reservations.Namespaces, name)
+		}
+	}
 
-			for _, ns := range namespaces {
-				var list *unstructured.UnstructuredList
+	dyn := r.DynamicClient
+	if dyn == nil {
+		var err error
 
-				list, scopeErr = dynamicClient.
-					Resource(schema.GroupVersionResource{
-						Group:    res.group,
-						Version:  res.version,
-						Resource: res.kind,
-					}).
-					Namespace(ns).
-					List(ctx, metav1.ListOptions{})
-				if scopeErr != nil {
-					if caperrors.IgnoreGone(scopeErr) || apierrors.HasStatusCause(scopeErr, corev1.NamespaceTerminatingCause) {
-						scopeErr = nil
+		dyn, err = dynamic.NewForConfig(r.RESTConfig)
+		if err != nil {
+			return err
+		}
+	}
 
-						continue
-					}
+	counts := make([]legacyQuotaCount, len(resources))
+	group, countContext := errgroup.WithContext(ctx)
+	group.SetLimit(8)
 
-					return scopeErr
-				}
+	for i, res := range resources {
+		group.Go(func() error {
+			var countErr error
 
-				for _, k := range list.Items {
-					if k.GetDeletionTimestamp() != nil {
-						continue
-					}
+			counts[i], countErr = countLegacyQuotaResources(countContext, dyn, namespaces, res.gvr, reservations.Pending[res.key], reservations.Deleting[res.key])
 
-					used++
-				}
-			}
-
-			usedMapMu.Lock()
-			usedMap[key] += used
-			usedMapMu.Unlock()
-
-			return scopeErr
+			return countErr
 		})
 	}
 
-	if err := errGroup.Wait(); err != nil {
+	if err := group.Wait(); err != nil {
 		return err
 	}
 
+	for i, res := range resources {
+		current.Annotations[capsulev1beta2.UsedAnnotationForResource(res.key)] = strconv.FormatInt(counts[i].used, 10)
+
+		reservations.Pending[res.key] = counts[i].pending
+		if reservations.Deleting != nil {
+			reservations.Deleting[res.key] = counts[i].deleting
+		}
+	}
+
 	return nil
+}
+
+// The owner index selects candidates independently of Tenant status. Pending
+// reservations also supply namespaces not visible in that index yet. Each is
+// checked against current UID-validated ownership using the API reader.
+func (r *Manager) legacyQuotaNamespaces(ctx context.Context, reader client.Reader, tnt *capsulev1beta2.Tenant, reservations *capsuletenant.LegacyQuotaReservations) (map[string]*corev1.Namespace, error) {
+	list := &corev1.NamespaceList{}
+	if err := r.List(ctx, list, client.MatchingFields{capsuletenant.NamespaceOwnerReferenceIndexerFieldName: tnt.Name}); err != nil {
+		return nil, fmt.Errorf("list legacy quota namespace candidates: %w", err)
+	}
+
+	candidates := make(map[string]struct{}, len(list.Items))
+	for _, ns := range list.Items {
+		candidates[ns.Name] = struct{}{}
+	}
+
+	for _, name := range tnt.Status.Namespaces {
+		candidates[name] = struct{}{}
+	}
+
+	for _, status := range tnt.Status.Spaces {
+		candidates[status.Name] = struct{}{}
+	}
+
+	for name := range reservations.Namespaces {
+		candidates[name] = struct{}{}
+	}
+
+	for _, entries := range reservations.Pending {
+		for _, entry := range entries {
+			candidates[entry.ObjectRef.Namespace] = struct{}{}
+		}
+	}
+
+	for _, entries := range reservations.Deleting {
+		for _, entry := range entries {
+			candidates[entry.ObjectRef.Namespace] = struct{}{}
+		}
+	}
+
+	namespaces := make(map[string]*corev1.Namespace, len(candidates))
+
+	for _, name := range slices.Sorted(maps.Keys(candidates)) {
+		ns := &corev1.Namespace{}
+		if err := reader.Get(ctx, client.ObjectKey{Name: name}, ns); err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+
+			return nil, err
+		}
+
+		if ns.DeletionTimestamp == nil && namespaceOwnedByTenant(ns, tnt) {
+			namespaces[name] = ns
+		}
+	}
+
+	return namespaces, nil
+}
+
+type (
+	legacyQuotaObject struct{ namespace, name string }
+	legacyQuotaCount  struct {
+		used     int64
+		pending  []capsuletenant.LegacyQuotaReservation
+		deleting []capsuletenant.LegacyQuotaDeletion
+	}
+)
+
+func countLegacyQuotaResources(ctx context.Context, dyn dynamic.Interface, namespaces map[string]*corev1.Namespace, gvr schema.GroupVersionResource, pending []capsuletenant.LegacyQuotaReservation, deleting []capsuletenant.LegacyQuotaDeletion) (legacyQuotaCount, error) {
+	// A resource can commit after its namespace was listed without changing the
+	// Tenant version. Keep reservations live at the start of this count even if
+	// they expire while the remaining namespaces are being enumerated.
+	now := metav1.Now()
+
+	result := legacyQuotaCount{}
+	// Retain identities only for pending requests, not for every counted object.
+	wanted := make(map[legacyQuotaObject]struct{}, len(pending))
+
+	materialized := make(map[legacyQuotaObject]types.UID, len(pending))
+
+	for _, entry := range pending {
+		wanted[legacyQuotaObject{entry.ObjectRef.Namespace, entry.ObjectRef.Name}] = struct{}{}
+	}
+
+	for _, entry := range deleting {
+		wanted[legacyQuotaObject{entry.ObjectRef.Namespace, entry.ObjectRef.Name}] = struct{}{}
+	}
+
+	for _, name := range slices.Sorted(maps.Keys(namespaces)) {
+		list, err := dyn.Resource(gvr).Namespace(name).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			if caperrors.IgnoreGone(err) || apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
+				continue
+			}
+
+			return result, err
+		}
+
+		for _, obj := range list.Items {
+			key := legacyQuotaObject{name, obj.GetName()}
+			if _, ok := wanted[key]; ok {
+				materialized[key] = obj.GetUID()
+			}
+
+			if obj.GetDeletionTimestamp() != nil {
+				continue
+			}
+
+			result.used++
+		}
+	}
+
+	for _, entry := range pending {
+		ns := namespaces[entry.ObjectRef.Namespace]
+		if ns == nil || ns.UID != entry.NamespaceUID || (entry.ExpiresAt != nil && entry.ExpiresAt.Before(&now)) {
+			continue
+		}
+
+		uid, found := materialized[legacyQuotaObject{entry.ObjectRef.Namespace, entry.ObjectRef.Name}]
+		if found && entry.ObjectRef.UID != "" && uid == entry.ObjectRef.UID {
+			continue
+		}
+
+		result.used++
+		result.pending = append(result.pending, entry)
+	}
+
+	for _, entry := range deleting {
+		ns := namespaces[entry.ObjectRef.Namespace]
+
+		uid, found := materialized[legacyQuotaObject{entry.ObjectRef.Namespace, entry.ObjectRef.Name}]
+		if ns != nil && ns.UID == entry.NamespaceUID && found && (entry.ObjectRef.UID == "" || uid == entry.ObjectRef.UID) && (entry.ExpiresAt == nil || !entry.ExpiresAt.Before(&now)) {
+			result.deleting = append(result.deleting, entry)
+		}
+	}
+
+	return result, nil
 }

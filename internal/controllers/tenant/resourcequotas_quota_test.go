@@ -7,6 +7,7 @@ import (
 	"context"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -19,17 +20,21 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	namespaceindex "github.com/projectcapsule/capsule/pkg/runtime/indexers/namespace"
 )
 
-func TestSyncCustomResourceQuotaUsagesCountsReadyNamespacesOnly(t *testing.T) {
+func TestSyncCustomResourceQuotaUsagesCountsOwnedActiveNamespaces(t *testing.T) {
 	ctx := context.Background()
 	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
 	if err := capsulev1beta2.AddToScheme(scheme); err != nil {
 		t.Fatalf("cannot add capsule scheme: %v", err)
 	}
 
 	tnt := &capsulev1beta2.Tenant{
-		Name: "tenant-a",
+		Name: "tenant-a", UID: "tenant-a-uid",
 		Annotations: map[string]string{
 			capsulev1beta2.LimitAnnotationForResource("widgets.example.com_v1"): "10",
 		},
@@ -72,7 +77,7 @@ func TestSyncCustomResourceQuotaUsagesCountsReadyNamespacesOnly(t *testing.T) {
 		return true, &unstructured.UnstructuredList{Items: []unstructured.Unstructured{active, deleting}}, nil
 	})
 
-	kubeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(tnt).Build()
+	kubeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(tnt, cleanupOwnedNamespace(tnt, "ready", false), cleanupOwnedNamespace(tnt, "terminating", true)).WithIndex(&corev1.Namespace{}, namespaceindex.OwnerReferenceIndex, namespaceindex.OwnerReference{}.Func()).Build()
 	manager := &Manager{
 		Client:        kubeClient,
 		DynamicClient: dynamicClient,
@@ -103,12 +108,15 @@ func TestSyncCustomResourceQuotaUsagesCountsReadyNamespacesOnly(t *testing.T) {
 func TestSyncCustomResourceQuotaUsagesIgnoresMissingResource(t *testing.T) {
 	ctx := context.Background()
 	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
 	if err := capsulev1beta2.AddToScheme(scheme); err != nil {
 		t.Fatalf("cannot add capsule scheme: %v", err)
 	}
 
 	tnt := &capsulev1beta2.Tenant{
-		Name: "tenant-a",
+		Name: "tenant-a", UID: "tenant-a-uid",
 		Annotations: map[string]string{
 			capsulev1beta2.LimitAnnotationForResource("widgets.example.com_v1"): "10",
 		},
@@ -132,7 +140,7 @@ func TestSyncCustomResourceQuotaUsagesIgnoresMissingResource(t *testing.T) {
 	})
 
 	manager := &Manager{
-		Client:        fake.NewClientBuilder().WithScheme(scheme).WithObjects(tnt).Build(),
+		Client:        fake.NewClientBuilder().WithScheme(scheme).WithObjects(tnt, cleanupOwnedNamespace(tnt, "ready", false), cleanupOwnedNamespace(tnt, "terminating", true)).WithIndex(&corev1.Namespace{}, namespaceindex.OwnerReferenceIndex, namespaceindex.OwnerReference{}.Func()).Build(),
 		DynamicClient: dynamicClient,
 	}
 

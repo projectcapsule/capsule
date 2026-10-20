@@ -5,11 +5,15 @@ package tenant
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -83,8 +87,12 @@ func (r *Manager) reconcileNamespaceProvisioning(ctx context.Context, request re
 		// Established profiles remain on the Tenant queue, where promotion rules
 		// are evaluated across the complete membership before permission updates.
 		if status := tnt.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{Name: ns.Name, UID: ns.UID}); status != nil && status.UID == ns.UID {
-			if ready := status.Conditions.GetConditionByType(meta.ReadyCondition); ready != nil && ready.Status == metav1.ConditionTrue {
-				return nil
+			if ready := status.Conditions.GetConditionByType(meta.ReadyCondition); ready != nil {
+				// A known profile failure must recover on the Tenant queue, which
+				// owns metadata reconciliation. Partial RBAC failures can retry here.
+				if ready.Status == metav1.ConditionTrue || (ready.Status == metav1.ConditionFalse && ready.Reason == meta.FailedReason) {
+					return nil
+				}
 			}
 		}
 
@@ -240,8 +248,20 @@ func (r *Manager) provisionNamespaceLocked(ctx context.Context, log logr.Logger,
 	bindings, bindingErr := plan.forNamespace(ns)
 
 	stat, profileErr := r.reconcileNamespace(ctx, log, ns, snapshot, snapshot)
-	if profileErr != nil || ns.DeletionTimestamp != nil {
+	if ns.DeletionTimestamp != nil {
 		return stat, profileErr
+	}
+
+	if profileErr != nil {
+		// A failed profile must not retain revoked grants. Only prune from a
+		// complete, evaluated permission plan; new grants still require the profile.
+		if bindingErr == nil && plan.prune {
+			bindingErr = r.runPhase(log, "namespace_role_bindings", func() error {
+				return r.pruningResources(ctx, ns.Name, slices.Collect(maps.Keys(bindings)), &rbacv1.RoleBinding{})
+			})
+		}
+
+		return stat, errors.Join(profileErr, bindingErr)
 	}
 
 	if bindingErr == nil {

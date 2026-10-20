@@ -317,7 +317,7 @@ func TestNamespaceProvisioningUsesIsolatedReaderAndRejectsReusedUID(t *testing.T
 
 func BenchmarkNamespaceProvisioningQueue(b *testing.B) {
 	for _, unrelated := range []int{0, 64} {
-		for _, state := range []string{"initial", "ready"} {
+		for _, state := range []string{"initial", "ready", "profile-failed", "permissions-failed"} {
 			b.Run(fmt.Sprintf("unrelatedTenants=%d/%s", unrelated, state), func(b *testing.B) {
 				tnt := provisioningTenant()
 				ns := cleanupOwnedNamespace(tnt, "new", false)
@@ -330,12 +330,20 @@ func BenchmarkNamespaceProvisioningQueue(b *testing.B) {
 				calls := &mockclient.CallCounter{}
 				c := interceptor.NewClient(base.(client.WithWatch), calls.Interceptors())
 				r.Client, r.reader = c, c
-				if state == "ready" {
+				if state != "initial" {
 					current := &capsulev1beta2.Tenant{}
 					if err := base.Get(b.Context(), client.ObjectKeyFromObject(tnt), current); err != nil {
 						b.Fatal(err)
 					}
 					current.Status.Spaces = []*capsulev1beta2.TenantStatusNamespaceItem{{Name: ns.Name, UID: ns.UID, Conditions: meta.ConditionList{meta.NewReadyCondition(ns)}}}
+					if state == "profile-failed" || state == "permissions-failed" {
+						ready := &current.Status.Spaces[0].Conditions[0]
+						ready.Status = metav1.ConditionFalse
+						ready.Reason = meta.FailedReason
+						if state == "permissions-failed" {
+							ready.Reason = meta.PermissionsFailedReason
+						}
+					}
 					if err := base.Status().Update(b.Context(), current); err != nil {
 						b.Fatal(err)
 					}
