@@ -47,6 +47,7 @@ func BenchmarkLegacyQuotaAdmission(b *testing.B) {
 					calls := &mockclient.CallCounter{}
 					c := interceptor.NewClient(writer, calls.Interceptors())
 					req := legacyQuotaRequest(admissionv1.Create)
+					req.UID = "benchmark-admission"
 					if outcome == "delete" {
 						req.Operation = admissionv1.Delete
 					}

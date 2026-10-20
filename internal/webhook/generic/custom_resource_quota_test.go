@@ -27,6 +27,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	tenantindex "github.com/projectcapsule/capsule/pkg/runtime/indexers/tenant"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 const quotaTestResource = "widgets.example.com_v1"
@@ -311,4 +312,75 @@ func TestLegacyQuotaConcurrentReservations(t *testing.T) {
 	result := invokeLegacyQuota(t.Context(), base, base, legacyQuotaRequest(admissionv1.Create))
 	require.NotNil(t, result)
 	require.Contains(t, result.Result.Message, "quota limit of 3")
+}
+
+func TestLegacyQuotaReservationAdmission(t *testing.T) {
+	for _, mode := range []string{"retry-same-request", "different-request", "lowered-limit", "dry-run", "delete-pending", "malformed-state"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx := t.Context()
+			base := legacyQuotaFixture(t, 2)
+			req := legacyQuotaRequest(admissionv1.Create)
+			req.UID = "first"
+			var writes int
+			c := interceptor.NewClient(base, interceptor.Funcs{Update: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
+				writes++
+				return c.Update(ctx, obj, opts...)
+			}})
+			require.Nil(t, invokeLegacyQuota(ctx, c, c, req))
+			require.Equal(t, 1, writes)
+			current := &capsulev1beta2.Tenant{}
+			require.NoError(t, base.Get(ctx, client.ObjectKey{Name: "tenant-0"}, current))
+			state, err := tenant.ReadLegacyQuotaReservations(current.Annotations)
+			require.NoError(t, err)
+			require.Len(t, state.Pending[quotaTestResource], 1)
+			require.Equal(t, "first", state.Pending[quotaTestResource][0].ID)
+			before := current.DeepCopy()
+			switch mode {
+			case "different-request":
+				req.UID = "second"
+				req.Name = "second"
+			case "lowered-limit":
+				current.Annotations[capsulev1beta2.LimitAnnotationForResource(quotaTestResource)] = "1"
+				require.NoError(t, base.Update(ctx, current))
+			case "dry-run":
+				req.UID = "dry-run"
+				req.Name = "dry-run"
+				req.DryRun = new(true)
+			case "delete-pending":
+				req.Operation = admissionv1.Delete
+			case "malformed-state":
+				current.Annotations[tenant.LegacyQuotaReservationsAnnotation] = "invalid"
+				require.NoError(t, base.Update(ctx, current))
+			}
+			response := invokeLegacyQuota(ctx, c, c, req)
+			if mode == "lowered-limit" || mode == "malformed-state" {
+				require.NotNil(t, response)
+				require.False(t, response.Allowed)
+				if mode == "lowered-limit" {
+					require.Contains(t, response.Result.Message, "quota limit of 1")
+				} else {
+					require.Contains(t, response.Result.Message, "decode legacy quota")
+				}
+				require.Equal(t, 1, writes)
+				return
+			}
+			require.Nil(t, response)
+			require.NoError(t, base.Get(ctx, client.ObjectKey{Name: "tenant-0"}, current))
+			state, err = tenant.ReadLegacyQuotaReservations(current.Annotations)
+			require.NoError(t, err)
+			switch mode {
+			case "retry-same-request", "dry-run":
+				require.Equal(t, 1, writes)
+				require.Equal(t, before, current)
+			case "different-request":
+				require.Equal(t, 2, writes)
+				require.Len(t, state.Pending[quotaTestResource], 2)
+				require.Equal(t, "3", current.Annotations[capsulev1beta2.UsedAnnotationForResource(quotaTestResource)])
+			case "delete-pending":
+				require.Equal(t, 2, writes)
+				require.Empty(t, state.Pending)
+				require.Equal(t, "1", current.Annotations[capsulev1beta2.UsedAnnotationForResource(quotaTestResource)])
+			}
+		})
+	}
 }

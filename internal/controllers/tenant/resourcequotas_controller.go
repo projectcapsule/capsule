@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -22,6 +23,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
+	tenantutils "github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 func (r *Manager) setupResourceQuotaController(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
@@ -84,5 +86,5 @@ func (r *Manager) reconcileResourceQuotas(
 		errs = append(errs, fmt.Errorf("sync ResourceQuotas: %w", err))
 	}
 
-	return reconcile.Result{}, errors.Join(errs...)
+	return reconcile.Result{RequeueAfter: tenantutils.LegacyQuotaRequeueAfter(tenant.Annotations, time.Now())}, errors.Join(errs...)
 }

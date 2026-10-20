@@ -7,9 +7,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -39,7 +43,7 @@ func (r *resourceCounterHandler) OnCreate(
 
 		var limit int64
 
-		tnt, err := r.updateUsage(ctx, c, reader, req, func(tnt *capsulev1beta2.Tenant) (bool, error) {
+		tnt, err := r.updateUsage(ctx, c, reader, req, func(tnt *capsulev1beta2.Tenant, ns *corev1.Namespace) (bool, error) {
 			var limitErr error
 			if limit, limitErr = capsulev1beta2.GetLimitResourceFromTenant(*tnt, kgv); limitErr != nil {
 				if _, ok := errors.AsType[*capsulev1beta2.NonLimitedResourceError](limitErr); ok {
@@ -49,9 +53,45 @@ func (r *resourceCounterHandler) OnCreate(
 				return false, limitErr
 			}
 
+			reservations, err := tenant.ReadLegacyQuotaReservations(tnt.Annotations)
+			if err != nil {
+				return false, err
+			}
+
+			now := metav1.Now()
+
 			used, _ := capsulev1beta2.GetUsedResourceFromTenant(*tnt, kgv)
+
+			for _, pending := range reservations.Pending[kgv] {
+				if req.UID != "" && pending.ID == string(req.UID) && pending.NamespaceUID == ns.UID && pending.ObjectRef.Namespace == req.Namespace && pending.ObjectRef.Name == req.Name && pending.ExpiresAt.After(now.Time) {
+					if used > limit {
+						return false, caperrors.NewCustomResourceQuotaError(kgv, limit)
+					}
+
+					return false, nil
+				}
+			}
+
 			if used >= limit {
 				return false, caperrors.NewCustomResourceQuotaError(kgv, limit)
+			}
+
+			expires := metav1.NewTime(now.Add(2 * time.Minute))
+
+			id := string(req.UID)
+			if id == "" {
+				id = string(uuid.NewUUID())
+			}
+
+			reservations.Pending[kgv] = append(reservations.Pending[kgv], tenant.LegacyQuotaReservation{
+				ID: id, Usage: *resource.NewQuantity(1, resource.DecimalSI), CreatedAt: now, UpdatedAt: now, ExpiresAt: &expires,
+				ObjectRef: capsulev1beta2.QuantityLedgerObjectRef{APIGroup: req.Resource.Group, APIVersion: req.Resource.Version, Kind: req.Kind.Kind, Namespace: req.Namespace, Name: req.Name}, NamespaceUID: ns.UID,
+			})
+
+			reservations.Namespaces[ns.Name] = ns.UID
+
+			if err := tenant.WriteLegacyQuotaReservations(tnt.Annotations, reservations); err != nil {
+				return false, err
 			}
 
 			tnt.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)] = fmt.Sprintf("%d", used+1)
@@ -89,14 +129,32 @@ func (r *resourceCounterHandler) OnDelete(
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		kgv := fmt.Sprintf("%s.%s_%s", req.Resource.Resource, req.Resource.Group, req.Resource.Version)
 
-		_, err := r.updateUsage(ctx, c, reader, req, func(tnt *capsulev1beta2.Tenant) (bool, error) {
+		_, err := r.updateUsage(ctx, c, reader, req, func(tnt *capsulev1beta2.Tenant, ns *corev1.Namespace) (bool, error) {
 			if _, ok := tnt.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)]; !ok {
 				return false, nil
 			}
 
 			used, _ := capsulev1beta2.GetUsedResourceFromTenant(*tnt, kgv)
 
-			tnt.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)] = fmt.Sprintf("%d", used-1)
+			reservations, err := tenant.ReadLegacyQuotaReservations(tnt.Annotations)
+			if err != nil {
+				return false, err
+			}
+
+			active := reservations.Pending[kgv][:0]
+
+			for _, pending := range reservations.Pending[kgv] {
+				if pending.NamespaceUID != ns.UID || pending.ObjectRef.Namespace != req.Namespace || pending.ObjectRef.Name != req.Name {
+					active = append(active, pending)
+				}
+			}
+
+			reservations.Pending[kgv] = active
+			if err := tenant.WriteLegacyQuotaReservations(tnt.Annotations, reservations); err != nil {
+				return false, err
+			}
+
+			tnt.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)] = fmt.Sprintf("%d", max(used-1, 0))
 
 			return true, nil
 		})
@@ -127,7 +185,7 @@ func (r *resourceCounterHandler) updateUsage(
 	clt client.Client,
 	reader client.Reader,
 	req admission.Request,
-	mutate func(*capsulev1beta2.Tenant) (bool, error),
+	mutate func(*capsulev1beta2.Tenant, *corev1.Namespace) (bool, error),
 ) (*capsulev1beta2.Tenant, error) {
 	if req.Namespace == "" || req.SubResource != "" {
 		return nil, nil
@@ -164,7 +222,7 @@ func (r *resourceCounterHandler) updateUsage(
 		original = current
 		namespaceUID = ns.UID
 
-		changed, err := mutate(current)
+		changed, err := mutate(current, ns)
 		if err != nil || !changed || (req.DryRun != nil && *req.DryRun) {
 			return err
 		}

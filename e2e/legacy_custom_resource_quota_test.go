@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -25,6 +26,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
+	capsuletenant "github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 var _ = Describe("legacy quota during namespace provisioning", Label("resourcequota", "namespace-rbac-priority"), func() {
@@ -123,6 +125,79 @@ var _ = Describe("legacy quota during namespace provisioning", Label("resourcequ
 				g.Expect(used).To(Equal(entry.used), fmt.Sprintf("usage for %s", current.Name))
 			}
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		By("retaining pending admission reservations through background recounts")
+		Eventually(func(g Gomega) {
+			current := &capsulev1beta2.Tenant{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(b), current)).To(Succeed())
+			state, err := capsuletenant.ReadLegacyQuotaReservations(current.Annotations)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(state.Pending[kgv]).To(BeEmpty(), "persisted objects must not be counted twice")
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Expect(bClient.Resource(resource).Namespace(allowedNS.Name).Delete(ctx, "after-delete", metav1.DeleteOptions{})).To(Succeed())
+		Eventually(func(g Gomega) {
+			_, err := admin.Resource(resource).Namespace(allowedNS.Name).Get(ctx, "after-delete", metav1.GetOptions{})
+			g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		// Model a create accepted by another webhook replica whose object has
+		// not yet committed. A real Tenant update drives its normal recount.
+		Eventually(func(g Gomega) {
+			current := &capsulev1beta2.Tenant{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(b), current)).To(Succeed())
+			ns := &corev1.Namespace{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(allowedNS), ns)).To(Succeed())
+			now := metav1.Now()
+			expiry := metav1.NewTime(now.Add(2 * time.Minute))
+			state, err := capsuletenant.ReadLegacyQuotaReservations(nil)
+			g.Expect(err).NotTo(HaveOccurred())
+			state.Pending[kgv] = []capsuletenant.LegacyQuotaReservation{{NamespaceUID: ns.UID, ID: "held-create", CreatedAt: now, UpdatedAt: now, ExpiresAt: &expiry, ObjectRef: capsulev1beta2.QuantityLedgerObjectRef{Namespace: ns.Name, Name: "held"}}}
+			state.Namespaces[ns.Name] = ns.UID
+			g.Expect(capsuletenant.WriteLegacyQuotaReservations(current.Annotations, state)).To(Succeed())
+			current.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)] = "1"
+			g.Expect(k8sClient.Update(ctx, current)).To(Succeed())
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		// A completed recount prunes the namespace pin once membership is
+		// published, while retaining the outstanding request reservation.
+		Eventually(func(g Gomega) {
+			current := &capsulev1beta2.Tenant{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(b), current)).To(Succeed())
+			state, err := capsuletenant.ReadLegacyQuotaReservations(current.Annotations)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(state.Pending[kgv]).To(HaveLen(1))
+			g.Expect(state.Namespaces).NotTo(HaveKey(allowedNS.Name))
+			g.Expect(current.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)]).To(Equal("1"))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		_, err = bClient.Resource(resource).Namespace(allowedNS.Name).Create(ctx, object("blocked-by-pending"), metav1.CreateOptions{})
+		Expect(err).To(MatchError(ContainSubstring("has reached quota limit of 1 items")))
+		_, err = admin.Resource(resource).Namespace(allowedNS.Name).Get(ctx, "blocked-by-pending", metav1.GetOptions{})
+		Expect(apierrors.IsNotFound(err)).To(BeTrue())
+		By("releasing abandoned reservations at expiry without blocking permission provisioning")
+		Eventually(func(g Gomega) {
+			current := &capsulev1beta2.Tenant{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(b), current)).To(Succeed())
+			state, err := capsuletenant.ReadLegacyQuotaReservations(current.Annotations)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(state.Pending[kgv]).To(HaveLen(1))
+			expired := metav1.NewTime(time.Now().Add(-time.Minute))
+			state.Pending[kgv][0].ExpiresAt = &expired
+			g.Expect(capsuletenant.WriteLegacyQuotaReservations(current.Annotations, state)).To(Succeed())
+			g.Expect(k8sClient.Update(ctx, current)).To(Succeed())
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Eventually(func(g Gomega) {
+			current := &capsulev1beta2.Tenant{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(b), current)).To(Succeed())
+			g.Expect(current.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)]).To(Equal("0"))
+			state, err := capsuletenant.ReadLegacyQuotaReservations(current.Annotations)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(state.Pending).To(BeEmpty())
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		_, err = bClient.Resource(resource).Namespace(allowedNS.Name).Create(ctx, object("after-expiry"), metav1.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		_, err = bClient.Resource(resource).Namespace(allowedNS.Name).Get(ctx, "after-expiry", metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		currentA := &capsulev1beta2.Tenant{}
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(a), currentA)).To(Succeed())
+		Expect(currentA.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)]).To(Equal("0"))
 		TenantNamespaceReady(a, deniedNS, 1)
 		TenantNamespaceReady(b, allowedNS, 1)
 	})
