@@ -5,9 +5,11 @@ package tenant
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -18,6 +20,8 @@ import (
 // when webhook and controller requests are served by different replicas.
 const LegacyQuotaReservationsAnnotation = capsulev1beta2.ResourceUsedAnnotationPrefix + "/reservations"
 
+var ErrLegacyQuotaStateCapacity = errors.New("legacy quota coordination state capacity exceeded")
+
 // LegacyQuotaReservation uses the existing ledger reservation representation.
 // NamespaceUID additionally prevents a recreated namespace materializing an old
 // reservation. This is internal coordination for the legacy annotation API.
@@ -27,8 +31,18 @@ type LegacyQuotaReservation struct {
 	NamespaceUID types.UID `json:"namespaceUid"`
 }
 
+// LegacyQuotaDeletion schedules authoritative recounts until deletion is
+// observed. Admission alone cannot prove that a DELETE will be persisted.
+type LegacyQuotaDeletion struct {
+	capsulev1beta2.QuantityLedgerPendingDelete
+
+	NamespaceUID types.UID    `json:"namespaceUid"`
+	ExpiresAt    *metav1.Time `json:"expiresAt"`
+}
+
 type LegacyQuotaReservations struct {
-	Pending map[string][]LegacyQuotaReservation `json:"pending,omitempty"`
+	Pending  map[string][]LegacyQuotaReservation `json:"pending,omitempty"`
+	Deleting map[string][]LegacyQuotaDeletion    `json:"deleting,omitempty"`
 	// Namespace pins bridge informer/status visibility independently of create TTL.
 	Namespaces map[string]types.UID `json:"namespaces,omitempty"`
 }
@@ -67,6 +81,14 @@ func ReadLegacyQuotaReservations(annotations map[string]string) (*LegacyQuotaRes
 		}
 	}
 
+	for _, entries := range reservations.Deleting {
+		for _, entry := range entries {
+			if entry.ID == "" || entry.NamespaceUID == "" || entry.ObjectRef.Namespace == "" || entry.ObjectRef.Name == "" || entry.ExpiresAt == nil {
+				return nil, fmt.Errorf("legacy quota deletion has incomplete identity or expiry")
+			}
+		}
+	}
+
 	return reservations, nil
 }
 
@@ -81,6 +103,14 @@ func WriteLegacyQuotaReservations(annotations map[string]string, reservations *L
 		count += len(entries)
 	}
 
+	for key, entries := range reservations.Deleting {
+		if len(entries) == 0 {
+			delete(reservations.Deleting, key)
+		}
+
+		count += len(entries)
+	}
+
 	if count == 0 && len(reservations.Namespaces) == 0 {
 		delete(annotations, LegacyQuotaReservationsAnnotation)
 
@@ -88,7 +118,7 @@ func WriteLegacyQuotaReservations(annotations map[string]string, reservations *L
 	}
 	// Bound admission work and leave room for the Tenant's existing annotations.
 	if count > 1024 {
-		return fmt.Errorf("too many pending legacy quota reservations; retry after reconciliation")
+		return fmt.Errorf("%w: too many pending legacy quota reservations; retry after reconciliation", ErrLegacyQuotaStateCapacity)
 	}
 
 	value, err := json.Marshal(reservations)
@@ -97,7 +127,7 @@ func WriteLegacyQuotaReservations(annotations map[string]string, reservations *L
 	}
 
 	if len(value) > 192*1024 {
-		return fmt.Errorf("legacy quota reservations exceed metadata budget; retry after reconciliation")
+		return fmt.Errorf("%w: legacy quota reservations exceed metadata budget; retry after reconciliation", ErrLegacyQuotaStateCapacity)
 	}
 
 	annotations[LegacyQuotaReservationsAnnotation] = string(value)
@@ -124,24 +154,38 @@ func LegacyQuotaRequeueAfter(annotations map[string]string, now time.Time) time.
 
 	for _, entries := range reservations.Pending {
 		for _, entry := range entries {
-			candidate := 2 * time.Second
-			if age := now.Sub(entry.CreatedAt.Time); age >= 30*time.Second {
-				candidate = 15 * time.Second
-			} else if age >= 5*time.Second {
-				candidate = 5 * time.Second
-			}
-
-			if entry.ExpiresAt != nil {
-				if remaining := entry.ExpiresAt.Sub(now); remaining <= 0 {
-					candidate = time.Millisecond
-				} else if remaining < candidate {
-					candidate = remaining
-				}
-			}
-
+			candidate := legacyQuotaRetryDelay(now, entry.CreatedAt, entry.ExpiresAt)
 			if delay == 0 || candidate < delay {
 				delay = candidate
 			}
+		}
+	}
+
+	for _, entries := range reservations.Deleting {
+		for _, entry := range entries {
+			candidate := legacyQuotaRetryDelay(now, entry.CreatedAt, entry.ExpiresAt)
+			if delay == 0 || candidate < delay {
+				delay = candidate
+			}
+		}
+	}
+
+	return delay
+}
+
+func legacyQuotaRetryDelay(now time.Time, created metav1.Time, expires *metav1.Time) time.Duration {
+	delay := 2 * time.Second
+	if age := now.Sub(created.Time); age >= 30*time.Second {
+		delay = 15 * time.Second
+	} else if age >= 5*time.Second {
+		delay = 5 * time.Second
+	}
+
+	if expires != nil {
+		if remaining := expires.Sub(now); remaining <= 0 {
+			return time.Millisecond
+		} else if remaining < delay {
+			delay = remaining
 		}
 	}
 

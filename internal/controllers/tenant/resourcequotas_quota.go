@@ -112,6 +112,12 @@ func (r *Manager) recountLegacyQuotaResources(ctx context.Context, reader client
 		}
 	}
 
+	for key := range reservations.Deleting {
+		if _, ok := configured[key]; !ok {
+			delete(reservations.Deleting, key)
+		}
+	}
+
 	if len(resources) == 0 {
 		clear(reservations.Namespaces)
 
@@ -151,7 +157,7 @@ func (r *Manager) recountLegacyQuotaResources(ctx context.Context, reader client
 		group.Go(func() error {
 			var countErr error
 
-			counts[i], countErr = countLegacyQuotaResources(countContext, dyn, namespaces, res.gvr, reservations.Pending[res.key])
+			counts[i], countErr = countLegacyQuotaResources(countContext, dyn, namespaces, res.gvr, reservations.Pending[res.key], reservations.Deleting[res.key])
 
 			return countErr
 		})
@@ -163,7 +169,11 @@ func (r *Manager) recountLegacyQuotaResources(ctx context.Context, reader client
 
 	for i, res := range resources {
 		current.Annotations[capsulev1beta2.UsedAnnotationForResource(res.key)] = strconv.FormatInt(counts[i].used, 10)
+
 		reservations.Pending[res.key] = counts[i].pending
+		if reservations.Deleting != nil {
+			reservations.Deleting[res.key] = counts[i].deleting
+		}
 	}
 
 	return nil
@@ -201,6 +211,12 @@ func (r *Manager) legacyQuotaNamespaces(ctx context.Context, reader client.Reade
 		}
 	}
 
+	for _, entries := range reservations.Deleting {
+		for _, entry := range entries {
+			candidates[entry.ObjectRef.Namespace] = struct{}{}
+		}
+	}
+
 	namespaces := make(map[string]*corev1.Namespace, len(candidates))
 
 	for _, name := range slices.Sorted(maps.Keys(candidates)) {
@@ -224,12 +240,13 @@ func (r *Manager) legacyQuotaNamespaces(ctx context.Context, reader client.Reade
 type (
 	legacyQuotaObject struct{ namespace, name string }
 	legacyQuotaCount  struct {
-		used    int64
-		pending []capsuletenant.LegacyQuotaReservation
+		used     int64
+		pending  []capsuletenant.LegacyQuotaReservation
+		deleting []capsuletenant.LegacyQuotaDeletion
 	}
 )
 
-func countLegacyQuotaResources(ctx context.Context, dyn dynamic.Interface, namespaces map[string]*corev1.Namespace, gvr schema.GroupVersionResource, pending []capsuletenant.LegacyQuotaReservation) (legacyQuotaCount, error) {
+func countLegacyQuotaResources(ctx context.Context, dyn dynamic.Interface, namespaces map[string]*corev1.Namespace, gvr schema.GroupVersionResource, pending []capsuletenant.LegacyQuotaReservation, deleting []capsuletenant.LegacyQuotaDeletion) (legacyQuotaCount, error) {
 	// A resource can commit after its namespace was listed without changing the
 	// Tenant version. Keep reservations live at the start of this count even if
 	// they expire while the remaining namespaces are being enumerated.
@@ -245,6 +262,10 @@ func countLegacyQuotaResources(ctx context.Context, dyn dynamic.Interface, names
 		wanted[legacyQuotaObject{entry.ObjectRef.Namespace, entry.ObjectRef.Name}] = struct{}{}
 	}
 
+	for _, entry := range deleting {
+		wanted[legacyQuotaObject{entry.ObjectRef.Namespace, entry.ObjectRef.Name}] = struct{}{}
+	}
+
 	for _, name := range slices.Sorted(maps.Keys(namespaces)) {
 		list, err := dyn.Resource(gvr).Namespace(name).List(ctx, metav1.ListOptions{})
 		if err != nil {
@@ -256,16 +277,16 @@ func countLegacyQuotaResources(ctx context.Context, dyn dynamic.Interface, names
 		}
 
 		for _, obj := range list.Items {
+			key := legacyQuotaObject{name, obj.GetName()}
+			if _, ok := wanted[key]; ok {
+				materialized[key] = obj.GetUID()
+			}
+
 			if obj.GetDeletionTimestamp() != nil {
 				continue
 			}
 
 			result.used++
-
-			key := legacyQuotaObject{name, obj.GetName()}
-			if _, ok := wanted[key]; ok {
-				materialized[key] = obj.GetUID()
-			}
 		}
 	}
 
@@ -276,12 +297,21 @@ func countLegacyQuotaResources(ctx context.Context, dyn dynamic.Interface, names
 		}
 
 		uid, found := materialized[legacyQuotaObject{entry.ObjectRef.Namespace, entry.ObjectRef.Name}]
-		if found && (entry.ObjectRef.UID == "" || uid == entry.ObjectRef.UID) {
+		if found && entry.ObjectRef.UID != "" && uid == entry.ObjectRef.UID {
 			continue
 		}
 
 		result.used++
 		result.pending = append(result.pending, entry)
+	}
+
+	for _, entry := range deleting {
+		ns := namespaces[entry.ObjectRef.Namespace]
+
+		uid, found := materialized[legacyQuotaObject{entry.ObjectRef.Namespace, entry.ObjectRef.Name}]
+		if ns != nil && ns.UID == entry.NamespaceUID && found && (entry.ObjectRef.UID == "" || uid == entry.ObjectRef.UID) && (entry.ExpiresAt == nil || !entry.ExpiresAt.Before(&now)) {
+			result.deleting = append(result.deleting, entry)
+		}
 	}
 
 	return result, nil

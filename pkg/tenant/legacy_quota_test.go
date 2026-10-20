@@ -21,7 +21,7 @@ func testLegacyReservation(now time.Time) LegacyQuotaReservation {
 }
 
 func TestLegacyQuotaReservationState(t *testing.T) {
-	for _, raw := range []string{"null", "[]", "{", `{"namespaces":{"space":""}}`, `{"pending":{"widgets.example.com_v1":[{"id":"request"}]}}`} {
+	for _, raw := range []string{"null", "[]", "{", `{"namespaces":{"space":""}}`, `{"pending":{"widgets.example.com_v1":[{"id":"request"}]}}`, `{"deleting":{"widgets.example.com_v1":[{"id":"request"}]}}`} {
 		t.Run(raw, func(t *testing.T) {
 			_, err := ReadLegacyQuotaReservations(map[string]string{LegacyQuotaReservationsAnnotation: raw})
 			require.Error(t, err)
@@ -48,6 +48,30 @@ func TestLegacyQuotaReservationState(t *testing.T) {
 	clear(state.Namespaces)
 	require.NoError(t, WriteLegacyQuotaReservations(annotations, state))
 	require.Equal(t, map[string]string{"unrelated": "preserved"}, annotations)
+}
+
+func TestLegacyQuotaDeletionStateAndBounds(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	reservation := testLegacyReservation(now)
+	deletion := LegacyQuotaDeletion{ID: "delete", ObjectRef: reservation.ObjectRef, CreatedAt: reservation.CreatedAt, NamespaceUID: reservation.NamespaceUID, ExpiresAt: reservation.ExpiresAt}
+	state := &LegacyQuotaReservations{Deleting: map[string][]LegacyQuotaDeletion{"widgets.example.com_v1": {deletion}}}
+	annotations := map[string]string{}
+	require.NoError(t, WriteLegacyQuotaReservations(annotations, state))
+	decoded, err := ReadLegacyQuotaReservations(annotations)
+	require.NoError(t, err)
+	require.Equal(t, deletion.ID, decoded.Deleting["widgets.example.com_v1"][0].ID)
+	require.Equal(t, deletion.NamespaceUID, decoded.Deleting["widgets.example.com_v1"][0].NamespaceUID)
+	require.Equal(t, 2*time.Second, LegacyQuotaRequeueAfter(annotations, now))
+	decoded.Deleting["widgets.example.com_v1"][0].ID = "mutated"
+	again, err := ReadLegacyQuotaReservations(annotations)
+	require.NoError(t, err)
+	require.Equal(t, "delete", again.Deleting["widgets.example.com_v1"][0].ID)
+	state.Pending = map[string][]LegacyQuotaReservation{"widgets.example.com_v1": make([]LegacyQuotaReservation, 1024)}
+	require.ErrorIs(t, WriteLegacyQuotaReservations(annotations, state), ErrLegacyQuotaStateCapacity)
+	clear(state.Pending)
+	clear(state.Deleting)
+	require.NoError(t, WriteLegacyQuotaReservations(annotations, state))
+	require.Empty(t, annotations)
 }
 
 func TestLegacyQuotaReservationBounds(t *testing.T) {

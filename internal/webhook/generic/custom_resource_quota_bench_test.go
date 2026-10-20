@@ -59,10 +59,19 @@ func BenchmarkLegacyQuotaAdmission(b *testing.B) {
 					if outcome == "skip" {
 						req.Operation = admissionv1.Update
 					}
-					invoke := func() *admission.Response { return invokeLegacyQuota(b.Context(), c, c, req) }
+					handler := ResourceCounterHandler(c)
+					decoder := admission.NewDecoder(c.Scheme())
+					admit := handler.OnCreate(c, c, decoder, events.NewDiscardRecorder())
+					if outcome == "delete" {
+						admit = handler.OnDelete(c, c, decoder, events.NewDiscardRecorder())
+					}
+					if outcome == "skip" {
+						admit = handler.OnUpdate(c, c, decoder, events.NewDiscardRecorder())
+					}
+					invoke := func() *admission.Response { return admit(b.Context(), req) }
 					if strings.HasPrefix(outcome, "generated-") {
 						req.Name = ""
-						raw, err := json.Marshal(map[string]any{"apiVersion": "example.com/v1", "kind": "Widget", "metadata": map[string]any{"name": "widget-generated", "generateName": "widget-", "namespace": req.Namespace}})
+						raw, err := json.Marshal(map[string]any{"apiVersion": "example.com/v1", "kind": "Widget", "metadata": map[string]any{"name": "widget-generated", "generateName": "widget-", "namespace": req.Namespace, "uid": "generated-object"}})
 						if err != nil {
 							b.Fatal(err)
 						}
@@ -104,6 +113,14 @@ func BenchmarkLegacyQuotaAdmission(b *testing.B) {
 }
 
 func BenchmarkLegacyQuotaGeneratedObjectSize(b *testing.B) {
+	benchmarkLegacyQuotaObjectSize(b, true)
+}
+
+func BenchmarkLegacyQuotaNamedObjectSize(b *testing.B) {
+	benchmarkLegacyQuotaObjectSize(b, false)
+}
+
+func benchmarkLegacyQuotaObjectSize(b *testing.B, generated bool) {
 	for _, tenants := range []int{1, 128} {
 		for _, payload := range []int{1024, 65536} {
 			b.Run(fmt.Sprintf("tenants=%d/payloadBytes=%d", tenants, payload), func(b *testing.B) {
@@ -112,10 +129,14 @@ func BenchmarkLegacyQuotaGeneratedObjectSize(b *testing.B) {
 				calls := &mockclient.CallCounter{}
 				c := interceptor.NewClient(writer, calls.Interceptors())
 				req := legacyQuotaRequest(admissionv1.Create)
-				req.Name, req.UID = "", "generated-request"
+				req.UID = "size-benchmark-request"
+				name := req.Name
+				if generated {
+					req.Name, name = "", "widget-generated"
+				}
 				raw, err := json.Marshal(map[string]any{
 					"apiVersion": "example.com/v1", "kind": "Widget",
-					"metadata": map[string]any{"name": "widget-generated", "generateName": "widget-", "namespace": req.Namespace},
+					"metadata": map[string]any{"name": name, "namespace": req.Namespace, "uid": "size-benchmark-object"},
 					"spec":     map[string]any{"payload": strings.Repeat("x", payload)},
 				})
 				if err != nil {

@@ -87,8 +87,12 @@ func (r *Manager) reconcileNamespaceProvisioning(ctx context.Context, request re
 		// Established profiles remain on the Tenant queue, where promotion rules
 		// are evaluated across the complete membership before permission updates.
 		if status := tnt.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{Name: ns.Name, UID: ns.UID}); status != nil && status.UID == ns.UID {
-			if ready := status.Conditions.GetConditionByType(meta.ReadyCondition); ready != nil && ready.Status == metav1.ConditionTrue {
-				return nil
+			if ready := status.Conditions.GetConditionByType(meta.ReadyCondition); ready != nil {
+				// A known profile failure must recover on the Tenant queue, which
+				// owns metadata reconciliation. Partial RBAC failures can retry here.
+				if ready.Status == metav1.ConditionTrue || (ready.Status == metav1.ConditionFalse && ready.Reason == meta.FailedReason) {
+					return nil
+				}
 			}
 		}
 

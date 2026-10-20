@@ -45,6 +45,8 @@ func (r *resourceCounterHandler) OnCreate(
 
 		name := req.Name
 
+		var object *metav1.PartialObjectMetadata
+
 		tnt, err := r.updateUsage(ctx, c, reader, req, func(tnt *capsulev1beta2.Tenant, ns *corev1.Namespace) (bool, error) {
 			var limitErr error
 			if limit, limitErr = capsulev1beta2.GetLimitResourceFromTenant(*tnt, kgv); limitErr != nil {
@@ -55,19 +57,17 @@ func (r *resourceCounterHandler) OnCreate(
 				return false, limitErr
 			}
 
-			// Generated-name CREATEs can omit request.name even though the
-			// object already has its final name. Decode only those limited
-			// requests, once across conflict retries, to identify the reservation.
-			if name == "" {
-				obj := &metav1.PartialObjectMetadata{}
-				if err := decoder.Decode(req, obj); err != nil {
+			// The server-assigned UID distinguishes a delayed CREATE from an
+			// older same-name object. Decode once, including conflict retries.
+			if object == nil {
+				var err error
+
+				object, err = legacyQuotaAdmissionObject(req, decoder, false)
+				if err != nil {
 					return false, err
 				}
 
-				name = obj.Name
-				if name == "" {
-					return false, errors.New("cannot reserve quota for a resource without a name")
-				}
+				name = object.Name
 			}
 
 			reservations, err := tenant.ReadLegacyQuotaReservations(tnt.Annotations)
@@ -80,7 +80,11 @@ func (r *resourceCounterHandler) OnCreate(
 			used, _ := capsulev1beta2.GetUsedResourceFromTenant(*tnt, kgv)
 
 			for _, pending := range reservations.Pending[kgv] {
-				if req.UID != "" && pending.ID == string(req.UID) && pending.NamespaceUID == ns.UID && pending.ObjectRef.Namespace == req.Namespace && pending.ObjectRef.Name == name && pending.ExpiresAt.After(now.Time) {
+				if req.UID != "" && pending.ID == string(req.UID) && pending.ExpiresAt.After(now.Time) {
+					if pending.NamespaceUID != ns.UID || pending.ObjectRef.Namespace != req.Namespace || pending.ObjectRef.Name != name || pending.ObjectRef.UID != object.UID {
+						return false, errors.New("quota reservation identity changed for admission request")
+					}
+
 					if used > limit {
 						return false, caperrors.NewCustomResourceQuotaError(kgv, limit)
 					}
@@ -102,7 +106,7 @@ func (r *resourceCounterHandler) OnCreate(
 
 			reservations.Pending[kgv] = append(reservations.Pending[kgv], tenant.LegacyQuotaReservation{
 				ID: id, Usage: *resource.NewQuantity(1, resource.DecimalSI), CreatedAt: now, UpdatedAt: now, ExpiresAt: &expires,
-				ObjectRef: capsulev1beta2.QuantityLedgerObjectRef{APIGroup: req.Resource.Group, APIVersion: req.Resource.Version, Kind: req.Kind.Kind, Namespace: req.Namespace, Name: name}, NamespaceUID: ns.UID,
+				ObjectRef: capsulev1beta2.QuantityLedgerObjectRef{APIGroup: req.Resource.Group, APIVersion: req.Resource.Version, Kind: req.Kind.Kind, Namespace: req.Namespace, Name: name, UID: object.UID}, NamespaceUID: ns.UID,
 			})
 
 			reservations.Namespaces[ns.Name] = ns.UID
@@ -140,38 +144,74 @@ func (r *resourceCounterHandler) OnCreate(
 func (r *resourceCounterHandler) OnDelete(
 	c client.Client,
 	reader client.Reader,
-	_ admission.Decoder,
+	decoder admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		kgv := fmt.Sprintf("%s.%s_%s", req.Resource.Resource, req.Resource.Group, req.Resource.Version)
+
+		var object *metav1.PartialObjectMetadata
 
 		_, err := r.updateUsage(ctx, c, reader, req, func(tnt *capsulev1beta2.Tenant, ns *corev1.Namespace) (bool, error) {
 			if _, ok := tnt.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)]; !ok {
 				return false, nil
 			}
 
-			used, _ := capsulev1beta2.GetUsedResourceFromTenant(*tnt, kgv)
+			if object == nil {
+				var err error
+
+				object, err = legacyQuotaAdmissionObject(req, decoder, true)
+				if err != nil {
+					return false, err
+				}
+			}
 
 			reservations, err := tenant.ReadLegacyQuotaReservations(tnt.Annotations)
 			if err != nil {
 				return false, err
 			}
 
+			for _, pending := range reservations.Deleting[kgv] {
+				if pending.NamespaceUID == ns.UID && pending.ObjectRef.Namespace == req.Namespace && pending.ObjectRef.Name == object.Name && pending.ObjectRef.UID == object.UID {
+					return false, nil
+				}
+			}
+
 			active := reservations.Pending[kgv][:0]
 
 			for _, pending := range reservations.Pending[kgv] {
-				if pending.NamespaceUID != ns.UID || pending.ObjectRef.Namespace != req.Namespace || pending.ObjectRef.Name != req.Name {
+				if object.UID == "" || pending.NamespaceUID != ns.UID || pending.ObjectRef.Namespace != req.Namespace || pending.ObjectRef.Name != object.Name || pending.ObjectRef.UID != object.UID {
 					active = append(active, pending)
 				}
 			}
 
 			reservations.Pending[kgv] = active
-			if err := tenant.WriteLegacyQuotaReservations(tnt.Annotations, reservations); err != nil {
-				return false, err
+			if reservations.Deleting == nil {
+				reservations.Deleting = make(map[string][]tenant.LegacyQuotaDeletion)
 			}
 
-			tnt.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)] = fmt.Sprintf("%d", max(used-1, 0))
+			now := metav1.Now()
+			expires := metav1.NewTime(now.Add(2 * time.Minute))
+
+			id := string(req.UID)
+			if id == "" {
+				id = string(uuid.NewUUID())
+			}
+
+			reservations.Deleting[kgv] = append(reservations.Deleting[kgv], tenant.LegacyQuotaDeletion{
+				ID: id, CreatedAt: now,
+				ObjectRef:    capsulev1beta2.QuantityLedgerObjectRef{APIGroup: req.Resource.Group, APIVersion: req.Resource.Version, Kind: req.Kind.Kind, Namespace: req.Namespace, Name: object.Name, UID: object.UID},
+				NamespaceUID: ns.UID, ExpiresAt: &expires,
+			})
+			if err := tenant.WriteLegacyQuotaReservations(tnt.Annotations, reservations); err != nil {
+				// Existing bounded coordination work already schedules recounts.
+				// A full hint queue must not prevent deleting an object to free quota.
+				if errors.Is(err, tenant.ErrLegacyQuotaStateCapacity) {
+					return false, nil
+				}
+
+				return false, err
+			}
 
 			return true, nil
 		})
@@ -181,6 +221,36 @@ func (r *resourceCounterHandler) OnDelete(
 
 		return nil
 	}
+}
+
+func legacyQuotaAdmissionObject(req admission.Request, decoder admission.Decoder, deleted bool) (*metav1.PartialObjectMetadata, error) {
+	object := &metav1.PartialObjectMetadata{}
+
+	var err error
+
+	if deleted {
+		err = decoder.DecodeRaw(req.OldObject, object)
+	} else {
+		err = decoder.Decode(req, object)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	if (req.Name != "" && object.Name != "" && object.Name != req.Name) || (object.Namespace != "" && object.Namespace != req.Namespace) {
+		return nil, errors.New("quota object identity does not match admission request")
+	}
+
+	if object.Name == "" {
+		object.Name = req.Name
+	}
+
+	if object.Name == "" {
+		return nil, errors.New("cannot reserve quota for a resource without a name")
+	}
+
+	return object, nil
 }
 
 func (r *resourceCounterHandler) OnUpdate(

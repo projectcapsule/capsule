@@ -129,6 +129,25 @@ var _ = Describe("namespace profile permission revocation", Label("namespace-rba
 			g.Expect(err).To(MatchError(ContainSubstring(`cannot get resource "configmaps"`)))
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		expectDenied(newReader, selected.Name)
+		By("keeping replacement grants blocked when a metadata event reaches the fast queue")
+		Eventually(func() error {
+			current := &corev1.Namespace{}
+			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(selected), current); err != nil {
+				return err
+			}
+			if current.Annotations == nil {
+				current.Annotations = map[string]string{}
+			}
+			current.Annotations["e2e.projectcapsule.dev/fast-queue"] = name
+			return k8sClient.Update(ctx, current)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Consistently(func(g Gomega) {
+			err := probe(newReader, selected.Name)
+			g.Expect(apierrors.IsForbidden(err)).To(BeTrue(), "%v", err)
+			g.Expect(err).To(MatchError(ContainSubstring(`cannot get resource "configmaps"`)))
+			key := client.ObjectKey{Namespace: selected.Name, Name: meta.NameForManagedRoleBindings(utils.RoleBindingHashFunc(replacement))}
+			g.Expect(apierrors.IsNotFound(k8sClient.Get(ctx, key, &rbacv1.RoleBinding{}))).To(BeTrue())
+		}, 3*defaultPollInterval, defaultPollInterval).Should(Succeed())
 		expectDenied(newReader, plain.Name)
 		expectDenied(keeperReader, foreign.Name)
 		Expect(probe(keeperReader, selected.Name)).To(Succeed())

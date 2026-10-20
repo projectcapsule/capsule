@@ -22,21 +22,27 @@ import (
 func BenchmarkLegacyQuotaRecount(b *testing.B) {
 	for _, unrelated := range []int{0, 127} {
 		for _, namespaces := range []int{1, 16} {
-			for _, pending := range []int{0, 16} {
-				b.Run(fmt.Sprintf("unrelatedTenants=%d/namespaces=%d/pending=%d", unrelated, namespaces, pending), func(b *testing.B) {
+			for _, coordination := range []struct{ pending, deleting int }{{}, {pending: 16}, {deleting: 16}, {pending: 16, deleting: 16}} {
+				b.Run(fmt.Sprintf("unrelatedTenants=%d/namespaces=%d/pending=%d/deleting=%d", unrelated, namespaces, coordination.pending, coordination.deleting), func(b *testing.B) {
 					tnt := provisioningTenant()
 					tnt.Annotations = map[string]string{capsulev1beta2.LimitAnnotationForResource(recountResource): "500"}
 					state, _ := capsuletenant.ReadLegacyQuotaReservations(nil)
+					state.Deleting = make(map[string][]capsuletenant.LegacyQuotaDeletion)
 					objects := []client.Object{}
 					for i := range namespaces {
 						ns := cleanupOwnedNamespace(tnt, fmt.Sprintf("space-%d", i), false)
 						objects = append(objects, ns)
 						tnt.Status.Namespaces = append(tnt.Status.Namespaces, ns.Name)
 						tnt.Status.Spaces = append(tnt.Status.Spaces, &capsulev1beta2.TenantStatusNamespaceItem{Name: ns.Name, UID: ns.UID, Conditions: meta.ConditionList{meta.NewReadyCondition(ns)}})
-						for j := range pending {
+						for j := range coordination.pending {
 							now := metav1.Now()
 							expiry := metav1.NewTime(now.Add(2 * time.Minute))
 							state.Pending[recountResource] = append(state.Pending[recountResource], capsuletenant.LegacyQuotaReservation{NamespaceUID: ns.UID, ID: fmt.Sprintf("%d-%d", i, j), CreatedAt: now, ExpiresAt: &expiry, ObjectRef: capsulev1beta2.QuantityLedgerObjectRef{Namespace: ns.Name, Name: fmt.Sprintf("pending-%d", j)}})
+						}
+						for j := range coordination.deleting {
+							now := metav1.Now()
+							expiry := metav1.NewTime(now.Add(2 * time.Minute))
+							state.Deleting[recountResource] = append(state.Deleting[recountResource], capsuletenant.LegacyQuotaDeletion{NamespaceUID: ns.UID, ID: fmt.Sprintf("delete-%d-%d", i, j), CreatedAt: now, ExpiresAt: &expiry, ObjectRef: capsulev1beta2.QuantityLedgerObjectRef{Namespace: ns.Name, Name: fmt.Sprintf("widget-%d", j), UID: "persisted"}})
 						}
 					}
 					if err := capsuletenant.WriteLegacyQuotaReservations(tnt.Annotations, state); err != nil {
@@ -50,7 +56,7 @@ func BenchmarkLegacyQuotaRecount(b *testing.B) {
 					r, dyn := namespaceCleanupFixture(b, objects...)
 					for _, name := range tnt.Status.Namespaces {
 						for j := range 100 {
-							obj := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "example.com/v1", "kind": "Widget", "metadata": map[string]any{"namespace": name, "name": fmt.Sprintf("widget-%d", j)}}}
+							obj := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "example.com/v1", "kind": "Widget", "metadata": map[string]any{"namespace": name, "name": fmt.Sprintf("widget-%d", j), "uid": "persisted"}}}
 							if _, err := dyn.Resource(recountGVR).Namespace(name).Create(b.Context(), obj, metav1.CreateOptions{}); err != nil {
 								b.Fatal(err)
 							}

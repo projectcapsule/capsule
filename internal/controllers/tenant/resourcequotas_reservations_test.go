@@ -37,8 +37,9 @@ const recountResource = "widgets.example.com_v1"
 var recountGVR = schema.GroupVersionResource{Group: "example.com", Version: "v1", Resource: "widgets"}
 
 func admitRecountWidget(ctx context.Context, c client.Client, ns *corev1.Namespace, id, name string) *admission.Response {
-	request := admission.Request{UID: types.UID(id), Namespace: ns.Name, Name: name, Resource: metav1.GroupVersionResource{Group: "example.com", Version: "v1", Resource: "widgets"}}
-	return generic.ResourceCounterHandler(c).OnCreate(c, c, nil, events.NewDiscardRecorder())(ctx, request)
+	raw := []byte(fmt.Sprintf(`{"apiVersion":"example.com/v1","kind":"Widget","metadata":{"name":%q,"namespace":%q,"uid":%q}}`, name, ns.Name, "object-"+id))
+	request := admission.Request{UID: types.UID(id), Namespace: ns.Name, Name: name, Resource: metav1.GroupVersionResource{Group: "example.com", Version: "v1", Resource: "widgets"}, Object: runtime.RawExtension{Raw: raw}}
+	return generic.ResourceCounterHandler(c).OnCreate(c, c, admission.NewDecoder(c.Scheme()), events.NewDiscardRecorder())(ctx, request)
 }
 
 func TestLegacyRecountCannotEraseFastQueueReservations(t *testing.T) {
@@ -93,7 +94,7 @@ func TestLegacyRecountCannotEraseFastQueueReservations(t *testing.T) {
 				t.Fatalf("first create: %+v", response)
 			}
 			if materialized {
-				obj := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "example.com/v1", "kind": "Widget", "metadata": map[string]any{"name": "first", "namespace": ns.Name}}}
+				obj := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "example.com/v1", "kind": "Widget", "metadata": map[string]any{"name": "first", "namespace": ns.Name, "uid": "object-first"}}}
 				if _, err := dyn.Resource(recountGVR).Namespace(ns.Name).Create(ctx, obj, metav1.CreateOptions{}); err != nil {
 					t.Fatal(err)
 				}
@@ -182,7 +183,7 @@ func TestLegacyRecountReservationLifecycle(t *testing.T) {
 			case "materialized":
 				wantUsed = "1"
 				wantPin = true
-				obj := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "example.com/v1", "kind": "Widget", "metadata": map[string]any{"name": "first", "namespace": ns.Name}}}
+				obj := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "example.com/v1", "kind": "Widget", "metadata": map[string]any{"name": "first", "namespace": ns.Name, "uid": "object-first"}}}
 				_, err := dyn.Resource(recountGVR).Namespace(ns.Name).Create(ctx, obj, metav1.CreateOptions{})
 				require.NoError(t, err)
 			case "expired":
@@ -376,7 +377,7 @@ func TestLegacyRecountMatchesGeneratedNameReservations(t *testing.T) {
 	tnt.Annotations = map[string]string{capsulev1beta2.LimitAnnotationForResource(recountResource): "2"}
 	ns := cleanupOwnedNamespace(tnt, "selected", false)
 	r, dyn := namespaceCleanupFixture(t, tnt, ns)
-	obj := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "example.com/v1", "kind": "Widget", "metadata": map[string]any{"namespace": ns.Name, "name": "widget-generated", "generateName": "widget-"}}}
+	obj := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "example.com/v1", "kind": "Widget", "metadata": map[string]any{"namespace": ns.Name, "name": "widget-generated", "generateName": "widget-", "uid": "generated-object"}}}
 	raw, err := json.Marshal(obj)
 	require.NoError(t, err)
 	req := admission.Request{UID: "generated", Namespace: ns.Name, Resource: metav1.GroupVersionResource{Group: "example.com", Version: "v1", Resource: "widgets"}, Object: runtime.RawExtension{Raw: raw}}

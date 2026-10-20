@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	mockclient "github.com/projectcapsule/capsule/internal/mocks/client"
@@ -106,15 +107,32 @@ func TestNamespaceProfileFailureRevokesPermissions(t *testing.T) {
 				base := failNamespaceProfile(t, r, tnt, selected, phase, failure)
 				plan := prepareNamespaceRoleBindings(tnt)
 				input := tnt.DeepCopy()
+				var failed *capsulev1beta2.TenantStatusNamespaceItem
 				for range 2 {
 					stat, err := r.provisionNamespace(ctx, logr.Discard(), selected, tnt, &plan)
 					require.ErrorIs(t, err, failure)
 					require.Equal(t, metav1.ConditionFalse, stat.Conditions.GetConditionByType(meta.ReadyCondition).Status)
+					failed = stat
 					assertBindingSubject(t, ctx, base, selected.Name, oldSubject, false)
 					assertBindingSubject(t, ctx, base, selected.Name, "keeper", true)
 					assertBindingSubject(t, ctx, base, selected.Name, "replacement", false)
 				}
 				require.Equal(t, input, tnt, "shared evaluated profile must remain immutable")
+				if phase == "metadata" {
+					// Publish the failed profile exactly as the Tenant queue does,
+					// then exercise a subsequent namespace event on the fast queue.
+					current := &capsulev1beta2.Tenant{}
+					require.NoError(t, base.Get(ctx, client.ObjectKeyFromObject(tnt), current))
+					current.Spec = *tnt.Spec.DeepCopy()
+					require.NoError(t, base.Update(ctx, current))
+					require.NoError(t, base.Get(ctx, client.ObjectKeyFromObject(tnt), current))
+					current.Status.ObservedGeneration = current.Generation
+					current.Status.Spaces = []*capsulev1beta2.TenantStatusNamespaceItem{failed}
+					require.NoError(t, base.Status().Update(ctx, current))
+					_, err := r.reconcileNamespaceProvisioning(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(selected)})
+					require.NoError(t, err)
+					assertBindingSubject(t, ctx, base, selected.Name, "replacement", false)
+				}
 				assertBindingSubject(t, ctx, base, plain.Name, "alice", true)
 				assertBindingSubject(t, ctx, base, foreign.Name, "alice", true)
 				assertBindingSubject(t, ctx, base, foreign.Name, "keeper", false)
@@ -179,6 +197,58 @@ func TestNamespaceProfileFailurePruningErrorsAndIncompletePlans(t *testing.T) {
 				require.Zero(t, deletes)
 			}
 			assertBindingSubject(t, ctx, base, ns.Name, "alice", mode != "empty-plan")
+		})
+	}
+}
+
+func TestNamespaceQueueProfileFailureGate(t *testing.T) {
+	for _, mode := range []string{"initial", "profile-failed", "permissions-failed", "old-uid", "ready"} {
+		t.Run(mode, func(t *testing.T) {
+			tnt := provisioningTenant()
+			ns := cleanupOwnedNamespace(tnt, "selected", false)
+			if mode != "initial" {
+				ready := meta.NewReadyCondition(ns)
+				ready.Status, ready.Reason = metav1.ConditionFalse, meta.FailedReason
+				if mode == "ready" {
+					ready.Status = metav1.ConditionTrue
+				}
+				if mode == "permissions-failed" {
+					ready.Reason = meta.PermissionsFailedReason
+				}
+				tnt.Status.Spaces = []*capsulev1beta2.TenantStatusNamespaceItem{{Name: ns.Name, UID: ns.UID, Conditions: meta.ConditionList{ready}}}
+				if mode == "old-uid" {
+					tnt.Status.Spaces[0].UID = "old-namespace"
+				}
+			}
+			r, _ := namespaceCleanupFixture(t, tnt, ns)
+			reads, lists, writes := 0, 0, 0
+			r.Client = interceptor.NewClient(r.Client.(client.WithWatch), interceptor.Funcs{
+				Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+					reads++
+					return c.Get(ctx, key, obj, opts...)
+				},
+				List: func(ctx context.Context, c client.WithWatch, obj client.ObjectList, opts ...client.ListOption) error {
+					lists++
+					return c.List(ctx, obj, opts...)
+				},
+				Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+					writes++
+					return c.Create(ctx, obj, opts...)
+				},
+				Update: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
+					writes++
+					return c.Update(ctx, obj, opts...)
+				},
+			})
+			r.provisioningReader = r.Client
+			_, err := r.reconcileNamespaceProvisioning(t.Context(), reconcile.Request{NamespacedName: client.ObjectKeyFromObject(ns)})
+			require.NoError(t, err)
+			if mode == "profile-failed" || mode == "ready" {
+				require.Equal(t, 2, reads)
+				require.Zero(t, lists)
+				require.Zero(t, writes)
+			}
+			assertBindingSubject(t, t.Context(), r.Client, ns.Name, "alice", mode != "profile-failed" && mode != "ready")
 		})
 	}
 }

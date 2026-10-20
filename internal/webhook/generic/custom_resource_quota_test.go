@@ -49,17 +49,23 @@ func legacyQuotaFixture(t testing.TB, tenants int) client.WithWatch {
 }
 
 func legacyQuotaRequest(operation admissionv1.Operation) admission.Request {
-	return admission.Request{Operation: operation, Namespace: "tenant-0-ns", Name: "widget", Resource: metav1.GroupVersionResource{Group: "example.com", Version: "v1", Resource: "widgets"}}
+	raw := quotaTestObject("tenant-0-ns", "widget", "widget-uid")
+	return admission.Request{Operation: operation, Namespace: "tenant-0-ns", Name: "widget", Resource: metav1.GroupVersionResource{Group: "example.com", Version: "v1", Resource: "widgets"}, Object: raw, OldObject: raw}
+}
+
+func quotaTestObject(namespace, name, uid string) runtime.RawExtension {
+	return runtime.RawExtension{Raw: []byte(fmt.Sprintf(`{"apiVersion":"example.com/v1","kind":"Widget","metadata":{"name":%q,"namespace":%q,"uid":%q}}`, name, namespace, uid))}
 }
 
 func invokeLegacyQuota(ctx context.Context, c client.Client, reader client.Reader, req admission.Request) *admission.Response {
 	handler := ResourceCounterHandler(c)
 	recorder := events.NewDiscardRecorder()
+	decoder := admission.NewDecoder(c.Scheme())
 	switch req.Operation {
 	case admissionv1.Create:
-		return handler.OnCreate(c, reader, nil, recorder)(ctx, req)
+		return handler.OnCreate(c, reader, decoder, recorder)(ctx, req)
 	case admissionv1.Delete:
-		return handler.OnDelete(c, reader, nil, recorder)(ctx, req)
+		return handler.OnDelete(c, reader, decoder, recorder)(ctx, req)
 	default:
 		return handler.OnUpdate(c, reader, nil, recorder)(ctx, req)
 	}
@@ -162,8 +168,6 @@ func TestLegacyQuotaUsesAuthoritativeNamespaceOwnership(t *testing.T) {
 						} else {
 							used = "2"
 						}
-					} else {
-						used = "0"
 					}
 				}
 				require.Equal(t, used, actual.Annotations[capsulev1beta2.UsedAnnotationForResource(quotaTestResource)])
@@ -278,7 +282,7 @@ func TestLegacyQuotaOwnershipErrorsAndRetries(t *testing.T) {
 					require.NoError(t, base.Get(t.Context(), client.ObjectKey{Name: "tenant-0"}, actual))
 					expected := "3"
 					if operation == admissionv1.Delete {
-						expected = "1"
+						expected = "2"
 					}
 					require.Equal(t, expected, actual.Annotations[capsulev1beta2.UsedAnnotationForResource(quotaTestResource)], "conflict must refresh usage before mutating")
 				}
@@ -353,6 +357,7 @@ func TestLegacyQuotaReservationAdmission(t *testing.T) {
 				current.Annotations[tenant.LegacyQuotaReservationsAnnotation] = "invalid"
 				require.NoError(t, base.Update(ctx, current))
 			}
+			req.Object = quotaTestObject(req.Namespace, req.Name, "widget-uid")
 			response := invokeLegacyQuota(ctx, c, c, req)
 			if mode == "lowered-limit" || mode == "malformed-state" {
 				require.NotNil(t, response)
@@ -380,7 +385,8 @@ func TestLegacyQuotaReservationAdmission(t *testing.T) {
 			case "delete-pending":
 				require.Equal(t, 2, writes)
 				require.Empty(t, state.Pending)
-				require.Equal(t, "1", current.Annotations[capsulev1beta2.UsedAnnotationForResource(quotaTestResource)])
+				require.Len(t, state.Deleting[quotaTestResource], 1)
+				require.Equal(t, "2", current.Annotations[capsulev1beta2.UsedAnnotationForResource(quotaTestResource)], "release waits for persisted deletion")
 			}
 		})
 	}
@@ -396,6 +402,11 @@ func (d *quotaCountingDecoder) Decode(req admission.Request, into runtime.Object
 	return d.Decoder.Decode(req, into)
 }
 
+func (d *quotaCountingDecoder) DecodeRaw(raw runtime.RawExtension, into runtime.Object) error {
+	d.calls++
+	return d.Decoder.DecodeRaw(raw, into)
+}
+
 func TestLegacyQuotaGeneratedNameIdentity(t *testing.T) {
 	for _, mode := range []string{"create", "retry", "conflict", "dry-run", "malformed", "missing-name", "unlimited", "subresource", "cluster-scoped"} {
 		t.Run(mode, func(t *testing.T) {
@@ -403,7 +414,7 @@ func TestLegacyQuotaGeneratedNameIdentity(t *testing.T) {
 			base := legacyQuotaFixture(t, 2)
 			req := legacyQuotaRequest(admissionv1.Create)
 			req.Name, req.UID = "", "generated-request"
-			raw, err := json.Marshal(map[string]any{"apiVersion": "example.com/v1", "kind": "Widget", "metadata": map[string]any{"name": "widget-generated", "namespace": req.Namespace, "generateName": "widget-"}})
+			raw, err := json.Marshal(map[string]any{"apiVersion": "example.com/v1", "kind": "Widget", "metadata": map[string]any{"name": "widget-generated", "namespace": req.Namespace, "generateName": "widget-", "uid": "generated-object"}})
 			require.NoError(t, err)
 			req.Object.Raw = raw
 			switch mode {
@@ -476,6 +487,7 @@ func TestLegacyQuotaGeneratedNameIdentity(t *testing.T) {
 			if mode == "create" || mode == "retry" || mode == "conflict" {
 				require.Len(t, state.Pending[quotaTestResource], 1)
 				require.Equal(t, "widget-generated", state.Pending[quotaTestResource][0].ObjectRef.Name)
+				require.Equal(t, types.UID("generated-object"), state.Pending[quotaTestResource][0].ObjectRef.UID)
 				require.Equal(t, req.Namespace, state.Pending[quotaTestResource][0].ObjectRef.Namespace)
 				require.Equal(t, "2", current.Annotations[capsulev1beta2.UsedAnnotationForResource(quotaTestResource)])
 			} else {

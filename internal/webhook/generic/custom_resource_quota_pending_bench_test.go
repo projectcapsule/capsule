@@ -13,9 +13,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	mockclient "github.com/projectcapsule/capsule/internal/mocks/client"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
@@ -47,8 +49,9 @@ func BenchmarkLegacyQuotaAdmissionPending(b *testing.B) {
 				c := interceptor.NewClient(writer, calls.Interceptors())
 				req := legacyQuotaRequest(admissionv1.Create)
 				req.UID = "next-request"
+				onCreate := ResourceCounterHandler(c).OnCreate(c, c, admission.NewDecoder(c.Scheme()), events.NewDiscardRecorder())
 				run := func() {
-					if result := invokeLegacyQuota(b.Context(), c, c, req); result != nil {
+					if result := onCreate(b.Context(), req); result != nil {
 						b.Errorf("unexpected response: %+v", result)
 					}
 				}

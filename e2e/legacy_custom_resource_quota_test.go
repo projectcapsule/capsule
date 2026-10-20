@@ -236,6 +236,77 @@ var _ = Describe("legacy quota during namespace provisioning", Label("resourcequ
 		persisted, err := bClient.Resource(resource).Namespace(allowedNS.Name).List(ctx, metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(persisted.Items).To(HaveLen(2), "denied generated-name requests must not persist")
+
+		By("retaining a same-name CREATE's distinct UID through recount and deletion of the older object")
+		Expect(bClient.Resource(resource).Namespace(allowedNS.Name).Delete(ctx, secondGenerated.GetName(), metav1.DeleteOptions{})).To(Succeed())
+		Eventually(func(g Gomega) {
+			current := &capsulev1beta2.Tenant{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(b), current)).To(Succeed())
+			g.Expect(current.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)]).To(Equal("1"))
+			state, err := capsuletenant.ReadLegacyQuotaReservations(current.Annotations)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(state.Pending[kgv]).To(BeEmpty())
+			g.Expect(state.Deleting[kgv]).To(BeEmpty())
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		// Validation runs before storage reports AlreadyExists. That failed
+		// CREATE must retain its own reservation, not borrow the older UID.
+		_, err = bClient.Resource(resource).Namespace(allowedNS.Name).Create(ctx, object(firstGenerated.GetName()), metav1.CreateOptions{})
+		Expect(apierrors.IsAlreadyExists(err)).To(BeTrue(), "%v", err)
+		Eventually(func(g Gomega) {
+			current := &capsulev1beta2.Tenant{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(b), current)).To(Succeed())
+			state, err := capsuletenant.ReadLegacyQuotaReservations(current.Annotations)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(state.Pending[kgv]).To(HaveLen(1))
+			g.Expect(state.Pending[kgv][0].ObjectRef.UID).NotTo(BeEmpty())
+			g.Expect(state.Pending[kgv][0].ObjectRef.UID).NotTo(Equal(firstGenerated.GetUID()))
+			g.Expect(current.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)]).To(Equal("2"))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		// A pin on an already-published namespace is removed only by the
+		// recount, providing an observable completion signal for this test.
+		Eventually(func() error {
+			current, ns := &capsulev1beta2.Tenant{}, &corev1.Namespace{}
+			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(b), current); err != nil {
+				return err
+			}
+			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(allowedNS), ns); err != nil {
+				return err
+			}
+			state, err := capsuletenant.ReadLegacyQuotaReservations(current.Annotations)
+			if err != nil {
+				return err
+			}
+			state.Namespaces[ns.Name] = ns.UID
+			if err := capsuletenant.WriteLegacyQuotaReservations(current.Annotations, state); err != nil {
+				return err
+			}
+			return k8sClient.Update(ctx, current)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Eventually(func(g Gomega) {
+			current := &capsulev1beta2.Tenant{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(b), current)).To(Succeed())
+			state, err := capsuletenant.ReadLegacyQuotaReservations(current.Annotations)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(state.Namespaces).NotTo(HaveKey(allowedNS.Name))
+			g.Expect(state.Pending[kgv]).To(HaveLen(1))
+			g.Expect(current.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)]).To(Equal("2"))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Expect(bClient.Resource(resource).Namespace(allowedNS.Name).Delete(ctx, firstGenerated.GetName(), metav1.DeleteOptions{})).To(Succeed())
+		Eventually(func(g Gomega) {
+			current := &capsulev1beta2.Tenant{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(b), current)).To(Succeed())
+			state, err := capsuletenant.ReadLegacyQuotaReservations(current.Annotations)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(state.Pending[kgv]).To(HaveLen(1))
+			g.Expect(state.Deleting[kgv]).To(BeEmpty())
+			g.Expect(current.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)]).To(Equal("1"))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		_, err = bClient.Resource(resource).Namespace(allowedNS.Name).Create(ctx, object("after-older-delete"), metav1.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		_, err = bClient.Resource(resource).Namespace(allowedNS.Name).Create(ctx, object("over-remaining-reservation"), metav1.CreateOptions{})
+		Expect(err).To(MatchError(ContainSubstring("has reached quota limit of 2 items")))
+		_, err = admin.Resource(resource).Namespace(allowedNS.Name).Get(ctx, "over-remaining-reservation", metav1.GetOptions{})
+		Expect(apierrors.IsNotFound(err)).To(BeTrue(), "denied object must not persist")
 		currentA := &capsulev1beta2.Tenant{}
 		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(a), currentA)).To(Succeed())
 		Expect(currentA.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)]).To(Equal("0"))
