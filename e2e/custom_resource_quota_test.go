@@ -98,7 +98,7 @@ var _ = Describe("when Tenant limits custom Resource Quota", Ordered, Label("res
 		EventuallyDeletion(tnt)
 	})
 
-	It("should block resources in overflow", Label("skip-on-openshift"), func() {
+	It("should block resources in overflow", func() {
 		dynamicClient := dynamic.NewForConfigOrDie(cfg)
 
 		for _, i := range []int{1, 2, 3} {

@@ -23,7 +23,7 @@ import (
 	tenantutils "github.com/projectcapsule/capsule/pkg/tenant"
 )
 
-var _ = Describe("rule-generated GlobalResourceQuota", Ordered, Label("resourcequota", "rules", "ledger", "skip-on-openshift"), func() {
+var _ = Describe("rule-generated GlobalResourceQuota", Ordered, Label("resourcequota", "rules", "ledger"), func() {
 	const (
 		tenantName = "e2e-rule-quota"
 

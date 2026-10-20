@@ -55,6 +55,15 @@
     {
       "matchManagers": ["helmv3","helm-values"],
       "minimumReleaseAge": null
+    },
+    {
+      "description": "MicroShift: each tracked version line only receives updates from its own minor",
+      "matchDepTypes": ["microshift-4.21"],
+      "allowedVersions": "/^4\\.21\\./"
+    },
+    {
+      "matchDepTypes": ["microshift-4.22"],
+      "allowedVersions": "/^4\\.22\\./"
     }
   ],
   "customManagers": [
@@ -63,6 +72,17 @@
       "managerFilePatterns": [
         "/^Makefile$/"
       ],
+      "matchStrings": [
+        "MICROSHIFT_TAG_(?<minor>\\d+\\.\\d+)\\s*:=\\s*(?<currentValue>\\S+)"
+      ],
+      "depNameTemplate": "microshift-io/microshift",
+      "depTypeTemplate": "microshift-{{{minor}}}",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^Makefile$"],
       "matchStrings": [
         "(?<depName>[A-Z0-9_]+)_VERSION\\s*[:=?]+\\s*\"?(?<currentValue>[^\"\\r\\n]+)\"?[\\r\\n]+\\s*(?<depName2>[A-Z0-9_]+)_LOOKUP\\s*[:=?]+\\s*\"?(?<lookupValue>[^\"\\r\\n]+)\"?(?:[\\r\\n]+\\s*(?<depName3>[A-Z0-9_]+)_RENOVATE\\s*[:=?]+\\s*\"?(?<renovateValue>[^\"\\r\\n]+)\"?)?(?:[\\r\\n]+\\s*(?<depName4>[A-Z0-9_]+)_SOURCE\\s*[:=?]+\\s*\"?(?<sourceValue>[^\"\\r\\n]+)\"?)?"
       ],

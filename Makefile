@@ -23,8 +23,13 @@ FILTER		 	?= && !skip
 ## Kubernetes Version Support
 KUBERNETES_SUPPORTED_VERSION ?= "v1.36.1"
 
-## Openshift Version Support
-OS_SUPPORTED_VERSION ?= "4.22.0-okd-scos.ec.10"
+## Openshift Version Support: MicroShift (OKD) release from https://github.com/microshift-io/microshift/releases
+MICROSHIFT_VERSION ?= 4.22
+MICROSHIFT_TAG_4.21 := 4.21.0_g29f429c21_4.21.0_okd_scos.ec.15
+MICROSHIFT_TAG_4.22 := 4.22.0_202610071017_g0a516b4eb_4.22.0_okd_scos.ec.16
+MICROSHIFT_TAG ?= $(MICROSHIFT_TAG_$(MICROSHIFT_VERSION))
+MICROSHIFT_INSTALLER_TAG ?= $(MICROSHIFT_TAG_4.22)
+MICROSHIFT_KUBECONFIG ?= /var/lib/microshift/resources/kubeadmin/kubeconfig
 
 ## Tool Binaries
 KUBECTL ?= kubectl
@@ -307,6 +312,7 @@ dev-setup-fluxcd-openshift:
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/overlays/openshift | envsubst | kubectl apply -f -
 
 dev-setup-openshift-specifics:
+	@$(KUBECTL) apply --force-conflicts --server-side=true -f ./e2e/rbac.yaml
 	@$(KUBECTL) apply -f hack/distro/openshift/extend-admin-role.yaml
 	@$(KUBECTL) apply -f hack/distro/openshift/capsule-namespace-deleter.yaml
 # Build and deploy the current Capsule checkout in the local playground.
@@ -509,22 +515,17 @@ golint-fix: golangci-lint
 mocks: mockgen
 	$(MOCKGEN) -destination internal/mocks/client/mock.go sigs.k8s.io/controller-runtime/pkg/client Client,SubResourceWriter,Reader
 
+# Running OpenShift e2e tests on a MicroShift installed directly on the (Ubuntu) host, requires root
 .PHONY: e2e-openshift
 e2e-openshift: ginkgo
-	$(MAKE) e2e-build-openshift && $(MAKE) e2e-exec FILTER='&& !skip && !skip-on-openshift' && $(MAKE) e2e-destroy-openshift
+	$(MAKE) e2e-build-openshift && KUBECONFIG=$(MICROSHIFT_KUBECONFIG) E2E_OPENSHIFT=true $(MAKE) e2e-exec FILTER='&& !skip && !skip-on-openshift'
 
-e2e-build-openshift: minc
-	$(MINC) config set provider docker
-	$(MINC) config set microshift-version $(OS_SUPPORTED_VERSION)
-	$(MINC) create --disable-overlay-cache true
-	$(MINC) status
-	$(MAKE) dev-install-deps-openshift
-	$(MAKE) dev-setup-openshift-specifics
-	$(MAKE) e2e-install-openshift
-
-
-e2e-destroy-openshift: minc
-	$(MINC) delete
+.PHONY: e2e-build-openshift
+e2e-build-openshift:
+	./hack/microshift/install.sh $(MICROSHIFT_TAG) $(MICROSHIFT_INSTALLER_TAG)
+	KUBECONFIG=$(MICROSHIFT_KUBECONFIG) $(MAKE) dev-install-deps-openshift
+	KUBECONFIG=$(MICROSHIFT_KUBECONFIG) $(MAKE) dev-setup-openshift-specifics
+	KUBECONFIG=$(MICROSHIFT_KUBECONFIG) $(MAKE) e2e-install-openshift
 
 # Running e2e tests in a KinD instance
 .PHONY: e2e
@@ -585,6 +586,7 @@ e2e-install: helm-controller-version ko-build-all dev-install-gw-api-crds
 .PHONY: e2e-install-openshift
 e2e-install-openshift: helm-controller-version ko-build-all
 	$(MAKE) e2e-load-image-openshift IMAGE=$(CAPSULE_IMG) VERSION=$(VERSION)
+	$(KUBECTL) label clusterrole admin projectcapsule.dev/aggregate-to-controller=true
 	$(HELM) upgrade \
 	    --dependency-update \
 		--debug \
@@ -596,13 +598,34 @@ e2e-install-openshift: helm-controller-version ko-build-all
 		--set 'manager.resources=null'\
 		--set "manager.image.tag=$(VERSION)" \
 		--set 'manager.livenessProbe.failureThreshold=10' \
+		--set 'manager.options.workers=4' \
+		--set 'manager.options.clientConnectionQPS=2000' \
+		--set 'manager.options.clientConnectionBurst=1000' \
 		--set 'manager.options.leaderElection.leaseDuration=60s' \
 		--set 'manager.options.leaderElection.renewDeadline=40s' \
+		--set 'manager.rbac.minimal=true' \
+		--set rbac.resources.create=true \
+		--set-string 'rbac.resources.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
+		--set rbac.resourcepoolclaims.create=true \
+		--set-string 'rbac.resourcepoolclaims.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
+		--set rbac.customquotas.create=true \
+		--set-string 'rbac.customquotas.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set 'webhooks.hooks.nodes.enabled=true' \
 		--set "webhooks.exclusive=true"\
 		--set "manager.options.logLevel=debug"\
 		--set "jobs.podSecurityContext.enabled=false"\
 		--set "jobs.securityContext.enabled=false"\
+		--set 'webhooks.hooks.calculations.enabled=true' \
+		--set-string 'webhooks.hooks.calculations.rules[0].apiGroups[0]=' \
+		--set 'webhooks.hooks.calculations.rules[0].apiVersions[0]=v1' \
+		--set 'webhooks.hooks.calculations.rules[0].operations[0]=CREATE' \
+		--set 'webhooks.hooks.calculations.rules[0].operations[1]=UPDATE' \
+		--set 'webhooks.hooks.calculations.rules[0].operations[2]=DELETE' \
+		--set 'webhooks.hooks.calculations.rules[0].resources[0]=pods' \
+		--set 'webhooks.hooks.calculations.rules[0].resources[1]=pods/status' \
+		--set 'webhooks.hooks.calculations.rules[0].resources[2]=persistentvolumeclaims' \
+		--set 'webhooks.hooks.calculations.rules[0].scope=Namespaced' \
+		--set 'webhooks.hooks.calculations.namespaceSelector.matchLabels.env=e2e' \
 		capsule \
 		./charts/capsule
 
@@ -644,12 +667,10 @@ seccomp:
 e2e-load-image: kind
 	$(KIND) load docker-image $(IMAGE):$(VERSION) --name $(CLUSTER_NAME)
 
+# MicroShift runs CRI-O on the host: load the image into the shared containers-storage
 .PHONY: e2e-load-image-openshift
-e2e-load-image-openshift: minc
-	docker save $(IMAGE):$(VERSION) > capsule.tar
-	docker cp capsule.tar microshift:/tmp/
-	docker exec microshift sh -c 'podman load -i /tmp/capsule.tar'
-	rm -rf capsule.tar
+e2e-load-image-openshift:
+	docker save $(IMAGE):$(VERSION) | podman load
 
 .PHONY: e2e-exec
 e2e-exec: ginkgo
@@ -710,13 +731,6 @@ CT_LOOKUP  := helm/chart-testing
 ct:
 	@test -s $(CT) && $(CT) version | grep -q $(CT_VERSION) || \
 	$(call go-install-tool,$(CT),github.com/$(CT_LOOKUP)/v3/ct@$(CT_VERSION))
-
-MINC:= $(LOCALBIN)/minc
-MINC_VERSION := 5d70364166af05edf00fe0d1ea8e731f138b5c51
-MINC_LOOKUP  := minc-org/minc
-minc:
-	echo "Installing minc to $(MINC)" && \
-	$(call go-install-tool,$(MINC),github.com/$(MINC_LOOKUP)/cmd/minc@$(MINC_VERSION))
 
 KIND         := $(LOCALBIN)/kind
 KIND_VERSION := v0.32.0
