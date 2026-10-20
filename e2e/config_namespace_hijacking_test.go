@@ -253,8 +253,9 @@ func createHijackTenants(tenants ...*capsulev1beta2.Tenant) {
 	}
 
 	DeferCleanup(func() {
+		// The Tenant names are unique per spec: no need to wait for them to be gone.
 		for _, tnt := range tenants {
-			EventuallyDeletion(tnt)
+			DeleteInBackground(tnt)
 		}
 	})
 }

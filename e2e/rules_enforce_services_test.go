@@ -744,7 +744,8 @@ var _ = Describe("enforcing service namespace rules", Label("tenant", "rules", "
 	})
 
 	JustAfterEach(func() {
-		EventuallyDeletion(tnt)
+		// The Tenant name is unique per spec: no need to wait for it to be gone.
+		DeleteInBackground(tnt)
 	})
 
 	It("requires or validates LoadBalancer nodePorts when allocation is enabled and nodePort ranges are configured", func() {

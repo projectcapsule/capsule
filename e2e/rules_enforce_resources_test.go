@@ -354,7 +354,8 @@ var _ = Describe("enforcing workload resource namespace rules", Label("tenant", 
 	})
 
 	JustAfterEach(func() {
-		EventuallyDeletion(tnt)
+		// The Tenant name is unique per spec: no need to wait for it to be gone.
+		DeleteInBackground(tnt)
 	})
 
 	It("projects ordered resource policies into the namespace RuleStatus", func() {

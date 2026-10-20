@@ -79,7 +79,7 @@ var _ = Describe("DeviceClass request authorization", Label("tenant", "classes",
 				},
 			}
 			Expect(k8sClient.Create(ctx, tnt)).To(Succeed())
-			DeferCleanup(EventuallyDeletion, tnt)
+			DeferCleanup(DeleteInBackground, tnt)
 			TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 			ns := NewNamespace(name+"-ns", map[string]string{meta.TenantLabel: name})
 			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())

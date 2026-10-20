@@ -367,7 +367,8 @@ var _ = Describe("enforcing pod QoS namespace rules", Label("tenant", "rules", "
 	})
 
 	JustAfterEach(func() {
-		EventuallyDeletion(tnt)
+		// The Tenant name is unique per spec: no need to wait for it to be gone.
+		DeleteInBackground(tnt)
 	})
 
 	It("stores QoS workload rules as independent status rule blocks", func() {

@@ -77,7 +77,8 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 			}
 		}
 
-		ForceDeleteNamespace(ctx, testNamespace)
+		// The namespace name is unique per spec: no need to wait for it to be gone.
+		DeleteNamespaceInBackground(ctx, testNamespace)
 	})
 
 	It("marks the quota not ready when an existing matching object has no value at the configured quantity path", func() {

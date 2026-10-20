@@ -865,7 +865,8 @@ var _ = Describe("enforcing generic metadata namespace rules", Label("tenant", "
 	})
 
 	JustAfterEach(func() {
-		EventuallyDeletion(tnt)
+		// The Tenant name is unique per spec: no need to wait for it to be gone.
+		DeleteInBackground(tnt)
 	})
 
 	It("stores matching tenant metadata rules as independent status rule blocks", func() {

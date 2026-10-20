@@ -445,6 +445,14 @@ Test implementation requirements:
 - Preserve descriptive Ginkgo labels. Tests changing shared CapsuleConfiguration
   must use the `config` label and restore configuration; those tests run serially.
   Ordinary tests must remain safe under parallel execution.
+- Keep specs cheap to schedule and to tear down. An `Ordered` container is one
+  indivisible unit of work on a single Ginkgo process, so prefer independent specs
+  with per-spec unique names (`rand.String`, `NewNamespace("")`). Every wait for a
+  namespace or Tenant to disappear costs at least the 5 s namespace deletion grace
+  period of kube-controller-manager: with unique names, delete fixtures with
+  `DeleteNamespaceInBackground` and `DeleteInBackground` instead of
+  `ForceDeleteNamespace` and `EventuallyDeletion`; `SynchronizedAfterSuite` waits
+  for the leftovers once. Keep the blocking helpers for names a later spec reuses.
 - Do not weaken assertions, increase timeouts without diagnosis, mark new coverage
   skipped, or commit focused specs to make a failing run appear successful.
 

@@ -624,7 +624,8 @@ var _ = Describe("enforcing container registry namespace rules", Label("tenant",
 	})
 
 	JustAfterEach(func() {
-		EventuallyDeletion(tnt)
+		// The Tenant name is unique per spec: no need to wait for it to be gone.
+		DeleteInBackground(tnt)
 	})
 
 	It("audits a matching image but still denies when no allow rule matches", func() {

@@ -32,11 +32,12 @@ var _ = Describe("TenantResource template environment sandbox", Label("tenant", 
 		var namespaces []string
 		DeferCleanup(func() {
 			cleanupTenantResourcesWithDefaultServiceAccount(ctx, namespaces...)
+			// The names are unique per spec: no need to wait for them to be gone.
 			for _, namespace := range namespaces {
-				ForceDeleteNamespace(ctx, namespace)
+				DeleteNamespaceInBackground(ctx, namespace)
 			}
 			for _, tenant := range tenants {
-				EventuallyDeletion(tenant)
+				DeleteInBackground(tenant)
 			}
 		})
 

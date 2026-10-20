@@ -173,12 +173,14 @@ var _ = Describe("GlobalTenantResource", Label("replications", "global", "global
 	AfterEach(func() {
 		cleanupGlobalTenantResources(ctx, client.MatchingLabels{e2eRunLabel: prefix})
 
+		// The names are unique per spec, so nothing waits for the namespaces or
+		// the Tenants to be gone (see DeleteNamespaceInBackground).
 		for _, ns := range allNamespaces {
-			ForceDeleteNamespace(ctx, ns)
+			DeleteNamespaceInBackground(ctx, ns)
 		}
 
-		EventuallyDeletion(tenantA)
-		EventuallyDeletion(tenantB)
+		DeleteInBackground(tenantA)
+		DeleteInBackground(tenantB)
 	})
 
 	// These specs share the controller's cluster-scoped RBAC fixture and sweep

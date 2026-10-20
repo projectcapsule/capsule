@@ -99,6 +99,12 @@ Keep new specs cheap to schedule: an `Ordered` container is one indivisible unit
 of work on a single Ginkgo process, so prefer independent specs with per-spec
 random names (`rand.String`, `NewNamespace("")`) over `Ordered` containers, and
 only add the `config` label to specs that really change the `CapsuleConfiguration`.
+Keep teardown cheap too: kube-controller-manager waits a fixed 5 s before it
+processes any namespace deletion, so a fixture that waits for its namespaces or
+Tenant to disappear pays at least that per object. With per-spec unique names
+use `DeleteNamespaceInBackground` and `DeleteInBackground` instead of
+`ForceDeleteNamespace` and `EventuallyDeletion`; the suite waits for the
+leftovers once, in `SynchronizedAfterSuite`.
 
 ### OpenShift e2e (MicroShift)
 

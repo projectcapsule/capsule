@@ -298,7 +298,8 @@ var _ = Describe("enforcing pod schedulerName namespace rules", Label("tenant", 
 	})
 
 	JustAfterEach(func() {
-		EventuallyDeletion(tnt)
+		// The Tenant name is unique per spec: no need to wait for it to be gone.
+		DeleteInBackground(tnt)
 	})
 
 	It("stores scheduler workload rules as independent status rule blocks", func() {

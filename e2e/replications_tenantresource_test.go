@@ -131,11 +131,13 @@ var _ = Describe("TenantResource SSA", Label("replications", "namespace", "tenan
 		ignoreNotFound(k8sClient.Delete(ctx, contextSecretOne))
 		ignoreNotFound(k8sClient.Delete(ctx, contextSecretTwo))
 
+		// The names are unique per spec, so nothing waits for the namespaces or
+		// the Tenant to be gone (see DeleteNamespaceInBackground).
 		for _, ns := range append([]string{baseNamespace}, targetNamespaces...) {
-			ForceDeleteNamespace(ctx, ns)
+			DeleteNamespaceInBackground(ctx, ns)
 		}
 
-		EventuallyDeletion(tnt)
+		DeleteInBackground(tnt)
 	})
 
 	It("converts legacy settings and applies independent resource policies", Label("replication-policy"), func() {

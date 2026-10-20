@@ -317,7 +317,8 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 			EventuallyDeletion(&list.Items[i])
 		}
 
-		ForceDeleteNamespace(ctx, testNamespace)
+		// The namespace name is unique per spec: no need to wait for it to be gone.
+		DeleteNamespaceInBackground(ctx, testNamespace)
 	})
 
 	It("aggregates a custom pod quantity path and settles the corresponding ledger", func() {

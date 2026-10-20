@@ -134,15 +134,18 @@ var _ = SynchronizedAfterSuite(
 				return nil
 			}
 
+			// Specs with unique names delete their namespaces and Tenants in the
+			// background (DeleteNamespaceInBackground, DeleteInBackground), so the
+			// suite ends with namespaces that are still terminating: wait for them
+			// here, and release any termination hold a failed spec left behind.
 			for i := range nsList.Items {
-				ns := &nsList.Items[i]
-				if err := k8sClient.Delete(context.TODO(), ns); err != nil && !apierrors.IsNotFound(err) {
+				if err := triggerNamespaceDeletion(context.TODO(), nsList.Items[i].GetName()); err != nil {
 					return err
 				}
 			}
 
 			return fmt.Errorf("still have %d namespaces with env=e2e", len(nsList.Items))
-		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		}, defaultTerminationTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 		Eventually(func() error {
 			var tnts capsulev1beta2.TenantList
@@ -167,7 +170,7 @@ var _ = SynchronizedAfterSuite(
 			}
 
 			return fmt.Errorf("still have %d tenants with env=e2e", len(tnts.Items))
-		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		}, defaultTerminationTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 		By("tearing down the test environment")
 
