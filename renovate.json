@@ -78,7 +78,7 @@
       "depNameTemplate": "microshift-io/microshift",
       "depTypeTemplate": "microshift-{{{minor}}}",
       "datasourceTemplate": "github-releases",
-      "versioningTemplate": "loose"
+      "versioningTemplate": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.\\d+(?:_(?<build>\\d+))?_g[0-9a-f]+_\\d+\\.\\d+\\.\\d+_okd_scos\\.(?:ec\\.)?(?<patch>\\d+)$"
     },
     {
       "customType": "regex",

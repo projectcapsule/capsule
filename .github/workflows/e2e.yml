@@ -12,6 +12,7 @@ on:
       - 'internal/**'
       - 'pkg/**'
       - 'e2e/*'
+      - 'hack/microshift/**'
       - 'Dockerfile'
       - 'go.*'
       - 'main.go'
