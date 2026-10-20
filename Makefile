@@ -705,7 +705,7 @@ ginkgo:
 	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo)
 
 CT         := $(LOCALBIN)/ct
-CT_VERSION := v3.14.0
+CT_VERSION := v3.15.0
 CT_LOOKUP  := helm/chart-testing
 ct:
 	@test -s $(CT) && $(CT) version | grep -q $(CT_VERSION) || \
