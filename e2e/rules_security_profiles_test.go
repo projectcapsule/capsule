@@ -25,7 +25,7 @@ import (
 	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 )
 
-var _ = Describe("workload security profiles", Label("tenant", "rules", "workloads", "security-profiles"), func() {
+var _ = Describe("workload security profiles", Label("tenant", "rules", "workloads", "security-profiles", "skip-on-openshift"), func() {
 	It("defaults and enforces profiles across namespace selection, templates and ephemeral containers", func() {
 		ctx := context.Background()
 		prefix := "e2e-profiles-" + rand.String(8)

@@ -25,7 +25,7 @@ import (
 )
 
 var _ = Describe("workload type namespace profiles", Label("tenant", "rules", "workloads", "workload-types"), func() {
-	It("enforces native kinds with conditions, ordering, audiences and isolated namespace profiles", func() {
+	It("enforces native kinds with conditions, ordering, audiences and isolated namespace profiles", Label("skip-on-openshift"), func() {
 		ctx := context.Background()
 		prefix := "e2e-types-" + rand.String(8)
 		policy := func(profile string, action rules.ActionType, types ...rules.WorkloadValidationTarget) *rules.NamespaceRuleBodyTenant {

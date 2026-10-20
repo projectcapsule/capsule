@@ -23,7 +23,7 @@ import (
 )
 
 var _ = Describe("rule-generated GlobalResourceQuota admission", Ordered,
-	Label("resourcequota", "rules", "admission", "managed", "skip-on-openshift"), func() {
+	Label("resourcequota", "rules", "admission", "managed"), func() {
 		const (
 			tenantName  = "e2e-rule-quota-admission"
 			quotaName   = "compute"
@@ -430,7 +430,7 @@ var _ = Describe("rule-generated GlobalResourceQuota admission", Ordered,
 	})
 
 var _ = Describe("managed GlobalResourceQuota administrator admission", Ordered,
-	Label("config", "resourcequota", "admission", "managed", "skip-on-openshift"), func() {
+	Label("config", "resourcequota", "admission", "managed"), func() {
 		const (
 			adminName = "e2e-managed-global-quota-admin"
 			quotaName = "e2e-managed-global-quota-admin"

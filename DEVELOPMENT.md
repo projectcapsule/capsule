@@ -91,6 +91,64 @@ The [e2e workflow](./.github/workflows/e2e.yml) runs the full suite for pull req
 matching its path filters. Local runs should cover only the new tests and affected
 components.
 
+### OpenShift e2e (MicroShift)
+
+The OpenShift e2e runs against [MicroShift](https://github.com/microshift-io/microshift)
+(OKD based, no pull secret) in CI. `make e2e-openshift` installs MicroShift directly on
+the host as root (apt, ufw, systemd), so it is meant for the GitHub runner and must
+not be run on a workstation. Specs that cannot run there carry the `skip-on-openshift`
+label. The versions under test are the `MICROSHIFT_TAG_*` entries in the
+[Makefile](./Makefile) and the matrix in the [e2e workflow](./.github/workflows/e2e.yml).
+
+To reproduce a scoped run on macOS (Docker Desktop with at least 8 GB of memory),
+run MicroShift in a privileged systemd container that stands in for the runner and
+install Capsule with the same Make targets as CI:
+
+```bash
+# 1. Privileged Ubuntu 24.04 container with systemd (the runner stand-in)
+docker build -t msx-ubuntu - <<'EOF'
+FROM ubuntu:24.04
+RUN apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+    systemd systemd-sysv dbus curl ca-certificates iptables sudo kmod
+STOPSIGNAL SIGRTMIN+3
+CMD ["/sbin/init"]
+EOF
+docker run -d --name msx --privileged --cgroupns=host -p 6443:6443 \
+  -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
+  -v msx-containers:/var/lib/containers -v msx-ms:/var/lib/microshift \
+  --tmpfs /run --tmpfs /run/lock -v "$PWD/hack:/hack:ro" msx-ubuntu
+
+# 2. Install MicroShift with the CI script (version tags are read from the Makefile)
+VERSION=4.22
+TAG=$(sed -n "s/^MICROSHIFT_TAG_${VERSION} := //p" Makefile)
+INSTALLER_TAG=$(sed -n 's/^MICROSHIFT_TAG_4.22 := //p' Makefile)
+docker exec msx /hack/microshift/install.sh "$TAG" "$INSTALLER_TAG"
+docker exec msx ufw allow 6443/tcp   # make the API reachable through the published port
+docker exec msx cat /var/lib/microshift/resources/kubeadmin/kubeconfig > /tmp/ms-kubeconfig
+
+# 3. Install the dependencies and the current checkout. The podman shim loads the
+#    locally built image into the container's CRI-O storage.
+mkdir -p /tmp/shim
+printf '#!/bin/sh\nexec docker exec -i msx podman "$@"\n' > /tmp/shim/podman
+chmod +x /tmp/shim/podman
+export KUBECONFIG=/tmp/ms-kubeconfig PATH=/tmp/shim:$PATH
+make dev-install-deps-openshift
+make dev-setup-openshift-specifics
+make e2e-install-openshift
+
+# 4. Run the scoped tests (E2E_OPENSHIFT makes the fixtures OpenShift SCC compatible)
+E2E_OPENSHIFT=true make e2e-exec FILTER='&& !skip && !skip-on-openshift && feature-label'
+
+# 5. Clean up
+docker rm -f msx && docker volume rm msx-containers msx-ms
+```
+
+Replace `feature-label` with the labels of the new feature and affected components.
+Differences to CI: on Apple Silicon the images and MicroShift are arm64 (CI uses
+x86_64), and the Ubuntu DEB build uses the Kindnet CNI instead of OVN-Kubernetes. If
+Docker Desktop restarts, run `docker start msx` and wait until the node is `Ready`
+again. The full suite only runs in CI.
+
 ## Security assessment
 
 The [capability catalog](./security/capabilities.yaml) and
