@@ -30,7 +30,8 @@ import (
 )
 
 var _ = Describe("managed labels cannot bypass metadata enforcement", Label("tenant", "rules", "metadata", "managed-label"), func() {
-	const denied = "pod-security.kubernetes.io/enforce"
+	// Not a pod-security label: OpenShift re-adds those to every namespace.
+	const denied = "example.org/forbidden"
 	const profile = "example.org/profile"
 	ctx := context.Background()
 	var tenantA, tenantB *capsulev1beta2.Tenant

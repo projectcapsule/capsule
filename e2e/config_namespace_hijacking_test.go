@@ -511,7 +511,8 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace", 
 	})
 
 	It("Owners can not bypass forbidden metadata through namespaces/finalize", func() {
-		const forbiddenLabel = "pod-security.kubernetes.io/enforce"
+		// Not a pod-security label: OpenShift re-adds those to every namespace.
+		const forbiddenLabel = "example.org/forbidden"
 
 		UpdateTenantEventually(t1, func(current *capsulev1beta2.Tenant) {
 			if current.Spec.NamespaceOptions == nil {

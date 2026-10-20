@@ -890,7 +890,7 @@ var _ = Describe("enforcing service namespace rules", Label("tenant", "rules", "
 		Expect(err.Error()).To(HaveSuffix(`service type "NodePort" at spec.type is denied by namespace rule`))
 	})
 
-	It("allows only Service external IPs contained in configured CIDRs", func() {
+	It("allows only Service external IPs contained in configured CIDRs", Label("skip-on-openshift"), func() {
 		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
 			serviceTypeRule(
 				rules.ActionTypeAllow,
@@ -954,7 +954,7 @@ var _ = Describe("enforcing service namespace rules", Label("tenant", "rules", "
 		)
 	})
 
-	It("denies every specified Service external IP when a deny rule has empty CIDRs", func() {
+	It("denies every specified Service external IP when a deny rule has empty CIDRs", Label("skip-on-openshift"), func() {
 		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
 			serviceTypeRule(
 				rules.ActionTypeAllow,

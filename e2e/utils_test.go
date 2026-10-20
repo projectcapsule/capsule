@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"os"
 	"reflect"
 	"sort"
 	"strings"
@@ -1134,7 +1135,7 @@ func ExpectPodsForDeployment(ctx context.Context, namespace, app string, expecte
 }
 
 func nobodyPodSecurityContext() *corev1.PodSecurityContext {
-	return &corev1.PodSecurityContext{
+	sc := &corev1.PodSecurityContext{
 		RunAsNonRoot: new(true),
 		RunAsUser:    ptr.To[int64](65534),
 		RunAsGroup:   ptr.To[int64](65534),
@@ -1142,6 +1143,13 @@ func nobodyPodSecurityContext() *corev1.PodSecurityContext {
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},
 	}
+
+	// OpenShift SCCs assign the UID from the namespace range and reject fixed ones.
+	if os.Getenv("E2E_OPENSHIFT") != "" {
+		sc.RunAsUser, sc.RunAsGroup = nil, nil
+	}
+
+	return sc
 }
 
 func restrictedContainerSecurityContext() *corev1.SecurityContext {

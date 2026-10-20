@@ -212,7 +212,7 @@ func getLedger(ctx context.Context, namespace, name string) *capsulev1beta2.Quan
 	return obj
 }
 
-var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Label("global", "globalcustomquota", "customquota", "ledger", "skip-on-openshift"), func() {
+var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Label("global", "globalcustomquota", "customquota", "ledger"), func() {
 	const tenantLabel = "e2e.capsule.dev/test-suite"
 
 	// The namespace name and the selector value are unique per spec, so the specs
@@ -320,7 +320,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 		ForceDeleteNamespace(ctx, testNamespace)
 	})
 
-	It("aggregates a custom pod quantity path and settles the corresponding ledger", Label("skip-on-openshift"), func() {
+	It("aggregates a custom pod quantity path and settles the corresponding ledger", func() {
 		By("isolating the quota from identically labelled Pods in another tenant")
 		prefix := "e2e-quota-cpu-" + rand.String(6)
 		tenants := []*capsulev1beta2.Tenant{
@@ -471,7 +471,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 
-	It("denies creating a matching object when the configured quantity path resolves to no value", Label("skip-on-openshift"), func() {
+	It("denies creating a matching object when the configured quantity path resolves to no value", func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
 			Name: "gq-missing-path-deny-create",
 			Labels: map[string]string{
@@ -518,7 +518,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 	})
 
-	It("remains consistent under concurrent pod creations for a GlobalCustomQuota", Label("skip-on-openshift"), func() {
+	It("remains consistent under concurrent pod creations for a GlobalCustomQuota", func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
 			Name: "gq-concurrent-pod-count",
 			Labels: map[string]string{

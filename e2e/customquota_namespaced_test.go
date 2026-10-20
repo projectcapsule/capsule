@@ -21,7 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("namespaced", "namespacedcustomquota", "customquota", "ledger", "skip-on-openshift"), func() {
+var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("namespaced", "namespacedcustomquota", "customquota", "ledger"), func() {
 	const tenantLabel = "e2e.capsule.dev/test-suite"
 
 	// The namespace name and the selector value are unique per spec, so the specs
@@ -126,7 +126,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 
-	It("denies creating a matching object when the configured quantity path resolves to no value", Label("skip-on-openshift"), func() {
+	It("denies creating a matching object when the configured quantity path resolves to no value", func() {
 		q := &capsulev1beta2.CustomQuota{
 			Name:      "cq-missing-path-deny-create",
 			Namespace: testNamespace,
@@ -163,7 +163,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 		expectLedgerSettled(ctx, testNamespace, q.GetName())
 	})
 
-	It("remains consistent under concurrent pod creations for a CustomQuota", Label("skip-on-openshift"), func() {
+	It("remains consistent under concurrent pod creations for a CustomQuota", func() {
 		q := &capsulev1beta2.CustomQuota{
 			Name:      "cq-concurrent-pod-count",
 			Namespace: testNamespace,
@@ -240,7 +240,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 		expectLedgerSettled(ctx, testNamespace, q.GetName())
 	})
 
-	It("tracks different paths independently when global and namespaced quotas match the same pod gvk", Label("skip-on-openshift"), func() {
+	It("tracks different paths independently when global and namespaced quotas match the same pod gvk", func() {
 		gq := &capsulev1beta2.GlobalCustomQuota{
 			Name: "gq-mixed-path-cpu-from-cq-suite",
 			Labels: map[string]string{

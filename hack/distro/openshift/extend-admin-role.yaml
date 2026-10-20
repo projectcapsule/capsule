@@ -11,6 +11,25 @@ rules:
       - capsule.clastix.io
     resources:
       - '*/finalizers'
+  # Kubernetes' view role grants this, OpenShift's admin role does not
+  - verbs:
+      - get
+      - list
+      - watch
+    apiGroups:
+      - ''
+    resources:
+      - namespaces
+  # OwnerReferencesPermissionEnforcement is enabled on OpenShift
+  - verbs:
+      - update
+    apiGroups:
+      - apps
+    resources:
+      - deployments/finalizers
+      - replicasets/finalizers
+      - statefulsets/finalizers
+      - daemonsets/finalizers
   - apiGroups:
       - security.openshift.io
     resources:
