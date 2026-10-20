@@ -5,11 +5,15 @@ package tenant
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -240,8 +244,20 @@ func (r *Manager) provisionNamespaceLocked(ctx context.Context, log logr.Logger,
 	bindings, bindingErr := plan.forNamespace(ns)
 
 	stat, profileErr := r.reconcileNamespace(ctx, log, ns, snapshot, snapshot)
-	if profileErr != nil || ns.DeletionTimestamp != nil {
+	if ns.DeletionTimestamp != nil {
 		return stat, profileErr
+	}
+
+	if profileErr != nil {
+		// A failed profile must not retain revoked grants. Only prune from a
+		// complete, evaluated permission plan; new grants still require the profile.
+		if bindingErr == nil && plan.prune {
+			bindingErr = r.runPhase(log, "namespace_role_bindings", func() error {
+				return r.pruningResources(ctx, ns.Name, slices.Collect(maps.Keys(bindings)), &rbacv1.RoleBinding{})
+			})
+		}
+
+		return stat, errors.Join(profileErr, bindingErr)
 	}
 
 	if bindingErr == nil {
