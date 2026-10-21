@@ -130,9 +130,10 @@ sboms:
   - artifacts: archive
 signs:
 - cmd: cosign
+  signature: "${artifact}.sigstore.json"
   args:
   - "sign-blob"
-  - "--output-signature=${signature}"
+  - "--bundle=${signature}"
   - "${artifact}"
   - "--yes"
   artifacts: all
