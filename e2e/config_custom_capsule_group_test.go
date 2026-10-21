@@ -47,9 +47,9 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 			tnt.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
+		// Registered before waiting for readiness so a failed setup still deletes it.
+		DeferCleanup(EventuallyDeletion, tnt)
 		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
-
-		DeferCleanup(func() { EventuallyDeletion(tnt) })
 	})
 	JustAfterEach(func() {
 		// Restore Configuration

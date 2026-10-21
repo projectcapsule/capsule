@@ -60,28 +60,28 @@ var _ = Describe("Administrators", Ordered, Label("namespace", "permissions", "a
 	BeforeAll(func() {
 		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: defaultConfigurationName}, originConfig)).To(Succeed())
 
+		// Registered first so it runs last (DeferCleanup is last in, first out)
+		// and so the administrators are restored even when the setup below fails.
+		DeferCleanup(func() {
+			ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+				configuration.Spec.Administrators = originConfig.Spec.Administrators
+			})
+		})
+
 		for _, tnt := range []*capsulev1beta2.Tenant{tnt1, tnt2} {
 			EventuallyCreation(func() error {
 				tnt.ResourceVersion = ""
 
 				return k8sClient.Create(context.TODO(), tnt)
 			}).Should(Succeed())
+			// One cleanup per Tenant, registered before waiting for readiness.
+			DeferCleanup(EventuallyDeletion, tnt)
 
 			TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 		}
 
 		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
 			configuration.Spec.Administrators = []rbac.UserSpec{admin}
-		})
-
-		DeferCleanup(func() {
-			for _, tnt := range []*capsulev1beta2.Tenant{tnt1, tnt2} {
-				EventuallyDeletion(tnt)
-			}
-
-			ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
-				configuration.Spec.Administrators = originConfig.Spec.Administrators
-			})
 		})
 	})
 

@@ -249,15 +249,11 @@ func createHijackTenants(tenants ...*capsulev1beta2.Tenant) {
 		EventuallyCreation(func() error {
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
+		// The Tenant names are unique per spec: no need to wait for them to be gone.
+		// Registered before waiting for readiness so a failed setup still deletes it.
+		DeferCleanup(DeleteInBackground, tnt)
 		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 	}
-
-	DeferCleanup(func() {
-		// The Tenant names are unique per spec: no need to wait for them to be gone.
-		for _, tnt := range tenants {
-			DeleteInBackground(tnt)
-		}
-	})
 }
 
 // The owner-facing hijacking specs only rely on default CapsuleConfiguration
@@ -1463,9 +1459,8 @@ var _ = Describe("Capsule administrators changing Tenant ownership of Namespaces
 	)
 
 	BeforeAll(func() {
-		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
-			configuration.Spec.Administrators = append(configuration.Spec.Administrators, administrator)
-		})
+		// Registered before the change so the administrator is removed again even
+		// when the rest of the setup fails (removing an absent entry is a no-op).
 		DeferCleanup(func() {
 			ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
 				kept := make(rbac.UserListSpec, 0, len(configuration.Spec.Administrators))
@@ -1479,6 +1474,9 @@ var _ = Describe("Capsule administrators changing Tenant ownership of Namespaces
 
 				configuration.Spec.Administrators = kept
 			})
+		})
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec.Administrators = append(configuration.Spec.Administrators, administrator)
 		})
 
 		t1, t2, _ = hijackTenants("e2e-ns-admin-" + utilrand.String(6))
