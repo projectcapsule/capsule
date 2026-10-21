@@ -152,7 +152,7 @@ dev-install-deps-openshift:
 	$(MAKE) dev-install-deps FLUX_SETUP_TARGET=dev-setup-fluxcd-openshift
 
 API_GW         := none
-API_GW_VERSION := v1.6.2
+API_GW_VERSION := v1.6.3
 API_GW_LOOKUP  := kubernetes-sigs/gateway-api
 dev-install-gw-api-crds:
 	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/$(API_GW_LOOKUP)/releases/download/$(API_GW_VERSION)/standard-install.yaml
