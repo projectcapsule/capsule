@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 
 # Collects the Capsule controller state after a failed e2e run so a hang can be
-# diagnosed from CI: pod status and events, current and previous container logs,
-# the answer and latency of the readiness and liveness endpoints, a goroutine
-# dump over pprof (the e2e install starts the manager with --enable-pprof), and
-# the kubelet/containerd journal of the kind nodes.
+# diagnosed from CI: pod status and events, the complete current and previous
+# container logs plus the rotated log files from the nodes, the answer and
+# latency of the readiness and liveness endpoints, a goroutine dump over pprof
+# (the e2e install starts the manager with --enable-pprof), and the
+# kubelet/containerd journal of the kind nodes.
 #
 # usage: [CLUSTER_NAME=capsule] [KUBECTL=kubectl] ./hack/e2e-diagnostics.sh [output dir]
 
@@ -33,8 +34,8 @@ $KUBECTL get --raw '/readyz?verbose' > "$OUT/apiserver-readyz.txt" 2>&1
 
 for pod in $($KUBECTL -n "$NAMESPACE" get pods -l "$SELECTOR" -o name 2>/dev/null); do
   name="${pod#pod/}"
-  $KUBECTL -n "$NAMESPACE" logs "$pod" --tail=5000 > "$OUT/$name.log" 2>&1
-  if ! $KUBECTL -n "$NAMESPACE" logs "$pod" --previous --tail=5000 > "$OUT/$name.previous.log" 2>&1; then
+  $KUBECTL -n "$NAMESPACE" logs "$pod" > "$OUT/$name.log" 2>&1
+  if ! $KUBECTL -n "$NAMESPACE" logs "$pod" --previous > "$OUT/$name.previous.log" 2>&1; then
     rm -f "$OUT/$name.previous.log"
   fi
 
@@ -59,22 +60,51 @@ for pod in $($KUBECTL -n "$NAMESPACE" get pods -l "$SELECTOR" -o name 2>/dev/nul
   wait "$forward" 2>/dev/null
 done
 
-# kind nodes are containers on the host: capture the node side of the log pipeline.
-for node in $(docker ps --filter "label=io.x-k8s.kind.cluster=$CLUSTER_NAME" --format '{{.Names}}' 2>/dev/null); do
+# kind nodes are containers on the host: capture the node side of the log
+# pipeline, including the rotated controller log files that kubectl logs no
+# longer serves.
+POD_LOG_GLOB='/var/log/pods/capsule-system_capsule-controller-manager-*'
+nodes=$(docker ps --filter "label=io.x-k8s.kind.cluster=$CLUSTER_NAME" --format '{{.Names}}' 2>/dev/null)
+for node in $nodes; do
   docker exec "$node" sh -c '
     uptime; echo; free -m; echo; df -h /var/log; echo
+    systemctl show kubelet containerd -p Id -p ActiveState -p SubState -p NRestarts -p ExecMainStartTimestamp; echo
     ls -la --time-style=full-iso /var/log/pods/capsule-system_capsule-controller-manager-*/manager/ 2>/dev/null; echo
     top -b -n 1 | head -n 25
   ' > "$OUT/$node.node.txt" 2>&1
-  docker exec "$node" journalctl -u kubelet --no-pager -n 300 > "$OUT/$node.kubelet.log" 2>&1
-  docker exec "$node" journalctl -u containerd --no-pager -n 300 > "$OUT/$node.containerd.log" 2>&1
+  # The whole journals: a runtime crash happens long before the suite gives up.
+  docker exec "$node" journalctl -u kubelet --no-pager > "$OUT/$node.kubelet.log" 2>&1
+  docker exec "$node" journalctl -u containerd --no-pager > "$OUT/$node.containerd.log" 2>&1
+  if docker exec "$node" sh -c "ls -d $POD_LOG_GLOB" > /dev/null 2>&1; then
+    docker exec "$node" sh -c 'cd /var/log/pods && tar -cz capsule-system_capsule-controller-manager-*' \
+      > "$OUT/$node.pod-logs.tar.gz" 2> /dev/null
+  fi
 done
+
+# Without kind nodes the cluster runs on this host (MicroShift in CI): same data from here.
+# shellcheck disable=SC2086
+if [ -z "$nodes" ] && ls -d $POD_LOG_GLOB > /dev/null 2>&1; then
+  {
+    uptime; echo; free -m; echo; df -h /var/log; echo
+    systemctl show microshift crio -p Id -p ActiveState -p SubState -p NRestarts -p ExecMainStartTimestamp; echo
+    ls -la --time-style=full-iso $POD_LOG_GLOB/manager/; echo
+    top -b -n 1 | head -n 25
+  } > "$OUT/host.node.txt" 2>&1
+  journalctl -u microshift --no-pager > "$OUT/host.microshift.log" 2>&1
+  (cd /var/log/pods && tar -cz capsule-system_capsule-controller-manager-*) > "$OUT/host.pod-logs.tar.gz" 2> /dev/null
+fi
 
 echo "=== Capsule pods ==="
 cat "$OUT/pods.txt"
 echo
 echo "=== last events ==="
 tail -n 30 "$OUT/events.txt"
+for nodefile in "$OUT"/*.node.txt; do
+  [ -f "$nodefile" ] || continue
+  echo
+  echo "=== $(basename "$nodefile" .node.txt): services ==="
+  grep -E '^(Id|ActiveState|SubState|NRestarts|ExecMainStartTimestamp)=' "$nodefile"
+done
 for probes in "$OUT"/*.probes.txt; do
   [ -f "$probes" ] || continue
   echo

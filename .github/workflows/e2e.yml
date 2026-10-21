@@ -46,10 +46,15 @@ jobs:
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
 
       - name: e2e
-        run: sudo E2E_PHASE=${{ matrix.phase }} make e2e
+        id: e2e
+        shell: bash
+        # The suite output joins the diagnostics, and the cluster stays up for them.
+        run: |
+          mkdir -p .e2e-diagnostics
+          sudo E2E_PHASE=${{ matrix.phase }} make e2e-build e2e-exec 2>&1 | tee .e2e-diagnostics/e2e-run.log
 
       - name: Capsule diagnostics
-        if: failure()
+        if: always()
         run: sudo make e2e-diagnostics
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -58,6 +63,19 @@ jobs:
           name: e2e-diagnostics-ce-${{ matrix.phase }}
           include-hidden-files: true
           path: .e2e-diagnostics
+
+      - name: Ship diagnostics to object storage
+        if: always()
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.LINODE_OBJ_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.LINODE_OBJ_SECRET_KEY }}
+          E2E_LOGS_BUCKET: ${{ vars.LINODE_OBJ_BUCKET }}
+          E2E_LOGS_ENDPOINT: ${{ vars.LINODE_OBJ_ENDPOINT }}
+          E2E_LANE: kind-ce-${{ matrix.phase }}
+          E2E_OUTCOME: ${{ steps.e2e.outcome }}
+          E2E_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          E2E_PR: ${{ github.event.pull_request.number }}
+        run: ./hack/e2e-diagnostics-upload.sh .e2e-diagnostics
 
   e2e-openshift-CE:
     name: E2E OpenShift Testing (CE, MicroShift ${{ matrix.version }}, ${{ matrix.phase }})
@@ -83,14 +101,21 @@ jobs:
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
 
       - name: e2e
-        run: sudo MICROSHIFT_VERSION=${{ matrix.version }} E2E_PHASE=${{ matrix.phase }} make e2e-openshift
+        id: e2e
+        shell: bash
+        run: |
+          mkdir -p .e2e-diagnostics
+          sudo MICROSHIFT_VERSION=${{ matrix.version }} E2E_PHASE=${{ matrix.phase }} make e2e-openshift 2>&1 | tee .e2e-diagnostics/e2e-run.log
 
       - name: MicroShift logs
         if: failure()
         run: |
           sudo journalctl -u microshift --no-pager | tail -n 300
           sudo KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig kubectl get pods --all-namespaces
-          sudo KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig make e2e-diagnostics
+
+      - name: Capsule diagnostics
+        if: always()
+        run: sudo KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig make e2e-diagnostics
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
@@ -99,15 +124,32 @@ jobs:
           include-hidden-files: true
           path: .e2e-diagnostics
 
+      - name: Ship diagnostics to object storage
+        if: always()
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.LINODE_OBJ_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.LINODE_OBJ_SECRET_KEY }}
+          E2E_LOGS_BUCKET: ${{ vars.LINODE_OBJ_BUCKET }}
+          E2E_LOGS_ENDPOINT: ${{ vars.LINODE_OBJ_ENDPOINT }}
+          E2E_LANE: microshift-${{ matrix.version }}-${{ matrix.phase }}
+          E2E_OUTCOME: ${{ steps.e2e.outcome }}
+          E2E_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          E2E_PR: ${{ github.event.pull_request.number }}
+        run: ./hack/e2e-diagnostics-upload.sh .e2e-diagnostics
+
   run-e2e:
     name: E2E Testing
     strategy:
       fail-fast: false
       matrix:
+        # Node images built for the kind release pinned in the Makefile (KIND_VERSION).
+        # Older tags ship older containerd builds: kindest/node:v1.33.0 carries
+        # containerd 2.0.5, which crashes on a failed pod sandbox and then cannot
+        # restart (fixed in 2.0.6), wedging the whole worker node mid-suite.
         k8s-version:
-          - 'v1.33.0'
-          - 'v1.34.0'
-          - 'v1.35.0'
+          - 'v1.33.12'
+          - 'v1.34.8'
+          - 'v1.35.5'
         phase: ['parallel', 'config']
     runs-on:
       labels: ubuntu-latest-8-cores
@@ -125,10 +167,14 @@ jobs:
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
 
       - name: e2e (Enterprise)
-        run: sudo KUBERNETES_SUPPORTED_VERSION=${{ matrix.k8s-version }} E2E_PHASE=${{ matrix.phase }} make e2e
+        id: e2e
+        shell: bash
+        run: |
+          mkdir -p .e2e-diagnostics
+          sudo KUBERNETES_SUPPORTED_VERSION=${{ matrix.k8s-version }} E2E_PHASE=${{ matrix.phase }} make e2e-build e2e-exec 2>&1 | tee .e2e-diagnostics/e2e-run.log
 
       - name: Capsule diagnostics
-        if: failure()
+        if: always()
         run: sudo make e2e-diagnostics
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -137,3 +183,16 @@ jobs:
           name: e2e-diagnostics-${{ matrix.k8s-version }}-${{ matrix.phase }}
           include-hidden-files: true
           path: .e2e-diagnostics
+
+      - name: Ship diagnostics to object storage
+        if: always()
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.LINODE_OBJ_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.LINODE_OBJ_SECRET_KEY }}
+          E2E_LOGS_BUCKET: ${{ vars.LINODE_OBJ_BUCKET }}
+          E2E_LOGS_ENDPOINT: ${{ vars.LINODE_OBJ_ENDPOINT }}
+          E2E_LANE: kind-${{ matrix.k8s-version }}-${{ matrix.phase }}
+          E2E_OUTCOME: ${{ steps.e2e.outcome }}
+          E2E_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          E2E_PR: ${{ github.event.pull_request.number }}
+        run: ./hack/e2e-diagnostics-upload.sh .e2e-diagnostics

@@ -711,8 +711,9 @@ e2e-exec-config: ginkgo
 .PHONY: e2e-destroy
 e2e-destroy: dev-destroy
 
-# Collect the controller state of a failed e2e run (pods, events, logs, goroutine
-# dumps over pprof, kind node journal) into $(E2E_DIAGNOSTICS_DIR); CI uploads it.
+# Collect the controller state of an e2e run (pods, events, probes, logs, goroutine
+# dumps over pprof, node journals) into $(E2E_DIAGNOSTICS_DIR). CI keeps it as a job
+# artifact on failure and ships it to object storage (hack/e2e-diagnostics-upload.sh).
 E2E_DIAGNOSTICS_DIR ?= .e2e-diagnostics
 .PHONY: e2e-diagnostics
 e2e-diagnostics:
