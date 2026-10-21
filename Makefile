@@ -516,7 +516,6 @@ mocks: mockgen
 	$(MOCKGEN) -destination internal/mocks/client/mock.go sigs.k8s.io/controller-runtime/pkg/client Client,SubResourceWriter,Reader
 
 # Running OpenShift e2e tests on a MicroShift installed directly on the (Ubuntu) host, requires root.
-# Only one MicroShift fits on a host, so there is no OpenShift equivalent of e2e-dual:
 # CI runs the parallel specs and the serial config specs on separate runners with
 # E2E_PHASE=parallel and E2E_PHASE=config (see e2e-exec); the default runs both.
 .PHONY: e2e-openshift
@@ -689,7 +688,8 @@ GINKGO_PARALLEL_FLAGS = $(if $(E2E_PROCS),--procs=$(E2E_PROCS),-p)
 #   2. the "config" specs mutate the cluster-wide CapsuleConfiguration and run
 #      serially, on one Ginkgo process, after the parallel phase.
 # E2E_PHASE selects what e2e-exec runs: "all" (default, both phases in order),
-# "parallel" or "config". CI uses it where the two phases cannot share a runner.
+# "parallel" or "config". CI runs the two phases as separate jobs per lane, so a
+# lane takes setup plus the longer phase instead of setup plus both phases.
 E2E_PHASE ?= all
 
 .PHONY: e2e-exec
@@ -706,60 +706,8 @@ e2e-exec-parallel: ginkgo
 e2e-exec-config: ginkgo
 	$(GINKGO) -v -tags e2e --label-filter="config $(FILTER)" ./e2e
 
-# -- Dual-cluster e2e
-#
-# The "config" specs only need to be isolated from the other specs, not to wait
-# for them. e2e-dual brings up a second kind cluster and runs the serial config
-# phase there while the parallel phase runs on the first cluster, so the wall
-# time is max(parallel, config) instead of parallel + config.
-E2E_CONFIG_CLUSTER_NAME ?= $(CLUSTER_NAME)-config
-E2E_CONFIG_KUBECONFIG   ?= $(SRC_ROOT)/.e2e-config.kubeconfig
-E2E_LOG_DIR             ?= $(SRC_ROOT)/.e2e-logs
-
-# The clusters are always destroyed, also when the specs fail (the exit code of
-# the specs is preserved). Set E2E_KEEP_CLUSTERS=1 to keep them for debugging.
-.PHONY: e2e-dual
-e2e-dual: ginkgo
-	@$(MAKE) e2e-dual-build && $(MAKE) e2e-exec-dual; rc=$$?; \
-	if [ -z "$(E2E_KEEP_CLUSTERS)" ]; then $(MAKE) e2e-dual-destroy; fi; \
-	exit $$rc
-
-# The image is built once; the two kind clusters are created concurrently and
-# then Capsule is installed into each of them.
-.PHONY: e2e-dual-build
-e2e-dual-build: kind ko-build-all
-	@$(MAKE) dev-build & P1=$$!; \
-	KUBECONFIG=$(E2E_CONFIG_KUBECONFIG) $(MAKE) dev-build CLUSTER_NAME=$(E2E_CONFIG_CLUSTER_NAME) & P2=$$!; \
-	wait $$P1 && wait $$P2
-	$(MAKE) e2e-install
-	KUBECONFIG=$(E2E_CONFIG_KUBECONFIG) $(MAKE) e2e-install CLUSTER_NAME=$(E2E_CONFIG_CLUSTER_NAME)
-
-# Both phases run the same precompiled test binary. The config phase writes to a
-# log file that is printed once it finishes, so the two outputs do not interleave.
-.PHONY: e2e-exec-dual
-e2e-exec-dual: ginkgo
-	@mkdir -p $(E2E_LOG_DIR)
-	$(GINKGO) build -tags e2e ./e2e
-	@echo "Running the config specs on cluster $(E2E_CONFIG_CLUSTER_NAME) (log: $(E2E_LOG_DIR)/config.log) while the parallel specs run on cluster $(CLUSTER_NAME)"
-	@KUBECONFIG=$(E2E_CONFIG_KUBECONFIG) $(GINKGO) -v --label-filter="config $(FILTER)" ./e2e/e2e.test > $(E2E_LOG_DIR)/config.log 2>&1 & \
-	CONFIG_PID=$$!; \
-	$(GINKGO) -v $(GINKGO_PARALLEL_FLAGS) --label-filter="!config $(FILTER)" ./e2e/e2e.test; PARALLEL_RC=$$?; \
-	wait $$CONFIG_PID; CONFIG_RC=$$?; \
-	echo "==== config phase output (cluster $(E2E_CONFIG_CLUSTER_NAME)) ===="; cat $(E2E_LOG_DIR)/config.log; \
-	echo "==== parallel phase exit code: $$PARALLEL_RC, config phase exit code: $$CONFIG_RC ===="; \
-	test $$PARALLEL_RC -eq 0 && test $$CONFIG_RC -eq 0
-
-.PHONY: e2e-dual-destroy
-e2e-dual-destroy: kind
-	-$(KIND) delete cluster --name $(CLUSTER_NAME)
-	-$(KIND) delete cluster --name $(E2E_CONFIG_CLUSTER_NAME)
-	rm -f $(E2E_CONFIG_KUBECONFIG)
-
-# Also removes a leftover dual-cluster config cluster, if any.
 .PHONY: e2e-destroy
 e2e-destroy: dev-destroy
-	-$(KIND) delete cluster --name $(E2E_CONFIG_CLUSTER_NAME)
-	rm -f $(E2E_CONFIG_KUBECONFIG)
 
 ####################
 # -- Helpers

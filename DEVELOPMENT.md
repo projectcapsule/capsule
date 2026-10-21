@@ -88,12 +88,13 @@ selected `config` tests serially. To use an existing dedicated test cluster,
 install the current checkout before running the same scoped `e2e-exec` command.
 
 The [e2e workflow](./.github/workflows/e2e.yml) runs the full suite for pull requests
-matching its path filters with `make e2e-dual`: the `config` specs, which mutate
-the cluster-wide `CapsuleConfiguration` and therefore run serially, execute on a
-second KinD cluster at the same time as the parallel specs. `make e2e` runs the
-same suite on a single cluster, `E2E_PROCS=<n>` overrides the number of
-parallel Ginkgo processes, and `E2E_PHASE=parallel|config` runs only one of the
-two phases. Local runs should cover only the new tests and affected components.
+matching its path filters as two jobs per lane: `E2E_PHASE=parallel make e2e` runs
+the independent specs across several Ginkgo processes, and `E2E_PHASE=config make e2e`
+runs, on its own runner and cluster, the `config` specs that mutate the cluster-wide
+`CapsuleConfiguration` and therefore execute serially. A lane thus takes setup plus
+the longer phase instead of both phases. `make e2e` without `E2E_PHASE` runs both
+phases in order on one cluster, and `E2E_PROCS=<n>` overrides the number of parallel
+Ginkgo processes. Local runs should cover only the new tests and affected components.
 
 Keep new specs cheap to schedule: an `Ordered` container is one indivisible unit
 of work on a single Ginkgo process, so prefer independent specs with per-spec
@@ -114,10 +115,9 @@ the host as root (apt, ufw, systemd), so it is meant for the GitHub runner and m
 not be run on a workstation. Specs that cannot run there carry the `skip-on-openshift`
 label. The versions under test are the `MICROSHIFT_TAG_*` entries in the
 [Makefile](./Makefile) and the matrix in the [e2e workflow](./.github/workflows/e2e.yml).
-Only one MicroShift fits on a runner, so there is no OpenShift `e2e-dual`: the workflow
-runs the parallel specs and the serial `config` specs as separate jobs per version
-(`E2E_PHASE=parallel` and `E2E_PHASE=config`), which gives the same overlap as the
-second KinD cluster. `E2E_PHASE` also narrows a local `make e2e-exec` to one phase.
+Like the KinD lanes, the workflow runs the parallel specs and the serial `config`
+specs as separate jobs per version (`E2E_PHASE=parallel` and `E2E_PHASE=config`).
+`E2E_PHASE` also narrows a local `make e2e-exec` to one phase.
 
 To reproduce a scoped run on macOS (Docker Desktop with at least 8 GB of memory),
 run MicroShift in a privileged systemd container that stands in for the runner and

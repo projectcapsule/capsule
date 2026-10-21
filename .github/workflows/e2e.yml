@@ -24,7 +24,13 @@ concurrency:
 
 jobs:
   e2e:
-    name: E2E Testing (CE)
+    name: E2E Testing (CE, ${{ matrix.phase }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # The parallel specs and the serial config specs run on separate runners,
+        # so a lane takes setup plus the longer phase instead of both phases.
+        phase: ['parallel', 'config']
     runs-on:
       labels: ubuntu-latest-8-cores
     steps:
@@ -40,7 +46,7 @@ jobs:
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
 
       - name: e2e
-        run: sudo make e2e-dual
+        run: sudo E2E_PHASE=${{ matrix.phase }} make e2e
 
   e2e-openshift-CE:
     name: E2E OpenShift Testing (CE, MicroShift ${{ matrix.version }}, ${{ matrix.phase }})
@@ -48,9 +54,8 @@ jobs:
       fail-fast: false
       matrix:
         version: ['4.21', '4.22'] # tags are pinned in the Makefile (MICROSHIFT_TAG_*)
-        # Only one MicroShift fits on a runner, so the parallel specs and the serial
-        # config specs run on separate runners (the kind lanes get the same overlap
-        # from e2e-dual's second cluster).
+        # The parallel specs and the serial config specs run on separate runners,
+        # like the kind lanes.
         phase: ['parallel', 'config']
     runs-on:
       labels: ubuntu-latest-8-cores
@@ -84,6 +89,7 @@ jobs:
           - 'v1.33.0'
           - 'v1.34.0'
           - 'v1.35.0'
+        phase: ['parallel', 'config']
     runs-on:
       labels: ubuntu-latest-8-cores
     steps:
@@ -100,4 +106,4 @@ jobs:
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
 
       - name: e2e (Enterprise)
-        run: sudo KUBERNETES_SUPPORTED_VERSION=${{ matrix.k8s-version }} make e2e-dual
+        run: sudo KUBERNETES_SUPPORTED_VERSION=${{ matrix.k8s-version }} E2E_PHASE=${{ matrix.phase }} make e2e
