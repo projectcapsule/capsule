@@ -37,4 +37,3 @@ hack/generated/
 kind.yaml
 capsule-seccomp.json
 kubeconfig.yaml
-.e2e-diagnostics/

@@ -94,16 +94,7 @@ runs, on its own runner and cluster, the `config` specs that mutate the cluster-
 `CapsuleConfiguration` and therefore execute serially. A lane thus takes setup plus
 the longer phase instead of both phases. `make e2e` without `E2E_PHASE` runs both
 phases in order on one cluster, and `E2E_PROCS=<n>` overrides the number of parallel
-Ginkgo processes. After every lane the workflow runs `make e2e-diagnostics`, which collects
-the controller pods' logs (current, previous and the rotated files from the nodes), their
-probe answers, goroutine dumps (the e2e install enables pprof) and the kind nodes' kubelet
-and containerd journals. A failed lane keeps them as a job artifact, and every lane ships
-them, with the suite output and a `metadata.json` of run labels, to the project's Linode
-Object Storage bucket through `hack/e2e-diagnostics-upload.sh`. That upload needs the
-`LINODE_OBJ_ACCESS_KEY` and `LINODE_OBJ_SECRET_KEY` secrets and the `LINODE_OBJ_BUCKET`
-and `LINODE_OBJ_ENDPOINT` repository variables, so it skips itself on pull requests from
-forks. The diagnostics target also works against a local cluster. Local runs should cover
-only the new tests and affected components.
+Ginkgo processes. Local runs should cover only the new tests and affected components.
 
 Keep new specs cheap to schedule: an `Ordered` container is one indivisible unit
 of work on a single Ginkgo process, so prefer independent specs with per-spec

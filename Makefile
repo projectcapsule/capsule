@@ -559,7 +559,6 @@ e2e-install: helm-controller-version ko-build-all dev-install-gw-api-crds
 		--set 'manager.resources=null'\
 		--set "manager.image.tag=$(VERSION)" \
 		--set 'manager.livenessProbe.failureThreshold=10' \
-		--set 'manager.extraArgs[0]=--enable-pprof' \
 		--set-string 'manager.options.logLevel=5' \
 		--set 'manager.options.workers=4' \
 		--set 'manager.options.clientConnectionQPS=2000' \
@@ -604,7 +603,6 @@ e2e-install-openshift: helm-controller-version ko-build-all
 		--set 'manager.resources=null'\
 		--set "manager.image.tag=$(VERSION)" \
 		--set 'manager.livenessProbe.failureThreshold=10' \
-		--set 'manager.extraArgs[0]=--enable-pprof' \
 		--set 'manager.options.workers=4' \
 		--set 'manager.options.clientConnectionQPS=2000' \
 		--set 'manager.options.clientConnectionBurst=1000' \
@@ -710,14 +708,6 @@ e2e-exec-config: ginkgo
 
 .PHONY: e2e-destroy
 e2e-destroy: dev-destroy
-
-# Collect the controller state of an e2e run (pods, events, probes, logs, goroutine
-# dumps over pprof, node journals) into $(E2E_DIAGNOSTICS_DIR). CI keeps it as a job
-# artifact on failure and ships it to object storage (hack/e2e-diagnostics-upload.sh).
-E2E_DIAGNOSTICS_DIR ?= .e2e-diagnostics
-.PHONY: e2e-diagnostics
-e2e-diagnostics:
-	CLUSTER_NAME=$(CLUSTER_NAME) KUBECTL=$(KUBECTL) ./hack/e2e-diagnostics.sh $(E2E_DIAGNOSTICS_DIR)
 
 ####################
 # -- Helpers
