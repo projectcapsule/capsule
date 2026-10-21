@@ -43,5 +43,51 @@ func validateStorageRules(index int, storage rules.NamespaceRuleEnforceStorageBo
 		}
 	}
 
+	return validateStorageClassRules(index, storage)
+}
+
+func validateStorageClassRules(index int, storage rules.NamespaceRuleEnforceStorageBody) error {
+	path := fmt.Sprintf("rules[%d].enforce.storage", index)
+
+	targets := make(map[rules.StorageValidationTarget]struct{}, len(storage.Targets))
+
+	for i, target := range storage.Targets {
+		switch target {
+		case rules.StorageTargetVolumeSnapshot:
+		default:
+			return fmt.Errorf("%s.targets[%d] %q is invalid: unsupported storage target", path, i, target)
+		}
+
+		if _, exists := targets[target]; exists {
+			return fmt.Errorf("%s.targets[%d] %q is invalid: duplicate target", path, i, target)
+		}
+
+		targets[target] = struct{}{}
+	}
+
+	if len(storage.Targets) > 0 && len(storage.Classes) == 0 {
+		return fmt.Errorf("%s.classes is invalid: classes must be configured when targets are configured", path)
+	}
+
+	if len(storage.Classes) > 64 {
+		return fmt.Errorf("%s.classes: at most 64 matches are supported", path)
+	}
+
+	for i, class := range storage.Classes {
+		classPath := fmt.Sprintf("%s.classes[%d]", path, i)
+
+		if !class.HasNameMatch() && !class.HasSelector() {
+			return fmt.Errorf("%s is invalid: at least one of exact, exp, matchLabels or matchExpressions must be set", classPath)
+		}
+
+		if err := validateExpressionMatch(class.NameMatch(), classPath); err != nil {
+			return err
+		}
+
+		if err := validateNativePlacementSelector(classPath, &class.LabelSelector); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }

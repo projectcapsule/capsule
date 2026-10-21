@@ -147,7 +147,7 @@ dev-destroy: kind
 FLUX_SETUP_TARGET ?= dev-setup-fluxcd
 
 .PHONY: dev-install-deps dev-install-deps-openshift dev-setup-cert-manager dev-setup-fluxcd dev-setup-fluxcd-openshift
-dev-install-deps: $(FLUX_SETUP_TARGET) dev-setup-cert-manager dev-install-gw-api-crds dev-install-prometheus-crds wait-for-helmreleases
+dev-install-deps: $(FLUX_SETUP_TARGET) dev-setup-cert-manager dev-install-gw-api-crds dev-install-snapshot-crds dev-install-prometheus-crds wait-for-helmreleases
 dev-install-deps-openshift:
 	$(MAKE) dev-install-deps FLUX_SETUP_TARGET=dev-setup-fluxcd-openshift
 
@@ -156,6 +156,17 @@ API_GW_VERSION := v1.6.3
 API_GW_LOOKUP  := kubernetes-sigs/gateway-api
 dev-install-gw-api-crds:
 	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/$(API_GW_LOOKUP)/releases/download/$(API_GW_VERSION)/standard-install.yaml
+
+# Distributions with a CSI snapshot controller ship these CRDs; keep theirs.
+SNAPSHOTTER         := none
+SNAPSHOTTER_VERSION := v8.6.0
+SNAPSHOTTER_LOOKUP  := kubernetes-csi/external-snapshotter
+dev-install-snapshot-crds:
+	@$(KUBECTL) get crd volumesnapshots.snapshot.storage.k8s.io >/dev/null 2>&1 || \
+	$(KUBECTL) apply --server-side=true \
+		-f https://raw.githubusercontent.com/$(SNAPSHOTTER_LOOKUP)/$(SNAPSHOTTER_VERSION)/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml \
+		-f https://raw.githubusercontent.com/$(SNAPSHOTTER_LOOKUP)/$(SNAPSHOTTER_VERSION)/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml \
+		-f https://raw.githubusercontent.com/$(SNAPSHOTTER_LOOKUP)/$(SNAPSHOTTER_VERSION)/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml
 
 GRAFANA         := none
 GRAFANA_VERSION := v5.23.0
@@ -537,7 +548,7 @@ e2e-build: kind
 	$(MAKE) e2e-install
 
 .PHONY: e2e-install
-e2e-install: helm-controller-version ko-build-all dev-install-gw-api-crds
+e2e-install: helm-controller-version ko-build-all dev-install-gw-api-crds dev-install-snapshot-crds
 	$(MAKE) e2e-load-image CLUSTER_NAME=$(CLUSTER_NAME) IMAGE=$(CAPSULE_IMG) VERSION=$(VERSION)
 	$(KUBECTL) label clusterrole admin projectcapsule.dev/aggregate-to-controller=true
 	$(HELM) upgrade \
