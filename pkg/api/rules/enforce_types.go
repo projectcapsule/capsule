@@ -53,7 +53,8 @@ type NamespaceRuleEnforceBody struct {
 	// +optional
 	Services NamespaceRuleEnforceServicesBody `json:"services,omitempty"`
 
-	// Additional access to PersistentVolumes without a tenant ownership label.
+	// Additional access to PersistentVolumes without a tenant ownership label,
+	// and the classes storage objects may reference.
 	// +optional
 	Storage NamespaceRuleEnforceStorageBody `json:"storage,omitempty"`
 
