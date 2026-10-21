@@ -17,7 +17,7 @@ concurrency:
 jobs:
   compliance:
     name: "License Compliance"
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
@@ -43,7 +43,7 @@ jobs:
           run-tests: true
   sast:
     name: "SAST"
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       GO111MODULE: on
     permissions:
@@ -68,7 +68,7 @@ jobs:
           sarif_file: gosec.sarif
   unit_tests:
     name: "Unit tests"
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
