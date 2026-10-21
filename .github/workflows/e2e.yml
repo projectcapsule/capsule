@@ -56,6 +56,7 @@ jobs:
         if: failure()
         with:
           name: e2e-diagnostics-ce-${{ matrix.phase }}
+          include-hidden-files: true
           path: .e2e-diagnostics
 
   e2e-openshift-CE:
@@ -95,6 +96,7 @@ jobs:
         if: failure()
         with:
           name: e2e-diagnostics-microshift-${{ matrix.version }}-${{ matrix.phase }}
+          include-hidden-files: true
           path: .e2e-diagnostics
 
   run-e2e:
@@ -133,4 +135,5 @@ jobs:
         if: failure()
         with:
           name: e2e-diagnostics-${{ matrix.k8s-version }}-${{ matrix.phase }}
+          include-hidden-files: true
           path: .e2e-diagnostics
