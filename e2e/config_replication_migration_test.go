@@ -163,7 +163,7 @@ var _ = Describe("Replication settings migration", Serial,
 						}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
 						expectReplicationPolicyOrphan(target, cm.Name)
 						Expect(actor.Patch(ctx, cm, client.RawPatch(types.MergePatchType, []byte(`{"metadata":{"annotations":{"released":"true"}}}`)))).To(Succeed())
-						expectConfigMapGone(excluded, cm.Name)
+						expectConfigMapAbsent(excluded, cm.Name)
 					}
 					seed := &corev1.ConfigMap{APIVersion: "v1", Kind: "ConfigMap", Name: name + "-existing", Namespace: target, Data: map[string]string{"mode": "external", "outside": "retained"}}
 					Expect(k8sClient.Patch(ctx, seed, client.Apply, client.FieldOwner("e2e-migration-external"))).To(Succeed())
@@ -209,8 +209,8 @@ var _ = Describe("Replication settings migration", Serial,
 					}
 					expectConfigMapData(target, name+"-existing", map[string]string{"mode": mode, "outside": "retained"})
 					expectConfigMapData(target, name+"-created", map[string]string{"mode": "replicated"})
-					expectConfigMapGone(excluded, name+"-existing")
-					expectConfigMapGone(excluded, name+"-created")
+					expectConfigMapAbsent(excluded, name+"-existing")
+					expectConfigMapAbsent(excluded, name+"-created")
 					before := spec.DeepCopy()
 					Expect(k8sClient.Patch(ctx, parent, client.RawPatch(types.MergePatchType, []byte(`{"metadata":{"annotations":{"e2e-migration":"revisited"}}}`)))).To(Succeed())
 					Expect(k8sClient.Get(ctx, key, parent)).To(Succeed())
@@ -231,10 +231,11 @@ var _ = Describe("Replication settings migration", Serial,
 		})
 	})
 
-// expectConfigMapGone asserts that a ConfigMap is absent or becomes absent. The
-// callers run after the parent's processedItems already prove where the
-// controller applied, so an immediate NotFound is conclusive and a fixed
-// Consistently window would only add idle time to the serial config phase.
+// expectConfigMapGone waits for a ConfigMap that the spec deleted, directly or
+// through its parent, to disappear. It is not an assertion that the ConfigMap
+// was never replicated: a check on an excluded tenant must fail on the first
+// sighting, also when the controller would prune the object later, so those
+// checks use expectConfigMapAbsent and its Consistently window instead.
 func expectConfigMapGone(namespace, name string) {
 	Eventually(func() bool {
 		return apierrors.IsNotFound(k8sClient.Get(context.Background(), client.ObjectKey{Namespace: namespace, Name: name}, &corev1.ConfigMap{}))
