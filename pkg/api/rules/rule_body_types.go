@@ -22,7 +22,8 @@ type NamespaceRuleBodyNamespace struct {
 	Quota []ResourceQuotaRule `json:"quota,omitempty"`
 
 	// Mutate applies ordered typed mutations before enforcement. It shares the
-	// rule's namespace selection and audience. Workload mutations apply on Pod creation.
+	// rule's namespace selection and audience. Workload mutations apply on Pod creation;
+	// ListenerSet parent references apply on main-resource creation and update.
 	// +optional
 	// +kubebuilder:validation:MaxItems=64
 	// +listType=atomic
