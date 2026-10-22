@@ -37,7 +37,12 @@ func exerciseTenantResourceConditions(tenantName, baseNamespace, targetNamespace
 		g.Expect(parent.Status.ProcessedItems[0].Tenant).To(Equal(tenantName))
 		g.Expect(parent.Status.ProcessedItems[0].LastApply.IsZero()).To(BeTrue())
 	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-	expectConfigMapAbsent(targetNamespace, "conditional")
+	// The status above proves the condition was evaluated without an apply; the
+	// window spans one jittered resync (ResyncPeriod +10%) plus observation lag
+	// so a later apply would still be caught, without idling for 5s.
+	Consistently(func() error {
+		return k8sClient.Get(ctx, client.ObjectKey{Namespace: targetNamespace, Name: "conditional"}, &corev1.ConfigMap{})
+	}, 2*parent.Spec.ResyncPeriod.Duration+defaultPollInterval, defaultPollInterval).Should(HaveOccurred())
 	Eventually(func() error {
 		if err := k8sClient.Get(ctx, key, parent); err != nil {
 			return err
@@ -51,7 +56,9 @@ func exerciseTenantResourceConditions(tenantName, baseNamespace, targetNamespace
 		g.Expect(parent.Status.ProcessedItems[0].Message).To(Equal(ssa.ConditionNotMet))
 		g.Expect(parent.Status.ProcessedItems[0].LastApply.IsZero()).To(BeFalse())
 	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-	expectConfigMapAbsent(excludedNamespace, "conditional")
+	// The same reconcile that applied to the target evaluated the excluded
+	// namespace, so a single observation is sufficient.
+	Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKey{Namespace: excludedNamespace, Name: "conditional"}, &corev1.ConfigMap{}))).To(BeTrue())
 	Expect(k8sClient.Delete(ctx, parent)).To(Succeed())
 	Eventually(func() bool {
 		return apierrors.IsNotFound(k8sClient.Get(ctx, key, &capsulev1beta2.TenantResource{}))
@@ -59,5 +66,4 @@ func exerciseTenantResourceConditions(tenantName, baseNamespace, targetNamespace
 	Eventually(func() bool {
 		return apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKey{Namespace: targetNamespace, Name: "conditional"}, &corev1.ConfigMap{}))
 	}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
-	expectConfigMapAbsent(targetNamespace, "conditional")
 }

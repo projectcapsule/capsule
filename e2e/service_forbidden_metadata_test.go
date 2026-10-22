@@ -171,7 +171,7 @@ var _ = Describe("creating a Service with user-specified labels and annotations"
 				_, err = cs.CoreV1().Services(svc.Namespace).Update(context.Background(), svc, metav1.UpdateOptions{})
 
 				return err
-			}, 10*time.Second, time.Second).ShouldNot(Succeed())
+			}, 3*time.Second, time.Second).ShouldNot(Succeed())
 		})
 		By("specifying forbidden labels using regex match", func() {
 			ns := NewNamespace("", map[string]string{
@@ -221,7 +221,7 @@ var _ = Describe("creating a Service with user-specified labels and annotations"
 				_, err = cs.CoreV1().Services(svc.Namespace).Update(context.Background(), svc, metav1.UpdateOptions{})
 
 				return err
-			}, 10*time.Second, time.Second).ShouldNot(Succeed())
+			}, 3*time.Second, time.Second).ShouldNot(Succeed())
 		})
 		By("specifying forbidden annotations using regex match", func() {
 			ns := NewNamespace("", map[string]string{
@@ -246,7 +246,7 @@ var _ = Describe("creating a Service with user-specified labels and annotations"
 				_, err = cs.CoreV1().Services(svc.Namespace).Update(context.Background(), svc, metav1.UpdateOptions{})
 
 				return err
-			}, 10*time.Second, time.Second).ShouldNot(Succeed())
+			}, 3*time.Second, time.Second).ShouldNot(Succeed())
 		})
 	})
 })

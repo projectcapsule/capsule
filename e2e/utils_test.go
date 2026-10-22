@@ -42,12 +42,17 @@ import (
 )
 
 const (
-	defaultTimeoutInterval                    = 80 * time.Second
-	defaultTerminationTimeoutInterval         = 120 * time.Second
-	defaultPollInterval                       = 2 * time.Second
-	defaultConfigurationName                  = "default"
-	e2eClientQPS                      float32 = 1000
-	e2eClientBurst                    int     = 2000
+	defaultTimeoutInterval            = 80 * time.Second
+	defaultTerminationTimeoutInterval = 120 * time.Second
+	// Polling at 500ms keeps the gap between a reconcile and its detection small;
+	// waits that must span a fixed window pass an explicit duration instead.
+	defaultPollInterval      = 500 * time.Millisecond
+	defaultConfigurationName = "default"
+	// e2eRunLabel marks cluster-scoped objects with the unique prefix of the
+	// spec that created them, so concurrent specs can clean up only their own.
+	e2eRunLabel            = "e2e.projectcapsule.dev/run"
+	e2eClientQPS   float32 = 1000
+	e2eClientBurst int     = 2000
 )
 
 func tuneE2ERestConfig(c *rest.Config) *rest.Config {
@@ -151,42 +156,92 @@ func NamespaceDeletionAdmin(ns *corev1.Namespace, timeout time.Duration) AsyncAs
 	}, timeout, defaultPollInterval)
 }
 
-func ForceDeleteNamespace(ctx context.Context, name string) {
+// triggerNamespaceDeletion removes the e2e termination hold and deletes the
+// namespace. It returns as soon as the deletion is accepted.
+func triggerNamespaceDeletion(ctx context.Context, name string) error {
+	cs := clusterAdminClient()
+
+	ns, err := cs.CoreV1().Namespaces().Get(ctx, name, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	if controllerutil.RemoveFinalizer(ns, namespaceTerminationHoldFinalizer) {
+		if _, err = cs.CoreV1().Namespaces().Update(ctx, ns, metav1.UpdateOptions{}); err != nil {
+			return err
+		}
+	}
+
+	if !ns.DeletionTimestamp.IsZero() {
+		return nil
+	}
+
+	if err = cs.CoreV1().Namespaces().Delete(ctx, name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	return nil
+}
+
+// DeleteNamespaceInBackground triggers the deletion of a namespace and returns
+// without waiting for it to be gone.
+//
+// kube-controller-manager waits namespaceDeletionGracePeriod (5 s, not
+// configurable) before it even looks at a deleted namespace, so every wait for
+// a namespace to disappear costs at least that. A spec whose names are unique
+// per spec does not need to wait: nothing recreates the name, and
+// SynchronizedAfterSuite waits for whatever is still terminating at the end.
+func DeleteNamespaceInBackground(ctx context.Context, name string) {
+	Eventually(func() error {
+		return triggerNamespaceDeletion(ctx, name)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed(),
+		"failed to trigger the deletion of namespace %s", name)
+}
+
+// ForceDeleteNamespaces triggers the deletion of all the namespaces first and
+// then waits once for all of them, so n namespaces cost one grace period
+// instead of n.
+func ForceDeleteNamespaces(ctx context.Context, names ...string) {
+	for _, name := range names {
+		DeleteNamespaceInBackground(ctx, name)
+	}
+
 	cs := clusterAdminClient()
 
 	Eventually(func() error {
-		ns, err := cs.CoreV1().Namespaces().Get(ctx, name, metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
+		var remaining []string
 
-		if controllerutil.RemoveFinalizer(ns, namespaceTerminationHoldFinalizer) {
-			if _, err = cs.CoreV1().Namespaces().Update(ctx, ns, metav1.UpdateOptions{}); err != nil {
+		for _, name := range names {
+			_, err := cs.CoreV1().Namespaces().Get(ctx, name, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+
+			if err != nil {
 				return err
 			}
 
-			return fmt.Errorf("removed E2E termination hold finalizer from namespace %s", name)
+			remaining = append(remaining, name)
 		}
 
-		// Trigger deletion if not already happening
-		if ns.DeletionTimestamp.IsZero() {
-			if err := cs.CoreV1().Namespaces().Delete(ctx, name, metav1.DeleteOptions{}); err != nil &&
-				!apierrors.IsNotFound(err) {
-				return err
-			}
-
-			return fmt.Errorf("namespace %s deletion triggered", name)
+		if len(remaining) > 0 {
+			// Let the namespace controller remove the kubernetes finalizer. Forcing
+			// finalization can orphan content that becomes visible if a namespace
+			// with the same name is recreated.
+			return fmt.Errorf("namespaces still terminating: %s", strings.Join(remaining, ", "))
 		}
 
-		// Let the namespace controller remove the kubernetes finalizer. Forcing
-		// finalization can orphan content that becomes visible if a namespace
-		// with the same name is recreated.
-		return fmt.Errorf("namespace %s still terminating", name)
+		return nil
 	}, defaultTerminationTimeoutInterval, defaultPollInterval).Should(Succeed(),
-		"failed to delete namespace %s", name)
+		"failed to delete namespaces %v", names)
+}
+
+func ForceDeleteNamespace(ctx context.Context, name string) {
+	ForceDeleteNamespaces(ctx, name)
 }
 
 func NamespaceCreation(ns *corev1.Namespace, owner rbac.UserSpec, timeout time.Duration) AsyncAssertion {
@@ -560,6 +615,29 @@ func EventuallyDeletion(obj client.Object) {
 	}
 
 	eventuallyDeletionWithoutPodCleanup(obj)
+}
+
+// DeleteInBackground is EventuallyDeletion without the wait: it deletes the
+// object (for a Tenant, its Pods first, like EventuallyDeletion) and returns as
+// soon as the deletion is accepted. Use it only for objects whose names no
+// later spec reuses. A Tenant's namespaces are garbage collected through their
+// owner reference, which takes at least the namespace deletion grace period
+// (see DeleteNamespaceInBackground), and SynchronizedAfterSuite waits for the
+// leftovers at the end of the suite.
+func DeleteInBackground(obj client.Object) {
+	if tnt, ok := obj.(*capsulev1beta2.Tenant); ok {
+		deleteTenantPodsBeforeDeletion(tnt)
+	}
+
+	Eventually(func() error {
+		err := k8sClient.Delete(context.TODO(), obj)
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+
+		return err
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed(),
+		"failed to delete %T %q", obj, obj.GetName())
 }
 
 func EventuallyDeletionWithoutPodCleanup(obj client.Object) {

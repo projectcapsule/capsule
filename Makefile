@@ -140,7 +140,7 @@ dev-build: kind
 
 .PHONY: dev-destroy
 dev-destroy: kind
-	$(KIND) delete cluster --name capsule
+	$(KIND) delete cluster --name $(CLUSTER_NAME)
 
 # Target used to install Flux. Overridden on OpenShift so that dependents (e.g. cert-manager)
 # never re-apply the vanilla Flux manifests over the SCC-compatible overlay.
@@ -515,7 +515,9 @@ golint-fix: golangci-lint
 mocks: mockgen
 	$(MOCKGEN) -destination internal/mocks/client/mock.go sigs.k8s.io/controller-runtime/pkg/client Client,SubResourceWriter,Reader
 
-# Running OpenShift e2e tests on a MicroShift installed directly on the (Ubuntu) host, requires root
+# Running OpenShift e2e tests on a MicroShift installed directly on the (Ubuntu) host, requires root.
+# CI runs the parallel specs and the serial config specs on separate runners with
+# E2E_PHASE=parallel and E2E_PHASE=config (see e2e-exec); the default runs both.
 .PHONY: e2e-openshift
 e2e-openshift: ginkgo
 	$(MAKE) e2e-build-openshift && KUBECONFIG=$(MICROSHIFT_KUBECONFIG) E2E_OPENSHIFT=true $(MAKE) e2e-exec FILTER='&& !skip && !skip-on-openshift'
@@ -539,6 +541,9 @@ e2e-build: kind
 .PHONY: e2e-install
 e2e-install: helm-controller-version ko-build-all dev-install-gw-api-crds
 	$(MAKE) e2e-load-image CLUSTER_NAME=$(CLUSTER_NAME) IMAGE=$(CAPSULE_IMG) VERSION=$(VERSION)
+	# Replace a stale charts/capsule/charts/*.tgz: an archive that does not match
+	# Chart.lock is rendered unconditionally, ignoring proxy.enabled.
+	$(HELM) dependency build ./charts/capsule
 	$(KUBECTL) label clusterrole admin projectcapsule.dev/aggregate-to-controller=true
 	$(HELM) upgrade \
 	    --dependency-update \
@@ -672,14 +677,34 @@ e2e-load-image: kind
 e2e-load-image-openshift:
 	docker save $(IMAGE):$(VERSION) | podman load
 
+# Number of Ginkgo processes for the parallel phase. Leave empty to let Ginkgo
+# auto-detect it (NumCPU, minus one on machines with more than four CPUs).
+E2E_PROCS ?=
+GINKGO_PARALLEL_FLAGS = $(if $(E2E_PROCS),--procs=$(E2E_PROCS),-p)
+
+# The suite runs in two phases:
+#   1. every spec NOT labelled "config" runs in parallel (Ordered containers are
+#      the unit of scheduling, so keep them small or avoid them);
+#   2. the "config" specs mutate the cluster-wide CapsuleConfiguration and run
+#      serially, on one Ginkgo process, after the parallel phase.
+# E2E_PHASE selects what e2e-exec runs: "all" (default, both phases in order),
+# "parallel" or "config". CI runs the two phases as separate jobs per lane, so a
+# lane takes setup plus the longer phase instead of setup plus both phases.
+E2E_PHASE ?= all
+
 .PHONY: e2e-exec
 e2e-exec: ginkgo
-	$(GINKGO) -v -p -tags e2e --label-filter="!config $(FILTER)" ./e2e
-	$(MAKE) e2e-exec-config
+	@case "$(E2E_PHASE)" in all|parallel|config) ;; *) echo "E2E_PHASE must be all, parallel or config (got '$(E2E_PHASE)')" >&2; exit 2 ;; esac
+	$(if $(filter all parallel,$(E2E_PHASE)),$(MAKE) e2e-exec-parallel,@true)
+	$(if $(filter all config,$(E2E_PHASE)),$(MAKE) e2e-exec-config,@true)
+
+.PHONY: e2e-exec-parallel
+e2e-exec-parallel: ginkgo
+	$(GINKGO) -v $(GINKGO_PARALLEL_FLAGS) -tags e2e --label-filter="!config $(FILTER)" ./e2e
 
 .PHONY: e2e-exec-config
 e2e-exec-config: ginkgo
-	$(GINKGO) -v  -tags e2e --label-filter="config $(FILTER)" ./e2e
+	$(GINKGO) -v -tags e2e --label-filter="config $(FILTER)" ./e2e
 
 .PHONY: e2e-destroy
 e2e-destroy: dev-destroy
@@ -735,9 +760,11 @@ ct:
 KIND         := $(LOCALBIN)/kind
 KIND_VERSION := v0.32.0
 KIND_LOOKUP  := kubernetes-sigs/kind
+# `kind version` prints "kind v0.32.0 ..."; a binary of another version is
+# replaced, since go-install-tool skips existing files.
 kind:
-	@test -s $(KIND) && $(KIND) --version | grep -q $(KIND_VERSION) || \
-	$(call go-install-tool,$(KIND),sigs.k8s.io/kind/cmd/kind@$(KIND_VERSION))
+	@test -s $(KIND) && $(KIND) version | grep -q "$(KIND_VERSION)" || \
+	{ rm -f $(KIND) && $(call go-install-tool,$(KIND),sigs.k8s.io/kind/cmd/kind@$(KIND_VERSION)); }
 
 KO           := $(LOCALBIN)/ko
 KO_VERSION   := v0.19.1

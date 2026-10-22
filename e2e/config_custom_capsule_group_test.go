@@ -38,18 +38,20 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 		},
 	}
 
-	JustBeforeEach(func() {
+	// No spec mutates the Tenant, so it is created once; the configuration is
+	// restored after every spec.
+	BeforeAll(func() {
 		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: defaultConfigurationName}, originConfig)).To(Succeed())
 
 		EventuallyCreation(func() error {
 			tnt.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
+		// Registered before waiting for readiness so a failed setup still deletes it.
+		DeferCleanup(EventuallyDeletion, tnt)
 		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 	})
 	JustAfterEach(func() {
-		EventuallyDeletion(tnt)
-
 		// Restore Configuration
 		Eventually(func() error {
 			c := &capsulev1beta2.CapsuleConfiguration{}

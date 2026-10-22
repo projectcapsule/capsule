@@ -114,7 +114,7 @@ var _ = Describe("trying to escalate from a Tenant Namespace ServiceAccount", Or
 			_, err = saClient.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
 
 			return err
-		}, 10*time.Second, time.Second).ShouldNot(Succeed())
+		}, 3*time.Second, time.Second).ShouldNot(Succeed())
 		// Removing Owner Reference is forbidden
 		Consistently(func() error {
 			if err := k8sClient.Get(context.Background(), types.NamespacedName{Name: ns.GetName()}, ns); err != nil {
@@ -126,7 +126,7 @@ var _ = Describe("trying to escalate from a Tenant Namespace ServiceAccount", Or
 			_, err = saClient.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
 
 			return err
-		}, 10*time.Second, time.Second).ShouldNot(Succeed())
+		}, 3*time.Second, time.Second).ShouldNot(Succeed())
 		// Breaking nodeSelector is forbidden
 		Consistently(func() error {
 			if err := k8sClient.Get(context.Background(), types.NamespacedName{Name: ns.GetName()}, ns); err != nil {
@@ -140,6 +140,6 @@ var _ = Describe("trying to escalate from a Tenant Namespace ServiceAccount", Or
 			_, err = saClient.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
 
 			return err
-		}, 10*time.Second, time.Second).ShouldNot(Succeed())
+		}, 3*time.Second, time.Second).ShouldNot(Succeed())
 	})
 })

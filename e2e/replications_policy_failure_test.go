@@ -25,9 +25,10 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/ssa"
 )
 
-func exerciseReplicationPolicyFailure(global bool, tenantName, baseNamespace, targetNamespace, excludedNamespace string, owner rbac.UserSpec) {
+func exerciseReplicationPolicyFailure(tenantSelector *metav1.LabelSelector, tenantName, baseNamespace, targetNamespace, excludedNamespace string, owner rbac.UserSpec) {
 	ctx := context.Background()
-	name := fmt.Sprintf("policy-failure-%t", global)
+	global := tenantSelector != nil
+	name := "policy-failure-" + tenantName
 	key := client.ObjectKey{Name: name, Namespace: targetNamespace}
 	target := &corev1.ConfigMap{APIVersion: "v1", Kind: "ConfigMap", Name: name, Data: map[string]string{"managed": "initial"}}
 	seed := &corev1.ConfigMap{APIVersion: "v1", Kind: "ConfigMap", Name: name, Namespace: targetNamespace, Data: map[string]string{"external": "retained"}}
@@ -42,7 +43,7 @@ func exerciseReplicationPolicyFailure(global bool, tenantName, baseNamespace, ta
 	var spec *capsulev1beta2.TenantResourceCommonSpec
 	var status *capsulev1beta2.TenantResourceCommonStatus
 	if global {
-		obj := &capsulev1beta2.GlobalTenantResource{Name: name, Spec: capsulev1beta2.GlobalTenantResourceSpec{Scope: api.ResourceScopeNamespace, TenantSelector: metav1.LabelSelector{MatchLabels: map[string]string{"energy": "solar"}}, TenantResourceCommonSpec: common}}
+		obj := &capsulev1beta2.GlobalTenantResource{Name: name, Spec: capsulev1beta2.GlobalTenantResourceSpec{Scope: api.ResourceScopeNamespace, TenantSelector: *tenantSelector, TenantResourceCommonSpec: common}}
 		parent, spec, status = obj, &obj.Spec.TenantResourceCommonSpec, &obj.Status.TenantResourceCommonStatus
 	} else {
 		obj := &capsulev1beta2.TenantResource{Name: name, Namespace: baseNamespace, Spec: capsulev1beta2.TenantResourceSpec{TenantResourceCommonSpec: common}}
@@ -176,9 +177,10 @@ func blockReplicationMetadataUpdates(name, namespace string, names []string, exp
 	return binding
 }
 
-func exerciseInitialReplicationPolicyFailure(global bool, tenantName, baseNamespace, targetNamespace, excludedNamespace string, owner rbac.UserSpec) {
+func exerciseInitialReplicationPolicyFailure(tenantSelector *metav1.LabelSelector, tenantName, baseNamespace, targetNamespace, excludedNamespace string, owner rbac.UserSpec) {
 	ctx := context.Background()
-	name := fmt.Sprintf("initial-policy-failure-%t", global)
+	global := tenantSelector != nil
+	name := "initial-policy-failure-" + tenantName
 	created, adopted, removed := name+"-created", name+"-adopted", name+"-removed"
 	seed := &corev1.ConfigMap{APIVersion: "v1", Kind: "ConfigMap", Name: adopted, Namespace: targetNamespace, Data: map[string]string{"external": "retained"}}
 	Expect(k8sClient.Patch(ctx, seed, client.Apply, client.FieldOwner("e2e-external"))).To(Succeed())
@@ -205,7 +207,7 @@ func exerciseInitialReplicationPolicyFailure(global bool, tenantName, baseNamesp
 	var status *capsulev1beta2.TenantResourceCommonStatus
 	var spec *capsulev1beta2.TenantResourceCommonSpec
 	if global {
-		obj := &capsulev1beta2.GlobalTenantResource{Name: name, Spec: capsulev1beta2.GlobalTenantResourceSpec{Scope: api.ResourceScopeNamespace, TenantSelector: metav1.LabelSelector{MatchLabels: map[string]string{"energy": "solar"}}, TenantResourceCommonSpec: common}}
+		obj := &capsulev1beta2.GlobalTenantResource{Name: name, Spec: capsulev1beta2.GlobalTenantResourceSpec{Scope: api.ResourceScopeNamespace, TenantSelector: *tenantSelector, TenantResourceCommonSpec: common}}
 		parent, spec, status = obj, &obj.Spec.TenantResourceCommonSpec, &obj.Status.TenantResourceCommonStatus
 	} else {
 		obj := &capsulev1beta2.TenantResource{Name: name, Namespace: baseNamespace, Spec: capsulev1beta2.TenantResourceSpec{TenantResourceCommonSpec: common}}
