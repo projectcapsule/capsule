@@ -28,31 +28,33 @@ type ListenerSetMutation struct {
 // fields permit namespace-rule templates; rendered values are validated through
 // the existing RuleStatus validation path. Capsule does not read or create the
 // referenced resource. An omitted namespace refers to the ListenerSet namespace.
+// Source strings are bounded at 4096 characters to permit templates; rendered
+// values must satisfy the parent reference's native DNS and length constraints.
 // +kubebuilder:object:generate=true
 type GatewayParentReference struct {
 	// Group identifies the parent's API group. An explicit empty string selects
 	// the core API group, following Gateway API reference semantics.
 	// +optional
 	// +kubebuilder:default="gateway.networking.k8s.io"
-	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:MaxLength=4096
 	Group *string `json:"group,omitempty"`
 
 	// Kind identifies the parent's kind.
 	// +optional
 	// +kubebuilder:default=Gateway
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:MaxLength=4096
 	Kind *string `json:"kind,omitempty"`
 
 	// Name identifies the parent resource.
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:MaxLength=4096
 	Name string `json:"name"`
 
 	// Namespace identifies the parent's namespace. Omitted means the
 	// ListenerSet's namespace; an explicit empty string is invalid.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:MaxLength=4096
 	Namespace *string `json:"namespace,omitempty"`
 }

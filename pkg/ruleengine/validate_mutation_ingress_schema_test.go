@@ -6,6 +6,7 @@ package ruleengine
 import (
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -44,6 +45,7 @@ func TestListenerSetMutationGeneratedAPISchema(t *testing.T) {
 					{`{}`, false},
 					{`{"name":""}`, false},
 					{`{"name":"edge","namespace":""}`, false},
+					{`{"name":"edge","namespace":"{{ index .tenant.metadata.labels \"networking.example.com/default-gateway-namespace\" }}"}`, true},
 				} {
 					var obj map[string]any
 					require.NoError(t, json.Unmarshal([]byte(tc.source), &obj))
@@ -52,6 +54,14 @@ func TestListenerSetMutationGeneratedAPISchema(t *testing.T) {
 					require.Equal(t, "Gateway", obj["kind"])
 					errs := crdvalidation.ValidateCustomResource(field.NewPath("parentRef"), obj, validator)
 					require.Equal(t, tc.valid, len(errs) == 0, "%s: %v", tc.source, errs)
+				}
+				for _, name := range []string{"name", "namespace", "group", "kind"} {
+					for _, length := range []int{4096, 4097} {
+						template := "{{" + strings.Repeat(" ", length-6) + ". }}"
+						obj := map[string]any{"name": "edge", name: template}
+						errs := crdvalidation.ValidateCustomResource(field.NewPath("parentRef"), obj, validator)
+						require.Equal(t, length == 4096, len(errs) == 0, "%s/%s length %d: %v", resource, name, length, errs)
+					}
 				}
 			}
 			for _, child := range schema.Properties {

@@ -28,10 +28,13 @@ func TestListenerSetMutationValidation(t *testing.T) {
 		{"invalid name", rules.GatewayParentReference{Name: "bad/name"}, ".name"},
 		{"oversized name", rules.GatewayParentReference{Name: strings.Repeat("a", 254)}, ".name"},
 		{"empty namespace", rules.GatewayParentReference{Name: "edge", Namespace: new("")}, ".namespace"},
+		{"oversized namespace", rules.GatewayParentReference{Name: "edge", Namespace: new(strings.Repeat("a", 64))}, ".namespace"},
 		{"invalid namespace", rules.GatewayParentReference{Name: "edge", Namespace: new("bad.namespace")}, ".namespace"},
 		{"invalid group", rules.GatewayParentReference{Name: "edge", Group: new("bad/group")}, ".group"},
+		{"oversized group", rules.GatewayParentReference{Name: "edge", Group: new(strings.Repeat("a", 254))}, ".group"},
 		{"empty kind", rules.GatewayParentReference{Name: "edge", Kind: new("")}, ".kind"},
 		{"invalid kind", rules.GatewayParentReference{Name: "edge", Kind: new("bad.kind")}, ".kind"},
+		{"oversized kind", rules.GatewayParentReference{Name: "edge", Kind: new(strings.Repeat("a", 64))}, ".kind"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			body := &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{{Ingress: rules.IngressMutation{ListenerSets: rules.ListenerSetMutation{ParentRef: &tc.ref}}}}}

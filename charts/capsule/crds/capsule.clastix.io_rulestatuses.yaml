@@ -1834,24 +1834,24 @@ spec:
                                     description: |-
                                       Group identifies the parent's API group. An explicit empty string selects
                                       the core API group, following Gateway API reference semantics.
-                                    maxLength: 253
+                                    maxLength: 4096
                                     type: string
                                   kind:
                                     default: Gateway
                                     description: Kind identifies the parent's kind.
-                                    maxLength: 63
+                                    maxLength: 4096
                                     minLength: 1
                                     type: string
                                   name:
                                     description: Name identifies the parent resource.
-                                    maxLength: 253
+                                    maxLength: 4096
                                     minLength: 1
                                     type: string
                                   namespace:
                                     description: |-
                                       Namespace identifies the parent's namespace. Omitted means the
                                       ListenerSet's namespace; an explicit empty string is invalid.
-                                    maxLength: 63
+                                    maxLength: 4096
                                     minLength: 1
                                     type: string
                                 required:
@@ -5150,24 +5150,24 @@ spec:
                                       description: |-
                                         Group identifies the parent's API group. An explicit empty string selects
                                         the core API group, following Gateway API reference semantics.
-                                      maxLength: 253
+                                      maxLength: 4096
                                       type: string
                                     kind:
                                       default: Gateway
                                       description: Kind identifies the parent's kind.
-                                      maxLength: 63
+                                      maxLength: 4096
                                       minLength: 1
                                       type: string
                                     name:
                                       description: Name identifies the parent resource.
-                                      maxLength: 253
+                                      maxLength: 4096
                                       minLength: 1
                                       type: string
                                     namespace:
                                       description: |-
                                         Namespace identifies the parent's namespace. Omitted means the
                                         ListenerSet's namespace; an explicit empty string is invalid.
-                                      maxLength: 63
+                                      maxLength: 4096
                                       minLength: 1
                                       type: string
                                   required:
@@ -8427,25 +8427,25 @@ spec:
                                         description: |-
                                           Group identifies the parent's API group. An explicit empty string selects
                                           the core API group, following Gateway API reference semantics.
-                                        maxLength: 253
+                                        maxLength: 4096
                                         type: string
                                       kind:
                                         default: Gateway
                                         description: Kind identifies the parent's
                                           kind.
-                                        maxLength: 63
+                                        maxLength: 4096
                                         minLength: 1
                                         type: string
                                       name:
                                         description: Name identifies the parent resource.
-                                        maxLength: 253
+                                        maxLength: 4096
                                         minLength: 1
                                         type: string
                                       namespace:
                                         description: |-
                                           Namespace identifies the parent's namespace. Omitted means the
                                           ListenerSet's namespace; an explicit empty string is invalid.
-                                        maxLength: 63
+                                        maxLength: 4096
                                         minLength: 1
                                         type: string
                                     required:

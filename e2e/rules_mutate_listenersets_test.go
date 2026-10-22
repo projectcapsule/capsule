@@ -5,6 +5,7 @@ package e2e
 
 import (
 	"context"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -35,15 +36,18 @@ var _ = Describe("ListenerSet parent reference namespace profiles", Label("tenan
 		mutation := func(name string, action rules.MutationAction, namespace *string) rules.NamespaceRuleMutation {
 			return rules.NamespaceRuleMutation{Action: action, Ingress: rules.IngressMutation{ListenerSets: rules.ListenerSetMutation{ParentRef: &rules.GatewayParentReference{Name: name, Namespace: namespace}}}}
 		}
+		const gatewayNamespaceLabel = "networking.example.com/default-gateway-namespace"
+		const gatewayNamespaceTemplate = `{{ index .tenant.metadata.labels "networking.example.com/default-gateway-namespace" }}`
+		Expect(len(gatewayNamespaceTemplate)).To(BeNumerically(">", 63))
 		for _, suffix := range []string{"a", "b"} {
 			name := prefix + "-" + suffix
 			selected := &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "gateway-profile", Operator: metav1.LabelSelectorOpIn, Values: []string{"merge", "replace"}}}}
-			defaultMutation := mutation("{{ .tenant.metadata.name }}-edge", "", new("platform-gateways"))
+			defaultMutation := mutation("{{ .tenant.metadata.name }}-edge", "", new(gatewayNamespaceTemplate))
 			defaultMutation.Conditions = []rules.AdmissionCondition{{Expression: `!has(object.metadata.labels) || !('skip-default' in object.metadata.labels)`}}
 			forcedMutation := mutation(name+"-forced", rules.MutationActionReplace, nil)
 			forcedMutation.Ingress.ListenerSets.ParentRef.Group = new("gateway.networking.k8s.io")
 			forcedMutation.Ingress.ListenerSets.ParentRef.Kind = new("Gateway")
-			tnt := &capsulev1beta2.Tenant{Name: name, Labels: map[string]string{"env": "e2e"}, Spec: capsulev1beta2.TenantSpec{
+			tnt := &capsulev1beta2.Tenant{Name: name, Labels: map[string]string{"env": "e2e", gatewayNamespaceLabel: "platform-gateways-" + suffix}, Spec: capsulev1beta2.TenantSpec{
 				Owners: rbac.OwnerListSpec{{Kind: "User", Name: name}},
 				Rules: []*rules.NamespaceRuleBodyTenant{
 					{Permissions: rules.NamespaceRulePermissionBody{Bindings: []rbac.AdditionalRoleBindingsSpec{{ClusterRoleName: role.Name, Subjects: []rbacv1.Subject{{APIGroup: rbacv1.GroupName, Kind: "User", Name: name}}}}}},
@@ -68,6 +72,7 @@ var _ = Describe("ListenerSet parent reference namespace profiles", Label("tenan
 			Expect(*ref.Group).To(Equal("gateway.networking.k8s.io"))
 			Expect(ref.Kind).NotTo(BeNil())
 			Expect(*ref.Kind).To(Equal("Gateway"))
+			Expect(*ref.Namespace).To(Equal(gatewayNamespaceTemplate))
 			tenants = append(tenants, tnt)
 			owners = append(owners, impersonationClient(name, withDefaultGroups(nil)))
 		}
@@ -144,12 +149,30 @@ var _ = Describe("ListenerSet parent reference namespace profiles", Label("tenan
 			return obj
 		}
 		By("defaulting omitted references and preserving explicit local references atomically")
-		defaultRef := parentRef(tenants[0].Name+"-edge", new("platform-gateways"))
+		defaultRef := parentRef(tenants[0].Name+"-edge", new(tenants[0].Labels[gatewayNamespaceLabel]))
 		original := create(owners[0], mergeNS, "omitted", nil, defaultRef, true)
 		create(owners[0], mergeNS, "explicit", map[string]any{"name": "custom"}, parentRef("custom", nil), true)
 		create(owners[0], replaceNS, "replace", map[string]any{"name": "custom", "namespace": "old"}, parentRef(tenants[0].Name+"-forced", nil), true)
 		create(owners[0], otherNS, "unselected", map[string]any{"name": "custom"}, parentRef("custom", nil), false)
-		create(owners[1], tenantBNS, "tenant-b", nil, parentRef(tenants[1].Name+"-edge", new("platform-gateways")), true)
+		create(owners[1], tenantBNS, "tenant-b", nil, parentRef(tenants[1].Name+"-edge", new(tenants[1].Labels[gatewayNamespaceLabel])), true)
+
+		By("rejecting invalid rendered namespaces in effective rules without changing the active profile")
+		for _, namespace := range []string{"invalid.namespace", strings.Repeat("a", 64)} {
+			Eventually(func(g Gomega) {
+				current := &capsulev1beta2.RuleStatus{}
+				g.Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: mergeNS.Name, Name: meta.NameForManagedRuleStatus()}, current)).To(Succeed())
+				current.Spec[0].Mutate[0].Ingress.ListenerSets.ParentRef.Namespace = new(namespace)
+				err := k8sClient.Update(ctx, current)
+				if err == nil {
+					Fail("invalid rendered Gateway namespace was accepted")
+				}
+				g.Expect(err).To(MatchError(ContainSubstring("ingress.listenerSets.parentRef.namespace")))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			stored := &capsulev1beta2.RuleStatus{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: mergeNS.Name, Name: meta.NameForManagedRuleStatus()}, stored)).To(Succeed())
+			Expect(*stored.Spec[0].Mutate[0].Ingress.ListenerSets.ParentRef.Namespace).To(Equal(tenants[0].Labels[gatewayNamespaceLabel]))
+		}
+		expectRef(original, defaultRef, true)
 
 		By("retaining conditions and hostname enforcement after mutation")
 		skipped := listenerSet(mergeNS, "conditional", map[string]any{"name": "custom"})
@@ -219,9 +242,9 @@ var _ = Describe("ListenerSet parent reference namespace profiles", Label("tenan
 			return k8sClient.Update(ctx, current)
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		expectProfile(mergeNS, 2, "updated-edge")
-		create(owners[0], mergeNS, "updated-policy", nil, parentRef("updated-edge", new("platform-gateways")), true)
+		create(owners[0], mergeNS, "updated-policy", nil, parentRef("updated-edge", new(tenants[0].Labels[gatewayNamespaceLabel])), true)
 		expectRef(original, defaultRef, true)
-		create(owners[1], tenantBNS, "tenant-b-unchanged", nil, parentRef(tenants[1].Name+"-edge", new("platform-gateways")), true)
+		create(owners[1], tenantBNS, "tenant-b-unchanged", nil, parentRef(tenants[1].Name+"-edge", new(tenants[1].Labels[gatewayNamespaceLabel])), true)
 
 		By("changing namespace profiles without reconciling existing ListenerSets")
 		Eventually(func() error {
