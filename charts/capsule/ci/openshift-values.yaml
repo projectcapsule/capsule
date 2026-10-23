@@ -1,0 +1,6 @@
+global:
+  openshift:
+    enabled: true
+openshift:
+  etcdEncryption:
+    enabled: true

@@ -35,6 +35,9 @@ spec:
         {{- with $.Values.podAnnotations }}
           {{- toYaml . | nindent 8 }}
         {{- end }}
+        {{- with include "capsule.openshiftAnnotations" $ }}
+          {{- . | nindent 8 }}
+        {{- end }}
       labels:
         app.kubernetes.io/component: {{ include "capsule.crds.component" . | quote }}
         app.kubernetes.io/name: {{ include "capsule.crds.component" . | quote }}
@@ -47,7 +50,10 @@ spec:
         {{- end }}
     spec:
       restartPolicy: {{ $Values.restartPolicy }}
-      {{- if $Values.podSecurityContext.enabled }}
+      {{- if include "capsule.hostUsersDisabled" (dict "hostUsers" $Values.hostUsers "root" $) }}
+      hostUsers: false
+      {{- end }}
+      {{- if include "capsule.jobSecurityContextEnabled" (dict "key" "podSecurityContext" "values" $Values "root" $) }}
       securityContext: {{- omit $Values.podSecurityContext "enabled" | toYaml | nindent 8 }}
       {{- end }}
       {{- with $Values.nodeSelector }}
@@ -78,7 +84,7 @@ spec:
       - name: crds-hook
         image: {{ include "capsule.jobsFullyQualifiedDockerImage" . }}
         imagePullPolicy: {{ $Values.image.pullPolicy }}
-        {{- if $Values.securityContext.enabled }}
+        {{- if include "capsule.jobSecurityContextEnabled" (dict "key" "securityContext" "values" $Values "root" $) }}
         securityContext: {{- omit $Values.securityContext "enabled" | toYaml | nindent 10 }}
         {{- end }}
         args:
