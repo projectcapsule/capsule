@@ -11,6 +11,7 @@ import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -33,7 +34,7 @@ type volumeSnapshotRules struct {
 }
 
 // Handler joins the generic rules chain. Kind/subresource filtering, and the
-// skip for updates that keep the class, happen before decoding and
+// skip for updates that can't change the class, happen before decoding and
 // tenant/ruleset reads; a successful check continues it.
 func Handler(
 	cfg configuration.Configuration,
@@ -60,26 +61,52 @@ func Handler(
 			}))
 }
 
-type classReference struct {
+// snapshotFields holds the fields that decide whether an update needs a check.
+type snapshotFields struct {
+	Metadata struct {
+		OwnerReferences []metav1.OwnerReference `json:"ownerReferences"`
+	} `json:"metadata"`
 	Spec struct {
+		Source struct {
+			VolumeSnapshotContentName *string `json:"volumeSnapshotContentName"`
+		} `json:"source"`
 		VolumeSnapshotClassName *string `json:"volumeSnapshotClassName"`
 	} `json:"spec"`
+	Status *struct {
+		BoundVolumeSnapshotContentName *string `json:"boundVolumeSnapshotContentName"`
+	} `json:"status"`
 }
 
-// classMayChange lets updates through only when they change the class.
-// Finalizer and label updates, such as the snapshot-controller's, keep it.
-// Undecodable payloads continue, so that the typed handler reports them.
+func (f *snapshotFields) defaultsClass() bool {
+	return defaultsClass(f.Spec.Source.VolumeSnapshotContentName, f.Metadata.OwnerReferences)
+}
+
+func (f *snapshotFields) bound() bool {
+	return f.Status != nil && ptr.Deref(f.Status.BoundVolumeSnapshotContentName, "") != ""
+}
+
+// classMayChange lets an update through when it changes the class, or when it
+// opens an unbound snapshot without a class to defaulting, for example by
+// removing its VolumeGroupSnapshot owner. Finalizer and label updates, such as
+// the snapshot-controller's, and the garbage collector orphaning a bound group
+// member are skipped. Undecodable payloads continue, so that the typed handler
+// reports them.
 func classMayChange(req admission.Request) bool {
 	if req.Operation != admissionv1.Update {
 		return true
 	}
 
-	var current, previous classReference
+	var current, previous snapshotFields
 	if json.Unmarshal(req.Object.Raw, &current) != nil || json.Unmarshal(req.OldObject.Raw, &previous) != nil {
 		return true
 	}
 
-	return !ptr.Equal(current.Spec.VolumeSnapshotClassName, previous.Spec.VolumeSnapshotClassName)
+	if !ptr.Equal(current.Spec.VolumeSnapshotClassName, previous.Spec.VolumeSnapshotClassName) {
+		return true
+	}
+
+	return current.Spec.VolumeSnapshotClassName == nil && !current.bound() &&
+		current.defaultsClass() && !previous.defaultsClass()
 }
 
 func (h *volumeSnapshotRules) OnCreate(_ client.Client, reader client.Reader, obj *snapshotv1.VolumeSnapshot, _ admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant, bodies []*rules.NamespaceRuleBodyNamespace) handlers.Func {
