@@ -467,13 +467,25 @@ func TestVolumeSnapshotClassNamespaceProfilesAndTenants(t *testing.T) {
 }
 
 func TestVolumeSnapshotClassReadErrors(t *testing.T) {
-	cl, decoder := singleProfile(t, allowList())
-	cl.classErr = errors.New("apiserver unavailable")
-	response := admit(t.Context(), cl, decoder, newRecorder(), request(t, newSnapshot("tenant-a", new("gold")), nil))
-	require.NotNil(t, response)
-	require.False(t, response.Allowed)
-	require.Equal(t, int32(http.StatusInternalServerError), response.Result.Code)
-	require.Contains(t, response.Result.Message, `get VolumeSnapshotClass "gold": apiserver unavailable`)
+	t.Run("a failed class read is a server error", func(t *testing.T) {
+		cl, decoder := singleProfile(t, allowList())
+		cl.classErr = errors.New("apiserver unavailable")
+		response := admit(t.Context(), cl, decoder, newRecorder(), request(t, newSnapshot("tenant-a", new("gold")), nil))
+		require.NotNil(t, response)
+		require.False(t, response.Allowed)
+		require.Equal(t, int32(http.StatusInternalServerError), response.Result.Code)
+		require.Contains(t, response.Result.Message, `get VolumeSnapshotClass "gold": apiserver unavailable`)
+	})
+
+	// An entry that matches by name already matches, so its selector needs no
+	// class read, and a failing read must not reject the request.
+	t.Run("a name match in an entry with a selector reads no class", func(t *testing.T) {
+		cl, decoder := singleProfile(t, classRule(rules.ActionTypeAllow, snapshotTargets,
+			rules.StorageClassMatch{Exact: []string{"silver"}, LabelSelector: customerClasses.LabelSelector}))
+		cl.classErr = errors.New("apiserver unavailable")
+		require.Nil(t, admit(t.Context(), cl, decoder, newRecorder(), request(t, newSnapshot("tenant-a", new("silver")), nil)))
+		require.Zero(t, cl.classGets.Load())
+	})
 }
 
 func TestVolumeSnapshotClassDryRunEvents(t *testing.T) {
