@@ -170,6 +170,11 @@ var _ = Describe("VolumeSnapshot class rules", Label("tenant", "rules", "storage
 		preProvisioned.Spec.Source = snapshotv1.VolumeSnapshotSource{VolumeSnapshotContentName: new(prefix + "-content")}
 		admit(ownerA, preProvisioned)
 
+		By("rejecting a snapshot without a class whose group owner the snapshot-controller doesn't recognize")
+		forged := snapshot(restricted, "forged-member", nil)
+		forged.OwnerReferences = []metav1.OwnerReference{{APIVersion: "groupsnapshot.storage.k8s.io/v999", Kind: "VolumeGroupSnapshot", Name: "group", UID: "forged"}}
+		reject(ownerA, forged, required)
+
 		By("leaving other namespace profiles and tenants to their own rules")
 		admit(ownerA, snapshot(open, "bronze", new(className("bronze"))))
 		admit(ownerA, snapshot(open, "default", nil))

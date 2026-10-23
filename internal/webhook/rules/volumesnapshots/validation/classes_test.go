@@ -171,6 +171,19 @@ func denyNames(names ...string) *rules.NamespaceRuleBodyNamespace {
 	return classRule(rules.ActionTypeDeny, nil, rules.StorageClassMatch{Exact: names})
 }
 
+// forAlice scopes a rule to the requesting user, so it would not check the
+// snapshot-controller's later default-class patch.
+func forAlice(body *rules.NamespaceRuleBodyNamespace) *rules.NamespaceRuleBodyNamespace {
+	body.Audience = []rules.Audience{{Kind: rules.AudienceKindUser, Name: "alice"}}
+	return body
+}
+
+func groupOwner(apiVersion string) func(*snapshotv1.VolumeSnapshot) {
+	return func(obj *snapshotv1.VolumeSnapshot) {
+		obj.OwnerReferences = []metav1.OwnerReference{{APIVersion: apiVersion, Kind: "VolumeGroupSnapshot", Name: "group", UID: "group"}}
+	}
+}
+
 func newSnapshot(namespace string, class *string, mutate ...func(*snapshotv1.VolumeSnapshot)) *snapshotv1.VolumeSnapshot {
 	obj := &snapshotv1.VolumeSnapshot{
 		APIVersion: snapshotv1.SchemeGroupVersion.String(), Kind: "VolumeSnapshot",
@@ -237,11 +250,6 @@ func TestVolumeSnapshotClassRules(t *testing.T) {
 	preProvisioned := func(obj *snapshotv1.VolumeSnapshot) {
 		obj.Spec.Source = snapshotv1.VolumeSnapshotSource{VolumeSnapshotContentName: new("restored-content")}
 	}
-	groupOwner := func(apiVersion string) func(*snapshotv1.VolumeSnapshot) {
-		return func(obj *snapshotv1.VolumeSnapshot) {
-			obj.OwnerReferences = []metav1.OwnerReference{{APIVersion: apiVersion, Kind: "VolumeGroupSnapshot", Name: "group", UID: "group"}}
-		}
-	}
 	nightly := func(obj *snapshotv1.VolumeSnapshot) { obj.Labels = map[string]string{"backup": "nightly"} }
 	conditional := func() *rules.NamespaceRuleBodyNamespace {
 		body := allowNames("silver")
@@ -300,6 +308,16 @@ func TestVolumeSnapshotClassRules(t *testing.T) {
 		{
 			name: "owner from another group is not a group member", rules: []*rules.NamespaceRuleBodyNamespace{allowList()},
 			mutate: []func(*snapshotv1.VolumeSnapshot){groupOwner("example.com/v1")}, denied: required, reasons: []string{events.ReasonMissingVolumeSnapshotClass},
+		},
+		// The snapshot-controller only treats owners with its own API version as
+		// group members, and defaults the class of any other snapshot.
+		{
+			name: "group owner with an unrecognized version is not a group member", rules: []*rules.NamespaceRuleBodyNamespace{forAlice(allowList())},
+			mutate: []func(*snapshotv1.VolumeSnapshot){groupOwner("groupsnapshot.storage.k8s.io/v999")}, denied: required, reasons: []string{events.ReasonMissingVolumeSnapshotClass},
+		},
+		{
+			name: "group owner with an older version is not a group member", rules: []*rules.NamespaceRuleBodyNamespace{forAlice(allowList())},
+			mutate: []func(*snapshotv1.VolumeSnapshot){groupOwner("groupsnapshot.storage.k8s.io/v1beta2")}, denied: required, reasons: []string{events.ReasonMissingVolumeSnapshotClass},
 		},
 		{
 			name: "volume rules do not require a class",
@@ -377,6 +395,31 @@ func TestVolumeSnapshotClassUpdates(t *testing.T) {
 		req := request(t, newSnapshot("tenant-a", new("bronze")), newSnapshot("tenant-a", new("silver")))
 		req.SubResource = "status"
 		require.Nil(t, admit(t.Context(), cl, decoder, newRecorder(), req))
+		require.Zero(t, cl.gets.Load())
+	})
+
+	// Without its group owner, an unbound snapshot without a class gets a
+	// default class from the snapshot-controller, which a user-scoped rule
+	// never checks.
+	t.Run("removing the group owner of an unbound snapshot without a class", func(t *testing.T) {
+		cl, decoder := singleProfile(t, forAlice(allowList()))
+		member := newSnapshot("tenant-a", nil, groupOwner("groupsnapshot.storage.k8s.io/v1"))
+		response := admit(t.Context(), cl, decoder, newRecorder(), request(t, newSnapshot("tenant-a", nil), member))
+		require.NotNil(t, response)
+		require.False(t, response.Allowed)
+		require.Contains(t, response.Result.Message, required)
+	})
+
+	// The garbage collector removes the owner when a VolumeGroupSnapshot is
+	// deleted with orphan propagation. A bound snapshot is never provisioned
+	// again, so the update must not be blocked.
+	t.Run("orphaning a bound group member is skipped", func(t *testing.T) {
+		cl, decoder := singleProfile(t, allowList())
+		bound := func(obj *snapshotv1.VolumeSnapshot) {
+			obj.Status = &snapshotv1.VolumeSnapshotStatus{BoundVolumeSnapshotContentName: new("group-content")}
+		}
+		member := newSnapshot("tenant-a", nil, groupOwner("groupsnapshot.storage.k8s.io/v1"), bound)
+		require.Nil(t, admit(t.Context(), cl, decoder, newRecorder(), request(t, newSnapshot("tenant-a", nil, bound), member)))
 		require.Zero(t, cl.gets.Load())
 	})
 }

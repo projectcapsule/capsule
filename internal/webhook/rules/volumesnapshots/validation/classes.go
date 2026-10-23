@@ -7,8 +7,8 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"strings"
 
+	groupsnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumegroupsnapshot/v1"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,9 +25,9 @@ import (
 const (
 	classSetName = "volume snapshot class"
 	classPath    = "spec.volumeSnapshotClassName"
-
-	volumeGroupSnapshotGroup = "groupsnapshot.storage.k8s.io"
 )
+
+var volumeGroupSnapshotAPIVersion = groupsnapshotv1.SchemeGroupVersion.String()
 
 func appliesToVolumeSnapshots(body *rules.NamespaceRuleEnforceBody) bool {
 	return body.GetStorageClassTargets(rules.StorageTargetVolumeSnapshot)
@@ -135,7 +135,7 @@ func (h *volumeSnapshotRules) evaluate(
 // admission, which no rule has checked.
 func missingClass(obj *snapshotv1.VolumeSnapshot, enforce []*rules.NamespaceRuleEnforceBody) *ruleengine.Evaluation {
 	evaluation := &ruleengine.Evaluation{}
-	if !defaultsClass(obj) {
+	if !defaultsClass(obj.Spec.Source.VolumeSnapshotContentName, obj.OwnerReferences) {
 		return evaluation
 	}
 
@@ -179,13 +179,21 @@ func missingClass(obj *snapshotv1.VolumeSnapshot, enforce []*rules.NamespaceRule
 
 // defaultsClass reports whether the snapshot-controller assigns a default
 // class to a snapshot without one. It skips pre-provisioned snapshots and the
-// members it creates for a VolumeGroupSnapshot.
-func defaultsClass(obj *snapshotv1.VolumeSnapshot) bool {
-	if obj.Spec.Source.VolumeSnapshotContentName != nil {
-		return false
+// members of a VolumeGroupSnapshot.
+func defaultsClass(contentName *string, owners []metav1.OwnerReference) bool {
+	return contentName == nil && !isVolumeGroupSnapshotMember(owners)
+}
+
+// isVolumeGroupSnapshotMember mirrors the snapshot-controller's own check:
+// the first VolumeGroupSnapshot owner with its API version, v1 since v8.6,
+// decides, and it needs a name. Owners with other versions are not exempt,
+// because a controller that doesn't recognize them defaults the class.
+func isVolumeGroupSnapshotMember(owners []metav1.OwnerReference) bool {
+	for _, owner := range owners {
+		if owner.Kind == "VolumeGroupSnapshot" && owner.APIVersion == volumeGroupSnapshotAPIVersion {
+			return owner.Name != ""
+		}
 	}
 
-	return !slices.ContainsFunc(obj.OwnerReferences, func(owner metav1.OwnerReference) bool {
-		return owner.Kind == "VolumeGroupSnapshot" && strings.HasPrefix(owner.APIVersion, volumeGroupSnapshotGroup+"/")
-	})
+	return false
 }
