@@ -24,7 +24,13 @@ concurrency:
 
 jobs:
   e2e:
-    name: E2E Testing (CE)
+    name: E2E Testing (CE, ${{ matrix.phase }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # The parallel specs and the serial config specs run on separate runners,
+        # so a lane takes setup plus the longer phase instead of both phases.
+        phase: ['parallel', 'config']
     runs-on:
       labels: ubuntu-latest-8-cores
     steps:
@@ -40,14 +46,17 @@ jobs:
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
 
       - name: e2e
-        run: sudo make e2e
+        run: sudo E2E_PHASE=${{ matrix.phase }} make e2e
 
   e2e-openshift-CE:
-    name: E2E OpenShift Testing (CE, MicroShift ${{ matrix.version }})
+    name: E2E OpenShift Testing (CE, MicroShift ${{ matrix.version }}, ${{ matrix.phase }})
     strategy:
       fail-fast: false
       matrix:
         version: ['4.21', '4.22'] # tags are pinned in the Makefile (MICROSHIFT_TAG_*)
+        # The parallel specs and the serial config specs run on separate runners,
+        # like the kind lanes.
+        phase: ['parallel', 'config']
     runs-on:
       labels: ubuntu-latest-8-cores
     steps:
@@ -63,7 +72,7 @@ jobs:
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
 
       - name: e2e
-        run: sudo MICROSHIFT_VERSION=${{ matrix.version }} make e2e-openshift
+        run: sudo MICROSHIFT_VERSION=${{ matrix.version }} E2E_PHASE=${{ matrix.phase }} make e2e-openshift
 
       - name: MicroShift logs
         if: failure()
@@ -76,10 +85,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Node images built for the kind release pinned in the Makefile (KIND_VERSION).
+        # Older tags ship older containerd builds: kindest/node:v1.33.0 carries
+        # containerd 2.0.5, which crashes on a failed pod sandbox and then cannot
+        # restart (fixed in 2.0.6), wedging the whole worker node mid-suite.
         k8s-version:
-          - 'v1.33.0'
-          - 'v1.34.0'
-          - 'v1.35.0'
+          - 'v1.33.12'
+          - 'v1.34.8'
+          - 'v1.35.5'
+        phase: ['parallel', 'config']
     runs-on:
       labels: ubuntu-latest-8-cores
     steps:
@@ -96,4 +110,4 @@ jobs:
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
 
       - name: e2e (Enterprise)
-        run: sudo KUBERNETES_SUPPORTED_VERSION=${{ matrix.k8s-version }} make e2e
+        run: sudo KUBERNETES_SUPPORTED_VERSION=${{ matrix.k8s-version }} E2E_PHASE=${{ matrix.phase }} make e2e

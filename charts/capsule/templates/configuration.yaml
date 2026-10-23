@@ -712,7 +712,11 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
+        {{- $explicitConditions := or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
+        {{- if and $.Values.openshift.etcdEncryption.enabled (not $explicitConditions) (or (dig "capsuleUsers" false (.opts | default dict)) (dig "administrators" false (.opts | default dict))) }}
+          {{- fail "openshift.etcdEncryption.enabled would replace the generated capsule-user-gate of the replications webhook; set explicit matchConditions for it" }}
+        {{- end }}
+        {{- if or $explicitConditions $.Values.openshift.etcdEncryption.enabled }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
@@ -723,6 +727,9 @@ spec:
         {{- end }}
         {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with include "capsule.openshiftEtcdEncryptionMatchConditions" $ }}
+          {{- . | nindent 10 }}
         {{- end }}
         rules:
           {{- toYaml .rules | nindent 10 }}

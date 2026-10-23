@@ -15,6 +15,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -24,14 +25,19 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 )
 
-var _ = Describe("enforcing pod QoS namespace rules", Ordered, Label("tenant", "rules", "enforce", "workloads", "qos"), func() {
-	const ownerName = "e2e-rules-qos"
+var _ = Describe("enforcing pod QoS namespace rules", Label("tenant", "rules", "enforce", "workloads", "qos"), func() {
+	// The owner and tenant names are unique per spec so the specs of this
+	// container can run concurrently on different Ginkgo processes.
+	var (
+		suffix    string
+		ownerName string
+	)
 
 	var tnt *capsulev1beta2.Tenant
 
 	newTenant := func() *capsulev1beta2.Tenant {
 		return &capsulev1beta2.Tenant{
-			Name: "e2e-rule-qos",
+			Name: "e2e-rule-qos-" + suffix,
 			Labels: map[string]string{
 				"env": "e2e",
 			},
@@ -347,6 +353,8 @@ var _ = Describe("enforcing pod QoS namespace rules", Ordered, Label("tenant", "
 	}
 
 	JustBeforeEach(func() {
+		suffix = rand.String(6)
+		ownerName = "e2e-rules-qos-" + suffix
 		tnt = newTenant()
 
 		EventuallyCreation(func() error {
@@ -359,7 +367,8 @@ var _ = Describe("enforcing pod QoS namespace rules", Ordered, Label("tenant", "
 	})
 
 	JustAfterEach(func() {
-		EventuallyDeletion(tnt)
+		// The Tenant name is unique per spec: no need to wait for it to be gone.
+		DeleteInBackground(tnt)
 	})
 
 	It("stores QoS workload rules as independent status rule blocks", func() {

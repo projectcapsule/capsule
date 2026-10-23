@@ -122,6 +122,10 @@
                                     "description": "Backofflimit for jobs",
                                     "type": "integer"
                                 },
+                                "hostUsers": {
+                                    "description": "Don't use Host Users (User Namespaces) for the job pods. Always disabled when `global.openshift.requiredScc` is `restricted-v3`.",
+                                    "type": "boolean"
+                                },
                                 "image": {
                                     "type": "object",
                                     "properties": {
@@ -164,7 +168,7 @@
                                     "type": "object"
                                 },
                                 "podSecurityContext": {
-                                    "description": "Security context for the job pods.",
+                                    "description": "Security context for the job pods. Ignored when `global.openshift.enabled` is set, unless `jobs.podSecurityContext.enabled` is set explicitly.",
                                     "type": "object",
                                     "properties": {
                                         "enabled": {
@@ -194,7 +198,7 @@
                                     "type": "string"
                                 },
                                 "securityContext": {
-                                    "description": "Security context for the job containers.",
+                                    "description": "Security context for the job containers. Ignored when `global.openshift.enabled` is set, unless `jobs.securityContext.enabled` is set explicitly.",
                                     "type": "object",
                                     "properties": {
                                         "allowPrivilegeEscalation": {
@@ -269,6 +273,19 @@
                                     "type": "boolean"
                                 }
                             }
+                        }
+                    }
+                },
+                "openshift": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "description": "Run on OpenShift. Unless set explicitly, the pod/container securityContexts of the controller and jobs are omitted (so the SCC assigns UID, fsGroup and SELinux level) and the `openshift.io/required-scc` annotation is added to all pods.",
+                            "type": "boolean"
+                        },
+                        "requiredScc": {
+                            "description": "SCC requested on all pods through the `openshift.io/required-scc` annotation. With `restricted-v3`, hostUsers is disabled on all pods.",
+                            "type": "string"
                         }
                     }
                 }
@@ -961,6 +978,20 @@
             "description": "Set the node selector for the Capsule pod",
             "type": "object"
         },
+        "openshift": {
+            "type": "object",
+            "properties": {
+                "etcdEncryption": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "description": "Exclude the kube-storage-version-migrator from the replications webhook (required when etcd encryption is enabled on OpenShift)",
+                            "type": "boolean"
+                        }
+                    }
+                }
+            }
+        },
         "podAnnotations": {
             "description": "Annotations to add to the capsule pod.",
             "type": "object"
@@ -970,11 +1001,14 @@
             "type": "object"
         },
         "podSecurityContext": {
-            "description": "Set the securityContext for the Capsule pod",
+            "description": "Set the securityContext for the Capsule pod. `enabled: null` means enabled, unless `global.openshift.enabled` is set.",
             "type": "object",
             "properties": {
                 "enabled": {
-                    "type": "boolean"
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
                 },
                 "runAsGroup": {
                     "type": "integer"
@@ -1059,7 +1093,7 @@
             "type": "integer"
         },
         "securityContext": {
-            "description": "Set the securityContext for the Capsule container",
+            "description": "Set the securityContext for the Capsule container. `enabled: null` means enabled, unless `global.openshift.enabled` is set.",
             "type": "object",
             "properties": {
                 "allowPrivilegeEscalation": {
@@ -1077,7 +1111,10 @@
                     }
                 },
                 "enabled": {
-                    "type": "boolean"
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
                 },
                 "readOnlyRootFilesystem": {
                     "type": "boolean"

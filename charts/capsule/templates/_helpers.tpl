@@ -148,6 +148,60 @@ Create the Capsule TLS Secret name to use
 {{ default ( printf "%s-tls" ( include "capsule.fullname" . ) ) .Values.tls.name }}
 {{- end }}
 
+{{/*
+Whether a securityContext is rendered. Called with (dict "enabled" <value> "root" $).
+An unset (null) value defaults to enabled, unless running on OpenShift.
+*/}}
+{{- define "capsule.securityContextEnabled" -}}
+{{- if kindIs "invalid" .enabled -}}
+  {{- if not .root.Values.global.openshift.enabled -}}true{{- end -}}
+{{- else if .enabled -}}true{{- end -}}
+{{- end }}
+
+{{/*
+Whether a job securityContext is rendered. Called with (dict "key" "securityContext" "values" $Values "root" $).
+On OpenShift it is off, unless set explicitly in the top-level `jobs` values (global values cannot be
+null-defaulted as the capsule-proxy subchart schema/defaults require a boolean).
+*/}}
+{{- define "capsule.jobSecurityContextEnabled" -}}
+{{- $override := dig .key "enabled" nil .root.Values.jobs -}}
+{{- if and .root.Values.global.openshift.enabled (kindIs "invalid" $override) -}}
+{{- else if (get .values .key).enabled -}}true{{- end -}}
+{{- end }}
+
+{{/*
+Pod annotations required on OpenShift
+*/}}
+{{- define "capsule.openshiftAnnotations" -}}
+{{- if .Values.global.openshift.enabled -}}
+openshift.io/required-scc: {{ .Values.global.openshift.requiredScc | quote }}
+{{- end }}
+{{- end }}
+
+{{/*
+Whether hostUsers: false is rendered. Called with (dict "hostUsers" <value> "root" $).
+Always on when running on OpenShift with the restricted-v3 SCC, which requires user namespaces.
+*/}}
+{{- define "capsule.hostUsersDisabled" -}}
+{{- if and .root.Values.global.openshift.enabled (eq (toString .root.Values.global.openshift.requiredScc) "restricted-v3") -}}true
+{{- else if and (not (kindIs "invalid" .hostUsers)) (not .hostUsers) -}}true{{- end -}}
+{{- end }}
+
+{{/*
+Admission matchCondition excluding the OpenShift kube-storage-version-migrator (etcd encryption)
+*/}}
+{{- define "capsule.openshiftEtcdEncryptionMatchConditions" -}}
+{{- if .Values.openshift.etcdEncryption.enabled -}}
+- name: "exclude-openshift-encryption-key-migrator"
+  expression: >
+    !(
+      request.userInfo.username in [
+        "system:serviceaccount:openshift-kube-storage-version-migrator:kube-storage-version-migrator-sa"
+      ]
+    )
+{{- end }}
+{{- end }}
+
 
 {{/*
 Capsule Webhook service (Called with $.Path)

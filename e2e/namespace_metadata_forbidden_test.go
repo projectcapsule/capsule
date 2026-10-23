@@ -64,33 +64,37 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 		Kind: "User",
 	}
 
-	JustBeforeEach(func() {
+	// The three specs never mutate the Tenant and use distinct namespace names,
+	// so the Tenant and the administrators setting are created once.
+	BeforeAll(func() {
 		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: defaultConfigurationName}, originConfig)).To(Succeed())
+
+		// Registered first so it runs last (DeferCleanup is last in, first out)
+		// and so the configuration is restored even when the setup below fails.
+		DeferCleanup(func() {
+			Eventually(func() error {
+				c := &capsulev1beta2.CapsuleConfiguration{}
+				if err := k8sClient.Get(context.Background(), client.ObjectKey{Name: originConfig.Name}, c); err != nil {
+					return err
+				}
+				c.Spec = originConfig.Spec
+				return k8sClient.Update(context.Background(), c)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		})
 
 		EventuallyCreation(func() error {
 			tnt.ResourceVersion = ""
 
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
+		// Registered before waiting for readiness so a failed setup still deletes it.
+		DeferCleanup(EventuallyDeletion, tnt)
 
 		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 
 		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
 			configuration.Spec.Administrators = []rbac.UserSpec{admin}
 		})
-	})
-
-	JustAfterEach(func() {
-		EventuallyDeletion(tnt)
-
-		Eventually(func() error {
-			c := &capsulev1beta2.CapsuleConfiguration{}
-			if err := k8sClient.Get(context.Background(), client.ObjectKey{Name: originConfig.Name}, c); err != nil {
-				return err
-			}
-			c.Spec = originConfig.Spec
-			return k8sClient.Update(context.Background(), c)
-		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 
 	It("should allow", func() {
@@ -316,7 +320,7 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 				_, err := cs.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
 
 				return err
-			}, 10*time.Second, time.Second).ShouldNot(Succeed())
+			}, 3*time.Second, time.Second).ShouldNot(Succeed())
 		})
 
 		By("specifying forbidden labels using regex match", func() {
@@ -372,7 +376,7 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 				_, err := cs.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
 
 				return err
-			}, 10*time.Second, time.Second).ShouldNot(Succeed())
+			}, 3*time.Second, time.Second).ShouldNot(Succeed())
 		})
 
 		By("specifying forbidden annotations using regex match", func() {
@@ -400,7 +404,7 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 				_, err := cs.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
 
 				return err
-			}, 10*time.Second, time.Second).ShouldNot(Succeed())
+			}, 3*time.Second, time.Second).ShouldNot(Succeed())
 		})
 
 		By("specifying forbidden-prefix labels that are not managed by Capsule", func() {
@@ -428,7 +432,7 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 				_, err := cs.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
 
 				return err
-			}, 10*time.Second, time.Second).ShouldNot(Succeed())
+			}, 3*time.Second, time.Second).ShouldNot(Succeed())
 		})
 
 		By("specifying forbidden-prefix annotations that are not managed by Capsule", func() {
@@ -456,7 +460,7 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 				_, err := cs.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
 
 				return err
-			}, 10*time.Second, time.Second).ShouldNot(Succeed())
+			}, 3*time.Second, time.Second).ShouldNot(Succeed())
 		})
 
 		By("restoring a Capsule-managed forbidden-prefix label value on update", func() {

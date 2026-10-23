@@ -15,6 +15,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -27,8 +28,13 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
-var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "rules", "enforce", "services"), func() {
-	const ownerName = "e2e-rules-services"
+var _ = Describe("enforcing service namespace rules", Label("tenant", "rules", "enforce", "services"), func() {
+	// The owner and tenant names are unique per spec so the specs of this
+	// container can run concurrently on different Ginkgo processes.
+	var (
+		suffix    string
+		ownerName string
+	)
 
 	var (
 		tnt         *capsulev1beta2.Tenant
@@ -235,7 +241,7 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 
 	newTenant := func() *capsulev1beta2.Tenant {
 		return &capsulev1beta2.Tenant{
-			Name: "e2e-rule-services",
+			Name: "e2e-rule-services-" + suffix,
 			Labels: map[string]string{
 				"env": "e2e",
 			},
@@ -720,6 +726,8 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 	}
 
 	BeforeEach(func() {
+		suffix = rand.String(6)
+		ownerName = "e2e-rules-services-" + suffix
 		tenantRules = baseTenantRules()
 	})
 
@@ -736,7 +744,8 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 	})
 
 	JustAfterEach(func() {
-		EventuallyDeletion(tnt)
+		// The Tenant name is unique per spec: no need to wait for it to be gone.
+		DeleteInBackground(tnt)
 	})
 
 	It("requires or validates LoadBalancer nodePorts when allocation is enabled and nodePort ranges are configured", func() {
@@ -1199,27 +1208,6 @@ var _ = Describe("enforcing service namespace rules", Ordered, Label("tenant", "
 			ns.Name,
 			nodePortService("node-port-later-deny", 30090),
 			`nodePort "30090" at spec.ports[0].nodePort is denied by namespace rule`,
-		)
-	})
-
-	It("requires or validates LoadBalancer nodePorts when allocation is enabled and nodePort ranges are configured", func() {
-		ns := createNamespace(nil)
-		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
-
-		createServiceAndExpectDeniedOneOf(
-			cs,
-			ns.Name,
-			loadBalancerService("lb-auto-node-port-denied", "10.0.0.2", nil, nil),
-			[]string{
-				"spec.ports[*].nodePort is required by namespace rule",
-			},
-			[]string{
-				"nodePort",
-				"not allowed by namespace rule",
-				"Allowed ranges",
-				"30000-30100",
-				"30500",
-			},
 		)
 	})
 

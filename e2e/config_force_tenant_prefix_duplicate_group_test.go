@@ -9,15 +9,17 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
+// The prefix is enforced at Tenant level, so the spec needs no change to the
+// cluster-wide CapsuleConfiguration and runs in the parallel phase.
 var _ = Describe(
 	"creating a prefixed Namespace when one Tenant is matched more than once",
-	Ordered,
-	Label("config", "tenant", "prefix", "issue-2058"),
+	Label("tenant", "prefix", "issue-2058"),
 	func() {
 		const (
 			ownerGroup = "e2e-prefix-duplicate-group"
@@ -28,6 +30,7 @@ var _ = Describe(
 			Name:   "e2e-prefix-duplicate-group",
 			Labels: map[string]string{"env": "e2e"},
 			Spec: capsulev1beta2.TenantSpec{
+				ForceTenantPrefix: ptr.To(true),
 				Owners: rbac.OwnerListSpec{{
 					Kind: rbac.GroupOwner,
 					Name: ownerGroup,
@@ -42,18 +45,10 @@ var _ = Describe(
 				return k8sClient.Create(context.TODO(), tnt)
 			}).Should(Succeed())
 			TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
-
-			ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
-				configuration.Spec.ForceTenantPrefix = true
-			})
 		})
 
 		JustAfterEach(func() {
 			EventuallyDeletion(tnt)
-
-			ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
-				configuration.Spec.ForceTenantPrefix = false
-			})
 		})
 
 		It("assigns the Namespace when the owning group is repeated in the request", func() {

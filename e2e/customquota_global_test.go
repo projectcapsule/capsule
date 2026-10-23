@@ -13,8 +13,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -214,11 +212,14 @@ func getLedger(ctx context.Context, namespace, name string) *capsulev1beta2.Quan
 	return obj
 }
 
-var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ordered, Label("global", "globalcustomquota", "customquota", "ledger"), Ordered, func() {
-	const (
-		testNamespace = "global-custom-quota-e2e-test"
-		tenantLabel   = "e2e.capsule.dev/test-suite"
-		tenantValue   = "global-custom-quota-e2e"
+var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Label("global", "globalcustomquota", "customquota", "ledger"), func() {
+	const tenantLabel = "e2e.capsule.dev/test-suite"
+
+	// The namespace name and the selector value are unique per spec, so the specs
+	// of this container can run concurrently on different Ginkgo processes.
+	var (
+		testNamespace string
+		tenantValue   string
 	)
 
 	var (
@@ -277,12 +278,14 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	}
 
-	BeforeAll(func() {
+	BeforeEach(func() {
 		ctx = context.Background()
 		utilruntime.Must(capsulev1beta2.AddToScheme(scheme.Scheme))
-	})
 
-	BeforeEach(func() {
+		suffix := rand.String(6)
+		testNamespace = "global-custom-quota-e2e-" + suffix
+		tenantValue = "global-custom-quota-e2e-" + suffix
+
 		ns = &corev1.Namespace{
 			Name: testNamespace,
 			Labels: map[string]string{
@@ -298,36 +301,24 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 	})
 
 	AfterEach(func() {
-		req, err := labels.NewRequirement("e2e.capsule.dev/test-suite", selection.Equals, []string{"globalcustomquota-ledger"})
-		Expect(err).NotTo(HaveOccurred())
-
+		// Delete only this spec's quotas: other specs of this container may be
+		// running on other processes at the same time.
 		var customQuotaList capsulev1beta2.CustomQuotaList
-		Expect(k8sClient.List(
-			context.TODO(),
-			&customQuotaList,
-			client.MatchingLabelsSelector{
-				Selector: labels.NewSelector().Add(*req),
-			},
-		)).Should(Succeed())
+		Expect(k8sClient.List(context.TODO(), &customQuotaList, client.MatchingLabels{e2eRunLabel: testNamespace})).Should(Succeed())
 
 		for i := range customQuotaList.Items {
 			EventuallyDeletion(&customQuotaList.Items[i])
 		}
 
 		var list capsulev1beta2.GlobalCustomQuotaList
-		Expect(k8sClient.List(
-			context.TODO(),
-			&list,
-			client.MatchingLabelsSelector{
-				Selector: labels.NewSelector().Add(*req),
-			},
-		)).Should(Succeed())
+		Expect(k8sClient.List(context.TODO(), &list, client.MatchingLabels{e2eRunLabel: testNamespace})).Should(Succeed())
 
 		for i := range list.Items {
 			EventuallyDeletion(&list.Items[i])
 		}
 
-		ForceDeleteNamespace(ctx, testNamespace)
+		// The namespace name is unique per spec: no need to wait for it to be gone.
+		DeleteNamespaceInBackground(ctx, testNamespace)
 	})
 
 	It("aggregates a custom pod quantity path and settles the corresponding ledger", func() {
@@ -361,6 +352,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 		}).Should(Succeed())
 
 		q := newGlobalPodCPUQuota(prefix, selected.Name)
+		q.Labels[e2eRunLabel] = testNamespace
 
 		EventuallyCreation(func() error {
 			return k8sClient.Create(ctx, q)
@@ -432,6 +424,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-missing-path-not-ready",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -484,6 +477,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-missing-path-deny-create",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -530,6 +524,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-concurrent-pod-count",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -685,6 +680,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-mixed-pod-count",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -714,6 +710,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Namespace: testNamespace,
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.CustomQuotaSpec{
 				Limit: resource.MustParse("2"),
@@ -766,6 +763,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-mixed-pod-cpu",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -796,6 +794,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Namespace: testNamespace,
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.CustomQuotaSpec{
 				Limit: resource.MustParse("200m"),
@@ -846,6 +845,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-mixed-overlap",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -884,6 +884,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Namespace: testNamespace,
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.CustomQuotaSpec{
 				Limit: resource.MustParse("2"),
@@ -939,6 +940,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-mixed-path-cpu",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -969,6 +971,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Namespace: testNamespace,
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.CustomQuotaSpec{
 				Limit: resource.MustParse("2Gi"),
@@ -1013,6 +1016,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-mixed-scale",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -1042,6 +1046,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Namespace: testNamespace,
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.CustomQuotaSpec{
 				Limit: resource.MustParse("3"),
@@ -1091,6 +1096,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-sub-only-clamps-zero",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -1136,6 +1142,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-add-sub-storage",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -1193,6 +1200,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-add-sub-clamp-zero",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -1250,6 +1258,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-sub-label-selector",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -1329,6 +1338,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-sub-delete-reconcile",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -1390,6 +1400,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-sub-cpu-clamp",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -1447,6 +1458,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-sub-deployment-scale",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -1506,6 +1518,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-sub-small",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -1540,6 +1553,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-sub-large",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -1614,6 +1628,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-nsstatus-all",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -1664,6 +1679,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-nsstatus-multi-selectors",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -1722,6 +1738,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-nsstatus-empty",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -1765,6 +1782,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-no-negative-on-relabel",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -1828,6 +1846,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-pod-count",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -1882,6 +1901,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-count-single-matchlabel",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -1937,6 +1957,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-count-multi-matchlabel",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -1999,6 +2020,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-count-single-fieldselector",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -2052,6 +2074,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-count-multi-fieldselector",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -2106,6 +2129,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-multi-source-storage",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -2158,65 +2182,12 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 	})
 
-	It("tracks count with multiple field selectors and updates when the pod no longer matches", func() {
-		q := &capsulev1beta2.GlobalCustomQuota{
-			Name: "gq-count-multi-fieldselector",
-			Labels: map[string]string{
-				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-			},
-			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
-				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
-					Limit: resource.MustParse("10"),
-					Sources: []capsulev1beta2.CustomQuotaSpecSource{
-						{
-							APIVersion: "v1",
-							Kind:       "Pod",
-							Operation:  quota.OpCount,
-							Selectors: []selectors.SelectorWithFields{
-								{
-									FieldSelectors: []string{
-										`.spec.containers[?(@.image=="nginx:1.27.0")]`,
-										`.spec.containers[?(@.name=="main")]`,
-									},
-								},
-							},
-						},
-					},
-				},
-				NamespaceSelectors: []selectors.NamespaceSelector{
-					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								tenantLabel: tenantValue,
-							},
-						},
-					},
-				},
-			},
-		}
-
-		EventuallyCreation(func() error {
-			return k8sClient.Create(ctx, q)
-		}).Should(Succeed())
-
-		pod := MakePod(testNamespace, "multi-fieldselector", nil, nil, "nginx:1.27.0", "", "")
-		EventuallyCreation(func() error {
-			pod.ResourceVersion = ""
-			return k8sClient.Create(ctx, pod)
-		}).Should(Succeed())
-
-		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "1", 1)
-
-		UpdatePodImage(ctx, testNamespace, "multi-fieldselector", "nginx:1.26.0")
-		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "0", 0)
-		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
-	})
-
 	It("aggregates multiple sources with selectors across pod emptyDir and pvc storage", func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
 			Name: "gq-multi-source-selectors-storage",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -2304,6 +2275,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-multi-source-reconcile",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -2376,6 +2348,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-invalid-fieldselector",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -2426,6 +2399,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-pod-count-small",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -2454,6 +2428,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-pod-count-large",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -2513,6 +2488,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-pod-cpu-small",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -2542,6 +2518,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-pod-cpu-large",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -2603,6 +2580,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-pod-track-broad",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -2640,6 +2618,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-pod-track-frontend",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -2718,6 +2697,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-pod-path-cpu",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -2747,6 +2727,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-pod-path-emptydir",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -2801,6 +2782,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-pod-track-only",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -2838,6 +2820,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-pod-nginx-only",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -2893,6 +2876,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-tie-a",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -2921,6 +2905,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-tie-b",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -2987,6 +2972,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-multi-path-cpu",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -3016,6 +3002,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-multi-path-emptydir",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -3072,6 +3059,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-not-equals-succeeded",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
@@ -3212,6 +3200,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			Name: "gq-not-equals-failed",
 			Labels: map[string]string{
 				"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				e2eRunLabel:                  testNamespace,
 			},
 			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
 				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
