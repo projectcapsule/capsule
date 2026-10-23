@@ -134,12 +134,13 @@ func (h *volumeSnapshotRules) validate(reader client.Reader, obj *snapshotv1.Vol
 			return ad.Deny(fmt.Sprintf("enforce: %s", err))
 		}
 
-		class, err := readClass(ctx, reader, obj, enforce)
-		if err != nil {
-			return handlers.ErroredResponse(err)
+		classes := &classReader{reader: reader, name: ptr.Deref(obj.Spec.VolumeSnapshotClassName, "")}
+
+		result, err := h.evaluate(ctx, obj, classes, enforce)
+		if classes.err != nil {
+			return handlers.ErroredResponse(classes.err)
 		}
 
-		result, err := h.evaluate(obj, class, enforce)
 		if err != nil {
 			return ad.Deny(err.Error())
 		}

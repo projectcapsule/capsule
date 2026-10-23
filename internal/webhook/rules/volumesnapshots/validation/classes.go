@@ -39,48 +39,42 @@ func hasClassRules(bodies []*rules.NamespaceRuleEnforceBody) bool {
 	})
 }
 
-// readClass reads the VolumeSnapshotClass only when an applicable match
-// selects classes by label. A missing class never matches a selector.
-func readClass(
-	ctx context.Context,
-	reader client.Reader,
-	obj *snapshotv1.VolumeSnapshot,
-	enforce []*rules.NamespaceRuleEnforceBody,
-) (*snapshotv1.VolumeSnapshotClass, error) {
-	name := ptr.Deref(obj.Spec.VolumeSnapshotClassName, "")
-	if name == "" || !hasClassSelector(enforce) {
-		return nil, nil
+// classReader reads the snapshot's VolumeSnapshotClass at most once, and only
+// when a selector has to be matched. A missing class never matches a selector.
+type classReader struct {
+	reader client.Reader
+	name   string
+
+	read  bool
+	class *snapshotv1.VolumeSnapshotClass
+	err   error
+}
+
+func (c *classReader) get(ctx context.Context) (*snapshotv1.VolumeSnapshotClass, error) {
+	if c.read {
+		return c.class, c.err
 	}
+
+	c.read = true
 
 	class := &snapshotv1.VolumeSnapshotClass{}
-	if err := reader.Get(ctx, types.NamespacedName{Name: name}, class); err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, nil
+	if err := c.reader.Get(ctx, types.NamespacedName{Name: c.name}, class); err != nil {
+		if !apierrors.IsNotFound(err) {
+			c.err = fmt.Errorf("get VolumeSnapshotClass %q: %w", c.name, err)
 		}
 
-		return nil, fmt.Errorf("get VolumeSnapshotClass %q: %w", name, err)
+		return nil, c.err
 	}
+
+	c.class = class
 
 	return class, nil
 }
 
-func hasClassSelector(enforce []*rules.NamespaceRuleEnforceBody) bool {
-	for _, body := range enforce {
-		if body == nil || !appliesToVolumeSnapshots(body) {
-			continue
-		}
-
-		if slices.ContainsFunc(body.Storage.Classes, rules.StorageClassMatch.HasSelector) {
-			return true
-		}
-	}
-
-	return false
-}
-
 func (h *volumeSnapshotRules) evaluate(
+	ctx context.Context,
 	obj *snapshotv1.VolumeSnapshot,
-	class *snapshotv1.VolumeSnapshotClass,
+	classes *classReader,
 	enforce []*rules.NamespaceRuleEnforceBody,
 ) (*ruleengine.Evaluation, error) {
 	name := ptr.Deref(obj.Spec.VolumeSnapshotClassName, "")
@@ -113,12 +107,17 @@ func (h *volumeSnapshotRules) evaluate(
 				}
 			}
 
-			if !match.HasSelector() || class == nil {
+			if !match.HasSelector() {
 				return ruleengine.Match{}, nil
 			}
 
 			selector, err := h.selectors.GetOrCompile(&match.LabelSelector)
 			if err != nil {
+				return ruleengine.Match{}, err
+			}
+
+			class, err := classes.get(ctx)
+			if err != nil || class == nil {
 				return ruleengine.Match{}, err
 			}
 
