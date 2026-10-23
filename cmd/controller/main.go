@@ -13,6 +13,7 @@ import (
 	goRuntime "runtime"
 	"time"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	flag "github.com/spf13/pflag"
 	_ "go.uber.org/automaxprocs"
 	"go.uber.org/zap/zapcore"
@@ -83,6 +84,7 @@ import (
 	podrules "github.com/projectcapsule/capsule/internal/webhook/rules/pods/validation"
 	pvcrules "github.com/projectcapsule/capsule/internal/webhook/rules/pvc/validation"
 	servicerules "github.com/projectcapsule/capsule/internal/webhook/rules/services/validation"
+	volumesnapshotrules "github.com/projectcapsule/capsule/internal/webhook/rules/volumesnapshots/validation"
 	"github.com/projectcapsule/capsule/internal/webhook/service"
 	"github.com/projectcapsule/capsule/internal/webhook/serviceaccounts"
 	tenantmutation "github.com/projectcapsule/capsule/internal/webhook/tenant/mutation"
@@ -106,6 +108,7 @@ func init() {
 	utilruntime.Must(capsulev1beta2.AddToScheme(scheme))
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
 	utilruntime.Must(gatewayv1.Install(scheme))
+	utilruntime.Must(snapshotv1.AddToScheme(scheme))
 	utilruntime.Must(admissionv1.AddToScheme(scheme))
 }
 
@@ -729,6 +732,7 @@ func main() {
 				),
 			),
 			networkpolicyrules.Handler(cfg, celCache),
+			volumesnapshotrules.Handler(cfg, regexCache, labelSelectorCache, celCache),
 		),
 		route.GenericReplicasHandler(),
 		route.GenericManagedHandler(cfg),
