@@ -39,8 +39,8 @@ type ExpressionRegex struct {
 	// +kubebuilder:validation:MaxLength=4096
 	// +optional
 	Expression string `json:"exp,omitempty"`
-	// Negate regular Expression
-	//+kubebuilder:default:=false
+	// Negate inverts the match result. Omitted means false.
+	// +optional
 	Negate bool `json:"negate,omitempty"`
 }
 
