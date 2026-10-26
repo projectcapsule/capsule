@@ -62,7 +62,7 @@ func (r *Manager) SetupWithManager(
 	r.metrics = metrics
 
 	return ctrl.NewControllerManagedBy(mgr).
-		Named("capsule/configuration").
+		Named("capsule/config").
 		WithOptions(controller.Options{MaxConcurrentReconciles: 1}).
 		For(
 			&capsulev1beta2.CapsuleConfiguration{},

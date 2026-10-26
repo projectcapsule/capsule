@@ -79,7 +79,7 @@ func (h *TypedTenantWithRulesetHandler[T]) OnCreate(
 
 		rulesetResult := h.readRulesetAsync(ctx, reader, req.Namespace)
 
-		tnt, err := h.resolveTenant(ctx, reader, req)
+		tnt, ns, err := h.resolveTenant(ctx, reader, req)
 		if err != nil {
 			return ErroredResponse(err)
 		}
@@ -93,7 +93,7 @@ func (h *TypedTenantWithRulesetHandler[T]) OnCreate(
 			return ErroredResponse(err)
 		}
 
-		ruleBlocks, err := h.resolveRuleset(ctx, c, req.Namespace, tnt, <-rulesetResult)
+		ruleBlocks, err := h.resolveRuleset(c, ns, tnt, <-rulesetResult)
 		if err != nil {
 			return ErroredResponse(err)
 		}
@@ -124,9 +124,13 @@ func (h *TypedTenantWithRulesetHandler[T]) OnUpdate(
 			return nil
 		}
 
+		if isControllerFinalizerRemoval(req) {
+			return nil
+		}
+
 		rulesetResult := h.readRulesetAsync(ctx, reader, req.Namespace)
 
-		tnt, err := h.resolveTenant(ctx, reader, req)
+		tnt, ns, err := h.resolveTenant(ctx, reader, req)
 		if err != nil {
 			return ErroredResponse(err)
 		}
@@ -145,7 +149,7 @@ func (h *TypedTenantWithRulesetHandler[T]) OnUpdate(
 			return ErroredResponse(err)
 		}
 
-		ruleBlocks, err := h.resolveRuleset(ctx, c, req.Namespace, tnt, <-rulesetResult)
+		ruleBlocks, err := h.resolveRuleset(c, ns, tnt, <-rulesetResult)
 		if err != nil {
 			return ErroredResponse(err)
 		}
@@ -180,12 +184,12 @@ func (h *TypedTenantWithRulesetHandler[T]) resolveTenant(
 	ctx context.Context,
 	c client.Reader,
 	req admission.Request,
-) (*capsulev1beta2.Tenant, error) {
+) (*capsulev1beta2.Tenant, *corev1.Namespace, error) {
 	if req.Namespace == "" {
-		return nil, nil
+		return nil, nil, nil
 	}
 
-	return tenant.GetTenantByNamespace(ctx, c, req.Namespace)
+	return tenant.GetTenantByNamespaceWithSnapshot(ctx, c, req.Namespace)
 }
 
 func (h *TypedTenantWithRulesetHandler[T]) readRulesetAsync(
@@ -208,7 +212,10 @@ func (h *TypedTenantWithRulesetHandler[T]) readRulesetAsync(
 		case err == nil:
 			result <- rulesetReadResult{
 				rules: rs.Status.Rules,
-				found: true,
+				// A newly published spec can precede its effective status. Use
+				// the existing namespace-rendering fallback until this generation
+				// has been processed, rather than allowing with an empty ruleset.
+				found: rs.Status.ObservedGeneration == rs.Generation,
 			}
 		case apierrors.IsNotFound(err):
 			result <- rulesetReadResult{}
@@ -223,9 +230,8 @@ func (h *TypedTenantWithRulesetHandler[T]) readRulesetAsync(
 // Resolve the corresponding managed ruleset for this namespace.
 // If not yet present, try to calculate it.
 func (h *TypedTenantWithRulesetHandler[T]) resolveRuleset(
-	ctx context.Context,
 	c client.Client,
-	namespace string,
+	ns *corev1.Namespace,
 	tnt *capsulev1beta2.Tenant,
 	result rulesetReadResult,
 ) ([]*rules.NamespaceRuleBodyNamespace, error) {
@@ -237,10 +243,6 @@ func (h *TypedTenantWithRulesetHandler[T]) resolveRuleset(
 		return result.rules, nil
 	}
 
-	ns := &corev1.Namespace{}
-	if err := c.Get(ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
-		return nil, err
-	}
-
+	// Use the exact ownership snapshot, including on single-handler routes.
 	return tenant.BuildNamespaceRuleBodyStatus(c.Scheme(), ns, tnt)
 }

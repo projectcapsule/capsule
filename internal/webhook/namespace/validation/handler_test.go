@@ -27,6 +27,7 @@ func TestNamespaceHandlerAllowsUnchangedFinalizeWithoutTenant(t *testing.T) {
 	t.Parallel()
 
 	scheme := namespaceValidationScheme(t)
+	reader := fake.NewClientBuilder().WithScheme(scheme).Build()
 	now := metav1.Now()
 	oldNs := namespaceWithTenantReference("workloads", "missing", "missing-uid")
 	oldNs.DeletionTimestamp = &now
@@ -35,8 +36,8 @@ func TestNamespaceHandlerAllowsUnchangedFinalizeWithoutTenant(t *testing.T) {
 	newNs.Spec.Finalizers = nil
 
 	response := NamespaceHandler(nil).OnUpdate(
-		nil,
-		nil,
+		reader,
+		reader,
 		admission.NewDecoder(scheme),
 		nil,
 	)(context.Background(), namespaceUpdateRequest(t, oldNs, newNs, "finalize"))
@@ -189,7 +190,7 @@ func TestNamespaceHandlerAllowsDeleteWithMissingTenant(t *testing.T) {
 	}
 }
 
-func namespaceValidationScheme(t *testing.T) *runtime.Scheme {
+func namespaceValidationScheme(t testing.TB) *runtime.Scheme {
 	t.Helper()
 
 	scheme := runtime.NewScheme()
@@ -216,7 +217,7 @@ func namespaceWithTenantReference(name, tenantName, tenantUID string) *corev1.Na
 }
 
 func namespaceUpdateRequest(
-	t *testing.T,
+	t testing.TB,
 	oldNs, newNs *corev1.Namespace,
 	subresource string,
 ) admission.Request {

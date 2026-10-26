@@ -17,6 +17,10 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 )
 
+// NamespaceOwnerReferenceIndexerFieldName selects namespace candidates by Tenant name.
+// Callers must also check the owner reference UID before using a candidate.
+const NamespaceOwnerReferenceIndexerFieldName = ".metadata.ownerReferences[*].capsule"
+
 func CollectOwners(
 	ctx context.Context,
 	c client.Reader,

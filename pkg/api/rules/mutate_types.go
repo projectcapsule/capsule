@@ -9,7 +9,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// MutationAction selects merge or replacement of supplied workload properties.
+// MutationAction selects merge or replacement of supplied properties.
 type MutationAction string
 
 const (
@@ -34,6 +34,8 @@ type NamespaceRuleMutation struct {
 	// Replace replaces each supplied property in full: scheduler, hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy, nodeSelector,
 	// registries.imagePullSecrets, tolerations, topologySpreadConstraints, affinity, or security profiles. Omitted properties are
 	// retained. Supplying affinity replaces all its branches, including omitted ones.
+	// ListenerSet parent references are atomic: merge fills an absent or null
+	// reference, while replace replaces the entire supplied reference.
 	// +optional
 	// +kubebuilder:default=merge
 	// +kubebuilder:validation:Enum=merge;replace
@@ -41,6 +43,10 @@ type NamespaceRuleMutation struct {
 
 	// +optional
 	Workloads WorkloadMutation `json:"workloads,omitempty"`
+
+	// Ingress configures Kubernetes ingress and Gateway API resource mutations.
+	// +optional
+	Ingress IngressMutation `json:"ingress,omitzero"`
 }
 
 // WorkloadMutation contains typed native Pod values. Empty maps/lists are
@@ -182,4 +188,9 @@ func (w WorkloadMutation) GetWorkloadTargets(target WorkloadValidationTarget) bo
 // HasPodProperties reports whether any Pod-level property is configured.
 func (w WorkloadMutation) HasPodProperties() bool {
 	return w.Placement.Scheduler != "" || w.Security.HostUsers != nil || w.Placement.NodeSelector != nil || w.Placement.Tolerations != nil || w.Placement.TopologySpreadConstraints != nil || w.Placement.Affinity != nil || w.Security.SeccompProfile != nil || w.Security.AppArmorProfile != nil || w.Registries.ImagePullSecrets != nil
+}
+
+// HasProperties reports whether any workload mutation property is supplied.
+func (w WorkloadMutation) HasProperties() bool {
+	return w.HasPodProperties() || w.Security.ReadOnlyRootFilesystem != nil || w.Registries.ImagePullPolicy != ""
 }

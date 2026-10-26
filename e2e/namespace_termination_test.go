@@ -20,6 +20,15 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
+// Mirrors namespaceCascadingCleanupGracePeriod and namespaceCleanupRetryPeriod in
+// internal/controllers/tenant/namespace_cleanup.go: the cascading cleanup of a
+// terminating namespace is first attempted 10 s after its deletion and retried
+// every 5 s while the namespace still has Pods.
+const (
+	namespaceCleanupGracePeriod = 10 * time.Second
+	namespaceCleanupRetryPeriod = 5 * time.Second
+)
+
 var _ = Describe("terminating namespace with guardrails", Ordered, Label("namespace", "termination"), func() {
 	ctx := context.TODO()
 
@@ -90,6 +99,8 @@ var _ = Describe("terminating namespace with guardrails", Ordered, Label("namesp
 	})
 
 	It("keeps managed rolebindings during namespace termination and cleans up after finalizer removal", func() {
+		var deletionTimestamp time.Time
+
 		By("deleting the namespace (it should get stuck terminating due to pod finalizer)", func() {
 			ns := &corev1.Namespace{Name: nsName}
 			Expect(k8sClient.Delete(ctx, ns)).To(Succeed())
@@ -101,28 +112,52 @@ var _ = Describe("terminating namespace with guardrails", Ordered, Label("namesp
 				err := k8sClient.Get(ctx, types.NamespacedName{Name: nsName}, ns)
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(ns.DeletionTimestamp).ToNot(BeNil(), "namespace should have deletionTimestamp")
+				deletionTimestamp = ns.DeletionTimestamp.Time
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 
-		By("while namespace is terminating, verify rolebindings are still present", func() {
-			Consistently(func(g Gomega) {
-				// Namespace likely still exists during this window
-				ns := &corev1.Namespace{}
-				err := k8sClient.Get(ctx, types.NamespacedName{Name: nsName}, ns)
-				g.Expect(err).ToNot(HaveOccurred())
+		By("waiting for the Tenant status to report the namespace as blocked by its pod", func() {
+			Eventually(func(g Gomega) {
+				current := &capsulev1beta2.Tenant{}
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: tnt.GetName()}, current)).To(Succeed())
 
-				VerifyTenantRoleBindings(tnt)
-			}, 10*time.Second, defaultPollInterval).Should(Succeed())
+				var space *capsulev1beta2.TenantStatusNamespaceItem
+				for _, item := range current.Status.Spaces {
+					if item != nil && item.Name == nsName {
+						space = item
+					}
+				}
+				g.Expect(space).ToNot(BeNil(), "namespace %s should be listed in the Tenant status", nsName)
+
+				terminating := space.Conditions.GetConditionByType(meta.TerminatingCondition)
+				g.Expect(terminating).ToNot(BeNil(), "namespace %s should carry a Terminating condition", nsName)
+				g.Expect(terminating.Reason).To(Equal(meta.PendingUnmanagedContentReason))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 
-		By("while namespace is terminating, verify tenant still exists and has controller finalizer", func() {
+		By("verifying rolebindings and the tenant finalizer survive a cleanup attempt while the pod blocks termination", func() {
+			// The cascading cleanup is first attempted namespaceCleanupGracePeriod
+			// after the deletion and retried every namespaceCleanupRetryPeriod while
+			// the pod is still there. Observing past the first retry covers at least
+			// one attempt that found the pod and had to leave the RoleBindings alone.
+			deadline := deletionTimestamp.Add(namespaceCleanupGracePeriod + namespaceCleanupRetryPeriod + 2*time.Second)
+
 			Consistently(func(g Gomega) {
-				cur := &capsulev1beta2.Tenant{}
-				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: tnt.GetName()}, cur)).To(Succeed())
-				g.Expect(controllerutil.ContainsFinalizer(cur, meta.ControllerFinalizer)).To(BeTrue(),
+				ns := &corev1.Namespace{}
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: nsName}, ns)).To(Succeed())
+				g.Expect(ns.DeletionTimestamp).ToNot(BeNil())
+
+				// Check the live Tenant: the fixture copy has no status namespaces,
+				// which would make the RoleBinding verification vacuous.
+				current := &capsulev1beta2.Tenant{}
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: tnt.GetName()}, current)).To(Succeed())
+				g.Expect(current.Status.Namespaces).To(ContainElement(nsName))
+				g.Expect(controllerutil.ContainsFinalizer(current, meta.ControllerFinalizer)).To(BeTrue(),
 					"tenant should still have controller finalizer while a namespace is terminating",
 				)
-			}, 10*time.Second, defaultPollInterval).Should(Succeed())
+
+				VerifyTenantRoleBindings(current)
+			}, max(time.Until(deadline), 5*time.Second), defaultPollInterval).Should(Succeed())
 		})
 
 		By("removing the pod finalizer to unblock namespace deletion", func() {
@@ -166,15 +201,32 @@ var _ = Describe("terminating namespace with guardrails", Ordered, Label("namesp
 			)
 		})
 
-		By("verifying tenant still exists (and finalizer cleanup depending on policy)", func() {
+		By("keeping lifecycle protection on the active Tenant after its last namespace disappears", func() {
 			Eventually(func(g Gomega) {
 				cur := &capsulev1beta2.Tenant{}
 				err := k8sClient.Get(ctx, types.NamespacedName{Name: tnt.GetName()}, cur)
 				g.Expect(err).ToNot(HaveOccurred())
 
 				g.Expect(cur.Status.Size).Should(Equal(uint(0)))
-				g.Expect(controllerutil.ContainsFinalizer(cur, meta.ControllerFinalizer)).To(BeFalse())
+				g.Expect(cur.Status.Spaces).To(BeEmpty())
+				g.Expect(cur.Status.Namespaces).To(BeEmpty())
+				g.Expect(cur.DeletionTimestamp).To(BeNil())
+				g.Expect(controllerutil.ContainsFinalizer(cur, meta.ControllerFinalizer)).To(BeTrue())
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		})
+
+		By("accepting another namespace while the empty Tenant remains protected", func() {
+			ns := NewNamespace("", map[string]string{meta.TenantLabel: tnt.Name})
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+			TenantNamespaceReady(tnt, ns, 1)
+			EventuallyDeletion(ns)
+		})
+
+		By("finalizing the Tenant after an explicit deletion", func() {
+			EventuallyDeletionWithoutPodCleanup(tnt)
+			Eventually(func() bool {
+				return apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: tnt.Name}, &capsulev1beta2.Tenant{}))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
 		})
 	})
 })

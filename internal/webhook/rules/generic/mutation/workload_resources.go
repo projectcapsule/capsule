@@ -67,7 +67,9 @@ func mutateWorkloadResources(
 
 	// Skip decoding when neither legacy resource policies nor mutation applies.
 	if !slices.ContainsFunc(bodies, func(body *apirules.NamespaceRuleBodyNamespace) bool {
-		return body != nil && (len(body.Mutate) > 0 || (body.Enforce != nil && body.Enforce.Workloads.Resources != nil))
+		return body != nil && (slices.ContainsFunc(body.Mutate, func(mutation apirules.NamespaceRuleMutation) bool {
+			return mutation.Workloads.HasProperties()
+		}) || (body.Enforce != nil && body.Enforce.Workloads.Resources != nil))
 	}) {
 		return false, nil
 	}

@@ -123,13 +123,3 @@ func (r *Manager) pruneGlobalResourceQuotas(
 
 	return nil
 }
-
-func hasRuleGlobalResourceQuotas(tnt *capsulev1beta2.Tenant) bool {
-	for _, rule := range tnt.Spec.Rules {
-		if rule != nil && rule.NamespaceRuleBodyNamespace != nil && len(rule.Quota) > 0 {
-			return true
-		}
-	}
-
-	return false
-}

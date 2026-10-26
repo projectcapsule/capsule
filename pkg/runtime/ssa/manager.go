@@ -26,9 +26,12 @@ import (
 
 // Metadata configures the labels used to track resources managed by a Manager.
 type Metadata struct {
-	CreatedByValue                      string
-	ManagedByValue                      string
-	ProtectedByValue                    string
+	CreatedByValue   string
+	ManagedByValue   string
+	ProtectedByValue string
+	// ProtectionFieldOwnerPrefix scopes a shared protection marker to its controller family.
+	// Empty retains conservative ownership checks.
+	ProtectionFieldOwnerPrefix          string
 	ProtectedByServiceAccount           string
 	ProtectedByServiceAccountAnnotation string
 	AppManagedByValue                   string
@@ -90,13 +93,12 @@ func (m Manager) Apply(
 	// Rendered input cannot assert lifecycle ownership. Creation provenance is
 	// added below only after checking the live target; other tracking metadata
 	// belongs to the lifecycle manager.
-	meta.SetFilteredLabels(desired, map[string]struct{}{
-		meta.CreatedByCapsuleLabel:         {},
-		meta.NewManagedByCapsuleLabel:      {},
-		meta.ProtectedByCapsuleLabel:       {},
-		meta.ReplicationProtectionLabel:    {},
-		meta.ResourcePermitProtectionLabel: {},
-	})
+	meta.SetFilteredLabelsWithPrefixes(desired, map[string]struct{}{
+		meta.CreatedByCapsuleLabel:      {},
+		meta.NewManagedByCapsuleLabel:   {},
+		meta.ProtectedByCapsuleLabel:    {},
+		meta.ReplicationProtectionLabel: {},
+	}, []string{meta.ProtectionLabelPrefix})
 
 	protectionAnnotation := m.Metadata.ProtectedByServiceAccountAnnotation
 	if protectionAnnotation != "" {

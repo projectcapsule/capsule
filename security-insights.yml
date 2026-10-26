@@ -1,0 +1,231 @@
+# Copyright 2020-2026 Project Capsule Authors
+# SPDX-License-Identifier: Apache-2.0
+# Schema: https://github.com/ossf/security-insights/blob/v2.2.0/spec/schema.cue
+header:
+  schema-version: "2.2.0"
+  last-updated: "2026-10-17"
+  last-reviewed: "2026-10-15"
+  url: https://raw.githubusercontent.com/projectcapsule/capsule/main/security-insights.yml
+  comment: |
+    Repository-derived refresh for Security Slam. The scoped security
+    assessment was approved by maintainer Oliver Bähler on 2026-10-15.
+    Contacts and team membership come from SECURITY.md and
+    .github/maintainers.yaml. GitHub administrative access,
+    repository protection settings, and individual release attestations have
+    not been independently verified.
+project:
+  name: Capsule
+  homepage: https://projectcapsule.dev/
+  administrators:
+    - name: Capsule maintainers
+      primary: true
+      email: cncf-capsule-maintainers@lists.cncf.io
+      social: https://github.com/projectcapsule
+  repositories:
+    - name: capsule
+      url: https://github.com/projectcapsule/capsule
+      comment: Controller, namespace profiling rules, admission webhooks, and Helm chart.
+    - name: capsule-proxy
+      url: https://github.com/projectcapsule/capsule-proxy
+      comment: Optional Kubernetes API proxy for tenant users; developed and released separately.
+    - name: website
+      url: https://github.com/projectcapsule/website
+      comment: User documentation and project website; supports the runtime codebases.
+  vulnerability-reporting:
+    reports-accepted: true
+    bug-bounty-available: false
+    policy: https://github.com/projectcapsule/capsule/blob/main/SECURITY.md
+    contact:
+      name: Capsule maintainers
+      primary: true
+      email: cncf-capsule-maintainers@lists.cncf.io
+    comment: |
+      Submit a private vulnerability report through
+      https://github.com/projectcapsule/capsule/security/advisories/new.
+      SECURITY.md records the Linux Foundation CRA stewardship statement
+      for Capsule's intended commercial use and emergency reporting process.
+      Prefix emergency report titles with URGENT; if GitHub private reporting
+      is unavailable or affected by an incident, contact
+      steward@linuxfoundation.org privately. Maintainer escalation instructions
+      for actively exploited vulnerabilities and severe incidents are at
+      https://github.com/projectcapsule/capsule/blob/main/CONTRIBUTING.md#cra-stewardship-and-security-escalation.
+      SECURITY.md does not advertise a bug bounty; the false flag reflects
+      that documented position and needs maintainer confirmation before publication.
+      SECURITY.md describes reporting coverage across the projectcapsule
+      organization; the assessment linked below covers this repository only.
+      Reports cover security vulnerabilities in repositories under the
+      projectcapsule organization. Installation or configuration support
+      requests and issues unrelated to security are out of scope, as are
+      unverified scanner reports without confirmation that Capsule is affected.
+      Scope is recorded here because the scanner's si-tooling v2.2.0 parser
+      cannot read the schema's in-scope and out-of-scope lists.
+  documentation:
+    design: https://github.com/projectcapsule/capsule/blob/main/security/capabilities.yaml
+    detailed-guide: https://projectcapsule.dev/docs/
+    quickstart-guide: https://projectcapsule.dev/docs/quickstart/
+    release-process: https://github.com/projectcapsule/capsule/blob/main/DEVELOPMENT.md#release-process
+    code-of-conduct: https://github.com/projectcapsule/capsule/blob/main/CODE_OF_CONDUCT.md
+    support-policy: https://github.com/projectcapsule/capsule/blob/main/CONTRIBUTING.md#supported-versions
+    signature-verification: https://github.com/projectcapsule/capsule/blob/main/SECURITY.md#release-artifacts
+repository:
+  url: https://github.com/projectcapsule/capsule
+  status: active
+  accepts-change-request: true
+  accepts-automated-change-request: true
+  bug-fixes-only: false
+  no-third-party-packages: false
+  core-team:
+    - name: Adriano Pezzuto
+      primary: false
+      social: https://github.com/bsctl
+    - name: Dario Tranchitella
+      primary: false
+      social: https://github.com/prometherion
+    - name: Maksim Fedotov
+      primary: false
+      social: https://github.com/MaxFedotov
+    - name: Oliver Bähler
+      primary: true
+      social: https://github.com/oliverbaehler
+    - name: Massimiliano Giovagnoli
+      primary: false
+      social: https://github.com/maxgio92
+    - name: Hristo Hristov
+      primary: false
+      social: https://github.com/Svarrogh1337
+  license:
+    expression: Apache-2.0
+    url: https://github.com/projectcapsule/capsule/blob/main/LICENSE
+  documentation:
+    contributing-guide: https://github.com/projectcapsule/capsule/blob/main/CONTRIBUTING.md
+    governance: https://github.com/projectcapsule/capsule/blob/main/GOVERNANCE.md
+    dependency-management-policy: https://github.com/projectcapsule/capsule/blob/main/DEPENDENCY.md
+    security-policy: https://github.com/projectcapsule/capsule/blob/main/SECURITY.md
+  security:
+    assessments:
+      self:
+        name: Capsule namespace profiling Gemara threat assessment
+        evidence: https://raw.githubusercontent.com/projectcapsule/capsule/main/security/threats.yaml
+        comment: |
+          Catalogs version 0.3.0 in Gemara v1.6.0 were approved for publication
+          by maintainer Oliver Bähler (https://github.com/oliverbaehler) on
+          2026-10-15. Scope, trust boundaries, assessed runtime revision, and
+          capabilities are at
+          https://raw.githubusercontent.com/projectcapsule/capsule/main/security/capabilities.yaml.
+          Threats identify existing defenses and residual risks; referenced tests
+          indicate coverage and do not attest passing execution. Publication
+          date is omitted until the approved assessment is published.
+          Historical prose self-assessment remains available at
+          https://github.com/projectcapsule/capsule/blob/main/SELF_ASSESSMENT.md.
+          The threat catalog maps twelve published Capsule advisories and
+          records five Capsule Proxy advisories as unassessed integration risks.
+          Maintenance, validation, and review instructions are at
+          https://github.com/projectcapsule/capsule/blob/main/DEVELOPMENT.md#security-assessment.
+          OSPS Baseline Level 1 evidence, the published evaluation, and the
+          build-workflow review are at
+          https://github.com/projectcapsule/capsule/blob/main/security/osps-baseline.md.
+    tools:
+      - name: OSPS Baseline Scanner
+        type: other
+        rulesets:
+          - osps-baseline-2026-08
+        integration:
+          adhoc: false
+          ci: true
+          release: false
+        results:
+          ci:
+            name: OSPS Baseline evaluation
+            predicate-uri: https://github.com/revanite-io/osps-baseline-action
+            location: https://github.com/projectcapsule/capsule/actions/workflows/osps-baseline.yml
+        comment: |
+          osps-baseline.yml configures weekly, main-branch push, and manual
+          Maturity Level 1 evaluations using a SHA-pinned action and its
+          digest-pinned scanner image. It requires the PVTR_GITHUB_TOKEN
+          Actions secret with repository-scoped read access to settings.
+          Full results are available in the job summary and retained as
+          workflow artifacts for 30 days; failed controls are uploaded as SARIF.
+          Failed controls do not fail the job, while scanner execution and
+          missing-artifact errors do. Configuration does not attest a passing
+          assessment or a completed live run.
+      - name: Privateer grc.store Publisher
+        type: other
+        rulesets:
+          - osps-baseline-2026-08
+        integration:
+          adhoc: false
+          ci: true
+          release: false
+        results:
+          ci:
+            name: Published OSPS Baseline evaluations
+            predicate-uri: https://github.com/revanite-io/pvtr-publish-results
+            location: https://grc.store/targets/capsule/capsule
+        comment: |
+          osps-baseline-publish.yml configures daily Privateer evaluations at
+          10:00 Europe/Zurich and manual runs using the trusted
+          pvtr-publish-results workflow at v1.
+          Publishing uses OIDC; scanning uses the read-only PVTR_GITHUB_TOKEN
+          Actions secret. GRC_NAMESPACE and GRC_RESULTS_LICENSE Actions
+          variables select the namespace and SPDX results license. The namespace
+          must trust projectcapsule/capsule as a publisher on refs/heads/main.
+          The caller versions the target with the workflow run's commit SHA.
+          Manual dry runs retain bundles without publishing. Failed Baseline
+          controls can be published; execution and publication errors fail.
+          Capsule is a CNCF Sandbox project; the Defender submission targets
+          OSPS Baseline Level 1. The verified run published on 2026-10-17
+          passed all 24 active Level 1 requirements; OSPS-BR-01.02 is retired.
+          Source revision, the immutable result, and control evidence are at
+          https://github.com/projectcapsule/capsule/blob/main/security/osps-baseline.md.
+      - name: Gosec
+        type: SAST
+        version: v2.29.0
+        rulesets:
+          - default
+        integration:
+          adhoc: false
+          ci: true
+          release: false
+        results: {}
+        comment: |
+          coverage.yml runs Gosec and uploads SARIF. The scanner uses -no-fail;
+          this records execution, not a security findings merge gate.
+      - name: Trivy
+        type: SCA
+        rulesets:
+          - default
+        integration:
+          adhoc: false
+          ci: true
+          release: true
+        results: {}
+        comment: |
+          docker-build.yml scans the repository filesystem on selected pull
+          requests and uploads SARIF. docker-publish.yml scans during image
+          release. Both select HIGH and CRITICAL findings and ignore unfixed
+          vulnerabilities. No published results URL is asserted here.
+      - name: OpenSSF Scorecard
+        type: other
+        rulesets:
+          - default
+        integration:
+          adhoc: true
+          ci: true
+          release: false
+        results: {}
+        comment: |
+          scorecard.yml runs on a weekly schedule and main-branch pushes,
+          publishes results, and uploads SARIF. Configuration does not attest
+          the current score or repository protection settings.
+  release:
+    automated-pipeline: true
+    changelog: https://github.com/projectcapsule/capsule/blob/main/CHANGELOG.md
+    distribution-points:
+      - uri: https://github.com/projectcapsule/capsule/releases
+        comment: Tagged project releases.
+      - uri: https://ghcr.io/projectcapsule/capsule
+        comment: Controller images; docker-publish.yml requests signing, SBOM, and provenance generation.
+      - uri: https://ghcr.io/projectcapsule/charts/capsule
+        comment: OCI Helm chart; helm-publish.yml requests signing and provenance generation.
+      - uri: https://projectcapsule.github.io/charts
+        comment: Helm chart repository published by helm-publish.yml.

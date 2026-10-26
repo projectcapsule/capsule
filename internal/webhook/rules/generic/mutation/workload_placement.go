@@ -41,6 +41,10 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 
 		for j := range body.Mutate {
 			mutation := &body.Mutate[j]
+			if !mutation.Workloads.HasProperties() {
+				continue
+			}
+
 			if (len(mutation.Workloads.Targets) > 0 || mutation.Workloads.Security.ReadOnlyRootFilesystem != nil || mutation.Workloads.Registries.ImagePullPolicy != "") && !mutationAppliesToPod(pod, mutation.Workloads) {
 				continue
 			}

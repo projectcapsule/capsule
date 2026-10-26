@@ -1,9 +1,12 @@
 
 <p align="left">
-  <img src="https://img.shields.io/github/license/clastix/capsule"/>
-  <img src="https://img.shields.io/github/go-mod/go-version/clastix/capsule"/>
+  <a href="https://grc.store/targets/capsule/capsule">
+    <img src="https://img.shields.io/badge/OSPS_Baseline-results-blue" alt="OSPS Baseline results on grc.store"/>
+  </a>
+  <img src="https://img.shields.io/github/license/projectcapsule/capsule"/>
+  <img src="https://img.shields.io/github/go-mod/go-version/projectcapsule/capsule"/>
   <a href="https://github.com/projectcapsule/capsule/releases">
-    <img src="https://img.shields.io/github/v/release/clastix/capsule"/>
+    <img src="https://img.shields.io/github/v/release/projectcapsule/capsule"/>
   </a>
   <a href="https://charmhub.io/capsule-k8s">
     <img src="https://charmhub.io/capsule-k8s/badge.svg"/>
@@ -11,7 +14,7 @@
   <a href="https://www.bestpractices.dev/projects/5601">
     <img src="https://www.bestpractices.dev/projects/5601/badge"/>
   </a>
-  <a href="https://api.securityscorecards.dev/projects/github.com/projectcapsule/capsule/badge">
+  <a href="https://securityscorecards.dev/viewer/?uri=github.com%2Fprojectcapsule%2Fcapsule">
     <img src="https://api.securityscorecards.dev/projects/github.com/projectcapsule/capsule/badge"/>
   </a>
   <a href="https://artifacthub.io/packages/search?repo=projectcapsule">
@@ -87,6 +90,19 @@ Assign to tenants a dedicated set of compute, storage, and network resources and
 # Documentation
 
 Please check the project [documentation](https://projectcapsule.dev) for the cool things you can do with Capsule.
+
+## Project repositories
+
+| Repository | Scope |
+| --- | --- |
+| [Capsule](https://github.com/projectcapsule/capsule) | Controller, namespace profiling rules, admission webhooks, and Helm chart. |
+| [Capsule Proxy](https://github.com/projectcapsule/capsule-proxy) | Optional Kubernetes API proxy for tenant users, developed and released separately. |
+| [Website](https://github.com/projectcapsule/website) | Source for the user documentation and project website. |
+| [Community](https://github.com/projectcapsule/capsule-community) | Community coordination and meeting materials. |
+
+Capsule and Capsule Proxy are the runtime codebases. The website and community
+repositories support documentation and collaboration. The [release process](DEVELOPMENT.md#release-process)
+in this repository builds and publishes the Capsule controller and Helm chart.
 
 # Contributions
 

@@ -35,7 +35,7 @@ func TestManagedResourceProtectionDoesNotExemptMetadata(t *testing.T) {
 			denied: {Values: []runtime.ExpressionMatch{{Exact: []string{"true"}}}},
 		}}},
 	}}}
-	for _, source := range []string{meta.ValueControllerResourcePermit, meta.ValueControllerReplications} {
+	for _, source := range []string{meta.ValueControllerReplications} {
 		for _, op := range []admissionv1.Operation{admissionv1.Create, admissionv1.Update} {
 			for _, marker := range []string{source, meta.ValueController, meta.ValueControllerResources} {
 				for _, removeProtection := range []bool{false, true} {
@@ -46,16 +46,11 @@ func TestManagedResourceProtectionDoesNotExemptMetadata(t *testing.T) {
 						var c client.Client
 						var req admission.Request
 						var guard handlers.Handler
-						protection := meta.ResourcePermitProtectionLabel
-						if source == meta.ValueControllerResourcePermit {
-							c, req = permitAdmissionFixture(t, 2, false)
-							guard = ResourcePermitResourceHandler()
-						} else {
-							c, req = replicationAdmissionFixture(t, true, true, 2)
-							guard = ReplicaHandler()
-							protection = meta.ReplicationProtectionLabel
-							req.UserInfo.Username = "system:serviceaccount:tenant-a:runner"
-						}
+						protection := (meta.ProtectionLabelPrefix + "example-addon")
+						c, req = replicationAdmissionFixture(t, true, true, 2)
+						guard = ReplicaHandler()
+						protection = meta.ReplicationProtectionLabel
+						req.UserInfo.Username = "system:serviceaccount:tenant-a:runner"
 						req.Operation = op
 						old := &metav1.PartialObjectMetadata{}
 						require.NoError(t, json.Unmarshal(req.Object.Raw, old))

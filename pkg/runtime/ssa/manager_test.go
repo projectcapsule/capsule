@@ -41,11 +41,11 @@ func TestManagedMetadataPatches(t *testing.T) {
 		ManagedByValue:                      testCreatedBy,
 		ProtectedByValue:                    testCreatedBy,
 		ProtectedByServiceAccount:           "system:serviceaccount:test:runner",
-		ProtectedByServiceAccountAnnotation: meta.ResourcePermitServiceAccountAnnotation,
+		ProtectedByServiceAccountAnnotation: "example.org/service-account",
 	}}
 	owner := metav1.OwnerReference{
 		APIVersion: "capsule.clastix.io/v1beta2",
-		Kind:       "ResourcePermit",
+		Kind:       "RenderedResource",
 		Name:       "request",
 		UID:        types.UID("request-uid"),
 	}
@@ -223,18 +223,18 @@ func TestApplyUsesServerSideApply(t *testing.T) {
 		ManagedByValue:                      testCreatedBy,
 		ProtectedByValue:                    testCreatedBy,
 		ProtectedByServiceAccount:           "system:serviceaccount:test:runner",
-		ProtectedByServiceAccountAnnotation: meta.ResourcePermitServiceAccountAnnotation,
+		ProtectedByServiceAccountAnnotation: "example.org/service-account",
 	}}
 	desired := configMap("applied", map[string]any{"requested": "value"})
 	desired.SetLabels(map[string]string{
-		meta.CreatedByCapsuleLabel:         "template-value",
-		meta.NewManagedByCapsuleLabel:      "template-value",
-		meta.ProtectedByCapsuleLabel:       "template-value",
-		meta.ReplicationProtectionLabel:    "true",
-		meta.ResourcePermitProtectionLabel: "true",
+		meta.CreatedByCapsuleLabel:                     "template-value",
+		meta.NewManagedByCapsuleLabel:                  "template-value",
+		meta.ProtectedByCapsuleLabel:                   "template-value",
+		meta.ReplicationProtectionLabel:                "true",
+		(meta.ProtectionLabelPrefix + "example-addon"): "true",
 	})
 	desired.SetAnnotations(map[string]string{
-		meta.ResourcePermitServiceAccountAnnotation: "system:serviceaccount:spoofed:runner",
+		"example.org/service-account": "system:serviceaccount:spoofed:runner",
 	})
 
 	result, err := manager.Apply(context.Background(), recording, desired, ApplyOptions{
@@ -271,10 +271,10 @@ func TestApplyUsesServerSideApply(t *testing.T) {
 	if value := apply.object.GetLabels()[meta.ProtectionLabelPrefix+testCreatedBy]; value != meta.ValueTrue {
 		t.Fatalf("Apply() independent protection label = %q, want true", value)
 	}
-	if labels := apply.object.GetLabels(); labels[meta.ReplicationProtectionLabel] != "" || labels[meta.ResourcePermitProtectionLabel] != "" {
+	if labels := apply.object.GetLabels(); labels[meta.ReplicationProtectionLabel] != "" || labels[(meta.ProtectionLabelPrefix+"example-addon")] != "" {
 		t.Fatalf("Apply() allowed rendered protection identities: %#v", labels)
 	}
-	if value := apply.object.GetAnnotations()[meta.ResourcePermitServiceAccountAnnotation]; value != "system:serviceaccount:test:runner" {
+	if value := apply.object.GetAnnotations()["example.org/service-account"]; value != "system:serviceaccount:test:runner" {
 		t.Fatalf("Apply() protection ServiceAccount = %q, want resolved identity", value)
 	}
 }
@@ -337,12 +337,12 @@ func TestApplyStripsProtectionWhenDisabled(t *testing.T) {
 		ManagedByValue:                      testCreatedBy,
 		ProtectedByValue:                    testCreatedBy,
 		ProtectedByServiceAccount:           "system:serviceaccount:test:runner",
-		ProtectedByServiceAccountAnnotation: meta.ResourcePermitServiceAccountAnnotation,
+		ProtectedByServiceAccountAnnotation: "example.org/service-account",
 	}}
 	desired := configMap("unprotected", nil)
 	desired.SetLabels(map[string]string{meta.ProtectedByCapsuleLabel: "template-value"})
 	desired.SetAnnotations(map[string]string{
-		meta.ResourcePermitServiceAccountAnnotation: "system:serviceaccount:spoofed:runner",
+		"example.org/service-account": "system:serviceaccount:spoofed:runner",
 	})
 
 	if _, err := manager.Apply(context.Background(), recording, desired, ApplyOptions{
@@ -353,7 +353,7 @@ func TestApplyStripsProtectionWhenDisabled(t *testing.T) {
 	if value := recording.patches[0].object.GetLabels()[meta.ProtectedByCapsuleLabel]; value != "" {
 		t.Fatalf("Apply() protection label = %q with protection disabled", value)
 	}
-	if value := recording.patches[0].object.GetAnnotations()[meta.ResourcePermitServiceAccountAnnotation]; value != "" {
+	if value := recording.patches[0].object.GetAnnotations()["example.org/service-account"]; value != "" {
 		t.Fatalf("Apply() protection ServiceAccount = %q with protection disabled", value)
 	}
 }
@@ -446,7 +446,7 @@ func TestPrune(t *testing.T) {
 
 	owner := metav1.OwnerReference{
 		APIVersion: "capsule.clastix.io/v1beta2",
-		Kind:       "ResourcePermit",
+		Kind:       "RenderedResource",
 		Name:       "request",
 		UID:        types.UID("request-uid"),
 	}
@@ -577,7 +577,7 @@ func TestOrphan(t *testing.T) {
 
 	owner := metav1.OwnerReference{
 		APIVersion: "capsule.clastix.io/v1beta2",
-		Kind:       "ResourcePermit",
+		Kind:       "RenderedResource",
 		Name:       "request",
 		UID:        types.UID("request-uid"),
 	}
@@ -592,8 +592,8 @@ func TestOrphan(t *testing.T) {
 		"example.com/keep":            "true",
 	})
 	existing.SetAnnotations(map[string]string{
-		meta.ResourcePermitServiceAccountAnnotation: "system:serviceaccount:stale:runner",
-		"example.com/keep":                          "true",
+		"example.org/service-account": "system:serviceaccount:stale:runner",
+		"example.com/keep":            "true",
 	})
 
 	c := fake.NewClientBuilder().
@@ -606,7 +606,7 @@ func TestOrphan(t *testing.T) {
 		ManagedByValue:                      testCreatedBy,
 		ProtectedByValue:                    testCreatedBy,
 		ProtectedByServiceAccount:           "system:serviceaccount:test:runner",
-		ProtectedByServiceAccountAnnotation: meta.ResourcePermitServiceAccountAnnotation,
+		ProtectedByServiceAccountAnnotation: "example.org/service-account",
 		AppManagedByValue:                   "test-app-manager",
 	}}
 
@@ -639,7 +639,7 @@ func TestOrphan(t *testing.T) {
 			t.Fatalf("orphaned resource retains lifecycle label %q", key)
 		}
 	}
-	if _, found := retained.GetAnnotations()[meta.ResourcePermitServiceAccountAnnotation]; found {
+	if _, found := retained.GetAnnotations()["example.org/service-account"]; found {
 		t.Fatalf("orphaned resource retains protection ServiceAccount annotation")
 	}
 	if retained.GetAnnotations()["example.com/keep"] != "true" {

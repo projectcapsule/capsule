@@ -1,20 +1,24 @@
 name: "Check Pull Request"
 
 on:
-  pull_request_target:
+  pull_request:
     types:
       - opened
       - edited
       - synchronize
 
-permissions:
-  pull-requests: write
+permissions: {}
 
 jobs:
   main:
     name: Validate PR title
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
     steps:
+      # This job reads PR metadata only. Keep fork checkouts,
+      # build steps, caches, and artifact downloads out of this job.
       - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

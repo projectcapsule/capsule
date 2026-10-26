@@ -14,9 +14,11 @@ jobs:
   publish-helm:
     # Skip this Release on forks
     if: github.repository_owner == 'projectcapsule'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: "Extract Version"
         id: extract_version
         run: |
@@ -37,7 +39,7 @@ jobs:
           branch: gh-pages
           commit_username: ${{ github.actor }}
   publish-helm-oci:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
       id-token: write
@@ -45,7 +47,9 @@ jobs:
     outputs:
       chart-digest: ${{ steps.helm_publish.outputs.digest }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
       - name: "Extract Version"
         id: extract_version
@@ -74,7 +78,7 @@ jobs:
       packages: write   # To upload assets to release.
       actions: read     # To read the workflow path.
     # NOTE: The container generator workflow is not officially released as GA.
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@f7dd8c54c2067bafc12ca7a55595d5ee9b75204a # v2.1.0
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0 # zizmor: ignore[unpinned-uses]
     with:
       image: ghcr.io/${{ github.repository_owner }}/charts/capsule
       digest: "${{ needs.publish-helm-oci.outputs.chart-digest }}"

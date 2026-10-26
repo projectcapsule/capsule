@@ -5,9 +5,12 @@ package tenant
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	nodev1 "k8s.io/api/node/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
@@ -27,8 +30,53 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 )
 
+func BenchmarkControllerNamespaceProvisioning(b *testing.B) {
+	for _, tenants := range []int{1, 16} {
+		for _, count := range []int{1, 32} {
+			b.Run(fmt.Sprintf("tenants=%d/namespaces=%d", tenants, count), func(b *testing.B) {
+				tnt := &capsulev1beta2.Tenant{Name: "tenant-a", UID: "tenant-a-uid",
+					Status: capsulev1beta2.TenantStatus{Owners: rbac.OwnerStatusListSpec{{Kind: rbac.UserOwner, Name: "alice", ClusterRoles: []string{"admin"}}}},
+					Spec: capsulev1beta2.TenantSpec{Rules: []*rules.NamespaceRuleBodyTenant{{
+						NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"profile": "reader"}},
+						Permissions: rules.NamespaceRulePermissionBody{Bindings: []rbac.AdditionalRoleBindingsSpec{{
+							ClusterRoleName: "view", Subjects: []rbacv1.Subject{{Kind: "User", Name: "reader"}},
+						}}},
+					}}},
+				}
+				objects := []client.Object{tnt}
+				for i := range count {
+					ns := cleanupOwnedNamespace(tnt, fmt.Sprintf("team-%d", i), false)
+					if i%2 == 0 {
+						ns.Labels["profile"] = "reader"
+					}
+					objects = append(objects, ns)
+				}
+				for i := 1; i < tenants; i++ {
+					other := &capsulev1beta2.Tenant{Name: fmt.Sprintf("unrelated-%d", i), UID: types.UID(fmt.Sprintf("unrelated-%d", i))}
+					objects = append(objects, other, cleanupOwnedNamespace(other, other.Name+"-ns", false))
+				}
+				r, _ := namespaceCleanupFixture(b, objects...)
+				calls := &mockclient.CallCounter{}
+				r.Client = interceptor.NewClient(provisioningDefaultingClient(r.Client.(client.WithWatch)), calls.Interceptors())
+				r.reader = r.Client
+				if err := r.reconcileActiveTenantNamespaces(b.Context(), logr.Discard(), tnt); err != nil {
+					b.Fatal(err)
+				}
+				calls.Reset()
+				b.ReportAllocs()
+				for b.Loop() {
+					if err := r.reconcileActiveTenantNamespaces(b.Context(), logr.Discard(), tnt); err != nil {
+						b.Fatal(err)
+					}
+				}
+				calls.Report(b)
+			})
+		}
+	}
+}
+
 func BenchmarkControllerTenant(b *testing.B) {
-	for _, kind := range []string{"tenant", "resource-quotas", "namespace-cleanup"} {
+	for _, kind := range []string{"tenant", "resource-quotas", "namespace-cleanup", "namespace-cleanup-missing-tenant", "namespace-cleanup-recreated-tenant"} {
 		for _, count := range []int{1, 32} {
 			b.Run(fmt.Sprintf("%s/namespaces=%d", kind, count), func(b *testing.B) {
 				tnt := &capsulev1beta2.Tenant{
@@ -52,10 +100,25 @@ func BenchmarkControllerTenant(b *testing.B) {
 					},
 				}
 				other := &capsulev1beta2.Tenant{Name: "tenant-b", UID: "tenant-b-uid"}
-				objects := []client.Object{tnt, other, cleanupOwnedNamespace(other, "unrelated", false)}
+				if kind == "tenant" {
+					tnt.Spec.NetworkPolicies.Items = []networkingv1.NetworkPolicySpec{{PodSelector: metav1.LabelSelector{}}}
+					tnt.Spec.LimitRanges.Items = []corev1.LimitRangeSpec{{Limits: []corev1.LimitRangeItem{{Type: corev1.LimitTypeContainer, DefaultRequest: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("10m")}}}}}
+					tnt.Spec.Rules[0].NamespaceRuleBodyNamespace = &rules.NamespaceRuleBodyNamespace{Quota: []rules.ResourceQuotaRule{{Name: "compute", Hard: corev1.ResourceList{corev1.ResourceRequestsCPU: resource.MustParse("100")}}}}
+				}
+				objects := []client.Object{other, cleanupOwnedNamespace(other, "unrelated", false)}
+				switch kind {
+				case "namespace-cleanup-missing-tenant":
+				case "namespace-cleanup-recreated-tenant":
+					replacement := tnt.DeepCopy()
+					replacement.UID = "replacement-tenant-uid"
+					objects = append(objects, replacement)
+				default:
+					objects = append(objects, tnt)
+				}
+				cleanup := strings.HasPrefix(kind, "namespace-cleanup")
 				for i := range count {
 					name := fmt.Sprintf("team-%d", i)
-					ns := cleanupOwnedNamespace(tnt, name, kind == "namespace-cleanup")
+					ns := cleanupOwnedNamespace(tnt, name, cleanup)
 					if i%2 == 0 {
 						ns.Labels["profile"] = "reader"
 					}
@@ -72,7 +135,7 @@ func BenchmarkControllerTenant(b *testing.B) {
 				}
 				calls := &mockclient.CallCounter{}
 				base := r.Client
-				c := interceptor.NewClient(base.(client.WithWatch), calls.Interceptors())
+				c := interceptor.NewClient(provisioningDefaultingClient(base.(client.WithWatch)), calls.Interceptors())
 				r.Client = c
 				r.reader = c
 				var controller reconcile.Reconciler = r
@@ -80,7 +143,7 @@ func BenchmarkControllerTenant(b *testing.B) {
 				if kind == "resource-quotas" {
 					controller = reconcile.Func(r.reconcileResourceQuotas)
 				}
-				if kind == "namespace-cleanup" {
+				if cleanup {
 					controller = reconcile.Func(r.reconcileNamespaceCleanup)
 					req.Name = "team-0"
 				}
@@ -109,7 +172,7 @@ func BenchmarkControllerTenant(b *testing.B) {
 					if len(quotas.Items) != count {
 						b.Fatalf("got %d quotas, want %d", len(quotas.Items), count)
 					}
-				case "namespace-cleanup":
+				case "namespace-cleanup", "namespace-cleanup-missing-tenant", "namespace-cleanup-recreated-tenant":
 					if len(dyn.Actions()) == 0 {
 						b.Fatal("cleanup did not scan resources")
 					}

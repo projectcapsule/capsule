@@ -27,6 +27,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	namespaceindex "github.com/projectcapsule/capsule/pkg/runtime/indexers/namespace"
 )
 
 func TestResourceQuotaReconcileSyncsTenantQuotas(t *testing.T) {
@@ -42,7 +43,7 @@ func TestResourceQuotaReconcileSyncsTenantQuotas(t *testing.T) {
 
 	controller := true
 	tenant := &capsulev1beta2.Tenant{
-		Name: "tenant-a",
+		Name: "tenant-a", UID: "tenant-a-uid",
 		Annotations: map[string]string{
 			capsulev1beta2.LimitAnnotationForResource("widgets.example.com_v1"): "10",
 		},
@@ -62,8 +63,9 @@ func TestResourceQuotaReconcileSyncsTenantQuotas(t *testing.T) {
 			Kind:       "Tenant",
 			Name:       tenant.Name,
 			Controller: &controller,
-		}}}
-	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(tenant, trigger).Build()
+		}},
+	}
+	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(tenant, trigger, cleanupOwnedNamespace(tenant, "team-a", false)).WithIndex(&corev1.Namespace{}, namespaceindex.OwnerReferenceIndex, namespaceindex.OwnerReference{}.Func()).Build()
 	gvr := schema.GroupVersionResource{Group: "example.com", Version: "v1", Resource: "widgets"}
 	dynamicClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
 		gvr: "WidgetList",
@@ -126,7 +128,8 @@ func TestResourceQuotaInitialEventsCoalesceByOwnerTenant(t *testing.T) {
 				Kind:       "Tenant",
 				Name:       "tenant-a",
 				Controller: &controller,
-			}}}
+			}},
+		}
 
 		h.Create(context.Background(), event.CreateEvent{Object: quota, IsInInitialList: true}, queue)
 	}

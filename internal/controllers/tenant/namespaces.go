@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 
 	"github.com/go-logr/logr"
 	"golang.org/x/sync/errgroup"
@@ -76,9 +77,18 @@ func (r *Manager) reconcileDeletingTenantNamespaces(
 				return nil
 			}
 
+			if !namespaceOwnedByTenant(namespace, tnt) {
+				removed <- statusNamespace.Name
+
+				return nil
+			}
+
 			if namespace.DeletionTimestamp == nil {
 				if err := r.Delete(ctx, namespace, &client.DeleteOptions{
 					PropagationPolicy: ptr.To(metav1.DeletePropagationBackground),
+					Preconditions: &metav1.Preconditions{
+						UID: new(namespace.UID), ResourceVersion: new(namespace.ResourceVersion),
+					},
 				}); err != nil && !apierrors.IsNotFound(err) {
 					log.Error(err, "unable to delete tenant namespace",
 						"tenant", tnt.GetName(),
@@ -106,6 +116,11 @@ func (r *Manager) reconcileDeletingTenantNamespaces(
 				}
 
 				namespace = latest
+				if !namespaceOwnedByTenant(namespace, tnt) {
+					removed <- statusNamespace.Name
+
+					return nil
+				}
 			}
 
 			stat, err := r.reconcileNamespace(ctx, log, namespace, tnt, templateTenant)
@@ -158,6 +173,16 @@ func (r *Manager) reconcileDeletingTenantNamespaces(
 	return errors.Join(joined...)
 }
 
+func namespaceOwnedByTenant(namespace *corev1.Namespace, tnt *capsulev1beta2.Tenant) bool {
+	for _, ref := range namespace.OwnerReferences {
+		if tenant.IsTenantOwnerReferenceForTenant(ref, tnt) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (r *Manager) reconcileActiveTenantNamespaces(
 	ctx context.Context,
 	log logr.Logger,
@@ -168,10 +193,17 @@ func (r *Manager) reconcileActiveTenantNamespaces(
 		return err
 	}
 
+	// The index selects candidates by name. A recreated Tenant must not inherit
+	// namespace profiles or lifecycle status from the previous owner's UID.
+	list.Items = slices.DeleteFunc(list.Items, func(ns corev1.Namespace) bool {
+		return !namespaceOwnedByTenant(&ns, tnt)
+	})
+
 	// Rule rendering reads the complete Tenant, including status. Keep one
 	// immutable snapshot for all namespace workers so their status updates do
 	// not race with template conversion.
 	templateTenant := tnt.DeepCopy()
+	roleBindings := prepareNamespaceRoleBindings(tnt)
 
 	oldStatus := make(map[string]struct{}, len(tnt.Status.Spaces))
 	for i := range tnt.Status.Spaces {
@@ -188,7 +220,7 @@ func (r *Manager) reconcileActiveTenantNamespaces(
 		ns := list.Items[i].DeepCopy()
 
 		group.Go(func() error {
-			stat, err := r.reconcileNamespace(ctx, log, ns, tnt, templateTenant)
+			stat, err := r.provisionNamespace(ctx, log, ns, templateTenant, &roleBindings)
 			if stat != nil {
 				results <- stat
 			}
@@ -267,8 +299,12 @@ func (r *Manager) reconcileNamespace(
 	metaStatus := &capsulev1beta2.TenantStatusNamespaceMetadata{}
 
 	instance := tnt.Status.GetInstance(stat)
+	if instance != nil && instance.UID != namespace.UID {
+		instance = nil
+	}
+
 	if instance != nil {
-		stat = instance
+		stat = instance.DeepCopy()
 	}
 
 	// Always update tenant status condition after reconciliation.
@@ -401,7 +437,7 @@ func (r *Manager) reconcileNamespaceMetadata(
 
 		// Cleanup old Metadata.
 		instance := tnt.Status.GetInstance(stat)
-		if instance != nil && instance.Metadata != nil {
+		if instance != nil && instance.UID == ns.UID && instance.Metadata != nil {
 			for label := range instance.Metadata.Labels {
 				if _, ok := managedLabels[label]; ok {
 					continue

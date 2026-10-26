@@ -219,14 +219,25 @@ var _ = Describe("Replication settings migration", Serial,
 					Expect(apierrors.IsInvalid(err)).To(BeTrue(), fmt.Sprint(err))
 					Expect(k8sClient.Delete(ctx, parent)).To(Succeed())
 					Eventually(func() bool { return apierrors.IsNotFound(k8sClient.Get(ctx, key, parent)) }, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
-					expectConfigMapAbsent(target, name+"-explicit")
+					expectConfigMapGone(target, name+"-explicit")
 					if adopt {
 						expectReplicationPolicyOrphan(target, name+"-existing")
 						expectReplicationPolicyOrphan(target, name+"-created")
 					} else {
-						expectConfigMapAbsent(target, name+"-created")
+						expectConfigMapGone(target, name+"-created")
 					}
 				}
 			}
 		})
 	})
+
+// expectConfigMapGone waits for a ConfigMap that the spec deleted, directly or
+// through its parent, to disappear. It is not an assertion that the ConfigMap
+// was never replicated: a check on an excluded tenant must fail on the first
+// sighting, also when the controller would prune the object later, so those
+// checks use expectConfigMapAbsent and its Consistently window instead.
+func expectConfigMapGone(namespace, name string) {
+	Eventually(func() bool {
+		return apierrors.IsNotFound(k8sClient.Get(context.Background(), client.ObjectKey{Namespace: namespace, Name: name}, &corev1.ConfigMap{}))
+	}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
+}

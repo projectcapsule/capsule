@@ -24,14 +24,14 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
-	"github.com/projectcapsule/capsule/pkg/api/resourcepermit"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 	"github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 var _ = Describe("managed labels cannot bypass metadata enforcement", Label("tenant", "rules", "metadata", "managed-label"), func() {
-	const denied = "pod-security.kubernetes.io/enforce"
+	// Not a pod-security label: OpenShift re-adds those to every namespace.
+	const denied = "example.org/forbidden"
 	const profile = "example.org/profile"
 	ctx := context.Background()
 	var tenantA, tenantB *capsulev1beta2.Tenant
@@ -267,53 +267,25 @@ var _ = Describe("managed labels cannot bypass metadata enforcement", Label("ten
 				EventuallyDeletion(&rbacv1.ClusterRole{Name: sa + "-namespaces"})
 			})
 		}
-		grantResourcePermitServiceAccount(selected.Name, name, selected.Name, []string{"get", "list", "watch", "create", "update", "patch", "delete"})
+		grantManagedTargetServiceAccount(selected.Name, name, selected.Name, []string{"get", "list", "watch", "create", "update", "patch", "delete"})
 		runner := impersonationClient(serviceAccountUsername(selected.Name, name), serviceAccountGroups(selected.Name))
 		// Give the second identity Kubernetes access to this target so rejection
 		// demonstrates the managed-resource guard, rather than missing RBAC.
-		grantResourcePermitServiceAccount(other.Name, name+"-other", selected.Name, []string{"get", "patch", "update"})
+		grantManagedTargetServiceAccount(other.Name, name+"-other", selected.Name, []string{"get", "patch", "update"})
 		otherRunner := impersonationClient(serviceAccountUsername(other.Name, name+"-other"), serviceAccountGroups(other.Name))
 		cm := &corev1.ConfigMap{Name: name, Namespace: selected.Name}
-		protection, protectionReason := meta.ResourcePermitProtectionLabel, "resources protected by a ResourcePermit"
-		By("creating a real managed target through its execution ServiceAccount")
-		if source == meta.ValueControllerResourcePermit {
-			template := &capsulev1beta2.GlobalResourcePermitTemplate{Name: name, Spec: capsulev1beta2.GlobalResourcePermitTemplateSpec{
-				Impersonation: resourcePermitServiceAccountReference(selected.Name, name),
-				Approvals:     resourcepermit.ApprovalSpec{Auto: true},
-				Resources: []runtime.ResourceTemplate{{Template: fmt.Sprintf(`apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: %s
-data:
-  source: resource-permit
-`, name)}},
-			}}
-			DeferCleanup(func() { EventuallyDeletion(template) })
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, template) }).Should(Succeed())
-			permit := newImpersonatedResourcePermit(selected.Name, name, template.Name)
-			DeferCleanup(func() {
-				expireResourcePermitForCleanup(ctx, permit)
-				EventuallyDeletion(permit)
-			})
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, permit) }).Should(Succeed())
-			Eventually(func(g Gomega) {
-				current := &capsulev1beta2.ResourcePermit{}
-				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(permit), current)).To(Succeed())
-				g.Expect(current.Status.Phase).To(Equal(capsulev1beta2.ResourcePermitPhaseActive))
-				expectResourcePermitServiceAccount(g, current, selected.Name, name)
-			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-		} else {
-			protection, protectionReason = meta.ReplicationProtectionLabel, "is managed by a global capsule replication"
-			parent := newManagedLabelReplication(name, tenantA.Name, selected.Name)
-			DeferCleanup(func() { EventuallyDeletion(parent) })
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, parent) }).Should(Succeed())
-			Eventually(func(g Gomega) {
-				current := &capsulev1beta2.GlobalTenantResource{}
-				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(parent), current)).To(Succeed())
-				g.Expect(current.Status.ProcessedItems).To(HaveLen(1))
-				g.Expect(current.Status.ProcessedItems[0].Status).To(Equal(metav1.ConditionTrue), current.Status.ProcessedItems[0].Message)
-			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-		}
+		protection, protectionReason := meta.ReplicationProtectionLabel, "is managed by a global capsule replication"
+
+		protection, protectionReason = meta.ReplicationProtectionLabel, "is managed by a global capsule replication"
+		parent := newManagedLabelReplication(name, tenantA.Name, selected.Name)
+		DeferCleanup(func() { EventuallyDeletion(parent) })
+		EventuallyCreation(func() error { return k8sClient.Create(ctx, parent) }).Should(Succeed())
+		Eventually(func(g Gomega) {
+			current := &capsulev1beta2.GlobalTenantResource{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(parent), current)).To(Succeed())
+			g.Expect(current.Status.ProcessedItems).To(HaveLen(1))
+			g.Expect(current.Status.ProcessedItems[0].Status).To(Equal(metav1.ConditionTrue), current.Status.ProcessedItems[0].Message)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		Eventually(func(g Gomega) {
 			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cm), cm)).To(Succeed())
 			g.Expect(cm.Labels).To(HaveKeyWithValue(meta.NewManagedByCapsuleLabel, source))
@@ -358,7 +330,7 @@ data:
 				current := &corev1.ConfigMap{}
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cm), current)).To(Succeed())
 				current.Labels = nil
-				current.Annotations = map[string]string{meta.ResourcePermitServiceAccountAnnotation: serviceAccountUsername(other.Name, name+"-other")}
+				current.Annotations = map[string]string{"example.org/forged-service-account": serviceAccountUsername(other.Name, name+"-other")}
 				err := actor.Update(ctx, current)
 				if apierrors.IsConflict(err) {
 					g.Expect(err).NotTo(HaveOccurred())
@@ -373,5 +345,5 @@ data:
 		Expect(cm.Labels).To(HaveKeyWithValue(protection, meta.ValueTrue))
 		Expect(cm.Annotations).To(HaveKeyWithValue("example.org/valid", "allowed"))
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKey{Namespace: other.Name, Name: name}, &corev1.ConfigMap{}))).To(BeTrue())
-	}, Entry("ResourcePermit", Label("resource-permit"), meta.ValueControllerResourcePermit), Entry("GlobalTenantResource", Label("replications"), meta.ValueControllerReplications))
+	}, Entry("GlobalTenantResource", Label("replications"), meta.ValueControllerReplications))
 })

@@ -25,12 +25,6 @@ var (
 
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(GroupVersion,
-		&ResourcePermit{},
-		&ResourcePermitList{},
-		&ResourcePermitTemplate{},
-		&ResourcePermitTemplateList{},
-		&GlobalResourcePermitTemplate{},
-		&GlobalResourcePermitTemplateList{},
 		&CapsuleConfiguration{},
 		&CapsuleConfigurationList{},
 		&CustomQuota{},

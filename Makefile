@@ -23,12 +23,19 @@ FILTER		 	?= && !skip
 ## Kubernetes Version Support
 KUBERNETES_SUPPORTED_VERSION ?= "v1.36.1"
 
-## Openshift Version Support
-OS_SUPPORTED_VERSION ?= "4.22.0-okd-scos.ec.10"
+## Openshift Version Support: MicroShift (OKD) release from https://github.com/microshift-io/microshift/releases
+MICROSHIFT_VERSION ?= 4.22
+MICROSHIFT_TAG_4.21 := 4.21.0_g29f429c21_4.21.0_okd_scos.ec.15
+MICROSHIFT_TAG_4.22 := 4.22.0_202610071017_g0a516b4eb_4.22.0_okd_scos.ec.16
+MICROSHIFT_TAG ?= $(MICROSHIFT_TAG_$(MICROSHIFT_VERSION))
+MICROSHIFT_INSTALLER_TAG ?= $(MICROSHIFT_TAG_4.22)
+MICROSHIFT_KUBECONFIG ?= /var/lib/microshift/resources/kubeadmin/kubeconfig
 
 ## Tool Binaries
 KUBECTL ?= kubectl
 HELM ?= helm
+# Mike Farah yq v4, used for enterprise chart packaging.
+YQ ?= yq
 DEV_SETUP_TIMEOUT ?= 10m
 export LAPTOP_HOST_IP
 
@@ -75,15 +82,6 @@ bench-controllers:
 # Build manager binary
 manager: generate golint
 	go build -o bin/manager
-
-# Build kubectl Capsule plugin binary
-.PHONY: kubectl-capsule
-kubectl-capsule:
-	@mkdir -p bin
-	go build -o bin/kubectl-capsule ./cmd/cli
-	@echo ""
-	@echo "Run the kubectl plugin with:"
-	@echo '  PATH="$(CURDIR)/bin:$$PATH" kubectl capsule --help'
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate manifests
@@ -142,7 +140,7 @@ dev-build: kind
 
 .PHONY: dev-destroy
 dev-destroy: kind
-	$(KIND) delete cluster --name capsule
+	$(KIND) delete cluster --name $(CLUSTER_NAME)
 
 # Target used to install Flux. Overridden on OpenShift so that dependents (e.g. cert-manager)
 # never re-apply the vanilla Flux manifests over the SCC-compatible overlay.
@@ -154,7 +152,7 @@ dev-install-deps-openshift:
 	$(MAKE) dev-install-deps FLUX_SETUP_TARGET=dev-setup-fluxcd-openshift
 
 API_GW         := none
-API_GW_VERSION := v1.3.0
+API_GW_VERSION := v1.6.3
 API_GW_LOOKUP  := kubernetes-sigs/gateway-api
 dev-install-gw-api-crds:
 	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/$(API_GW_LOOKUP)/releases/download/$(API_GW_VERSION)/standard-install.yaml
@@ -246,8 +244,6 @@ dev-setup: dev-setup-flux-handoff
 		--set 'certManager.generateCertificates=false' \
 		--set 'tls.enableController=false' \
 		--set 'tls.create=false' \
-		--set rbac.resourcepermits.create=true \
-		--set-string 'rbac.resourcepermits.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set rbac.resources.create=true \
 		--set-string 'rbac.resources.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set rbac.resourcepoolclaims.create=true \
@@ -316,6 +312,7 @@ dev-setup-fluxcd-openshift:
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/overlays/openshift | envsubst | kubectl apply -f -
 
 dev-setup-openshift-specifics:
+	@$(KUBECTL) apply --force-conflicts --server-side=true -f ./e2e/rbac.yaml
 	@$(KUBECTL) apply -f hack/distro/openshift/extend-admin-role.yaml
 	@$(KUBECTL) apply -f hack/distro/openshift/capsule-namespace-deleter.yaml
 # Build and deploy the current Capsule checkout in the local playground.
@@ -355,10 +352,22 @@ wait-for-helmreleases:
 ENTERPRISE_VERSION  ?= "dirty"
 ENTERPRISE_REGISTRY ?= "registry.projectcapsule.dev"
 
+.PHONY: enterprise-chart enterprise-release enterprise-prerelease
+enterprise-chart:
+	# Remove the proxy before resolving dependencies; keep the community chart intact.
+	@set -eu; \
+	chart_dir=$$(mktemp -d); \
+	trap 'rm -rf "$$chart_dir"' EXIT; \
+	cp -R ./charts/capsule "$$chart_dir/capsule"; \
+	$(YQ) -i '.dependencies |= map(select(.name != "capsule-proxy"))' "$$chart_dir/capsule/Chart.yaml"; \
+	rm -rf "$$chart_dir/capsule/charts" "$$chart_dir/capsule/Chart.lock"; \
+	$(HELM) dependency update "$$chart_dir/capsule" --skip-refresh; \
+	$(HELM) package "$$chart_dir/capsule" --app-version=$(ENTERPRISE_VERSION) --version=$(ENTERPRISE_VERSION) --destination ./builds/
+
 enterprise-release:
 	mkdir -p ./builds
 	$(MAKE) CAPSULE_IMG=$(ENTERPRISE_REGISTRY)/enterprise/capsule VERSION=v$(ENTERPRISE_VERSION) ko-publish-capsule
-	$(HELM) package ./charts/capsule --app-version=$(ENTERPRISE_VERSION) --version=$(ENTERPRISE_VERSION) --destination ./builds/
+	$(MAKE) enterprise-chart
 	$(HELM) push ./builds/capsule-$(ENTERPRISE_VERSION).tgz oci://$(ENTERPRISE_REGISTRY)/charts/
 	$(MAKE) deploy-enterprise
 	rm -rf ./builds
@@ -389,7 +398,7 @@ deploy-enterprise:
 enterprise-prerelease:
 	mkdir -p ./builds
 	$(MAKE) CAPSULE_IMG=$(ENTERPRISE_REGISTRY)/prereleases/capsule VERSION=v$(ENTERPRISE_VERSION) ko-publish-capsule
-	$(HELM) package ./charts/capsule --app-version=$(ENTERPRISE_VERSION) --version=$(ENTERPRISE_VERSION) --destination ./builds/
+	$(MAKE) enterprise-chart
 	$(HELM) push ./builds/capsule-$(ENTERPRISE_VERSION).tgz oci://$(ENTERPRISE_REGISTRY)/charts/prereleases/
 	$(MAKE) deploy-enterprise-prerelease
 	rm -rf ./builds
@@ -506,22 +515,19 @@ golint-fix: golangci-lint
 mocks: mockgen
 	$(MOCKGEN) -destination internal/mocks/client/mock.go sigs.k8s.io/controller-runtime/pkg/client Client,SubResourceWriter,Reader
 
+# Running OpenShift e2e tests on a MicroShift installed directly on the (Ubuntu) host, requires root.
+# CI runs the parallel specs and the serial config specs on separate runners with
+# E2E_PHASE=parallel and E2E_PHASE=config (see e2e-exec); the default runs both.
 .PHONY: e2e-openshift
 e2e-openshift: ginkgo
-	$(MAKE) e2e-build-openshift && $(MAKE) e2e-exec FILTER='&& !skip && !skip-on-openshift' && $(MAKE) e2e-destroy-openshift
+	$(MAKE) e2e-build-openshift && KUBECONFIG=$(MICROSHIFT_KUBECONFIG) E2E_OPENSHIFT=true $(MAKE) e2e-exec FILTER='&& !skip && !skip-on-openshift'
 
-e2e-build-openshift: minc
-	$(MINC) config set provider docker
-	$(MINC) config set microshift-version $(OS_SUPPORTED_VERSION)
-	$(MINC) create --disable-overlay-cache true
-	$(MINC) status
-	$(MAKE) dev-install-deps-openshift
-	$(MAKE) dev-setup-openshift-specifics
-	$(MAKE) e2e-install-openshift
-
-
-e2e-destroy-openshift: minc
-	$(MINC) delete
+.PHONY: e2e-build-openshift
+e2e-build-openshift:
+	./hack/microshift/install.sh $(MICROSHIFT_TAG) $(MICROSHIFT_INSTALLER_TAG)
+	KUBECONFIG=$(MICROSHIFT_KUBECONFIG) $(MAKE) dev-install-deps-openshift
+	KUBECONFIG=$(MICROSHIFT_KUBECONFIG) $(MAKE) dev-setup-openshift-specifics
+	KUBECONFIG=$(MICROSHIFT_KUBECONFIG) $(MAKE) e2e-install-openshift
 
 # Running e2e tests in a KinD instance
 .PHONY: e2e
@@ -535,6 +541,9 @@ e2e-build: kind
 .PHONY: e2e-install
 e2e-install: helm-controller-version ko-build-all dev-install-gw-api-crds
 	$(MAKE) e2e-load-image CLUSTER_NAME=$(CLUSTER_NAME) IMAGE=$(CAPSULE_IMG) VERSION=$(VERSION)
+	# Replace a stale charts/capsule/charts/*.tgz: an archive that does not match
+	# Chart.lock is rendered unconditionally, ignoring proxy.enabled.
+	$(HELM) dependency build ./charts/capsule
 	$(KUBECTL) label clusterrole admin projectcapsule.dev/aggregate-to-controller=true
 	$(HELM) upgrade \
 	    --dependency-update \
@@ -557,8 +566,6 @@ e2e-install: helm-controller-version ko-build-all dev-install-gw-api-crds
 		--set 'manager.options.leaderElection.leaseDuration=60s' \
 		--set 'manager.options.leaderElection.renewDeadline=40s' \
 		--set 'manager.rbac.minimal=true' \
-		--set rbac.resourcepermits.create=true \
-		--set-string 'rbac.resourcepermits.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set rbac.resources.create=true \
 		--set-string 'rbac.resources.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set rbac.resourcepoolclaims.create=true \
@@ -584,6 +591,7 @@ e2e-install: helm-controller-version ko-build-all dev-install-gw-api-crds
 .PHONY: e2e-install-openshift
 e2e-install-openshift: helm-controller-version ko-build-all
 	$(MAKE) e2e-load-image-openshift IMAGE=$(CAPSULE_IMG) VERSION=$(VERSION)
+	$(KUBECTL) label clusterrole admin projectcapsule.dev/aggregate-to-controller=true
 	$(HELM) upgrade \
 	    --dependency-update \
 		--debug \
@@ -595,13 +603,33 @@ e2e-install-openshift: helm-controller-version ko-build-all
 		--set 'manager.resources=null'\
 		--set "manager.image.tag=$(VERSION)" \
 		--set 'manager.livenessProbe.failureThreshold=10' \
+		--set 'manager.options.workers=4' \
+		--set 'manager.options.clientConnectionQPS=2000' \
+		--set 'manager.options.clientConnectionBurst=1000' \
 		--set 'manager.options.leaderElection.leaseDuration=60s' \
 		--set 'manager.options.leaderElection.renewDeadline=40s' \
+		--set 'manager.rbac.minimal=true' \
+		--set rbac.resources.create=true \
+		--set-string 'rbac.resources.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
+		--set rbac.resourcepoolclaims.create=true \
+		--set-string 'rbac.resourcepoolclaims.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
+		--set rbac.customquotas.create=true \
+		--set-string 'rbac.customquotas.labels.rbac\.authorization\.k8s\.io/aggregate-to-admin=true' \
 		--set 'webhooks.hooks.nodes.enabled=true' \
 		--set "webhooks.exclusive=true"\
 		--set "manager.options.logLevel=debug"\
-		--set "jobs.podSecurityContext.enabled=false"\
-		--set "jobs.securityContext.enabled=false"\
+		--set 'global.openshift.enabled=true' \
+		--set 'webhooks.hooks.calculations.enabled=true' \
+		--set-string 'webhooks.hooks.calculations.rules[0].apiGroups[0]=' \
+		--set 'webhooks.hooks.calculations.rules[0].apiVersions[0]=v1' \
+		--set 'webhooks.hooks.calculations.rules[0].operations[0]=CREATE' \
+		--set 'webhooks.hooks.calculations.rules[0].operations[1]=UPDATE' \
+		--set 'webhooks.hooks.calculations.rules[0].operations[2]=DELETE' \
+		--set 'webhooks.hooks.calculations.rules[0].resources[0]=pods' \
+		--set 'webhooks.hooks.calculations.rules[0].resources[1]=pods/status' \
+		--set 'webhooks.hooks.calculations.rules[0].resources[2]=persistentvolumeclaims' \
+		--set 'webhooks.hooks.calculations.rules[0].scope=Namespaced' \
+		--set 'webhooks.hooks.calculations.namespaceSelector.matchLabels.env=e2e' \
 		capsule \
 		./charts/capsule
 
@@ -643,21 +671,39 @@ seccomp:
 e2e-load-image: kind
 	$(KIND) load docker-image $(IMAGE):$(VERSION) --name $(CLUSTER_NAME)
 
+# MicroShift runs CRI-O on the host: load the image into the shared containers-storage
 .PHONY: e2e-load-image-openshift
-e2e-load-image-openshift: minc
-	docker save $(IMAGE):$(VERSION) > capsule.tar
-	docker cp capsule.tar microshift:/tmp/
-	docker exec microshift sh -c 'podman load -i /tmp/capsule.tar'
-	rm -rf capsule.tar
+e2e-load-image-openshift:
+	docker save $(IMAGE):$(VERSION) | podman load
+
+# Number of Ginkgo processes for the parallel phase. Leave empty to let Ginkgo
+# auto-detect it (NumCPU, minus one on machines with more than four CPUs).
+E2E_PROCS ?=
+GINKGO_PARALLEL_FLAGS = $(if $(E2E_PROCS),--procs=$(E2E_PROCS),-p)
+
+# The suite runs in two phases:
+#   1. every spec NOT labelled "config" runs in parallel (Ordered containers are
+#      the unit of scheduling, so keep them small or avoid them);
+#   2. the "config" specs mutate the cluster-wide CapsuleConfiguration and run
+#      serially, on one Ginkgo process, after the parallel phase.
+# E2E_PHASE selects what e2e-exec runs: "all" (default, both phases in order),
+# "parallel" or "config". CI runs the two phases as separate jobs per lane, so a
+# lane takes setup plus the longer phase instead of setup plus both phases.
+E2E_PHASE ?= all
 
 .PHONY: e2e-exec
 e2e-exec: ginkgo
-	$(GINKGO) -v -p -tags e2e --label-filter="!config $(FILTER)" ./e2e
-	$(MAKE) e2e-exec-config
+	@case "$(E2E_PHASE)" in all|parallel|config) ;; *) echo "E2E_PHASE must be all, parallel or config (got '$(E2E_PHASE)')" >&2; exit 2 ;; esac
+	$(if $(filter all parallel,$(E2E_PHASE)),$(MAKE) e2e-exec-parallel,@true)
+	$(if $(filter all config,$(E2E_PHASE)),$(MAKE) e2e-exec-config,@true)
+
+.PHONY: e2e-exec-parallel
+e2e-exec-parallel: ginkgo
+	$(GINKGO) -v $(GINKGO_PARALLEL_FLAGS) -tags e2e --label-filter="!config $(FILTER)" ./e2e
 
 .PHONY: e2e-exec-config
 e2e-exec-config: ginkgo
-	$(GINKGO) -v  -tags e2e --label-filter="config $(FILTER)" ./e2e
+	$(GINKGO) -v -tags e2e --label-filter="config $(FILTER)" ./e2e
 
 .PHONY: e2e-destroy
 e2e-destroy: dev-destroy
@@ -683,7 +729,7 @@ helm-plugin-schema:
 	@$(HELM) plugin install https://github.com/losisin/helm-values-schema-json.git --version $(HELM_SCHEMA_VERSION) --verify=false || true
 
 HELM_DOCS         := $(LOCALBIN)/helm-docs
-HELM_DOCS_VERSION := v1.14.1
+HELM_DOCS_VERSION := v1.14.2
 HELM_DOCS_LOOKUP  := norwoodj/helm-docs
 helm-doc:
 	@test -s $(HELM_DOCS) || \
@@ -710,19 +756,14 @@ ct:
 	@test -s $(CT) && $(CT) version | grep -q $(CT_VERSION) || \
 	$(call go-install-tool,$(CT),github.com/$(CT_LOOKUP)/v3/ct@$(CT_VERSION))
 
-MINC:= $(LOCALBIN)/minc
-MINC_VERSION := 5d70364166af05edf00fe0d1ea8e731f138b5c51
-MINC_LOOKUP  := minc-org/minc
-minc:
-	echo "Installing minc to $(MINC)" && \
-	$(call go-install-tool,$(MINC),github.com/$(MINC_LOOKUP)/cmd/minc@$(MINC_VERSION))
-
 KIND         := $(LOCALBIN)/kind
 KIND_VERSION := v0.32.0
 KIND_LOOKUP  := kubernetes-sigs/kind
+# `kind version` prints "kind v0.32.0 ..."; a binary of another version is
+# replaced, since go-install-tool skips existing files.
 kind:
-	@test -s $(KIND) && $(KIND) --version | grep -q $(KIND_VERSION) || \
-	$(call go-install-tool,$(KIND),sigs.k8s.io/kind/cmd/kind@$(KIND_VERSION))
+	@test -s $(KIND) && $(KIND) version | grep -q "$(KIND_VERSION)" || \
+	{ rm -f $(KIND) && $(call go-install-tool,$(KIND),sigs.k8s.io/kind/cmd/kind@$(KIND_VERSION)); }
 
 KO           := $(LOCALBIN)/ko
 KO_VERSION   := v0.19.1
@@ -752,9 +793,10 @@ apidocs-gen: ## Download crdoc locally if necessary.
 	@test -s $(APIDOCS_GEN) && $(APIDOCS_GEN) --version | grep -q $(APIDOCS_GEN_VERSION) || \
 	$(call go-install-tool,$(APIDOCS_GEN),fybrik.io/crdoc@$(APIDOCS_GEN_VERSION))
 
-MOCKGEN         := $(LOCALBIN)/mockgen
-MOCKGEN_VERSION := v0.6.0
-MOCKGEN_LOOKUP  := go.uber.org/mock/mockgen
+MOCKGEN          := $(LOCALBIN)/mockgen
+MOCKGEN_VERSION  := v0.6.0
+MOCKGEN_LOOKUP   := go.uber.org/mock/mockgen
+MOCKGEN_RENOVATE := uber-go/mock
 mockgen:
 	@test -s $(MOCKGEN) && $(MOCKGEN) -version | grep -q $(MOCKGEN_VERSION) || \
 	$(call go-install-tool,$(MOCKGEN),$(MOCKGEN_LOOKUP)@$(MOCKGEN_VERSION))
@@ -788,9 +830,10 @@ harpoon:
 	@curl -s https://raw.githubusercontent.com/alegrey91/harpoon/main/install | \
 		sudo bash -s -- --install-version $(HARPOON_VERSION) --install-dir $(LOCALBIN)
 
-GUM         := $(LOCALBIN)/gum
-GUM_VERSION := 2.0.1
-GUM_LOOKUP  := charm.land/gum
+GUM          := $(LOCALBIN)/gum
+GUM_VERSION  := 2.0.2
+GUM_LOOKUP   := charm.land/gum
+GUM_RENOVATE := charmbracelet/gum
 gum: ## Download gum locally if necessary.
 		test -s $(GUM) && $(GUM) --version | grep -q $(GUM_VERSION) ||  \
 	$(call go-install-tool,$(GUM),$(GUM_LOOKUP)/v2@v$(GUM_VERSION))

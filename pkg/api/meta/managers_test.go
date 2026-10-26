@@ -17,7 +17,7 @@ func TestCapsuleResourceFieldOwners(t *testing.T) {
 		manager string
 		owned   bool
 	}{
-		{ResourceFieldOwner("resourcepermit/request"), true},
+		{ResourceFieldOwner("example-addon/request"), true},
 		{ResourceControllerFieldOwnerPrefix(), true},
 		{"2lclct9cwq6mg/target/tenant-a/0/raw-0/", true},
 		{"2lclct9cwq6mg/target/tenant-b/1/generator-0-1/", true},

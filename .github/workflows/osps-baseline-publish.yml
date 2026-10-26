@@ -1,0 +1,87 @@
+# Copyright 2020-2026 Project Capsule Authors
+# SPDX-License-Identifier: Apache-2.0
+name: Publish OSPS Baseline
+permissions: {}
+
+on:
+  # The hub accepts one result per target/catalog every ten minutes.
+  schedule:
+    - cron: '0 10 * * *'
+      timezone: Europe/Zurich
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Evaluate and retain bundles without publishing to grc.store
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  configure:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    outputs:
+      target: ${{ steps.prepare.outputs.target }}
+      license: ${{ steps.prepare.outputs.license }}
+    steps:
+      - name: Check publishing configuration
+        id: prepare
+        env:
+          GRC_NAMESPACE: ${{ vars.GRC_NAMESPACE }}
+          GRC_RESULTS_LICENSE: ${{ vars.GRC_RESULTS_LICENSE }}
+          PVTR_GITHUB_TOKEN: ${{ secrets.PVTR_GITHUB_TOKEN }}
+          TARGET_ID: ${{ github.event.repository.name }}
+          PROJECT_REVISION: ${{ github.sha }}
+        run: |
+          if [ -z "$PVTR_GITHUB_TOKEN" ]; then
+            echo '::error::Configure the PVTR_GITHUB_TOKEN Actions secret for the read-only GitHub scan.'
+            exit 1
+          fi
+          if [ -z "$GRC_NAMESPACE" ] || [ -z "$GRC_RESULTS_LICENSE" ]; then
+            echo '::error::Set the GRC_NAMESPACE and GRC_RESULTS_LICENSE Actions variables. Bind this repository as a trusted publisher in that grc.store namespace and choose an SPDX license for the results.'
+            exit 1
+          fi
+          if [[ ! "$GRC_NAMESPACE" =~ ^[a-z0-9][a-z0-9._-]*$ ]]; then
+            echo '::error::GRC_NAMESPACE must be a single lowercase namespace slug.'
+            exit 1
+          fi
+          if [[ "$GRC_RESULTS_LICENSE" == *$'\n'* || "$GRC_RESULTS_LICENSE" == *$'\r'* ]]; then
+            echo '::error::GRC_RESULTS_LICENSE must be a single-line SPDX expression.'
+            exit 1
+          fi
+          printf 'target=%s/%s@%s\n' "$GRC_NAMESPACE" "$TARGET_ID" "$PROJECT_REVISION" >> "$GITHUB_OUTPUT"
+          printf 'license=%s\n' "$GRC_RESULTS_LICENSE" >> "$GITHUB_OUTPUT"
+  publish:
+    needs: configure
+    permissions:
+      contents: read
+      id-token: write
+      # Required by the upstream report job, even when upload-sarif is false.
+      security-events: write
+    # Keep @v1: grc.store requires refs/tags/v1 in the OIDC signer identity.
+    # Do not change this tag or pin it to a commit SHA; publishing will fail.
+    # https://github.com/revanite-io/pvtr-publish-results#calling-it
+    uses: revanite-io/pvtr-publish-results/.github/workflows/publish.yml@v1 # zizmor: ignore[unpinned-uses]
+    with:
+      target: ${{ needs.configure.outputs.target }}
+      license: ${{ needs.configure.outputs.license }}
+      dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}
+    secrets:
+      config: |
+        loglevel: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run && 'trace' || 'info' }}
+        targets:
+          capsule:
+            plugin: openssf/github-repo
+            policy:
+              catalogs:
+                - osps-baseline-2026-08
+              applicability:
+                - Maturity Level 1
+            vars:
+              owner: ${{ github.repository_owner }}
+              repo: ${{ github.event.repository.name }}
+              token: ${{ secrets.PVTR_GITHUB_TOKEN }}

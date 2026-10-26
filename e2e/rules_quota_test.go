@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
@@ -23,7 +24,7 @@ import (
 	tenantutils "github.com/projectcapsule/capsule/pkg/tenant"
 )
 
-var _ = Describe("rule-generated GlobalResourceQuota", Ordered, Label("resourcequota", "rules", "ledger", "skip-on-openshift"), func() {
+var _ = Describe("rule-generated GlobalResourceQuota", Ordered, Label("resourcequota", "rules", "ledger"), func() {
 	const (
 		tenantName = "e2e-rule-quota"
 
@@ -394,7 +395,17 @@ var _ = Describe("rule-generated GlobalResourceQuota", Ordered, Label("resourceq
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		stableUID := initialQuota.UID
 
+		var updateServiceLimit func(limit string) error
+
+		// The tenant controller updates the Tenant concurrently, so a plain
+		// get-then-update can lose the race with a Conflict. Only conflicts are
+		// retried: an admission denial is returned to the caller as-is.
 		setServiceLimit := func(limit string) error {
+			return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				return updateServiceLimit(limit)
+			})
+		}
+		updateServiceLimit = func(limit string) error {
 			current := &capsulev1beta2.Tenant{}
 			if err := k8sClient.Get(ctx, clientKey("", tenantName), current); err != nil {
 				return err

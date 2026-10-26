@@ -20,9 +20,11 @@ design and follow the conventions of the package you are changing.
 - Every change requires unit tests and end-to-end (e2e) tests. Add or extend coverage
   for the changed behavior; an unrelated passing suite is insufficient.
 - Cover application behavior with handler/controller unit tests and tenant e2e
-  scenarios. Do not add or expand chart tests or edit chart README files unless
-  the user explicitly requests them; chart configuration changes alone do not
-  require those additions.
+  scenarios. Do not add or expand chart tests unless the user explicitly requests
+  them; chart configuration changes alone do not require those additions.
+- Do not create, edit, or regenerate repository Markdown documentation unless the
+  user explicitly requests it. Report implementation details, performance evidence,
+  and review findings in the response or PR instead.
 - Every e2e change must cover positive and negative cases with one or more real
   Tenant objects present. Add multiple tenants whenever isolation or shared state
   is involved.
@@ -308,7 +310,7 @@ workloads, representative rule/object sizes, and cache/concurrency states. Inclu
 counting-reader/client tests when lookup behavior changes.
 
 Report timing, allocations, API-call changes, and scaling behavior. Fix regressions
-or explicitly document their measured cost and the required correctness tradeoff
+or explicitly report their measured cost and the required correctness tradeoff
 for review; do not silently accept them. If API round trips, contention, or webhook
 selection changes, also validate with a real-cluster workload. Fake-client benchmark
 timings alone cannot establish production admission latency.
@@ -354,8 +356,15 @@ using a fake client, or running against an old controller image is not an e2e pa
   A passing scoped run satisfies local e2e execution requirements; report GitHub
   full-suite results separately, including when they are pending or unavailable.
 - Preserve the parallel non-configuration and serial `config` phases within the
-  selected scope. Run relevant OpenShift scenarios when platform behavior is
-  impacted, using the same scoped approach.
+  selected scope. When platform behavior is impacted, also run the scoped OpenShift
+  scenarios locally against MicroShift in a container, using the procedure in
+  [DEVELOPMENT.md](DEVELOPMENT.md) ("OpenShift e2e (MicroShift)", condensed in the
+  command table below). Never run `make e2e-openshift`, `make e2e-build-openshift`,
+  or `hack/microshift/install.sh` directly on the host: they install MicroShift as
+  root (apt, ufw, systemd) and are for the GitHub runner. The install script only
+  runs inside the container. Label specs that cannot run on OpenShift with
+  `skip-on-openshift` and report the full OpenShift results from GitHub Actions
+  separately.
 
 ### Observe during execution; perform forensics afterward
 
@@ -436,6 +445,14 @@ Test implementation requirements:
 - Preserve descriptive Ginkgo labels. Tests changing shared CapsuleConfiguration
   must use the `config` label and restore configuration; those tests run serially.
   Ordinary tests must remain safe under parallel execution.
+- Keep specs cheap to schedule and to tear down. An `Ordered` container is one
+  indivisible unit of work on a single Ginkgo process, so prefer independent specs
+  with per-spec unique names (`rand.String`, `NewNamespace("")`). Every wait for a
+  namespace or Tenant to disappear costs at least the 5 s namespace deletion grace
+  period of kube-controller-manager: with unique names, delete fixtures with
+  `DeleteNamespaceInBackground` and `DeleteInBackground` instead of
+  `ForceDeleteNamespace` and `EventuallyDeletion`; `SynchronizedAfterSuite` waits
+  for the leftovers once. Keep the blocking helpers for names a later spec reuses.
 - Do not weaken assertions, increase timeouts without diagnosis, mark new coverage
   skipped, or commit focused specs to make a failing run appear successful.
 
@@ -495,14 +512,15 @@ and `go.mod` instead of independently selecting newer tools.
 | Prepare local e2e cluster | `make e2e-build` creates a KinD cluster and builds/installs Capsule. Requires Docker and the target's cluster tooling; follow with a scoped test run. |
 | Scoped local e2e | `make e2e-exec FILTER='&& !skip && scheduler'`. Replace the example label with the new feature/impacted component selection. Runs selected non-configuration tests in parallel, then selected configuration tests serially. Ensure the cluster runs the current changes. |
 | Scoped configuration e2e | `make e2e-exec-config FILTER='&& !skip && feature-label'`. Replace `feature-label` with the relevant existing label. |
-| Scoped OpenShift e2e | Prepare with `make e2e-build-openshift`, then use `make e2e-exec FILTER='&& !skip && !skip-on-openshift && feature-label'` for impacted platform behavior, replacing `feature-label`. |
-| Full e2e in GitHub Actions | `make e2e` and `make e2e-openshift` are the full-suite CI entry points; local execution uses the scoped commands above. |
-| Local e2e cleanup | `make e2e-destroy` or `make e2e-destroy-openshift` after preserving observations and completing the relevant run. |
+| Prepare local OpenShift e2e cluster | Follow [DEVELOPMENT.md](DEVELOPMENT.md) ("OpenShift e2e (MicroShift)"). Start a privileged systemd Ubuntu container named `msx` (published port 6443), run `docker exec msx /hack/microshift/install.sh "$TAG" "$INSTALLER_TAG"` (tags from the `MICROSHIFT_TAG_*` Makefile entries), `docker exec msx ufw allow 6443/tcp`, and copy `/var/lib/microshift/resources/kubeadmin/kubeconfig` out of the container to `/tmp/ms-kubeconfig`. Then, with `KUBECONFIG=/tmp/ms-kubeconfig` and a `podman` shim on `PATH` (`exec docker exec -i msx podman "$@"`), run `make dev-install-deps-openshift`, `make dev-setup-openshift-specifics`, and `make e2e-install-openshift`. Needs Docker with at least 8 GB of memory; setup takes several minutes, so run it in the background and poll. Verify the context before running tests. |
+| Scoped OpenShift e2e | `E2E_OPENSHIFT=true KUBECONFIG=/tmp/ms-kubeconfig make e2e-exec FILTER='&& !skip && !skip-on-openshift && feature-label'`. Replace `feature-label` with the new feature/impacted component selection; `E2E_OPENSHIFT` makes the fixtures SCC compatible. Re-run `make e2e-install-openshift` after changing controller code. |
+| OpenShift e2e cleanup | `docker rm -f msx && docker volume rm msx-containers msx-ms`, then remove `/tmp/ms-kubeconfig` and the `podman` shim. If Docker restarts, `docker start msx` and wait for the node to be `Ready`. |
+| Full e2e in GitHub Actions | `make e2e` and `make e2e-openshift` (installs MicroShift on the host and is CI only) are the full-suite CI entry points; every lane runs them as two jobs, `E2E_PHASE=parallel` and `E2E_PHASE=config`, so a lane takes setup plus the longer phase. Without `E2E_PHASE` both phases run in order on one cluster. Local execution uses the scoped commands above. `E2E_PROCS=<n>` overrides the number of parallel Ginkgo processes. |
+| Local e2e cleanup | `make e2e-destroy` after preserving observations and completing the relevant run. |
 | Focused benchmarks | `go test ./path/to/changed/package -run '^$' -bench 'BenchmarkName' -benchmem -count=5` (replace path/name). |
 | Existing benchmark examples | `go test ./pkg/tenant ./internal/controllers/resources -run '^$' -bench . -benchmem -count=5`. |
 | Existing chart checks | `make helm-lint`; use `make helm-test` for installation behavior. Running existing checks does not require adding chart tests. |
 | Chart schema | `make helm-schema` when the values schema needs updating. |
-| Chart documentation | Only when explicitly requested: edit `charts/capsule/README.md.gotmpl` and run `make helm-docs`. Do not automatically regenerate README values tables for chart configuration changes. |
 | Diff hygiene | `git diff --check` and review the full diff, including new files. |
 
 Do not use `go test ./...` as a unit-only shortcut: `e2e/` contains a suite that uses
@@ -564,11 +582,8 @@ declare the change fully validated while required evidence is missing.
 - Keep API types, defaults/validation, conversions, CRDs, RBAC, webhook rules, and
   tests consistent. Review generated changes for unintended schema/default changes.
 - Keep functional chart values, templates, and schema consistent when affected.
-  Do not add or expand chart tests, README prose, or generated README values tables
-  unless explicitly requested. Chart changes do not automatically require README
-  updates. When documentation is requested, edit `charts/capsule/README.md.gotmpl`
-  and regenerate its README. Follow `DEVELOPMENT.md` for chart changelog annotations;
-  release version bumps belong to the release process.
+  Do not add or expand chart tests unless explicitly requested. Release version
+  bumps belong to the release process.
 - Keep credentials, kubeconfigs, certificates/private keys, test artifacts, and
   benchmark output out of commits. Preserve unrelated local files.
 - Describe the resulting namespace profile behavior, rules API integration, reused

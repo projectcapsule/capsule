@@ -93,7 +93,13 @@ func (h *metadataRules) mutate(obj, old *unstructured.Unstructured, bodies []*ap
 			}
 		}
 
-		return mutationResponse(obj, req, metadataMutated || resourcesMutated, nil)
+		ingressMutated := false
+
+		if (req.Operation == admissionv1.Create || req.Operation == admissionv1.Update) && gvk == listenerSetKind {
+			ingressMutated, err = mutateListenerSetParentRef(ctx, obj, bodies, conditions)
+		}
+
+		return mutationResponse(obj, req, metadataMutated || resourcesMutated || ingressMutated, err)
 	}
 }
 

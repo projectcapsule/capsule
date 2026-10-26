@@ -23,7 +23,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
 
-var _ = Describe("GlobalResourceQuota", Ordered, Label("globalresourcequota", "resourcequota", "ledger", "skip-on-openshift"), func() {
+var _ = Describe("GlobalResourceQuota", Ordered, Label("globalresourcequota", "resourcequota", "ledger"), func() {
 	const (
 		tenantAName = "e2e-global-resource-quota-a"
 		tenantBName = "e2e-global-resource-quota-b"

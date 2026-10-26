@@ -53,15 +53,6 @@ spec:
                     matchLabels:
                       projectcapsule.dev/tenant: {{ $.tenant.metadata.name }}
                 - apiGroups:
-                  - "capsule.clastix.io"
-                  resources:
-                  - "globalresourcepermittemplates"
-                  operations:
-                  - List
-                  selector:
-                    matchLabels:
-                      company.com/consumer: "tenants"
-                - apiGroups:
                   - "rbac.authorization.k8s.io"
                   resources:
                   - "clusterroles"

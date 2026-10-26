@@ -712,7 +712,11 @@ spec:
         objectSelector:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
+        {{- $explicitConditions := or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
+        {{- if and $.Values.openshift.etcdEncryption.enabled (not $explicitConditions) (or (dig "capsuleUsers" false (.opts | default dict)) (dig "administrators" false (.opts | default dict))) }}
+          {{- fail "openshift.etcdEncryption.enabled would replace the generated capsule-user-gate of the replications webhook; set explicit matchConditions for it" }}
+        {{- end }}
+        {{- if or $explicitConditions $.Values.openshift.etcdEncryption.enabled }}
         matchConditions:
         {{- end }}
         {{- with .matchConditions }}
@@ -724,161 +728,8 @@ spec:
         {{- with $.Values.webhooks.validating.matchConditions }}
           {{- toYaml . |  nindent 10 }}
         {{- end }}
-        rules:
-          {{- toYaml .rules | nindent 10 }}
-        sideEffects: None
-        timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
-        {{- end }}
-      {{- end }}
-      {{- with .Values.webhooks.hooks.resourcepermits }}
-        {{- if .enabled }}
-          {{- $anyValidating = true }}
-      - name: resourcepermits.validating.projectcapsule.dev
-        {{- with .opts }}
-        opts:
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        admissionReviewVersions:
-          - v1
-        path: "/resourcepermits/validating"
-        failurePolicy: {{ .failurePolicy }}
-        matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
-        namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        {{- with .objectSelector }}
-        objectSelector:
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
-        matchConditions:
-        {{- end }}
-        {{- with .matchConditions }}
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        {{- with $.Values.webhooks.matchConditions }}
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        {{- with $.Values.webhooks.validating.matchConditions }}
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        rules:
-          {{- toYaml .rules | nindent 10 }}
-        sideEffects: None
-        timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
-        {{- end }}
-      {{- end }}
-      {{- with .Values.webhooks.hooks.resourcepermittemplates }}
-        {{- if .enabled }}
-          {{- $anyValidating = true }}
-      - name: resourcepermittemplates.validating.projectcapsule.dev
-        {{- with .opts }}
-        opts:
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        admissionReviewVersions:
-          - v1
-        path: "/resourcepermittemplates/validating"
-        failurePolicy: {{ .failurePolicy }}
-        matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
-        namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        {{- with .objectSelector }}
-        objectSelector:
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
-        matchConditions:
-        {{- end }}
-        {{- with .matchConditions }}
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        {{- with $.Values.webhooks.matchConditions }}
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        {{- with $.Values.webhooks.validating.matchConditions }}
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        rules:
-          {{- toYaml .rules | nindent 10 }}
-        sideEffects: None
-        timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
-        {{- end }}
-      {{- end }}
-      {{- with .Values.webhooks.hooks.globalresourcepermittemplates }}
-        {{- if .enabled }}
-          {{- $anyValidating = true }}
-      - name: globalresourcepermittemplates.validating.projectcapsule.dev
-        {{- with .opts }}
-        opts:
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        admissionReviewVersions:
-          - v1
-        path: "/globalresourcepermittemplates/validating"
-        failurePolicy: {{ .failurePolicy }}
-        matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
-        namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        {{- with .objectSelector }}
-        objectSelector:
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
-        matchConditions:
-        {{- end }}
-        {{- with .matchConditions }}
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        {{- with $.Values.webhooks.matchConditions }}
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        {{- with $.Values.webhooks.validating.matchConditions }}
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        rules:
-          {{- toYaml .rules | nindent 10 }}
-        sideEffects: None
-        timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
-        {{- end }}
-      {{- end }}
-      {{- with .Values.webhooks.hooks.resourcePermit }}
-        {{- if .enabled }}
-          {{- $anyValidating = true }}
-      - name: resource-permit.validating.projectcapsule.dev
-        {{- with .opts }}
-        opts:
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        admissionReviewVersions:
-          - v1
-        path: "/generic/resourcepermit"
-        failurePolicy: {{ .failurePolicy }}
-        matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
-        namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        {{- with .objectSelector }}
-        objectSelector:
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
-        matchConditions:
-        {{- end }}
-        {{- with .matchConditions }}
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        {{- with $.Values.webhooks.matchConditions }}
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        {{- with $.Values.webhooks.validating.matchConditions }}
-          {{- toYaml . |  nindent 10 }}
+        {{- with include "capsule.openshiftEtcdEncryptionMatchConditions" $ }}
+          {{- . | nindent 10 }}
         {{- end }}
         rules:
           {{- toYaml .rules | nindent 10 }}
@@ -1139,7 +990,7 @@ spec:
         timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
 
       # ServiceAccount references may point outside Tenant namespaces (for
-      # example, from a GlobalTenantResource or GlobalResourcePermitTemplate).
+      # example, from a GlobalTenantResource).
       # Keep deletion protection separate from promotion validation so it is
       # not limited by the promotion label or Tenant namespace selectors.
       - name: serviceaccount-references.validating.projectcapsule.dev
@@ -1981,47 +1832,6 @@ spec:
         {{- end }}
         rules:
           {{- toYaml .rules |  nindent 10 }}
-        sideEffects: None
-        timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
-        {{- end }}
-      {{- end }}
-      {{- with .Values.webhooks.hooks.resourcepermits }}
-        {{- if .enabled }}
-          {{- $anyMutating = true }}
-      - name: resourcepermits.mutating.projectcapsule.dev
-        {{- with .opts }}
-        opts:
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        admissionReviewVersions:
-          - v1
-          - v1beta1
-        path: "/resourcepermits/mutating"
-        failurePolicy:  {{ .failurePolicy }}
-        matchPolicy: {{ .matchPolicy }}
-        reinvocationPolicy: {{ .reinvocationPolicy }}
-        {{- with .namespaceSelector }}
-        namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        {{- with .objectSelector }}
-        objectSelector:
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        {{- if or .matchConditions $.Values.webhooks.matchConditions $.Values.webhooks.mutating.matchConditions }}
-        matchConditions:
-        {{- end }}
-        {{- with .matchConditions }}
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        {{- with $.Values.webhooks.matchConditions }}
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        {{- with $.Values.webhooks.mutating.matchConditions }}
-          {{- toYaml . |  nindent 10 }}
-        {{- end }}
-        rules:
-          {{- toYaml .rules | nindent 10 }}
         sideEffects: None
         timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
         {{- end }}

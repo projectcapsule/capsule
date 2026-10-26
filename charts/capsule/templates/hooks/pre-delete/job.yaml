@@ -33,6 +33,9 @@ spec:
         {{- with $.Values.podAnnotations }}
           {{- toYaml . | nindent 8 }}
         {{- end }}
+        {{- with include "capsule.openshiftAnnotations" $ }}
+          {{- . | nindent 8 }}
+        {{- end }}
       labels:
         app.kubernetes.io/component: {{ include "capsule.pre-delete.component" . | quote }}
         app.kubernetes.io/name: {{ include "capsule.pre-delete.component" . | quote }}
@@ -45,7 +48,10 @@ spec:
         {{- end }}
     spec:
       restartPolicy: {{ $Values.restartPolicy }}
-      {{- if $Values.podSecurityContext.enabled }}
+      {{- if include "capsule.hostUsersDisabled" (dict "hostUsers" $Values.hostUsers "root" $) }}
+      hostUsers: false
+      {{- end }}
+      {{- if include "capsule.jobSecurityContextEnabled" (dict "key" "podSecurityContext" "values" $Values "root" $) }}
       securityContext: {{- omit $Values.podSecurityContext "enabled" | toYaml | nindent 8 }}
       {{- end }}
       {{- with $Values.nodeSelector }}
@@ -76,22 +82,18 @@ spec:
         - name: pre-delete-job
           image: {{ include "capsule.jobsFullyQualifiedDockerImage" . }}
           imagePullPolicy: {{ $Values.image.pullPolicy }}
-          command:
-          - "/bin/sh"
-          - "-c"
-          - |
-              set -o errexit ; set -o xtrace ; set -o nounset
+          args:
+            - delete
+            - --ignore-not-found=true
           {{- if or (.Values.tls.create) (.Values.certManager.generateCertificates) }}
-              kubectl delete secret -n $NAMESPACE {{ include "capsule.secretTlsName" $ }} --ignore-not-found
+            - --namespace={{ $.Release.Namespace }}
+            - secrets/{{ include "capsule.secretTlsName" $ }}
           {{- end }}
-              kubectl delete clusterroles.rbac.authorization.k8s.io capsule-namespace-deleter capsule-namespace-provisioner --ignore-not-found
-              kubectl delete clusterrolebindings.rbac.authorization.k8s.io capsule-namespace-deleter capsule-namespace-provisioner --ignore-not-found
-          env:
-            - name: NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-          {{- if $Values.securityContext.enabled }}
+            - clusterroles.rbac.authorization.k8s.io/capsule-namespace-deleter
+            - clusterroles.rbac.authorization.k8s.io/capsule-namespace-provisioner
+            - clusterrolebindings.rbac.authorization.k8s.io/capsule-namespace-deleter
+            - clusterrolebindings.rbac.authorization.k8s.io/capsule-namespace-provisioner
+          {{- if include "capsule.jobSecurityContextEnabled" (dict "key" "securityContext" "values" $Values "root" $) }}
           securityContext: {{- omit $Values.securityContext "enabled" | toYaml | nindent 12 }}
           {{- end }}
           {{- with $Values.resources }}

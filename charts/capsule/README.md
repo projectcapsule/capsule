@@ -47,6 +47,7 @@ and [replication documentation](https://projectcapsule.dev/docs/replications/).
 | global.jobs.kubectl.affinity | object | `{}` | Set affinity rules |
 | global.jobs.kubectl.annotations | object | `{}` | Annotations to add to the job. |
 | global.jobs.kubectl.backoffLimit | int | `4` | Backofflimit for jobs |
+| global.jobs.kubectl.hostUsers | bool | `true` | Don't use Host Users (User Namespaces) for the job pods. Always disabled when `global.openshift.requiredScc` is `restricted-v3`. |
 | global.jobs.kubectl.image.pullPolicy | string | `"IfNotPresent"` | Set the image pull policy of the helm chart job |
 | global.jobs.kubectl.image.registry | string | `"docker.io"` | Set the image repository of the helm chart job |
 | global.jobs.kubectl.image.repository | string | `"clastix/kubectl"` | Set the image repository of the helm chart job |
@@ -56,17 +57,19 @@ and [replication documentation](https://projectcapsule.dev/docs/replications/).
 | global.jobs.kubectl.nodeSelector | object | `{}` | Set the node selector |
 | global.jobs.kubectl.podAnnotations | object | `{}` | Annotations to add to the job pod |
 | global.jobs.kubectl.podLabels | object | `{}` | Labels to add to the job pod |
-| global.jobs.kubectl.podSecurityContext | object | `{"enabled":true,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for the job pods. |
+| global.jobs.kubectl.podSecurityContext | object | `{"enabled":true,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for the job pods. Ignored when `global.openshift.enabled` is set, unless `jobs.podSecurityContext.enabled` is set explicitly. |
 | global.jobs.kubectl.priorityClassName | string | `""` | Set a pod priorityClassName |
 | global.jobs.kubectl.resources | object | `{}` | Job resources |
 | global.jobs.kubectl.restartPolicy | string | `"Never"` | Set the restartPolicy |
-| global.jobs.kubectl.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"enabled":true,"readOnlyRootFilesystem":true,"runAsGroup":1002,"runAsNonRoot":true,"runAsUser":1002}` | Security context for the job containers. |
+| global.jobs.kubectl.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"enabled":true,"readOnlyRootFilesystem":true,"runAsGroup":1002,"runAsNonRoot":true,"runAsUser":1002}` | Security context for the job containers. Ignored when `global.openshift.enabled` is set, unless `jobs.securityContext.enabled` is set explicitly. |
 | global.jobs.kubectl.tolerations | list | `[]` | Set list of tolerations |
 | global.jobs.kubectl.topologySpreadConstraints | list | `[]` | Set Topology Spread Constraints |
 | global.jobs.kubectl.ttlSecondsAfterFinished | int | `60` | Sets the ttl in seconds after a finished certgen job is deleted. Set to -1 to never delete. |
 | global.jobs.postDelete.enabled | bool | `true` | Enable Post Delete Job to remove Capsule's mutating and validating webhook configurations |
 | global.jobs.postInstall.enabled | bool | `true` | Enable Post Install Job |
 | global.jobs.preDelete.enabled | bool | `true` | Enable Pre Delete Job |
+| global.openshift.enabled | bool | `false` | Run on OpenShift. Unless set explicitly, the pod/container securityContexts of the controller and jobs are omitted (so the SCC assigns UID, fsGroup and SELinux level) and the `openshift.io/required-scc` annotation is added to all pods. |
+| global.openshift.requiredScc | string | `"restricted-v2"` | SCC requested on all pods through the `openshift.io/required-scc` annotation. With `restricted-v3`, hostUsers is disabled on all pods. |
 
 ### General Parameters
 
@@ -86,18 +89,18 @@ and [replication documentation](https://projectcapsule.dev/docs/replications/).
 | imagePullSecrets | list | `[]` | Configuration for `imagePullSecrets` so that you can use a private images registry. |
 | jobs | object | `{}` | Deprecated, use .global.jobs.kubectl instead |
 | nodeSelector | object | `{}` | Set the node selector for the Capsule pod |
+| openshift.etcdEncryption.enabled | bool | `false` | Exclude the kube-storage-version-migrator from the replications webhook (required when etcd encryption is enabled on OpenShift) |
 | podAnnotations | object | `{}` | Annotations to add to the capsule pod. |
 | podLabels | object | `{}` | Labels to add to the capsule pod. |
-| podSecurityContext | object | `{"enabled":true,"runAsGroup":1002,"runAsNonRoot":true,"runAsUser":1002,"seccompProfile":{"type":"RuntimeDefault"}}` | Set the securityContext for the Capsule pod |
+| podSecurityContext | object | `{"enabled":null,"runAsGroup":1002,"runAsNonRoot":true,"runAsUser":1002,"seccompProfile":{"type":"RuntimeDefault"}}` | Set the securityContext for the Capsule pod. `enabled: null` means enabled, unless `global.openshift.enabled` is set. |
 | ports | list | `[]` | Set additional ports for the deployment |
 | priorityClassName | string | `""` | Set the priority class name of the Capsule pod |
 | proxy.enabled | bool | `false` | Enable Installation of Capsule Proxy |
 | rbac.customquotas | object | `{"create":false,"labels":{}}` | Allow the creation of CustomQuotas |
-| rbac.resourcepermits | object | `{"create":false,"labels":{}}` | Allow the creation and review of ResourcePermits |
 | rbac.resourcepoolclaims | object | `{"create":false,"labels":{}}` | Allow the creation of ResourcePoolClaims |
 | rbac.resources | object | `{"create":false,"labels":{}}` | Allow the creation of TenantResources |
 | replicaCount | int | `1` | Set the replica count for capsule pod |
-| securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"enabled":true,"readOnlyRootFilesystem":true}` | Set the securityContext for the Capsule container |
+| securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"enabled":null,"readOnlyRootFilesystem":true}` | Set the securityContext for the Capsule container. `enabled: null` means enabled, unless `global.openshift.enabled` is set. |
 | serviceAccount.annotations | object | `{}` | Annotations to add to the service account. |
 | serviceAccount.create | bool | `true` | Specifies whether a service account should be created. |
 | serviceAccount.imagePullSecrets | list | `[]` |  |
@@ -307,15 +310,6 @@ and [replication documentation](https://projectcapsule.dev/docs/replications/).
 | webhooks.hooks.globalcustomquotas.namespaceSelector | object | `{}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
 | webhooks.hooks.globalcustomquotas.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
 | webhooks.hooks.globalcustomquotas.rules | list | `[{"apiGroups":["capsule.clastix.io"],"apiVersions":["v1beta2"],"operations":["CREATE","UPDATE","DELETE"],"resources":["globalcustomquotas"],"scope":"Cluster"}]` | [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules) |
-| webhooks.hooks.globalresourcepermittemplates | object | `{"enabled":true,"failurePolicy":"Fail","matchConditions":[],"matchPolicy":"Equivalent","namespaceSelector":{},"objectSelector":{},"opts":{},"rules":[{"apiGroups":["capsule.clastix.io"],"apiVersions":["v1beta2"],"operations":["CREATE","UPDATE","DELETE"],"resources":["globalresourcepermittemplates"],"scope":"Cluster"}]}` | Validate cluster-scoped GlobalResourcePermitTemplates |
-| webhooks.hooks.globalresourcepermittemplates.enabled | bool | `true` | Enable the Hook |
-| webhooks.hooks.globalresourcepermittemplates.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
-| webhooks.hooks.globalresourcepermittemplates.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
-| webhooks.hooks.globalresourcepermittemplates.matchPolicy | string | `"Equivalent"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
-| webhooks.hooks.globalresourcepermittemplates.namespaceSelector | object | `{}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
-| webhooks.hooks.globalresourcepermittemplates.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
-| webhooks.hooks.globalresourcepermittemplates.opts | object | `{}` | Capsule Hook Options |
-| webhooks.hooks.globalresourcepermittemplates.rules | list | `[{"apiGroups":["capsule.clastix.io"],"apiVersions":["v1beta2"],"operations":["CREATE","UPDATE","DELETE"],"resources":["globalresourcepermittemplates"],"scope":"Cluster"}]` | [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules) |
 | webhooks.hooks.globalresourcequotas | object | `{"enabled":true,"failurePolicy":"Fail","matchConditions":[],"matchPolicy":"Equivalent","namespaceSelector":{"matchExpressions":[{"key":"capsule.clastix.io/tenant","operator":"Exists"}]},"objectSelector":{},"opts":{},"rules":[{"apiGroups":["*"],"apiVersions":["*"],"operations":["CREATE","UPDATE"],"resources":["*/*"],"scope":"Namespaced"},{"apiGroups":["capsule.clastix.io"],"apiVersions":["v1beta2"],"operations":["CREATE","UPDATE"],"resources":["globalresourcequotas"],"scope":"Cluster"}]}` | Webhook for admission-time GlobalResourceQuota calculations |
 | webhooks.hooks.globalresourcequotas.enabled | bool | `true` | Enable the Hook |
 | webhooks.hooks.globalresourcequotas.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
@@ -407,34 +401,6 @@ and [replication documentation](https://projectcapsule.dev/docs/replications/).
 | webhooks.hooks.replications.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) Match either legacy tracking marker or independent protection below. A LabelSelector cannot express OR across different label keys. |
 | webhooks.hooks.replications.opts | object | `{}` | Capsule Hook Options |
 | webhooks.hooks.replications.rules | list | `[{"apiGroups":["*"],"apiVersions":["*"],"operations":["CREATE","UPDATE","DELETE"],"resources":["*"],"scope":"*"}]` | [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules) |
-| webhooks.hooks.resourcePermit | object | `{"enabled":true,"failurePolicy":"Fail","matchConditions":[{"expression":"[object, oldObject].exists(o, o != null && has(o.metadata.labels) && (\n  ('projectcapsule.dev/protected-by' in o.metadata.labels && o.metadata.labels['projectcapsule.dev/protected-by'] == 'resource-permit') ||\n  ('protection.projectcapsule.dev/resource-permit' in o.metadata.labels && o.metadata.labels['protection.projectcapsule.dev/resource-permit'] == 'true')\n))","name":"resource-permit-protection"}],"matchPolicy":"Equivalent","namespaceSelector":{},"objectSelector":{},"opts":{},"rules":[{"apiGroups":["*"],"apiVersions":["*"],"operations":["CREATE","UPDATE","DELETE"],"resources":["*"],"scope":"*"}]}` | Protect resources managed by ResourcePermits from changes outside the Capsule controller |
-| webhooks.hooks.resourcePermit.enabled | bool | `true` | Enable the Hook |
-| webhooks.hooks.resourcePermit.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
-| webhooks.hooks.resourcePermit.matchConditions | list | `[{"expression":"[object, oldObject].exists(o, o != null && has(o.metadata.labels) && (\n  ('projectcapsule.dev/protected-by' in o.metadata.labels && o.metadata.labels['projectcapsule.dev/protected-by'] == 'resource-permit') ||\n  ('protection.projectcapsule.dev/resource-permit' in o.metadata.labels && o.metadata.labels['protection.projectcapsule.dev/resource-permit'] == 'true')\n))","name":"resource-permit-protection"}]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
-| webhooks.hooks.resourcePermit.matchPolicy | string | `"Equivalent"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
-| webhooks.hooks.resourcePermit.namespaceSelector | object | `{}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
-| webhooks.hooks.resourcePermit.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
-| webhooks.hooks.resourcePermit.opts | object | `{}` | Capsule Hook Options |
-| webhooks.hooks.resourcePermit.rules | list | `[{"apiGroups":["*"],"apiVersions":["*"],"operations":["CREATE","UPDATE","DELETE"],"resources":["*"],"scope":"*"}]` | [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules) |
-| webhooks.hooks.resourcepermits | object | `{"enabled":true,"failurePolicy":"Fail","matchConditions":[],"matchPolicy":"Equivalent","namespaceSelector":{},"objectSelector":{},"opts":{},"reinvocationPolicy":"Never","rules":[{"apiGroups":["capsule.clastix.io"],"apiVersions":["v1beta2"],"operations":["CREATE","UPDATE","DELETE"],"resources":["resourcepermits","resourcepermits/status"],"scope":"Namespaced"}]}` | Validate namespaced ResourcePermits and their referenced templates |
-| webhooks.hooks.resourcepermits.enabled | bool | `true` | Enable the Hook |
-| webhooks.hooks.resourcepermits.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
-| webhooks.hooks.resourcepermits.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
-| webhooks.hooks.resourcepermits.matchPolicy | string | `"Equivalent"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
-| webhooks.hooks.resourcepermits.namespaceSelector | object | `{}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
-| webhooks.hooks.resourcepermits.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
-| webhooks.hooks.resourcepermits.opts | object | `{}` | Capsule Hook Options |
-| webhooks.hooks.resourcepermits.reinvocationPolicy | string | `"Never"` | [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy) |
-| webhooks.hooks.resourcepermits.rules | list | `[{"apiGroups":["capsule.clastix.io"],"apiVersions":["v1beta2"],"operations":["CREATE","UPDATE","DELETE"],"resources":["resourcepermits","resourcepermits/status"],"scope":"Namespaced"}]` | [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules) |
-| webhooks.hooks.resourcepermittemplates | object | `{"enabled":true,"failurePolicy":"Fail","matchConditions":[],"matchPolicy":"Equivalent","namespaceSelector":{},"objectSelector":{},"opts":{},"rules":[{"apiGroups":["capsule.clastix.io"],"apiVersions":["v1beta2"],"operations":["CREATE","UPDATE","DELETE"],"resources":["resourcepermittemplates"],"scope":"Namespaced"}]}` | Validate namespaced ResourcePermitTemplates |
-| webhooks.hooks.resourcepermittemplates.enabled | bool | `true` | Enable the Hook |
-| webhooks.hooks.resourcepermittemplates.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
-| webhooks.hooks.resourcepermittemplates.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matchconditions) |
-| webhooks.hooks.resourcepermittemplates.matchPolicy | string | `"Equivalent"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matchpolicy) |
-| webhooks.hooks.resourcepermittemplates.namespaceSelector | object | `{}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#namespaceselector) |
-| webhooks.hooks.resourcepermittemplates.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#objectselector) |
-| webhooks.hooks.resourcepermittemplates.opts | object | `{}` | Capsule Hook Options |
-| webhooks.hooks.resourcepermittemplates.rules | list | `[{"apiGroups":["capsule.clastix.io"],"apiVersions":["v1beta2"],"operations":["CREATE","UPDATE","DELETE"],"resources":["resourcepermittemplates"],"scope":"Namespaced"}]` | [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#rules) |
 | webhooks.hooks.resourcepools.claims.enabled | bool | `true` | Enable the Hook |
 | webhooks.hooks.resourcepools.claims.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
 | webhooks.hooks.resourcepools.claims.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |

@@ -138,7 +138,7 @@ func (r *NamespaceTrigger) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.C
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		Named("NamespaceWatcher").
+		Named("capsule/replications/namespace-trigger").
 		For(
 			&corev1.Namespace{},
 			// Only the Namespaces of a Tenant which are created from now on: the already

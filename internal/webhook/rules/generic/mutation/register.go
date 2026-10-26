@@ -4,7 +4,10 @@
 package mutation
 
 import (
+	admissionv1 "k8s.io/api/admission/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/projectcapsule/capsule/pkg/ruleengine"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
@@ -23,7 +26,7 @@ func Register(cfg configuration.Configuration, compiler ruleengine.ConditionComp
 }
 
 func (g genericMutating) GetHandlers() []handlers.Handler {
-	return []handlers.Handler{genericHandler(g.configuration, MetadataRules(g.compiler))}
+	return []handlers.Handler{handlers.MatchingRequest(matchesMutationRequest, genericHandler(g.configuration, MetadataRules(g.compiler)))}
 }
 
 func (genericMutating) GetPath() string { return Path }
@@ -34,4 +37,14 @@ func genericHandler(cfg configuration.Configuration, handler ...handlers.TypedHa
 		Handlers:      handler,
 		Configuration: cfg,
 	}
+}
+
+func matchesMutationRequest(req admission.Request) bool {
+	// Preserve malformed-kind errors on requests that previously reached mutation.
+	if req.Kind.Version == "" || req.Kind.Kind == "" || req.SubResource == "" {
+		return true
+	}
+
+	return req.SubResource == "ephemeralcontainers" && req.Operation == admissionv1.Update &&
+		req.Kind.Group == corev1.GroupName && req.Kind.Version == corev1.SchemeGroupVersion.Version && req.Kind.Kind == "Pod"
 }

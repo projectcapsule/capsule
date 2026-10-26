@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -64,7 +65,13 @@ func (h *metaHandler) handle(decoder admission.Decoder, req admission.Request) *
 	}
 
 	labels := tenant.GetLabels()
-	if val, ok := labels[meta.TenantNameLabel]; ok && val == tenant.Name {
+
+	changed := false
+	if tenant.DeletionTimestamp == nil {
+		changed = controllerutil.AddFinalizer(tenant, meta.ControllerFinalizer)
+	}
+
+	if val, ok := labels[meta.TenantNameLabel]; ok && val == tenant.Name && !changed {
 		return nil
 	}
 

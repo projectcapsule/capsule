@@ -68,9 +68,17 @@ var _ = Describe("Capsule administrators changing existing Namespace tenant assi
 
 			originalConfigurationSpec = configuration.Spec.DeepCopy()
 
-		})
+			// Registered before the change so the administrators list is restored
+			// even when the rest of the setup fails; DeferCleanup runs last in,
+			// first out, so this runs after the Tenants below are deleted.
+			DeferCleanup(func() {
+				ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+					configuration.Spec.Administrators = originalConfigurationSpec.Administrators
+				})
+			})
 
-		JustBeforeEach(func() {
+			// No spec mutates the Tenants or the administrator, so the fixture is
+			// created once for the container.
 			ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
 				configuration.Spec.Administrators = rbac.UserListSpec{administrator}
 			})
@@ -81,17 +89,11 @@ var _ = Describe("Capsule administrators changing existing Namespace tenant assi
 
 					return k8sClient.Create(context.Background(), tnt)
 				}).Should(Succeed())
+				// One cleanup per Tenant, registered before waiting for readiness, so
+				// a failure here or for the other Tenant cannot leak it.
+				DeferCleanup(EventuallyDeletion, tnt)
 				TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 			}
-		})
-
-		JustAfterEach(func() {
-			EventuallyDeletion(tenantA)
-			EventuallyDeletion(tenantB)
-
-			ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
-				configuration.Spec = *originalConfigurationSpec
-			})
 		})
 
 		newUnassignedNamespace := func() *corev1.Namespace {

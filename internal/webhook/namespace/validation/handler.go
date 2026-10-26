@@ -5,16 +5,20 @@ package validation
 
 import (
 	"context"
-	"fmt"
+	"maps"
 	"reflect"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	webhookutils "github.com/projectcapsule/capsule/internal/webhook/utils"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
@@ -68,8 +72,8 @@ func (h *handler) OnCreate(
 			return nil
 		}
 
-		if terminating := h.rejectOnTermination(ns, tnt); terminating != nil {
-			return terminating
+		if response := validateTenantAssignment(nil, tnt); response != nil {
+			return response
 		}
 
 		for _, hndl := range h.handlers {
@@ -151,11 +155,19 @@ func (h *handler) OnUpdate(
 			return response
 		}
 
+		user := handlers.ResolveAdmissionUser(ctx, c, req, h.cfg)
+
+		// Kubernetes authorizes status/finalize before admission. Its namespace
+		// controller must finish cleanup even when a CREATE persisted after the
+		// Tenant's final absence check. Keep tenant-owner checks and all metadata
+		// changes on the ordinary path, except removal of existing finalizers.
+		if !user.IsCapsule() && namespaceLifecycleOnlyUpdate(req, oldNs, ns) {
+			return nil
+		}
+
 		if reader != nil {
 			reader = webhookutils.NewTenantCachingReader(reader)
 		}
-
-		user := handlers.ResolveAdmissionUser(ctx, c, req, h.cfg)
 
 		if response, stop := validateNamespaceTenantReferenceTransition(user, oldNs, ns); stop {
 			return response
@@ -211,8 +223,8 @@ func (h *handler) OnUpdate(
 			return nil
 		}
 
-		if terminating := h.rejectOnTermination(ns, newTenant); terminating != nil {
-			return terminating
+		if response := validateTenantAssignment(oldNs, newTenant); response != nil {
+			return response
 		}
 
 		if adminTenantTransition {
@@ -294,6 +306,57 @@ func validateNamespaceTenantReferenceTransition(
 	}
 }
 
+func namespaceLifecycleOnlyUpdate(req admission.Request, oldNs, newNs *corev1.Namespace) bool {
+	if oldNs.DeletionTimestamp == nil || newNs.DeletionTimestamp == nil ||
+		(req.SubResource != "" && req.SubResource != "status" && req.SubResource != "finalize") {
+		return false
+	}
+
+	if req.SubResource == "" && len(newNs.Finalizers) >= len(oldNs.Finalizers) {
+		return false
+	}
+
+	// Typed map equality avoids reflection allocations proportional to metadata.
+	if !maps.Equal(oldNs.Labels, newNs.Labels) || !maps.Equal(oldNs.Annotations, newNs.Annotations) {
+		return false
+	}
+
+	// Compare metadata without copying its maps/slices. Only API-managed fields
+	// may differ, alongside removal of existing finalizers. Other metadata still
+	// needs Tenant validation when it changes.
+	if len(newNs.Finalizers) > len(oldNs.Finalizers) ||
+		(!slices.Equal(oldNs.Finalizers, newNs.Finalizers) && !sets.New(oldNs.Finalizers...).HasAll(newNs.Finalizers...)) {
+		return false
+	}
+
+	oldMeta, newMeta := oldNs.ObjectMeta, newNs.ObjectMeta
+	oldMeta.ResourceVersion = newMeta.ResourceVersion
+	oldMeta.Generation = newMeta.Generation
+	oldMeta.ManagedFields = newMeta.ManagedFields
+	oldMeta.Finalizers = newMeta.Finalizers
+	oldMeta.Labels, newMeta.Labels = nil, nil
+	oldMeta.Annotations, newMeta.Annotations = nil, nil
+
+	if !reflect.DeepEqual(oldMeta, newMeta) {
+		return false
+	}
+
+	if req.SubResource == "status" {
+		return reflect.DeepEqual(oldNs.Spec, newNs.Spec)
+	}
+
+	if !reflect.DeepEqual(oldNs.Status, newNs.Status) {
+		return false
+	}
+
+	if req.SubResource == "" {
+		return reflect.DeepEqual(oldNs.Spec, newNs.Spec)
+	}
+
+	// Finalization may remove existing spec finalizers, never introduce new ones.
+	return len(newNs.Spec.Finalizers) <= len(oldNs.Spec.Finalizers) && sets.New(oldNs.Spec.Finalizers...).HasAll(newNs.Spec.Finalizers...)
+}
+
 func namespaceTenantAssignmentChanged(oldNs, newNs *corev1.Namespace) bool {
 	if tenant.TenanLabelValue(oldNs) != tenant.TenanLabelValue(newNs) {
 		return true
@@ -305,28 +368,32 @@ func namespaceTenantAssignmentChanged(oldNs, newNs *corev1.Namespace) bool {
 	)
 }
 
-func (h *handler) rejectOnTermination(
-	ns *corev1.Namespace,
+func validateTenantAssignment(
+	oldNs *corev1.Namespace,
 	t *capsulev1beta2.Tenant,
 ) *admission.Response {
 	if t == nil {
 		return nil
 	}
 
-	if t.DeletionTimestamp == nil {
-		return nil
+	// Existing namespaces must be able to finish deletion even if they never
+	// reached status.spaces. Use the persisted old ownership, including UID,
+	// rather than the incoming owner reference or the Tenant status projection.
+	if oldNs != nil {
+		for _, ref := range oldNs.OwnerReferences {
+			if tenant.IsTenantOwnerReferenceForTenant(ref, t) {
+				return nil
+			}
+		}
 	}
 
-	instance := t.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{
-		Name: ns.GetName(),
-		UID:  ns.GetUID(),
-	})
-
-	if instance != nil {
-		return nil
+	if t.DeletionTimestamp != nil {
+		return ad.Deny("tenant is terminating and does not accept new namespaces")
 	}
 
-	err := fmt.Errorf("tenant is terminating and does not accept new namespaces")
+	if !controllerutil.ContainsFinalizer(t, meta.ControllerFinalizer) {
+		return ad.Deny("tenant lifecycle protection is not ready; retry after the Tenant is reconciled")
+	}
 
-	return ad.ErroredResponse(err)
+	return nil
 }

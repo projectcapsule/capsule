@@ -5,10 +5,11 @@ package tenant
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -25,13 +26,21 @@ const (
 )
 
 func (r *Manager) setupNamespaceCleanupController(mgr ctrl.Manager, config utils.ControllerOptions) error {
+	// Cleanup performs an authoritative namespace read before every destructive
+	// write. Give those reads a separate client so a deletion batch cannot drain
+	// the namespace-read token bucket used by admission and Tenant provisioning.
+	// Keep the existing configured QPS/burst and reuse the manager's transport.
+	cleanupClient, err := isolatedNamespaceReader(mgr)
+	if err != nil {
+		return fmt.Errorf("create namespace cleanup reader: %w", err)
+	}
+
+	r.cleanupReader = cleanupClient
+
 	options := config.Runtime.ToControllerOptions()
-	// Cleanup already fans out to four resource types. A single worker bounds
-	// background API pressure independently of Tenant provisioning concurrency.
-	options.MaxConcurrentReconciles = 1
 
 	return ctrl.NewControllerManagedBy(mgr).
-		Named("capsule/namespace-cleanup").
+		Named("capsule/tenants/namespace-cleanup").
 		For(&corev1.Namespace{}, builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
 			ns, ok := obj.(*corev1.Namespace)
 
@@ -42,31 +51,30 @@ func (r *Manager) setupNamespaceCleanupController(mgr ctrl.Manager, config utils
 }
 
 func (r *Manager) reconcileNamespaceCleanup(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	reader := r.cleanupReader
+	if reader == nil {
+		reader = r.reader
+	}
+
 	ns := &corev1.Namespace{}
-	if err := r.reader.Get(ctx, request.NamespacedName, ns); err != nil {
+	if err := reader.Get(ctx, request.NamespacedName, ns); err != nil {
 		return reconcile.Result{}, client.IgnoreNotFound(err)
 	}
 
 	if ns.DeletionTimestamp == nil {
 		return reconcile.Result{}, nil
 	}
-	// Labels only select candidates; a live Tenant with the matching owner UID
-	// establishes the scope of this controller's destructive operations.
-	tnt, err := tenant.ResolveNamespaceTenant(ctx, r.reader, ns)
-	if apierrors.IsNotFound(err) {
-		return reconcile.Result{}, nil
-	}
-
-	if err != nil {
-		return reconcile.Result{}, err
-	}
-
-	if tnt == nil {
-		return reconcile.Result{}, nil
-	}
-
+	// Admission persists the Tenant owner UID on each namespace. Cleanup is
+	// scoped to that namespace's UID and owner, even when an in-flight CREATE
+	// persisted after Tenant finalization or the Tenant name has been reused.
+	// The cleanup helper rechecks that identity before every destructive write.
+	// Labels alone never authorize cleanup, and incomplete ownership fails closed.
 	refs := tenant.TenantOwnerReferences(ns)
-	if len(refs) != 1 || tnt.UID == "" || !tenant.IsTenantOwnerReferenceForTenant(refs[0], tnt) {
+	if ns.UID == "" || len(refs) != 1 || refs[0].Name == "" || refs[0].UID == "" {
+		return reconcile.Result{}, nil
+	}
+
+	if label := tenant.TenanLabelValue(ns); label != "" && label != refs[0].Name {
 		return reconcile.Result{}, nil
 	}
 
@@ -74,7 +82,7 @@ func (r *Manager) reconcileNamespaceCleanup(ctx context.Context, request reconci
 		return reconcile.Result{RequeueAfter: remaining}, nil
 	}
 
-	pending, err := tenant.NamespaceIsPendingPodTerminating(ctx, r.reader, ns)
+	pending, err := tenant.NamespaceIsPendingPodTerminating(ctx, reader, ns)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -84,7 +92,7 @@ func (r *Manager) reconcileNamespaceCleanup(ctx context.Context, request reconci
 	}
 
 	err = r.runPhase(ctrl.LoggerFrom(ctx), "namespace_cleanup", func() error {
-		_, cleanupErr := tenant.NamespacedCascadingCleanup(ctx, r.reader, r.DiscoveryClient, &r.discoveryCache, r.DynamicClient, ns)
+		_, cleanupErr := tenant.NamespacedCascadingCleanup(ctx, reader, r.DiscoveryClient, &r.discoveryCache, r.DynamicClient, ns)
 
 		return cleanupErr
 	})
@@ -93,4 +101,13 @@ func (r *Manager) reconcileNamespaceCleanup(ctx context.Context, request reconci
 	}
 
 	return reconcile.Result{RequeueAfter: namespaceCleanupRetryPeriod}, nil
+}
+
+// Separate configured token buckets keep bulk authoritative namespace reads
+// from consuming the admission reader's budget. Reuse transport and limits.
+func isolatedNamespaceReader(mgr ctrl.Manager) (client.Client, error) {
+	config := rest.CopyConfig(mgr.GetConfig())
+	config.RateLimiter = nil
+
+	return client.New(config, client.Options{Scheme: mgr.GetScheme(), Mapper: mgr.GetRESTMapper(), HTTPClient: mgr.GetHTTPClient()})
 }

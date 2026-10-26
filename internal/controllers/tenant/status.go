@@ -195,6 +195,11 @@ func (r *Manager) updateReconcilingStatus(ctx context.Context, instance *capsule
 			return err
 		}
 
+		// Use the same authoritative read for lifecycle and spec, not only
+		// status. A stale cached deletionTimestamp must not select the active
+		// path after deletion has already started.
+		*instance = *latest
+
 		originalStatus := latest.Status.DeepCopy()
 
 		// Spec owners are already known and do not depend on ServiceAccount or

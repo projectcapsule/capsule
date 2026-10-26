@@ -4,19 +4,16 @@
 package validation
 
 import (
-	"context"
 	"slices"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/pkg/ruleengine"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
-	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -142,61 +139,8 @@ func ForKind(
 	}, handler)
 }
 
-type requestPredicate func(admission.Request) bool
-
-type matchingHandler struct {
-	predicate requestPredicate
-	handler   handlers.Handler
-}
-
-func matchingRequest(predicate requestPredicate, handler handlers.Handler) handlers.Handler {
-	return &matchingHandler{
-		predicate: predicate,
-		handler:   handler,
-	}
-}
-
-func (h *matchingHandler) OnCreate(
-	c client.Client,
-	reader client.Reader,
-	decoder admission.Decoder,
-	recorder events.EventRecorder,
-) handlers.Func {
-	next := h.handler.OnCreate(c, reader, decoder, recorder)
-
-	return h.handle(next)
-}
-
-func (h *matchingHandler) OnUpdate(
-	c client.Client,
-	reader client.Reader,
-	decoder admission.Decoder,
-	recorder events.EventRecorder,
-) handlers.Func {
-	next := h.handler.OnUpdate(c, reader, decoder, recorder)
-
-	return h.handle(next)
-}
-
-func (h *matchingHandler) OnDelete(
-	c client.Client,
-	reader client.Reader,
-	decoder admission.Decoder,
-	recorder events.EventRecorder,
-) handlers.Func {
-	next := h.handler.OnDelete(c, reader, decoder, recorder)
-
-	return h.handle(next)
-}
-
-func (h *matchingHandler) handle(next handlers.Func) handlers.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if !h.predicate(req) {
-			return nil
-		}
-
-		return next(ctx, req)
-	}
+func matchingRequest(predicate func(admission.Request) bool, handler handlers.Handler) handlers.Handler {
+	return handlers.MatchingRequest(predicate, handler)
 }
 
 func requestGVK(req admission.Request) schema.GroupVersionKind {

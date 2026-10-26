@@ -80,7 +80,7 @@ func (r *CacheInvalidator) SetupWithManager(
 	options.NeedLeaderElection = new(false)
 
 	err = ctrl.NewControllerManagedBy(mgr).
-		Named("config/caches").
+		Named("capsule/config/caches").
 		For(
 			&capsulev1beta2.CapsuleConfiguration{},
 			builder.WithPredicates(

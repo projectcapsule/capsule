@@ -81,6 +81,7 @@ func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager, ctrlCo
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
+		Named("capsule/replications/tenantresource").
 		For(
 			&capsulev1beta2.TenantResource{},
 			builder.WithPredicates(

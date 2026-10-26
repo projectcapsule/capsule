@@ -5,6 +5,7 @@ package generic
 
 import (
 	"context"
+	"maps"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,7 +55,36 @@ func (r *tenantAssignmentHandler) OnUpdate(
 	_ events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return r.handle(ctx, reader, decoder, req)
+		if req.Namespace == "" {
+			return nil
+		}
+
+		obj := &metav1.PartialObjectMetadata{}
+		if err := decoder.Decode(req, obj); err != nil {
+			return ad.ErroredResponse(err)
+		}
+
+		if req.SubResource == "" && obj.DeletionTimestamp != nil && len(obj.Finalizers) == 0 &&
+			(obj.DeletionGracePeriodSeconds == nil || *obj.DeletionGracePeriodSeconds == 0) &&
+			obj.Labels[meta.ManagedByCapsuleLabel] != "" && obj.Labels[meta.ManagedByCapsuleLabel] == obj.Labels[meta.NewTenantLabel] {
+			old := &metav1.PartialObjectMetadata{}
+			if err := decoder.DecodeRaw(req.OldObject, old); err != nil {
+				return ad.ErroredResponse(err)
+			}
+
+			// Removing the last finalizer deletes this persisted object. Retagging
+			// unchanged Tenant labels cannot affect its surviving state. Return nil
+			// so other handlers and validating webhooks still enforce their policies.
+			if old.DeletionTimestamp != nil && old.DeletionTimestamp.Equal(obj.DeletionTimestamp) &&
+				(old.DeletionGracePeriodSeconds == nil || *old.DeletionGracePeriodSeconds == 0) &&
+				old.UID != "" && old.UID == obj.UID && old.Name == obj.Name && old.Namespace == obj.Namespace &&
+				obj.Namespace == req.Namespace && len(old.Finalizers) > 0 &&
+				maps.Equal(old.Labels, obj.Labels) {
+				return nil
+			}
+		}
+
+		return r.assign(ctx, reader, obj, req)
 	}
 }
 
@@ -73,6 +103,15 @@ func (r *tenantAssignmentHandler) handle(
 		return ad.ErroredResponse(err)
 	}
 
+	return r.assign(ctx, c, obj, req)
+}
+
+func (r *tenantAssignmentHandler) assign(
+	ctx context.Context,
+	c client.Reader,
+	obj *metav1.PartialObjectMetadata,
+	req admission.Request,
+) *admission.Response {
 	tnt, err := tenant.GetTenantNameByNamespace(ctx, c, req.Namespace)
 	if err != nil {
 		if apierrors.IsNotFound(err) {

@@ -16,6 +16,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -32,9 +34,17 @@ const (
 	resourcesLabel = "resources"
 )
 
-var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global", "globaltenantresource"), Ordered, func() {
+var _ = Describe("GlobalTenantResource", Label("replications", "global", "globaltenantresource"), func() {
 	var (
 		ctx context.Context
+
+		// prefix is unique per spec. Tenants, namespaces, owners, source
+		// namespaces and the tenant-selector label values all derive from it, so
+		// the specs of this container can run concurrently on different Ginkgo
+		// processes without selecting or cleaning up each other's objects.
+		prefix  string
+		energyA string
+		energyB string
 
 		tenantA *capsulev1beta2.Tenant
 		tenantB *capsulev1beta2.Tenant
@@ -47,44 +57,61 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 		allNamespaces     []string
 	)
 
-	It("converts legacy settings and applies independent resource policies across tenant boundaries", Label("replication-policy"), func() {
-		exerciseReplicationPolicies(true, tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner)
-	})
+	// tenantASelector matches only this spec's tenant A.
+	tenantASelector := func() metav1.LabelSelector {
+		return metav1.LabelSelector{MatchLabels: map[string]string{"energy": energyA}}
+	}
 
-	It("composes replication and ResourcePermit protection", Label("protection-composition"), func() {
-		exerciseMixedProtection(true, tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner)
+	// createGlobalTenantResource stamps the per-spec run label on the object so
+	// that AfterEach removes exactly the GlobalTenantResources of this spec.
+	createGlobalTenantResource := func(gtr *capsulev1beta2.GlobalTenantResource) {
+		if gtr.Labels == nil {
+			gtr.Labels = map[string]string{}
+		}
+
+		gtr.Labels[e2eRunLabel] = prefix
+
+		EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+	}
+
+	It("converts legacy settings and applies independent resource policies across tenant boundaries", Label("replication-policy"), func() {
+		exerciseReplicationPolicies(ptr.To(tenantASelector()), tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner)
 	})
 
 	It("preserves explicit policies after a partial first apply", Label("policy-metadata-failure", "policy-first-apply-failure"), func() {
-		exerciseInitialReplicationPolicyFailure(true, tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner)
+		exerciseInitialReplicationPolicyFailure(ptr.To(tenantASelector()), tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner)
 	})
 
 	It("retains effective policy when protection metadata reconciliation fails", Label("policy-metadata-failure"), func() {
-		exerciseReplicationPolicyFailure(true, tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner)
+		exerciseReplicationPolicyFailure(ptr.To(tenantASelector()), tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner)
 	})
 
 	It("keeps a shared adopted target protected until its last owner departs", Label("shared-protection", "protection-markers"), func() {
-		exerciseSharedReplicationProtection(true, tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner, false)
+		exerciseSharedReplicationProtection(ptr.To(tenantASelector()), tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner, false)
 	})
 
 	It("keeps shared protection when one parent switches to Orphan", Label("shared-orphan-protection"), func() {
-		exerciseSharedReplicationProtection(true, tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner, true)
+		exerciseSharedReplicationProtection(ptr.To(tenantASelector()), tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner, true)
 	})
 
 	BeforeEach(func() {
 		ctx = context.Background()
 
-		tenantAOwner = rbac.UserSpec{Name: "e2e-gtr-tenant-a", Kind: rbac.OwnerKind("User")}
-		tenantBOwner = rbac.UserSpec{Name: "e2e-gtr-tenant-b", Kind: rbac.OwnerKind("User")}
+		prefix = "e2e-gtr-" + rand.String(6)
+		energyA = "solar-" + prefix
+		energyB = "lunar-" + prefix
 
-		tenantANamespaces = []string{"e2e-gtr-tenant-a-one", "e2e-gtr-tenant-a-two", "e2e-gtr-tenant-a-system"}
-		tenantBNamespaces = []string{"e2e-gtr-tenant-b-one", "e2e-gtr-tenant-b-two"}
+		tenantAOwner = rbac.UserSpec{Name: prefix + "-owner-a", Kind: rbac.OwnerKind("User")}
+		tenantBOwner = rbac.UserSpec{Name: prefix + "-owner-b", Kind: rbac.OwnerKind("User")}
+
+		tenantANamespaces = []string{prefix + "-a-one", prefix + "-a-two", prefix + "-a-system"}
+		tenantBNamespaces = []string{prefix + "-b-one", prefix + "-b-two"}
 		allNamespaces = append(append([]string{}, tenantANamespaces...), tenantBNamespaces...)
 
 		tenantA = &capsulev1beta2.Tenant{
-			Name: "e2e-gtr-tenant-a",
+			Name: prefix + "-a",
 			Labels: map[string]string{
-				"energy": "solar",
+				"energy": energyA,
 				"group":  "alpha",
 				"env":    "e2e",
 			},
@@ -103,9 +130,9 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 		}
 
 		tenantB = &capsulev1beta2.Tenant{
-			Name: "e2e-gtr-tenant-b",
+			Name: prefix + "-b",
 			Labels: map[string]string{
-				"energy": "lunar",
+				"energy": energyB,
 				"group":  "beta",
 				"env":    "e2e",
 			},
@@ -144,33 +171,22 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 	})
 
 	AfterEach(func() {
-		cleanupGlobalTenantResourcesWithDefaultServiceAccount(ctx)
+		cleanupGlobalTenantResources(ctx, client.MatchingLabels{e2eRunLabel: prefix})
 
+		// The names are unique per spec, so nothing waits for the namespaces or
+		// the Tenants to be gone (see DeleteNamespaceInBackground).
 		for _, ns := range allNamespaces {
-			ForceDeleteNamespace(ctx, ns)
+			DeleteNamespaceInBackground(ctx, ns)
 		}
 
-		EventuallyDeletion(tenantA)
-		EventuallyDeletion(tenantB)
-
-		Eventually(func() error {
-			clusterRoleList := &rbacv1.ClusterRoleList{}
-			labelSelector := client.MatchingLabels{"e2e.capsule.dev/test-suite": "true"}
-			if err := k8sClient.List(context.TODO(), clusterRoleList, labelSelector); err != nil {
-				return err
-			}
-
-			for _, clusterRole := range clusterRoleList.Items {
-				if err := k8sClient.Delete(context.TODO(), &clusterRole); err != nil {
-					return err
-				}
-			}
-
-			return nil
-		}, "30s", "5s").Should(Succeed())
+		DeleteInBackground(tenantA)
+		DeleteInBackground(tenantB)
 	})
 
-	Context("cluster-scoped objects", func() {
+	// These specs share the controller's cluster-scoped RBAC fixture and sweep
+	// the ClusterRoles they replicate by label, so they stay serialised on one
+	// process (Ordered) while the rest of the container runs in parallel.
+	Context("cluster-scoped objects", Ordered, func() {
 		const (
 			controllerClusterResourceRoleName    = "gtr-controller-cluster-resource-writer"
 			controllerClusterResourceBindingName = "gtr-controller-cluster-resource-writer-binding"
@@ -203,6 +219,27 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 		})
 
 		AfterEach(func() {
+			// Delete this spec's GlobalTenantResources while the controller still
+			// holds the cluster-scoped permissions it needs to prune, then sweep
+			// whatever ClusterRole pruning left behind.
+			cleanupGlobalTenantResources(ctx, client.MatchingLabels{e2eRunLabel: prefix})
+
+			Eventually(func() error {
+				clusterRoleList := &rbacv1.ClusterRoleList{}
+				labelSelector := client.MatchingLabels{"e2e.capsule.dev/test-suite": "true"}
+				if err := k8sClient.List(context.TODO(), clusterRoleList, labelSelector); err != nil {
+					return err
+				}
+
+				for _, clusterRole := range clusterRoleList.Items {
+					if err := k8sClient.Delete(context.TODO(), &clusterRole); err != nil {
+						return err
+					}
+				}
+
+				return nil
+			}, "30s", "5s").Should(Succeed())
+
 			ignoreNotFound(k8sClient.Delete(ctx, &rbacv1.ClusterRoleBinding{
 				Name: controllerClusterResourceBindingName,
 			}))
@@ -214,7 +251,7 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 		It("applies raw cluster-scoped items", func() {
 			gtr := newRawClusterRoleGlobalTenantResource("gtr-cluster-raw", "gtr-cluster-raw-role")
 
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+			createGlobalTenantResource(gtr)
 
 			expectGlobalTenantResourceReady("gtr-cluster-raw")
 			expectClusterRoleRules("gtr-cluster-raw-role", []rbacv1.PolicyRule{{
@@ -228,7 +265,7 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 		It("applies generated cluster-scoped items", func() {
 			gtr := newGeneratedClusterRoleGlobalTenantResource("gtr-cluster-generator", "gtr-cluster-generator-role")
 
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+			createGlobalTenantResource(gtr)
 
 			expectGlobalTenantResourceReady("gtr-cluster-generator")
 			expectClusterRoleRules("gtr-cluster-generator-role", []rbacv1.PolicyRule{{
@@ -278,7 +315,7 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 				Namespace: apimeta.RFC1123SubdomainName("capsule-system"),
 			}
 
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+			createGlobalTenantResource(gtr)
 			expectGlobalTenantResourceReady(gtr.Name)
 			expectClusterRoleRules(clusterRoleName, []rbacv1.PolicyRule{{
 				APIGroups: []string{""},
@@ -344,15 +381,11 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 			"mode": "active",
 		})
 
-		gtr.Spec.TenantSelector = metav1.LabelSelector{
-			MatchLabels: map[string]string{"energy": "solar"},
-		}
+		gtr.Spec.TenantSelector = tenantASelector()
 
 		renameFirstRawConfigMap(gtr, "gtr-skip-terminating")
 
-		EventuallyCreation(func() error {
-			return k8sClient.Create(ctx, gtr)
-		}).Should(Succeed())
+		createGlobalTenantResource(gtr)
 
 		By("verifying non-terminating selected namespaces still receive the resource")
 		for _, ns := range tenantANamespaces[:2] {
@@ -367,7 +400,7 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 				Name:      "gtr-skip-terminating",
 				Namespace: terminatingNamespace,
 			}, &corev1.ConfigMap{})
-		}, 2*resyncPeriod.Duration, defaultPollInterval).Should(HaveOccurred())
+		}, 2*gtr.Spec.ResyncPeriod.Duration, defaultPollInterval).Should(HaveOccurred())
 
 		By("verifying non-selected tenants do not receive the resource")
 		for _, ns := range tenantBNamespaces {
@@ -391,74 +424,6 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 
-	It("fails to replicate namespacedItems when the impersonated service account cannot read source resources", func() {
-		saName := "gtr-no-namespaceditem-read"
-		ensureServiceAccount("capsule-system", saName)
-
-		sourceNs := "gtr-source-items"
-		sourceNamespace := &corev1.Namespace{
-			Name: sourceNs,
-		}
-		EventuallyCreation(func() error { return k8sClient.Create(ctx, sourceNamespace) }).Should(Succeed())
-		defer ForceDeleteNamespace(ctx, sourceNs)
-
-		sourceSecret := &corev1.Secret{
-			Name:      "source-secret",
-			Namespace: sourceNs,
-			Labels: map[string]string{
-				"replicate": "true",
-			},
-			Type:       corev1.SecretTypeOpaque,
-			StringData: map[string]string{"token": "abc"},
-		}
-		EventuallyCreation(func() error { return k8sClient.Create(ctx, sourceSecret) }).Should(Succeed())
-
-		for _, ns := range tenantANamespaces {
-			bindServiceAccountToSecretWriter("capsule-system", saName, ns)
-		}
-
-		gtr := &capsulev1beta2.GlobalTenantResource{
-			Name: "gtr-sa-no-namespaceditem-read",
-			Labels: map[string]string{
-				"e2e.capsule.dev/test-suite": "true",
-			},
-			Spec: capsulev1beta2.GlobalTenantResourceSpec{
-				Scope: api.ResourceScopeNamespace,
-				ServiceAccount: &apimeta.NamespacedRFC1123ObjectReferenceWithNamespace{
-					Name:      apimeta.RFC1123Name(saName),
-					Namespace: apimeta.RFC1123SubdomainName("capsule-system"),
-				},
-				TenantSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"energy": "solar"},
-				},
-				TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
-					ResyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
-					PruningOnDelete: new(true),
-					Resources: []capsulev1beta2.ResourceSpec{{
-						NamespacedItems: []template.ResourceReference{{
-							APIVersion: "v1",
-							Kind:       "Secret",
-							Namespace:  sourceNs,
-							Selector: &metav1.LabelSelector{
-								MatchLabels: map[string]string{
-									"replicate": "true",
-								},
-							},
-						}},
-					}},
-				},
-			},
-		}
-
-		EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
-
-		expectGlobalTenantResourceFailed("gtr-sa-no-namespaceditem-read", "forbidden")
-
-		for _, ns := range tenantANamespaces {
-			expectSecretAbsent(ns, "source-secret")
-		}
-	})
-
 	Context("scope handling", func() {
 		It("reconciles with scope Namespace", func() {
 			gtr := newRawConfigMapGlobalTenantResourceWithScope(
@@ -466,12 +431,10 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 				api.ResourceScopeNamespace,
 				map[string]string{"mode": "namespace"},
 			)
-			gtr.Spec.TenantSelector = metav1.LabelSelector{
-				MatchLabels: map[string]string{"energy": "solar"},
-			}
+			gtr.Spec.TenantSelector = tenantASelector()
 			renameFirstRawConfigMap(gtr, "gtr-scope-namespace")
 
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+			createGlobalTenantResource(gtr)
 
 			for _, ns := range tenantANamespaces {
 				expectConfigMapData(ns, "gtr-scope-namespace", map[string]string{"mode": "namespace"})
@@ -487,12 +450,10 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 				api.ResourceScopeTenant,
 				map[string]string{"mode": "tenant"},
 			)
-			gtr.Spec.TenantSelector = metav1.LabelSelector{
-				MatchLabels: map[string]string{"energy": "solar"},
-			}
+			gtr.Spec.TenantSelector = tenantASelector()
 			renameFirstRawConfigMap(gtr, "gtr-scope-tenant")
 
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+			createGlobalTenantResource(gtr)
 
 			Eventually(func(g Gomega) {
 				current := &capsulev1beta2.GlobalTenantResource{}
@@ -508,12 +469,10 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 				api.ResourceScopeNone,
 				map[string]string{"mode": "none"},
 			)
-			gtr.Spec.TenantSelector = metav1.LabelSelector{
-				MatchLabels: map[string]string{"energy": "solar"},
-			}
+			gtr.Spec.TenantSelector = tenantASelector()
 			renameFirstRawConfigMap(gtr, "gtr-scope-none")
 
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+			createGlobalTenantResource(gtr)
 
 			Eventually(func(g Gomega) {
 				current := &capsulev1beta2.GlobalTenantResource{}
@@ -543,23 +502,19 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 			gtrA := newRawConfigMapGlobalTenantResource("gtr-collision-preexisting-a", map[string]string{
 				"from": "a",
 			})
-			gtrA.Spec.TenantSelector = metav1.LabelSelector{
-				MatchLabels: map[string]string{"energy": "solar"},
-			}
+			gtrA.Spec.TenantSelector = tenantASelector()
 			gtrA.Spec.Settings.Adopt = new(false)
 			renameFirstRawConfigMap(gtrA, "gtr-shared-preexisting")
 
 			gtrB := newRawConfigMapGlobalTenantResource("gtr-collision-preexisting-b", map[string]string{
 				"from": "b",
 			})
-			gtrB.Spec.TenantSelector = metav1.LabelSelector{
-				MatchLabels: map[string]string{"energy": "solar"},
-			}
+			gtrB.Spec.TenantSelector = tenantASelector()
 			gtrB.Spec.Settings.Adopt = new(false)
 			renameFirstRawConfigMap(gtrB, "gtr-shared-preexisting")
 
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtrA) }).Should(Succeed())
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtrB) }).Should(Succeed())
+			createGlobalTenantResource(gtrA)
+			createGlobalTenantResource(gtrB)
 
 			expectGlobalTenantResourceFailed("gtr-collision-preexisting-a", "applying of")
 			expectGlobalTenantResourceFailed("gtr-collision-preexisting-b", "applying of")
@@ -584,13 +539,11 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 			gtrA := newRawConfigMapGlobalTenantResource("gtr-collision-managed-a", map[string]string{
 				"owner": "first",
 			})
-			gtrA.Spec.TenantSelector = metav1.LabelSelector{
-				MatchLabels: map[string]string{"energy": "solar"},
-			}
+			gtrA.Spec.TenantSelector = tenantASelector()
 			gtrA.Spec.Settings.Adopt = new(false)
 			renameFirstRawConfigMap(gtrA, "gtr-shared-managed")
 
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtrA) }).Should(Succeed())
+			createGlobalTenantResource(gtrA)
 			expectGlobalTenantResourceReady("gtr-collision-managed-a")
 
 			for _, ns := range tenantANamespaces {
@@ -600,13 +553,11 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 			gtrB := newRawConfigMapGlobalTenantResource("gtr-collision-managed-b", map[string]string{
 				"owner": "second",
 			})
-			gtrB.Spec.TenantSelector = metav1.LabelSelector{
-				MatchLabels: map[string]string{"energy": "solar"},
-			}
+			gtrB.Spec.TenantSelector = tenantASelector()
 			gtrB.Spec.Settings.Adopt = new(false)
 			renameFirstRawConfigMap(gtrB, "gtr-shared-managed")
 
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtrB) }).Should(Succeed())
+			createGlobalTenantResource(gtrB)
 			expectGlobalTenantResourceFailed("gtr-collision-managed-b", "applying of")
 
 			for _, ns := range tenantANamespaces {
@@ -635,12 +586,10 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 				Name:      apimeta.RFC1123Name(saName),
 				Namespace: apimeta.RFC1123SubdomainName("capsule-system"),
 			}
-			gtr.Spec.TenantSelector = metav1.LabelSelector{
-				MatchLabels: map[string]string{"energy": "solar"},
-			}
+			gtr.Spec.TenantSelector = tenantASelector()
 			renameFirstRawConfigMap(gtr, "gtr-blocked-create")
 
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+			createGlobalTenantResource(gtr)
 
 			expectGlobalTenantResourceFailed("gtr-sa-no-create", "applying of")
 
@@ -653,7 +602,7 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 			saName := "gtr-no-context-read"
 			ensureServiceAccount("capsule-system", saName)
 
-			sourceNs := "gtr-context-source"
+			sourceNs := prefix + "-context-source"
 			sourceNamespace := &corev1.Namespace{
 				Name: sourceNs,
 			}
@@ -686,9 +635,7 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 						Name:      apimeta.RFC1123Name(saName),
 						Namespace: apimeta.RFC1123SubdomainName("capsule-system"),
 					},
-					TenantSelector: metav1.LabelSelector{
-						MatchLabels: map[string]string{"energy": "solar"},
-					},
+					TenantSelector: tenantASelector(),
 					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
 						ResyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 						PruningOnDelete: new(true),
@@ -722,7 +669,7 @@ data:
 				},
 			}
 
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+			createGlobalTenantResource(gtr)
 
 			expectGlobalTenantResourceFailed("gtr-sa-no-context-read", "forbidden")
 
@@ -735,7 +682,7 @@ data:
 			saName := "gtr-no-namespaceditem-read"
 			ensureServiceAccount("capsule-system", saName)
 
-			sourceNs := "gtr-source-items"
+			sourceNs := prefix + "-source-items"
 			sourceNamespace := &corev1.Namespace{
 				Name: sourceNs,
 			}
@@ -758,7 +705,7 @@ data:
 			}
 
 			gtr := &capsulev1beta2.GlobalTenantResource{
-				Name: "gtr-sa-no-namespaceditem-read",
+				Name: "gtr-impersonation-no-namespaceditem-read",
 				Labels: map[string]string{
 					"e2e.capsule.dev/test-suite": "true",
 				},
@@ -768,9 +715,7 @@ data:
 						Name:      apimeta.RFC1123Name(saName),
 						Namespace: apimeta.RFC1123SubdomainName("capsule-system"),
 					},
-					TenantSelector: metav1.LabelSelector{
-						MatchLabels: map[string]string{"energy": "solar"},
-					},
+					TenantSelector: tenantASelector(),
 					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
 						ResyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 						PruningOnDelete: new(true),
@@ -790,9 +735,9 @@ data:
 				},
 			}
 
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+			createGlobalTenantResource(gtr)
 
-			expectGlobalTenantResourceFailed("gtr-sa-no-namespaceditem-read", "forbidden")
+			expectGlobalTenantResourceFailed("gtr-impersonation-no-namespaceditem-read", "forbidden")
 
 			for _, ns := range tenantANamespaces {
 				expectSecretAbsent(ns, "source-secret")
@@ -816,12 +761,10 @@ data:
 				Name:      apimeta.RFC1123Name(saName),
 				Namespace: apimeta.RFC1123SubdomainName("capsule-system"),
 			}
-			gtr.Spec.TenantSelector = metav1.LabelSelector{
-				MatchLabels: map[string]string{"energy": "solar"},
-			}
+			gtr.Spec.TenantSelector = tenantASelector()
 			renameFirstRawConfigMap(gtr, configMapName)
 
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+			createGlobalTenantResource(gtr)
 			expectGlobalTenantResourceReady(gtr.Name)
 			expectConfigMapData(targetNamespace, configMapName, map[string]string{"mode": "managed"})
 			expectManagedLabelsOnConfigMap(targetNamespace, configMapName, true)
@@ -887,13 +830,11 @@ data:
 				Name:      apimeta.RFC1123Name(saCreate),
 				Namespace: apimeta.RFC1123SubdomainName("capsule-system"),
 			}
-			gtr.Spec.TenantSelector = metav1.LabelSelector{
-				MatchLabels: map[string]string{"energy": "solar"},
-			}
+			gtr.Spec.TenantSelector = tenantASelector()
 			gtr.Spec.PruningOnDelete = new(true)
 			renameFirstRawConfigMap(gtr, "gtr-prune-protected")
 
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+			createGlobalTenantResource(gtr)
 			expectGlobalTenantResourceReady("gtr-sa-no-prune")
 
 			for _, ns := range tenantANamespaces {
@@ -960,13 +901,11 @@ data:
 			gtr := newRawConfigMapGlobalTenantResource("gtr-adoption-disabled", map[string]string{
 				"mode": "new",
 			})
-			gtr.Spec.TenantSelector = metav1.LabelSelector{
-				MatchLabels: map[string]string{"energy": "solar"},
-			}
+			gtr.Spec.TenantSelector = tenantASelector()
 			gtr.Spec.Settings.Adopt = new(false)
 			renameFirstRawConfigMap(gtr, "gtr-adopt-me")
 
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+			createGlobalTenantResource(gtr)
 
 			expectGlobalTenantResourceFailed("gtr-adoption-disabled", "applying of")
 
@@ -998,13 +937,11 @@ data:
 				"mode": "adopted",
 				"foo":  "bar",
 			})
-			gtr.Spec.TenantSelector = metav1.LabelSelector{
-				MatchLabels: map[string]string{"energy": "solar"},
-			}
+			gtr.Spec.TenantSelector = tenantASelector()
 			gtr.Spec.Settings.Adopt = new(true)
 			renameFirstRawConfigMap(gtr, "gtr-adopt-me-enabled")
 
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+			createGlobalTenantResource(gtr)
 			expectGlobalTenantResourceReady("gtr-adoption-enabled")
 
 			for _, ns := range tenantANamespaces {
@@ -1028,12 +965,12 @@ data:
 				MatchExpressions: []metav1.LabelSelectorRequirement{{
 					Key:      "energy",
 					Operator: metav1.LabelSelectorOpIn,
-					Values:   []string{"solar", "lunar"},
+					Values:   []string{energyA, energyB},
 				}},
 			}
 			renameFirstRawConfigMap(gtr, "gtr-tenant-selector-prune")
 
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+			createGlobalTenantResource(gtr)
 
 			for _, ns := range append(tenantANamespaces, tenantBNamespaces...) {
 				expectConfigMapData(ns, "gtr-tenant-selector-prune", map[string]string{"mode": "both"})
@@ -1044,9 +981,7 @@ data:
 				if err := k8sClient.Get(ctx, types.NamespacedName{Name: gtr.Name}, current); err != nil {
 					return err
 				}
-				current.Spec.TenantSelector = metav1.LabelSelector{
-					MatchLabels: map[string]string{"energy": "solar"},
-				}
+				current.Spec.TenantSelector = tenantASelector()
 				return k8sClient.Update(ctx, current)
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
@@ -1059,7 +994,7 @@ data:
 		})
 
 		It("prunes objects from namespaces that stop matching namespaceSelector", func() {
-			for _, ns := range []string{"e2e-gtr-tenant-a-one", "e2e-gtr-tenant-a-two"} {
+			for _, ns := range []string{tenantANamespaces[0], tenantANamespaces[1]} {
 				Eventually(func() error {
 					n := &corev1.Namespace{}
 					if err := k8sClient.Get(ctx, types.NamespacedName{Name: ns}, n); err != nil {
@@ -1075,22 +1010,20 @@ data:
 			gtr := newRawConfigMapGlobalTenantResource("gtr-namespace-selector-prune", map[string]string{
 				"mode": "selected",
 			})
-			gtr.Spec.TenantSelector = metav1.LabelSelector{
-				MatchLabels: map[string]string{"energy": "solar"},
-			}
+			gtr.Spec.TenantSelector = tenantASelector()
 			gtr.Spec.Resources[0].NamespaceSelector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{"replicate": "true"},
 			}
 			renameFirstRawConfigMap(gtr, "gtr-namespace-selector-prune")
 
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+			createGlobalTenantResource(gtr)
 
-			expectConfigMapData("e2e-gtr-tenant-a-one", "gtr-namespace-selector-prune", map[string]string{"mode": "selected"})
-			expectConfigMapData("e2e-gtr-tenant-a-two", "gtr-namespace-selector-prune", map[string]string{"mode": "selected"})
+			expectConfigMapData(tenantANamespaces[0], "gtr-namespace-selector-prune", map[string]string{"mode": "selected"})
+			expectConfigMapData(tenantANamespaces[1], "gtr-namespace-selector-prune", map[string]string{"mode": "selected"})
 
 			Eventually(func() error {
 				n := &corev1.Namespace{}
-				if err := k8sClient.Get(ctx, types.NamespacedName{Name: "e2e-gtr-tenant-a-two"}, n); err != nil {
+				if err := k8sClient.Get(ctx, types.NamespacedName{Name: tenantANamespaces[1]}, n); err != nil {
 					return err
 				}
 				lbls := n.GetLabels()
@@ -1099,8 +1032,8 @@ data:
 				return k8sClient.Update(ctx, n)
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
-			expectConfigMapData("e2e-gtr-tenant-a-one", "gtr-namespace-selector-prune", map[string]string{"mode": "selected"})
-			expectConfigMapDeleted("e2e-gtr-tenant-a-two", "gtr-namespace-selector-prune")
+			expectConfigMapData(tenantANamespaces[0], "gtr-namespace-selector-prune", map[string]string{"mode": "selected"})
+			expectConfigMapDeleted(tenantANamespaces[1], "gtr-namespace-selector-prune")
 		})
 	})
 
@@ -1109,12 +1042,10 @@ data:
 			gtr := newRawConfigMapGlobalTenantResource("gtr-apply-selected-tenants", map[string]string{
 				"mode": "solar",
 			})
-			gtr.Spec.TenantSelector = metav1.LabelSelector{
-				MatchLabels: map[string]string{"energy": "solar"},
-			}
+			gtr.Spec.TenantSelector = tenantASelector()
 			renameFirstRawConfigMap(gtr, "gtr-shared-config")
 
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+			createGlobalTenantResource(gtr)
 
 			for _, ns := range tenantANamespaces {
 				expectConfigMapData(ns, "gtr-shared-config", map[string]string{"mode": "solar"})
@@ -1125,7 +1056,7 @@ data:
 		})
 
 		It("applies only to namespaces matching namespaceSelector within the selected tenants", func() {
-			for _, ns := range []string{"e2e-gtr-tenant-a-one", "e2e-gtr-tenant-a-two"} {
+			for _, ns := range []string{tenantANamespaces[0], tenantANamespaces[1]} {
 				Eventually(func() error {
 					n := &corev1.Namespace{}
 					if err := k8sClient.Get(ctx, types.NamespacedName{Name: ns}, n); err != nil {
@@ -1141,19 +1072,17 @@ data:
 			gtr := newRawConfigMapGlobalTenantResource("gtr-tenant-and-namespace-selector", map[string]string{
 				"mode": "filtered",
 			})
-			gtr.Spec.TenantSelector = metav1.LabelSelector{
-				MatchLabels: map[string]string{"energy": "solar"},
-			}
+			gtr.Spec.TenantSelector = tenantASelector()
 			gtr.Spec.Resources[0].NamespaceSelector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{"replicate": "true"},
 			}
 			renameFirstRawConfigMap(gtr, "gtr-filtered-config")
 
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+			createGlobalTenantResource(gtr)
 
-			expectConfigMapData("e2e-gtr-tenant-a-one", "gtr-filtered-config", map[string]string{"mode": "filtered"})
-			expectConfigMapData("e2e-gtr-tenant-a-two", "gtr-filtered-config", map[string]string{"mode": "filtered"})
-			expectConfigMapAbsent("e2e-gtr-tenant-a-system", "gtr-filtered-config")
+			expectConfigMapData(tenantANamespaces[0], "gtr-filtered-config", map[string]string{"mode": "filtered"})
+			expectConfigMapData(tenantANamespaces[1], "gtr-filtered-config", map[string]string{"mode": "filtered"})
+			expectConfigMapAbsent(tenantANamespaces[2], "gtr-filtered-config")
 
 			for _, ns := range tenantBNamespaces {
 				expectConfigMapAbsent(ns, "gtr-filtered-config")
@@ -1164,12 +1093,10 @@ data:
 	Context("apply lifecycle", func() {
 		It("updates previously applied objects across all selected namespaces", func() {
 			gtr := newRawConfigMapGlobalTenantResource("gtr-update", map[string]string{"mode": "before"})
-			gtr.Spec.TenantSelector = metav1.LabelSelector{
-				MatchLabels: map[string]string{"energy": "solar"},
-			}
+			gtr.Spec.TenantSelector = tenantASelector()
 			renameFirstRawConfigMap(gtr, "gtr-update-config")
 
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+			createGlobalTenantResource(gtr)
 
 			for _, ns := range tenantANamespaces {
 				expectConfigMapData(ns, "gtr-update-config", map[string]string{"mode": "before"})
@@ -1206,13 +1133,11 @@ data:
 
 		It("prunes applied objects on delete when pruningOnDelete is enabled", func() {
 			gtr := newRawConfigMapGlobalTenantResource("gtr-prune-enabled", map[string]string{"mode": "prune"})
-			gtr.Spec.TenantSelector = metav1.LabelSelector{
-				MatchLabels: map[string]string{"energy": "solar"},
-			}
+			gtr.Spec.TenantSelector = tenantASelector()
 			gtr.Spec.PruningOnDelete = new(true)
 			renameFirstRawConfigMap(gtr, "gtr-pruned")
 
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+			createGlobalTenantResource(gtr)
 
 			for _, ns := range tenantANamespaces {
 				expectConfigMapData(ns, "gtr-pruned", map[string]string{"mode": "prune"})
@@ -1227,13 +1152,11 @@ data:
 
 		It("keeps applied objects on delete when pruningOnDelete is disabled", func() {
 			gtr := newRawConfigMapGlobalTenantResource("gtr-prune-disabled", map[string]string{"mode": "keep"})
-			gtr.Spec.TenantSelector = metav1.LabelSelector{
-				MatchLabels: map[string]string{"energy": "solar"},
-			}
+			gtr.Spec.TenantSelector = tenantASelector()
 			gtr.Spec.PruningOnDelete = new(false)
 			renameFirstRawConfigMap(gtr, "gtr-kept")
 
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+			createGlobalTenantResource(gtr)
 
 			for _, ns := range tenantANamespaces {
 				expectConfigMapData(ns, "gtr-kept", map[string]string{"mode": "keep"})
@@ -1255,10 +1178,8 @@ data:
 					"e2e.capsule.dev/test-suite": "true",
 				},
 				Spec: capsulev1beta2.GlobalTenantResourceSpec{
-					Scope: api.ResourceScopeNamespace,
-					TenantSelector: metav1.LabelSelector{
-						MatchLabels: map[string]string{"energy": "solar"},
-					},
+					Scope:          api.ResourceScopeNamespace,
+					TenantSelector: tenantASelector(),
 					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
 						ResyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 						PruningOnDelete: new(true),
@@ -1279,7 +1200,7 @@ data:
 				},
 			}
 
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+			createGlobalTenantResource(gtr)
 
 			for _, ns := range tenantANamespaces {
 				Eventually(func(g Gomega) {
@@ -1302,10 +1223,8 @@ data:
 					"e2e.capsule.dev/test-suite": "true",
 				},
 				Spec: capsulev1beta2.GlobalTenantResourceSpec{
-					Scope: api.ResourceScopeNamespace,
-					TenantSelector: metav1.LabelSelector{
-						MatchLabels: map[string]string{"energy": "solar"},
-					},
+					Scope:          api.ResourceScopeNamespace,
+					TenantSelector: tenantASelector(),
 					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
 						ResyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 						PruningOnDelete: new(true),
@@ -1336,7 +1255,7 @@ data:
 				},
 			}
 
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+			createGlobalTenantResource(gtr)
 
 			for _, ns := range tenantANamespaces {
 				expectConfigMapData(ns, "gtr-shared-merge", map[string]string{
@@ -1349,7 +1268,7 @@ data:
 
 	Context("context loading", func() {
 		It("allows context loading from another namespace", func() {
-			sourceNs := "gtr-shared-context"
+			sourceNs := prefix + "-shared-context"
 			sourceNamespace := &corev1.Namespace{
 				Name: sourceNs,
 			}
@@ -1378,10 +1297,8 @@ data:
 					"e2e.capsule.dev/test-suite": "true",
 				},
 				Spec: capsulev1beta2.GlobalTenantResourceSpec{
-					Scope: api.ResourceScopeNamespace,
-					TenantSelector: metav1.LabelSelector{
-						MatchLabels: map[string]string{"energy": "solar"},
-					},
+					Scope:          api.ResourceScopeNamespace,
+					TenantSelector: tenantASelector(),
 					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
 						ResyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 						PruningOnDelete: new(true),
@@ -1415,7 +1332,7 @@ data:
 				},
 			}
 
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+			createGlobalTenantResource(gtr)
 
 			for _, ns := range tenantANamespaces {
 				expectConfigMapData(ns, "gtr-context-count", map[string]string{"count": "2"})
@@ -1606,11 +1523,12 @@ func bindServiceAccountToClusterResource(
 	)
 }
 
-func cleanupGlobalTenantResourcesWithDefaultServiceAccount(ctx context.Context) {
+// cleanupGlobalTenantResources drops the impersonation of every matching
+// GlobalTenantResource and then deletes it, waiting until all are gone.
+func cleanupGlobalTenantResources(ctx context.Context, selector client.MatchingLabels) {
 	Eventually(func() error {
 		resources := &capsulev1beta2.GlobalTenantResourceList{}
-		labelSelector := client.MatchingLabels{"e2e.capsule.dev/test-suite": "true"}
-		if err := k8sClient.List(ctx, resources, labelSelector); err != nil {
+		if err := k8sClient.List(ctx, resources, selector); err != nil {
 			return err
 		}
 

@@ -2603,8 +2603,8 @@ spec:
                                     minLength: 1
                                     type: string
                                   negate:
-                                    default: false
-                                    description: Negate regular Expression
+                                    description: Negate inverts the match result.
+                                      Omitted means false.
                                     type: boolean
                                 type: object
                                 x-kubernetes-validations:
@@ -2654,9 +2654,8 @@ spec:
                                         to the effective managed value.
                                       type: string
                                     required:
-                                      default: false
                                       description: |-
-                                        Required enforces that the metadata key must be present.
+                                        Required enforces that the metadata key must be present. Omitted means false.
 
                                         This is only meaningful with action=allow. Deny and audit rules do not
                                         require missing metadata to exist.
@@ -2687,8 +2686,8 @@ spec:
                                             minLength: 1
                                             type: string
                                           negate:
-                                            default: false
-                                            description: Negate regular Expression
+                                            description: Negate inverts the match
+                                              result. Omitted means false.
                                             type: boolean
                                         type: object
                                         x-kubernetes-validations:
@@ -2746,9 +2745,8 @@ spec:
                                         to the effective managed value.
                                       type: string
                                     required:
-                                      default: false
                                       description: |-
-                                        Required enforces that the metadata key must be present.
+                                        Required enforces that the metadata key must be present. Omitted means false.
 
                                         This is only meaningful with action=allow. Deny and audit rules do not
                                         require missing metadata to exist.
@@ -2779,8 +2777,8 @@ spec:
                                             minLength: 1
                                             type: string
                                           negate:
-                                            default: false
-                                            description: Negate regular Expression
+                                            description: Negate inverts the match
+                                              result. Omitted means false.
                                             type: boolean
                                         type: object
                                         x-kubernetes-validations:
@@ -2896,8 +2894,8 @@ spec:
                                         minLength: 1
                                         type: string
                                       negate:
-                                        default: false
-                                        description: Negate regular Expression
+                                        description: Negate inverts the match result.
+                                          Omitted means false.
                                         type: boolean
                                     type: object
                                     x-kubernetes-validations:
@@ -3136,8 +3134,8 @@ spec:
                                                   minLength: 1
                                                   type: string
                                                 negate:
-                                                  default: false
-                                                  description: Negate regular Expression
+                                                  description: Negate inverts the
+                                                    match result. Omitted means false.
                                                   type: boolean
                                               type: object
                                             operators:
@@ -3177,8 +3175,8 @@ spec:
                                                   minLength: 1
                                                   type: string
                                                 negate:
-                                                  default: false
-                                                  description: Negate regular Expression
+                                                  description: Negate inverts the
+                                                    match result. Omitted means false.
                                                   type: boolean
                                               type: object
                                           type: object
@@ -3227,9 +3225,9 @@ spec:
                                                       minLength: 1
                                                       type: string
                                                     negate:
-                                                      default: false
-                                                      description: Negate regular
-                                                        Expression
+                                                      description: Negate inverts
+                                                        the match result. Omitted
+                                                        means false.
                                                       type: boolean
                                                   type: object
                                                 operators:
@@ -3269,9 +3267,9 @@ spec:
                                                       minLength: 1
                                                       type: string
                                                     negate:
-                                                      default: false
-                                                      description: Negate regular
-                                                        Expression
+                                                      description: Negate inverts
+                                                        the match result. Omitted
+                                                        means false.
                                                       type: boolean
                                                   type: object
                                               type: object
@@ -3338,9 +3336,9 @@ spec:
                                                       minLength: 1
                                                       type: string
                                                     negate:
-                                                      default: false
-                                                      description: Negate regular
-                                                        Expression
+                                                      description: Negate inverts
+                                                        the match result. Omitted
+                                                        means false.
                                                       type: boolean
                                                   type: object
                                                 operators:
@@ -3380,9 +3378,9 @@ spec:
                                                       minLength: 1
                                                       type: string
                                                     negate:
-                                                      default: false
-                                                      description: Negate regular
-                                                        Expression
+                                                      description: Negate inverts
+                                                        the match result. Omitted
+                                                        means false.
                                                       type: boolean
                                                   type: object
                                               type: object
@@ -3407,8 +3405,8 @@ spec:
                                             minLength: 1
                                             type: string
                                           negate:
-                                            default: false
-                                            description: Negate regular Expression
+                                            description: Negate inverts the match
+                                              result. Omitted means false.
                                             type: boolean
                                         type: object
                                       requirements:
@@ -3443,8 +3441,8 @@ spec:
                                                   minLength: 1
                                                   type: string
                                                 negate:
-                                                  default: false
-                                                  description: Negate regular Expression
+                                                  description: Negate inverts the
+                                                    match result. Omitted means false.
                                                   type: boolean
                                               type: object
                                             operators:
@@ -3484,8 +3482,8 @@ spec:
                                                   minLength: 1
                                                   type: string
                                                 negate:
-                                                  default: false
-                                                  description: Negate regular Expression
+                                                  description: Negate inverts the
+                                                    match result. Omitted means false.
                                                   type: boolean
                                               type: object
                                           type: object
@@ -3509,8 +3507,8 @@ spec:
                                             minLength: 1
                                             type: string
                                           negate:
-                                            default: false
-                                            description: Negate regular Expression
+                                            description: Negate inverts the match
+                                              result. Omitted means false.
                                             type: boolean
                                         type: object
                                       types:
@@ -3567,8 +3565,8 @@ spec:
                                             minLength: 1
                                             type: string
                                           negate:
-                                            default: false
-                                            description: Negate regular Expression
+                                            description: Negate inverts the match
+                                              result. Omitted means false.
                                             type: boolean
                                         type: object
                                       values:
@@ -3593,8 +3591,8 @@ spec:
                                             minLength: 1
                                             type: string
                                           negate:
-                                            default: false
-                                            description: Negate regular Expression
+                                            description: Negate inverts the match
+                                              result. Omitted means false.
                                             type: boolean
                                         type: object
                                     type: object
@@ -3624,8 +3622,8 @@ spec:
                                         minLength: 1
                                         type: string
                                       negate:
-                                        default: false
-                                        description: Negate regular Expression
+                                        description: Negate inverts the match result.
+                                          Omitted means false.
                                         type: boolean
                                     type: object
                                     x-kubernetes-validations:
@@ -3672,8 +3670,8 @@ spec:
                                             minLength: 1
                                             type: string
                                           negate:
-                                            default: false
-                                            description: Negate regular Expression
+                                            description: Negate inverts the match
+                                              result. Omitted means false.
                                             type: boolean
                                         type: object
                                       operators:
@@ -3726,8 +3724,8 @@ spec:
                                             minLength: 1
                                             type: string
                                           negate:
-                                            default: false
-                                            description: Negate regular Expression
+                                            description: Negate inverts the match
+                                              result. Omitted means false.
                                             type: boolean
                                         type: object
                                     type: object
@@ -3781,9 +3779,9 @@ spec:
                                                       minLength: 1
                                                       type: string
                                                     negate:
-                                                      default: false
-                                                      description: Negate regular
-                                                        Expression
+                                                      description: Negate inverts
+                                                        the match result. Omitted
+                                                        means false.
                                                       type: boolean
                                                   type: object
                                                 operators:
@@ -3823,9 +3821,9 @@ spec:
                                                       minLength: 1
                                                       type: string
                                                     negate:
-                                                      default: false
-                                                      description: Negate regular
-                                                        Expression
+                                                      description: Negate inverts
+                                                        the match result. Omitted
+                                                        means false.
                                                       type: boolean
                                                   type: object
                                               type: object
@@ -3897,8 +3895,8 @@ spec:
                                             minLength: 1
                                             type: string
                                           negate:
-                                            default: false
-                                            description: Negate regular Expression
+                                            description: Negate inverts the match
+                                              result. Omitted means false.
                                             type: boolean
                                         type: object
                                       whenUnsatisfiable:
@@ -3940,8 +3938,8 @@ spec:
                                     minLength: 1
                                     type: string
                                   negate:
-                                    default: false
-                                    description: Negate regular Expression
+                                    description: Negate inverts the match result.
+                                      Omitted means false.
                                     type: boolean
                                   policy:
                                     description: Allowed PullPolicy for the given
@@ -4074,8 +4072,8 @@ spec:
                                     minLength: 1
                                     type: string
                                   negate:
-                                    default: false
-                                    description: Negate regular Expression
+                                    description: Negate inverts the match result.
+                                      Omitted means false.
                                     type: boolean
                                 type: object
                                 x-kubernetes-validations:
@@ -4121,8 +4119,8 @@ spec:
                                               minLength: 1
                                               type: string
                                             negate:
-                                              default: false
-                                              description: Negate regular Expression
+                                              description: Negate inverts the match
+                                                result. Omitted means false.
                                               type: boolean
                                           type: object
                                           x-kubernetes-validations:
@@ -4187,8 +4185,8 @@ spec:
                                               minLength: 1
                                               type: string
                                             negate:
-                                              default: false
-                                              description: Negate regular Expression
+                                              description: Negate inverts the match
+                                                result. Omitted means false.
                                               type: boolean
                                           type: object
                                           x-kubernetes-validations:
@@ -4237,7 +4235,8 @@ spec:
                     mutate:
                       description: |-
                         Mutate applies ordered typed mutations before enforcement. It shares the
-                        rule's namespace selection and audience. Workload mutations apply on Pod creation.
+                        rule's namespace selection and audience. Workload mutations apply on Pod creation;
+                        ListenerSet parent references apply on main-resource creation and update.
                       items:
                         description: |-
                           NamespaceRuleMutation applies typed mutations independently of enforce.action.
@@ -4252,6 +4251,8 @@ spec:
                               Replace replaces each supplied property in full: scheduler, hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy, nodeSelector,
                               registries.imagePullSecrets, tolerations, topologySpreadConstraints, affinity, or security profiles. Omitted properties are
                               retained. Supplying affinity replaces all its branches, including omitted ones.
+                              ListenerSet parent references are atomic: merge fills an absent or null
+                              reference, while replace replaces the entire supplied reference.
                             enum:
                             - merge
                             - replace
@@ -4285,6 +4286,53 @@ spec:
                             maxItems: 64
                             type: array
                             x-kubernetes-list-type: atomic
+                          ingress:
+                            description: Ingress configures Kubernetes ingress and
+                              Gateway API resource mutations.
+                            properties:
+                              listenerSets:
+                                description: ListenerSets configures gateway.networking.k8s.io/v1
+                                  ListenerSets.
+                                properties:
+                                  parentRef:
+                                    description: |-
+                                      ParentRef supplies the complete spec.parentRef. Merge fills only an absent
+                                      or null reference; any supplied reference is retained, including an omitted
+                                      namespace. Replace replaces the entire reference. Nil leaves it unchanged.
+                                      The first applicable merge wins; later replacements can override it.
+                                      Attachment remains subject to the parent's allowedListeners configuration.
+                                    properties:
+                                      group:
+                                        default: gateway.networking.k8s.io
+                                        description: |-
+                                          Group identifies the parent's API group. An explicit empty string selects
+                                          the core API group, following Gateway API reference semantics.
+                                        maxLength: 4096
+                                        type: string
+                                      kind:
+                                        default: Gateway
+                                        description: Kind identifies the parent's
+                                          kind.
+                                        maxLength: 4096
+                                        minLength: 1
+                                        type: string
+                                      name:
+                                        description: Name identifies the parent resource.
+                                        maxLength: 4096
+                                        minLength: 1
+                                        type: string
+                                      namespace:
+                                        description: |-
+                                          Namespace identifies the parent's namespace. Omitted means the
+                                          ListenerSet's namespace; an explicit empty string is invalid.
+                                        maxLength: 4096
+                                        minLength: 1
+                                        type: string
+                                    required:
+                                    - name
+                                    type: object
+                                type: object
+                            type: object
                           workloads:
                             description: |-
                               WorkloadMutation contains typed native Pod values. Empty maps/lists are
@@ -6358,8 +6406,8 @@ spec:
                                 minLength: 1
                                 type: string
                               negate:
-                                default: false
-                                description: Negate regular Expression
+                                description: Negate inverts the match result. Omitted
+                                  means false.
                                 type: boolean
                               policy:
                                 description: Allowed PullPolicy for the given registry.

@@ -3,6 +3,8 @@
 
 package namespace
 
+import "github.com/projectcapsule/capsule/pkg/tenant"
+
 const (
-	OwnerReferenceIndex string = ".metadata.ownerReferences[*].capsule"
+	OwnerReferenceIndex string = tenant.NamespaceOwnerReferenceIndexerFieldName
 )

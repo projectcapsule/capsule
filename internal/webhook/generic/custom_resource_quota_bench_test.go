@@ -1,0 +1,157 @@
+// Copyright 2020-2026 Project Capsule Authors
+// SPDX-License-Identifier: Apache-2.0
+
+package generic
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+	"testing"
+
+	admissionv1 "k8s.io/api/admission/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	mockclient "github.com/projectcapsule/capsule/internal/mocks/client"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
+)
+
+func BenchmarkLegacyQuotaAdmission(b *testing.B) {
+	for _, tenants := range []int{1, 16, 128} {
+		for _, outcome := range []string{"allow", "deny", "delete", "unlimited", "skip", "generated-allow", "generated-deny"} {
+			for _, parallel := range []bool{false, true} {
+				b.Run(fmt.Sprintf("tenants=%d/%s/parallel=%v", tenants, outcome, parallel), func(b *testing.B) {
+					base := legacyQuotaFixture(b, tenants)
+					tnt := &capsulev1beta2.Tenant{}
+					if err := base.Get(b.Context(), client.ObjectKey{Name: "tenant-0"}, tnt); err != nil {
+						b.Fatal(err)
+					}
+					// Include visible membership so the original implementation performs its
+					// normal lookup; the pending-membership regression is covered separately.
+					tnt.Status.Namespaces = []string{"tenant-0-ns"}
+					if err := base.Status().Update(b.Context(), tnt); err != nil {
+						b.Fatal(err)
+					}
+					behavior := strings.TrimPrefix(outcome, "generated-")
+					switch behavior {
+					case "deny":
+						tnt.Annotations[capsulev1beta2.LimitAnnotationForResource(quotaTestResource)] = "0"
+					case "unlimited":
+						delete(tnt.Annotations, capsulev1beta2.LimitAnnotationForResource(quotaTestResource))
+					}
+					if err := base.Update(b.Context(), tnt); err != nil {
+						b.Fatal(err)
+					}
+					// A stable successful reservation avoids measuring fixture resets and
+					// contention from fake resource versions instead of admission work.
+					writer := interceptor.NewClient(base, interceptor.Funcs{Update: func(context.Context, client.WithWatch, client.Object, ...client.UpdateOption) error { return nil }})
+					calls := &mockclient.CallCounter{}
+					c := interceptor.NewClient(writer, calls.Interceptors())
+					req := legacyQuotaRequest(admissionv1.Create)
+					req.UID = "benchmark-admission"
+					if outcome == "delete" {
+						req.Operation = admissionv1.Delete
+					}
+					if outcome == "skip" {
+						req.Operation = admissionv1.Update
+					}
+					handler := ResourceCounterHandler(c)
+					decoder := admission.NewDecoder(c.Scheme())
+					admit := handler.OnCreate(c, c, decoder, events.NewDiscardRecorder())
+					if outcome == "delete" {
+						admit = handler.OnDelete(c, c, decoder, events.NewDiscardRecorder())
+					}
+					if outcome == "skip" {
+						admit = handler.OnUpdate(c, c, decoder, events.NewDiscardRecorder())
+					}
+					invoke := func() *admission.Response { return admit(b.Context(), req) }
+					if strings.HasPrefix(outcome, "generated-") {
+						req.Name = ""
+						raw, err := json.Marshal(map[string]any{"apiVersion": "example.com/v1", "kind": "Widget", "metadata": map[string]any{"name": "widget-generated", "generateName": "widget-", "namespace": req.Namespace, "uid": "generated-object"}})
+						if err != nil {
+							b.Fatal(err)
+						}
+						req.Object.Raw = raw
+						onCreate := ResourceCounterHandler(c).OnCreate(c, c, admission.NewDecoder(c.Scheme()), events.NewDiscardRecorder())
+						invoke = func() *admission.Response { return onCreate(b.Context(), req) }
+					}
+					run := func() {
+						response := invoke()
+						if behavior == "deny" {
+							if response == nil || response.Allowed {
+								b.Error("quota denial missing")
+							}
+						} else if response != nil {
+							b.Errorf("unexpected response: %+v", response)
+						}
+					}
+					run()
+					calls.Reset()
+					b.ReportAllocs()
+					b.ResetTimer()
+					if parallel {
+						b.RunParallel(func(pb *testing.PB) {
+							for pb.Next() {
+								run()
+							}
+						})
+					} else {
+						for range b.N {
+							run()
+						}
+					}
+					b.StopTimer()
+					calls.Report(b)
+				})
+			}
+		}
+	}
+}
+
+func BenchmarkLegacyQuotaGeneratedObjectSize(b *testing.B) {
+	benchmarkLegacyQuotaObjectSize(b, true)
+}
+
+func BenchmarkLegacyQuotaNamedObjectSize(b *testing.B) {
+	benchmarkLegacyQuotaObjectSize(b, false)
+}
+
+func benchmarkLegacyQuotaObjectSize(b *testing.B, generated bool) {
+	for _, tenants := range []int{1, 128} {
+		for _, payload := range []int{1024, 65536} {
+			b.Run(fmt.Sprintf("tenants=%d/payloadBytes=%d", tenants, payload), func(b *testing.B) {
+				base := legacyQuotaFixture(b, tenants)
+				writer := interceptor.NewClient(base, interceptor.Funcs{Update: func(context.Context, client.WithWatch, client.Object, ...client.UpdateOption) error { return nil }})
+				calls := &mockclient.CallCounter{}
+				c := interceptor.NewClient(writer, calls.Interceptors())
+				req := legacyQuotaRequest(admissionv1.Create)
+				req.UID = "size-benchmark-request"
+				name := req.Name
+				if generated {
+					req.Name, name = "", "widget-generated"
+				}
+				raw, err := json.Marshal(map[string]any{
+					"apiVersion": "example.com/v1", "kind": "Widget",
+					"metadata": map[string]any{"name": name, "namespace": req.Namespace, "uid": "size-benchmark-object"},
+					"spec":     map[string]any{"payload": strings.Repeat("x", payload)},
+				})
+				if err != nil {
+					b.Fatal(err)
+				}
+				req.Object.Raw = raw
+				onCreate := ResourceCounterHandler(c).OnCreate(c, c, admission.NewDecoder(c.Scheme()), events.NewDiscardRecorder())
+				b.ReportAllocs()
+				for b.Loop() {
+					if response := onCreate(b.Context(), req); response != nil {
+						b.Fatalf("unexpected response: %+v", response)
+					}
+				}
+				calls.Report(b)
+			})
+		}
+	}
+}

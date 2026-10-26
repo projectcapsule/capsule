@@ -14,7 +14,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("creating a Namespace without a Tenant selector when user owns multiple Tenants", Ordered, Label("config", "tenant", "assignment"), func() {
+var _ = Describe("creating a Namespace without a Tenant selector when user owns multiple Tenants", Label("tenant", "assignment"), func() {
 	t1 := &capsulev1beta2.Tenant{
 		Name: "e2e-tenant-fail-one",
 		Labels: map[string]string{

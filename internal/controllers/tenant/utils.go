@@ -29,7 +29,10 @@ func readyTenantNamespaces(tnt *capsulev1beta2.Tenant) []string {
 
 	for _, ns := range tnt.Status.Spaces {
 		ready := ns.Conditions.GetConditionByType(meta.ReadyCondition)
-		if ready != nil && ready.Status != metav1.ConditionTrue {
+		// Permission failures follow successful profile reconciliation. They must
+		// not prevent independent resource policies from converging.
+		if ready != nil && ready.Status != metav1.ConditionTrue &&
+			(ready.Status != metav1.ConditionFalse || ready.Reason != meta.PermissionsFailedReason) {
 			continue
 		}
 
@@ -138,7 +141,9 @@ func (r *Manager) runGarbageCollection(
 			return err
 		}
 
-		if ns.DeletionTimestamp != nil {
+		if ns.DeletionTimestamp != nil || namespaceOwnedByTenant(ns, tnt) {
+			// A namespace may have been provisioned by its own queue after this
+			// Tenant pass captured membership. Status lag must not revoke its access.
 			return nil
 		}
 

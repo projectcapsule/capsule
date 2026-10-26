@@ -23,6 +23,7 @@ const (
 	// FailedReason indicates a condition or event observed a failure (Claim Rejected).
 	SucceededReason               string = "Succeeded"
 	FailedReason                  string = "Failed"
+	PermissionsFailedReason       string = "PermissionsFailed"
 	ActiveReason                  string = "Active"
 	CordonedReason                string = "Cordoned"
 	TerminatingReason             string = "Terminating"

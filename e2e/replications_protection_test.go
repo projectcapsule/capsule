@@ -26,8 +26,9 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/ssa"
 )
 
-func exerciseSharedReplicationProtection(global bool, tenantName, baseNamespace, targetNamespace, excludedNamespace string, owner rbac.UserSpec, orphan bool) {
+func exerciseSharedReplicationProtection(tenantSelector *metav1.LabelSelector, tenantName, baseNamespace, targetNamespace, excludedNamespace string, owner rbac.UserSpec, orphan bool) {
 	ctx := context.Background()
+	global := tenantSelector != nil
 	const name = "shared-protected"
 	seed := &corev1.ConfigMap{APIVersion: "v1", Kind: "ConfigMap", Name: name, Namespace: targetNamespace, Data: map[string]string{"outside": "retained"}}
 	Expect(k8sClient.Patch(ctx, seed, client.Apply, client.FieldOwner("e2e-external"))).To(Succeed())
@@ -52,10 +53,10 @@ func exerciseSharedReplicationProtection(global bool, tenantName, baseNamespace,
 				RawItems:          []capsulev1beta2.RawExtension{{Object: &corev1.ConfigMap{APIVersion: "v1", Kind: "ConfigMap", Name: name, Data: map[string]string{"shared": "managed"}}}},
 			}},
 		}
-		parentName := fmt.Sprintf("shared-protection-%d", i)
+		parentName := fmt.Sprintf("shared-protection-%d-%s", i, tenantName)
 		if global {
 			obj := &capsulev1beta2.GlobalTenantResource{Name: parentName, Spec: capsulev1beta2.GlobalTenantResourceSpec{
-				Scope: api.ResourceScopeNamespace, TenantSelector: metav1.LabelSelector{MatchLabels: map[string]string{"energy": "solar"}}, TenantResourceCommonSpec: common,
+				Scope: api.ResourceScopeNamespace, TenantSelector: *tenantSelector, TenantResourceCommonSpec: common,
 			}}
 			parents[i] = replication{obj, &obj.Spec.TenantResourceCommonSpec, &obj.Status.TenantResourceCommonStatus}
 		} else {
@@ -186,7 +187,7 @@ func exerciseSharedReplicationProtection(global bool, tenantName, baseNamespace,
 			// Tenant ownership labels are maintained by metadata admission.
 			// Vary only the markers involved in protection webhook selection.
 			expected := maps.Clone(original)
-			for _, key := range []string{meta.CreatedByCapsuleLabel, meta.NewManagedByCapsuleLabel, meta.ProtectedByCapsuleLabel, meta.ReplicationProtectionLabel, meta.ResourcePermitProtectionLabel} {
+			for _, key := range []string{meta.CreatedByCapsuleLabel, meta.NewManagedByCapsuleLabel, meta.ProtectedByCapsuleLabel, meta.ReplicationProtectionLabel, (meta.ProtectionLabelPrefix + "example-addon")} {
 				delete(expected, key)
 			}
 			maps.Copy(expected, marker)

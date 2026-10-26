@@ -153,7 +153,7 @@ var _ = Describe("dry-run rule Events", Label("tenant", "rules", "enforce", "dry
 					}
 				}
 			}
-		}, 3*defaultPollInterval, defaultPollInterval).Should(Succeed())
+		}, 6*time.Second, defaultPollInterval).Should(Succeed())
 
 		By("retaining audit and denial Events for normal CREATE and UPDATE")
 		for _, ns := range []*corev1.Namespace{audit, deny} {
@@ -251,6 +251,6 @@ var _ = Describe("dry-run rule Events", Label("tenant", "rules", "enforce", "dry
 			for _, event := range list.Items {
 				g.Expect(event.Regarding.Name).NotTo(Equal("changed-profile"))
 			}
-		}, 3*defaultPollInterval, defaultPollInterval).Should(Succeed())
+		}, 6*time.Second, defaultPollInterval).Should(Succeed())
 	})
 })

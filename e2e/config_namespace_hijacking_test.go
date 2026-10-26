@@ -16,6 +16,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/kubernetes"
 
@@ -27,317 +28,250 @@ import (
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
-var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("config", "namespace", "hijack"), func() {
-	administrator := rbac.UserSpec{
-		Name: "e2e-namespace-hijacking-admin",
-		Kind: rbac.UserOwner,
+func cleanupNamespaceSubresourceGrant(name string) {
+	Eventually(func() error {
+		return k8sClient.Delete(context.TODO(), &rbacv1.ClusterRoleBinding{
+			Name: name,
+		})
+	}).Should(SatisfyAny(Succeed(), WithTransform(apierrors.IsNotFound, BeTrue())))
+
+	Eventually(func() error {
+		return k8sClient.Delete(context.TODO(), &rbacv1.ClusterRole{
+			Name: name,
+		})
+	}).Should(SatisfyAny(Succeed(), WithTransform(apierrors.IsNotFound, BeTrue())))
+}
+
+func grantNamespaceSubresourceUpdate(name string, subject rbacv1.Subject) {
+	cleanupNamespaceSubresourceGrant(name)
+
+	clusterRole := &rbacv1.ClusterRole{
+		Name: name,
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{""},
+				Resources: []string{
+					"namespaces/status",
+					"namespaces/finalize",
+				},
+				Verbs: []string{
+					"get",
+					"update",
+					"patch",
+				},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{
+					"namespaces",
+				},
+				Verbs: []string{
+					"get",
+					"update",
+					"patch",
+				},
+			},
+		},
 	}
 
-	var originalConfigurationSpec *capsulev1beta2.CapsuleConfigurationSpec
+	clusterRoleBinding := &rbacv1.ClusterRoleBinding{
+		Name: name,
+		Subjects: []rbacv1.Subject{
+			subject,
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "ClusterRole",
+			Name:     name,
+		},
+	}
 
-	t1 := &capsulev1beta2.Tenant{
-		Name: "e2e-ns-attack-1",
+	EventuallyCreation(func() error {
+		return k8sClient.Create(context.TODO(), clusterRole)
+	}).Should(Succeed())
+
+	EventuallyCreation(func() error {
+		return k8sClient.Create(context.TODO(), clusterRoleBinding)
+	}).Should(Succeed())
+}
+
+func updateNamespaceSubresource(
+	cs kubernetes.Interface,
+	ns *corev1.Namespace,
+	subresource string,
+) error {
+	switch subresource {
+	case "status":
+		_, err := cs.CoreV1().Namespaces().UpdateStatus(context.TODO(), ns, metav1.UpdateOptions{})
+
+		return err
+	case "finalize":
+		_, err := cs.CoreV1().Namespaces().Finalize(context.TODO(), ns, metav1.UpdateOptions{})
+
+		return err
+	default:
+		return fmt.Errorf("unsupported namespace subresource %q", subresource)
+	}
+}
+
+func expectNoTenantHijackPersisted(nsName string, originalTenant, attackerTenant *capsulev1beta2.Tenant) {
+	Eventually(func(g Gomega) {
+		current := &corev1.Namespace{}
+		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: nsName}, current)).Should(Succeed())
+
+		g.Expect(current.Labels).To(HaveKeyWithValue(meta.TenantLabel, originalTenant.GetName()))
+		g.Expect(current.Labels).NotTo(HaveKeyWithValue(meta.TenantLabel, attackerTenant.GetName()))
+
+		g.Expect(hasTenantOwnerReferenceByNameAndUID(current, originalTenant.GetName(), originalTenant.GetUID())).
+			To(BeTrue(), "namespace should keep original tenant ownerReference")
+
+		g.Expect(hasTenantOwnerReferenceByNameAndUID(current, attackerTenant.GetName(), attackerTenant.GetUID())).
+			To(BeFalse(), "namespace must not gain attacker tenant ownerReference")
+	}).Should(Succeed())
+}
+
+func getTenant(name string) *capsulev1beta2.Tenant {
+	tenant := &capsulev1beta2.Tenant{}
+	Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: name}, tenant)).Should(Succeed())
+
+	return tenant
+}
+
+func getNamespace(name string) *corev1.Namespace {
+	ns := &corev1.Namespace{}
+	Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: name}, ns)).Should(Succeed())
+
+	return ns
+}
+
+func hasTenantOwnerReference(ns *corev1.Namespace, tenant *capsulev1beta2.Tenant) bool {
+	for _, ownerRef := range ns.OwnerReferences {
+		if ownerRef.APIVersion == capsulev1beta2.GroupVersion.String() &&
+			ownerRef.Kind == "Tenant" &&
+			ownerRef.Name == tenant.GetName() &&
+			ownerRef.UID == tenant.GetUID() {
+			return true
+		}
+	}
+
+	return false
+}
+
+func expectOriginalTenantOwnership(nsName string, tenant *capsulev1beta2.Tenant) {
+	retrievedNs := getNamespace(nsName)
+
+	Expect(retrievedNs.Labels).To(HaveKeyWithValue(meta.TenantLabel, tenant.GetName()))
+	Expect(hasTenantOwnerReference(retrievedNs, tenant)).To(BeTrue(), "Namespace should keep original Tenant ownerReference")
+}
+
+func expectNoTenantOwnership(nsName string, tenant *capsulev1beta2.Tenant) {
+	retrievedNs := getNamespace(nsName)
+
+	Expect(retrievedNs.Labels).NotTo(HaveKeyWithValue(meta.TenantLabel, tenant.GetName()))
+	Expect(hasTenantOwnerReference(retrievedNs, tenant)).To(BeFalse(), "Namespace should not have Tenant ownerReference")
+}
+
+func randomTenantReference() (string, types.UID) {
+	return fmt.Sprintf("random-tenant-%d", rand.Int()), types.UID(fmt.Sprintf("%d", rand.Int()))
+}
+
+func createUnmanagedNamespace() *corev1.Namespace {
+	ns := NewNamespace("")
+	Expect(k8sClient.Create(context.TODO(), ns)).To(Succeed())
+	// Names are random and never reused; the suite sweeps env=e2e namespaces.
+	DeferCleanup(func() { ignoreNotFound(k8sClient.Delete(context.TODO(), ns)) })
+
+	return ns
+}
+
+// hijackTenants builds the attacker and victim Tenants of one spec. Names and
+// owners derive from a per-spec prefix so the specs can run concurrently on
+// different Ginkgo processes without sharing a Tenant or an owner identity.
+func hijackTenants(prefix string) (t1, t2, t3 *capsulev1beta2.Tenant) {
+	t1 = &capsulev1beta2.Tenant{
+		Name: prefix + "-1",
 		Labels: map[string]string{
 			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					Name: "gatsby",
+					Name: prefix + "-gatsby",
 					Kind: "User",
 				},
 				{
-					Name: "oidc:group",
+					Name: "oidc:" + prefix,
 					Kind: "Group",
 				},
 				{
 					Kind: "ServiceAccount",
-					Name: "system:serviceaccount:attacker-system:attacker",
+					Name: "system:serviceaccount:attacker-system:" + prefix,
 				},
 			},
 		},
 	}
 
-	t2 := &capsulev1beta2.Tenant{
-		Name: "e2e-ns-attack-2",
+	t2 = &capsulev1beta2.Tenant{
+		Name: prefix + "-2",
 		Labels: map[string]string{
 			"env": "e2e",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					Name: "gatsby",
+					Name: prefix + "-gatsby",
 					Kind: "User",
 				},
 			},
 		},
 	}
 
-	t3 := &capsulev1beta2.Tenant{
-		Name:   "e2e-ns-attack-3",
+	t3 = &capsulev1beta2.Tenant{
+		Name:   prefix + "-3",
 		Labels: map[string]string{"env": "e2e"},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
-					Name: "different-owner",
+					Name: prefix + "-different-owner",
 					Kind: "User",
 				},
 			},
 		},
 	}
 
-	cleanupNamespaceSubresourceGrant := func(name string) {
-		Eventually(func() error {
-			return k8sClient.Delete(context.TODO(), &rbacv1.ClusterRoleBinding{
-				Name: name,
-			})
-		}).Should(SatisfyAny(Succeed(), WithTransform(apierrors.IsNotFound, BeTrue())))
+	return t1, t2, t3
+}
 
-		Eventually(func() error {
-			return k8sClient.Delete(context.TODO(), &rbacv1.ClusterRole{
-				Name: name,
-			})
-		}).Should(SatisfyAny(Succeed(), WithTransform(apierrors.IsNotFound, BeTrue())))
-	}
-
-	grantNamespaceSubresourceUpdate := func(name string, subject rbacv1.Subject) {
-		cleanupNamespaceSubresourceGrant(name)
-
-		clusterRole := &rbacv1.ClusterRole{
-			Name: name,
-			Rules: []rbacv1.PolicyRule{
-				{
-					APIGroups: []string{""},
-					Resources: []string{
-						"namespaces/status",
-						"namespaces/finalize",
-					},
-					Verbs: []string{
-						"get",
-						"update",
-						"patch",
-					},
-				},
-				{
-					APIGroups: []string{""},
-					Resources: []string{
-						"namespaces",
-					},
-					Verbs: []string{
-						"get",
-						"update",
-						"patch",
-					},
-				},
-			},
-		}
-
-		clusterRoleBinding := &rbacv1.ClusterRoleBinding{
-			Name: name,
-			Subjects: []rbacv1.Subject{
-				subject,
-			},
-			RoleRef: rbacv1.RoleRef{
-				APIGroup: rbacv1.GroupName,
-				Kind:     "ClusterRole",
-				Name:     name,
-			},
-		}
-
+// createHijackTenants creates the given Tenants, waits for them to be Ready and
+// registers their deletion.
+func createHijackTenants(tenants ...*capsulev1beta2.Tenant) {
+	for _, tnt := range tenants {
 		EventuallyCreation(func() error {
-			return k8sClient.Create(context.TODO(), clusterRole)
+			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
-
-		EventuallyCreation(func() error {
-			return k8sClient.Create(context.TODO(), clusterRoleBinding)
-		}).Should(Succeed())
+		// The Tenant names are unique per spec: no need to wait for them to be gone.
+		// Registered before waiting for readiness so a failed setup still deletes it.
+		DeferCleanup(DeleteInBackground, tnt)
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 	}
+}
 
-	updateNamespaceSubresource := func(
-		cs kubernetes.Interface,
-		ns *corev1.Namespace,
-		subresource string,
-	) error {
-		switch subresource {
-		case "status":
-			_, err := cs.CoreV1().Namespaces().UpdateStatus(context.TODO(), ns, metav1.UpdateOptions{})
-
-			return err
-		case "finalize":
-			_, err := cs.CoreV1().Namespaces().Finalize(context.TODO(), ns, metav1.UpdateOptions{})
-
-			return err
-		default:
-			return fmt.Errorf("unsupported namespace subresource %q", subresource)
-		}
-	}
-
-	expectNoTenantHijackPersisted := func(nsName string, originalTenant, attackerTenant *capsulev1beta2.Tenant) {
-		Eventually(func(g Gomega) {
-			current := &corev1.Namespace{}
-			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: nsName}, current)).Should(Succeed())
-
-			g.Expect(current.Labels).To(HaveKeyWithValue(meta.TenantLabel, originalTenant.GetName()))
-			g.Expect(current.Labels).NotTo(HaveKeyWithValue(meta.TenantLabel, attackerTenant.GetName()))
-
-			g.Expect(hasTenantOwnerReferenceByNameAndUID(current, originalTenant.GetName(), originalTenant.GetUID())).
-				To(BeTrue(), "namespace should keep original tenant ownerReference")
-
-			g.Expect(hasTenantOwnerReferenceByNameAndUID(current, attackerTenant.GetName(), attackerTenant.GetUID())).
-				To(BeFalse(), "namespace must not gain attacker tenant ownerReference")
-		}).Should(Succeed())
-	}
+// The owner-facing hijacking specs only rely on default CapsuleConfiguration
+// values, so they run in the parallel phase; every spec gets its own Tenants.
+var _ = Describe("creating several Namespaces for a Tenant", Label("namespace", "hijack"), func() {
+	var (
+		t1 *capsulev1beta2.Tenant
+		t2 *capsulev1beta2.Tenant
+		t3 *capsulev1beta2.Tenant
+	)
 
 	kubeSystem := &corev1.Namespace{
 		Name: "kube-system",
 	}
 
-	getTenant := func(name string) *capsulev1beta2.Tenant {
-		tenant := &capsulev1beta2.Tenant{}
-		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: name}, tenant)).Should(Succeed())
-
-		return tenant
-	}
-
-	getNamespace := func(name string) *corev1.Namespace {
-		ns := &corev1.Namespace{}
-		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: name}, ns)).Should(Succeed())
-
-		return ns
-	}
-
-	hasTenantOwnerReference := func(ns *corev1.Namespace, tenant *capsulev1beta2.Tenant) bool {
-		for _, ownerRef := range ns.OwnerReferences {
-			if ownerRef.APIVersion == capsulev1beta2.GroupVersion.String() &&
-				ownerRef.Kind == "Tenant" &&
-				ownerRef.Name == tenant.GetName() &&
-				ownerRef.UID == tenant.GetUID() {
-				return true
-			}
-		}
-
-		return false
-	}
-
-	hasTenantOwnerReferenceByNameAndUID := func(ns *corev1.Namespace, name string, uid types.UID) bool {
-		for _, ownerRef := range ns.OwnerReferences {
-			if ownerRef.APIVersion == capsulev1beta2.GroupVersion.String() &&
-				ownerRef.Kind == "Tenant" &&
-				ownerRef.Name == name &&
-				ownerRef.UID == uid {
-				return true
-			}
-		}
-
-		return false
-	}
-
-	expectOriginalTenantOwnership := func(nsName string, tenant *capsulev1beta2.Tenant) {
-		retrievedNs := getNamespace(nsName)
-
-		Expect(retrievedNs.Labels).To(HaveKeyWithValue(meta.TenantLabel, tenant.GetName()))
-		Expect(hasTenantOwnerReference(retrievedNs, tenant)).To(BeTrue(), "Namespace should keep original Tenant ownerReference")
-	}
-
-	expectNoTenantOwnership := func(nsName string, tenant *capsulev1beta2.Tenant) {
-		retrievedNs := getNamespace(nsName)
-
-		Expect(retrievedNs.Labels).NotTo(HaveKeyWithValue(meta.TenantLabel, tenant.GetName()))
-		Expect(hasTenantOwnerReference(retrievedNs, tenant)).To(BeFalse(), "Namespace should not have Tenant ownerReference")
-	}
-
-	randomTenantReference := func() (string, types.UID) {
-		return fmt.Sprintf("random-tenant-%d", rand.Int()), types.UID(fmt.Sprintf("%d", rand.Int()))
-	}
-
-	createUnmanagedNamespace := func() *corev1.Namespace {
-		ns := NewNamespace("")
-		Expect(k8sClient.Create(context.TODO(), ns)).To(Succeed())
-		DeferCleanup(func() { EventuallyDeletion(ns) })
-
-		return ns
-	}
-
-	waitForTenantNamespacesDeletion := func(tenantNames ...string) {
-		names := make(map[string]struct{}, len(tenantNames))
-		for _, name := range tenantNames {
-			names[name] = struct{}{}
-		}
-
-		Eventually(func(g Gomega) {
-			list := &corev1.NamespaceList{}
-			g.Expect(k8sClient.List(context.TODO(), list)).To(Succeed())
-
-			for i := range list.Items {
-				for _, ref := range tenant.TenantOwnerReferences(&list.Items[i]) {
-					_, belongsToTestTenant := names[ref.Name]
-					g.Expect(belongsToTestTenant).To(
-						BeFalse(),
-						"namespace %q still references a previous incarnation of Tenant %q (UID %q)",
-						list.Items[i].Name,
-						ref.Name,
-						ref.UID,
-					)
-				}
-			}
-		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-	}
-
-	BeforeAll(func() {
-		configuration := &capsulev1beta2.CapsuleConfiguration{}
-		Expect(k8sClient.Get(
-			context.Background(),
-			types.NamespacedName{Name: defaultConfigurationName},
-			configuration,
-		)).To(Succeed())
-
-		originalConfigurationSpec = configuration.Spec.DeepCopy()
-
-		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
-			configuration.Spec.Administrators = append(configuration.Spec.Administrators, administrator)
-		})
-	})
-
-	AfterAll(func() {
-		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
-			configuration.Spec = *originalConfigurationSpec
-		})
-	})
-
-	JustBeforeEach(func() {
-		waitForTenantNamespacesDeletion(t1.Name, t2.Name, t3.Name)
-
-		EventuallyCreation(func() error {
-			t1.ResourceVersion = ""
-			t1.UID = ""
-
-			return k8sClient.Create(context.TODO(), t1)
-		}).Should(Succeed())
-		TenantReady(t1, metav1.ConditionTrue, defaultTimeoutInterval)
-
-		EventuallyCreation(func() error {
-			t2.ResourceVersion = ""
-			t2.UID = ""
-
-			return k8sClient.Create(context.TODO(), t2)
-		}).Should(Succeed())
-		TenantReady(t2, metav1.ConditionTrue, defaultTimeoutInterval)
-
-		EventuallyCreation(func() error {
-			t3.ResourceVersion = ""
-			t3.UID = ""
-
-			return k8sClient.Create(context.TODO(), t3)
-		}).Should(Succeed())
-		TenantReady(t3, metav1.ConditionTrue, defaultTimeoutInterval)
-
-	})
-
-	JustAfterEach(func() {
-		EventuallyDeletion(t1)
-		EventuallyDeletion(t2)
-		EventuallyDeletion(t3)
-		waitForTenantNamespacesDeletion(t1.Name, t2.Name, t3.Name)
+	BeforeEach(func() {
+		t1, t2, t3 = hijackTenants("e2e-ns-attack-" + utilrand.String(6))
+		createHijackTenants(t1, t2, t3)
 	})
 
 	It("Owners can not hijack Tenant ownership through namespaces/status", func() {
@@ -347,7 +281,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("con
 		owner := t1.Spec.Owners[0].UserSpec
 		cs := ownerClient(owner)
 
-		grantName := "e2e-ns-status-hijack"
+		grantName := t1.Name + "-status-hijack"
 		grantNamespaceSubresourceUpdate(grantName, rbacv1.Subject{
 			APIGroup: rbacv1.GroupName,
 			Kind:     rbacv1.UserKind,
@@ -432,7 +366,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("con
 		owner := t1.Spec.Owners[0].UserSpec
 		cs := ownerClient(owner)
 
-		grantName := "e2e-ns-finalize-hijack"
+		grantName := t1.Name + "-finalize-hijack"
 		grantNamespaceSubresourceUpdate(grantName, rbacv1.Subject{
 			APIGroup: rbacv1.GroupName,
 			Kind:     rbacv1.UserKind,
@@ -514,7 +448,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("con
 	It("Owners can not write metadata to unmanaged namespaces through subresources", func() {
 		owner := t1.Spec.Owners[0].UserSpec
 		cs := ownerClient(owner)
-		grantName := "e2e-ns-unmanaged-subresource-metadata"
+		grantName := t1.Name + "-unmanaged-subresource-metadata"
 		grantNamespaceSubresourceUpdate(grantName, rbacv1.Subject{
 			APIGroup: rbacv1.GroupName,
 			Kind:     rbacv1.UserKind,
@@ -544,7 +478,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("con
 		attacker := t1.Spec.Owners[0].UserSpec
 		victim := t3.Spec.Owners[0].UserSpec
 		cs := ownerClient(attacker)
-		grantName := "e2e-ns-cross-tenant-subresource-metadata"
+		grantName := t1.Name + "-cross-tenant-subresource-metadata"
 		grantNamespaceSubresourceUpdate(grantName, rbacv1.Subject{
 			APIGroup: rbacv1.GroupName,
 			Kind:     rbacv1.UserKind,
@@ -574,7 +508,8 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("con
 	})
 
 	It("Owners can not bypass forbidden metadata through namespaces/finalize", func() {
-		const forbiddenLabel = "pod-security.kubernetes.io/enforce"
+		// Not a pod-security label: OpenShift re-adds those to every namespace.
+		const forbiddenLabel = "example.org/forbidden"
 
 		UpdateTenantEventually(t1, func(current *capsulev1beta2.Tenant) {
 			if current.Spec.NamespaceOptions == nil {
@@ -588,7 +523,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("con
 
 		owner := t1.Spec.Owners[0].UserSpec
 		cs := ownerClient(owner)
-		grantName := "e2e-ns-finalize-forbidden-metadata"
+		grantName := t1.Name + "-finalize-forbidden-metadata"
 		grantNamespaceSubresourceUpdate(grantName, rbacv1.Subject{
 			APIGroup: rbacv1.GroupName,
 			Kind:     rbacv1.UserKind,
@@ -1211,96 +1146,6 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("con
 		}
 	})
 
-	It("Administrators can migrate managed namespaces to another Tenant", func() {
-		tenantA := getTenant(t1.Name)
-		tenantB := getTenant(t2.Name)
-
-		ns := NewNamespace("", map[string]string{
-			meta.TenantLabel: tenantA.GetName(),
-		})
-		NamespaceCreation(ns, t1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		NamespaceIsPartOfTenant(t1, ns).Should(Succeed())
-		DeferCleanup(func() { EventuallyDeletion(ns) })
-
-		ref, err := GetTenantOwnerReferenceAsPatch(tenantB)
-		Expect(err).NotTo(HaveOccurred())
-
-		patch := map[string]any{
-			"metadata": map[string]any{
-				"labels": map[string]any{
-					meta.TenantLabel: tenantB.GetName(),
-				},
-				"ownerReferences": []map[string]any{ref},
-			},
-		}
-
-		Eventually(func() error {
-			return PatchNamespace(ns, ownerClient(administrator), patch)
-		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-
-		Eventually(func(g Gomega) {
-			current := getNamespace(ns.Name)
-
-			g.Expect(current.Labels).To(HaveKeyWithValue(meta.TenantLabel, tenantB.GetName()))
-			g.Expect(tenantOwnerReferences(current)).To(Equal([]string{tenantB.GetName()}))
-			g.Expect(hasTenantOwnerReference(current, tenantB)).To(BeTrue())
-			g.Expect(hasTenantOwnerReference(current, tenantA)).To(BeFalse())
-		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-
-		NamespaceIsNotPartOfTenant(t1, ns).Should(Succeed())
-		NamespaceIsPartOfTenant(t2, ns).Should(Succeed())
-	})
-
-	It("Administrators can remove complete Tenant ownership while partial removal is reverted", func() {
-		tenant := getTenant(t1.Name)
-
-		ns := NewNamespace("", map[string]string{
-			meta.TenantLabel: tenant.GetName(),
-		})
-		NamespaceCreation(ns, t1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		NamespaceIsPartOfTenant(t1, ns).Should(Succeed())
-		DeferCleanup(func() { EventuallyDeletion(ns) })
-
-		adminClient := ownerClient(administrator)
-		Eventually(func() error {
-			_, err := adminClient.CoreV1().Namespaces().Patch(
-				context.TODO(),
-				ns.Name,
-				types.MergePatchType,
-				[]byte(`{"metadata":{"annotations":{"e2e.capsule.clastix.io/admin":"true"}}}`),
-				metav1.PatchOptions{},
-			)
-
-			return err
-		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-
-		Eventually(func() error {
-			_, err := adminClient.CoreV1().Namespaces().Patch(
-				context.TODO(),
-				ns.Name,
-				types.MergePatchType,
-				[]byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":null}}}`, meta.TenantLabel)),
-				metav1.PatchOptions{},
-			)
-
-			return err
-		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-		expectOriginalTenantOwnership(ns.Name, tenant)
-
-		patch := map[string]any{
-			"metadata": map[string]any{
-				"labels": map[string]any{
-					meta.TenantLabel: nil,
-				},
-				"ownerReferences": []any{},
-			},
-		}
-		Expect(PatchNamespace(ns, adminClient, patch)).To(Succeed())
-
-		ExpectNamespaceNotAssignedToTenant(context.TODO(), ns.Name)
-		NamespaceIsNotPartOfTenant(t1, ns).Should(Succeed())
-	})
-
 	It("Owners can not migrate managed namespaces to another Tenant", func() {
 		tenantA := getTenant(t1.Name)
 		tenantB := getTenant(t2.Name)
@@ -1597,6 +1442,135 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("con
 
 			return apierrors.IsNotFound(err)
 		}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
+	})
+})
+
+// Administrators are configured cluster-wide, so these specs stay in the
+// serial config phase.
+var _ = Describe("Capsule administrators changing Tenant ownership of Namespaces", Ordered, Label("config", "namespace", "hijack", "administrators"), func() {
+	administrator := rbac.UserSpec{
+		Name: "e2e-namespace-hijacking-admin",
+		Kind: rbac.UserOwner,
+	}
+
+	var (
+		t1 *capsulev1beta2.Tenant
+		t2 *capsulev1beta2.Tenant
+	)
+
+	BeforeAll(func() {
+		// Registered before the change so the administrator is removed again even
+		// when the rest of the setup fails (removing an absent entry is a no-op).
+		DeferCleanup(func() {
+			ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+				kept := make(rbac.UserListSpec, 0, len(configuration.Spec.Administrators))
+				for _, admin := range configuration.Spec.Administrators {
+					if admin.Name == administrator.Name && admin.Kind == administrator.Kind {
+						continue
+					}
+
+					kept = append(kept, admin)
+				}
+
+				configuration.Spec.Administrators = kept
+			})
+		})
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec.Administrators = append(configuration.Spec.Administrators, administrator)
+		})
+
+		t1, t2, _ = hijackTenants("e2e-ns-admin-" + utilrand.String(6))
+		createHijackTenants(t1, t2)
+	})
+
+	It("Administrators can migrate managed namespaces to another Tenant", func() {
+		tenantA := getTenant(t1.Name)
+		tenantB := getTenant(t2.Name)
+
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tenantA.GetName(),
+		})
+		NamespaceCreation(ns, t1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(t1, ns).Should(Succeed())
+		DeferCleanup(func() { EventuallyDeletion(ns) })
+
+		ref, err := GetTenantOwnerReferenceAsPatch(tenantB)
+		Expect(err).NotTo(HaveOccurred())
+
+		patch := map[string]any{
+			"metadata": map[string]any{
+				"labels": map[string]any{
+					meta.TenantLabel: tenantB.GetName(),
+				},
+				"ownerReferences": []map[string]any{ref},
+			},
+		}
+
+		Eventually(func() error {
+			return PatchNamespace(ns, ownerClient(administrator), patch)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		Eventually(func(g Gomega) {
+			current := getNamespace(ns.Name)
+
+			g.Expect(current.Labels).To(HaveKeyWithValue(meta.TenantLabel, tenantB.GetName()))
+			g.Expect(tenantOwnerReferences(current)).To(Equal([]string{tenantB.GetName()}))
+			g.Expect(hasTenantOwnerReference(current, tenantB)).To(BeTrue())
+			g.Expect(hasTenantOwnerReference(current, tenantA)).To(BeFalse())
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		NamespaceIsNotPartOfTenant(t1, ns).Should(Succeed())
+		NamespaceIsPartOfTenant(t2, ns).Should(Succeed())
+	})
+
+	It("Administrators can remove complete Tenant ownership while partial removal is reverted", func() {
+		tenant := getTenant(t1.Name)
+
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tenant.GetName(),
+		})
+		NamespaceCreation(ns, t1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(t1, ns).Should(Succeed())
+		DeferCleanup(func() { EventuallyDeletion(ns) })
+
+		adminClient := ownerClient(administrator)
+		Eventually(func() error {
+			_, err := adminClient.CoreV1().Namespaces().Patch(
+				context.TODO(),
+				ns.Name,
+				types.MergePatchType,
+				[]byte(`{"metadata":{"annotations":{"e2e.capsule.clastix.io/admin":"true"}}}`),
+				metav1.PatchOptions{},
+			)
+
+			return err
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		Eventually(func() error {
+			_, err := adminClient.CoreV1().Namespaces().Patch(
+				context.TODO(),
+				ns.Name,
+				types.MergePatchType,
+				[]byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":null}}}`, meta.TenantLabel)),
+				metav1.PatchOptions{},
+			)
+
+			return err
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		expectOriginalTenantOwnership(ns.Name, tenant)
+
+		patch := map[string]any{
+			"metadata": map[string]any{
+				"labels": map[string]any{
+					meta.TenantLabel: nil,
+				},
+				"ownerReferences": []any{},
+			},
+		}
+		Expect(PatchNamespace(ns, adminClient, patch)).To(Succeed())
+
+		ExpectNamespaceNotAssignedToTenant(context.TODO(), ns.Name)
+		NamespaceIsNotPartOfTenant(t1, ns).Should(Succeed())
 	})
 })
 
