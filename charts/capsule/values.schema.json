@@ -447,6 +447,10 @@
                             "description": "Define entities which can act as Administrators in the capsule construct These entities are automatically owners for all existing tenants. Meaning they can add namespaces to any tenant. However they must be specific by using the capsule label for interacting with namespaces. Because if that label is not defined, it's assumed that namespace interaction was not targeted towards a tenant and will therefore be ignored by capsule. May also be handy in GitOps scenarios where certain service accounts need to be able to manage namespaces for all tenants.",
                             "type": "array"
                         },
+                        "admissionCachedReads": {
+                            "description": "Resolve the Namespace, Tenant and RuleStatus of admission requests from the informer cache, falling back to the API server for objects not cached yet. Removes the direct API reads made by every admission request, at the cost of evaluating a request against a Tenant state that may lag by the informer delay.",
+                            "type": "boolean"
+                        },
                         "allowServiceAccountPromotion": {
                             "description": "ServiceAccounts within tenant namespaces can be promoted to owners of the given tenant this can be achieved by labeling the serviceaccount and then they are considered owners. This can only be done by other owners of the tenant. However ServiceAccounts which have been promoted to owner can not promote further serviceAccounts.",
                             "type": "boolean"

@@ -128,6 +128,7 @@ func main() {
 		enableLeaderElection bool
 		enablePprof          bool
 		enableTracing        bool
+		admissionCachedReads bool
 		version              bool
 		secureMetrics        bool
 		enableHTTP2          bool
@@ -178,6 +179,12 @@ func main() {
 		"enable-tracing",
 		false,
 		"Enable OpenTelemetry tracing for admission webhook requests.",
+	)
+	flag.BoolVar(
+		&admissionCachedReads,
+		"admission-cached-reads",
+		false,
+		"Resolve the Namespace, Tenant and RuleStatus of admission requests from the informer cache, falling back to the API server for objects not cached yet. Cuts the direct API reads made by every admission request, at the cost of evaluating a request against a Tenant state that may lag by the informer delay.",
 	)
 	flag.StringVar(
 		&tracingEndpoint,
@@ -872,6 +879,7 @@ func main() {
 		),
 		webhook.RegistrationOptions{
 			EnableTracing: enableTracing,
+			CachedReads:   admissionCachedReads,
 		},
 		webhooksList...); err != nil {
 		setupLog.Error(err, "unable to setup webhooks")
