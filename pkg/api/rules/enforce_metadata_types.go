@@ -54,13 +54,12 @@ func (r MetadataRule) MatchesGroupVersionKind(gvk schema.GroupVersionKind) bool 
 
 // +kubebuilder:object:generate=true
 type MetadataValueRule struct {
-	// Required enforces that the metadata key must be present.
+	// Required enforces that the metadata key must be present. Omitted means false.
 	//
 	// This is only meaningful with action=allow. Deny and audit rules do not
 	// require missing metadata to exist.
 	//
 	// +optional
-	// +kubebuilder:default:=false
 	Required bool `json:"required,omitempty"`
 
 	// Values defines allowed, denied, or audited values for the metadata key.
