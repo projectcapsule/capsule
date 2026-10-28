@@ -757,7 +757,7 @@ ct:
 	$(call go-install-tool,$(CT),github.com/$(CT_LOOKUP)/v3/ct@$(CT_VERSION))
 
 KIND         := $(LOCALBIN)/kind
-KIND_VERSION := v0.32.0
+KIND_VERSION := v0.33.0
 KIND_LOOKUP  := kubernetes-sigs/kind
 # `kind version` prints "kind v0.32.0 ..."; a binary of another version is
 # replaced, since go-install-tool skips existing files.
