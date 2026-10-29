@@ -28,3 +28,17 @@ func (e NamespaceRuleEnforceBody) WorkloadTargetsAny(targets ...WorkloadValidati
 
 	return slices.ContainsFunc(targets, e.GetWorkloadTargets)
 }
+
+// GetStorageClassTargets reports whether the storage classes of this rule apply
+// to target. Omitted targets select every supported kind.
+func (e NamespaceRuleEnforceBody) GetStorageClassTargets(target StorageValidationTarget) bool {
+	if len(e.Storage.Classes) == 0 {
+		return false
+	}
+
+	if len(e.Storage.Targets) == 0 {
+		return true
+	}
+
+	return slices.Contains(e.Storage.Targets, target)
+}
