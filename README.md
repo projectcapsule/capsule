@@ -127,16 +127,28 @@ Please check the project [documentation](https://projectcapsule.dev) for the coo
 
 ## Project repositories
 
+All repositories live in the [projectcapsule](https://github.com/projectcapsule) GitHub organization.
+
+### Core
+
 | Repository | Scope |
 | --- | --- |
 | [Capsule](https://github.com/projectcapsule/capsule) | Controller, namespace profiling rules, admission webhooks, and Helm chart. |
 | [Capsule Proxy](https://github.com/projectcapsule/capsule-proxy) | Optional Kubernetes API proxy for tenant users, developed and released separately. |
 | [Website](https://github.com/projectcapsule/website) | Source for the user documentation and project website. |
-| [Community](https://github.com/projectcapsule/capsule-community) | Community coordination and meeting materials. |
 
-Capsule and Capsule Proxy are the runtime codebases. The website and community
-repositories support documentation and collaboration. The [release process](DEVELOPMENT.md#release-process)
-in this repository builds and publishes the Capsule controller and Helm chart.
+### Addons
+
+| Repository | Scope |
+| --- | --- |
+| [Change Windows](https://github.com/projectcapsule/change-windows) | Controller for maintenance windows and scheduled actions. See the [documentation](https://change-windows.addons.projectcapsule.dev/). |
+| [Resource Permits](https://github.com/projectcapsule/resource-permits) | Approval flows native to Kubernetes for requesting predefined services. See the [documentation](https://resource-permits.addons.projectcapsule.dev/). |
+| [SOPS Operator](https://github.com/projectcapsule/sops-operator) | Create SOPS Secrets on Kubernetes in a multi-tenant way. |
+| [Observability Tenancy](https://github.com/projectcapsule/observability-tenancy) | Controllers to align your monitoring stack with multi-tenancy. |
+| [Headlamp Plugin](https://github.com/projectcapsule/headlamp-plugin) | Headlamp plugins for Capsule. |
+
+Capsule and Capsule Proxy are the runtime codebases. The [release process](DEVELOPMENT.md#release-process).
+in this repository builds and publishes the Capsule controller and Helm chart. More addons and integrations are listed in the [ecosystem](https://projectcapsule.dev/ecosystem/).
 
 # Contributions
 
