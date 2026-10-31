@@ -90,7 +90,7 @@ namespace/solar-dev created
 $ kubectl create namespace experiments
 The Namespace name must start with 'solar-' when ForceTenantPrefix is enabled in the Tenant.
 
-$ kubectl apply -f pod.yaml
+$ kubectl apply -n solar-dev -f pod.yaml
 resource exceeds GlobalResourceQuota "solar-shared-compute": requests.cpu (requested=2, current=7, projected=9, hard=8, exceededBy=1)
 ```
 
