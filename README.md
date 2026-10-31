@@ -32,7 +32,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/logo/capsule.svg" height=560 />
+  <img src="assets/logo/capsule.svg" height=240 />
 </p>
 
 ---
@@ -61,6 +61,8 @@ Capsule groups a team's namespaces into a _Tenant_, a lightweight cluster-scoped
 | **Tenant Owner** | Creates and manages namespaces within their Tenant and grants access to team members. |
 | **Tenant User** | Deploys workloads inside tenant namespaces, within the limits the owner has set. |
 
+As a cluster admin, you describe a team once as a Tenant:
+
 ```yaml
 apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
@@ -68,22 +70,51 @@ metadata:
   name: solar
 spec:
   owners:
-    - name: alice
-      kind: User
+    - kind: User
+      name: alice
+  forceTenantPrefix: true
+  rules:
+    - quota:
+        - name: shared-compute
+          hard:
+            requests.cpu: "8"
+            requests.memory: 16Gi
 ```
 
-Capsule enforces the boundaries through admission control: it grants owners access, applies the configured quotas and policies, and rejects requests that fall outside the tenant's rules.
+Alice, the tenant owner, now creates namespaces herself, without cluster-admin rights or a ticket. Capsule enforces the boundaries through admission control: it grants owners access, applies the configured quotas and policies, and rejects requests that fall outside the tenant's rules.
+
+```
+$ kubectl create namespace solar-dev
+namespace/solar-dev created
+
+$ kubectl create namespace experiments
+The Namespace name must start with 'solar-' when ForceTenantPrefix is enabled in the Tenant.
+
+$ kubectl apply -f pod.yaml
+resource exceeds GlobalResourceQuota "solar-shared-compute": requests.cpu (requested=2, current=7, projected=9, hard=8, exceededBy=1)
+```
 
 # Project Status
 This project is stable. [We follow the Kubernetes definition of stable](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/#feature-stages).
 
 # Quick start
 
-Capsule is installed with its [Helm chart](https://artifacthub.io/packages/helm/capsule/capsule), which also manages the CustomResourceDefinitions. By default the chart uses [cert-manager](https://cert-manager.io/) for the webhook certificates, so install cert-manager first. It can be disabled with `certManager.generateCertificates=false`, see the [installation guide](https://projectcapsule.dev/docs/operating/setup/installation/).
+Capsule is installed with its [Helm chart](https://artifacthub.io/packages/helm/capsule/capsule), which also manages the CustomResourceDefinitions. The webhooks need TLS certificates. By default the chart gets them from [cert-manager](https://cert-manager.io/), so install cert-manager first, then:
 
 ```bash
 helm install capsule oci://ghcr.io/projectcapsule/charts/capsule -n capsule-system --create-namespace
 ```
+
+Without cert-manager, let Capsule generate and inject its own certificates instead:
+
+```bash
+helm install capsule oci://ghcr.io/projectcapsule/charts/capsule -n capsule-system --create-namespace \
+  --set 'certManager.generateCertificates=false' \
+  --set 'tls.enableController=true' \
+  --set 'tls.create=true'
+```
+
+See the [installation guide](https://projectcapsule.dev/docs/operating/setup/installation/) for all options.
 
 Then follow the [quickstart](https://projectcapsule.dev/docs/quickstart/) to create your first Tenant, or try the [live demo](https://killercoda.com/projectcapsule/scenario/demo).
 
@@ -121,34 +152,15 @@ Developers self-provision within their assigned boundaries. Everything is declar
 
 Tenant namespaces are ordinary namespaces, so your tools keep working. Integrations for Argo CD, Rancher, OpenShift, Headlamp, Kyverno, Velero, Crossplane, Tekton, and more make them tenant-aware. See the [ecosystem](https://projectcapsule.dev/ecosystem/).
 
+## How it fits together
+
+<p align="center">
+  <img src="assets/docs/capsule-architecture.png" alt="Capsule architecture: administrators manage tenant resources, which Capsule applies to every tenant namespace, while tenant owners and users create namespaces and workloads" width="800" />
+</p>
+
 # Documentation
 
 Please check the project [documentation](https://projectcapsule.dev) for the cool things you can do with Capsule. [What's new](https://projectcapsule.dev/docs/whats-new/) lists the features of the current release.
-
-## Project repositories
-
-All repositories live in the [projectcapsule](https://github.com/projectcapsule) GitHub organization.
-
-### Core
-
-| Repository | Scope |
-| --- | --- |
-| [Capsule](https://github.com/projectcapsule/capsule) | Controller, namespace profiling rules, admission webhooks, and Helm chart. |
-| [Capsule Proxy](https://github.com/projectcapsule/capsule-proxy) | Optional Kubernetes API proxy for tenant users, developed and released separately. |
-| [Website](https://github.com/projectcapsule/website) | Source for the user documentation and project website. |
-
-### Addons
-
-| Repository | Scope |
-| --- | --- |
-| [Change Windows](https://github.com/projectcapsule/change-windows) | Controller for maintenance windows and scheduled actions. See the [documentation](https://change-windows.addons.projectcapsule.dev/). |
-| [Resource Permits](https://github.com/projectcapsule/resource-permits) | Approval flows native to Kubernetes for requesting predefined services. See the [documentation](https://resource-permits.addons.projectcapsule.dev/). |
-| [SOPS Operator](https://github.com/projectcapsule/sops-operator) | Create SOPS Secrets on Kubernetes in a multi-tenant way. See the [documentation](https://sops.addons.projectcapsule.dev/). |
-| [Observability Tenancy](https://github.com/projectcapsule/observability-tenancy) | Controllers to align your monitoring stack with multi-tenancy. |
-| [Headlamp Plugin](https://github.com/projectcapsule/headlamp-plugin) | Headlamp plugins for Capsule. See the [documentation](https://projectcapsule.dev/ecosystem/integrations/headlamp/). |
-
-Capsule and Capsule Proxy are the runtime codebases. The [release process](DEVELOPMENT.md#release-process).
-in this repository builds and publishes the Capsule controller and Helm chart. More addons and integrations are listed in the [ecosystem](https://projectcapsule.dev/ecosystem/).
 
 # Contributions
 
@@ -203,3 +215,28 @@ All OCI release artifacts include a Software Bill of Materials (SBOM) in Cyclone
 - Q. Do you provide commercial support?
 
   A. Yes, there is commercial support for Capsule, including consulting and priority feature support. See the [support page](https://projectcapsule.dev/support/) for more information.
+
+# Project repositories
+
+All repositories live in the [projectcapsule](https://github.com/projectcapsule) GitHub organization.
+
+### Core
+
+| Repository | Scope |
+| --- | --- |
+| [Capsule](https://github.com/projectcapsule/capsule) | Controller, namespace profiling rules, admission webhooks, and Helm chart. |
+| [Capsule Proxy](https://github.com/projectcapsule/capsule-proxy) | Optional Kubernetes API proxy for tenant users, developed and released separately. |
+| [Website](https://github.com/projectcapsule/website) | Source for the user documentation and project website. |
+
+### Addons
+
+| Repository | Scope |
+| --- | --- |
+| [Change Windows](https://github.com/projectcapsule/change-windows) | Controller for maintenance windows and scheduled actions. See the [documentation](https://change-windows.addons.projectcapsule.dev/). |
+| [Resource Permits](https://github.com/projectcapsule/resource-permits) | Approval flows native to Kubernetes for requesting predefined services. See the [documentation](https://resource-permits.addons.projectcapsule.dev/). |
+| [SOPS Operator](https://github.com/projectcapsule/sops-operator) | Create SOPS Secrets on Kubernetes in a multi-tenant way. See the [documentation](https://sops.addons.projectcapsule.dev/). |
+| [Observability Tenancy](https://github.com/projectcapsule/observability-tenancy) | Controllers to align your monitoring stack with multi-tenancy. |
+| [Headlamp Plugin](https://github.com/projectcapsule/headlamp-plugin) | Headlamp plugins for Capsule. See the [documentation](https://projectcapsule.dev/ecosystem/integrations/headlamp/). |
+
+Capsule and Capsule Proxy are the runtime codebases. The [release process](DEVELOPMENT.md#release-process).
+in this repository builds and publishes the Capsule controller and Helm chart. More addons and integrations are listed in the [ecosystem](https://projectcapsule.dev/ecosystem/).
