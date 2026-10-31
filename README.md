@@ -41,55 +41,89 @@
 
 # Kubernetes multi-tenancy made easy
 
-**Capsule** implements a multi-tenant and policy-based environment in your Kubernetes cluster. It is designed as a micro-services-based ecosystem with the minimalist approach, leveraging only on upstream Kubernetes.
+**Capsule** is a multi-tenancy framework for Kubernetes. It gives teams the freedom to create and manage their own namespaces, while access, resource budgets, and policies stay under platform control. It runs as a Kubernetes operator and relies only on upstream Kubernetes: no custom distribution and no extra tooling for your users to learn.
 
 # What's the problem with the current status?
 
-Kubernetes introduces the _Namespace_ object type to create logical partitions of the cluster as isolated *slices*. However, implementing advanced multi-tenancy scenarios, it soon becomes complicated because of the flat structure of Kubernetes namespaces and the impossibility to share resources among namespaces belonging to the same tenant. To overcome this, cluster admins tend to provision a dedicated cluster for each groups of users, teams, or departments. As an organization grows, the number of clusters to manage and keep aligned becomes an operational nightmare, described as the well known phenomena of the _clusters sprawl_.
+Kubernetes namespaces have no hierarchy. As soon as multiple teams or customers share a cluster, the choices are all costly:
+
+- **Namespaces only**: cluster admins become a bottleneck, and developers cannot list their own namespaces.
+- **A custom CRD**: your teams learn an API that exists on your cluster and nowhere else.
+- **Multiple clusters**: another control plane per team to upgrade, secure, and pay for, known as _clusters sprawl_.
 
 # Entering Capsule
 
-Capsule takes a different approach. In a single cluster, the Capsule Controller aggregates multiple namespaces in a lightweight abstraction called _Tenant_, basically a grouping of Kubernetes Namespaces. Within each tenant, users are free to create their namespaces and share all the assigned resources.
+Capsule groups a team's namespaces into a _Tenant_, a lightweight cluster-scoped resource. Cluster administrators define the tenant's owners, rules, and budgets once, and every namespace in the tenant inherits them. Tenant owners then create ordinary namespaces on their own, without cluster-admin rights or a ticket.
 
-On the other side, the Capsule Policy Engine keeps the different tenants isolated from each other. _Network and Security Policies_, _Resource Quota_, _Limit Ranges_, _RBAC_, and other policies defined at the tenant level are automatically inherited by all the namespaces in the tenant. Then users are free to operate their tenants in autonomy, without the intervention of the cluster administrator.
+| Role | Responsibility |
+| --- | --- |
+| **Cluster Admin** | Installs Capsule, creates Tenants, and sets resource budgets and policies. |
+| **Tenant Owner** | Creates and manages namespaces within their Tenant and grants access to team members. |
+| **Tenant User** | Deploys workloads inside tenant namespaces, within the limits the owner has set. |
 
+```yaml
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: solar
+spec:
+  owners:
+    - name: alice
+      kind: User
+```
+
+Capsule enforces the boundaries through admission control: it grants owners access, applies the configured quotas and policies, and rejects requests that fall outside the tenant's rules.
 
 # Project Status
 This project is stable. [We follow the Kubernetes definition of stable](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/#feature-stages).
 
+# Quick start
+
+Capsule is installed with its [Helm chart](https://artifacthub.io/packages/helm/capsule/capsule), which also manages the CustomResourceDefinitions. [cert-manager](https://cert-manager.io/) is used for the webhook certificates by default.
+
+```bash
+helm install capsule oci://ghcr.io/projectcapsule/charts/capsule -n capsule-system --create-namespace
+```
+
+Then follow the [quickstart](https://projectcapsule.dev/docs/quickstart/) to create your first Tenant, or try the [live demo](https://killercoda.com/projectcapsule/scenario/demo).
+
 # Features
 
-## Self-Service
+## Tenants
 
-Leave developers the freedom to self-provision their cluster resources according to the assigned boundaries.
+Group namespaces by team, product, or customer. Owners manage their namespaces and grant developers access to deploy applications. RBAC bindings are propagated to every namespace automatically.
 
-## Preventing Clusters Sprawl
+## Namespace rules
 
-Share a single cluster with multiple teams, groups of users, or departments by saving operational and management efforts.
+Configure policy on a per-namespace basis. Namespace selectors give namespaces within the same Tenant different profiles. Rules mutate new resources (such as workload placement, seccomp, AppArmor, or Gateway references) and enforce policies on the result, for example allowed registries, workload types, ingress hostnames, NetworkPolicy CIDRs, and namespace metadata. Rules can be applied conditionally with CEL expressions.
 
-## Governance
+## Resource management
 
-Leverage Kubernetes Admission Controllers to enforce the industry security best practices and meet policy requirements.
+Control the resources consumed by tenants and prevent them from overtaking:
 
-## Resources Control
+- `GlobalResourceQuota` enforces one shared ceiling across selected namespaces.
+- `ResourcePool` allocates capacity to namespaces through claims.
+- `CustomQuota` and `GlobalCustomQuota` limit custom quantities calculated from any Kubernetes object.
 
-Take control of the resources consumed by users while preventing them to overtake.
+## Replications
 
-## Native Experience
+Propagate Secrets, NetworkPolicies, LimitRanges, and other resources into tenant namespaces with `TenantResource` and `GlobalTenantResource`, using Go templates for values such as the namespace or tenant name.
 
-Provide multi-tenancy with a native Kubernetes experience without introducing additional management layers, plugins, or customized binaries.
+## Capsule Proxy
 
-## GitOps ready
+Let tenant users list only their own namespaces, pods, and volumes through the standard Kubernetes API with their existing tools. Capsule Proxy is optional and released separately.
 
-Capsule is completely declarative and GitOps ready.
+## Self-service, GitOps ready, and a native experience
 
-## Bring your own device (BYOD)
+Developers self-provision within their assigned boundaries. Everything is declarative and GitOps ready, built on plain Kubernetes without additional management layers or customized binaries.
 
-Assign to tenants a dedicated set of compute, storage, and network resources and avoid the noisy neighbors' effect.
+## Ecosystem
+
+Tenant namespaces are ordinary namespaces, so your tools keep working. Integrations for Argo CD, Rancher, OpenShift, Headlamp, Kyverno, Velero, Crossplane, Tekton, and more make them tenant-aware. See the [ecosystem](https://projectcapsule.dev/ecosystem/).
 
 # Documentation
 
-Please check the project [documentation](https://projectcapsule.dev) for the cool things you can do with Capsule.
+Please check the project [documentation](https://projectcapsule.dev) for the cool things you can do with Capsule. [What's new](https://projectcapsule.dev/docs/whats-new/) lists the features of the current release.
 
 ## Project repositories
 
@@ -152,8 +186,8 @@ All OCI release artifacts include a Software Bill of Materials (SBOM) in Cyclone
 
 - Q. Does it work with my Kubernetes XYZ distribution?
 
-  A. We tested Capsule with vanilla Kubernetes 1.16+ on private environments and public clouds. We expect it to work smoothly on any other Kubernetes distribution. Please let us know if you find it doesn't.
+  A. Our end-to-end tests run against vanilla Kubernetes 1.33 to 1.35 and against OpenShift (MicroShift). We expect Capsule to work on any other conformant Kubernetes distribution. Please let us know if you find it doesn't.
 
 - Q. Do you provide commercial support?
 
-  A. Yes, we're available to help and provide commercial support. [Clastix](https://clastix.io) is the company behind Capsule. Please, contact us for a quote.
+  A. Yes, there is commercial support for Capsule, including consulting and priority feature support. See the [support page](https://projectcapsule.dev/support/) for more information.
