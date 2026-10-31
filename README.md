@@ -79,7 +79,7 @@ This project is stable. [We follow the Kubernetes definition of stable](https://
 
 # Quick start
 
-Capsule is installed with its [Helm chart](https://artifacthub.io/packages/helm/capsule/capsule), which also manages the CustomResourceDefinitions. [cert-manager](https://cert-manager.io/) is used for the webhook certificates by default.
+Capsule is installed with its [Helm chart](https://artifacthub.io/packages/helm/capsule/capsule), which also manages the CustomResourceDefinitions. By default the chart uses [cert-manager](https://cert-manager.io/) for the webhook certificates, so install cert-manager first. It can be disabled with `certManager.generateCertificates=false`, see the [installation guide](https://projectcapsule.dev/docs/operating/setup/installation/).
 
 ```bash
 helm install capsule oci://ghcr.io/projectcapsule/charts/capsule -n capsule-system --create-namespace
@@ -198,7 +198,7 @@ All OCI release artifacts include a Software Bill of Materials (SBOM) in Cyclone
 
 - Q. Does it work with my Kubernetes XYZ distribution?
 
-  A. Our end-to-end tests run against vanilla Kubernetes 1.33 to 1.35 and against OpenShift (MicroShift). We expect Capsule to work on any other conformant Kubernetes distribution. Please let us know if you find it doesn't.
+  A. The community edition supports the latest Kubernetes release on vanilla Kubernetes, which is what our community end-to-end tests run against. Other Kubernetes distributions, for example OpenShift, and older Kubernetes versions are supported through the Enterprise offering. See the [support page](https://projectcapsule.dev/support/).
 
 - Q. Do you provide commercial support?
 
