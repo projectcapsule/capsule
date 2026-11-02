@@ -15,7 +15,7 @@ import (
 )
 
 func BenchmarkVolumeSnapshotClassAdmission(b *testing.B) {
-	modes := []string{"allow-name", "allow-selector", "deny", "missing-class", "no-class-rules", "unchanged-update", "other-kind"}
+	modes := []string{"allow-name", "allow-name-selector", "allow-selector", "deny", "missing-class", "no-class-rules", "unchanged-update", "other-kind"}
 
 	for _, tenants := range []int{1, 100} {
 		for _, count := range []int{1, 16} {
@@ -25,7 +25,7 @@ func BenchmarkVolumeSnapshotClassAdmission(b *testing.B) {
 					body.Enforce.Storage.Classes = append(body.Enforce.Storage.Classes, rules.StorageClassMatch{Expression: "^csi-"})
 
 					switch mode {
-					case "allow-selector":
+					case "allow-name-selector", "allow-selector":
 						body.Enforce.Storage.Classes = append(body.Enforce.Storage.Classes, customerClasses)
 					case "no-class-rules":
 						body = &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeAllow, Storage: rules.NamespaceRuleEnforceStorageBody{

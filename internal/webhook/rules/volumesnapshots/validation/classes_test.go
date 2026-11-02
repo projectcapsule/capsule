@@ -266,8 +266,8 @@ func TestVolumeSnapshotClassRules(t *testing.T) {
 		reasons    []string
 		classReads int64
 	}{
-		{name: "exact name is allowed", rules: []*rules.NamespaceRuleBodyNamespace{allowList()}, class: new("silver"), classReads: 1},
-		{name: "expression is allowed without a class object", rules: []*rules.NamespaceRuleBodyNamespace{allowList()}, class: new("csi-hostpath"), classReads: 1},
+		{name: "exact name is allowed", rules: []*rules.NamespaceRuleBodyNamespace{allowList()}, class: new("silver")},
+		{name: "expression is allowed without a class object", rules: []*rules.NamespaceRuleBodyNamespace{allowList()}, class: new("csi-hostpath")},
 		{name: "class labels are allowed", rules: []*rules.NamespaceRuleBodyNamespace{allowList()}, class: new("gold"), classReads: 1},
 		{
 			name: "allow list miss is denied", rules: []*rules.NamespaceRuleBodyNamespace{allowList()}, class: new("bronze"), classReads: 1,
@@ -290,8 +290,17 @@ func TestVolumeSnapshotClassRules(t *testing.T) {
 			denied: "is denied by namespace rule", reasons: []string{events.ReasonForbiddenVolumeSnapshotClass},
 		},
 		{
+			// A name match only decides its own rule; a later rule still reads the class.
+			name: "later deny selector overrides an allow name match", rules: []*rules.NamespaceRuleBodyNamespace{allowNames("gold"), classRule(rules.ActionTypeDeny, snapshotTargets, customerClasses)}, class: new("gold"), classReads: 1,
+			denied: "is denied by namespace rule", reasons: []string{events.ReasonForbiddenVolumeSnapshotClass},
+		},
+		{
 			name: "audit records without blocking", rules: []*rules.NamespaceRuleBodyNamespace{classRule(rules.ActionTypeAudit, nil, rules.StorageClassMatch{Expression: ".*"})}, class: new("bronze"),
 			reasons: []string{events.ReasonNamespaceRuleAudit},
+		},
+		{
+			name: "audit records every entry that matches", rules: []*rules.NamespaceRuleBodyNamespace{classRule(rules.ActionTypeAudit, snapshotTargets, rules.StorageClassMatch{Exact: []string{"gold"}}, customerClasses)}, class: new("gold"), classReads: 1,
+			reasons: []string{events.ReasonNamespaceRuleAudit, events.ReasonNamespaceRuleAudit},
 		},
 		{name: "allow requires a class", rules: []*rules.NamespaceRuleBodyNamespace{allowList()}, denied: required, reasons: []string{events.ReasonMissingVolumeSnapshotClass}},
 		{name: "deny requires a class", rules: []*rules.NamespaceRuleBodyNamespace{denyNames("bronze")}, denied: required, reasons: []string{events.ReasonMissingVolumeSnapshotClass}},
@@ -517,6 +526,35 @@ func TestVolumeSnapshotClassReadErrors(t *testing.T) {
 			rules.StorageClassMatch{Exact: []string{"silver"}, LabelSelector: customerClasses.LabelSelector}))
 		cl.classErr = errors.New("apiserver unavailable")
 		require.Nil(t, admit(t.Context(), cl, decoder, newRecorder(), request(t, newSnapshot("tenant-a", new("silver")), nil)))
+		require.Zero(t, cl.classGets.Load())
+	})
+
+	// The entries of an allow or deny rule are ORed, so a name match decides the
+	// rule, and the selector entries next to it must not read the class.
+	t.Run("a name match decides an allow rule without reading the class for its other entries", func(t *testing.T) {
+		cl, decoder := singleProfile(t, allowList())
+		cl.classErr = errors.New("apiserver unavailable")
+		require.Nil(t, admit(t.Context(), cl, decoder, newRecorder(), request(t, newSnapshot("tenant-a", new("silver")), nil)))
+		require.Zero(t, cl.classGets.Load())
+	})
+
+	// Rule validation rejects invalid expressions, but one that reaches admission
+	// must still fail the request rather than be skipped for a later name match.
+	t.Run("an invalid expression before a name match is still reported", func(t *testing.T) {
+		cl, decoder := singleProfile(t, classRule(rules.ActionTypeAllow, snapshotTargets, rules.StorageClassMatch{Expression: "("}, rules.StorageClassMatch{Exact: []string{"silver"}}))
+		response := admit(t.Context(), cl, decoder, newRecorder(), request(t, newSnapshot("tenant-a", new("silver")), nil))
+		require.NotNil(t, response)
+		require.False(t, response.Allowed)
+		require.Contains(t, response.Result.Message, "invalid rule")
+	})
+
+	t.Run("a name match decides a deny rule without reading the class for its other entries", func(t *testing.T) {
+		cl, decoder := singleProfile(t, classRule(rules.ActionTypeDeny, snapshotTargets, customerClasses, rules.StorageClassMatch{Exact: []string{"bronze"}}))
+		cl.classErr = errors.New("apiserver unavailable")
+		response := admit(t.Context(), cl, decoder, newRecorder(), request(t, newSnapshot("tenant-a", new("bronze")), nil))
+		require.NotNil(t, response)
+		require.False(t, response.Allowed)
+		require.Equal(t, int32(http.StatusForbidden), response.Result.Code)
 		require.Zero(t, cl.classGets.Load())
 	})
 }
