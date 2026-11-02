@@ -38,7 +38,7 @@ jobs:
           fi
       - name: OSPS Baseline scan
         id: scan
-        uses: revanite-io/osps-baseline-action@1af7ff8b44af83f120b20cc5f63b877286849257 # v1.5.2
+        uses: revanite-io/osps-baseline-action@d0d850b592f1788b2631f1dfdf84d80ea8c720f5 # v1.5.3
         with:
           owner: ${{ github.repository_owner }}
           repo: ${{ github.event.repository.name }}
