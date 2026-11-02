@@ -21,7 +21,7 @@ import (
 func BenchmarkDeviceClassRulesAdmission(b *testing.B) {
 	for _, tenants := range []int{1, 100} {
 		for _, count := range []int{1, 32} {
-			for _, mode := range []string{"exact", "regex-warm", "regex-cold", "selector", "deny", "skip", "parallel"} {
+			for _, mode := range []string{"exact", "regex-warm", "regex-cold", "selector", "deny", "audit", "dry-run-audit", "dry-run-deny", "skip", "parallel"} {
 				b.Run(fmt.Sprintf("tenants=%d/rules=%d/%s", tenants, count, mode), func(b *testing.B) {
 					cl := newDRAClient(b)
 					for i := 0; i < tenants-1; i++ {
@@ -40,12 +40,16 @@ func BenchmarkDeviceClassRulesAdmission(b *testing.B) {
 								match = rules.DeviceClassMatch{Expression: "^gpu-[ab]$"}
 							}
 						}
-						bodies = append(bodies, classBody(rules.ActionTypeAllow, match).NamespaceRuleBodyNamespace)
+						action := rules.ActionTypeAllow
+						if mode == "audit" || mode == "dry-run-audit" {
+							action = rules.ActionTypeAudit
+						}
+						bodies = append(bodies, classBody(action, match).NamespaceRuleBodyNamespace)
 					}
 					setClassRules(b, cl, "tenant-a")
 					require.NoError(b, cl.Create(b.Context(), &capsulev1beta2.RuleStatus{Name: meta.NameForManagedRuleStatus(), Namespace: "ns-a", Generation: 1, Spec: bodies, Status: capsulev1beta2.RuleStatusStatus{ObservedGeneration: 1, Rules: bodies}}))
 					refs := alternativeRequests("gpu-a", "gpu-a")
-					if mode == "deny" {
+					if mode == "deny" || mode == "dry-run-deny" {
 						refs = alternativeRequests("gpu-a", "gpu-other")
 					}
 					ns := "ns-a"
@@ -53,11 +57,14 @@ func BenchmarkDeviceClassRulesAdmission(b *testing.B) {
 						ns = "unmanaged"
 					}
 					request := draAdmissionRequest(b, "ResourceClaim", ns, refs)
+					if mode == "dry-run-audit" || mode == "dry-run-deny" {
+						request.DryRun = new(true)
+					}
 					regex := cache.NewRegexCache()
 					handler := DeviceClass(nil, regex, nil, nil).OnCreate(cl, cl, admission.NewDecoder(cl.Scheme()), events.NewDiscardRecorder())
 					run := func() {
 						response := handler(b.Context(), request)
-						if mode == "deny" {
+						if mode == "deny" || mode == "dry-run-deny" {
 							if response == nil || response.Allowed {
 								b.Error("expected denial")
 							}

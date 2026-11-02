@@ -227,6 +227,10 @@ func (h *deviceClass) evaluateClasses(refs []ruleengine.Value, enforce []*rules.
 }
 
 func emitClassEvent(ctx context.Context, req admission.Request, obj client.Object, tnt *capsulev1beta2.Tenant, recorder events.EventRecorder, eventType, reason, action, message string) {
+	if req.DryRun != nil && *req.DryRun {
+		return
+	}
+
 	recorder.LabeledEvent(obj, eventType, reason, action, message).WithRelated(tnt).WithTenantLabel(tnt).WithRequestAnnotations(req).Emit(ctx)
 }
 

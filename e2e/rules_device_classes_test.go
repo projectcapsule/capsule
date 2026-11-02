@@ -7,10 +7,12 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	eventsv1 "k8s.io/api/events/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	resources "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -25,6 +27,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 )
 
@@ -56,7 +59,7 @@ var _ = Describe("DeviceClass namespace profiles", Label("tenant", "rules", "dev
 			policy("named", rules.ActionTypeDeny, rules.DeviceClassMatch{Expression: "^" + prefix + "-"}),
 			policy("named", rules.ActionTypeAllow, rules.DeviceClassMatch{Exact: classes[:1]}),
 			policy("selected", rules.ActionTypeAllow, rules.DeviceClassMatch{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"dra-pool": prefix + "-a"}}}),
-			policy("named", rules.ActionTypeAudit, rules.DeviceClassMatch{Exact: classes[2:]}),
+			policy("named", rules.ActionTypeAudit, rules.DeviceClassMatch{Exact: []string{classes[0], classes[2]}}),
 			{NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeDeny, Metadata: []rules.MetadataRule{{APIGroups: []string{resources.GroupName}, Kinds: []string{kind}, Labels: map[string]rules.MetadataValueRule{"dra-denied": {Values: []apiruntime.ExpressionMatch{{Exact: []string{"true"}}}}}}}}}},
 		}}}
 		b := &capsulev1beta2.Tenant{Name: prefix + "-b", Labels: map[string]string{"env": "e2e"}, Spec: capsulev1beta2.TenantSpec{Owners: rbac.OwnerListSpec{{Kind: "User", Name: prefix + "-b"}}, Rules: []*rules.NamespaceRuleBodyTenant{policy("", rules.ActionTypeAllow, rules.DeviceClassMatch{Exact: classes[2:]})}}}
@@ -122,6 +125,45 @@ var _ = Describe("DeviceClass namespace profiles", Label("tenant", "rules", "dev
 			Expect(err.Error()).To(ContainSubstring(reason))
 			Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(obj), obj))).To(BeTrue())
 		}
+		var dryRequests []client.ObjectKey
+		dryRun := func(actor client.Client, obj client.Object, reason string) {
+			err := actor.Create(ctx, obj, client.DryRunAll)
+			if reason == "" {
+				Expect(err).NotTo(HaveOccurred())
+			} else {
+				Expect(err).To(HaveOccurred(), "dry-run denial must preserve enforcement")
+				Expect(err.Error()).To(ContainSubstring(reason))
+			}
+			key := client.ObjectKeyFromObject(obj)
+			Expect(apierrors.IsNotFound(k8sClient.Get(ctx, key, obj))).To(BeTrue())
+			dryRequests = append(dryRequests, key)
+		}
+		expectEvents := func(obj client.Object, wanted ...string) {
+			Eventually(func(g Gomega) {
+				list := &eventsv1.EventList{}
+				g.Expect(k8sClient.List(ctx, list, client.InNamespace(obj.GetNamespace()))).To(Succeed())
+				var reasons []string
+				for _, event := range list.Items {
+					if event.ReportingController == events.ReportingController && event.Regarding.Name == obj.GetName() && event.Regarding.Kind == kind {
+						g.Expect(event.Labels[meta.NewTenantLabel]).To(Equal(a.Name))
+						reasons = append(reasons, event.Reason)
+					}
+				}
+				g.Expect(reasons).To(ContainElements(wanted))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		}
+		By("preserving dry-run audit and denial decisions without persisting resources or Events")
+		dryRun(ownerA, claim(named, draExactRequests(classes[0])), "")
+		dryRun(ownerA, claim(named, draExactRequests(classes[2])), "is denied by namespace rule")
+		dryRun(ownerB, claim(isolated, draExactRequests(classes[2])), "")
+		dryRun(ownerB, claim(isolated, draExactRequests(classes[0])), "not allowed")
+		By("retaining audit and denial Events for ordinary requests")
+		audited := claim(named, draExactRequests(classes[0]))
+		create(ownerA, audited)
+		expectEvents(audited, events.ReasonNamespaceRuleAudit)
+		denied := claim(named, draExactRequests(classes[2]))
+		deny(ownerA, denied, "is denied by namespace rule")
+		expectEvents(denied, events.ReasonNamespaceRuleAudit, events.ReasonForbiddenDeviceClass)
 		By("applying different profiles within one tenant and isolating another tenant")
 		create(ownerA, claim(named, draExactRequests(classes[0])))
 		deny(ownerA, claim(named, draAlternativeRequests(classes[0], classes[2])), "firstAvailable[1].deviceClassName")
@@ -251,7 +293,21 @@ var _ = Describe("DeviceClass namespace profiles", Label("tenant", "rules", "dev
 			current.Spec.DeviceClasses = &api.SelectorAllowedListSpec{Exact: classes[:1]}
 			return k8sClient.Update(ctx, current)
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-		deny(ownerA, claim(selected, draExactRequests(classes[1])), "Device Class "+classes[1]+" is forbidden")
+		dryRun(ownerA, claim(selected, draExactRequests(classes[1])), "Device Class "+classes[1]+" is forbidden")
+		legacyDenied := claim(selected, draExactRequests(classes[1]))
+		deny(ownerA, legacyDenied, "Device Class "+classes[1]+" is forbidden")
+		expectEvents(legacyDenied, events.ReasonForbiddenDeviceClass)
+		Consistently(func(g Gomega) {
+			for _, key := range dryRequests {
+				list := &eventsv1.EventList{}
+				g.Expect(k8sClient.List(ctx, list, client.InNamespace(key.Namespace))).To(Succeed())
+				for _, event := range list.Items {
+					if event.ReportingController == events.ReportingController && event.Regarding.Kind == kind {
+						g.Expect(event.Regarding.Name).NotTo(Equal(key.Name), "dry-run requests must not create Events")
+					}
+				}
+			}
+		}, 6*time.Second, defaultPollInterval).Should(Succeed())
 		By("rejecting invalid policy while valid tenants are present")
 		invalid := &capsulev1beta2.Tenant{Name: prefix + "-invalid", Spec: capsulev1beta2.TenantSpec{Owners: a.Spec.Owners, Rules: []*rules.NamespaceRuleBodyTenant{policy("", rules.ActionTypeAllow, rules.DeviceClassMatch{Expression: "["})}}}
 		Expect(k8sClient.Create(ctx, invalid)).To(MatchError(ContainSubstring("enforce.devices.classes[0].exp")))
