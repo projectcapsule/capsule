@@ -181,6 +181,40 @@ var _ = Describe("VolumeSnapshot class rules", Label("tenant", "rules", "storage
 		}
 		admit(ownerA, member(restricted))
 
+		By("checking the default class the snapshot-controller would set on that member")
+		// A snapshot-controller that doesn't recognize the owner's API version
+		// defaults the member with a patch. The e2e setup only installs the CRDs,
+		// so the patch is sent with the controller's identity.
+		Expect(k8sClient.Create(ctx, &rbacv1.RoleBinding{
+			Name: "snapshot-controller", Namespace: restricted.Name,
+			RoleRef:  rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "Role", Name: "snapshots"},
+			Subjects: []rbacv1.Subject{{Kind: rbacv1.ServiceAccountKind, Name: "snapshot-controller", Namespace: "kube-system"}},
+		})).To(Succeed())
+		snapshotController := impersonationClient("system:serviceaccount:kube-system:snapshot-controller",
+			[]string{"system:serviceaccounts", "system:serviceaccounts:kube-system", "system:authenticated"})
+		setDefault := func(class string) error {
+			current := &snapshotv1.VolumeSnapshot{}
+			if err := snapshotController.Get(ctx, client.ObjectKey{Namespace: restricted.Name, Name: "member"}, current); err != nil {
+				return err
+			}
+			patch := client.MergeFrom(current.DeepCopy())
+			current.Spec.VolumeSnapshotClassName = new(class)
+			return snapshotController.Patch(ctx, current, patch)
+		}
+		Eventually(func(g Gomega) {
+			err := setDefault(className("bronze"))
+			if apierrors.IsConflict(err) {
+				g.Expect(err).NotTo(HaveOccurred())
+				return
+			}
+			Expect(err).To(HaveOccurred(), "a forbidden default class must not persist")
+			g.Expect(err).To(MatchError(ContainSubstring(notAllowed("bronze"))))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		defaulted := &snapshotv1.VolumeSnapshot{}
+		Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: restricted.Name, Name: "member"}, defaulted)).To(Succeed())
+		Expect(defaulted.Spec.VolumeSnapshotClassName).To(BeNil())
+		Eventually(func() error { return setDefault(className("silver")) }, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
 		By("leaving other namespace profiles and tenants to their own rules")
 		admit(ownerA, snapshot(open, "bronze", new(className("bronze"))))
 		admit(ownerA, snapshot(open, "default", nil))
