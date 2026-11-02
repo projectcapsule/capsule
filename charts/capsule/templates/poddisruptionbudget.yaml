@@ -1,7 +1,9 @@
 {{- $pdb := .Values.podDisruptionBudget }}
 {{- $enabled := ternary $pdb.enabled (gt (int .Values.replicaCount) 1) (kindIs "bool" $pdb.enabled) }}
 {{- if and $enabled (not .Values.crds.exclusive) (eq .Values.manager.kind "Deployment") }}
-  {{- if and $pdb.minAvailable $pdb.maxUnavailable }}
+  {{- $hasMin := not (kindIs "invalid" $pdb.minAvailable) }}
+  {{- $hasMax := not (kindIs "invalid" $pdb.maxUnavailable) }}
+  {{- if and $hasMin $hasMax }}
     {{- fail "podDisruptionBudget: cannot set both minAvailable and maxUnavailable" }}
   {{- end }}
 apiVersion: policy/v1
@@ -16,10 +18,10 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  {{- if $pdb.maxUnavailable }}
-  maxUnavailable: {{ $pdb.maxUnavailable }}
+  {{- if $hasMax }}
+  maxUnavailable: {{ $pdb.maxUnavailable | toYaml }}
   {{- else }}
-  minAvailable: {{ default 1 $pdb.minAvailable }}
+  minAvailable: {{ ternary $pdb.minAvailable 1 $hasMin | toYaml }}
   {{- end }}
   {{- with $pdb.unhealthyPodEvictionPolicy }}
   unhealthyPodEvictionPolicy: {{ . }}

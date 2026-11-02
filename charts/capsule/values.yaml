@@ -486,10 +486,14 @@ podDisruptionBudget:
   # @schema type:[boolean, null]
   # -- Enable the PodDisruptionBudget. `null` enables it automatically when `replicaCount` > 1.
   enabled:
-  # -- Minimum available pods during disruptions. Cannot be used together with `maxUnavailable`.
+  # @schema type:[integer, string, null]
+  # -- Minimum available pods during disruptions (number or percentage). Cannot be used together with `maxUnavailable`.
   minAvailable: 1
-  # -- Maximum unavailable pods during disruptions. Cannot be used together with `minAvailable`.
+  # @schema type:[integer, string, null]
+  # -- Maximum unavailable pods during disruptions (number or percentage). Cannot be used together with `minAvailable`.
   maxUnavailable:
+  # @schema type:[string, null]
+  # @schema enum:[IfHealthyBudget, AlwaysAllow, null]
   # -- Unhealthy pod eviction policy. Possible values are `IfHealthyBudget` or `AlwaysAllow`.
   unhealthyPodEvictionPolicy:
 

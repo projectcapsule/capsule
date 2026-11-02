@@ -1007,16 +1007,32 @@
                     ]
                 },
                 "maxUnavailable": {
-                    "description": "Maximum unavailable pods during disruptions. Cannot be used together with `minAvailable`.",
-                    "type": "null"
+                    "description": "Maximum unavailable pods during disruptions (number or percentage). Cannot be used together with `minAvailable`.",
+                    "type": [
+                        "integer",
+                        "string",
+                        "null"
+                    ]
                 },
                 "minAvailable": {
-                    "description": "Minimum available pods during disruptions. Cannot be used together with `maxUnavailable`.",
-                    "type": "integer"
+                    "description": "Minimum available pods during disruptions (number or percentage). Cannot be used together with `maxUnavailable`.",
+                    "type": [
+                        "integer",
+                        "string",
+                        "null"
+                    ]
                 },
                 "unhealthyPodEvictionPolicy": {
                     "description": "Unhealthy pod eviction policy. Possible values are `IfHealthyBudget` or `AlwaysAllow`.",
-                    "type": "null"
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "enum": [
+                        "IfHealthyBudget",
+                        "AlwaysAllow",
+                        null
+                    ]
                 }
             }
         },

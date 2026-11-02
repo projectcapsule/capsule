@@ -92,8 +92,8 @@ and [replication documentation](https://projectcapsule.dev/docs/replications/).
 | openshift.etcdEncryption.enabled | bool | `false` | Exclude the kube-storage-version-migrator from the replications webhook (required when etcd encryption is enabled on OpenShift) |
 | podAnnotations | object | `{}` | Annotations to add to the capsule pod. |
 | podDisruptionBudget.enabled | string | `nil` | Enable the PodDisruptionBudget. `null` enables it automatically when `replicaCount` > 1. |
-| podDisruptionBudget.maxUnavailable | string | `nil` | Maximum unavailable pods during disruptions. Cannot be used together with `minAvailable`. |
-| podDisruptionBudget.minAvailable | int | `1` | Minimum available pods during disruptions. Cannot be used together with `maxUnavailable`. |
+| podDisruptionBudget.maxUnavailable | string | `nil` | Maximum unavailable pods during disruptions (number or percentage). Cannot be used together with `minAvailable`. |
+| podDisruptionBudget.minAvailable | int | `1` | Minimum available pods during disruptions (number or percentage). Cannot be used together with `maxUnavailable`. |
 | podDisruptionBudget.unhealthyPodEvictionPolicy | string | `nil` | Unhealthy pod eviction policy. Possible values are `IfHealthyBudget` or `AlwaysAllow`. |
 | podLabels | object | `{}` | Labels to add to the capsule pod. |
 | podSecurityContext | object | `{"enabled":null,"runAsGroup":1002,"runAsNonRoot":true,"runAsUser":1002,"seccompProfile":{"type":"RuntimeDefault"}}` | Set the securityContext for the Capsule pod. `enabled: null` means enabled, unless `global.openshift.enabled` is set. |
