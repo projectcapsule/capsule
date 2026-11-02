@@ -996,6 +996,30 @@
             "description": "Annotations to add to the capsule pod.",
             "type": "object"
         },
+        "podDisruptionBudget": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "description": "Enable the PodDisruptionBudget. `null` enables it automatically when `replicaCount` \u003e 1.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "maxUnavailable": {
+                    "description": "Maximum unavailable pods during disruptions. Cannot be used together with `minAvailable`.",
+                    "type": "null"
+                },
+                "minAvailable": {
+                    "description": "Minimum available pods during disruptions. Cannot be used together with `maxUnavailable`.",
+                    "type": "integer"
+                },
+                "unhealthyPodEvictionPolicy": {
+                    "description": "Unhealthy pod eviction policy. Possible values are `IfHealthyBudget` or `AlwaysAllow`.",
+                    "type": "null"
+                }
+            }
+        },
         "podLabels": {
             "description": "Labels to add to the capsule pod.",
             "type": "object"

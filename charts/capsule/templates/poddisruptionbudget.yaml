@@ -1,0 +1,30 @@
+{{- $pdb := .Values.podDisruptionBudget }}
+{{- $enabled := ternary $pdb.enabled (gt (int .Values.replicaCount) 1) (kindIs "bool" $pdb.enabled) }}
+{{- if and $enabled (not .Values.crds.exclusive) (eq .Values.manager.kind "Deployment") }}
+  {{- if and $pdb.minAvailable $pdb.maxUnavailable }}
+    {{- fail "podDisruptionBudget: cannot set both minAvailable and maxUnavailable" }}
+  {{- end }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "capsule.controllerName" . }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "capsule.labels" . | nindent 4 }}
+  {{- with .Values.customAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if $pdb.maxUnavailable }}
+  maxUnavailable: {{ $pdb.maxUnavailable }}
+  {{- else }}
+  minAvailable: {{ default 1 $pdb.minAvailable }}
+  {{- end }}
+  {{- with $pdb.unhealthyPodEvictionPolicy }}
+  unhealthyPodEvictionPolicy: {{ . }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "capsule.selectorLabels" . | nindent 6 }}
+{{- end }}
