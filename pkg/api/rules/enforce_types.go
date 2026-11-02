@@ -57,6 +57,10 @@ type NamespaceRuleEnforceBody struct {
 	// +optional
 	Storage NamespaceRuleEnforceStorageBody `json:"storage,omitempty"`
 
+	// Devices restricts DeviceClass references in ResourceClaims and ResourceClaimTemplates.
+	// +optional
+	Devices NamespaceRuleEnforceDevicesBody `json:"devices,omitempty"`
+
 	// Network configures network enforcement for namespace resources.
 	// +optional
 	Network NamespaceRuleEnforceNetworkBody `json:"network,omitempty"`

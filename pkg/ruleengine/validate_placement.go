@@ -214,13 +214,17 @@ func validateMutations(index int, mutations []rules.NamespaceRuleMutation) error
 			return fmt.Errorf("%s.action: unsupported mutation action %q", path, mutation.Action)
 		}
 
-		if mutation.Workloads.HasProperties() || len(mutation.Workloads.Targets) > 0 || mutation.Ingress.ListenerSets.ParentRef == nil {
+		if mutation.Workloads.HasProperties() || len(mutation.Workloads.Targets) > 0 || (mutation.Ingress.ListenerSets.ParentRef == nil && mutation.Devices.Class == "") {
 			if err := validateMutationPlacement(path+".workloads", mutation.Workloads); err != nil {
 				return err
 			}
 		}
 
 		if err := validateIngressMutation(path+".ingress", mutation.Ingress); err != nil {
+			return err
+		}
+
+		if err := validateDeviceMutation(path+".devices.class", mutation); err != nil {
 			return err
 		}
 	}

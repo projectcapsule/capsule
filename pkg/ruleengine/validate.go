@@ -65,6 +65,10 @@ func ValidateRuleStatusBody(
 			return err
 		}
 
+		if err := validateDeviceRules(i, rule.Enforce.Devices); err != nil {
+			return err
+		}
+
 		if err := validateNetworkPolicyRules(i, rule.Enforce.Network.Policies); err != nil {
 			return err
 		}

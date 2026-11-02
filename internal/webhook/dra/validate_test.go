@@ -9,11 +9,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync/atomic"
 	"testing"
 
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/require"
 	admissionv1 "k8s.io/api/admission/v1"
+	corev1 "k8s.io/api/core/v1"
 	resources "k8s.io/api/resource/v1"
 	resourcesv1beta2 "k8s.io/api/resource/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,6 +26,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	tenantindex "github.com/projectcapsule/capsule/pkg/runtime/indexers/tenant"
 )
@@ -62,34 +65,34 @@ func TestDeviceClassRequests(t *testing.T) {
 		{name: "empty alternative class", requests: alternativeRequests(""), message: "the selected device class does not exist"},
 		{
 			name: "exact allowlist", requests: exactRequests("gpu-a", "gpu-b"), gets: 2,
-			policy: &api.SelectorAllowedListSpec{AllowedListSpec: api.AllowedListSpec{Exact: []string{"gpu-b", "gpu-a"}}},
+			policy: &api.SelectorAllowedListSpec{Exact: []string{"gpu-b", "gpu-a"}},
 		},
 		{
 			name: "exact allowlist rejects other classes", requests: exactRequests("gpu-a", "gpu-other"), gets: 2,
-			policy:  &api.SelectorAllowedListSpec{AllowedListSpec: api.AllowedListSpec{Exact: []string{"gpu-a"}}},
+			policy:  &api.SelectorAllowedListSpec{Exact: []string{"gpu-a"}},
 			message: "Device Class gpu-other is forbidden",
 		},
 		{
 			name: "regex allowlist", requests: alternativeRequests("gpu-a", "gpu-b"), gets: 2,
-			policy: &api.SelectorAllowedListSpec{AllowedListSpec: api.AllowedListSpec{Regex: "^gpu-[ab]$"}},
+			policy: &api.SelectorAllowedListSpec{Regex: "^gpu-[ab]$"},
 		},
 		{
 			name: "regex allowlist rejects other classes", requests: exactRequests("gpu-other"), gets: 1,
-			policy:  &api.SelectorAllowedListSpec{AllowedListSpec: api.AllowedListSpec{Regex: "^gpu-[ab]$"}},
+			policy:  &api.SelectorAllowedListSpec{Regex: "^gpu-[ab]$"},
 			message: "Device Class gpu-other is forbidden",
 		},
 		{
 			name: "name or selector", requests: exactRequests("gpu-a", "gpu-other"), gets: 2,
 			policy: &api.SelectorAllowedListSpec{
-				AllowedListSpec: api.AllowedListSpec{Exact: []string{"gpu-other"}},
-				LabelSelector:   metav1.LabelSelector{MatchLabels: map[string]string{"tenant": "a"}},
+				Exact:       []string{"gpu-other"},
+				MatchLabels: map[string]string{"tenant": "a"},
 			},
 		},
 		{
 			name: "match expressions", requests: alternativeRequests("gpu-a", "gpu-other"), gets: 2,
-			policy: &api.SelectorAllowedListSpec{LabelSelector: metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
+			policy: &api.SelectorAllowedListSpec{MatchExpressions: []metav1.LabelSelectorRequirement{
 				{Key: "tenant", Operator: metav1.LabelSelectorOpIn, Values: []string{"a"}},
-			}}},
+			}},
 			message: "Device Class gpu-other is forbidden",
 		},
 		{
@@ -117,7 +120,7 @@ func TestDeviceClassRequests(t *testing.T) {
 						}
 						req := draAdmissionRequestVersion(t, version, kind, namespace, tt.requests)
 						original := append([]byte(nil), req.Object.Raw...)
-						handler := DeviceClass().OnCreate(cl, cl, admission.NewDecoder(cl.Scheme()), events.NewEventRecorder(nil, logr.Discard(), nil, nil))
+						handler := DeviceClass(nil, nil, nil, nil).OnCreate(cl, cl, admission.NewDecoder(cl.Scheme()), events.NewEventRecorder(nil, logr.Discard(), nil, nil))
 						response := handler(t.Context(), req)
 						if tt.message == "" {
 							require.Nil(t, response, "allowed requests must continue the admission chain")
@@ -126,8 +129,8 @@ func TestDeviceClassRequests(t *testing.T) {
 							require.False(t, response.Allowed)
 							require.Contains(t, response.Result.Message, tt.message)
 						}
-						require.Equal(t, tt.gets, cl.deviceGets)
-						require.Equal(t, 1, cl.tenantLists)
+						require.EqualValues(t, tt.gets, cl.deviceGets.Load())
+						require.Zero(t, cl.tenantLists.Load())
 						require.Equal(t, original, req.Object.Raw)
 					})
 				}
@@ -145,11 +148,11 @@ func TestDeviceClassDependencyErrors(t *testing.T) {
 					t.Parallel()
 					cl := newDRAClientVersion(t, version)
 					if dependency == "tenant" {
-						cl.listError = errors.New("tenant lookup failed")
+						cl.getErrorTenant = true
 					} else {
 						cl.getErrorClass = "gpu-b"
 					}
-					handler := DeviceClass().OnCreate(cl, cl, admission.NewDecoder(cl.Scheme()), events.NewEventRecorder(nil, logr.Discard(), nil, nil))
+					handler := DeviceClass(nil, nil, nil, nil).OnCreate(cl, cl, admission.NewDecoder(cl.Scheme()), events.NewEventRecorder(nil, logr.Discard(), nil, nil))
 					response := handler(t.Context(), draAdmissionRequestVersion(t, version, kind, "ns-a", exactRequests("gpu-a", "gpu-b")))
 					require.NotNil(t, response)
 					require.False(t, response.Allowed)
@@ -164,17 +167,17 @@ func TestDeviceClassDependencyErrors(t *testing.T) {
 func TestDeviceClassSkipsUnrelatedKinds(t *testing.T) {
 	t.Parallel()
 	cl := newDRAClient(t)
-	handler := DeviceClass().OnCreate(cl, cl, admission.NewDecoder(cl.Scheme()), nil)
-	response := handler(t.Context(), admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{Kind: metav1.GroupVersionKind{Kind: "Pod"}}})
+	handler := DeviceClass(nil, nil, nil, nil).OnCreate(cl, cl, admission.NewDecoder(cl.Scheme()), nil)
+	response := handler(t.Context(), admission.Request{Kind: metav1.GroupVersionKind{Kind: "Pod"}})
 	require.Nil(t, response)
-	require.Zero(t, cl.tenantLists)
-	require.Zero(t, cl.deviceGets)
+	require.Zero(t, cl.tenantLists.Load())
+	require.Zero(t, cl.deviceGets.Load())
 }
 
 func TestDeviceClassEquivalentVersion(t *testing.T) {
 	t.Parallel()
 	cl := newDRAClientVersion(t, "v1beta2")
-	handler := DeviceClass().OnCreate(cl, cl, admission.NewDecoder(cl.Scheme()), events.NewEventRecorder(nil, logr.Discard(), nil, nil))
+	handler := DeviceClass(nil, nil, nil, nil).OnCreate(cl, cl, admission.NewDecoder(cl.Scheme()), events.NewEventRecorder(nil, logr.Discard(), nil, nil))
 	for _, kind := range []string{"ResourceClaim", "ResourceClaimTemplate"} {
 		req := draAdmissionRequestVersion(t, "v1beta2", kind, "ns-a", exactRequests("gpu-a", "gpu-other"))
 		// With matchPolicy=Equivalent, the API server converts the original beta1
@@ -190,7 +193,7 @@ func TestDeviceClassEquivalentVersion(t *testing.T) {
 func TestDeviceClassRechecksPolicyAndLabels(t *testing.T) {
 	t.Parallel()
 	cl := newDRAClient(t)
-	handler := DeviceClass().OnCreate(cl, cl, admission.NewDecoder(cl.Scheme()), events.NewEventRecorder(nil, logr.Discard(), nil, nil))
+	handler := DeviceClass(nil, nil, nil, nil).OnCreate(cl, cl, admission.NewDecoder(cl.Scheme()), events.NewEventRecorder(nil, logr.Discard(), nil, nil))
 	req := draAdmissionRequest(t, "ResourceClaim", "ns-a", alternativeRequests("gpu-a", "gpu-b"))
 	require.Nil(t, handler(t.Context(), req))
 
@@ -225,12 +228,12 @@ func TestDeviceClassDecodeErrors(t *testing.T) {
 				cl := newDRAClientVersion(t, version)
 				req := draAdmissionRequestVersion(t, version, kind, "ns-a", nil)
 				req.Object.Raw = []byte("invalid json")
-				handler := DeviceClass().OnCreate(cl, cl, admission.NewDecoder(cl.Scheme()), nil)
+				handler := DeviceClass(nil, nil, nil, nil).OnCreate(cl, cl, admission.NewDecoder(cl.Scheme()), nil)
 				response := handler(t.Context(), req)
 				require.NotNil(t, response)
 				require.False(t, response.Allowed)
-				require.Zero(t, cl.tenantLists)
-				require.Zero(t, cl.deviceGets)
+				require.Zero(t, cl.tenantLists.Load())
+				require.Zero(t, cl.deviceGets.Load())
 			})
 		}
 	}
@@ -273,11 +276,11 @@ func draAdmissionRequestVersion(tb testing.TB, version, kind, namespace string, 
 	obj.GetObjectKind().SetGroupVersionKind(gvk)
 	raw, err := json.Marshal(obj)
 	require.NoError(tb, err)
-	return admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+	return admission.Request{
 		Kind:      metav1.GroupVersionKind{Group: resources.GroupName, Version: version, Kind: kind},
 		Namespace: namespace, Name: "claim", Operation: admissionv1.Create,
 		Object: runtime.RawExtension{Raw: raw},
-	}}
+	}
 }
 
 func newDRAClient(tb testing.TB, extra ...client.Object) *draCountingClient {
@@ -289,19 +292,23 @@ func newDRAClientVersion(tb testing.TB, version string, extra ...client.Object) 
 	tb.Helper()
 	scheme := runtime.NewScheme()
 	require.NoError(tb, capsulev1beta2.AddToScheme(scheme))
+	require.NoError(tb, corev1.AddToScheme(scheme))
 	require.NoError(tb, resources.AddToScheme(scheme))
 	require.NoError(tb, resourcesv1beta2.AddToScheme(scheme))
 	objects := []client.Object{
 		&capsulev1beta2.Tenant{Name: "tenant-a", Spec: capsulev1beta2.TenantSpec{DeviceClasses: &api.SelectorAllowedListSpec{
-			LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"tenant": "a"}},
+			MatchLabels: map[string]string{"tenant": "a"},
 		}}, Status: capsulev1beta2.TenantStatus{Namespaces: []string{"ns-a"}}},
 		&capsulev1beta2.Tenant{Name: "tenant-b", Spec: capsulev1beta2.TenantSpec{DeviceClasses: &api.SelectorAllowedListSpec{
-			LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"tenant": "b"}},
+			MatchLabels: map[string]string{"tenant": "b"},
 		}}, Status: capsulev1beta2.TenantStatus{Namespaces: []string{"ns-b"}}},
 		&capsulev1beta2.Tenant{Name: "unrestricted", Status: capsulev1beta2.TenantStatus{Namespaces: []string{"unrestricted"}}},
 		&resources.DeviceClass{Name: "gpu-a", Labels: map[string]string{"tenant": "a"}},
 		&resources.DeviceClass{Name: "gpu-b", Labels: map[string]string{"tenant": "a"}},
 		&resources.DeviceClass{Name: "gpu-other", Labels: map[string]string{"tenant": "b"}},
+	}
+	for _, pair := range [][2]string{{"ns-a", "tenant-a"}, {"ns-b", "tenant-b"}, {"unrestricted", "unrestricted"}} {
+		objects = append(objects, &corev1.Namespace{Name: pair[0], Labels: map[string]string{meta.TenantLabel: pair[1]}, OwnerReferences: []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: pair[1]}}})
 	}
 	objects = append(objects, extra...)
 	if version == "v1beta2" {
@@ -319,16 +326,33 @@ func newDRAClientVersion(tb testing.TB, version string, extra ...client.Object) 
 
 type draCountingClient struct {
 	client.Client
-	deviceGets    int
-	tenantLists   int
-	getErrorClass string
-	listError     error
+	deviceGets      atomic.Int64
+	tenantLists     atomic.Int64
+	namespaceGets   atomic.Int64
+	tenantGets      atomic.Int64
+	rulesetGets     atomic.Int64
+	getErrorTenant  bool
+	getErrorRuleset bool
+	getErrorClass   string
+	listError       error
 }
 
 func (c *draCountingClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 	switch obj.(type) {
+	case *corev1.Namespace:
+		c.namespaceGets.Add(1)
+	case *capsulev1beta2.Tenant:
+		c.tenantGets.Add(1)
+		if c.getErrorTenant {
+			return errors.New("tenant lookup failed")
+		}
+	case *capsulev1beta2.RuleStatus:
+		c.rulesetGets.Add(1)
+		if c.getErrorRuleset {
+			return errors.New("ruleset lookup failed")
+		}
 	case *resources.DeviceClass, *resourcesv1beta2.DeviceClass:
-		c.deviceGets++
+		c.deviceGets.Add(1)
 		if c.getErrorClass != "" && key.Name == c.getErrorClass {
 			return errors.New("device class lookup failed")
 		}
@@ -337,7 +361,7 @@ func (c *draCountingClient) Get(ctx context.Context, key client.ObjectKey, obj c
 }
 
 func (c *draCountingClient) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
-	c.tenantLists++
+	c.tenantLists.Add(1)
 	if c.listError != nil {
 		return c.listError
 	}
