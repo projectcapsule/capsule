@@ -119,6 +119,12 @@ func collectRegexExpressionsFromNamespaceRule(
 		}
 	}
 
+	for _, match := range rule.Enforce.Devices.Classes {
+		if match.Expression != "" {
+			set[cache.HashRegex(match.ExpressionRegex)] = match.ExpressionRegex
+		}
+	}
+
 	for _, metadataRule := range rule.Enforce.Metadata {
 		for selector := range metadataRule.Labels {
 			expr := rules.MetadataKeyExpression(selector)

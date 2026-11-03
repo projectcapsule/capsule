@@ -19,7 +19,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/runtime"
 )
 
-func TestPlacementRegexCacheRebuild(t *testing.T) {
+func TestPlacementAndDeviceRegexCacheRebuild(t *testing.T) {
 	t.Parallel()
 	var expressions []runtime.ExpressionRegex
 	expression := func() *rules.PlacementExpressionMatch {
@@ -41,6 +41,10 @@ func TestPlacementRegexCacheRebuild(t *testing.T) {
 			LabelSelector: &rules.PlacementLabelSelectorMatch{Requirements: requirement()}, NamespaceSelector: &rules.PlacementLabelSelectorMatch{Requirements: requirement()},
 		}}},
 	}}}
+	body.Enforce.Devices.Classes = []rules.DeviceClassMatch{
+		{ExpressionRegex: expression().ExpressionRegex},
+		{Exact: []string{"exact-only"}},
+	}
 	body.Enforce.Workloads.Placement.Schedulers = []runtime.ExpressionMatch{{ExpressionRegex: expression().ExpressionRegex}}
 	body.Enforce.Workloads.Schedulers = []runtime.ExpressionMatch{
 		{ExpressionRegex: expression().ExpressionRegex},
@@ -66,7 +70,7 @@ func TestPlacementRegexCacheRebuild(t *testing.T) {
 			t.Fatal(err)
 		}
 		if got := r.RegexCache.Stats(); got != len(expressions) {
-			t.Fatalf("cache contains %d entries, want %d distinct placement expressions", got, len(expressions))
+			t.Fatalf("cache contains %d entries, want %d distinct expressions", got, len(expressions))
 		}
 		if r.RegexCache.Has(cache.HashRegex(stale)) {
 			t.Fatal("stale expression survived rebuild")
@@ -93,6 +97,6 @@ func TestPlacementRegexCacheRebuild(t *testing.T) {
 		t.Fatal(err)
 	}
 	if r.RegexCache.Stats() != 0 {
-		t.Fatal("unused placement expressions survived deletion")
+		t.Fatal("unused expressions survived deletion")
 	}
 }

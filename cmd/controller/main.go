@@ -773,7 +773,7 @@ func main() {
 		),
 		route.GenericCustomResources(generic.ResourceCounterHandler(manager.GetClient())),
 		route.Gateway(gateway.Class(cfg)),
-		route.DeviceClass(dra.DeviceClass()),
+		route.DeviceClass(dra.DeviceClass(cfg, regexCache, labelSelectorCache, celCache)),
 		route.Defaults(defaults.Handler(cfg, kubeVersion, celCache)),
 		route.TenantMutation(
 			tenantmutation.MetaHandler(),

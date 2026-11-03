@@ -39,11 +39,14 @@ func BenchmarkControllerCacheInvalidator(b *testing.B) {
 				name := fmt.Sprintf("tenant-%d", i)
 				rule := &rules.NamespaceRuleBodyNamespace{
 					Enforce: &rules.NamespaceRuleEnforceBody{
+						Devices: rules.NamespaceRuleEnforceDevicesBody{Classes: []rules.DeviceClassMatch{
+							{Expression: fmt.Sprintf("^device-%d$", i)},
+						}},
 						Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
-							Schedulers: []apiruntime.ExpressionMatch{{ExpressionRegex: apiruntime.ExpressionRegex{Expression: fmt.Sprintf("^scheduler-%d$", i)}}},
+							Schedulers: []apiruntime.ExpressionMatch{{Expression: fmt.Sprintf("^scheduler-%d$", i)}},
 							Registries: []rules.OCIRegistry{
 								{
-									ExpressionMatch: apiruntime.ExpressionMatch{ExpressionRegex: apiruntime.ExpressionRegex{Expression: fmt.Sprintf("^registry-%d.example.com/", i)}},
+									Expression: fmt.Sprintf("^registry-%d.example.com/", i),
 								},
 							},
 						},
@@ -61,8 +64,8 @@ func BenchmarkControllerCacheInvalidator(b *testing.B) {
 					Spec: capsulev1beta2.CustomQuotaSpec{
 						Sources: []capsulev1beta2.CustomQuotaSpecSource{
 							{
-								VersionKind:                 apiruntime.VersionKind{APIVersion: "v1", Kind: "ConfigMap"},
-								CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{Operation: "add", Path: ".data.units"},
+								APIVersion: "v1", Kind: "ConfigMap",
+								Operation: "add", Path: ".data.units",
 							},
 						},
 					},
@@ -93,7 +96,7 @@ func BenchmarkControllerCacheInvalidator(b *testing.B) {
 			if _, err := r.Reconcile(b.Context(), req); err != nil {
 				b.Fatal(err)
 			}
-			if regex.Stats() != 2*count || r.RegistryCache.Stats() != count || r.TargetsCache.Stats() != count || r.JSONPathCache.Stats() != 1 {
+			if regex.Stats() != 3*count || r.RegistryCache.Stats() != count || r.TargetsCache.Stats() != count || r.JSONPathCache.Stats() != 1 {
 				b.Fatal("cache rebuild did not populate expected entries")
 			}
 			calls.Reset()
