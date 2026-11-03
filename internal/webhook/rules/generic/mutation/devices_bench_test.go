@@ -137,3 +137,56 @@ func BenchmarkDeviceClassDefaultConcurrent(b *testing.B) {
 		}
 	})
 }
+
+func BenchmarkDeviceClassDefaultBeta1Admission(b *testing.B) {
+	for _, tenants := range []int{1, 100} {
+		for _, mode := range []string{"default", "explicit", "condition-false", "condition-error"} {
+			b.Run(fmt.Sprintf("tenants=%d/%s", tenants, mode), func(b *testing.B) {
+				c, reads, decoder := mutationRegistrationFixture(b, tenants)
+				compiler, err := cache.NewCELCache()
+				require.NoError(b, err)
+				mutation := deviceDefault("gpu")
+				if mode == "condition-false" {
+					mutation.Conditions = []rules.AdmissionCondition{{Expression: "false"}}
+				} else if mode == "condition-error" {
+					mutation.Conditions = []rules.AdmissionCondition{{Expression: "object.missing == true"}}
+				}
+				status := &capsulev1beta2.RuleStatus{}
+				require.NoError(b, c.Get(b.Context(), client.ObjectKey{Namespace: "selected", Name: meta.NameForManagedRuleStatus()}, status))
+				status.Spec = []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{mutation}}}
+				status.Status.Rules = status.Spec
+				require.NoError(b, c.Update(b.Context(), status))
+				class := ""
+				if mode == "explicit" {
+					class = "explicit"
+				}
+				obj := deviceDefaultObject("v1beta1", "ResourceClaim", []any{map[string]any{"name": "gpu", "deviceClassName": class}})
+				req := listenerSetRequest(b, obj, admissionv1.Create, "")
+				h := Register(nil, compiler).GetHandlers()[0].OnCreate(c, c, decoder, events.NewDiscardRecorder())
+				h(b.Context(), req)
+				reads.Store(0)
+				b.ReportAllocs()
+				b.ResetTimer()
+				for b.Loop() {
+					response := h(b.Context(), req)
+					switch mode {
+					case "explicit", "condition-false":
+						if response != nil {
+							b.Fatal("expected unchanged claim")
+						}
+					case "condition-error":
+						if response == nil || response.Allowed {
+							b.Fatal("expected condition failure")
+						}
+					default:
+						if response == nil || !response.Allowed || len(response.Patches) == 0 {
+							b.Fatal("expected beta1 class default patch")
+						}
+					}
+				}
+				b.StopTimer()
+				b.ReportMetric(float64(reads.Load())/float64(b.N), "GET/op")
+			})
+		}
+	}
+}

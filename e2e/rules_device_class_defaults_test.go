@@ -6,6 +6,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -101,6 +102,25 @@ var _ = Describe("DeviceClass default namespace profiles", Label("tenant", "rule
 			obj.SetLabels(map[string]string{"env": "e2e"})
 			return obj
 		}
+		claimBeta1 := func(ns *corev1.Namespace, requests []resources.DeviceRequest) client.Object {
+			obj := claim(ns, requests).(*unstructured.Unstructured)
+			obj.SetAPIVersion(resources.GroupName + "/v1beta1")
+			path := []string{"spec", "devices", "requests"}
+			if kind == "ResourceClaimTemplate" {
+				path = append([]string{"spec"}, path...)
+			}
+			values, _, err := unstructured.NestedSlice(obj.Object, path...)
+			Expect(err).NotTo(HaveOccurred())
+			for _, raw := range values {
+				request := raw.(map[string]any)
+				if exact, found := request["exactly"]; found {
+					maps.Copy(request, exact.(map[string]any))
+					delete(request, "exactly")
+				}
+			}
+			Expect(unstructured.SetNestedSlice(obj.Object, values, path...)).To(Succeed())
+			return obj
+		}
 		expectNames := func(obj client.Object, wanted ...string) {
 			Eventually(func(g Gomega) {
 				stored := &unstructured.Unstructured{}
@@ -115,6 +135,9 @@ var _ = Describe("DeviceClass default namespace profiles", Label("tenant", "rule
 				var actual []string
 				for _, raw := range requests {
 					request := raw.(map[string]any)
+					if class, found := request["deviceClassName"]; found && class != "" {
+						actual = append(actual, class.(string))
+					}
 					if exact, found := request["exactly"]; found {
 						actual = append(actual, exact.(map[string]any)["deviceClassName"].(string))
 					}
@@ -145,6 +168,23 @@ var _ = Describe("DeviceClass default namespace profiles", Label("tenant", "rule
 		create(owners[0], claim(gpuNS, draAlternativeRequests("", cpuA, "")), gpuA, cpuA, gpuA)
 		create(owners[0], claim(cpuNS, draExactRequests("")), cpuA)
 		create(owners[1], claim(tenantBNS, draExactRequests("")), gpuB)
+		mappings, err := k8sClient.RESTMapper().RESTMappings(resources.SchemeGroupVersion.WithKind(kind).GroupKind())
+		Expect(err).NotTo(HaveOccurred())
+		beta1Served := false
+		for _, mapping := range mappings {
+			beta1Served = beta1Served || mapping.GroupVersionKind.Version == "v1beta1"
+		}
+		if beta1Served {
+			By("defaulting the original v1beta1 wire layout before equivalent validating admission")
+			create(owners[0], claimBeta1(gpuNS, draExactRequests("")), gpuA)
+			create(owners[0], claimBeta1(gpuNS, draExactRequests(cpuA)), cpuA)
+			create(owners[0], claimBeta1(gpuNS, draAlternativeRequests("", cpuA, "")), gpuA, cpuA, gpuA)
+			create(owners[0], claimBeta1(cpuNS, draExactRequests("")), cpuA)
+			create(owners[1], claimBeta1(tenantBNS, draExactRequests("")), gpuB)
+			deny(owners[0], claimBeta1(otherNS, draExactRequests("")), "exactly one of `exactly` or `firstAvailable` is required")
+			deny(owners[0], claimBeta1(gpuNS, draExactRequests(gpuB)), "not allowed")
+			deny(owners[1], claimBeta1(tenantBNS, draExactRequests(gpuA)), "not allowed")
+		}
 		create(owners[0], claim(otherNS, draExactRequests(gpuA)), gpuA)
 		deny(owners[0], claim(otherNS, draExactRequests("")), "deviceClassName")
 		By("retaining condition skips, native validation, and class enforcement after mutation")
@@ -195,6 +235,9 @@ var _ = Describe("DeviceClass default namespace profiles", Label("tenant", "rule
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		waitProfile(gpuNS, cpuA, cpuA)
 		create(owners[0], claim(gpuNS, draExactRequests("")), cpuA)
+		if beta1Served {
+			create(owners[0], claimBeta1(gpuNS, draExactRequests("")), cpuA)
+		}
 		expectNames(original, gpuA)
 		Eventually(func() error {
 			current := &unstructured.Unstructured{}

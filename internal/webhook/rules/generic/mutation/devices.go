@@ -19,7 +19,7 @@ import (
 )
 
 func isDeviceClaim(gvk schema.GroupVersionKind) bool {
-	return gvk.Group == resourcev1.GroupName && (gvk.Version == "v1" || gvk.Version == "v1beta2") &&
+	return gvk.Group == resourcev1.GroupName && (gvk.Version == "v1" || gvk.Version == "v1beta2" || gvk.Version == "v1beta1") &&
 		(gvk.Kind == "ResourceClaim" || gvk.Kind == "ResourceClaimTemplate")
 }
 
@@ -36,6 +36,8 @@ func mutateDeviceClassDefaults(ctx context.Context, obj *unstructured.Unstructur
 	if obj.GetKind() == "ResourceClaimTemplate" {
 		path = append([]string{"spec"}, path...)
 	}
+
+	beta1 := obj.GetAPIVersion() == resourcev1.GroupName+"/v1beta1"
 
 	working := obj
 
@@ -79,7 +81,7 @@ func mutateDeviceClassDefaults(ctx context.Context, obj *unstructured.Unstructur
 				return false, fmt.Errorf("%s must be an array", strings.Join(path, "."))
 			}
 
-			updated, changed, err := defaultDeviceRequests(requests, mutation.Devices.Class)
+			updated, changed, err := defaultDeviceRequests(requests, mutation.Devices.Class, beta1)
 			if err != nil {
 				return false, fmt.Errorf("%s: %w", strings.Join(path, "."), err)
 			}
@@ -102,7 +104,7 @@ func mutateDeviceClassDefaults(ctx context.Context, obj *unstructured.Unstructur
 	return true, nil
 }
 
-func defaultDeviceRequests(requests []any, class string) ([]any, bool, error) {
+func defaultDeviceRequests(requests []any, class string, beta1 bool) ([]any, bool, error) {
 	working := requests
 	changed := false
 
@@ -114,7 +116,27 @@ func defaultDeviceRequests(requests []any, class string) ([]any, bool, error) {
 
 		var updated map[string]any
 
-		if exact := request["exactly"]; exact != nil {
+		// v1beta1 stores a single request directly on the request map.
+		// A non-empty firstAvailable list excludes those direct fields.
+		direct := false
+
+		if beta1 {
+			alternatives, valid := request["firstAvailable"].([]any)
+			direct = request["firstAvailable"] == nil || (valid && len(alternatives) == 0)
+		}
+
+		if direct {
+			value, defaulted, err := defaultClassName(request, class)
+			if err != nil {
+				return nil, false, fmt.Errorf("request[%d]: %w", i, err)
+			}
+
+			if defaulted {
+				updated = value
+			}
+		}
+
+		if exact := request["exactly"]; !beta1 && exact != nil {
 			fields, ok := exact.(map[string]any)
 			if !ok {
 				return nil, false, fmt.Errorf("request[%d].exactly must be an object", i)
