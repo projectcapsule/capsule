@@ -25,12 +25,6 @@ project:
     - name: capsule
       url: https://github.com/projectcapsule/capsule
       comment: Controller, namespace profiling rules, admission webhooks, and Helm chart.
-    - name: capsule-proxy
-      url: https://github.com/projectcapsule/capsule-proxy
-      comment: Optional Kubernetes API proxy for tenant users; developed and released separately.
-    - name: website
-      url: https://github.com/projectcapsule/website
-      comment: User documentation and project website; supports the runtime codebases.
   vulnerability-reporting:
     reports-accepted: true
     bug-bounty-available: false

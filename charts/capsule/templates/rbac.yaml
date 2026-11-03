@@ -367,6 +367,14 @@ rules:
   - "list"
   - "watch"
 - apiGroups:
+  - "snapshot.storage.k8s.io"
+  resources:
+  - "volumesnapshotclasses"
+  verbs:
+  - "get"
+  - "list"
+  - "watch"
+- apiGroups:
   - admissionregistration.k8s.io
   resources:
   - mutatingwebhookconfigurations

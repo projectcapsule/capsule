@@ -102,6 +102,13 @@ func collectRegexExpressionsFromNamespaceRule(
 		}
 	}
 
+	for _, class := range rule.Enforce.Storage.Classes {
+		if class.Expression != "" {
+			expr := class.NameMatch().ExpressionRegex
+			set[cache.HashRegex(expr)] = expr
+		}
+	}
+
 	for _, profiles := range [][]rules.WorkloadSecurityProfileMatch{rule.Enforce.Workloads.Security.SeccompProfiles, rule.Enforce.Workloads.Security.AppArmorProfiles} {
 		for _, profile := range profiles {
 			for _, match := range profile.LocalhostProfiles {
@@ -109,6 +116,12 @@ func collectRegexExpressionsFromNamespaceRule(
 					set[cache.HashRegex(match.ExpressionRegex)] = match.ExpressionRegex
 				}
 			}
+		}
+	}
+
+	for _, match := range rule.Enforce.Devices.Classes {
+		if match.Expression != "" {
+			set[cache.HashRegex(match.ExpressionRegex)] = match.ExpressionRegex
 		}
 	}
 
