@@ -91,7 +91,7 @@ and [replication documentation](https://projectcapsule.dev/docs/replications/).
 | nodeSelector | object | `{}` | Set the node selector for the Capsule pod |
 | openshift.etcdEncryption.enabled | bool | `false` | Exclude the kube-storage-version-migrator from the replications webhook (required when etcd encryption is enabled on OpenShift) |
 | podAnnotations | object | `{}` | Annotations to add to the capsule pod. |
-| podDisruptionBudget.enabled | string | `nil` | Enable the PodDisruptionBudget. `null` enables it automatically when `replicaCount` > 1. |
+| podDisruptionBudget.enabled | bool | `false` | Enable the PodDisruptionBudget. |
 | podDisruptionBudget.maxUnavailable | string | `nil` | Maximum unavailable pods during disruptions (number or percentage). Cannot be used together with `minAvailable`. |
 | podDisruptionBudget.minAvailable | int | `1` | Minimum available pods during disruptions (number or percentage). Cannot be used together with `maxUnavailable`. |
 | podDisruptionBudget.unhealthyPodEvictionPolicy | string | `nil` | Unhealthy pod eviction policy. Possible values are `IfHealthyBudget` or `AlwaysAllow`. |

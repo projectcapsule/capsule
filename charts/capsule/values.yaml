@@ -483,9 +483,8 @@ replicaCount: 1
 
 # PodDisruptionBudget for the Capsule pod
 podDisruptionBudget:
-  # @schema type:[boolean, null]
-  # -- Enable the PodDisruptionBudget. `null` enables it automatically when `replicaCount` > 1.
-  enabled:
+  # -- Enable the PodDisruptionBudget.
+  enabled: false
   # @schema type:[integer, string, null]
   # -- Minimum available pods during disruptions (number or percentage). Cannot be used together with `maxUnavailable`.
   minAvailable: 1

@@ -1,4 +1,6 @@
 replicaCount: 2
+podDisruptionBudget:
+  enabled: true
 manager:
   extraArgs:
   - "--enable-leader-election=true"
