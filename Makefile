@@ -169,7 +169,7 @@ dev-install-snapshot-crds:
 		-f https://raw.githubusercontent.com/$(SNAPSHOTTER_LOOKUP)/$(SNAPSHOTTER_VERSION)/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml
 
 GRAFANA         := none
-GRAFANA_VERSION := v5.23.0
+GRAFANA_VERSION := v5.25.0
 GRAFANA_LOOKUP  := grafana/grafana-operator
 dev-install-grafana-operator-crds:
 	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/grafana/grafana-operator/releases/download/$(GRAFANA_VERSION)/crds.yaml
