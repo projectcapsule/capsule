@@ -204,8 +204,38 @@ Admission matchCondition excluding the OpenShift kube-storage-version-migrator (
 
 
 {{/*
-Capsule Webhook service (Called with $.Path)
+Intersect global, webhook-type, and per-hook namespace selectors without mutating values.
+Keep conflicting label equalities as expressions so no selector silently overrides another.
+Called with a list of selectors in global, webhook-type, per-hook order.
+*/}}
+{{- define "capsule.webhooks.namespaceSelector" -}}
+{{- $labels := dict -}}
+{{- $expressions := list -}}
+{{- range . -}}
+  {{- $selector := default dict . -}}
+  {{- range $key, $value := $selector.matchLabels -}}
+    {{- if and (hasKey $labels $key) (ne (get $labels $key) $value) -}}
+      {{- $expressions = append $expressions (dict "key" $key "operator" "In" "values" (list $value)) -}}
+    {{- else -}}
+      {{- $_ := set $labels $key $value -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $expressions = concat $expressions (default list $selector.matchExpressions) -}}
+{{- end -}}
+{{- $selector := dict -}}
+{{- with $labels -}}
+  {{- $_ := set $selector "matchLabels" . -}}
+{{- end -}}
+{{- with $expressions -}}
+  {{- $_ := set $selector "matchExpressions" . -}}
+{{- end -}}
+{{- with $selector -}}
+  {{- toYaml . -}}
+{{- end -}}
+{{- end -}}
 
+{{/*
+Capsule Webhook service (Called with $.Path)
 */}}
 {{- define "capsule.webhooks.service" -}}
   {{- include "capsule.webhooks.cabundle" $.ctx | nindent 0 }}

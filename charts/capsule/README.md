@@ -455,13 +455,16 @@ and [replication documentation](https://projectcapsule.dev/docs/replications/).
 | webhooks.labels | object | `{}` | Additional Labels for all webhooks |
 | webhooks.matchConditions | list | `[]` | MatchConditions for all webhooks |
 | webhooks.mutating.matchConditions | list | `[]` | Additional MatchConditions for all mutating webhooks, combined with global and per-hook conditions |
+| webhooks.mutating.namespaceSelector | object | `{}` | Additional NamespaceSelector for all mutating webhooks, combined with global and per-hook selectors using AND |
 | webhooks.mutatingWebhooksTimeoutSeconds | int | `30` | Timeout in seconds for mutating webhooks |
+| webhooks.namespaceSelector | object | `{}` | NamespaceSelector for all webhooks, combined with type-specific and per-hook selectors using AND |
 | webhooks.service.caBundle | string | `""` | CABundle for the webhook service |
 | webhooks.service.name | string | `""` | Custom service name for the webhook service |
 | webhooks.service.namespace | string | `""` | Custom service namespace for the webhook service |
 | webhooks.service.port | integer, null | `nil` | Custom service port for the webhook service |
 | webhooks.service.url | string | `""` | The URL where the capsule webhook services are running (Overwrites cluster scoped service definition) |
 | webhooks.validating.matchConditions | list | `[]` | Additional MatchConditions for all validating webhooks, combined with global and per-hook conditions |
+| webhooks.validating.namespaceSelector | object | `{}` | Additional NamespaceSelector for all validating webhooks, combined with global and per-hook selectors using AND |
 | webhooks.validatingWebhooksTimeoutSeconds | int | `30` | Timeout in seconds for validating webhooks |
 
 ## Notes on installing Custom Resource Definitions with Helm3
