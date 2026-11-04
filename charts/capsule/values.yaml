@@ -481,6 +481,21 @@ tolerations: []
 # -- Set the replica count for capsule pod
 replicaCount: 1
 
+# PodDisruptionBudget for the Capsule pod
+podDisruptionBudget:
+  # -- Enable the PodDisruptionBudget.
+  enabled: false
+  # @schema type:[integer, string, null]
+  # -- Minimum available pods during disruptions (number or percentage). Cannot be used together with `maxUnavailable`.
+  minAvailable: 1
+  # @schema type:[integer, string, null]
+  # -- Maximum unavailable pods during disruptions (number or percentage). Cannot be used together with `minAvailable`.
+  maxUnavailable:
+  # @schema type:[string, null]
+  # @schema enum:[IfHealthyBudget, AlwaysAllow, null]
+  # -- Unhealthy pod eviction policy. Possible values are `IfHealthyBudget` or `AlwaysAllow`.
+  unhealthyPodEvictionPolicy:
+
 # -- Set additional ports for the deployment
 ports: []
 
