@@ -53,6 +53,16 @@ spec:
                     matchLabels:
                       projectcapsule.dev/tenant: {{ $.tenant.metadata.name }}
                 - apiGroups:
+                  - "addons.projectcapsule.dev"
+                  resources:
+                  - "globalresourcepermittemplates"
+                  - "changewindows"
+                  operations:
+                  - List
+                  selector:
+                    matchLabels:
+                      company.com/consumer: "tenants"
+                - apiGroups:
                   - "rbac.authorization.k8s.io"
                   resources:
                   - "clusterroles"

@@ -36,6 +36,7 @@ type NamespaceRuleMutation struct {
 	// retained. Supplying affinity replaces all its branches, including omitted ones.
 	// ListenerSet parent references are atomic: merge fills an absent or null
 	// reference, while replace replaces the entire supplied reference.
+	// DeviceClass defaults support merge only, preserving every explicit class name.
 	// +optional
 	// +kubebuilder:default=merge
 	// +kubebuilder:validation:Enum=merge;replace
@@ -47,6 +48,10 @@ type NamespaceRuleMutation struct {
 	// Ingress configures Kubernetes ingress and Gateway API resource mutations.
 	// +optional
 	Ingress IngressMutation `json:"ingress,omitzero"`
+
+	// Devices configures default DeviceClass references for DRA claims and templates.
+	// +optional
+	Devices DeviceMutation `json:"devices,omitzero"`
 }
 
 // WorkloadMutation contains typed native Pod values. Empty maps/lists are

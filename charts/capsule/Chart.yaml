@@ -40,6 +40,10 @@ annotations:
     - name: Documentation
       url: https://projectcapsule.dev/
   artifacthub.io/changes: |
+    - kind: added
+      description: combine global, mutating, validating, and per-hook namespace selectors for admission webhooks
+    - kind: added
+      description: enforce DeviceClass references and provide merge-only class defaults for DRA claims and templates through namespace rules
     - kind: fixed
       description: declare generic rule webhook side effects as NoneOnDryRun and suppress NetworkPolicy audit and denial Events for dry runs
     - kind: changed

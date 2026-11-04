@@ -91,6 +91,10 @@ and [replication documentation](https://projectcapsule.dev/docs/replications/).
 | nodeSelector | object | `{}` | Set the node selector for the Capsule pod |
 | openshift.etcdEncryption.enabled | bool | `false` | Exclude the kube-storage-version-migrator from the replications webhook (required when etcd encryption is enabled on OpenShift) |
 | podAnnotations | object | `{}` | Annotations to add to the capsule pod. |
+| podDisruptionBudget.enabled | bool | `false` | Enable the PodDisruptionBudget. |
+| podDisruptionBudget.maxUnavailable | string | `nil` | Maximum unavailable pods during disruptions (number or percentage). Cannot be used together with `minAvailable`. |
+| podDisruptionBudget.minAvailable | int | `1` | Minimum available pods during disruptions (number or percentage). Cannot be used together with `maxUnavailable`. |
+| podDisruptionBudget.unhealthyPodEvictionPolicy | string | `nil` | Unhealthy pod eviction policy. Possible values are `IfHealthyBudget` or `AlwaysAllow`. |
 | podLabels | object | `{}` | Labels to add to the capsule pod. |
 | podSecurityContext | object | `{"enabled":null,"runAsGroup":1002,"runAsNonRoot":true,"runAsUser":1002,"seccompProfile":{"type":"RuntimeDefault"}}` | Set the securityContext for the Capsule pod. `enabled: null` means enabled, unless `global.openshift.enabled` is set. |
 | ports | list | `[]` | Set additional ports for the deployment |
@@ -451,13 +455,16 @@ and [replication documentation](https://projectcapsule.dev/docs/replications/).
 | webhooks.labels | object | `{}` | Additional Labels for all webhooks |
 | webhooks.matchConditions | list | `[]` | MatchConditions for all webhooks |
 | webhooks.mutating.matchConditions | list | `[]` | Additional MatchConditions for all mutating webhooks, combined with global and per-hook conditions |
+| webhooks.mutating.namespaceSelector | object | `{}` | Additional NamespaceSelector for all mutating webhooks, combined with global and per-hook selectors using AND |
 | webhooks.mutatingWebhooksTimeoutSeconds | int | `30` | Timeout in seconds for mutating webhooks |
+| webhooks.namespaceSelector | object | `{}` | NamespaceSelector for all webhooks, combined with type-specific and per-hook selectors using AND |
 | webhooks.service.caBundle | string | `""` | CABundle for the webhook service |
 | webhooks.service.name | string | `""` | Custom service name for the webhook service |
 | webhooks.service.namespace | string | `""` | Custom service namespace for the webhook service |
 | webhooks.service.port | integer, null | `nil` | Custom service port for the webhook service |
 | webhooks.service.url | string | `""` | The URL where the capsule webhook services are running (Overwrites cluster scoped service definition) |
 | webhooks.validating.matchConditions | list | `[]` | Additional MatchConditions for all validating webhooks, combined with global and per-hook conditions |
+| webhooks.validating.namespaceSelector | object | `{}` | Additional NamespaceSelector for all validating webhooks, combined with global and per-hook selectors using AND |
 | webhooks.validatingWebhooksTimeoutSeconds | int | `30` | Timeout in seconds for validating webhooks |
 
 ## Notes on installing Custom Resource Definitions with Helm3

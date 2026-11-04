@@ -78,9 +78,9 @@ spec:
         path: "/rules/generic/validating"
         failurePolicy:  {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.validating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -118,9 +118,9 @@ spec:
         path: "/namespaces/validating"
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.validating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -170,9 +170,9 @@ spec:
         path: "/rulestatus/validating"
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.validating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -220,9 +220,9 @@ spec:
         path: "/generic/customresources"
         failurePolicy:  {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.validating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -270,9 +270,9 @@ spec:
         path: "/generic/cordoning"
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.validating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -312,9 +312,9 @@ spec:
         path: "/devices/validating"
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.validating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -363,9 +363,9 @@ spec:
         path: "/gateways/validating"
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.validating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -412,9 +412,9 @@ spec:
         path: "/ingresses/validating"
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.validating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -463,9 +463,9 @@ spec:
         path: "/nodes/validating"
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.validating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -510,9 +510,9 @@ spec:
         path: "/pods/validating"
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.validating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -560,9 +560,9 @@ spec:
         path: "/persistentvolumeclaims/validating"
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.validating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -617,9 +617,9 @@ spec:
         path: "/services/validating"
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.validating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -665,9 +665,9 @@ spec:
         path: "/generic/managed"
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.validating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -704,9 +704,9 @@ spec:
         path: "/generic/replications"
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.validating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -751,9 +751,9 @@ spec:
         path: "/tenants/validating"
         failurePolicy:  {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.validating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -801,9 +801,9 @@ spec:
         path: "/tenantowners/validating"
         failurePolicy:  {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.validating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -851,9 +851,9 @@ spec:
         path: "/resourcepools/validating"
         failurePolicy:  {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.validating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -900,9 +900,9 @@ spec:
         path: "/resourcepools/claim/validating"
         failurePolicy:  {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.validating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -950,9 +950,9 @@ spec:
         path: "/serviceaccounts/validating"
         failurePolicy:  {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.validating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -991,8 +991,8 @@ spec:
 
       # ServiceAccount references may point outside Tenant namespaces (for
       # example, from a GlobalTenantResource).
-      # Keep deletion protection separate from promotion validation so it is
-      # not limited by the promotion label or Tenant namespace selectors.
+      # Only shared selectors apply to deletion protection; do not inherit the
+      # promotion label or its per-hook Tenant namespace selector.
       - name: serviceaccount-references.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
@@ -1004,6 +1004,10 @@ spec:
         path: "/serviceaccounts/references/validating"
         failurePolicy: {{ .references.failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.validating.namespaceSelector)) }}
+        namespaceSelector:
+          {{- . | nindent 10 }}
+        {{- end }}
         {{- if or $.Values.webhooks.matchConditions $.Values.webhooks.validating.matchConditions }}
         matchConditions:
         {{- end }}
@@ -1041,9 +1045,9 @@ spec:
         path: "/config/validating"
         failurePolicy:  {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.validating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -1090,9 +1094,9 @@ spec:
         path: "/custom-quotas/namespaced/validating"
         failurePolicy:  {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.validating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -1130,9 +1134,9 @@ spec:
         path: "/custom-quotas/cluster/validating"
         failurePolicy:  {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.validating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -1170,9 +1174,9 @@ spec:
         path: "/global-resource-quotas/calculations"
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.validating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -1210,9 +1214,9 @@ spec:
         path: "/custom-quotas/calculations"
         failurePolicy:  {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.validating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -1267,9 +1271,9 @@ spec:
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
         reinvocationPolicy: {{ .reinvocationPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.mutating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . | nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -1318,9 +1322,9 @@ spec:
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
         reinvocationPolicy: {{ .reinvocationPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.mutating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . | nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -1359,9 +1363,9 @@ spec:
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
         reinvocationPolicy: {{ .reinvocationPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.mutating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -1412,9 +1416,9 @@ spec:
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
         reinvocationPolicy: {{ .reinvocationPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.mutating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -1463,9 +1467,9 @@ spec:
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
         reinvocationPolicy: {{ .reinvocationPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.mutating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -1511,9 +1515,9 @@ spec:
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
         reinvocationPolicy: {{ .reinvocationPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.mutating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -1559,9 +1563,9 @@ spec:
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
         reinvocationPolicy: {{ .reinvocationPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.mutating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -1609,9 +1613,9 @@ spec:
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
         reinvocationPolicy: {{ .reinvocationPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.mutating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -1659,9 +1663,9 @@ spec:
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
         reinvocationPolicy: {{ .reinvocationPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.mutating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -1709,9 +1713,9 @@ spec:
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
         reinvocationPolicy: {{ .reinvocationPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.mutating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -1759,9 +1763,9 @@ spec:
         failurePolicy:  {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
         reinvocationPolicy: {{ .reinvocationPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.mutating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:
@@ -1810,9 +1814,9 @@ spec:
         failurePolicy:  {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
         reinvocationPolicy: {{ .reinvocationPolicy }}
-        {{- with .namespaceSelector }}
+        {{- with (include "capsule.webhooks.namespaceSelector" (list $.Values.webhooks.namespaceSelector $.Values.webhooks.mutating.namespaceSelector .namespaceSelector)) }}
         namespaceSelector:
-          {{- toYaml . |  nindent 10 }}
+          {{- . | nindent 10 }}
         {{- end }}
         {{- with .objectSelector }}
         objectSelector:

@@ -61,7 +61,7 @@ func BenchmarkDeviceClassAdmission(b *testing.B) {
 						namespace = "ns-a"
 					}
 					req := draAdmissionRequestVersion(b, version, "ResourceClaim", namespace, tc.requests)
-					handler := DeviceClass().OnCreate(cl, cl, admission.NewDecoder(cl.Scheme()), events.NewEventRecorder(nil, logr.Discard(), nil, nil))
+					handler := DeviceClass(nil, nil, nil, nil).OnCreate(cl, cl, admission.NewDecoder(cl.Scheme()), events.NewEventRecorder(nil, logr.Discard(), nil, nil))
 					b.ReportAllocs()
 					b.ResetTimer()
 					for range b.N {
@@ -75,8 +75,11 @@ func BenchmarkDeviceClassAdmission(b *testing.B) {
 						}
 					}
 					b.StopTimer()
-					b.ReportMetric(float64(cl.deviceGets)/float64(b.N), "class-gets/op")
-					b.ReportMetric(float64(cl.tenantLists)/float64(b.N), "tenant-lists/op")
+					b.ReportMetric(float64(cl.deviceGets.Load())/float64(b.N), "class-gets/op")
+					b.ReportMetric(float64(cl.tenantLists.Load())/float64(b.N), "tenant-lists/op")
+					b.ReportMetric(float64(cl.tenantGets.Load())/float64(b.N), "tenant-gets/op")
+					b.ReportMetric(float64(cl.namespaceGets.Load())/float64(b.N), "namespace-gets/op")
+					b.ReportMetric(float64(cl.rulesetGets.Load())/float64(b.N), "ruleset-gets/op")
 				})
 			}
 		}

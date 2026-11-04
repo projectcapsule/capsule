@@ -44,6 +44,9 @@ const (
 	ReasonMissingDeviceClass     string = "MissingDeviceClass"
 	ReasonForbiddenDeviceClass   string = "ForbiddenDeviceClass"
 
+	ReasonMissingVolumeSnapshotClass   string = "MissingVolumeSnapshotClass"
+	ReasonForbiddenVolumeSnapshotClass string = "ForbiddenVolumeSnapshotClass"
+
 	// Nodes.
 	ReasonForbiddenNodeSelectorUpdate string = "ForbiddenNodeSelectorUpdate"
 

@@ -99,7 +99,12 @@ func (h *metadataRules) mutate(obj, old *unstructured.Unstructured, bodies []*ap
 			ingressMutated, err = mutateListenerSetParentRef(ctx, obj, bodies, conditions)
 		}
 
-		return mutationResponse(obj, req, metadataMutated || resourcesMutated || ingressMutated, err)
+		devicesMutated := false
+		if err == nil && req.Operation == admissionv1.Create && isDeviceClaim(gvk) {
+			devicesMutated, err = mutateDeviceClassDefaults(ctx, obj, bodies, conditions)
+		}
+
+		return mutationResponse(obj, req, metadataMutated || resourcesMutated || ingressMutated || devicesMutated, err)
 	}
 }
 
