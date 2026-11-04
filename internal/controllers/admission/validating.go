@@ -237,8 +237,14 @@ func (r *validatingReconciler) validatingWebhooks(
 	ctx context.Context,
 	cfg *capsulev1beta2.DynamicValidatingAdmissionConfig,
 ) (hooks []admissionv1.ValidatingWebhook, err error) {
+	if len(cfg.Webhooks) == 0 {
+		return nil, nil
+	}
+
+	users, administrators := r.configuration.Users(), r.configuration.Administrators()
+
 	for _, hook := range cfg.Webhooks {
-		h, err := admission.NewValidatingWebhook(hook, cfg.Client, r.configuration.Users(), r.configuration.Administrators())
+		h, err := admission.NewValidatingWebhook(hook, cfg.Client, users, administrators)
 		if err != nil {
 			return nil, err
 		}

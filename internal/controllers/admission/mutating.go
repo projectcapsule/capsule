@@ -237,8 +237,14 @@ func (r *mutatingReconciler) webhooks(
 	ctx context.Context,
 	cfg *capsulev1beta2.DynamicMutatingAdmissionConfig,
 ) (hooks []admissionv1.MutatingWebhook, err error) {
+	if len(cfg.Webhooks) == 0 {
+		return nil, nil
+	}
+
+	users, administrators := r.configuration.Users(), r.configuration.Administrators()
+
 	for _, hook := range cfg.Webhooks {
-		h, err := admission.NewMutatingWebhook(hook, cfg.Client, r.configuration.Users(), r.configuration.Administrators())
+		h, err := admission.NewMutatingWebhook(hook, cfg.Client, users, administrators)
 		if err != nil {
 			return nil, err
 		}
