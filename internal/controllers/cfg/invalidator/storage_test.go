@@ -29,3 +29,22 @@ func TestCollectStorageClassRegexes(t *testing.T) {
 	expr := apiruntime.ExpressionRegex{Expression: `^[a-z0-9-]+\.example\.com$`}
 	require.Equal(t, expr, set[cache.HashRegex(expr)])
 }
+
+func TestCollectStorageAttributeClassRegexes(t *testing.T) {
+	b := &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Storage: rules.NamespaceRuleEnforceStorageBody{
+		Classes: []rules.StorageClassMatch{{Expression: "^csi-"}},
+		AttributeClasses: []rules.StorageClassMatch{
+			{Expression: `^[a-z0-9-]+\.example\.com$`},
+			{Expression: "^csi-"},
+			{Exact: []string{"exact-only"}},
+			{MatchLabels: map[string]string{"env": "customer"}},
+		},
+	}}}
+	set := map[string]apiruntime.ExpressionRegex{}
+	collectRegexExpressionsFromNamespaceRules(set, []*rules.NamespaceRuleBodyNamespace{b})
+	require.Len(t, set, 2)
+	for _, expression := range []string{`^[a-z0-9-]+\.example\.com$`, "^csi-"} {
+		expr := apiruntime.ExpressionRegex{Expression: expression}
+		require.Equal(t, expr, set[cache.HashRegex(expr)])
+	}
+}

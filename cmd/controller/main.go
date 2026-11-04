@@ -733,6 +733,7 @@ func main() {
 			),
 			networkpolicyrules.Handler(cfg, celCache),
 			volumesnapshotrules.Handler(cfg, regexCache, labelSelectorCache, celCache),
+			pvcrules.AttributeClassHandler(cfg, regexCache, labelSelectorCache, celCache),
 		),
 		route.GenericReplicasHandler(),
 		route.GenericManagedHandler(cfg),

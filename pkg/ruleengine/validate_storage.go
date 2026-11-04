@@ -69,7 +69,11 @@ func validateStorageClassRules(index int, storage rules.NamespaceRuleEnforceStor
 		return fmt.Errorf("%s.classes is invalid: classes must be configured when targets are configured", path)
 	}
 
-	return validateClassMatches(path+".classes", storage.Classes)
+	if err := validateClassMatches(path+".classes", storage.Classes); err != nil {
+		return err
+	}
+
+	return validateClassMatches(path+".attributeClasses", storage.AttributeClasses)
 }
 
 func validateClassMatches(path string, classes []rules.StorageClassMatch) error {

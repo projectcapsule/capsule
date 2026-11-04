@@ -108,7 +108,7 @@ func (h *volumeSnapshotRules) evaluate(
 				return nil
 			}
 
-			return h.classesToMatch(body, name)
+			return rules.StorageClassesToMatch(body.Action, body.Storage.Classes, h.regexCache, name)
 		},
 		Matches: func(match rules.StorageClassMatch, value ruleengine.Value) (ruleengine.Match, error) {
 			if match.HasNameMatch() {
@@ -141,35 +141,6 @@ func (h *volumeSnapshotRules) evaluate(
 		RuleDescription:    rules.StorageClassMatch.Describe,
 		AllowedDescription: "Allowed classes",
 	})
-}
-
-// classesToMatch returns the entries of a rule to match against the class. The
-// entries of an allow or deny rule are ORed, so the first one that matches the
-// class by name decides the rule: matching the others could only read the class
-// for nothing, and a failed read would turn the decision into a server error.
-// Audit rules keep every entry, since each match is recorded.
-func (h *volumeSnapshotRules) classesToMatch(body *rules.NamespaceRuleEnforceBody, name string) []rules.StorageClassMatch {
-	if body.Action.OrDefault() == rules.ActionTypeAudit {
-		return body.Storage.Classes
-	}
-
-	for i, match := range body.Storage.Classes {
-		if !match.HasNameMatch() {
-			continue
-		}
-
-		matched, err := match.NameMatch().MatchesWithExpressionMatcher(h.regexCache, name)
-		if err != nil {
-			// Matching every entry reports the invalid expression.
-			return body.Storage.Classes
-		}
-
-		if matched {
-			return body.Storage.Classes[i : i+1]
-		}
-	}
-
-	return body.Storage.Classes
 }
 
 // missingClass handles a snapshot without a class like a missing ingress
