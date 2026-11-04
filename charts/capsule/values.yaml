@@ -927,6 +927,11 @@ webhooks:
   # -- Additional Annotations for all webhooks
   annotations: {}
 
+  # @schema type: object
+  # @schema additionalProperties: true
+  # -- NamespaceSelector for all webhooks, combined with type-specific and per-hook selectors using AND
+  namespaceSelector: {}
+
   # Configure custom webhook service
   service:
     # -- The URL where the capsule webhook services are running (Overwrites cluster scoped service definition)
@@ -952,10 +957,18 @@ webhooks:
   #      )
 
   mutating:
+    # @schema type: object
+    # @schema additionalProperties: true
+    # -- Additional NamespaceSelector for all mutating webhooks, combined with global and per-hook selectors using AND
+    namespaceSelector: {}
     # -- Additional MatchConditions for all mutating webhooks, combined with global and per-hook conditions
     matchConditions: []
 
   validating:
+    # @schema type: object
+    # @schema additionalProperties: true
+    # -- Additional NamespaceSelector for all validating webhooks, combined with global and per-hook selectors using AND
+    namespaceSelector: {}
     # -- Additional MatchConditions for all validating webhooks, combined with global and per-hook conditions
     matchConditions: []
 

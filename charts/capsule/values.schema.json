@@ -2756,12 +2756,22 @@
                         "matchConditions": {
                             "description": "Additional MatchConditions for all mutating webhooks, combined with global and per-hook conditions",
                             "type": "array"
+                        },
+                        "namespaceSelector": {
+                            "description": "Additional NamespaceSelector for all mutating webhooks, combined with global and per-hook selectors using AND",
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 },
                 "mutatingWebhooksTimeoutSeconds": {
                     "description": "Timeout in seconds for mutating webhooks",
                     "type": "integer"
+                },
+                "namespaceSelector": {
+                    "description": "NamespaceSelector for all webhooks, combined with type-specific and per-hook selectors using AND",
+                    "type": "object",
+                    "additionalProperties": true
                 },
                 "service": {
                     "type": "object",
@@ -2797,6 +2807,11 @@
                         "matchConditions": {
                             "description": "Additional MatchConditions for all validating webhooks, combined with global and per-hook conditions",
                             "type": "array"
+                        },
+                        "namespaceSelector": {
+                            "description": "Additional NamespaceSelector for all validating webhooks, combined with global and per-hook selectors using AND",
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 },
