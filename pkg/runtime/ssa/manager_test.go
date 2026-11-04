@@ -5,8 +5,11 @@ package ssa
 
 import (
 	"context"
+	"errors"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
@@ -27,6 +30,35 @@ const (
 	testCreatedBy  = "test-controller"
 	testFieldOwner = "projectcapsule.dev/resource/test/request"
 )
+
+func TestApplyReportsCreatedUIDWhenOwnershipUpgradeFails(t *testing.T) {
+	created := metav1.NewTime(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
+	c := fake.NewClientBuilder().WithReturnManagedFields().WithInterceptorFuncs(interceptor.Funcs{
+		Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+			obj.SetUID("created-uid")
+			obj.SetCreationTimestamp(created)
+			if err := c.Create(ctx, obj, opts...); err != nil {
+				return err
+			}
+			// The fake client does not populate the Create field manager response.
+			field := managedField(testFieldOwner)
+			field.Operation = metav1.ManagedFieldsOperationUpdate
+			obj.SetManagedFields([]metav1.ManagedFieldsEntry{field})
+			return nil
+		},
+		Patch: func(_ context.Context, _ client.WithWatch, _ client.Object, patch client.Patch, opts ...client.PatchOption) error {
+			require.Equal(t, types.JSONPatchType, patch.Type(), "must fail the ownership upgrade before content apply")
+			require.Equal(t, testFieldOwner, (&client.PatchOptions{}).ApplyOptions(opts).FieldManager)
+			return apierrors.NewConflict(corev1.Resource("configmaps"), "target", errors.New("concurrent status update"))
+		},
+	}).Build()
+	m := Manager{Metadata: Metadata{CreatedByValue: testCreatedBy}}
+	result, err := m.Apply(t.Context(), c, configMap("target", map[string]any{"key": "value"}), ApplyOptions{FieldOwner: testFieldOwner})
+	require.True(t, apierrors.IsConflict(err))
+	require.Equal(t, types.UID("created-uid"), result.UID)
+	require.True(t, result.Created)
+	require.True(t, result.LastApply.Equal(&created))
+}
 
 func TestManagedMetadataPatches(t *testing.T) {
 	t.Parallel()

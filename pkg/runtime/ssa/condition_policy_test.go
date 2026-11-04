@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
@@ -149,7 +150,7 @@ func TestSkippedConditionPolicyChecksResourceVersion(t *testing.T) {
 	}).Build()
 	m := skippedPolicyManager(t)
 	_, err := m.Apply(t.Context(), c, existing, ApplyOptions{FieldOwner: testFieldOwner, Condition: "false", Protect: true})
-	require.Error(t, err)
+	require.True(t, apierrors.IsConflict(err), "stale policy writes must produce a retryable conflict: %v", err)
 	require.Equal(t, 1, writes, "must re-read on the next reconciliation, not retry a stale patch")
 	actual := configMap("guarded", nil)
 	require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(existing), actual))

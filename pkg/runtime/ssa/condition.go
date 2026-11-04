@@ -48,6 +48,7 @@ func (m Manager) checkCondition(ctx context.Context, c client.Client, desired *u
 		existing = nil
 	} else {
 		object = existing.Object
+		result.UID = existing.GetUID()
 	}
 
 	allowed, err := compiled.EvaluateBooleanWithVariables(ctx, map[string]any{"object": object, "now": time.Now().UTC()})
@@ -70,6 +71,7 @@ func (m Manager) skippedResult(existing *unstructured.Unstructured, opts ApplyOp
 		return result
 	}
 
+	result.UID = existing.GetUID()
 	result.LastApply = clt.LastApplyTimeForManager(existing, opts.FieldOwner)
 	managedByUs := hasFieldManager(existing, opts.FieldOwner)
 
@@ -108,7 +110,9 @@ func (m Manager) reconcileSkippedPolicy(ctx context.Context, c client.Client, ex
 
 	// Protect against replacement or metadata changes since the condition read.
 	// Retry through reconciliation so the next attempt checks current ownership.
-	patches = append([]clt.JSONPatch{{Operation: "test", Path: "/metadata/resourceVersion", Value: existing.GetResourceVersion()}}, patches...)
+	// Assign the expected version so stale writes return 409 Conflict, as in
+	// the Kubernetes CSA-to-SSA ownership migration, rather than 422 Invalid.
+	patches = append([]clt.JSONPatch{{Operation: clt.JSONPatchReplace, Path: "/metadata/resourceVersion", Value: existing.GetResourceVersion()}}, patches...)
 
 	rawPatch, err := clt.JSONPatchesToRawPatch(patches)
 	if err != nil {
@@ -295,6 +299,8 @@ func (m Manager) createTarget(ctx context.Context, c client.Client, desired *uns
 	}
 
 	created := initial.GetCreationTimestamp()
+	// Report the created identity even if the subsequent ownership upgrade fails.
+	desired.SetUID(initial.GetUID())
 
 	if !opts.DryRun {
 		if err := m.upgradeOwnership(ctx, c, initial, opts); err != nil {
@@ -303,7 +309,6 @@ func (m Manager) createTarget(ctx context.Context, c client.Client, desired *uns
 	}
 
 	desired.SetResourceVersion(initial.GetResourceVersion())
-	desired.SetUID(initial.GetUID())
 
 	return &created, nil
 }

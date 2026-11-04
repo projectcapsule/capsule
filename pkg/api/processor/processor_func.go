@@ -533,7 +533,15 @@ func retryApply(ctx context.Context, manager ssa.Manager, c client.Client, obj *
 			return false, nil
 		}
 
+		previous := result
+
 		result, applyErr = manager.Apply(ctx, c, obj, options)
+		if result.LastApply == nil && result.UID != "" && result.UID == previous.UID {
+			// A successful create or content write still needs cleanup if later
+			// attempts fail. Never carry that timestamp onto a replacement target.
+			result.LastApply = previous.LastApply
+		}
+
 		if retryableApplyConflict(applyErr) {
 			return false, nil
 		}

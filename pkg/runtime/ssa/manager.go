@@ -60,8 +60,10 @@ type ApplyOptions struct {
 	PreviouslyCreated bool
 }
 
-// ApplyResult describes the resource after a successful apply.
+// ApplyResult describes the observed target, including partially completed writes.
 type ApplyResult struct {
+	// UID identifies the target of LastApply, so retries cannot transfer it to a replacement.
+	UID       types.UID
 	LastApply *metav1.Time
 	Created   bool
 	Skipped   bool
@@ -148,9 +150,14 @@ func (m Manager) Apply(
 		return ApplyResult{}, err
 	}
 
+	var targetUID types.UID
+	if snapshot[0] != nil {
+		targetUID = snapshot[0].GetUID()
+	}
+
 	_, created, err := m.managedMetadataPatches(ctx, c, desired, opts, snapshot...)
 	if err != nil {
-		return ApplyResult{Created: created}, fmt.Errorf("evaluating managed metadata: %w", err)
+		return ApplyResult{UID: targetUID, Created: created}, fmt.Errorf("evaluating managed metadata: %w", err)
 	}
 
 	if created {
@@ -171,17 +178,19 @@ func (m Manager) Apply(
 		// Creation and its provenance must be atomic. SSA upsert alone cannot
 		// distinguish creation from adoption or reject a concurrent creation.
 		initialized, err = m.createTarget(ctx, c, desired, opts)
+
+		targetUID = desired.GetUID()
 		if err != nil {
-			return ApplyResult{Created: initialized != nil, LastApply: initialized}, err
+			return ApplyResult{UID: targetUID, Created: initialized != nil, LastApply: initialized}, err
 		}
 
 		if opts.DryRun {
-			return ApplyResult{Created: true}, nil
+			return ApplyResult{UID: targetUID, Created: true}, nil
 		}
 	} else {
 		existing := snapshot[0]
 		if err := m.upgradeOwnership(ctx, c, existing, opts); err != nil {
-			return ApplyResult{Created: created}, err
+			return ApplyResult{UID: targetUID, Created: created}, err
 		}
 
 		desired.SetResourceVersion(existing.GetResourceVersion())
@@ -191,7 +200,7 @@ func (m Manager) Apply(
 	// A conflict restarts reconciliation from fresh ownership and conditions.
 	err = clt.PatchApply(ctx, c, desired, opts.FieldOwner, opts.Force, opts.DryRun)
 	if err != nil {
-		return ApplyResult{Created: created, LastApply: initialized}, fmt.Errorf("applying object failed: %w", err)
+		return ApplyResult{UID: targetUID, Created: created, LastApply: initialized}, fmt.Errorf("applying object failed: %w", err)
 	}
 
 	// A server-side dry-run exercises discovery, authorization, admission,
@@ -199,12 +208,13 @@ func (m Manager) Apply(
 	// desired object. There is consequently no actual object or managed-fields
 	// timestamp to read or decorate afterwards.
 	if opts.DryRun {
-		return ApplyResult{Created: created}, nil
+		return ApplyResult{UID: targetUID, Created: created}, nil
 	}
 
 	// Patch populates desired with the API response. A cached Get can still
 	// return the pre-apply version and fail the metadata patch's precondition.
 	actual := desired
+	targetUID = actual.GetUID()
 	lastApply := successfulApplyTime(actual, opts.FieldOwner)
 
 	// Build patches against the resulting object: SSA can add protection
@@ -214,11 +224,13 @@ func (m Manager) Apply(
 
 	patches, created, err := m.appliedMetadataPatches(ctx, c, desired, metadataOptions, actual)
 	if err != nil {
-		return ApplyResult{Created: created, LastApply: lastApply}, err
+		return ApplyResult{UID: targetUID, Created: created, LastApply: lastApply}, err
 	}
 
 	if len(patches) > 0 {
-		patches = append([]clt.JSONPatch{{Operation: "test", Path: "/metadata/resourceVersion", Value: actual.GetResourceVersion()}}, patches...)
+		// Use optimistic locking rather than a JSON test: stale versions must
+		// return 409 Conflict, not an indistinguishable 422 Invalid patch error.
+		patches = append([]clt.JSONPatch{{Operation: clt.JSONPatchReplace, Path: "/metadata/resourceVersion", Value: actual.GetResourceVersion()}}, patches...)
 	}
 
 	log.FromContext(ctx).V(4).Info("applying managed resource metadata", "patches", len(patches))
@@ -230,10 +242,11 @@ func (m Manager) Apply(
 		patches,
 		meta.ResourceControllerFieldOwnerPrefix(),
 	); err != nil {
-		return ApplyResult{Created: created, LastApply: lastApply}, fmt.Errorf("applying managed metadata failed: %w", err)
+		return ApplyResult{UID: targetUID, Created: created, LastApply: lastApply}, fmt.Errorf("applying managed metadata failed: %w", err)
 	}
 
 	return ApplyResult{
+		UID:       targetUID,
 		LastApply: lastApply,
 		Created:   created,
 	}, nil

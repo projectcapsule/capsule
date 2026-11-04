@@ -169,6 +169,18 @@ var _ = Describe("GlobalTenantResource", Label("replications", "global", "global
 		}
 	})
 
+	It("retries stale metadata versions while preserving validation failures", Label("replication-conflicts", "replication-conflict-review"), func() {
+		TenantNamespaceReady(tenantA, &corev1.Namespace{Name: tenantANamespaces[0]}, uint(len(tenantANamespaces)))
+		TenantNamespaceReady(tenantB, &corev1.Namespace{Name: tenantBNamespaces[0]}, uint(len(tenantBNamespaces)))
+		exerciseReplicationMetadataConflicts(tenantANamespaces[0], tenantBNamespaces[0], tenantBOwner)
+	})
+
+	It("cleans up partial creation after exhausting apply conflicts", Label("replication-conflicts", "replication-conflict-review"), func() {
+		TenantNamespaceReady(tenantA, &corev1.Namespace{Name: tenantANamespaces[0]}, uint(len(tenantANamespaces)))
+		TenantNamespaceReady(tenantB, &corev1.Namespace{Name: tenantBNamespaces[0]}, uint(len(tenantBNamespaces)))
+		exerciseReplicationExhaustedConflicts(tenantA.Name, tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner, tenantBOwner)
+	})
+
 	BeforeEach(func() {
 		ctx = context.Background()
 

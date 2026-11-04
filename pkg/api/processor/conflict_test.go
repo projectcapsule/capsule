@@ -6,8 +6,11 @@ package processor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
+	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -22,6 +25,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
+	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 )
 
 func TestApplyRetriesFreshTargetAfterConflict(t *testing.T) {
@@ -55,6 +59,11 @@ func TestApplyRetriesFreshTargetAfterConflict(t *testing.T) {
 						before := actual.DeepCopy()
 						actual.SetAnnotations(map[string]string{"external.example/change": "retained"})
 						require.NoError(t, c.Patch(ctx, actual, client.MergeFrom(before), client.FieldOwner("external")))
+						if patch.Type() == types.JSONPatchType {
+							err := c.Patch(ctx, obj, patch, opts...)
+							require.True(t, apierrors.IsConflict(err), "stale metadata must produce a retryable conflict: %v", err)
+							return err
+						}
 						return apierrors.NewConflict(corev1.Resource("configmaps"), obj.GetName(), errors.New("concurrent write"))
 					}
 					return c.Patch(ctx, obj, patch, opts...)
@@ -147,6 +156,7 @@ func TestApplyDoesNotRetryPermanentErrors(t *testing.T) {
 		"field ownership": &apierrors.StatusError{ErrStatus: metav1.Status{Reason: metav1.StatusReasonConflict, Code: 409, Details: &metav1.StatusDetails{Causes: []metav1.StatusCause{{Type: metav1.CauseTypeFieldManagerConflict}}}}},
 		"forbidden":       apierrors.NewForbidden(corev1.Resource("configmaps"), "target", errors.New("denied")),
 		"invalid":         apierrors.NewBadRequest("invalid content"),
+		"invalid patch":   &apierrors.StatusError{ErrStatus: metav1.Status{Reason: metav1.StatusReasonInvalid, Code: 422}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			patches := 0
@@ -157,6 +167,53 @@ func TestApplyDoesNotRetryPermanentErrors(t *testing.T) {
 			_, err := (&Processor{}).Apply(t.Context(), c, policyConfigMap("tenant-a", "target"), "test", false, false, nil, nil, nil)
 			require.ErrorIs(t, err, failure)
 			require.Equal(t, 1, patches)
+		})
+	}
+}
+
+func TestExhaustedApplyConflictsKeepInitializationForCleanup(t *testing.T) {
+	for _, deletion := range []apiruntime.ResourceDeletionPolicy{apiruntime.ResourceDeletionPolicyRemove, apiruntime.ResourceDeletionPolicyOrphan} {
+		t.Run(string(deletion), func(t *testing.T) {
+			attempts := 0
+			created := metav1.NewTime(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
+			c := fake.NewClientBuilder().WithObjects(&corev1.Namespace{Name: "tenant-a"}).WithReturnManagedFields().WithInterceptorFuncs(interceptor.Funcs{
+				Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+					obj.SetUID("target-uid")
+					obj.SetCreationTimestamp(created)
+					return c.Create(ctx, obj, opts...)
+				},
+				Patch: func(ctx context.Context, c client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+					if patch.Type() == types.ApplyPatchType {
+						attempts++
+						return apierrors.NewConflict(corev1.Resource("configmaps"), obj.GetName(), errors.New("concurrent status writer"))
+					}
+					return c.Patch(ctx, obj, patch, opts...)
+				},
+			}).Build()
+			p, _ := policyProcessor()
+			p.GatherClient = c
+			obj := policyConfigMap("tenant-a", "target")
+			id := gvk.NewResourceID(obj, "tenant-a", "0/raw-0")
+			policy := &apiruntime.ResourceReplicationPolicy{Deletion: deletion}
+			acc := Accumulator{}
+			AccumulatorAdd(acc, id, AccumulatorObject{Object: obj, Policy: policy})
+			processed := meta.ProcessedItems{}
+			opts := ProcessorOptions{FieldOwnerPrefix: "2lclct9cwq6mg", Prune: true}
+			require.ErrorContains(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, acc, opts), "applying of 1 resources failed")
+			require.Equal(t, retry.DefaultBackoff.Steps, attempts)
+			require.Len(t, processed, 1)
+			require.True(t, processed[0].LastApply.Equal(&created), "initialization must stay tracked when every SSA attempt conflicts")
+			require.True(t, processed[0].Created)
+			require.Equal(t, processedPolicy(policy), processed[0].Policy)
+			require.NoError(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, Accumulator{}, opts))
+			require.Empty(t, processed)
+			err := c.Get(t.Context(), client.ObjectKeyFromObject(obj), obj)
+			if deletion == apiruntime.ResourceDeletionPolicyOrphan {
+				require.NoError(t, err)
+				require.NotContains(t, obj.GetLabels(), meta.ReplicationProtectionLabel)
+			} else {
+				require.True(t, apierrors.IsNotFound(err), "cleanup must remove the initialized resource: %v", err)
+			}
 		})
 	}
 }
@@ -184,5 +241,62 @@ func TestApplyConflictRetryIsBoundedAndCancelable(t *testing.T) {
 				require.Equal(t, retry.DefaultBackoff.Steps, patches)
 			}
 		})
+	}
+}
+
+func TestApplyConflictTimestampIsScopedToTargetUID(t *testing.T) {
+	for _, uid := range []types.UID{"created-uid", "replacement-uid", ""} {
+		for _, skipped := range []bool{false, true} {
+			t.Run(fmt.Sprintf("uid=%q/skipped=%t", uid, skipped), func(t *testing.T) {
+				obj := policyConfigMap("tenant-a", "target")
+				attempts := 0
+				policy := &apiruntime.ResourceReplicationPolicy{Creation: apiruntime.ResourceCreationPolicyMerge, Condition: "object == null || !has(object.metadata.annotations)"}
+				c := fake.NewClientBuilder().WithReturnManagedFields().WithInterceptorFuncs(interceptor.Funcs{
+					Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+						obj.SetUID("created-uid")
+						obj.SetCreationTimestamp(metav1.Now())
+						return c.Create(ctx, obj, opts...)
+					},
+					Patch: func(ctx context.Context, c client.WithWatch, target client.Object, patch client.Patch, opts ...client.PatchOption) error {
+						if patch.Type() != types.ApplyPatchType {
+							return c.Patch(ctx, target, patch, opts...)
+						}
+						attempts++
+						if attempts == 1 {
+							if uid != "created-uid" {
+								require.NoError(t, c.Delete(ctx, obj))
+								replacement := policyConfigMap(obj.GetNamespace(), obj.GetName())
+								replacement.SetUID(uid)
+								require.NoError(t, c.Create(ctx, replacement))
+							}
+							if skipped {
+								current := obj.DeepCopy()
+								require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(obj), current))
+								current.SetAnnotations(map[string]string{"skip": "true"})
+								require.NoError(t, c.Update(ctx, current))
+							}
+						}
+						return apierrors.NewConflict(corev1.Resource("configmaps"), obj.GetName(), errors.New("concurrent writer"))
+					},
+				}).Build()
+				conditions, err := cache.NewCELCache()
+				require.NoError(t, err)
+				result, err := (&Processor{Conditions: conditions}).Apply(t.Context(), c, obj, "replication/test", false, false, nil, nil, policy)
+				if skipped {
+					require.NoError(t, err)
+					require.True(t, result.Skipped)
+				} else {
+					require.True(t, apierrors.IsConflict(err))
+				}
+				require.Equal(t, uid, result.UID)
+				if uid == "created-uid" {
+					require.NotNil(t, result.LastApply)
+					require.False(t, result.LastApply.IsZero())
+				} else {
+					require.Nil(t, result.LastApply, "must not transfer a successful write to another or unknown UID")
+					require.False(t, result.Created)
+				}
+			})
+		}
 	}
 }

@@ -73,6 +73,11 @@ func TestGlobalReplicationFirstReconcileConflicts(t *testing.T) {
 			}
 			attempts := 0
 			c := fake.NewClientBuilder().WithScheme(scheme).WithRESTMapper(mapper).WithObjects(objects...).WithStatusSubresource(parent).WithReturnManagedFields().WithInterceptorFuncs(interceptor.Funcs{
+				Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+					obj.SetUID("target-uid")
+					obj.SetCreationTimestamp(metav1.Now())
+					return c.Create(ctx, obj, opts...)
+				},
 				Patch: func(ctx context.Context, c client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
 					if patch.Type() == types.ApplyPatchType {
 						attempts++
@@ -107,6 +112,14 @@ func TestGlobalReplicationFirstReconcileConflicts(t *testing.T) {
 			require.Equal(t, tc.wantReady, item.Status == metav1.ConditionTrue)
 			if !tc.wantReady {
 				require.Contains(t, item.Message, "concurrent writer")
+				require.False(t, item.LastApply.IsZero(), "partial creation must remain tracked after failed applies")
+				parent.Spec.Resources = nil
+				require.NoError(t, c.Update(t.Context(), parent))
+				_, err = r.Reconcile(t.Context(), reconcile.Request{Name: parent.Name})
+				require.NoError(t, err)
+				require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(parent), parent))
+				require.Empty(t, parent.Status.ProcessedItems)
+				require.True(t, apierrors.IsNotFound(c.Get(t.Context(), client.ObjectKey{Namespace: "tenant-a", Name: "target"}, &corev1.ConfigMap{})), "removing a failed item must clean up its created target")
 			}
 			require.True(t, apierrors.IsNotFound(c.Get(t.Context(), client.ObjectKey{Namespace: "tenant-b", Name: "target"}, &corev1.ConfigMap{})))
 		})

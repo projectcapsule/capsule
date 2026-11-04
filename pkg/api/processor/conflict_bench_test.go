@@ -6,16 +6,20 @@ package processor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	mockclient "github.com/projectcapsule/capsule/internal/mocks/client"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 func BenchmarkApplyReplicationCreation(b *testing.B) {
@@ -69,4 +73,56 @@ func BenchmarkApplyReplicationConflict(b *testing.B) {
 		b.StartTimer()
 	}
 	calls.Report(b)
+}
+
+func BenchmarkApplyReplicationMetadataConflict(b *testing.B) {
+	for _, tenants := range []int{1, 128} {
+		b.Run(fmt.Sprintf("tenants=%d", tenants), func(b *testing.B) {
+			calls := &mockclient.CallCounter{}
+			scheme := runtime.NewScheme()
+			if err := capsulev1beta2.AddToScheme(scheme); err != nil {
+				b.Fatal(err)
+			}
+			objects := make([]client.Object, 0, tenants)
+			for i := range tenants {
+				objects = append(objects, &capsulev1beta2.Tenant{Name: fmt.Sprintf("tenant-%d", i)})
+			}
+			base := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).WithReturnManagedFields().Build()
+			needsConflict := false
+			racing := interceptor.NewClient(base, interceptor.Funcs{
+				Patch: func(ctx context.Context, c client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+					manager := (&client.PatchOptions{}).ApplyOptions(opts).FieldManager
+					if needsConflict && patch.Type() == types.JSONPatchType && manager == meta.ResourceControllerFieldOwnerPrefix() {
+						needsConflict = false
+						current := policyConfigMap(obj.GetNamespace(), obj.GetName())
+						if err := c.Get(ctx, client.ObjectKeyFromObject(obj), current); err != nil {
+							return err
+						}
+						current.SetAnnotations(map[string]string{"external.example/change": "retained"})
+						if err := c.Update(ctx, current); err != nil {
+							return err
+						}
+					}
+					return c.Patch(ctx, obj, patch, opts...)
+				},
+			})
+			c := interceptor.NewClient(racing, calls.Interceptors())
+			p := &Processor{}
+			obj := policyConfigMap("tenant-a", "created")
+			b.ReportAllocs()
+			for b.Loop() {
+				needsConflict = true
+				result, err := p.Apply(b.Context(), c, obj, "replication/test", false, false, nil, nil, nil)
+				if err != nil || !result.Created || needsConflict {
+					b.Fatalf("retry metadata: %+v, %v", result, err)
+				}
+				b.StopTimer()
+				if err := base.Delete(b.Context(), obj); err != nil {
+					b.Fatal(err)
+				}
+				b.StartTimer()
+			}
+			calls.Report(b)
+		})
+	}
 }
