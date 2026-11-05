@@ -6,6 +6,27 @@ package rules
 // IngressMutation contains typed ingress and Gateway API mutations.
 // +kubebuilder:object:generate=true
 type IngressMutation struct {
+	// Types selects the kinds whose class is set. Required when class is supplied.
+	// Gateway targets gateway.networking.k8s.io/v1. Served v1beta1 Gateway
+	// requests receive the same class mutation for version compatibility.
+	// ListenerSet parentRef mutation has its own explicit target and is unchanged.
+	// +optional
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=2
+	// +kubebuilder:validation:items:Enum=Ingress;Gateway
+	// +listType=set
+	Types []IngressType `json:"types,omitempty"`
+
+	// Class sets the targeted Ingress or Gateway class on CREATE and UPDATE.
+	// Merge fills an absent or empty class, preserving explicit field/annotation
+	// values. Replace sets the class and keeps an existing ingress annotation in
+	// sync. Rule changes do not reconcile existing objects. Templates are allowed;
+	// rendered values must be valid DNS subdomains. Omitted leaves it unchanged.
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=4096
+	Class string `json:"class,omitempty"`
+
 	// ListenerSets configures gateway.networking.k8s.io/v1 ListenerSets.
 	// +optional
 	ListenerSets ListenerSetMutation `json:"listenerSets,omitzero"`

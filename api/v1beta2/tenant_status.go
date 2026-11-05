@@ -95,7 +95,8 @@ type TenantAvailableClassesStatus struct {
 	PriorityClasses []string `json:"priority,omitempty"`
 	// Available StorageClasses
 	RuntimeClasses []string `json:"runtime,omitempty"`
-	// Available GatewayClasses
+	// Deprecated: retained for API compatibility, but no longer populated.
+	// Ingress/Gateway classes are enforced through namespace rules.
 	GatewayClasses []string `json:"gateway,omitempty"`
 	// Available DeviceClasses
 	DeviceClasses []string `json:"device,omitempty"`

@@ -13,6 +13,7 @@ import (
 func TestIngressMutationPresenceAndDeepCopy(t *testing.T) {
 	for _, source := range []string{
 		`{}`,
+		`{"types":["Ingress","Gateway"],"class":"edge"}`,
 		`{"listenerSets":{"parentRef":{"name":"edge"}}}`,
 		`{"listenerSets":{"parentRef":{"name":"edge","namespace":"platform","group":"gateway.networking.k8s.io","kind":"Gateway"}}}`,
 		`{"listenerSets":{"parentRef":{"name":"edge","group":"","kind":"Service"}}}`,
