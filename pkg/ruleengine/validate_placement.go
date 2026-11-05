@@ -250,6 +250,10 @@ func validateMutationPlacement(path string, workload rules.WorkloadMutation) err
 		return err
 	}
 
+	if err := validateClassMutation(path+".classes", workload.Classes); err != nil {
+		return err
+	}
+
 	path += ".placement"
 
 	if workload.Placement.Scheduler != "" && strings.TrimSpace(workload.Placement.Scheduler) == "" {

@@ -45,28 +45,45 @@ type podRuleValidator struct {
 		*corev1.Pod,
 		[]*apirules.NamespaceRuleEnforceBody,
 	) (*ruleengine.Evaluation, error)
+	// read replaces evaluate for validators that read a referenced object.
+	read func(
+		context.Context,
+		client.Reader,
+		*corev1.Pod,
+		[]*apirules.NamespaceRuleEnforceBody,
+	) (*ruleengine.Evaluation, error)
 	includeSubresources bool
 	// When set, only this subresource and the main resource are evaluated.
 	subresource string
 	changed     func(old, pod *corev1.Pod) bool
 }
 
+func (v *podRuleValidator) run(ctx context.Context, reader client.Reader, pod *corev1.Pod, bodies []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
+	if v.read != nil {
+		return v.read(ctx, reader, pod, bodies)
+	}
+
+	return v.evaluate(pod, bodies)
+}
+
 type podRules struct {
 	rules         []podRuleValidator
 	regexCache    *cache.RegexCache
 	registryCache *cache.RegistryRuleSetCache
+	selectors     *cache.LabelSelectorCache
 	compiler      ruleengine.ConditionCompiler
 }
 
 func PodRules(
 	regexCache *cache.RegexCache,
 	registryCache *cache.RegistryRuleSetCache,
+	selectors *cache.LabelSelectorCache,
 	compiler ruleengine.ConditionCompiler,
 ) handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod] {
-	return newPodRules(regexCache, registryCache, compiler)
+	return newPodRules(regexCache, registryCache, selectors, compiler)
 }
 
-func newPodRules(regexCache *cache.RegexCache, registryCache *cache.RegistryRuleSetCache, compiler ruleengine.ConditionCompiler) *podRules {
+func newPodRules(regexCache *cache.RegexCache, registryCache *cache.RegistryRuleSetCache, selectors *cache.LabelSelectorCache, compiler ruleengine.ConditionCompiler) *podRules {
 	if regexCache == nil {
 		regexCache = cache.NewRegexCache()
 	}
@@ -75,9 +92,14 @@ func newPodRules(regexCache *cache.RegexCache, registryCache *cache.RegistryRule
 		registryCache = cache.NewRegistryRuleSetCache(regexCache)
 	}
 
+	if selectors == nil {
+		selectors = cache.NewLabelSelectorCache()
+	}
+
 	h := &podRules{
 		regexCache:    regexCache,
 		registryCache: registryCache,
+		selectors:     selectors,
 		compiler:      compiler,
 	}
 
@@ -96,6 +118,9 @@ func newPodRules(regexCache *cache.RegexCache, registryCache *cache.RegistryRule
 		{evaluate: h.validateAffinity, changed: func(old, pod *corev1.Pod) bool {
 			return !equality.Semantic.DeepEqual(old.Spec.Affinity, pod.Spec.Affinity) || !equality.Semantic.DeepEqual(old.Labels, pod.Labels)
 		}},
+		{read: h.validatePriorityClasses, changed: func(old, pod *corev1.Pod) bool {
+			return old.Spec.PriorityClassName != pod.Spec.PriorityClassName
+		}},
 		{evaluate: h.validateResources},
 		{evaluate: h.validateSchedulers, includeSubresources: true},
 		{evaluate: h.validateQoSClasses, includeSubresources: true},
@@ -107,7 +132,7 @@ func newPodRules(regexCache *cache.RegexCache, registryCache *cache.RegistryRule
 
 func (h *podRules) OnCreate(
 	_ client.Client,
-	_ client.Reader,
+	reader client.Reader,
 	pod *corev1.Pod,
 	_ admission.Decoder,
 	recorder events.EventRecorder,
@@ -117,8 +142,8 @@ func (h *podRules) OnCreate(
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		enforceBodies := ruleengine.EnforceBodiesFromNamespaceRules(bodies)
 
-		if err := h.validatePodRules(ctx, req, pod, tnt, recorder, enforceBodies); err != nil {
-			return ad.Deny(err.Error())
+		if err := h.validatePodRules(ctx, req, reader, pod, tnt, recorder, enforceBodies); err != nil {
+			return rejection("", err)
 		}
 
 		return nil
@@ -127,7 +152,7 @@ func (h *podRules) OnCreate(
 
 func (h *podRules) OnUpdate(
 	_ client.Client,
-	_ client.Reader,
+	reader client.Reader,
 	old *corev1.Pod,
 	pod *corev1.Pod,
 	_ admission.Decoder,
@@ -138,8 +163,8 @@ func (h *podRules) OnUpdate(
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		enforceBodies := ruleengine.EnforceBodiesFromNamespaceRules(bodies)
 
-		if err := h.validatePodRules(ctx, req, pod, tnt, recorder, enforceBodies, old); err != nil {
-			return ad.Deny(err.Error())
+		if err := h.validatePodRules(ctx, req, reader, pod, tnt, recorder, enforceBodies, old); err != nil {
+			return rejection("", err)
 		}
 
 		return nil
@@ -160,9 +185,19 @@ func (h *podRules) OnDelete(
 	}
 }
 
+// rejection denies a rule decision and reports a failed class read as a server error.
+func rejection(prefix string, err error) *admission.Response {
+	if _, ok := errors.AsType[*classLookupError](err); ok {
+		return handlers.ErroredResponse(err)
+	}
+
+	return ad.Deny(prefix + err.Error())
+}
+
 func (h *podRules) validatePodRules(
 	ctx context.Context,
 	req admission.Request,
+	reader client.Reader,
 	pod *corev1.Pod,
 	tnt *capsulev1beta2.Tenant,
 	recorder events.EventRecorder,
@@ -171,11 +206,11 @@ func (h *podRules) validatePodRules(
 ) error {
 	enforceBodies = ruleengine.WorkloadEnforcement(enforceBodies, corev1.SchemeGroupVersion.WithKind("Pod"))
 
-	return h.validateWorkloadRules(ctx, req, pod, pod, pod, tnt, recorder, enforceBodies, old...)
+	return h.validateWorkloadRules(ctx, req, reader, pod, pod, pod, tnt, recorder, enforceBodies, old...)
 }
 
 func (h *podRules) validateWorkloadRules(
-	ctx context.Context, req admission.Request, pod *corev1.Pod,
+	ctx context.Context, req admission.Request, reader client.Reader, pod *corev1.Pod,
 	object client.Object, conditionObject any, tnt *capsulev1beta2.Tenant,
 	recorder events.EventRecorder, enforceBodies []*apirules.NamespaceRuleEnforceBody,
 	old ...*corev1.Pod,
@@ -202,7 +237,8 @@ func (h *podRules) validateWorkloadRules(
 		return fmt.Errorf("enforce: %w", err)
 	}
 
-	for _, rule := range h.rules {
+	for i := range h.rules {
+		rule := &h.rules[i]
 		if !conditional && len(old) > 0 && old[0] != nil && rule.changed != nil && !rule.changed(old[0], pod) {
 			continue
 		}
@@ -215,7 +251,7 @@ func (h *podRules) validateWorkloadRules(
 			continue
 		}
 
-		evaluation, err := rule.evaluate(pod, enforceBodies)
+		evaluation, err := rule.run(ctx, reader, pod, enforceBodies)
 		if err != nil {
 			return err
 		}
@@ -276,5 +312,5 @@ func hasWorkloadPolicy(body apirules.NamespaceRuleEnforceWorkloadsBody, subresou
 	}
 
 	return subresource == "" && (len(body.Placement.NodeSelector) > 0 || len(body.Placement.Tolerations) > 0 ||
-		len(body.Placement.TopologySpreadConstraints) > 0 || len(body.Placement.Affinity) > 0 || body.Resources != nil)
+		len(body.Placement.TopologySpreadConstraints) > 0 || len(body.Placement.Affinity) > 0 || body.Resources != nil || body.Classes.HasPolicies())
 }

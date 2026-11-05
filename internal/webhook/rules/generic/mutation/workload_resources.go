@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	resourcehelper "k8s.io/component-helpers/resource"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apirules "github.com/projectcapsule/capsule/pkg/api/rules"
 	"github.com/projectcapsule/capsule/pkg/ruleengine"
@@ -31,6 +32,7 @@ func MutateWorkloadResources(
 	gvk schema.GroupVersionKind,
 	bodies []*apirules.NamespaceRuleBodyNamespace,
 	conditions *ruleengine.ConditionEvaluator,
+	classes ...client.Reader,
 ) (bool, error) {
 	if obj == nil || (gvk != corev1.SchemeGroupVersion.WithKind("Pod") && len(workloads.PodTemplatePath(gvk)) == 0) {
 		return false, nil
@@ -46,7 +48,7 @@ func MutateWorkloadResources(
 		return false, err
 	}
 
-	return mutateWorkloadResources(ctx, obj, gvk, filtered, conditions)
+	return mutateWorkloadResources(ctx, obj, gvk, filtered, conditions, classes...)
 }
 
 // mutateWorkloadResources consumes rules whose enforcement gates have already run.
@@ -56,6 +58,7 @@ func mutateWorkloadResources(
 	gvk schema.GroupVersionKind,
 	bodies []*apirules.NamespaceRuleBodyNamespace,
 	conditions *ruleengine.ConditionEvaluator,
+	classes ...client.Reader,
 ) (bool, error) {
 	if obj != nil && len(workloads.PodTemplatePath(gvk)) > 0 {
 		return mutateTemplateResources(obj, gvk, bodies)
@@ -84,7 +87,7 @@ func mutateWorkloadResources(
 		return false, err
 	}
 
-	placementChanged, err := MutatePodPlacement(ctx, pod, bodies, conditions)
+	placementChanged, err := MutatePodPlacement(ctx, pod, bodies, conditions, classes...)
 	if err != nil || (!changed && !placementChanged) {
 		return false, err
 	}

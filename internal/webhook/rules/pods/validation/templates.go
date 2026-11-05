@@ -25,23 +25,23 @@ import (
 
 type templateRules struct{ pod *podRules }
 
-func TemplateRules(regex *cache.RegexCache, registries *cache.RegistryRuleSetCache, compiler ruleengine.ConditionCompiler) handlers.TypedHandlerWithTenantWithRuleset[*unstructured.Unstructured] {
-	return &templateRules{pod: newPodRules(regex, registries, compiler)}
+func TemplateRules(regex *cache.RegexCache, registries *cache.RegistryRuleSetCache, selectors *cache.LabelSelectorCache, compiler ruleengine.ConditionCompiler) handlers.TypedHandlerWithTenantWithRuleset[*unstructured.Unstructured] {
+	return &templateRules{pod: newPodRules(regex, registries, selectors, compiler)}
 }
 
-func (h *templateRules) OnCreate(_ client.Client, _ client.Reader, obj *unstructured.Unstructured, _ admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant, bodies []*rules.NamespaceRuleBodyNamespace) handlers.Func {
-	return h.validate(nil, obj, recorder, tnt, bodies)
+func (h *templateRules) OnCreate(_ client.Client, reader client.Reader, obj *unstructured.Unstructured, _ admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant, bodies []*rules.NamespaceRuleBodyNamespace) handlers.Func {
+	return h.validate(reader, nil, obj, recorder, tnt, bodies)
 }
 
-func (h *templateRules) OnUpdate(_ client.Client, _ client.Reader, old, obj *unstructured.Unstructured, _ admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant, bodies []*rules.NamespaceRuleBodyNamespace) handlers.Func {
-	return h.validate(old, obj, recorder, tnt, bodies)
+func (h *templateRules) OnUpdate(_ client.Client, reader client.Reader, old, obj *unstructured.Unstructured, _ admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant, bodies []*rules.NamespaceRuleBodyNamespace) handlers.Func {
+	return h.validate(reader, old, obj, recorder, tnt, bodies)
 }
 
 func (*templateRules) OnDelete(client.Client, client.Reader, *unstructured.Unstructured, admission.Decoder, events.EventRecorder, *capsulev1beta2.Tenant, []*rules.NamespaceRuleBodyNamespace) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response { return nil }
 }
 
-func (h *templateRules) validate(old, obj *unstructured.Unstructured, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant, bodies []*rules.NamespaceRuleBodyNamespace) handlers.Func {
+func (h *templateRules) validate(reader client.Reader, old, obj *unstructured.Unstructured, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant, bodies []*rules.NamespaceRuleBodyNamespace) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		gvk := schema.GroupVersionKind{Group: req.Kind.Group, Version: req.Kind.Version, Kind: req.Kind.Kind}
 
@@ -73,8 +73,8 @@ func (h *templateRules) validate(old, obj *unstructured.Unstructured, recorder e
 			}
 		}
 
-		if err := h.pod.validateWorkloadRules(ctx, req, pod, obj, obj, tnt, recorder, enforce, oldPod); err != nil {
-			return ad.Deny(strings.Join(path, ".") + ": " + err.Error())
+		if err := h.pod.validateWorkloadRules(ctx, req, reader, pod, obj, obj, tnt, recorder, enforce, oldPod); err != nil {
+			return rejection(strings.Join(path, ".")+": ", err)
 		}
 
 		return nil

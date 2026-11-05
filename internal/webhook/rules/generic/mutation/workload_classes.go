@@ -1,0 +1,113 @@
+// Copyright 2020-2026 Project Capsule Authors
+// SPDX-License-Identifier: Apache-2.0
+
+package mutation
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	corev1 "k8s.io/api/core/v1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	apirules "github.com/projectcapsule/capsule/pkg/api/rules"
+)
+
+// podPriorityClass applies priority class mutations of one admission request.
+// Class objects are read through the injected reader and never retained.
+type podPriorityClass struct {
+	reader client.Reader
+	// An earlier entry chose the class, so later merges must not treat it as omitted.
+	assigned bool
+}
+
+func newPodPriorityClass(readers []client.Reader) *podPriorityClass {
+	state := &podPriorityClass{}
+	if len(readers) > 0 {
+		state.reader = readers[0]
+	}
+
+	return state
+}
+
+// mutate applies the class of one mutation entry that selects the Pod.
+func (p *podPriorityClass) mutate(ctx context.Context, pod *corev1.Pod, mutation *apirules.NamespaceRuleMutation) error {
+	name := mutation.Workloads.Classes.Priority
+	if name == "" || !mutation.Workloads.GetWorkloadTargets(apirules.ValidatePod) {
+		return nil
+	}
+
+	return p.apply(ctx, pod, name, mutation.Action == apirules.MutationActionReplace)
+}
+
+// apply sets the class with the priority and preemptionPolicy of its
+// PriorityClass. The built-in Priority admission plugin resolves these before
+// webhooks run and again after a webhook changes the Pod, rejecting a priority
+// that differs from the class. Merge fills an omitted class, which that plugin
+// has already replaced with the cluster's global default class when one exists.
+func (p *podPriorityClass) apply(ctx context.Context, pod *corev1.Pod, name string, replace bool) error {
+	if !replace && p.assigned {
+		return nil
+	}
+
+	current := pod.Spec.PriorityClassName
+
+	p.assigned = true
+
+	if current == name {
+		return nil
+	}
+
+	if !replace && current != "" {
+		class, err := p.get(ctx, current)
+		if err != nil {
+			return err
+		}
+
+		// An unknown class is explicit: only the global default counts as omitted.
+		if class == nil || !class.GlobalDefault {
+			return nil
+		}
+	}
+
+	class, err := p.get(ctx, name)
+	if err != nil {
+		return err
+	}
+
+	if class == nil {
+		return fmt.Errorf("PriorityClass %q does not exist", name)
+	}
+
+	pod.Spec.PriorityClassName = class.Name
+	pod.Spec.Priority = new(class.Value)
+	pod.Spec.PreemptionPolicy = nil
+
+	if class.PreemptionPolicy != nil {
+		pod.Spec.PreemptionPolicy = new(*class.PreemptionPolicy)
+	}
+
+	return nil
+}
+
+// get returns nil for a class that does not exist.
+func (p *podPriorityClass) get(ctx context.Context, name string) (*schedulingv1.PriorityClass, error) {
+	if p.reader == nil {
+		return nil, errors.New("PriorityClass lookup is unavailable")
+	}
+
+	class, err := utils.GetPriorityClassByName(ctx, p.reader, name)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+
+		return nil, fmt.Errorf("get PriorityClass %q: %w", name, err)
+	}
+
+	return class, nil
+}

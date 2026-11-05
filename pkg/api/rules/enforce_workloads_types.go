@@ -67,6 +67,10 @@ type NamespaceRuleEnforceWorkloadsBody struct {
 	// Security matches effective Pod and container security profiles.
 	// +optional
 	Security WorkloadSecurityEnforcement `json:"security,omitzero"`
+
+	// Classes matches the classes referenced by Pods.
+	// +optional
+	Classes WorkloadClassEnforcement `json:"classes,omitzero"`
 }
 
 // WorkloadPlacementEnforcement contains matchers for Pod scheduling properties.

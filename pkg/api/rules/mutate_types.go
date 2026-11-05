@@ -29,9 +29,9 @@ type NamespaceRuleMutation struct {
 	Conditions []AdmissionCondition `json:"conditions,omitempty"`
 
 	// Action chooses how explicitly supplied properties are applied.
-	// Merge fills an empty schedulerName and absent security profiles, sets hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy,
+	// Merge fills an empty schedulerName, an omitted priority class and absent security profiles, sets hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy,
 	// and map keys, adds missing imagePullSecrets by name, upserts lists, and conjoins required affinity.
-	// Replace replaces each supplied property in full: scheduler, hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy, nodeSelector,
+	// Replace replaces each supplied property in full: scheduler, classes.priority, hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy, nodeSelector,
 	// registries.imagePullSecrets, tolerations, topologySpreadConstraints, affinity, or security profiles. Omitted properties are
 	// retained. Supplying affinity replaces all its branches, including omitted ones.
 	// ListenerSet parent references are atomic: merge fills an absent or null
@@ -85,6 +85,27 @@ type WorkloadMutation struct {
 	// Security configures Pod and container security settings.
 	// +optional
 	Security WorkloadSecurityMutation `json:"security,omitzero"`
+
+	// Classes configures the classes referenced by the Pod.
+	// +optional
+	Classes WorkloadClassMutation `json:"classes,omitzero"`
+}
+
+// WorkloadClassMutation contains the classes assigned to a Pod.
+// +kubebuilder:object:generate=true
+type WorkloadClassMutation struct {
+	// Priority sets spec.priorityClassName on Pod creation, together with the
+	// priority and preemptionPolicy of that PriorityClass. Merge fills an omitted
+	// class; the cluster's global default class, which Kubernetes assigns before
+	// admission, counts as omitted. The first applicable merge wins. Replace
+	// always sets the class. The PriorityClass must exist; Capsule does not create
+	// it. Omitted or null leaves the Pod unchanged. Tenant and Namespace templates
+	// are supported; rendered names must satisfy native PriorityClass name
+	// validation. Requires the pod target or omitted/empty targets.
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=4096
+	Priority string `json:"priority,omitempty"`
 }
 
 // WorkloadPlacementMutation contains native Pod scheduling values.
@@ -192,7 +213,7 @@ func (w WorkloadMutation) GetWorkloadTargets(target WorkloadValidationTarget) bo
 
 // HasPodProperties reports whether any Pod-level property is configured.
 func (w WorkloadMutation) HasPodProperties() bool {
-	return w.Placement.Scheduler != "" || w.Security.HostUsers != nil || w.Placement.NodeSelector != nil || w.Placement.Tolerations != nil || w.Placement.TopologySpreadConstraints != nil || w.Placement.Affinity != nil || w.Security.SeccompProfile != nil || w.Security.AppArmorProfile != nil || w.Registries.ImagePullSecrets != nil
+	return w.Placement.Scheduler != "" || w.Security.HostUsers != nil || w.Placement.NodeSelector != nil || w.Placement.Tolerations != nil || w.Placement.TopologySpreadConstraints != nil || w.Placement.Affinity != nil || w.Security.SeccompProfile != nil || w.Security.AppArmorProfile != nil || w.Registries.ImagePullSecrets != nil || w.Classes.Priority != ""
 }
 
 // HasProperties reports whether any workload mutation property is supplied.

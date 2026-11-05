@@ -47,7 +47,7 @@ func TestPodConditionsScopeAndUpdateReevaluation(t *testing.T) {
 			}
 			original := bodies[0].DeepCopy()
 			pod := &corev1.Pod{}
-			err := h.validatePodRules(context.Background(), admission.Request{}, pod, nil, nil, bodies, pod.DeepCopy())
+			err := h.validatePodRules(context.Background(), admission.Request{}, nil, pod, nil, nil, bodies, pod.DeepCopy())
 			if tc.failure == "" {
 				if err != nil || !evaluated {
 					t.Fatalf("evaluation=%v err=%v", evaluated, err)
@@ -67,12 +67,12 @@ func TestPlacementOnlyConditionsSkipSubresources(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := PodRules(nil, nil, c).(*podRules)
+	h := PodRules(nil, nil, nil, c).(*podRules)
 	bodies := []*rules.NamespaceRuleEnforceBody{{
 		Conditions: []rules.AdmissionCondition{{Expression: `object.spec.missing == 'x'`}}, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{Tolerations: []rules.WorkloadTolerationMatch{{}}}}}}
 	for _, subresource := range []string{"status", "ephemeralcontainers"} {
 		req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{SubResource: subresource}}
-		if err := h.validatePodRules(context.Background(), req, &corev1.Pod{}, nil, nil, bodies); err != nil {
+		if err := h.validatePodRules(context.Background(), req, nil, &corev1.Pod{}, nil, nil, bodies); err != nil {
 			t.Fatalf("%s evaluated placement condition: %v", subresource, err)
 		}
 	}
@@ -87,7 +87,7 @@ func TestPodSkipsConditionsForServiceOnlyRule(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := &rules.NamespaceRuleEnforceBody{Conditions: []rules.AdmissionCondition{{Expression: "object.spec.type == 'NodePort'"}}, Services: rules.NamespaceRuleEnforceServicesBody{Types: []rules.ServiceType{rules.ServiceTypeNodePort}}}
-	err = PodRules(nil, nil, compiler).(*podRules).validatePodRules(t.Context(), admission.Request{}, &corev1.Pod{}, nil, nil, []*rules.NamespaceRuleEnforceBody{body})
+	err = PodRules(nil, nil, nil, compiler).(*podRules).validatePodRules(t.Context(), admission.Request{}, nil, &corev1.Pod{}, nil, nil, []*rules.NamespaceRuleEnforceBody{body})
 	if err != nil || compiler.Stats() != 0 {
 		t.Fatalf("unrelated gate evaluated: err=%v compiled=%d", err, compiler.Stats())
 	}

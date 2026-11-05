@@ -211,7 +211,7 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 
 				return t.Status.Classes.PriorityClasses, nil
 			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf(all))
+				Should(BeEmpty())
 		})
 
 		By("providing any priorityclass", func() {
@@ -256,7 +256,7 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 
 				return t.Status.Classes.PriorityClasses, nil
 			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf("system-cluster-critical", "system-node-critical", customerBronze.GetName(), customerSilver.GetName()))
+				Should(BeEmpty())
 		})
 	})
 
@@ -280,7 +280,7 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 
 				return t.Status.Classes.PriorityClasses, nil
 			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf(customerGold.GetName(), customerBronze.GetName(), customerSilver.GetName()))
+				Should(BeEmpty())
 		})
 
 		pod := &corev1.Pod{
@@ -357,7 +357,7 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 
 					return t.Status.Classes.PriorityClasses, nil
 				}, defaultTimeoutInterval, defaultPollInterval).
-					Should(ConsistOf(customerGold.GetName(), customerBronze.GetName(), customerSilver.GetName()))
+					Should(BeEmpty())
 			})
 
 			EventuallyCreation(func() error {
@@ -387,7 +387,7 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 
 				return t.Status.Classes.PriorityClasses, nil
 			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf(customerGold.GetName(), customerBronze.GetName(), customerSilver.GetName()))
+				Should(BeEmpty())
 		})
 
 		pod := &corev1.Pod{
@@ -433,7 +433,7 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 
 				return t.Status.Classes.PriorityClasses, nil
 			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf(customerGold.GetName(), customerBronze.GetName(), customerSilver.GetName()))
+				Should(BeEmpty())
 		})
 
 		for _, class := range []string{customerBronze.GetName(), customerSilver.GetName(), customerGold.GetName()} {
@@ -495,7 +495,7 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 
 						return t.Status.Classes.PriorityClasses, nil
 					}, defaultTimeoutInterval, defaultPollInterval).
-						Should(ContainElement(class.GetName()))
+						Should(BeEmpty())
 				})
 
 				pod := &corev1.Pod{
@@ -536,7 +536,7 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 
 				return t.Status.Classes.PriorityClasses, nil
 			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf("internal-bronze-new-0", "internal-silver-new-1", "internal-gold-new-2", customerGold.GetName(), customerBronze.GetName(), customerSilver.GetName()))
+				Should(BeEmpty())
 		})
 	})
 
@@ -578,7 +578,7 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 
 					return t.Status.Classes.PriorityClasses, nil
 				}, defaultTimeoutInterval, defaultPollInterval).
-					Should(ConsistOf(customerBronze.GetName()))
+					Should(BeEmpty())
 			})
 
 			EventuallyCreation(func() error {
@@ -614,7 +614,7 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 
 					return t.Status.Classes.PriorityClasses, nil
 				}, defaultTimeoutInterval, defaultPollInterval).
-					Should(ConsistOf(tenantDefault.GetName(), customerBronze.GetName()))
+					Should(BeEmpty())
 			})
 
 			pod := corev1.Pod{
@@ -672,7 +672,7 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 
 				return t.Status.Classes.PriorityClasses, nil
 			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf(tenantDefault.GetName(), customerBronze.GetName()))
+				Should(BeEmpty())
 		})
 
 		pod := &corev1.Pod{
@@ -729,7 +729,7 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 
 				return t.Status.Classes.PriorityClasses, nil
 			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf(global.GetName(), tenantDefault.GetName(), customerBronze.GetName()))
+				Should(BeEmpty())
 		})
 
 		pod := &corev1.Pod{

@@ -17,7 +17,6 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	nodev1 "k8s.io/api/node/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -124,11 +123,6 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 		Watches(
 			&storagev1.StorageClass{},
 			r.tenantClassEventHandler(r.collectAvailableStorageClasses),
-			builder.WithPredicates(predicates.ClassChanged()),
-		).
-		Watches(
-			&schedulingv1.PriorityClass{},
-			r.tenantClassEventHandler(r.collectAvailablePriorityClasses),
 			builder.WithPredicates(predicates.ClassChanged()),
 		).
 		Watches(

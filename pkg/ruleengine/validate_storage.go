@@ -69,12 +69,16 @@ func validateStorageClassRules(index int, storage rules.NamespaceRuleEnforceStor
 		return fmt.Errorf("%s.classes is invalid: classes must be configured when targets are configured", path)
 	}
 
-	if len(storage.Classes) > 64 {
-		return fmt.Errorf("%s.classes: at most 64 matches are supported", path)
+	return validateClassMatches(path+".classes", storage.Classes)
+}
+
+func validateClassMatches(path string, classes []rules.StorageClassMatch) error {
+	if len(classes) > 64 {
+		return fmt.Errorf("%s: at most 64 matches are supported", path)
 	}
 
-	for i, class := range storage.Classes {
-		classPath := fmt.Sprintf("%s.classes[%d]", path, i)
+	for i, class := range classes {
+		classPath := fmt.Sprintf("%s[%d]", path, i)
 
 		if !class.HasNameMatch() && !class.HasSelector() {
 			return fmt.Errorf("%s is invalid: at least one of exact, exp, matchLabels or matchExpressions must be set", classPath)

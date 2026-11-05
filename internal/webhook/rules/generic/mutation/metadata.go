@@ -31,19 +31,21 @@ func MetadataRules(compiler ruleengine.ConditionCompiler) handlers.TypedHandlerW
 	return &metadataRules{compiler: compiler}
 }
 
-func (h *metadataRules) OnCreate(_ client.Client, _ client.Reader, obj *unstructured.Unstructured, _ admission.Decoder, _ events.EventRecorder, _ *capsulev1beta2.Tenant, bodies []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
-	return h.mutate(obj, nil, bodies)
+func (h *metadataRules) OnCreate(c client.Client, _ client.Reader, obj *unstructured.Unstructured, _ admission.Decoder, _ events.EventRecorder, _ *capsulev1beta2.Tenant, bodies []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
+	return h.mutate(c, obj, nil, bodies)
 }
 
-func (h *metadataRules) OnUpdate(_ client.Client, _ client.Reader, old *unstructured.Unstructured, obj *unstructured.Unstructured, _ admission.Decoder, _ events.EventRecorder, _ *capsulev1beta2.Tenant, bodies []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
-	return h.mutate(obj, old, bodies)
+func (h *metadataRules) OnUpdate(c client.Client, _ client.Reader, old *unstructured.Unstructured, obj *unstructured.Unstructured, _ admission.Decoder, _ events.EventRecorder, _ *capsulev1beta2.Tenant, bodies []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
+	return h.mutate(c, obj, old, bodies)
 }
 
 func (*metadataRules) OnDelete(client.Client, client.Reader, *unstructured.Unstructured, admission.Decoder, events.EventRecorder, *capsulev1beta2.Tenant, []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response { return nil }
 }
 
-func (h *metadataRules) mutate(obj, old *unstructured.Unstructured, bodies []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
+// mutate reads PriorityClasses through the manager's cached client: the API
+// server rechecks the resolved priority after the patch, so a stale read is rejected.
+func (h *metadataRules) mutate(c client.Client, obj, old *unstructured.Unstructured, bodies []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		gvk := schema.GroupVersionKind{Group: req.Kind.Group, Version: req.Kind.Version, Kind: req.Kind.Kind}
 		if gvk.Version == "" || gvk.Kind == "" {
@@ -85,7 +87,7 @@ func (h *metadataRules) mutate(obj, old *unstructured.Unstructured, bodies []*ap
 		resourcesMutated := false
 
 		if mutateResources {
-			resourcesMutated, err = mutateWorkloadResources(ctx, obj, gvk, filtered, conditions)
+			resourcesMutated, err = mutateWorkloadResources(ctx, obj, gvk, filtered, conditions, c)
 			if err != nil {
 				response := admission.Errored(http.StatusInternalServerError, err)
 

@@ -68,7 +68,7 @@ func TestPlaygroundWorkloadTargets(t *testing.T) {
 				metadata := &metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{Name: obj.GetName(), Namespace: ns.Name}}
 				response = genericvalidation.GenericRules(nil, compiler).OnCreate(nil, nil, metadata, nil, recorder, tnt, bodies)(t.Context(), req)
 				if response == nil {
-					response = podvalidation.TemplateRules(nil, nil, compiler).OnCreate(nil, nil, obj, nil, recorder, tnt, bodies)(t.Context(), req)
+					response = podvalidation.TemplateRules(nil, nil, nil, compiler).OnCreate(nil, nil, obj, nil, recorder, tnt, bodies)(t.Context(), req)
 				}
 				if profile == "test" && example != "deployment" {
 					require.NotNil(t, response)
