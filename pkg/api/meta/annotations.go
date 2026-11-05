@@ -17,6 +17,8 @@ import (
 )
 
 const (
+	IngressClassAnnotation = "kubernetes.io/ingress.class"
+
 	ReleaseAnnotation        = "projectcapsule.dev/release"
 	ReleaseAnnotationTrigger = "true"
 

@@ -18,12 +18,13 @@ const (
 	IngressTypeGRPCRoute   IngressType = "GRPCRoute"
 )
 
-// NamespaceRuleEnforceIngressBody defines hostname enforcement for Kubernetes
+// NamespaceRuleEnforceIngressBody defines hostname and class enforcement for Kubernetes
 // Ingress and Gateway API resources.
 //
 // +kubebuilder:object:generate=true
 type NamespaceRuleEnforceIngressBody struct {
-	// Types defines the resource kinds to which hostname enforcement applies.
+	// Types defines the resource kinds to which enforcement applies. Classes
+	// apply to Ingress and Gateway; hostnames apply to every supported type.
 	//
 	// +kubebuilder:validation:MinItems=1
 	Types []IngressType `json:"types,omitempty"`
@@ -35,4 +36,19 @@ type NamespaceRuleEnforceIngressBody struct {
 	//
 	// +kubebuilder:validation:MinItems=1
 	Hostnames []runtime.ExpressionMatch `json:"hostnames,omitempty"`
+
+	// Classes matches IngressClass or GatewayClass names and labels. Entries,
+	// and the criteria within each entry, are ORed. Label selectors read the
+	// referenced class, not the ingress or namespace. Exact and exp need no read.
+	// Classless objects are rejected by applicable allow/deny class rules.
+	// Legacy Tenant class restrictions remain an additional boundary.
+	// +optional
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=64
+	// +listType=atomic
+	Classes []IngressClassMatch `json:"classes,omitempty"`
 }
+
+// IngressClassMatch reuses the shared class name and label matching semantics.
+// +kubebuilder:object:generate=false
+type IngressClassMatch = StorageClassMatch
