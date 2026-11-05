@@ -65,11 +65,12 @@ type podRuleValidator struct {
 	policy func(*apirules.NamespaceRuleEnforceBody) bool
 }
 
-// scope returns the rules to evaluate, and false to skip the validator. An
-// update that keeps the value is only evaluated because of conditional rules.
-// All holds every rule, matched those whose conditions match this request.
-func (v *podRuleValidator) scope(old []*corev1.Pod, pod *corev1.Pod, conditional bool, all, matched []*apirules.NamespaceRuleEnforceBody) ([]*apirules.NamespaceRuleEnforceBody, bool) {
-	if len(old) == 0 || old[0] == nil || v.changed == nil || v.changed(old[0], pod) {
+// scope returns the rules to evaluate on an update, and false to skip the
+// validator. An update that keeps the value is only evaluated because of
+// conditional rules. All holds every rule, matched those whose conditions
+// match this request.
+func (v *podRuleValidator) scope(old, pod *corev1.Pod, conditional bool, all, matched []*apirules.NamespaceRuleEnforceBody) ([]*apirules.NamespaceRuleEnforceBody, bool) {
+	if v.changed == nil || v.changed(old, pod) {
 		return matched, true
 	}
 
@@ -283,12 +284,22 @@ func (h *podRules) validateWorkloadRules(
 		return fmt.Errorf("enforce: %w", err)
 	}
 
+	var previous *corev1.Pod
+	if len(old) > 0 {
+		previous = old[0]
+	}
+
 	for i := range h.rules {
 		rule := &h.rules[i]
+		bodies := enforceBodies
 
-		bodies, ok := rule.scope(old, pod, conditional, all, enforceBodies)
-		if !ok {
-			continue
+		// A create evaluates every rule that matched; only updates narrow them.
+		if previous != nil {
+			var ok bool
+
+			if bodies, ok = rule.scope(previous, pod, conditional, all, enforceBodies); !ok {
+				continue
+			}
 		}
 
 		if req.SubResource != "" && !rule.includeSubresources {
