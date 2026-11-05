@@ -7,6 +7,8 @@ package rules
 // +kubebuilder:object:generate=true
 type IngressMutation struct {
 	// Types selects the kinds whose class is set. Required when class is supplied.
+	// Gateway targets gateway.networking.k8s.io/v1. Served v1beta1 Gateway
+	// requests receive the same class mutation for version compatibility.
 	// ListenerSet parentRef mutation has its own explicit target and is unchanged.
 	// +optional
 	// +kubebuilder:validation:MinItems=1

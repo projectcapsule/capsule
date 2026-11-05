@@ -128,25 +128,9 @@ func mutateIngressRules(ctx context.Context, obj *unstructured.Unstructured, gvk
 		return mutateListenerSetParentRef(ctx, obj, bodies, conditions)
 	}
 
-	if kind := ingressClassMutationKind(gvk); kind != "" {
+	if kind, supported := ingress.ClassTypeForGVK(gvk); supported {
 		return mutateIngressClass(ctx, obj, kind, bodies, conditions)
 	}
 
 	return false, nil
-}
-
-func ingressClassMutationKind(gvk schema.GroupVersionKind) rules.IngressType {
-	if gvk.Version != "v1" {
-		return ""
-	}
-
-	if gvk.Group == "networking.k8s.io" && gvk.Kind == "Ingress" {
-		return rules.IngressTypeIngress
-	}
-
-	if gvk.Group == "gateway.networking.k8s.io" && gvk.Kind == "Gateway" {
-		return rules.IngressTypeGateway
-	}
-
-	return ""
 }

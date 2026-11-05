@@ -16,14 +16,23 @@ import (
 )
 
 func BenchmarkIngressClassMutation(b *testing.B) {
-	for _, kind := range []rules.IngressType{rules.IngressTypeIngress, rules.IngressTypeGateway} {
+	for _, target := range []struct {
+		kind          rules.IngressType
+		version, name string
+	}{
+		{rules.IngressTypeIngress, "v1", "Ingress"},
+		{rules.IngressTypeGateway, "v1", "Gateway"},
+		{rules.IngressTypeGateway, "v1beta1", "Gateway-v1beta1"},
+	} {
+		kind := target.kind
 		for _, count := range []int{1, 32} {
 			for _, tenants := range []int{1, 16} {
 				for _, state := range []string{"default", "replace", "preserve", "condition-false", "status"} {
-					b.Run(fmt.Sprintf("%s/rules=%d/tenants=%d/%s", kind, count, tenants, state), func(b *testing.B) {
+					b.Run(fmt.Sprintf("%s/rules=%d/tenants=%d/%s", target.name, count, tenants, state), func(b *testing.B) {
 						compiler, err := cache.NewCELCache()
 						require.NoError(b, err)
 						obj := ingressClassObject(kind)
+						obj.SetAPIVersion(obj.GroupVersionKind().Group + "/" + target.version)
 						field := "ingressClassName"
 						if kind == rules.IngressTypeGateway {
 							field = "gatewayClassName"

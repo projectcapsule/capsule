@@ -17,6 +17,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
+	"github.com/projectcapsule/capsule/internal/webhook/ingress"
 	apirules "github.com/projectcapsule/capsule/pkg/api/rules"
 	"github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/ruleengine"
@@ -248,9 +249,11 @@ func (h *ingressRules) evaluate(
 
 //nolint:exhaustive
 func ingressTypeForGVK(gvk schema.GroupVersionKind) (apirules.IngressType, bool) {
+	if kind, supported := ingress.ClassTypeForGVK(gvk); supported {
+		return kind, true
+	}
+
 	switch {
-	case gvk.Group == "networking.k8s.io" && gvk.Version == "v1" && gvk.Kind == string(apirules.IngressTypeIngress):
-		return apirules.IngressTypeIngress, true
 	case gvk.Group == "route.openshift.io" && gvk.Version == "v1" && gvk.Kind == string(apirules.IngressTypeRoute):
 		return apirules.IngressTypeRoute, true
 	case gvk.Group == "gateway.networking.k8s.io" && gvk.Version == "v1":
@@ -258,7 +261,6 @@ func ingressTypeForGVK(gvk schema.GroupVersionKind) (apirules.IngressType, bool)
 		switch resourceType {
 		case apirules.IngressTypeListenerSet,
 			apirules.IngressTypeHTTPRoute,
-			apirules.IngressTypeGateway,
 			apirules.IngressTypeTLSRoute,
 			apirules.IngressTypeGRPCRoute:
 			return resourceType, true

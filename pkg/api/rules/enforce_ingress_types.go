@@ -25,6 +25,8 @@ const (
 type NamespaceRuleEnforceIngressBody struct {
 	// Types defines the resource kinds to which enforcement applies. Classes
 	// apply to Ingress and Gateway; hostnames apply to every supported type.
+	// Gateway targets gateway.networking.k8s.io/v1. Served v1beta1 Gateway
+	// requests receive the same rules to prevent bypass through another version.
 	//
 	// +kubebuilder:validation:MinItems=1
 	Types []IngressType `json:"types,omitempty"`
