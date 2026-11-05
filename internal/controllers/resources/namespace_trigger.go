@@ -109,13 +109,13 @@ func (r *NamespaceTrigger) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.C
 		mgr.GetRESTMapper(),
 	)
 	r.globalClients = impersonatedClientLoader[*capsulev1beta2.GlobalTenantResource]{
-		client:        r.client,
+		client:        replicationClient{Client: r.client, reader: r.reader},
 		configuration: r.configuration,
 		impersonation: r.impersonation,
 		resolve:       globalServiceAccount,
 	}
 	r.namespacedClients = impersonatedClientLoader[*capsulev1beta2.TenantResource]{
-		client:        r.client,
+		client:        replicationClient{Client: r.client, reader: r.reader},
 		configuration: r.configuration,
 		impersonation: r.impersonation,
 		resolve:       namespacedServiceAccount,

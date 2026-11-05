@@ -5,12 +5,14 @@ package e2e
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -92,6 +94,99 @@ var _ = Describe("GlobalTenantResource", Label("replications", "global", "global
 
 	It("keeps shared protection when one parent switches to Orphan", Label("shared-orphan-protection"), func() {
 		exerciseSharedReplicationProtection(ptr.To(tenantASelector()), tenantA.Name, "", tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner, true)
+	})
+
+	It("completes first and updated applies despite native status writers", Label("replication-conflicts"), func() {
+		profileLabel := "e2e.projectcapsule.dev/conflict-profile"
+		for _, name := range []string{tenantANamespaces[0], tenantBNamespaces[0]} {
+			Eventually(func() error {
+				ns := &corev1.Namespace{}
+				if err := k8sClient.Get(ctx, types.NamespacedName{Name: name}, ns); err != nil {
+					return err
+				}
+				ns.Labels[profileLabel] = prefix
+				return k8sClient.Update(ctx, ns)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		}
+		gtr := &capsulev1beta2.GlobalTenantResource{Name: prefix + "-conflicts", Spec: capsulev1beta2.GlobalTenantResourceSpec{
+			TenantSelector: tenantASelector(), Scope: api.ResourceScopeNamespace,
+			TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{ResyncPeriod: metav1.Duration{Duration: time.Hour}, Resources: []capsulev1beta2.ResourceSpec{{NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{profileLabel: prefix}}}}},
+		}}
+		for i := range 8 {
+			name := fmt.Sprintf("conflict-%d", i)
+			// The Deployment controller immediately writes status after creation
+			// and spec updates, racing the GTR's resource-version precondition.
+			target := appsv1.Deployment{APIVersion: "apps/v1", Kind: "Deployment", Name: name, Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](0), Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"test": name}}, Template: corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"test": name}}, Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "pause", Image: "registry.k8s.io/pause:3.10.1"}}}}}}
+			raw, err := json.Marshal(target)
+			Expect(err).NotTo(HaveOccurred())
+			gtr.Spec.Resources[0].RawItems = append(gtr.Spec.Resources[0].RawItems, capsulev1beta2.RawExtension{Raw: raw})
+		}
+		assertNoFailure := observeGlobalReplication(ctx, gtr.Name)
+		createGlobalTenantResource(gtr)
+		check := func(revision string) {
+			latest := &capsulev1beta2.GlobalTenantResource{}
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(gtr), latest)).To(Succeed())
+				g.Expect(latest.Status.ObservedGeneration).To(Equal(latest.Generation))
+				ready := latest.Status.Conditions.GetConditionByType(meta.ReadyCondition)
+				g.Expect(ready).NotTo(BeNil())
+				g.Expect(ready.Status).To(Equal(metav1.ConditionTrue))
+				g.Expect(latest.Status.ProcessedItems).To(HaveLen(8))
+				for i := range 8 {
+					target := &appsv1.Deployment{}
+					g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: tenantANamespaces[0], Name: fmt.Sprintf("conflict-%d", i)}, target)).To(Succeed())
+					g.Expect(target.Spec.Template.Annotations["revision"]).To(Equal(revision))
+				}
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			assertNoFailure(latest.ResourceVersion)
+		}
+		check("")
+		Eventually(func() error {
+			latest := &capsulev1beta2.GlobalTenantResource{}
+			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(gtr), latest); err != nil {
+				return err
+			}
+			for i := range latest.Spec.Resources[0].RawItems {
+				target := appsv1.Deployment{}
+				if err := json.Unmarshal(latest.Spec.Resources[0].RawItems[i].Raw, &target); err != nil {
+					return err
+				}
+				target.Spec.Template.Annotations = map[string]string{"revision": "updated"}
+				raw, err := json.Marshal(target)
+				if err != nil {
+					return err
+				}
+				latest.Spec.Resources[0].RawItems[i].Raw = raw
+			}
+			return k8sClient.Update(ctx, latest)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		check("updated")
+		for _, ns := range []string{tenantANamespaces[1], tenantBNamespaces[0]} {
+			for i := range 8 {
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("conflict-%d", i)}, &appsv1.Deployment{})
+				Expect(apierrors.IsNotFound(err)).To(BeTrue(), "replication escaped its namespace/tenant selection: %v", err)
+			}
+		}
+	})
+
+	It("retries stale metadata versions while preserving validation failures", Label("replication-conflicts", "replication-conflict-review"), func() {
+		TenantNamespaceReady(tenantA, &corev1.Namespace{Name: tenantANamespaces[0]}, uint(len(tenantANamespaces)))
+		TenantNamespaceReady(tenantB, &corev1.Namespace{Name: tenantBNamespaces[0]}, uint(len(tenantBNamespaces)))
+		exerciseReplicationMetadataConflicts(tenantANamespaces[0], tenantBNamespaces[0], tenantBOwner)
+	})
+
+	It("cleans up partial creation after exhausting apply conflicts", Label("replication-conflicts", "replication-conflict-review"), func() {
+		TenantNamespaceReady(tenantA, &corev1.Namespace{Name: tenantANamespaces[0]}, uint(len(tenantANamespaces)))
+		TenantNamespaceReady(tenantB, &corev1.Namespace{Name: tenantBNamespaces[0]}, uint(len(tenantBNamespaces)))
+		exerciseReplicationFailedApply(tenantA.Name, tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner, tenantBOwner, "exhausted")
+	})
+
+	It("keeps cleanup state when a conflict retry cannot read its target", Label("replication-conflicts", "replication-conflict-review", "replication-observation-failure"), func() {
+		TenantNamespaceReady(tenantA, &corev1.Namespace{Name: tenantANamespaces[0]}, uint(len(tenantANamespaces)))
+		TenantNamespaceReady(tenantB, &corev1.Namespace{Name: tenantBNamespaces[0]}, uint(len(tenantBNamespaces)))
+		for _, failure := range []string{"read", "conditional-read"} {
+			exerciseReplicationFailedApply(tenantA.Name, tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner, tenantBOwner, failure)
+		}
 	})
 
 	BeforeEach(func() {

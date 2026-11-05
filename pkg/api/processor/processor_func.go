@@ -15,6 +15,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/projectcapsule/capsule/pkg/api/meta"
@@ -502,7 +504,59 @@ func (r *Processor) Apply(
 		options.Protect = policy.IsProtected()
 	}
 
-	return r.resourceManager().Apply(ctx, c, obj, options)
+	manager := r.resourceManager()
+
+	result, err := manager.Apply(ctx, c, obj, options)
+	if !retryableApplyConflict(err) {
+		return result, err
+	}
+
+	return retryApply(ctx, manager, c, obj, options, result, err)
+}
+
+func retryableApplyConflict(err error) bool {
+	return apierrors.IsConflict(err) && !apierrors.HasStatusCause(err, metav1.CauseTypeFieldManagerConflict)
+}
+
+func retryApply(ctx context.Context, manager ssa.Manager, c client.Client, obj *unstructured.Unstructured, options ssa.ApplyOptions, result ssa.ApplyResult, applyErr error) (ssa.ApplyResult, error) {
+	first := true
+
+	// Native controllers can update a new target's status between creation and
+	// SSA. Retry the whole target operation, including its condition and ownership
+	// reads, rather than replaying a patch with the same resource version.
+	err := wait.ExponentialBackoffWithContext(ctx, retry.DefaultBackoff, func(ctx context.Context) (bool, error) {
+		if first {
+			// Count the completed first attempt against the retry budget and
+			// wait before reading the target again. Keep this off the fast path.
+			first = false
+
+			return false, nil
+		}
+
+		previous := result
+
+		result, applyErr = manager.Apply(ctx, c, obj, options)
+		if !result.TargetObserved {
+			// A failed read says nothing about the last confirmed write. Keep it
+			// tracked for cleanup; absence and replacement are observations instead.
+			result.UID, result.LastApply, result.Created = previous.UID, previous.LastApply, previous.Created
+		} else if result.LastApply == nil && result.UID != "" && result.UID == previous.UID {
+			// A successful create or content write still needs cleanup if later
+			// attempts fail. Never carry that timestamp onto a replacement target.
+			result.LastApply = previous.LastApply
+		}
+
+		if retryableApplyConflict(applyErr) {
+			return false, nil
+		}
+
+		return applyErr == nil, applyErr
+	})
+	if wait.Interrupted(err) && ctx.Err() == nil && applyErr != nil {
+		return result, applyErr
+	}
+
+	return result, err
 }
 
 func (r *Processor) isNamespaceTerminatingForObject(

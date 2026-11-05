@@ -74,7 +74,7 @@ func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager, ctrlCo
 		mgr.GetRESTMapper(),
 	)
 	r.clients = impersonatedClientLoader[*capsulev1beta2.TenantResource]{
-		client:        r.client,
+		client:        replicationClient{Client: r.client, reader: r.reader},
 		configuration: r.configuration,
 		impersonation: r.impersonation,
 		resolve:       namespacedServiceAccount,

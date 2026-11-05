@@ -73,6 +73,18 @@ func (l impersonatedClientLoader[T]) Load(
 	return c, sa, err
 }
 
+// Keep target reads authoritative under the controller identity. Impersonated
+// clients already read directly and must never use this privileged reader.
+type replicationClient struct {
+	client.Client
+
+	reader client.Reader
+}
+
+func (c replicationClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	return c.reader.Get(ctx, key, obj, opts...)
+}
+
 // Resolves the ServiceAccount of a GlobalTenantResource: being cluster scoped, it must
 // declare the Namespace of the ServiceAccount along with its name.
 func globalServiceAccount(
