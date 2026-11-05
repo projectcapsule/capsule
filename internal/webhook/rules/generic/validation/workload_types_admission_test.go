@@ -50,7 +50,7 @@ func TestTemplateAdmissionSharesRequestReads(t *testing.T) {
 		objects = append(objects, tnt, ns, rs)
 	}
 	cl := &typeAdmissionClient{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()}
-	chain := Register(nil, nil, nil, nil, podvalidation.TemplateRules(nil, nil, nil)).GetHandlers()
+	chain := Register(nil, nil, nil, nil, podvalidation.TemplateRules(nil, nil, nil, nil)).GetHandlers()
 	for _, namespace := range []string{"a", "b"} {
 		cl.gets.Store(0)
 		req := requestWithKind("apps", "Deployment")
@@ -94,14 +94,14 @@ func TestTemplateAdmissionSharesRequestReads(t *testing.T) {
 	for _, kind := range []string{"Service", "ConfigMap", "Deployment"} {
 		req := requestWithKind("example.com", kind)
 		req.Namespace = "a"
-		h := &templateBridge{next: podvalidation.TemplateRules(nil, nil, nil)}
+		h := &templateBridge{next: podvalidation.TemplateRules(nil, nil, nil, nil)}
 		require.Nil(t, h.OnCreate(cl, cl, nil, admission.NewDecoder(scheme), nil, nil, nil)(t.Context(), req))
 		req.Kind.Group = "apps"
 		req.SubResource = "status"
 		require.Nil(t, h.OnUpdate(cl, cl, nil, nil, admission.NewDecoder(scheme), nil, nil, nil)(t.Context(), req))
 	}
 	require.Zero(t, cl.gets.Load(), "excluded requests skip resolution")
-	bridge := &templateBridge{next: podvalidation.TemplateRules(nil, nil, nil)}
+	bridge := &templateBridge{next: podvalidation.TemplateRules(nil, nil, nil, nil)}
 	req := requestWithKind("apps", "Deployment")
 	for _, body := range []*rules.NamespaceRuleBodyNamespace{
 		nil,
@@ -140,7 +140,7 @@ func BenchmarkTemplateHandlerChain(b *testing.B) {
 					cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
 					chain := Register(nil, nil, nil, nil, nil).GetHandlers()
 					if enabled {
-						chain = Register(nil, nil, nil, nil, podvalidation.TemplateRules(nil, nil, nil)).GetHandlers()
+						chain = Register(nil, nil, nil, nil, podvalidation.TemplateRules(nil, nil, nil, nil)).GetHandlers()
 					}
 					decoder := admission.NewDecoder(scheme)
 					b.ReportAllocs()

@@ -22,7 +22,7 @@ import (
 func BenchmarkPodTargetAdmission(b *testing.B) {
 	for _, count := range []int{1, 20} {
 		b.Run(fmt.Sprintf("rules=%d", count), func(b *testing.B) {
-			h := PodRules(nil, nil, nil)
+			h := PodRules(nil, nil, nil, nil)
 			pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "app", Namespace: "tenant-a"}, Spec: corev1.PodSpec{SchedulerName: "default-scheduler", Containers: []corev1.Container{{Name: "app", Image: "example.com/team/app:v1"}}}}
 			var bodies []*rules.NamespaceRuleBodyNamespace
 			for range count {
@@ -45,7 +45,7 @@ func BenchmarkSchedulerCompatibilityAdmission(b *testing.B) {
 			for _, field := range []string{"placement", "placement-pair", "legacy", "both"} {
 				for _, mode := range []string{"allow", "deny", "skip", "cold", "parallel"} {
 					b.Run(fmt.Sprintf("tenants=%d/rules=%d/%s/%s", tenants, count, field, mode), func(b *testing.B) {
-						h := PodRules(nil, nil, nil).(*podRules)
+						h := PodRules(nil, nil, nil, nil).(*podRules)
 						recorder := events.NewEventRecorder(nil, logr.Discard(), nil, nil)
 						calls := make([]handlers.Func, tenants)
 						for i := range tenants {

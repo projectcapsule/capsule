@@ -717,11 +717,11 @@ func main() {
 			labelSelectorCache,
 			cfg,
 			celCache,
-			podrules.TemplateRules(regexCache, registryCache, celCache),
+			podrules.TemplateRules(regexCache, registryCache, labelSelectorCache, celCache),
 			rulesgenericvalidation.ForKind(
 				corev1.SchemeGroupVersion.WithKind("Pod").GroupKind(),
 				pod.Handler(cfg,
-					podrules.PodRules(regexCache, registryCache, celCache),
+					podrules.PodRules(regexCache, registryCache, labelSelectorCache, celCache),
 				),
 				"ephemeralcontainers",
 			),

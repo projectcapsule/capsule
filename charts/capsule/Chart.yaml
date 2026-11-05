@@ -41,6 +41,10 @@ annotations:
       url: https://projectcapsule.dev/
   artifacthub.io/changes: |
     - kind: added
+      description: enforce PriorityClass references of Pods and controller templates and provide merge or replace class defaults through namespace rules
+    - kind: changed
+      description: tenant status no longer lists available PriorityClasses, which are now a namespace-specific policy
+    - kind: added
       description: combine global, mutating, validating, and per-hook namespace selectors for admission webhooks
     - kind: added
       description: enforce DeviceClass references and provide merge-only class defaults for DRA claims and templates through namespace rules

@@ -217,14 +217,14 @@ func TestAffinityFlatMatchersAndTermBoundaries(t *testing.T) {
 }
 
 func TestPlacementValidationSkipsUnchangedUpdatesAndSubresources(t *testing.T) {
-	h := PodRules(nil, nil, nil).(*podRules)
+	h := PodRules(nil, nil, nil, nil).(*podRules)
 	pod := &corev1.Pod{Spec: corev1.PodSpec{Tolerations: []corev1.Toleration{{Operator: corev1.TolerationOpExists}}}}
 	bodies := []*rules.NamespaceRuleEnforceBody{placementRule(rules.ActionTypeDeny, rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{Tolerations: []rules.WorkloadTolerationMatch{{}}}})}
-	if err := h.validatePodRules(context.Background(), admission.Request{}, pod, nil, nil, bodies, pod.DeepCopy()); err != nil {
+	if err := h.validatePodRules(context.Background(), admission.Request{}, nil, pod, nil, nil, bodies, pod.DeepCopy()); err != nil {
 		t.Fatalf("unrelated update rejected: %v", err)
 	}
 	req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{SubResource: "ephemeralcontainers"}}
-	if err := h.validatePodRules(context.Background(), req, pod, nil, nil, bodies); err != nil {
+	if err := h.validatePodRules(context.Background(), req, nil, pod, nil, nil, bodies); err != nil {
 		t.Fatalf("subresource rejected: %v", err)
 	}
 }

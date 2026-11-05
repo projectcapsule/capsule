@@ -836,6 +836,96 @@ spec:
                     workloads:
                       description: Enforcement for native workload kinds and Pod properties.
                       properties:
+                        classes:
+                          description: Classes matches the classes referenced by Pods.
+                          properties:
+                            priority:
+                              description: |-
+                                Priority matches spec.priorityClassName of selected Pods and Pod templates
+                                by name, or by the labels of the PriorityClass. Entries, and the criteria
+                                within each entry, are ORed. An applicable allow list rejects every other
+                                class; audit never grants access. A Pod without a class is not matched:
+                                Kubernetes assigns the cluster's global default class before admission, so
+                                that name is matched like an explicit one. A controller template gets its
+                                class only when its Pods are created, so an allow or deny rule that targets
+                                the controller requires the template to name one; audit rules record its
+                                absence. Exact and exp need no read; a label selector reads the class, and
+                                a missing class never matches it. Priority rules apply to the pod target
+                                and do not run on subresources. An update that keeps the class is only
+                                checked again when an allow or deny class rule has conditions; conditional
+                                audit rules are recorded without taking that decision again.
+                                Legacy Tenant.spec.priorityClasses restrictions remain an additional boundary.
+                              items:
+                                description: |-
+                                  StorageClassMatch matches a class by name, or by the labels of the class
+                                  object. Exact, exp and the label selector are ORed. The rule admission
+                                  validator requires at least one of them. A class object that does not exist
+                                  never matches the label selector.
+                                properties:
+                                  exact:
+                                    description: Exact matches one of the provided
+                                      class names exactly.
+                                    items:
+                                      minLength: 1
+                                      type: string
+                                    maxItems: 64
+                                    minItems: 1
+                                    type: array
+                                  exp:
+                                    description: Exp matches the class name by regular
+                                      expression.
+                                    maxLength: 4096
+                                    minLength: 1
+                                    type: string
+                                  matchExpressions:
+                                    description: matchExpressions is a list of label
+                                      selector requirements. The requirements are
+                                      ANDed.
+                                    items:
+                                      description: |-
+                                        A label selector requirement is a selector that contains values, a key, and an operator that
+                                        relates the key and values.
+                                      properties:
+                                        key:
+                                          description: key is the label key that the
+                                            selector applies to.
+                                          type: string
+                                        operator:
+                                          description: |-
+                                            operator represents a key's relationship to a set of values.
+                                            Valid operators are In, NotIn, Exists and DoesNotExist.
+                                          type: string
+                                        values:
+                                          description: |-
+                                            values is an array of string values. If the operator is In or NotIn,
+                                            the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                            the values array must be empty. This array is replaced during a strategic
+                                            merge patch.
+                                          items:
+                                            type: string
+                                          type: array
+                                          x-kubernetes-list-type: atomic
+                                      required:
+                                      - key
+                                      - operator
+                                      type: object
+                                    type: array
+                                    x-kubernetes-list-type: atomic
+                                  matchLabels:
+                                    additionalProperties:
+                                      type: string
+                                    description: |-
+                                      matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                                      map is equivalent to an element of matchExpressions, whose key field is "key", the
+                                      operator is "In", and the values array contains only "value". The requirements are ANDed.
+                                    type: object
+                                type: object
+                                x-kubernetes-map-type: atomic
+                              maxItems: 64
+                              minItems: 1
+                              type: array
+                              x-kubernetes-list-type: atomic
+                          type: object
                         disruptionBudgets:
                           description: |-
                             DisruptionBudgets constrains PDB coverage of selected Pods and controller templates.
@@ -2027,9 +2117,9 @@ spec:
                         default: merge
                         description: |-
                           Action chooses how explicitly supplied properties are applied.
-                          Merge fills an empty schedulerName and absent security profiles, sets hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy,
+                          Merge fills an empty schedulerName, an omitted priority class and absent security profiles, sets hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy,
                           and map keys, adds missing imagePullSecrets by name, upserts lists, and conjoins required affinity.
-                          Replace replaces each supplied property in full: scheduler, hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy, nodeSelector,
+                          Replace replaces each supplied property in full: scheduler, classes.priority, hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy, nodeSelector,
                           registries.imagePullSecrets, tolerations, topologySpreadConstraints, affinity, or security profiles. Omitted properties are
                           retained. Supplying affinity replaces all its branches, including omitted ones.
                           ListenerSet parent references are atomic: merge fills an absent or null
@@ -2171,6 +2261,24 @@ spec:
                           tolerations and spread constraints.
                           On merge, required affinity restrictions from applicable entries are ANDed.
                         properties:
+                          classes:
+                            description: Classes configures the classes referenced
+                              by the Pod.
+                            properties:
+                              priority:
+                                description: |-
+                                  Priority sets spec.priorityClassName on Pod creation, together with the
+                                  priority and preemptionPolicy of that PriorityClass. Merge fills an omitted
+                                  class; the cluster's global default class, which Kubernetes assigns before
+                                  admission, counts as omitted. The first applicable merge wins. Replace
+                                  always sets the class. The PriorityClass must exist; Capsule does not create
+                                  it. Omitted or null leaves the Pod unchanged. Tenant and Namespace templates
+                                  are supported; rendered names must satisfy native PriorityClass name
+                                  validation. Requires the pod target or omitted/empty targets.
+                                maxLength: 4096
+                                minLength: 1
+                                type: string
+                            type: object
                           placement:
                             description: Placement configures the Pod scheduler and
                               scheduling constraints.
@@ -4450,6 +4558,97 @@ spec:
                         description: Enforcement for native workload kinds and Pod
                           properties.
                         properties:
+                          classes:
+                            description: Classes matches the classes referenced by
+                              Pods.
+                            properties:
+                              priority:
+                                description: |-
+                                  Priority matches spec.priorityClassName of selected Pods and Pod templates
+                                  by name, or by the labels of the PriorityClass. Entries, and the criteria
+                                  within each entry, are ORed. An applicable allow list rejects every other
+                                  class; audit never grants access. A Pod without a class is not matched:
+                                  Kubernetes assigns the cluster's global default class before admission, so
+                                  that name is matched like an explicit one. A controller template gets its
+                                  class only when its Pods are created, so an allow or deny rule that targets
+                                  the controller requires the template to name one; audit rules record its
+                                  absence. Exact and exp need no read; a label selector reads the class, and
+                                  a missing class never matches it. Priority rules apply to the pod target
+                                  and do not run on subresources. An update that keeps the class is only
+                                  checked again when an allow or deny class rule has conditions; conditional
+                                  audit rules are recorded without taking that decision again.
+                                  Legacy Tenant.spec.priorityClasses restrictions remain an additional boundary.
+                                items:
+                                  description: |-
+                                    StorageClassMatch matches a class by name, or by the labels of the class
+                                    object. Exact, exp and the label selector are ORed. The rule admission
+                                    validator requires at least one of them. A class object that does not exist
+                                    never matches the label selector.
+                                  properties:
+                                    exact:
+                                      description: Exact matches one of the provided
+                                        class names exactly.
+                                      items:
+                                        minLength: 1
+                                        type: string
+                                      maxItems: 64
+                                      minItems: 1
+                                      type: array
+                                    exp:
+                                      description: Exp matches the class name by regular
+                                        expression.
+                                      maxLength: 4096
+                                      minLength: 1
+                                      type: string
+                                    matchExpressions:
+                                      description: matchExpressions is a list of label
+                                        selector requirements. The requirements are
+                                        ANDed.
+                                      items:
+                                        description: |-
+                                          A label selector requirement is a selector that contains values, a key, and an operator that
+                                          relates the key and values.
+                                        properties:
+                                          key:
+                                            description: key is the label key that
+                                              the selector applies to.
+                                            type: string
+                                          operator:
+                                            description: |-
+                                              operator represents a key's relationship to a set of values.
+                                              Valid operators are In, NotIn, Exists and DoesNotExist.
+                                            type: string
+                                          values:
+                                            description: |-
+                                              values is an array of string values. If the operator is In or NotIn,
+                                              the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                              the values array must be empty. This array is replaced during a strategic
+                                              merge patch.
+                                            items:
+                                              type: string
+                                            type: array
+                                            x-kubernetes-list-type: atomic
+                                        required:
+                                        - key
+                                        - operator
+                                        type: object
+                                      type: array
+                                      x-kubernetes-list-type: atomic
+                                    matchLabels:
+                                      additionalProperties:
+                                        type: string
+                                      description: |-
+                                        matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                                        map is equivalent to an element of matchExpressions, whose key field is "key", the
+                                        operator is "In", and the values array contains only "value". The requirements are ANDed.
+                                      type: object
+                                  type: object
+                                  x-kubernetes-map-type: atomic
+                                maxItems: 64
+                                minItems: 1
+                                type: array
+                                x-kubernetes-list-type: atomic
+                            type: object
                           disruptionBudgets:
                             description: |-
                               DisruptionBudgets constrains PDB coverage of selected Pods and controller templates.
@@ -5650,9 +5849,9 @@ spec:
                           default: merge
                           description: |-
                             Action chooses how explicitly supplied properties are applied.
-                            Merge fills an empty schedulerName and absent security profiles, sets hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy,
+                            Merge fills an empty schedulerName, an omitted priority class and absent security profiles, sets hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy,
                             and map keys, adds missing imagePullSecrets by name, upserts lists, and conjoins required affinity.
-                            Replace replaces each supplied property in full: scheduler, hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy, nodeSelector,
+                            Replace replaces each supplied property in full: scheduler, classes.priority, hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy, nodeSelector,
                             registries.imagePullSecrets, tolerations, topologySpreadConstraints, affinity, or security profiles. Omitted properties are
                             retained. Supplying affinity replaces all its branches, including omitted ones.
                             ListenerSet parent references are atomic: merge fills an absent or null
@@ -5794,6 +5993,24 @@ spec:
                             tolerations and spread constraints.
                             On merge, required affinity restrictions from applicable entries are ANDed.
                           properties:
+                            classes:
+                              description: Classes configures the classes referenced
+                                by the Pod.
+                              properties:
+                                priority:
+                                  description: |-
+                                    Priority sets spec.priorityClassName on Pod creation, together with the
+                                    priority and preemptionPolicy of that PriorityClass. Merge fills an omitted
+                                    class; the cluster's global default class, which Kubernetes assigns before
+                                    admission, counts as omitted. The first applicable merge wins. Replace
+                                    always sets the class. The PriorityClass must exist; Capsule does not create
+                                    it. Omitted or null leaves the Pod unchanged. Tenant and Namespace templates
+                                    are supported; rendered names must satisfy native PriorityClass name
+                                    validation. Requires the pod target or omitted/empty targets.
+                                  maxLength: 4096
+                                  minLength: 1
+                                  type: string
+                              type: object
                             placement:
                               description: Placement configures the Pod scheduler
                                 and scheduling constraints.
@@ -8024,6 +8241,97 @@ spec:
                           description: Enforcement for native workload kinds and Pod
                             properties.
                           properties:
+                            classes:
+                              description: Classes matches the classes referenced
+                                by Pods.
+                              properties:
+                                priority:
+                                  description: |-
+                                    Priority matches spec.priorityClassName of selected Pods and Pod templates
+                                    by name, or by the labels of the PriorityClass. Entries, and the criteria
+                                    within each entry, are ORed. An applicable allow list rejects every other
+                                    class; audit never grants access. A Pod without a class is not matched:
+                                    Kubernetes assigns the cluster's global default class before admission, so
+                                    that name is matched like an explicit one. A controller template gets its
+                                    class only when its Pods are created, so an allow or deny rule that targets
+                                    the controller requires the template to name one; audit rules record its
+                                    absence. Exact and exp need no read; a label selector reads the class, and
+                                    a missing class never matches it. Priority rules apply to the pod target
+                                    and do not run on subresources. An update that keeps the class is only
+                                    checked again when an allow or deny class rule has conditions; conditional
+                                    audit rules are recorded without taking that decision again.
+                                    Legacy Tenant.spec.priorityClasses restrictions remain an additional boundary.
+                                  items:
+                                    description: |-
+                                      StorageClassMatch matches a class by name, or by the labels of the class
+                                      object. Exact, exp and the label selector are ORed. The rule admission
+                                      validator requires at least one of them. A class object that does not exist
+                                      never matches the label selector.
+                                    properties:
+                                      exact:
+                                        description: Exact matches one of the provided
+                                          class names exactly.
+                                        items:
+                                          minLength: 1
+                                          type: string
+                                        maxItems: 64
+                                        minItems: 1
+                                        type: array
+                                      exp:
+                                        description: Exp matches the class name by
+                                          regular expression.
+                                        maxLength: 4096
+                                        minLength: 1
+                                        type: string
+                                      matchExpressions:
+                                        description: matchExpressions is a list of
+                                          label selector requirements. The requirements
+                                          are ANDed.
+                                        items:
+                                          description: |-
+                                            A label selector requirement is a selector that contains values, a key, and an operator that
+                                            relates the key and values.
+                                          properties:
+                                            key:
+                                              description: key is the label key that
+                                                the selector applies to.
+                                              type: string
+                                            operator:
+                                              description: |-
+                                                operator represents a key's relationship to a set of values.
+                                                Valid operators are In, NotIn, Exists and DoesNotExist.
+                                              type: string
+                                            values:
+                                              description: |-
+                                                values is an array of string values. If the operator is In or NotIn,
+                                                the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                                the values array must be empty. This array is replaced during a strategic
+                                                merge patch.
+                                              items:
+                                                type: string
+                                              type: array
+                                              x-kubernetes-list-type: atomic
+                                          required:
+                                          - key
+                                          - operator
+                                          type: object
+                                        type: array
+                                        x-kubernetes-list-type: atomic
+                                      matchLabels:
+                                        additionalProperties:
+                                          type: string
+                                        description: |-
+                                          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                                          map is equivalent to an element of matchExpressions, whose key field is "key", the
+                                          operator is "In", and the values array contains only "value". The requirements are ANDed.
+                                        type: object
+                                    type: object
+                                    x-kubernetes-map-type: atomic
+                                  maxItems: 64
+                                  minItems: 1
+                                  type: array
+                                  x-kubernetes-list-type: atomic
+                              type: object
                             disruptionBudgets:
                               description: |-
                                 DisruptionBudgets constrains PDB coverage of selected Pods and controller templates.
@@ -9231,9 +9539,9 @@ spec:
                             default: merge
                             description: |-
                               Action chooses how explicitly supplied properties are applied.
-                              Merge fills an empty schedulerName and absent security profiles, sets hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy,
+                              Merge fills an empty schedulerName, an omitted priority class and absent security profiles, sets hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy,
                               and map keys, adds missing imagePullSecrets by name, upserts lists, and conjoins required affinity.
-                              Replace replaces each supplied property in full: scheduler, hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy, nodeSelector,
+                              Replace replaces each supplied property in full: scheduler, classes.priority, hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy, nodeSelector,
                               registries.imagePullSecrets, tolerations, topologySpreadConstraints, affinity, or security profiles. Omitted properties are
                               retained. Supplying affinity replaces all its branches, including omitted ones.
                               ListenerSet parent references are atomic: merge fills an absent or null
@@ -9376,6 +9684,24 @@ spec:
                               tolerations and spread constraints.
                               On merge, required affinity restrictions from applicable entries are ANDed.
                             properties:
+                              classes:
+                                description: Classes configures the classes referenced
+                                  by the Pod.
+                                properties:
+                                  priority:
+                                    description: |-
+                                      Priority sets spec.priorityClassName on Pod creation, together with the
+                                      priority and preemptionPolicy of that PriorityClass. Merge fills an omitted
+                                      class; the cluster's global default class, which Kubernetes assigns before
+                                      admission, counts as omitted. The first applicable merge wins. Replace
+                                      always sets the class. The PriorityClass must exist; Capsule does not create
+                                      it. Omitted or null leaves the Pod unchanged. Tenant and Namespace templates
+                                      are supported; rendered names must satisfy native PriorityClass name
+                                      validation. Requires the pod target or omitted/empty targets.
+                                    maxLength: 4096
+                                    minLength: 1
+                                    type: string
+                                type: object
                               placement:
                                 description: Placement configures the Pod scheduler
                                   and scheduling constraints.

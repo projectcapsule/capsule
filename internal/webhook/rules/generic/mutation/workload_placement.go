@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apirules "github.com/projectcapsule/capsule/pkg/api/rules"
 	"github.com/projectcapsule/capsule/pkg/ruleengine"
@@ -20,7 +21,10 @@ const maxPlacementNodeTerms = 256
 
 // MutatePodPlacement applies ordered, audience-filtered placement and security mutations. It
 // never changes rule/cache-owned values. Call only for main-resource Pod CREATE.
-func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules.NamespaceRuleBodyNamespace, conditions *ruleengine.ConditionEvaluator) (bool, error) {
+// Priority class mutations resolve their PriorityClass through classes: a
+// cached reader for the configured class, optionally followed by an
+// authoritative one that judges the Pod's own class and covers cache misses.
+func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules.NamespaceRuleBodyNamespace, conditions *ruleengine.ConditionEvaluator, classes ...client.Reader) (bool, error) {
 	if pod == nil || !slices.ContainsFunc(bodies, func(body *apirules.NamespaceRuleBodyNamespace) bool { return body != nil && len(body.Mutate) > 0 }) {
 		return false, nil
 	}
@@ -33,6 +37,7 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 	var containers []workloadMutationContainer
 
 	linux := pod.Spec.OS == nil || pod.Spec.OS.Name != corev1.Windows
+	priorityClass := newPodPriorityClass(classes)
 
 	for i, body := range bodies {
 		if body == nil {
@@ -73,6 +78,10 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 				return false, fmt.Errorf("rules[%d].mutate[%d].action: unsupported action %q (expected merge or replace)", i, j, mutation.Action)
 			}
 
+			if err := priorityClass.mutate(ctx, pod, mutation); err != nil {
+				return false, fmt.Errorf("rules[%d].mutate[%d].workloads.classes.priority: %w", i, j, err)
+			}
+
 			if hasContainerMutation(mutation.Workloads, linux) {
 				if containers == nil {
 					containers = workloadMutationContainers(pod, false, nil)
@@ -88,6 +97,7 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 
 func podPlacementChanged(before, after *apirules.WorkloadMutation) bool {
 	return before.Placement.Scheduler != after.Placement.Scheduler ||
+		before.Classes.Priority != after.Classes.Priority ||
 		(before.Security.SeccompProfile != after.Security.SeccompProfile && !equality.Semantic.DeepEqual(before.Security.SeccompProfile, after.Security.SeccompProfile)) ||
 		(before.Security.AppArmorProfile != after.Security.AppArmorProfile && !equality.Semantic.DeepEqual(before.Security.AppArmorProfile, after.Security.AppArmorProfile)) ||
 		!equality.Semantic.DeepEqual(before.Security.HostUsers, after.Security.HostUsers) ||
@@ -135,6 +145,7 @@ func podPlacement(pod *corev1.Pod) *apirules.WorkloadMutation {
 			Affinity:                  pod.Spec.Affinity,
 		},
 		Security: apirules.WorkloadSecurityMutation{HostUsers: pod.Spec.HostUsers},
+		Classes:  apirules.WorkloadClassMutation{Priority: pod.Spec.PriorityClassName},
 	}
 	if pod.Spec.SecurityContext != nil {
 		placement.Security.SeccompProfile = pod.Spec.SecurityContext.SeccompProfile

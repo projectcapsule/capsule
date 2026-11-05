@@ -54,7 +54,7 @@ func (r *templateRecorder) LabeledEvent(obj runtime.Object, typ, reason, action,
 func TestTemplateWorkloadPolicies(t *testing.T) {
 	compiler, err := cache.NewCELCache()
 	require.NoError(t, err)
-	h := TemplateRules(nil, nil, compiler)
+	h := TemplateRules(nil, nil, nil, compiler)
 	for _, target := range []rules.WorkloadValidationTarget{rules.ValidateDeployment, rules.ValidateStatefulSet, rules.ValidateDaemonSet, rules.ValidateReplicaSet, rules.ValidateReplicationController, rules.ValidateJob, rules.ValidateCronJob} {
 		for _, policy := range []struct {
 			name, message string
@@ -125,7 +125,7 @@ func TestTemplateWorkloadPolicies(t *testing.T) {
 func TestTemplateConditionsPartsAndScope(t *testing.T) {
 	compiler, err := cache.NewCELCache()
 	require.NoError(t, err)
-	h := TemplateRules(nil, nil, compiler)
+	h := TemplateRules(nil, nil, nil, compiler)
 	obj, req := templateFixture(t, rules.ValidateDeployment)
 	recorder := events.NewEventRecorder(nil, logr.Discard(), nil, nil)
 	body := &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeDeny, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: []rules.WorkloadValidationTarget{"deployment/initcontainers"}, Registries: []rules.OCIRegistry{{ExpressionMatch: apiruntime.ExpressionMatch{Exact: []string{"example.com/team/app:v1"}}}}}}}
@@ -168,7 +168,7 @@ func TestTemplateConditionsPartsAndScope(t *testing.T) {
 	// Controller-only scheduler/QoS policies cannot affect Pods.
 	pod := &corev1.Pod{Spec: corev1.PodSpec{SchedulerName: "batch"}}
 	podBody := &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: []rules.WorkloadValidationTarget{rules.ValidateDeployment}, Placement: rules.WorkloadPlacementEnforcement{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"batch"}}}}}}
-	require.NoError(t, PodRules(nil, nil, compiler).(*podRules).validatePodRules(t.Context(), admission.Request{}, pod, nil, nil, []*rules.NamespaceRuleEnforceBody{podBody}))
+	require.NoError(t, PodRules(nil, nil, nil, compiler).(*podRules).validatePodRules(t.Context(), admission.Request{}, nil, pod, nil, nil, []*rules.NamespaceRuleEnforceBody{podBody}))
 }
 
 func BenchmarkTemplateAdmission(b *testing.B) {
@@ -177,7 +177,7 @@ func BenchmarkTemplateAdmission(b *testing.B) {
 			b.Run(fmt.Sprintf("rules=%d/%s", count, mode), func(b *testing.B) {
 				compiler, err := cache.NewCELCache()
 				require.NoError(b, err)
-				h := TemplateRules(nil, nil, compiler)
+				h := TemplateRules(nil, nil, nil, compiler)
 				obj, req := templateFixture(b, rules.ValidateDeployment)
 				var bodies []*rules.NamespaceRuleBodyNamespace
 				for range count {
@@ -218,7 +218,7 @@ func BenchmarkTemplateSizeAndConcurrency(b *testing.B) {
 		for _, containers := range []int{1, 20} {
 			for _, parallel := range []bool{false, true} {
 				b.Run(fmt.Sprintf("tenants=%d/containers=%d/parallel=%v", tenants, containers, parallel), func(b *testing.B) {
-					h := TemplateRules(nil, nil, nil)
+					h := TemplateRules(nil, nil, nil, nil)
 					obj, req := templateFixture(b, rules.ValidateDeployment)
 					data := make([]any, containers)
 					for i := range data {

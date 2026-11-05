@@ -24,7 +24,7 @@ func BenchmarkSecurityProfileAdmission(b *testing.B) {
 		for _, size := range []int{1, 10} {
 			for _, mode := range []string{"allow-warm", "deny", "skip", "cold", "parallel"} {
 				b.Run(fmt.Sprintf("tenants=%d/containers-rules=%d/%s", tenants, size, mode), func(b *testing.B) {
-					h := newPodRules(nil, nil, nil)
+					h := newPodRules(nil, nil, nil, nil)
 					recorder := events.NewEventRecorder(nil, logr.Discard(), nil, nil)
 					calls := make([]handlers.Func, 0, tenants)
 					for ti := range tenants {

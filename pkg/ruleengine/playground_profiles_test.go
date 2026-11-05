@@ -66,7 +66,7 @@ func TestPlaygroundSecurityProfiles(t *testing.T) {
 			} else {
 				require.Nil(t, pod.Spec.SecurityContext)
 			}
-			response = validation.PodRules(nil, nil, nil).OnCreate(nil, nil, pod, nil, events.NewEventRecorder(nil, logr.Discard(), nil, nil), tnt, bodies)(t.Context(), req)
+			response = validation.PodRules(nil, nil, nil, nil).OnCreate(nil, nil, pod, nil, events.NewEventRecorder(nil, logr.Discard(), nil, nil), tnt, bodies)(t.Context(), req)
 			if selected && name == "override-denied" {
 				require.NotNil(t, response)
 				require.False(t, response.Allowed)

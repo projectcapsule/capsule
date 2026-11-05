@@ -28,7 +28,7 @@ func TestTenantStatusRetiresGatewayClassSnapshots(t *testing.T) {
 	for _, add := range []func(*runtime.Scheme) error{capsulev1beta2.AddToScheme, nodev1.AddToScheme, schedulingv1.AddToScheme, storagev1.AddToScheme, gatewayv1.Install} {
 		require.NoError(t, add(scheme))
 	}
-	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(&schedulingv1.PriorityClass{Name: "priority"}).WithInterceptorFuncs(interceptor.Funcs{
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(&storagev1.StorageClass{Name: "storage"}).WithInterceptorFuncs(interceptor.Funcs{
 		List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
 			if _, gateway := list.(*gatewayv1.GatewayClassList); gateway {
 				return errors.New("must not list GatewayClasses for tenant status")
@@ -42,6 +42,6 @@ func TestTenantStatusRetiresGatewayClassSnapshots(t *testing.T) {
 	m := Manager{reader: c}
 	require.NoError(t, m.collectAvailableResources(t.Context(), logr.Discard(), tenant))
 	require.Nil(t, tenant.Status.Classes.GatewayClasses)
-	require.Equal(t, []string{"priority"}, tenant.Status.Classes.PriorityClasses)
+	require.Equal(t, []string{"storage"}, tenant.Status.Classes.StorageClasses)
 	require.Equal(t, before, &tenant.Spec, "legacy policy remains supported")
 }

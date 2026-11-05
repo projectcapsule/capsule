@@ -251,6 +251,13 @@ func validateWorkloadRules(
 		return err
 	}
 
+	if err := validateClassMatches(
+		fmt.Sprintf("rules[%d].enforce.workloads.classes.priority", ruleIndex),
+		workloads.Classes.Priority,
+	); err != nil {
+		return err
+	}
+
 	for j, registry := range workloads.Registries {
 		if err := validateExpressionMatch(
 			registry.ExpressionMatch,

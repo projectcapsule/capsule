@@ -95,7 +95,7 @@ func TestSecurityProfileEffectiveValuesAndTargets(t *testing.T) {
 				b := profileBody(appArmor, rules.ActionTypeAllow, rules.SecurityProfileRuntimeDefault)
 				b.Workloads.Targets = tc.targets
 				original := b.DeepCopy()
-				got, err := newPodRules(nil, nil, nil).validateSecurityProfiles(p, []*rules.NamespaceRuleEnforceBody{nil, b}, appArmor)
+				got, err := newPodRules(nil, nil, nil, nil).validateSecurityProfiles(p, []*rules.NamespaceRuleEnforceBody{nil, b}, appArmor)
 				require.NoError(t, err)
 				if tc.want == "" {
 					require.NoError(t, got.BlockingError())
@@ -123,7 +123,7 @@ func TestAppArmorLegacyAnnotationPrecedence(t *testing.T) {
 			if tc.override {
 				pod.Spec.Containers[0].SecurityContext = profileContext(rules.SecurityProfileRuntimeDefault, "")
 			}
-			got, err := newPodRules(nil, nil, nil).validateAppArmorProfiles(pod, []*rules.NamespaceRuleEnforceBody{profileBody(true, rules.ActionTypeAllow, rules.SecurityProfileRuntimeDefault)})
+			got, err := newPodRules(nil, nil, nil, nil).validateAppArmorProfiles(pod, []*rules.NamespaceRuleEnforceBody{profileBody(true, rules.ActionTypeAllow, rules.SecurityProfileRuntimeDefault)})
 			require.NoError(t, err)
 			require.Equal(t, tc.denied, got.BlockingError() != nil)
 		})
@@ -141,7 +141,7 @@ func TestSecurityProfileOrderingAndLocalhostMatching(t *testing.T) {
 				match = &allow.Workloads.Security.AppArmorProfiles
 			}
 			(*match)[0].LocalhostProfiles = []apiruntime.ExpressionMatch{{Exact: []string{"other"}}, {ExpressionRegex: apiruntime.ExpressionRegex{Expression: `^teams/a\.json$`}}}
-			h := newPodRules(nil, nil, nil)
+			h := newPodRules(nil, nil, nil, nil)
 			deny := profileBody(appArmor, rules.ActionTypeDeny, rules.SecurityProfileLocalhost)
 			audit := profileBody(appArmor, rules.ActionTypeAudit, rules.SecurityProfileLocalhost)
 			for _, tc := range []struct {
@@ -178,7 +178,7 @@ func TestSecurityProfileOrderingAndLocalhostMatching(t *testing.T) {
 func TestSecurityProfileAdmissionConditionsAndSubresources(t *testing.T) {
 	compiler, err := cache.NewCELCache()
 	require.NoError(t, err)
-	h := PodRules(nil, nil, compiler)
+	h := PodRules(nil, nil, nil, compiler)
 	recorder := events.NewEventRecorder(nil, logr.Discard(), nil, nil)
 	for _, sub := range []string{"", "ephemeralcontainers", "status", "resize"} {
 		for _, expression := range []string{"true", "false", "object.spec.missing == 'x'"} {
@@ -215,13 +215,13 @@ func TestSecurityProfileWindowsSkipsConditions(t *testing.T) {
 	b := profileBody(false, rules.ActionTypeAllow, rules.SecurityProfileRuntimeDefault)
 	b.Conditions = []rules.AdmissionCondition{{Expression: "object.spec.missing == 'x'"}}
 	recorder := events.NewEventRecorder(nil, logr.Discard(), nil, nil)
-	response := PodRules(nil, nil, compiler).OnCreate(nil, nil, pod, nil, recorder, &capsule.Tenant{}, []*rules.NamespaceRuleBodyNamespace{{Enforce: b}})(t.Context(), admission.Request{})
+	response := PodRules(nil, nil, nil, compiler).OnCreate(nil, nil, pod, nil, recorder, &capsule.Tenant{}, []*rules.NamespaceRuleBodyNamespace{{Enforce: b}})(t.Context(), admission.Request{})
 	require.Nil(t, response)
 }
 
 func TestSecurityProfileControllerTemplates(t *testing.T) {
 	recorder := events.NewEventRecorder(nil, logr.Discard(), nil, nil)
-	h := TemplateRules(nil, nil, nil)
+	h := TemplateRules(nil, nil, nil, nil)
 	b := profileBody(false, rules.ActionTypeAllow, rules.SecurityProfileRuntimeDefault)
 	b.Workloads.Targets = []rules.WorkloadValidationTarget{rules.ValidateDeployment, rules.ValidateCronJob}
 	for _, kind := range []string{"Deployment", "CronJob", "StatefulSet"} {
@@ -258,7 +258,7 @@ func TestSecurityProfileControllerTemplates(t *testing.T) {
 }
 
 func TestSecurityProfileConcurrentCacheUse(t *testing.T) {
-	h := newPodRules(nil, nil, nil)
+	h := newPodRules(nil, nil, nil, nil)
 	b := profileBody(false, rules.ActionTypeAllow, rules.SecurityProfileLocalhost)
 	b.Workloads.Targets = []rules.WorkloadValidationTarget{rules.ValidateContainers}
 	b.Workloads.Security.SeccompProfiles[0].LocalhostProfiles = []apiruntime.ExpressionMatch{{ExpressionRegex: apiruntime.ExpressionRegex{Expression: `^teams/a\.json$`}}}

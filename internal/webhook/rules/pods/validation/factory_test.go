@@ -48,6 +48,7 @@ func TestPodResourceRulesSkipSubresources(t *testing.T) {
 	if err := h.validatePodRules(
 		context.Background(),
 		req,
+		nil,
 		pod,
 		&capsulev1beta2.Tenant{},
 		nil,
