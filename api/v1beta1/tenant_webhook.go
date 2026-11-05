@@ -4,6 +4,7 @@
 package v1beta1
 
 import (
+	"fmt"
 	"os"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -11,7 +12,13 @@ import (
 )
 
 func (in *Tenant) SetupWebhookWithManager(mgr manager.Manager) error {
-	certData, _ := os.ReadFile("/tmp/k8s-webhook-server/serving-certs/tls.crt")
+	certData, err := os.ReadFile("/tmp/k8s-webhook-server/serving-certs/tls.crt")
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to read webhook serving cert: %w", err)
+	}
 	if len(certData) == 0 {
 		return nil
 	}
