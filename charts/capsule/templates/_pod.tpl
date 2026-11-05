@@ -83,6 +83,9 @@ spec:
         {{- with .Values.manager.options.leaderElection.retryPeriod }}
         - --leader-election-retry-period={{ . }}
         {{- end }}
+        {{- if .Values.manager.options.admissionCachedReads }}
+        - --admission-cached-reads=true
+        {{- end }}
         {{- if .Values.manager.options.tracing.enabled }}
         - --enable-tracing=true
         {{- with .Values.manager.options.tracing.endpoint }}

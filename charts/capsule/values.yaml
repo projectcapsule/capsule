@@ -353,6 +353,11 @@ manager:
       # for all GlobalTenantResources, if they don't already have a ServiceAccount defined.
       tenantDefaultServiceAccount: "default"
 
+    # -- Resolve the Namespace, Tenant and RuleStatus of admission requests from the informer cache,
+    # falling back to the API server for objects not cached yet. Removes the direct API reads made by every
+    # admission request, at the cost of evaluating a request against a Tenant state that may lag by the informer delay.
+    admissionCachedReads: false
+
     # Tracing Configuration
     tracing:
       # -- Enable OpenTelemetry tracing for admission webhook requests.

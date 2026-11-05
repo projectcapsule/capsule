@@ -23,16 +23,25 @@ import (
 
 type RegistrationOptions struct {
 	EnableTracing bool
+	// CachedReads answers the Namespace, Tenant and RuleStatus lookups of every
+	// admission request from the manager cache, falling back to the API server
+	// when the cache does not hold the object yet.
+	CachedReads bool
 }
 
 func Register(manager controllerruntime.Manager, recorder events.EventRecorder, options RegistrationOptions, webhookList ...handlers.Webhook) error {
 	server := manager.GetWebhookServer()
 
+	reader := manager.GetAPIReader()
+	if options.CachedReads {
+		reader = webhookutils.NewCacheFirstReader(manager.GetClient(), manager.GetAPIReader())
+	}
+
 	for _, wh := range webhookList {
 		handler := http.Handler(&webhook.Admission{
 			Handler: &handlerRouter{
 				client:   manager.GetClient(),
-				reader:   manager.GetAPIReader(),
+				reader:   reader,
 				decoder:  admission.NewDecoder(manager.GetScheme()),
 				recorder: recorder,
 				handlers: wh.GetHandlers(),
