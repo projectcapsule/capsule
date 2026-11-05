@@ -178,7 +178,15 @@ var _ = Describe("GlobalTenantResource", Label("replications", "global", "global
 	It("cleans up partial creation after exhausting apply conflicts", Label("replication-conflicts", "replication-conflict-review"), func() {
 		TenantNamespaceReady(tenantA, &corev1.Namespace{Name: tenantANamespaces[0]}, uint(len(tenantANamespaces)))
 		TenantNamespaceReady(tenantB, &corev1.Namespace{Name: tenantBNamespaces[0]}, uint(len(tenantBNamespaces)))
-		exerciseReplicationExhaustedConflicts(tenantA.Name, tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner, tenantBOwner)
+		exerciseReplicationFailedApply(tenantA.Name, tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner, tenantBOwner, "exhausted")
+	})
+
+	It("keeps cleanup state when a conflict retry cannot read its target", Label("replication-conflicts", "replication-conflict-review", "replication-observation-failure"), func() {
+		TenantNamespaceReady(tenantA, &corev1.Namespace{Name: tenantANamespaces[0]}, uint(len(tenantANamespaces)))
+		TenantNamespaceReady(tenantB, &corev1.Namespace{Name: tenantBNamespaces[0]}, uint(len(tenantBNamespaces)))
+		for _, failure := range []string{"read", "conditional-read"} {
+			exerciseReplicationFailedApply(tenantA.Name, tenantANamespaces[0], tenantBNamespaces[0], tenantAOwner, tenantBOwner, failure)
+		}
 	})
 
 	BeforeEach(func() {

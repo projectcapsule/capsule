@@ -159,12 +159,14 @@ func exerciseReplicationMetadataConflicts(namespace, excludedNamespace string, e
 	}
 }
 
-func exerciseReplicationExhaustedConflicts(tenant, namespace, excludedNamespace string, owner, excludedOwner rbac.UserSpec) {
+func exerciseReplicationFailedApply(tenant, namespace, excludedNamespace string, owner, excludedOwner rbac.UserSpec, failure string) {
 	ctx := context.Background()
 	base := replicationConflictClient()
-	p := processor.Processor{GatherClient: base, Mapper: base.RESTMapper()}
+	conditions, err := cache.NewCELCache()
+	Expect(err).NotTo(HaveOccurred())
+	p := processor.Processor{GatherClient: base, Mapper: base.RESTMapper(), Conditions: conditions}
 	for _, deletion := range []apiruntime.ResourceDeletionPolicy{apiruntime.ResourceDeletionPolicyRemove, apiruntime.ResourceDeletionPolicyOrphan} {
-		name := "exhausted-conflict-" + rand.String(6)
+		name := "failed-apply-" + rand.String(6)
 		excludedActor := impersonationClient(excludedOwner.Name, withDefaultGroups([]string{excludedOwner.Name}))
 		excluded := &corev1.ConfigMap{Name: name, Namespace: excludedNamespace, Data: map[string]string{"external": "retained"}}
 		EventuallyCreation(func() error { return excludedActor.Create(ctx, excluded) }).Should(Succeed())
@@ -172,43 +174,65 @@ func exerciseReplicationExhaustedConflicts(tenant, namespace, excludedNamespace 
 			"apiVersion": "v1", "kind": "ConfigMap", "metadata": map[string]any{"name": name, "namespace": namespace},
 			"data": map[string]any{"key": "retained"},
 		}}
-		attempts := 0
-		racing := interceptor.NewClient(base, interceptor.Funcs{Patch: func(ctx context.Context, c client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-			if patch.Type() != types.ApplyPatchType {
-				return c.Patch(ctx, obj, patch, opts...)
-			}
-			attempts++
-			Eventually(func() error {
-				current := &corev1.ConfigMap{}
-				if err := c.Get(ctx, client.ObjectKeyFromObject(obj), current); err != nil {
-					return err
+		attempts, failedReads := 0, 0
+		failRead := false
+		racing := interceptor.NewClient(base, interceptor.Funcs{
+			Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				if failRead && key.Name == name && key.Namespace == namespace {
+					failedReads++
+					return apierrors.NewServiceUnavailable("e2e target read unavailable")
 				}
-				if current.Annotations == nil {
-					current.Annotations = map[string]string{}
+				return c.Get(ctx, key, obj, opts...)
+			},
+			Patch: func(ctx context.Context, c client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+				if patch.Type() != types.ApplyPatchType {
+					return c.Patch(ctx, obj, patch, opts...)
 				}
-				current.Annotations["external.example/attempt"] = fmt.Sprint(attempts)
-				return c.Update(ctx, current)
-			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-			err := c.Patch(ctx, obj, patch, opts...)
-			Expect(apierrors.IsConflict(err)).To(BeTrue(), "expected a real SSA version conflict: %v", err)
-			return err
-		}})
+				attempts++
+				Eventually(func() error {
+					current := &corev1.ConfigMap{}
+					if err := c.Get(ctx, client.ObjectKeyFromObject(obj), current); err != nil {
+						return err
+					}
+					if current.Annotations == nil {
+						current.Annotations = map[string]string{}
+					}
+					current.Annotations["external.example/attempt"] = fmt.Sprint(attempts)
+					return c.Update(ctx, current)
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+				err := c.Patch(ctx, obj, patch, opts...)
+				Expect(apierrors.IsConflict(err)).To(BeTrue(), "expected a real SSA version conflict: %v", err)
+				failRead = failure != "exhausted"
+				return err
+			}})
 		id := gvk.NewResourceID(desired, tenant, "0/raw-0")
 		policy := &apiruntime.ResourceReplicationPolicy{Protect: new(false), Deletion: deletion}
+		if failure == "conditional-read" {
+			policy.Condition = "true"
+		}
 		acc := processor.Accumulator{}
 		processor.AccumulatorAdd(acc, id, processor.AccumulatorObject{Object: desired, Policy: policy})
 		processed := meta.ProcessedItems{}
 		opts := processor.ProcessorOptions{FieldOwnerPrefix: meta.ResourceFieldOwner(name), Prune: true}
 		Expect(p.Reconcile(ctx, logr.Discard(), racing, &processed, acc, opts)).To(MatchError(ContainSubstring("applying of 1 resources failed")))
-		Expect(attempts).To(Equal(retry.DefaultBackoff.Steps))
+		if failure == "exhausted" {
+			Expect(attempts).To(Equal(retry.DefaultBackoff.Steps))
+		} else {
+			Expect(attempts).To(Equal(1))
+			Expect(failedReads).To(Equal(1))
+		}
 		Expect(processed).To(HaveLen(1))
 		Expect(processed[0].Status).To(Equal(metav1.ConditionFalse))
-		Expect(processed[0].Message).To(ContainSubstring("the object has been modified"))
+		if failure == "exhausted" {
+			Expect(processed[0].Message).To(ContainSubstring("the object has been modified"))
+		} else {
+			Expect(processed[0].Message).To(ContainSubstring("e2e target read unavailable"))
+		}
 		Expect(processed[0].Created).To(BeTrue())
 		Expect(processed[0].Policy.Deletion).To(Equal(deletion))
 		actual := &corev1.ConfigMap{}
 		Expect(base.Get(ctx, client.ObjectKeyFromObject(desired), actual)).To(Succeed())
-		Expect(processed[0].LastApply.Equal(&actual.CreationTimestamp)).To(BeTrue(), "creation must remain tracked after every SSA attempt fails")
+		Expect(processed[0].LastApply.Equal(&actual.CreationTimestamp)).To(BeTrue(), "creation must remain tracked after the apply fails")
 		By("removing the failed item before any successful resync")
 		Expect(p.Reconcile(ctx, logr.Discard(), base, &processed, processor.Accumulator{}, opts)).To(Succeed())
 		Expect(processed).To(BeEmpty())

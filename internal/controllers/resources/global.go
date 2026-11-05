@@ -74,7 +74,7 @@ func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, ctrlConfig
 		mgr.GetRESTMapper(),
 	)
 	r.clients = impersonatedClientLoader[*capsulev1beta2.GlobalTenantResource]{
-		client:        r.client,
+		client:        replicationClient{Client: r.client, reader: r.reader},
 		configuration: r.configuration,
 		impersonation: r.impersonation,
 		resolve:       globalServiceAccount,

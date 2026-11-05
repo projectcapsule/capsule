@@ -244,6 +244,68 @@ func TestApplyConflictRetryIsBoundedAndCancelable(t *testing.T) {
 	}
 }
 
+func TestFailedObservationKeepsCreationForCleanup(t *testing.T) {
+	for _, condition := range []string{"", "true"} {
+		for _, deletion := range []apiruntime.ResourceDeletionPolicy{apiruntime.ResourceDeletionPolicyRemove, apiruntime.ResourceDeletionPolicyOrphan} {
+			t.Run(condition+"/"+string(deletion), func(t *testing.T) {
+				created := metav1.NewTime(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
+				attempts, failedReads := 0, 0
+				cleanup := false
+				c := fake.NewClientBuilder().WithObjects(&corev1.Namespace{Name: "tenant-a"}).WithReturnManagedFields().WithInterceptorFuncs(interceptor.Funcs{
+					Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						if !cleanup && key.Name == "target" && attempts > 0 {
+							failedReads++
+							return apierrors.NewServiceUnavailable("target read unavailable")
+						}
+						return c.Get(ctx, key, obj, opts...)
+					},
+					Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+						obj.SetUID("created-uid")
+						obj.SetCreationTimestamp(created)
+						return c.Create(ctx, obj, opts...)
+					},
+					Patch: func(ctx context.Context, c client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+						if patch.Type() == types.ApplyPatchType && !cleanup {
+							attempts++
+							return apierrors.NewConflict(corev1.Resource("configmaps"), obj.GetName(), errors.New("concurrent writer"))
+						}
+						return c.Patch(ctx, obj, patch, opts...)
+					},
+				}).Build()
+				conditions, err := cache.NewCELCache()
+				require.NoError(t, err)
+				p, _ := policyProcessor()
+				p.GatherClient, p.Conditions = c, conditions
+				obj := policyConfigMap("tenant-a", "target")
+				policy := &apiruntime.ResourceReplicationPolicy{Condition: condition, Deletion: deletion}
+				acc := Accumulator{}
+				AccumulatorAdd(acc, gvk.NewResourceID(obj, "tenant-a", "0/raw-0"), AccumulatorObject{Object: obj, Policy: policy})
+				processed := meta.ProcessedItems{}
+				opts := ProcessorOptions{FieldOwnerPrefix: "2lclct9cwq6mg", Prune: true}
+				require.ErrorContains(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, acc, opts), "applying of 1 resources failed")
+				require.Equal(t, 1, attempts)
+				require.Equal(t, 1, failedReads, "observation failures must not be retried as conflicts")
+				require.Len(t, processed, 1)
+				require.Contains(t, processed[0].Message, "target read unavailable")
+				require.True(t, processed[0].Created)
+				require.True(t, processed[0].LastApply.Equal(&created))
+				require.Equal(t, processedPolicy(policy), processed[0].Policy)
+				cleanup = true
+				require.NoError(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, Accumulator{}, opts))
+				require.Empty(t, processed)
+				err = c.Get(t.Context(), client.ObjectKeyFromObject(obj), obj)
+				if deletion == apiruntime.ResourceDeletionPolicyRemove {
+					require.True(t, apierrors.IsNotFound(err))
+				} else {
+					require.NoError(t, err)
+					require.Equal(t, map[string]any{"key": "value"}, obj.Object["data"])
+					require.NotContains(t, obj.GetLabels(), meta.ReplicationProtectionLabel)
+				}
+			})
+		}
+	}
+}
+
 func TestApplyConflictTimestampIsScopedToTargetUID(t *testing.T) {
 	for _, uid := range []types.UID{"created-uid", "replacement-uid", ""} {
 		for _, skipped := range []bool{false, true} {

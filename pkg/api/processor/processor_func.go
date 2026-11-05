@@ -536,7 +536,11 @@ func retryApply(ctx context.Context, manager ssa.Manager, c client.Client, obj *
 		previous := result
 
 		result, applyErr = manager.Apply(ctx, c, obj, options)
-		if result.LastApply == nil && result.UID != "" && result.UID == previous.UID {
+		if !result.TargetObserved {
+			// A failed read says nothing about the last confirmed write. Keep it
+			// tracked for cleanup; absence and replacement are observations instead.
+			result.UID, result.LastApply, result.Created = previous.UID, previous.LastApply, previous.Created
+		} else if result.LastApply == nil && result.UID != "" && result.UID == previous.UID {
 			// A successful create or content write still needs cleanup if later
 			// attempts fail. Never carry that timestamp onto a replacement target.
 			result.LastApply = previous.LastApply

@@ -51,6 +51,8 @@ func (m Manager) checkCondition(ctx context.Context, c client.Client, desired *u
 		result.UID = existing.GetUID()
 	}
 
+	result.TargetObserved = true
+
 	allowed, err := compiled.EvaluateBooleanWithVariables(ctx, map[string]any{"object": object, "now": time.Now().UTC()})
 	if err != nil {
 		// CEL errors may include values from a Secret. Keep those values out of
@@ -66,7 +68,7 @@ func (m Manager) checkCondition(ctx context.Context, c client.Client, desired *u
 }
 
 func (m Manager) skippedResult(existing *unstructured.Unstructured, opts ApplyOptions) ApplyResult {
-	result := ApplyResult{Skipped: true}
+	result := ApplyResult{TargetObserved: true, Skipped: true}
 	if existing == nil {
 		return result
 	}

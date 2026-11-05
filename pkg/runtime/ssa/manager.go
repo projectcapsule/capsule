@@ -70,6 +70,8 @@ type ApplyResult struct {
 	// PolicyReconciled means a skipped target is owned by this field manager
 	// and its lifecycle metadata reflects the requested policy.
 	PolicyReconciled bool
+	// TargetObserved distinguishes a successful read (including NotFound) from a failed observation.
+	TargetObserved bool
 }
 
 // PruneOptions configures one server-side apply prune operation.
@@ -157,7 +159,7 @@ func (m Manager) Apply(
 
 	_, created, err := m.managedMetadataPatches(ctx, c, desired, opts, snapshot...)
 	if err != nil {
-		return ApplyResult{UID: targetUID, Created: created}, fmt.Errorf("evaluating managed metadata: %w", err)
+		return ApplyResult{TargetObserved: true, UID: targetUID, Created: created}, fmt.Errorf("evaluating managed metadata: %w", err)
 	}
 
 	if created {
@@ -181,16 +183,16 @@ func (m Manager) Apply(
 
 		targetUID = desired.GetUID()
 		if err != nil {
-			return ApplyResult{UID: targetUID, Created: initialized != nil, LastApply: initialized}, err
+			return ApplyResult{TargetObserved: true, UID: targetUID, Created: initialized != nil, LastApply: initialized}, err
 		}
 
 		if opts.DryRun {
-			return ApplyResult{UID: targetUID, Created: true}, nil
+			return ApplyResult{TargetObserved: true, UID: targetUID, Created: true}, nil
 		}
 	} else {
 		existing := snapshot[0]
 		if err := m.upgradeOwnership(ctx, c, existing, opts); err != nil {
-			return ApplyResult{UID: targetUID, Created: created}, err
+			return ApplyResult{TargetObserved: true, UID: targetUID, Created: created}, err
 		}
 
 		desired.SetResourceVersion(existing.GetResourceVersion())
@@ -200,7 +202,7 @@ func (m Manager) Apply(
 	// A conflict restarts reconciliation from fresh ownership and conditions.
 	err = clt.PatchApply(ctx, c, desired, opts.FieldOwner, opts.Force, opts.DryRun)
 	if err != nil {
-		return ApplyResult{UID: targetUID, Created: created, LastApply: initialized}, fmt.Errorf("applying object failed: %w", err)
+		return ApplyResult{TargetObserved: true, UID: targetUID, Created: created, LastApply: initialized}, fmt.Errorf("applying object failed: %w", err)
 	}
 
 	// A server-side dry-run exercises discovery, authorization, admission,
@@ -208,7 +210,7 @@ func (m Manager) Apply(
 	// desired object. There is consequently no actual object or managed-fields
 	// timestamp to read or decorate afterwards.
 	if opts.DryRun {
-		return ApplyResult{UID: targetUID, Created: created}, nil
+		return ApplyResult{TargetObserved: true, UID: targetUID, Created: created}, nil
 	}
 
 	// Patch populates desired with the API response. A cached Get can still
@@ -224,7 +226,7 @@ func (m Manager) Apply(
 
 	patches, created, err := m.appliedMetadataPatches(ctx, c, desired, metadataOptions, actual)
 	if err != nil {
-		return ApplyResult{UID: targetUID, Created: created, LastApply: lastApply}, err
+		return ApplyResult{TargetObserved: true, UID: targetUID, Created: created, LastApply: lastApply}, err
 	}
 
 	if len(patches) > 0 {
@@ -242,13 +244,14 @@ func (m Manager) Apply(
 		patches,
 		meta.ResourceControllerFieldOwnerPrefix(),
 	); err != nil {
-		return ApplyResult{UID: targetUID, Created: created, LastApply: lastApply}, fmt.Errorf("applying managed metadata failed: %w", err)
+		return ApplyResult{TargetObserved: true, UID: targetUID, Created: created, LastApply: lastApply}, fmt.Errorf("applying managed metadata failed: %w", err)
 	}
 
 	return ApplyResult{
-		UID:       targetUID,
-		LastApply: lastApply,
-		Created:   created,
+		TargetObserved: true,
+		UID:            targetUID,
+		LastApply:      lastApply,
+		Created:        created,
 	}, nil
 }
 

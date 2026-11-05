@@ -15,6 +15,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,13 +34,18 @@ import (
 
 func TestGlobalReplicationFirstReconcileConflicts(t *testing.T) {
 	for _, tc := range []struct {
-		name       string
-		failures   int
-		fieldOwner bool
-		wantReady  bool
-		attempts   int
+		name        string
+		failures    int
+		fieldOwner  bool
+		wantReady   bool
+		attempts    int
+		staleCache  string
+		readFailure bool
 	}{
 		{name: "transient", failures: 1, wantReady: true, attempts: 2},
+		{name: "stale-notfound", failures: 1, wantReady: true, attempts: 2, staleCache: "notfound"},
+		{name: "stale-version", failures: 1, wantReady: true, attempts: 2, staleCache: "version"},
+		{name: "failed-observation", failures: 1, attempts: 1, readFailure: true},
 		{name: "exhausted", failures: 4, attempts: 4},
 		{name: "field-ownership", failures: 1, fieldOwner: true, attempts: 1},
 	} {
@@ -71,8 +77,18 @@ func TestGlobalReplicationFirstReconcileConflicts(t *testing.T) {
 				}
 				objects = append(objects, tenant, &corev1.Namespace{Name: name, Labels: map[string]string{meta.TenantLabel: name}, OwnerReferences: []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: name, UID: tenant.UID}}})
 			}
-			attempts := 0
+			attempts, failedReads, targetReads := 0, 0, 0
 			c := fake.NewClientBuilder().WithScheme(scheme).WithRESTMapper(mapper).WithObjects(objects...).WithStatusSubresource(parent).WithReturnManagedFields().WithInterceptorFuncs(interceptor.Funcs{
+				Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+					if key.Name == "target" {
+						targetReads++
+					}
+					if tc.readFailure && key.Name == "target" && attempts > 0 && failedReads == 0 {
+						failedReads++
+						return apierrors.NewServiceUnavailable("target read unavailable")
+					}
+					return c.Get(ctx, key, obj, opts...)
+				},
 				Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
 					obj.SetUID("target-uid")
 					obj.SetCreationTimestamp(metav1.Now())
@@ -92,17 +108,38 @@ func TestGlobalReplicationFirstReconcileConflicts(t *testing.T) {
 					return c.Patch(ctx, obj, patch, opts...)
 				},
 			}).Build()
+			staleReads := 0
+			cached := interceptor.NewClient(c, interceptor.Funcs{Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				if _, target := obj.(*unstructured.Unstructured); target && tc.staleCache != "" {
+					staleReads++
+					if tc.staleCache == "notfound" {
+						return apierrors.NewNotFound(corev1.Resource("configmaps"), key.Name)
+					}
+					if err := c.Get(ctx, key, obj, opts...); err != nil {
+						return err
+					}
+					obj.SetResourceVersion("stale")
+					return nil
+				}
+				return c.Get(ctx, key, obj, opts...)
+			}})
 			configuration := configuration.NewCapsuleConfiguration(t.Context(), c, c, nil, cfg.Name)
 			r := &globalResourceController{
-				client: c, reader: c, log: logr.Discard(), configuration: configuration,
+				client: cached, reader: c, log: logr.Discard(), configuration: configuration,
 				processor: processor.Processor{Configuration: configuration, GatherClient: c, Mapper: mapper, AllowCrossNamespaceSelection: true},
 				collector: NewCollector(c, mapper), metrics: metrics.NewGlobalTenantResourceRecorder(),
-				clients: impersonatedClientLoader[*capsulev1beta2.GlobalTenantResource]{client: c, configuration: configuration, resolve: globalServiceAccount},
+				clients: impersonatedClientLoader[*capsulev1beta2.GlobalTenantResource]{client: replicationClient{Client: cached, reader: c}, configuration: configuration, resolve: globalServiceAccount},
 			}
 			t.Cleanup(func() { r.metrics.DeleteMetrics(parent.Name) })
 			_, err := r.Reconcile(t.Context(), reconcile.Request{Name: parent.Name})
 			require.NoError(t, err, "handled item failures are reported in status")
 			require.Equal(t, tc.attempts, attempts)
+			require.Zero(t, staleReads, "target reads must bypass the manager cache")
+			expectedReads := tc.attempts
+			if tc.readFailure {
+				expectedReads++
+			}
+			require.Equal(t, expectedReads, targetReads, "each attempt must perform exactly one authoritative target read")
 			require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(parent), parent))
 			require.Equal(t, parent.Generation, parent.Status.ObservedGeneration)
 			require.Equal(t, tc.wantReady, meta.IsStatusConditionTrue(parent.Status.Conditions, meta.ReadyCondition))
@@ -111,7 +148,12 @@ func TestGlobalReplicationFirstReconcileConflicts(t *testing.T) {
 			require.Equal(t, "tenant-a", item.Tenant)
 			require.Equal(t, tc.wantReady, item.Status == metav1.ConditionTrue)
 			if !tc.wantReady {
-				require.Contains(t, item.Message, "concurrent writer")
+				if tc.readFailure {
+					require.Contains(t, item.Message, "target read unavailable")
+					require.Equal(t, 1, failedReads)
+				} else {
+					require.Contains(t, item.Message, "concurrent writer")
+				}
 				require.False(t, item.LastApply.IsZero(), "partial creation must remain tracked after failed applies")
 				parent.Spec.Resources = nil
 				require.NoError(t, c.Update(t.Context(), parent))

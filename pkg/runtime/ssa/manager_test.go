@@ -31,6 +31,48 @@ const (
 	testFieldOwner = "projectcapsule.dev/resource/test/request"
 )
 
+func TestApplyDistinguishesFailedObservation(t *testing.T) {
+	for _, tc := range []struct {
+		name, condition string
+		failure         bool
+		missing         bool
+	}{
+		{name: "read failure", failure: true},
+		{name: "conditional read failure", condition: "false", failure: true},
+		{name: "confirmed absence", condition: "false", missing: true},
+		{name: "confirmed target", condition: "false"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			obj := configMap("observed", nil)
+			obj.SetUID("target-uid")
+			builder := fake.NewClientBuilder()
+			if !tc.missing {
+				builder.WithObjects(obj)
+			}
+			c := builder.WithInterceptorFuncs(interceptor.Funcs{Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				if tc.failure {
+					return apierrors.NewServiceUnavailable("target read unavailable")
+				}
+				return c.Get(ctx, key, obj, opts...)
+			}}).Build()
+			m := skippedPolicyManager(t)
+			result, err := m.Apply(t.Context(), c, obj, ApplyOptions{FieldOwner: testFieldOwner, Condition: tc.condition})
+			require.Equal(t, !tc.failure, result.TargetObserved)
+			if tc.failure {
+				require.True(t, apierrors.IsServiceUnavailable(err))
+			} else {
+				require.NoError(t, err)
+				require.True(t, result.Skipped)
+			}
+			if tc.missing || tc.failure {
+				require.Empty(t, result.UID)
+			} else {
+				require.Equal(t, types.UID("target-uid"), result.UID)
+			}
+		})
+	}
+}
+
 func TestApplyReportsCreatedUIDWhenOwnershipUpgradeFails(t *testing.T) {
 	created := metav1.NewTime(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
 	c := fake.NewClientBuilder().WithReturnManagedFields().WithInterceptorFuncs(interceptor.Funcs{
