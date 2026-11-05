@@ -285,6 +285,73 @@ func TestPriorityClassRulesConditionsUpdatesAndSubresources(t *testing.T) {
 	}
 }
 
+// An update that keeps the class is only checked again by a class rule whose
+// own conditions match, never because an unrelated rule is conditional.
+func TestPriorityClassRulesMixedConditionalRules(t *testing.T) {
+	compiler, err := cache.NewCELCache()
+	require.NoError(t, err)
+
+	unrelated := func(expression string) *rules.NamespaceRuleBodyNamespace {
+		return &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{
+			Action:     rules.ActionTypeDeny,
+			Conditions: []rules.AdmissionCondition{{Expression: expression}},
+			Workloads:  rules.NamespaceRuleEnforceWorkloadsBody{QoSClasses: []corev1.PodQOSClass{corev1.PodQOSGuaranteed}},
+		}}
+	}
+	conditionalClass := func(expression string, action rules.ActionType, names ...string) *rules.NamespaceRuleBodyNamespace {
+		body := priorityClassBody(action, classNames(names...))
+		body.Enforce.Conditions = []rules.AdmissionCondition{{Expression: expression}}
+
+		return body
+	}
+	allowGold := priorityClassBody(rules.ActionTypeAllow, classNames("gold"))
+
+	for _, tc := range []struct {
+		name   string
+		bodies []*rules.NamespaceRuleBodyNamespace
+		// denied reports the outcome of an update that keeps the forbidden class.
+		denied bool
+	}{
+		{name: "unconditional class rule", bodies: []*rules.NamespaceRuleBodyNamespace{allowGold}},
+		{name: "unrelated matching conditional rule", bodies: []*rules.NamespaceRuleBodyNamespace{allowGold, unrelated("true")}},
+		{name: "unrelated conditional rule gated by false", bodies: []*rules.NamespaceRuleBodyNamespace{unrelated("false"), allowGold}},
+		{name: "conditional class rule that does not match", bodies: []*rules.NamespaceRuleBodyNamespace{allowGold, conditionalClass("false", rules.ActionTypeDeny, "silver"), unrelated("true")}},
+		{name: "conditional class rule that matches", bodies: []*rules.NamespaceRuleBodyNamespace{allowGold, conditionalClass("object.metadata.labels['app'] == 'example'", rules.ActionTypeDeny, "silver")}, denied: true},
+		{name: "conditional allow list that matches", bodies: []*rules.NamespaceRuleBodyNamespace{conditionalClass("true", rules.ActionTypeAllow, "gold"), unrelated("false")}, denied: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pods, templates := PodRules(nil, nil, nil, compiler), TemplateRules(nil, nil, nil, compiler)
+			tenant := &capsulev1beta2.Tenant{}
+
+			pod := priorityClassPod("silver")
+			old := pod.DeepCopy()
+			old.Labels["revision"] = "one"
+
+			req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{Operation: admissionv1.Update}}
+			require.Equal(t, tc.denied, pods.OnUpdate(nil, priorityClassFixture(t), old, pod, nil, events.NewDiscardRecorder(), tenant, tc.bodies)(t.Context(), req) != nil, "metadata-only Pod update")
+
+			// Creating the Pod, or moving it to the forbidden class, is always checked.
+			require.NotNil(t, pods.OnCreate(nil, priorityClassFixture(t), pod, nil, events.NewDiscardRecorder(), tenant, tc.bodies)(t.Context(), admission.Request{}))
+
+			changed := pod.DeepCopy()
+			changed.Spec.PriorityClassName = "gold"
+			require.NotNil(t, pods.OnUpdate(nil, priorityClassFixture(t), changed, pod, nil, events.NewDiscardRecorder(), tenant, tc.bodies)(t.Context(), req))
+
+			targeted := make([]*rules.NamespaceRuleBodyNamespace, len(tc.bodies))
+			for i, body := range tc.bodies {
+				targeted[i] = body.DeepCopy()
+				targeted[i].Enforce.Workloads.Targets = []rules.WorkloadValidationTarget{rules.ValidateDeployment}
+			}
+
+			obj, templateReq := priorityClassTemplate(t, rules.ValidateDeployment, "silver")
+			templateReq.Operation = admissionv1.Update
+			previous := obj.DeepCopy()
+			previous.SetLabels(map[string]string{"revision": "one"})
+			require.Equal(t, tc.denied, templates.OnUpdate(nil, priorityClassFixture(t), previous, obj, nil, events.NewDiscardRecorder(), tenant, targeted)(t.Context(), templateReq) != nil, "metadata-only template update")
+		})
+	}
+}
+
 func priorityClassTemplate(t testing.TB, target rules.WorkloadValidationTarget, class string) (*unstructured.Unstructured, admission.Request) {
 	t.Helper()
 

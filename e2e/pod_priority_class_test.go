@@ -175,12 +175,17 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 		req, err := labels.NewRequirement("env", selection.Equals, []string{"e2e"})
 		Expect(err).NotTo(HaveOccurred())
 
+		// Other specs create PriorityClasses in parallel. Only the fixtures of
+		// this file carry the environment label, so the sweep leaves theirs alone.
+		own, err := labels.NewRequirement("environment", selection.Exists, nil)
+		Expect(err).NotTo(HaveOccurred())
+
 		var list schedulingv1.PriorityClassList
 		Expect(k8sClient.List(
 			context.TODO(),
 			&list,
 			client.MatchingLabelsSelector{
-				Selector: labels.NewSelector().Add(*req),
+				Selector: labels.NewSelector().Add(*req, *own),
 			},
 		)).Should(Succeed())
 

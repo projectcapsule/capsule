@@ -21,7 +21,9 @@ const maxPlacementNodeTerms = 256
 
 // MutatePodPlacement applies ordered, audience-filtered placement and security mutations. It
 // never changes rule/cache-owned values. Call only for main-resource Pod CREATE.
-// Priority class mutations resolve their PriorityClass through classes.
+// Priority class mutations resolve their PriorityClass through classes: a
+// cached reader, optionally followed by an authoritative one for a Pod class
+// the cache does not know yet.
 func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules.NamespaceRuleBodyNamespace, conditions *ruleengine.ConditionEvaluator, classes ...client.Reader) (bool, error) {
 	if pod == nil || !slices.ContainsFunc(bodies, func(body *apirules.NamespaceRuleBodyNamespace) bool { return body != nil && len(body.Mutate) > 0 }) {
 		return false, nil

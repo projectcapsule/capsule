@@ -49,18 +49,24 @@ func (c *priorityClasses) Get(ctx context.Context, key client.ObjectKey, obj cli
 	return c.Client.Get(ctx, key, obj, opts...)
 }
 
-func priorityClassFixture(tb testing.TB) *priorityClasses {
+func priorityClassFixtureOf(tb testing.TB, classes ...client.Object) *priorityClasses {
 	tb.Helper()
 
 	scheme := runtime.NewScheme()
 	require.NoError(tb, schedulingv1.AddToScheme(scheme))
 
-	return &priorityClasses{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(
+	return &priorityClasses{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(classes...).Build()}
+}
+
+func priorityClassFixture(tb testing.TB) *priorityClasses {
+	tb.Helper()
+
+	return priorityClassFixtureOf(tb,
 		&schedulingv1.PriorityClass{Name: classTenantDefault, Value: 1000, PreemptionPolicy: new(corev1.PreemptNever)},
 		&schedulingv1.PriorityClass{Name: classGlobalDefault, Value: 10, GlobalDefault: true, PreemptionPolicy: new(corev1.PreemptLowerPriority)},
 		&schedulingv1.PriorityClass{Name: classCustom, Value: 500, PreemptionPolicy: new(corev1.PreemptLowerPriority)},
 		&schedulingv1.PriorityClass{Name: "second-default", Value: 2000},
-	).Build()}
+	)
 }
 
 // admittedPod is a Pod as the built-in Priority plugin hands it to webhooks.
@@ -260,6 +266,81 @@ func TestPriorityClassMutationFailures(t *testing.T) {
 	changed, err := MutatePodPlacement(t.Context(), pod, []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{{Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{"pool": "shared"}}}}}}}, nil)
 	require.NoError(t, err)
 	require.True(t, changed)
+}
+
+// The cache answers every lookup it can. Only a Pod class it does not know yet,
+// which the API server has already resolved, is read from the API server.
+func TestPriorityClassMutationCacheStates(t *testing.T) {
+	tenantDefault := &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: classTenantDefault}, Value: 1000}
+	global := &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: classGlobalDefault}, Value: 10, GlobalDefault: true}
+	demoted := &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: classGlobalDefault}, Value: 10}
+
+	for _, tc := range []struct {
+		name          string
+		action        rules.MutationAction
+		cached, fresh []client.Object
+		noFresh       bool
+		freshErr      error
+		want          string
+		wantErr       string
+		freshReads    int64
+	}{
+		{name: "cache knows the global default", cached: []client.Object{tenantDefault, global}, fresh: []client.Object{tenantDefault, global}, want: classTenantDefault},
+		{name: "cache is behind a new global default", cached: []client.Object{tenantDefault}, fresh: []client.Object{tenantDefault, global}, want: classTenantDefault, freshReads: 1},
+		{name: "cache is behind an explicit class", cached: []client.Object{tenantDefault}, fresh: []client.Object{tenantDefault, demoted}, want: classGlobalDefault, freshReads: 1},
+		{name: "class unknown everywhere is explicit", cached: []client.Object{tenantDefault}, fresh: []client.Object{tenantDefault}, want: classGlobalDefault, freshReads: 1},
+		{name: "cache hit is not read again", cached: []client.Object{tenantDefault, demoted}, fresh: []client.Object{tenantDefault, global}, want: classGlobalDefault},
+		{name: "no API reader keeps an unknown class", cached: []client.Object{tenantDefault}, noFresh: true, want: classGlobalDefault},
+		{name: "failed API read", cached: []client.Object{tenantDefault}, freshErr: errors.New("apiserver unavailable"), wantErr: `get PriorityClass "cluster-default": apiserver unavailable`, want: classGlobalDefault, freshReads: 1},
+		{name: "configured class is only read from the cache", cached: []client.Object{global}, fresh: []client.Object{tenantDefault, global}, wantErr: `PriorityClass "tenant-default" does not exist`, want: classGlobalDefault},
+		{name: "replace never reads the Pod class", action: rules.MutationActionReplace, cached: []client.Object{tenantDefault}, fresh: []client.Object{tenantDefault, global}, want: classTenantDefault},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cached, fresh := priorityClassFixtureOf(t, tc.cached...), priorityClassFixtureOf(t, tc.fresh...)
+			fresh.err = tc.freshErr
+
+			readers := []client.Reader{cached, fresh}
+			if tc.noFresh {
+				readers = readers[:1]
+			}
+
+			pod := admittedPod(classGlobalDefault)
+			bodies := []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{priorityClassMutation(tc.action, classTenantDefault)}}}
+
+			changed, err := MutatePodPlacement(t.Context(), pod, bodies, nil, readers...)
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, tc.wantErr)
+			}
+
+			require.Equal(t, tc.want != classGlobalDefault, changed)
+			require.Equal(t, tc.want, pod.Spec.PriorityClassName)
+			require.Equal(t, tc.freshReads, fresh.gets.Load(), "API reads")
+		})
+	}
+}
+
+// The handler hands the cache and the API reader of the request to the mutation.
+func TestPriorityClassMutationHandlerUsesTheAPIReaderOnCacheMiss(t *testing.T) {
+	tenantDefault := &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: classTenantDefault}, Value: 1000}
+	global := &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: classGlobalDefault}, Value: 10, GlobalDefault: true}
+	cached, fresh := priorityClassFixtureOf(t, tenantDefault), priorityClassFixtureOf(t, tenantDefault, global)
+
+	bodies := []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{priorityClassMutation("", classTenantDefault)}}}
+	obj := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "v1", "kind": "Pod", "spec": map[string]any{"priorityClassName": classGlobalDefault, "priority": int64(10), "containers": []any{map[string]any{"name": "app", "image": "example.com/app:v1"}}}}}
+	raw, err := json.Marshal(obj)
+	require.NoError(t, err)
+
+	req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{Kind: metav1.GroupVersionKind{Version: "v1", Kind: "Pod"}, Operation: admissionv1.Create, Object: runtime.RawExtension{Raw: raw}}}
+	response := MetadataRules(nil).OnCreate(cached, fresh, obj, nil, nil, nil, bodies)(t.Context(), req)
+	require.NotNil(t, response)
+	require.True(t, response.Allowed)
+	require.EqualValues(t, 1, fresh.gets.Load())
+
+	name, _, err := unstructured.NestedString(obj.Object, "spec", "priorityClassName")
+	require.NoError(t, err)
+	require.Equal(t, classTenantDefault, name)
 }
 
 func TestPriorityClassMutationDoesNotAliasTheClass(t *testing.T) {

@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -56,6 +57,22 @@ type podRuleValidator struct {
 	// When set, only this subresource and the main resource are evaluated.
 	subresource string
 	changed     func(old, pod *corev1.Pod) bool
+	// policy reports whether a rule carries this validator's policy. When set,
+	// only a matching conditional rule that carries it checks an unchanged value
+	// again; otherwise any conditional workload rule does.
+	policy func(*apirules.NamespaceRuleEnforceBody) bool
+}
+
+// recheck reports whether an update that keeps the value must still be
+// evaluated. Bodies are the rules whose conditions matched this request.
+func (v *podRuleValidator) recheck(conditional bool, bodies []*apirules.NamespaceRuleEnforceBody) bool {
+	if v.policy == nil {
+		return conditional
+	}
+
+	return slices.ContainsFunc(bodies, func(body *apirules.NamespaceRuleEnforceBody) bool {
+		return body != nil && len(body.Conditions) > 0 && v.policy(body)
+	})
 }
 
 func (v *podRuleValidator) run(ctx context.Context, reader client.Reader, pod *corev1.Pod, bodies []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
@@ -118,7 +135,7 @@ func newPodRules(regexCache *cache.RegexCache, registryCache *cache.RegistryRule
 		{evaluate: h.validateAffinity, changed: func(old, pod *corev1.Pod) bool {
 			return !equality.Semantic.DeepEqual(old.Spec.Affinity, pod.Spec.Affinity) || !equality.Semantic.DeepEqual(old.Labels, pod.Labels)
 		}},
-		{read: h.validatePriorityClasses, changed: func(old, pod *corev1.Pod) bool {
+		{read: h.validatePriorityClasses, policy: appliesToPriorityClasses, changed: func(old, pod *corev1.Pod) bool {
 			return old.Spec.PriorityClassName != pod.Spec.PriorityClassName
 		}},
 		{evaluate: h.validateResources},
@@ -239,7 +256,7 @@ func (h *podRules) validateWorkloadRules(
 
 	for i := range h.rules {
 		rule := &h.rules[i]
-		if !conditional && len(old) > 0 && old[0] != nil && rule.changed != nil && !rule.changed(old[0], pod) {
+		if len(old) > 0 && old[0] != nil && rule.changed != nil && !rule.changed(old[0], pod) && !rule.recheck(conditional, enforceBodies) {
 			continue
 		}
 

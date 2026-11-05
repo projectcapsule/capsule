@@ -14,7 +14,8 @@ type WorkloadClassEnforcement struct {
 	// that name is matched like an explicit one. Exact and exp need no read; a
 	// label selector reads the class, and a missing class never matches it.
 	// Priority rules apply to the pod target and do not run on subresources.
-	// Unconditional rules only check updates that change the class.
+	// An update that keeps the class is only checked again by class rules with
+	// conditions, so other updates keep working after a rule change.
 	// Legacy Tenant.spec.priorityClasses restrictions remain an additional boundary.
 	// +optional
 	// +kubebuilder:validation:MinItems=1

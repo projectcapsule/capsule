@@ -18,9 +18,11 @@ import (
 )
 
 // podPriorityClass applies priority class mutations of one admission request.
-// Class objects are read through the injected reader and never retained.
+// Class objects are read through the injected readers and never retained.
 type podPriorityClass struct {
 	reader client.Reader
+	// fresh resolves the Pod's class when reader, a cache, does not know it yet.
+	fresh client.Reader
 	// An earlier entry chose the class, so later merges must not treat it as omitted.
 	assigned bool
 }
@@ -29,6 +31,10 @@ func newPodPriorityClass(readers []client.Reader) *podPriorityClass {
 	state := &podPriorityClass{}
 	if len(readers) > 0 {
 		state.reader = readers[0]
+	}
+
+	if len(readers) > 1 {
+		state.fresh = readers[1]
 	}
 
 	return state
@@ -63,7 +69,7 @@ func (p *podPriorityClass) apply(ctx context.Context, pod *corev1.Pod, name stri
 	}
 
 	if !replace && current != "" {
-		class, err := p.get(ctx, current)
+		class, err := p.current(ctx, current)
 		if err != nil {
 			return err
 		}
@@ -74,7 +80,7 @@ func (p *podPriorityClass) apply(ctx context.Context, pod *corev1.Pod, name stri
 		}
 	}
 
-	class, err := p.get(ctx, name)
+	class, err := p.get(ctx, p.reader, name)
 	if err != nil {
 		return err
 	}
@@ -94,13 +100,25 @@ func (p *podPriorityClass) apply(ctx context.Context, pod *corev1.Pod, name stri
 	return nil
 }
 
+// current returns the class the Pod already names. The API server resolved it,
+// so a cache that misses it is behind: a global default created moments ago
+// must still count as omitted, which only the API server can tell.
+func (p *podPriorityClass) current(ctx context.Context, name string) (*schedulingv1.PriorityClass, error) {
+	class, err := p.get(ctx, p.reader, name)
+	if err != nil || class != nil || p.fresh == nil {
+		return class, err
+	}
+
+	return p.get(ctx, p.fresh, name)
+}
+
 // get returns nil for a class that does not exist.
-func (p *podPriorityClass) get(ctx context.Context, name string) (*schedulingv1.PriorityClass, error) {
-	if p.reader == nil {
+func (p *podPriorityClass) get(ctx context.Context, reader client.Reader, name string) (*schedulingv1.PriorityClass, error) {
+	if reader == nil {
 		return nil, errors.New("PriorityClass lookup is unavailable")
 	}
 
-	class, err := utils.GetPriorityClassByName(ctx, p.reader, name)
+	class, err := utils.GetPriorityClassByName(ctx, reader, name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, nil

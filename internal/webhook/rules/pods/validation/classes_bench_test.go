@@ -25,7 +25,8 @@ import (
 
 // priorityClassBench builds one admission per tenant. Every tenant has its own
 // classes and rules, so a decision can never be served from another tenant.
-func priorityClassBench(b *testing.B, h handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod], tenants, count int, mode string) (*classReads, []handlers.Func, bool) {
+// The returned function binds the admission of a tenant to a handler.
+func priorityClassBench(b *testing.B, tenants, count int, mode string) (*classReads, func(handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod], int) handlers.Func, bool) {
 	b.Helper()
 
 	scheme := runtime.NewScheme()
@@ -44,7 +45,7 @@ func priorityClassBench(b *testing.B, h handlers.TypedHandlerWithTenantWithRules
 
 	reader := &classReads{Reader: fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()}
 	recorder := events.NewEventRecorder(nil, logr.Discard(), nil, nil)
-	calls := make([]handlers.Func, tenants)
+	calls := make([]func(handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod]) handlers.Func, tenants)
 	denied := mode == "deny-name" || mode == "deny-selector" || mode == "allow-miss"
 
 	for i := range tenants {
@@ -91,13 +92,20 @@ func priorityClassBench(b *testing.B, h handlers.TypedHandlerWithTenantWithRules
 		if mode == "unchanged-update" {
 			// The class is forbidden now, but an update that keeps it is not checked.
 			pod.Spec.PriorityClassName = name + "-bronze"
-			calls[i] = h.OnUpdate(nil, reader, pod.DeepCopy(), pod, nil, recorder, tnt, bodies)
+			old := pod.DeepCopy()
+			calls[i] = func(h handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod]) handlers.Func {
+				return h.OnUpdate(nil, reader, old, pod, nil, recorder, tnt, bodies)
+			}
 		} else {
-			calls[i] = h.OnCreate(nil, reader, pod, nil, recorder, tnt, bodies)
+			calls[i] = func(h handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod]) handlers.Func {
+				return h.OnCreate(nil, reader, pod, nil, recorder, tnt, bodies)
+			}
 		}
 	}
 
-	return reader, calls, denied
+	return reader, func(h handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod], tenant int) handlers.Func {
+		return calls[tenant%tenants](h)
+	}, denied
 }
 
 var priorityClassBenchModes = []string{"allow-name", "allow-name-selector", "allow-selector", "allow-miss", "deny-name", "deny-selector", "no-class", "no-class-rules", "unchanged-update"}
@@ -107,14 +115,17 @@ func BenchmarkPriorityClassAdmission(b *testing.B) {
 		for _, count := range []int{1, 20} {
 			for _, mode := range priorityClassBenchModes {
 				b.Run(fmt.Sprintf("tenants=%d/rules=%d/%s", tenants, count, mode), func(b *testing.B) {
-					reader, calls, denied := priorityClassBench(b, PodRules(nil, nil, nil, nil), tenants, count, mode)
+					reader, bind, denied := priorityClassBench(b, tenants, count, mode)
+					h := PodRules(nil, nil, nil, nil)
 					req := admission.Request{}
 
 					if mode == "unchanged-update" {
 						req.Operation = admissionv1.Update
 					}
 
+					calls := make([]handlers.Func, tenants)
 					for i := range tenants {
+						calls[i] = bind(h, i)
 						calls[i](b.Context(), req)
 					}
 
@@ -145,46 +156,37 @@ func BenchmarkPriorityClassAdmissionCaches(b *testing.B) {
 			for _, mode := range []string{"allow-name", "allow-selector", "deny-name"} {
 				for _, phase := range []string{"cold", "parallel"} {
 					b.Run(fmt.Sprintf("tenants=%d/rules=%d/%s/%s", tenants, count, mode, phase), func(b *testing.B) {
+						reader, bind, denied := priorityClassBench(b, tenants, count, mode)
+
 						b.ReportAllocs()
 
 						if phase == "cold" {
-							var reads int64
-
 							for i := 0; b.Loop(); i++ {
-								b.StopTimer()
-
-								reader, calls, denied := priorityClassBench(b, PodRules(nil, nil, nil, nil), tenants, count, mode)
-
-								b.StartTimer()
-
-								response := calls[i%tenants](b.Context(), admission.Request{})
+								response := bind(PodRules(nil, nil, nil, nil), i)(b.Context(), admission.Request{})
 								if (response != nil) != denied {
 									b.Fatalf("unexpected response: %v", response)
 								}
+							}
+						} else {
+							h := PodRules(nil, nil, nil, nil)
 
-								reads += reader.gets.Load()
+							calls := make([]handlers.Func, tenants)
+							for i := range tenants {
+								calls[i] = bind(h, i)
+								calls[i](b.Context(), admission.Request{})
 							}
 
-							b.ReportMetric(float64(reads)/float64(b.N), "class-reads/op")
-
-							return
-						}
-
-						reader, calls, denied := priorityClassBench(b, PodRules(nil, nil, nil, nil), tenants, count, mode)
-						for i := range tenants {
-							calls[i](b.Context(), admission.Request{})
-						}
-
-						reader.gets.Store(0)
-						b.ResetTimer()
-						b.RunParallel(func(pb *testing.PB) {
-							for i := 0; pb.Next(); i++ {
-								response := calls[i%tenants](b.Context(), admission.Request{})
-								if (response != nil) != denied {
-									b.Errorf("unexpected response: %v", response)
+							reader.gets.Store(0)
+							b.ResetTimer()
+							b.RunParallel(func(pb *testing.PB) {
+								for i := 0; pb.Next(); i++ {
+									response := calls[i%tenants](b.Context(), admission.Request{})
+									if (response != nil) != denied {
+										b.Errorf("unexpected response: %v", response)
+									}
 								}
-							}
-						})
+							})
+						}
 
 						b.ReportMetric(float64(reader.gets.Load())/float64(b.N), "class-reads/op")
 					})

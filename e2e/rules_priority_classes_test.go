@@ -23,6 +23,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
@@ -85,6 +86,13 @@ var _ = Describe("PriorityClass namespace profiles", Label("tenant", "rules", "w
 			policy("named", rules.ActionTypeAudit, nil, rules.WorkloadClassMatch{Exact: []string{gold, bronze}}),
 			policy("selected", rules.ActionTypeAllow, nil, rules.WorkloadClassMatch{MatchLabels: premium}),
 			policy("templates", rules.ActionTypeAllow, []rules.WorkloadValidationTarget{rules.ValidatePod, rules.ValidateDeployment}, rules.WorkloadClassMatch{Exact: []string{silver}}),
+			// An unrelated conditional rule that matches every Pod of this spec: it must
+			// not make updates check a class they keep.
+			{NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"pc-profile": "named"}}, NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{
+				Action:     rules.ActionTypeDeny,
+				Conditions: []rules.AdmissionCondition{{Name: "e2e-pods", Expression: `has(object.metadata.labels) && 'env' in object.metadata.labels && object.metadata.labels['env'] == 'e2e'`}},
+				Workloads:  rules.NamespaceRuleEnforceWorkloadsBody{Placement: rules.WorkloadPlacementEnforcement{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{prefix + "-blocked-scheduler"}}}}},
+			}}},
 		}}}
 		b := &capsulev1beta2.Tenant{Name: prefix + "-b", Labels: map[string]string{"env": "e2e"}, Spec: capsulev1beta2.TenantSpec{Owners: rbac.OwnerListSpec{{Kind: "User", Name: prefix + "-b"}}, Rules: []*rules.NamespaceRuleBodyTenant{
 			policy("", rules.ActionTypeAllow, nil, rules.WorkloadClassMatch{Exact: []string{bronze}}),
@@ -114,7 +122,7 @@ var _ = Describe("PriorityClass namespace profiles", Label("tenant", "rules", "w
 			return ns
 		}
 
-		named := newNS(a, "named", 3)
+		named := newNS(a, "named", 4)
 		selected := newNS(a, "selected", 1)
 		templates := newNS(a, "templates", 1)
 		other := newNS(a, "other", 0)
@@ -276,7 +284,7 @@ var _ = Describe("PriorityClass namespace profiles", Label("tenant", "rules", "w
 		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(a), storedTenant)).To(Succeed())
 		Expect(storedTenant.Spec.Rules[1].Enforce.Workloads.Classes.Priority).To(Equal([]rules.WorkloadClassMatch{{Exact: []string{gold}}}))
 
-		By("applying a changed rule to new Pods while existing Pods stay updatable")
+		By("applying a changed rule to new Pods while existing Pods stay updatable next to a conditional rule")
 		Eventually(func() error {
 			current := &capsulev1beta2.Tenant{}
 			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(a), current); err != nil {
@@ -289,7 +297,7 @@ var _ = Describe("PriorityClass namespace profiles", Label("tenant", "rules", "w
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		TenantReady(a, metav1.ConditionTrue, defaultTimeoutInterval)
 		waitPriorityClassProfile(ctx, named, func(g Gomega, bodies []*rules.NamespaceRuleBodyNamespace) {
-			g.Expect(bodies).To(HaveLen(3))
+			g.Expect(bodies).To(HaveLen(4))
 			g.Expect(bodies[1].Enforce.Workloads.Classes.Priority).To(Equal([]rules.WorkloadClassMatch{{Exact: []string{silver}}}))
 		})
 		create(ownerA, pod(named, silver))
