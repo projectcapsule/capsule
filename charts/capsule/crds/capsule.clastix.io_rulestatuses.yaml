@@ -212,6 +212,82 @@ spec:
                       description: Enforcement for Ingress and Gateway API resource
                         hostnames.
                       properties:
+                        classes:
+                          description: |-
+                            Classes matches IngressClass or GatewayClass names and labels. Entries,
+                            and the criteria within each entry, are ORed. Label selectors read the
+                            referenced class, not the ingress or namespace. Exact and exp need no read.
+                            Classless objects are rejected by applicable allow/deny class rules.
+                            Legacy Tenant class restrictions remain an additional boundary.
+                          items:
+                            description: |-
+                              StorageClassMatch matches a class by name, or by the labels of the class
+                              object. Exact, exp and the label selector are ORed. The rule admission
+                              validator requires at least one of them. A class object that does not exist
+                              never matches the label selector.
+                            properties:
+                              exact:
+                                description: Exact matches one of the provided class
+                                  names exactly.
+                                items:
+                                  minLength: 1
+                                  type: string
+                                maxItems: 64
+                                minItems: 1
+                                type: array
+                              exp:
+                                description: Exp matches the class name by regular
+                                  expression.
+                                maxLength: 4096
+                                minLength: 1
+                                type: string
+                              matchExpressions:
+                                description: matchExpressions is a list of label selector
+                                  requirements. The requirements are ANDed.
+                                items:
+                                  description: |-
+                                    A label selector requirement is a selector that contains values, a key, and an operator that
+                                    relates the key and values.
+                                  properties:
+                                    key:
+                                      description: key is the label key that the selector
+                                        applies to.
+                                      type: string
+                                    operator:
+                                      description: |-
+                                        operator represents a key's relationship to a set of values.
+                                        Valid operators are In, NotIn, Exists and DoesNotExist.
+                                      type: string
+                                    values:
+                                      description: |-
+                                        values is an array of string values. If the operator is In or NotIn,
+                                        the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                        the values array must be empty. This array is replaced during a strategic
+                                        merge patch.
+                                      items:
+                                        type: string
+                                      type: array
+                                      x-kubernetes-list-type: atomic
+                                  required:
+                                  - key
+                                  - operator
+                                  type: object
+                                type: array
+                                x-kubernetes-list-type: atomic
+                              matchLabels:
+                                additionalProperties:
+                                  type: string
+                                description: |-
+                                  matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                                  map is equivalent to an element of matchExpressions, whose key field is "key", the
+                                  operator is "In", and the values array contains only "value". The requirements are ANDed.
+                                type: object
+                            type: object
+                            x-kubernetes-map-type: atomic
+                          maxItems: 64
+                          minItems: 1
+                          type: array
+                          x-kubernetes-list-type: atomic
                         hostnames:
                           description: |-
                             Hostnames defines allowed, denied, or audited hostname expressions.
@@ -247,8 +323,11 @@ spec:
                           minItems: 1
                           type: array
                         types:
-                          description: Types defines the resource kinds to which hostname
-                            enforcement applies.
+                          description: |-
+                            Types defines the resource kinds to which enforcement applies. Classes
+                            apply to Ingress and Gateway; hostnames apply to every supported type.
+                            Gateway targets gateway.networking.k8s.io/v1. Served v1beta1 Gateway
+                            requests receive the same rules to prevent bypass through another version.
                           items:
                             enum:
                             - Ingress
@@ -2099,6 +2178,16 @@ spec:
                         description: Ingress configures Kubernetes ingress and Gateway
                           API resource mutations.
                         properties:
+                          class:
+                            description: |-
+                              Class sets the targeted Ingress or Gateway class on CREATE and UPDATE.
+                              Merge fills an absent or empty class, preserving explicit field/annotation
+                              values. Replace sets the class and keeps an existing ingress annotation in
+                              sync. Rule changes do not reconcile existing objects. Templates are allowed;
+                              rendered values must be valid DNS subdomains. Omitted leaves it unchanged.
+                            maxLength: 4096
+                            minLength: 1
+                            type: string
                           listenerSets:
                             description: ListenerSets configures gateway.networking.k8s.io/v1
                               ListenerSets.
@@ -2140,6 +2229,26 @@ spec:
                                 - name
                                 type: object
                             type: object
+                          types:
+                            description: |-
+                              Types selects the kinds whose class is set. Required when class is supplied.
+                              Gateway targets gateway.networking.k8s.io/v1. Served v1beta1 Gateway
+                              requests receive the same class mutation for version compatibility.
+                              ListenerSet parentRef mutation has its own explicit target and is unchanged.
+                            items:
+                              enum:
+                              - Ingress
+                              - Route
+                              - ListenerSet
+                              - HTTPRoute
+                              - Gateway
+                              - TLSRoute
+                              - GRPCRoute
+                              type: string
+                            maxItems: 2
+                            minItems: 1
+                            type: array
+                            x-kubernetes-list-type: set
                         type: object
                       workloads:
                         description: |-
@@ -3821,6 +3930,82 @@ spec:
                         description: Enforcement for Ingress and Gateway API resource
                           hostnames.
                         properties:
+                          classes:
+                            description: |-
+                              Classes matches IngressClass or GatewayClass names and labels. Entries,
+                              and the criteria within each entry, are ORed. Label selectors read the
+                              referenced class, not the ingress or namespace. Exact and exp need no read.
+                              Classless objects are rejected by applicable allow/deny class rules.
+                              Legacy Tenant class restrictions remain an additional boundary.
+                            items:
+                              description: |-
+                                StorageClassMatch matches a class by name, or by the labels of the class
+                                object. Exact, exp and the label selector are ORed. The rule admission
+                                validator requires at least one of them. A class object that does not exist
+                                never matches the label selector.
+                              properties:
+                                exact:
+                                  description: Exact matches one of the provided class
+                                    names exactly.
+                                  items:
+                                    minLength: 1
+                                    type: string
+                                  maxItems: 64
+                                  minItems: 1
+                                  type: array
+                                exp:
+                                  description: Exp matches the class name by regular
+                                    expression.
+                                  maxLength: 4096
+                                  minLength: 1
+                                  type: string
+                                matchExpressions:
+                                  description: matchExpressions is a list of label
+                                    selector requirements. The requirements are ANDed.
+                                  items:
+                                    description: |-
+                                      A label selector requirement is a selector that contains values, a key, and an operator that
+                                      relates the key and values.
+                                    properties:
+                                      key:
+                                        description: key is the label key that the
+                                          selector applies to.
+                                        type: string
+                                      operator:
+                                        description: |-
+                                          operator represents a key's relationship to a set of values.
+                                          Valid operators are In, NotIn, Exists and DoesNotExist.
+                                        type: string
+                                      values:
+                                        description: |-
+                                          values is an array of string values. If the operator is In or NotIn,
+                                          the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                          the values array must be empty. This array is replaced during a strategic
+                                          merge patch.
+                                        items:
+                                          type: string
+                                        type: array
+                                        x-kubernetes-list-type: atomic
+                                    required:
+                                    - key
+                                    - operator
+                                    type: object
+                                  type: array
+                                  x-kubernetes-list-type: atomic
+                                matchLabels:
+                                  additionalProperties:
+                                    type: string
+                                  description: |-
+                                    matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                                    map is equivalent to an element of matchExpressions, whose key field is "key", the
+                                    operator is "In", and the values array contains only "value". The requirements are ANDed.
+                                  type: object
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            maxItems: 64
+                            minItems: 1
+                            type: array
+                            x-kubernetes-list-type: atomic
                           hostnames:
                             description: |-
                               Hostnames defines allowed, denied, or audited hostname expressions.
@@ -3856,8 +4041,11 @@ spec:
                             minItems: 1
                             type: array
                           types:
-                            description: Types defines the resource kinds to which
-                              hostname enforcement applies.
+                            description: |-
+                              Types defines the resource kinds to which enforcement applies. Classes
+                              apply to Ingress and Gateway; hostnames apply to every supported type.
+                              Gateway targets gateway.networking.k8s.io/v1. Served v1beta1 Gateway
+                              requests receive the same rules to prevent bypass through another version.
                             items:
                               enum:
                               - Ingress
@@ -5722,6 +5910,16 @@ spec:
                           description: Ingress configures Kubernetes ingress and Gateway
                             API resource mutations.
                           properties:
+                            class:
+                              description: |-
+                                Class sets the targeted Ingress or Gateway class on CREATE and UPDATE.
+                                Merge fills an absent or empty class, preserving explicit field/annotation
+                                values. Replace sets the class and keeps an existing ingress annotation in
+                                sync. Rule changes do not reconcile existing objects. Templates are allowed;
+                                rendered values must be valid DNS subdomains. Omitted leaves it unchanged.
+                              maxLength: 4096
+                              minLength: 1
+                              type: string
                             listenerSets:
                               description: ListenerSets configures gateway.networking.k8s.io/v1
                                 ListenerSets.
@@ -5763,6 +5961,26 @@ spec:
                                   - name
                                   type: object
                               type: object
+                            types:
+                              description: |-
+                                Types selects the kinds whose class is set. Required when class is supplied.
+                                Gateway targets gateway.networking.k8s.io/v1. Served v1beta1 Gateway
+                                requests receive the same class mutation for version compatibility.
+                                ListenerSet parentRef mutation has its own explicit target and is unchanged.
+                              items:
+                                enum:
+                                - Ingress
+                                - Route
+                                - ListenerSet
+                                - HTTPRoute
+                                - Gateway
+                                - TLSRoute
+                                - GRPCRoute
+                                type: string
+                              maxItems: 2
+                              minItems: 1
+                              type: array
+                              x-kubernetes-list-type: set
                           type: object
                         workloads:
                           description: |-
@@ -7393,6 +7611,83 @@ spec:
                           description: Enforcement for Ingress and Gateway API resource
                             hostnames.
                           properties:
+                            classes:
+                              description: |-
+                                Classes matches IngressClass or GatewayClass names and labels. Entries,
+                                and the criteria within each entry, are ORed. Label selectors read the
+                                referenced class, not the ingress or namespace. Exact and exp need no read.
+                                Classless objects are rejected by applicable allow/deny class rules.
+                                Legacy Tenant class restrictions remain an additional boundary.
+                              items:
+                                description: |-
+                                  StorageClassMatch matches a class by name, or by the labels of the class
+                                  object. Exact, exp and the label selector are ORed. The rule admission
+                                  validator requires at least one of them. A class object that does not exist
+                                  never matches the label selector.
+                                properties:
+                                  exact:
+                                    description: Exact matches one of the provided
+                                      class names exactly.
+                                    items:
+                                      minLength: 1
+                                      type: string
+                                    maxItems: 64
+                                    minItems: 1
+                                    type: array
+                                  exp:
+                                    description: Exp matches the class name by regular
+                                      expression.
+                                    maxLength: 4096
+                                    minLength: 1
+                                    type: string
+                                  matchExpressions:
+                                    description: matchExpressions is a list of label
+                                      selector requirements. The requirements are
+                                      ANDed.
+                                    items:
+                                      description: |-
+                                        A label selector requirement is a selector that contains values, a key, and an operator that
+                                        relates the key and values.
+                                      properties:
+                                        key:
+                                          description: key is the label key that the
+                                            selector applies to.
+                                          type: string
+                                        operator:
+                                          description: |-
+                                            operator represents a key's relationship to a set of values.
+                                            Valid operators are In, NotIn, Exists and DoesNotExist.
+                                          type: string
+                                        values:
+                                          description: |-
+                                            values is an array of string values. If the operator is In or NotIn,
+                                            the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                            the values array must be empty. This array is replaced during a strategic
+                                            merge patch.
+                                          items:
+                                            type: string
+                                          type: array
+                                          x-kubernetes-list-type: atomic
+                                      required:
+                                      - key
+                                      - operator
+                                      type: object
+                                    type: array
+                                    x-kubernetes-list-type: atomic
+                                  matchLabels:
+                                    additionalProperties:
+                                      type: string
+                                    description: |-
+                                      matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                                      map is equivalent to an element of matchExpressions, whose key field is "key", the
+                                      operator is "In", and the values array contains only "value". The requirements are ANDed.
+                                    type: object
+                                type: object
+                                x-kubernetes-map-type: atomic
+                              maxItems: 64
+                              minItems: 1
+                              type: array
+                              x-kubernetes-list-type: atomic
                             hostnames:
                               description: |-
                                 Hostnames defines allowed, denied, or audited hostname expressions.
@@ -7428,8 +7723,11 @@ spec:
                               minItems: 1
                               type: array
                             types:
-                              description: Types defines the resource kinds to which
-                                hostname enforcement applies.
+                              description: |-
+                                Types defines the resource kinds to which enforcement applies. Classes
+                                apply to Ingress and Gateway; hostnames apply to every supported type.
+                                Gateway targets gateway.networking.k8s.io/v1. Served v1beta1 Gateway
+                                requests receive the same rules to prevent bypass through another version.
                               items:
                                 enum:
                                 - Ingress
@@ -9302,6 +9600,16 @@ spec:
                             description: Ingress configures Kubernetes ingress and
                               Gateway API resource mutations.
                             properties:
+                              class:
+                                description: |-
+                                  Class sets the targeted Ingress or Gateway class on CREATE and UPDATE.
+                                  Merge fills an absent or empty class, preserving explicit field/annotation
+                                  values. Replace sets the class and keeps an existing ingress annotation in
+                                  sync. Rule changes do not reconcile existing objects. Templates are allowed;
+                                  rendered values must be valid DNS subdomains. Omitted leaves it unchanged.
+                                maxLength: 4096
+                                minLength: 1
+                                type: string
                               listenerSets:
                                 description: ListenerSets configures gateway.networking.k8s.io/v1
                                   ListenerSets.
@@ -9344,6 +9652,26 @@ spec:
                                     - name
                                     type: object
                                 type: object
+                              types:
+                                description: |-
+                                  Types selects the kinds whose class is set. Required when class is supplied.
+                                  Gateway targets gateway.networking.k8s.io/v1. Served v1beta1 Gateway
+                                  requests receive the same class mutation for version compatibility.
+                                  ListenerSet parentRef mutation has its own explicit target and is unchanged.
+                                items:
+                                  enum:
+                                  - Ingress
+                                  - Route
+                                  - ListenerSet
+                                  - HTTPRoute
+                                  - Gateway
+                                  - TLSRoute
+                                  - GRPCRoute
+                                  type: string
+                                maxItems: 2
+                                minItems: 1
+                                type: array
+                                x-kubernetes-list-type: set
                             type: object
                           workloads:
                             description: |-

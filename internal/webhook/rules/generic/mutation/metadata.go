@@ -99,8 +99,8 @@ func (h *metadataRules) mutate(c client.Client, reader client.Reader, obj, old *
 
 		ingressMutated := false
 
-		if (req.Operation == admissionv1.Create || req.Operation == admissionv1.Update) && gvk == listenerSetKind {
-			ingressMutated, err = mutateListenerSetParentRef(ctx, obj, bodies, conditions)
+		if req.Operation == admissionv1.Create || req.Operation == admissionv1.Update {
+			ingressMutated, err = mutateIngressRules(ctx, obj, gvk, bodies, conditions)
 		}
 
 		devicesMutated := false

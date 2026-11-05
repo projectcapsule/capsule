@@ -11,10 +11,12 @@ import (
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 const (
-	annotationName = "kubernetes.io/ingress.class"
+	annotationName = meta.IngressClassAnnotation
 )
 
 type Ingress interface {

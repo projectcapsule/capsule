@@ -30,7 +30,9 @@ func TestIngressTypeForGVK(t *testing.T) {
 		{schema.GroupVersionKind{Group: "gateway.networking.k8s.io", Version: "v1", Kind: "HTTPRoute"}, rules.IngressTypeHTTPRoute, true},
 		{schema.GroupVersionKind{Group: "gateway.networking.k8s.io", Version: "v1", Kind: "TLSRoute"}, rules.IngressTypeTLSRoute, true},
 		{schema.GroupVersionKind{Group: "gateway.networking.k8s.io", Version: "v1", Kind: "GRPCRoute"}, rules.IngressTypeGRPCRoute, true},
-		{schema.GroupVersionKind{Group: "gateway.networking.k8s.io", Version: "v1beta1", Kind: "Gateway"}, "", false},
+		{schema.GroupVersionKind{Group: "gateway.networking.k8s.io", Version: "v1beta1", Kind: "Gateway"}, rules.IngressTypeGateway, true},
+		{schema.GroupVersionKind{Group: "gateway.networking.k8s.io", Version: "v1alpha2", Kind: "Gateway"}, "", false},
+		{schema.GroupVersionKind{Group: "gateway.networking.k8s.io", Version: "v1beta1", Kind: "HTTPRoute"}, "", false},
 		{schema.GroupVersionKind{Group: "example.com", Version: "v1", Kind: "Ingress"}, "", false},
 	}
 
