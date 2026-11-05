@@ -285,9 +285,10 @@ func TestPriorityClassRulesConditionsUpdatesAndSubresources(t *testing.T) {
 	}
 }
 
-// An update that keeps the class is only checked again by a class rule whose
-// own conditions match, never because an unrelated rule is conditional.
-func TestPriorityClassRulesMixedConditionalRules(t *testing.T) {
+// An update that keeps the class takes the decision again only when an allow or
+// deny class rule has conditions: one of them may have started or stopped
+// matching. Unrelated conditional rules and audit rules never cause that.
+func TestPriorityClassRulesUnchangedClassUpdates(t *testing.T) {
 	compiler, err := cache.NewCELCache()
 	require.NoError(t, err)
 
@@ -306,18 +307,26 @@ func TestPriorityClassRulesMixedConditionalRules(t *testing.T) {
 	}
 	allowGold := priorityClassBody(rules.ActionTypeAllow, classNames("gold"))
 
+	const tierSilver = "has(object.metadata.labels) && 'tier' in object.metadata.labels && object.metadata.labels['tier'] == 'silver'"
+
 	for _, tc := range []struct {
 		name   string
 		bodies []*rules.NamespaceRuleBodyNamespace
-		// denied reports the outcome of an update that keeps the forbidden class.
+		// denied is the outcome of an update that keeps the class "silver".
 		denied bool
+		audits int
 	}{
 		{name: "unconditional class rule", bodies: []*rules.NamespaceRuleBodyNamespace{allowGold}},
 		{name: "unrelated matching conditional rule", bodies: []*rules.NamespaceRuleBodyNamespace{allowGold, unrelated("true")}},
 		{name: "unrelated conditional rule gated by false", bodies: []*rules.NamespaceRuleBodyNamespace{unrelated("false"), allowGold}},
-		{name: "conditional class rule that does not match", bodies: []*rules.NamespaceRuleBodyNamespace{allowGold, conditionalClass("false", rules.ActionTypeDeny, "silver"), unrelated("true")}},
-		{name: "conditional class rule that matches", bodies: []*rules.NamespaceRuleBodyNamespace{allowGold, conditionalClass("object.metadata.labels['app'] == 'example'", rules.ActionTypeDeny, "silver")}, denied: true},
+		{name: "conditional deny that matches", bodies: []*rules.NamespaceRuleBodyNamespace{allowGold, conditionalClass("true", rules.ActionTypeDeny, "silver")}, denied: true},
 		{name: "conditional allow list that matches", bodies: []*rules.NamespaceRuleBodyNamespace{conditionalClass("true", rules.ActionTypeAllow, "gold"), unrelated("false")}, denied: true},
+		// The Pod was admitted while it carried tier=silver; the update drops the label.
+		{name: "conditional allow that stopped matching", bodies: []*rules.NamespaceRuleBodyNamespace{allowGold, conditionalClass(tierSilver, rules.ActionTypeAllow, "silver")}, denied: true},
+		{name: "conditional deny that does not match", bodies: []*rules.NamespaceRuleBodyNamespace{allowGold, conditionalClass("false", rules.ActionTypeDeny, "silver"), unrelated("true")}, denied: true},
+		{name: "conditional audit that matches is recorded without deciding", bodies: []*rules.NamespaceRuleBodyNamespace{allowGold, conditionalClass("true", rules.ActionTypeAudit, "silver"), priorityClassBody(rules.ActionTypeAudit, classNames("silver"))}, audits: 1},
+		{name: "conditional audit that does not match", bodies: []*rules.NamespaceRuleBodyNamespace{allowGold, conditionalClass("false", rules.ActionTypeAudit, "silver"), unrelated("true")}},
+		{name: "conditional audit next to a conditional allow", bodies: []*rules.NamespaceRuleBodyNamespace{allowGold, conditionalClass("true", rules.ActionTypeAudit, "silver"), conditionalClass(tierSilver, rules.ActionTypeAllow, "silver")}, denied: true, audits: 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			pods, templates := PodRules(nil, nil, nil, compiler), TemplateRules(nil, nil, nil, compiler)
@@ -325,10 +334,21 @@ func TestPriorityClassRulesMixedConditionalRules(t *testing.T) {
 
 			pod := priorityClassPod("silver")
 			old := pod.DeepCopy()
-			old.Labels["revision"] = "one"
+			old.Labels["tier"] = "silver"
 
 			req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{Operation: admissionv1.Update}}
-			require.Equal(t, tc.denied, pods.OnUpdate(nil, priorityClassFixture(t), old, pod, nil, events.NewDiscardRecorder(), tenant, tc.bodies)(t.Context(), req) != nil, "metadata-only Pod update")
+			recorder := &classEvents{EventRecorder: events.NewEventRecorder(nil, logr.Discard(), nil, nil)}
+			require.Equal(t, tc.denied, pods.OnUpdate(nil, priorityClassFixture(t), old, pod, nil, recorder, tenant, tc.bodies)(t.Context(), req) != nil, "Pod update that keeps the class")
+
+			audits := 0
+
+			for _, reason := range recorder.reasons {
+				if reason == events.ReasonNamespaceRuleAudit {
+					audits++
+				}
+			}
+
+			require.Equal(t, tc.audits, audits, "audit events")
 
 			// Creating the Pod, or moving it to the forbidden class, is always checked.
 			require.NotNil(t, pods.OnCreate(nil, priorityClassFixture(t), pod, nil, events.NewDiscardRecorder(), tenant, tc.bodies)(t.Context(), admission.Request{}))
@@ -346,9 +366,112 @@ func TestPriorityClassRulesMixedConditionalRules(t *testing.T) {
 			obj, templateReq := priorityClassTemplate(t, rules.ValidateDeployment, "silver")
 			templateReq.Operation = admissionv1.Update
 			previous := obj.DeepCopy()
-			previous.SetLabels(map[string]string{"revision": "one"})
-			require.Equal(t, tc.denied, templates.OnUpdate(nil, priorityClassFixture(t), previous, obj, nil, events.NewDiscardRecorder(), tenant, targeted)(t.Context(), templateReq) != nil, "metadata-only template update")
+			previous.SetLabels(map[string]string{"tier": "silver"})
+			require.Equal(t, tc.denied, templates.OnUpdate(nil, priorityClassFixture(t), previous, obj, nil, events.NewDiscardRecorder(), tenant, targeted)(t.Context(), templateReq) != nil, "template update that keeps the class")
 		})
+	}
+}
+
+// A class rule without the pod target never applies to priorityClassName, so
+// its conditions must not be evaluated for the class alone.
+func TestPriorityClassRulesConditionsNeedThePodTarget(t *testing.T) {
+	compiler, err := cache.NewCELCache()
+	require.NoError(t, err)
+
+	for _, tc := range []struct {
+		name    string
+		targets []rules.WorkloadValidationTarget
+		failed  bool
+	}{
+		{name: "omitted targets", failed: true},
+		{name: "pod target", targets: []rules.WorkloadValidationTarget{rules.ValidatePod}, failed: true},
+		{name: "container target only", targets: []rules.WorkloadValidationTarget{rules.ValidateContainers}},
+		{name: "controller target", targets: []rules.WorkloadValidationTarget{rules.ValidateDeployment}, failed: true},
+		{name: "controller container target only", targets: []rules.WorkloadValidationTarget{"deployment/containers"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body := priorityClassBody(rules.ActionTypeAllow, classNames("gold"))
+			body.Enforce.Conditions = []rules.AdmissionCondition{{Expression: "object.spec.missing == 'x'"}}
+			body.Enforce.Workloads.Targets = tc.targets
+			bodies := []*rules.NamespaceRuleBodyNamespace{body}
+
+			var response *admission.Response
+
+			if len(tc.targets) > 0 && strings.HasPrefix(string(tc.targets[0]), "deployment") {
+				obj, req := priorityClassTemplate(t, rules.ValidateDeployment, "silver")
+				response = TemplateRules(nil, nil, nil, compiler).OnCreate(nil, priorityClassFixture(t), obj, nil, events.NewDiscardRecorder(), &capsulev1beta2.Tenant{}, bodies)(t.Context(), req)
+			} else {
+				response = PodRules(nil, nil, nil, compiler).OnCreate(nil, priorityClassFixture(t), priorityClassPod("silver"), nil, events.NewDiscardRecorder(), &capsulev1beta2.Tenant{}, bodies)(t.Context(), admission.Request{})
+			}
+
+			if tc.failed {
+				require.NotNil(t, response)
+				require.Contains(t, response.Result.Message, "conditions")
+			} else {
+				require.Nil(t, response, "a rule that cannot apply must not reject the request")
+			}
+		})
+	}
+}
+
+// Kubernetes resolves the class of a controller template only when its Pods
+// are created, so a rule that targets the controller cannot let it be omitted.
+func TestPriorityClassRulesOmittedTemplateClass(t *testing.T) {
+	targeted := func(action rules.ActionType, targets ...rules.WorkloadValidationTarget) *rules.NamespaceRuleBodyNamespace {
+		body := priorityClassBody(action, classNames("gold"), classLabels("env", "customer"))
+		body.Enforce.Workloads.Targets = targets
+
+		return body
+	}
+
+	for _, tc := range []struct {
+		name   string
+		bodies []*rules.NamespaceRuleBodyNamespace
+		denied bool
+		events []string
+	}{
+		{name: "allow list", bodies: []*rules.NamespaceRuleBodyNamespace{targeted(rules.ActionTypeAllow, rules.ValidateDeployment)}, denied: true, events: []string{events.ReasonMissingPriorityClass}},
+		{name: "deny list", bodies: []*rules.NamespaceRuleBodyNamespace{targeted(rules.ActionTypeDeny, rules.ValidateDeployment)}, denied: true, events: []string{events.ReasonMissingPriorityClass}},
+		{name: "default action", bodies: []*rules.NamespaceRuleBodyNamespace{targeted("", rules.ValidatePod, rules.ValidateDeployment)}, denied: true, events: []string{events.ReasonMissingPriorityClass}},
+		{name: "audit only", bodies: []*rules.NamespaceRuleBodyNamespace{targeted(rules.ActionTypeAudit, rules.ValidateDeployment)}, events: []string{events.ReasonNamespaceRuleAudit}},
+		{name: "audit and allow", bodies: []*rules.NamespaceRuleBodyNamespace{targeted(rules.ActionTypeAudit, rules.ValidateDeployment), targeted(rules.ActionTypeAllow, rules.ValidateDeployment)}, denied: true, events: []string{events.ReasonNamespaceRuleAudit, events.ReasonMissingPriorityClass}},
+		{name: "another controller", bodies: []*rules.NamespaceRuleBodyNamespace{targeted(rules.ActionTypeAllow, rules.ValidateStatefulSet)}},
+		{name: "pods only", bodies: []*rules.NamespaceRuleBodyNamespace{targeted(rules.ActionTypeAllow, rules.ValidatePod), targeted(rules.ActionTypeAllow)}},
+		{name: "container target only", bodies: []*rules.NamespaceRuleBodyNamespace{targeted(rules.ActionTypeAllow, "deployment/containers")}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			reader := priorityClassFixture(t)
+			recorder := &classEvents{EventRecorder: events.NewEventRecorder(nil, logr.Discard(), nil, nil)}
+			h := TemplateRules(nil, nil, nil, nil)
+			obj, req := priorityClassTemplate(t, rules.ValidateDeployment, "")
+
+			response := h.OnCreate(nil, reader, obj, nil, recorder, &capsulev1beta2.Tenant{}, tc.bodies)(t.Context(), req)
+			if tc.denied {
+				require.NotNil(t, response)
+				require.False(t, response.Allowed)
+				require.EqualValues(t, http.StatusForbidden, response.Result.Code)
+				require.Contains(t, response.Result.Message, "spec.template: priority class is required at spec.priorityClassName because class rules target deployment")
+			} else {
+				require.Nil(t, response)
+			}
+
+			require.Equal(t, tc.events, recorder.reasons)
+			require.Zero(t, reader.gets.Load(), "a missing class needs no read")
+
+			// An update that keeps the class omitted is not checked again; dropping it is.
+			req.Operation = admissionv1.Update
+			require.Nil(t, h.OnUpdate(nil, reader, obj.DeepCopy(), obj, nil, events.NewDiscardRecorder(), &capsulev1beta2.Tenant{}, tc.bodies)(t.Context(), req))
+
+			named, _ := priorityClassTemplate(t, rules.ValidateDeployment, "gold")
+			require.Equal(t, tc.denied, h.OnUpdate(nil, reader, named, obj, nil, events.NewDiscardRecorder(), &capsulev1beta2.Tenant{}, tc.bodies)(t.Context(), req) != nil)
+		})
+	}
+
+	// A Pod has already been given the cluster's global default class, if any.
+	for _, action := range []rules.ActionType{rules.ActionTypeAllow, rules.ActionTypeDeny, rules.ActionTypeAudit} {
+		recorder := &classEvents{EventRecorder: events.NewEventRecorder(nil, logr.Discard(), nil, nil)}
+		require.Nil(t, PodRules(nil, nil, nil, nil).OnCreate(nil, priorityClassFixture(t), priorityClassPod(""), nil, recorder, &capsulev1beta2.Tenant{}, []*rules.NamespaceRuleBodyNamespace{targeted(action)})(t.Context(), admission.Request{}))
+		require.Empty(t, recorder.reasons)
 	}
 }
 
@@ -383,7 +506,7 @@ func TestPriorityClassRulesControllerTemplates(t *testing.T) {
 				class  string
 				denied bool
 				reads  int64
-			}{{class: "gold"}, {class: "bronze", reads: 1}, {class: "silver", denied: true, reads: 1}, {class: "ghost", denied: true, reads: 1}, {class: ""}} {
+			}{{class: "gold"}, {class: "bronze", reads: 1}, {class: "silver", denied: true, reads: 1}, {class: "ghost", denied: true, reads: 1}, {class: "", denied: true}} {
 				reader := priorityClassFixture(t)
 				obj, req := priorityClassTemplate(t, target, tc.class)
 				original := obj.DeepCopy()
@@ -391,9 +514,14 @@ func TestPriorityClassRulesControllerTemplates(t *testing.T) {
 
 				response := h.OnCreate(nil, reader, obj, nil, recorder, tenant, bodies)(t.Context(), req)
 				if tc.denied {
+					want := path + `: priority class "` + tc.class + `" at spec.priorityClassName is not allowed by namespace rule`
+					if tc.class == "" {
+						want = path + ": priority class is required at spec.priorityClassName because class rules target " + string(target)
+					}
+
 					require.NotNil(t, response, tc.class)
 					require.False(t, response.Allowed)
-					require.Contains(t, response.Result.Message, path+`: priority class "`+tc.class+`" at spec.priorityClassName is not allowed by namespace rule`)
+					require.Contains(t, response.Result.Message, want)
 					require.Same(t, obj, recorder.regarding, "events must concern the controller, not a synthetic Pod")
 				} else {
 					require.Nil(t, response, tc.class)

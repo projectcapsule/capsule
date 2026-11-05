@@ -268,12 +268,13 @@ func TestPriorityClassMutationFailures(t *testing.T) {
 	require.True(t, changed)
 }
 
-// The cache answers every lookup it can. Only a Pod class it does not know yet,
-// which the API server has already resolved, is read from the API server.
+// The API server judges the Pod's own class, since nothing rechecks that
+// decision. The cache serves the configured class, whose priority the API
+// server rechecks, and only a class it does not know yet is read again.
 func TestPriorityClassMutationCacheStates(t *testing.T) {
 	tenantDefault := &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: classTenantDefault}, Value: 1000}
 	global := &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: classGlobalDefault}, Value: 10, GlobalDefault: true}
-	demoted := &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: classGlobalDefault}, Value: 10}
+	plain := &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: classGlobalDefault}, Value: 10}
 
 	for _, tc := range []struct {
 		name          string
@@ -283,17 +284,21 @@ func TestPriorityClassMutationCacheStates(t *testing.T) {
 		freshErr      error
 		want          string
 		wantErr       string
+		cacheReads    int64
 		freshReads    int64
 	}{
-		{name: "cache knows the global default", cached: []client.Object{tenantDefault, global}, fresh: []client.Object{tenantDefault, global}, want: classTenantDefault},
-		{name: "cache is behind a new global default", cached: []client.Object{tenantDefault}, fresh: []client.Object{tenantDefault, global}, want: classTenantDefault, freshReads: 1},
-		{name: "cache is behind an explicit class", cached: []client.Object{tenantDefault}, fresh: []client.Object{tenantDefault, demoted}, want: classGlobalDefault, freshReads: 1},
-		{name: "class unknown everywhere is explicit", cached: []client.Object{tenantDefault}, fresh: []client.Object{tenantDefault}, want: classGlobalDefault, freshReads: 1},
-		{name: "cache hit is not read again", cached: []client.Object{tenantDefault, demoted}, fresh: []client.Object{tenantDefault, global}, want: classGlobalDefault},
-		{name: "no API reader keeps an unknown class", cached: []client.Object{tenantDefault}, noFresh: true, want: classGlobalDefault},
-		{name: "failed API read", cached: []client.Object{tenantDefault}, freshErr: errors.New("apiserver unavailable"), wantErr: `get PriorityClass "cluster-default": apiserver unavailable`, want: classGlobalDefault, freshReads: 1},
-		{name: "configured class is only read from the cache", cached: []client.Object{global}, fresh: []client.Object{tenantDefault, global}, wantErr: `PriorityClass "tenant-default" does not exist`, want: classGlobalDefault},
-		{name: "replace never reads the Pod class", action: rules.MutationActionReplace, cached: []client.Object{tenantDefault}, fresh: []client.Object{tenantDefault, global}, want: classTenantDefault},
+		{name: "cache and API server agree", cached: []client.Object{tenantDefault, global}, fresh: []client.Object{tenantDefault, global}, want: classTenantDefault, cacheReads: 1, freshReads: 1},
+		{name: "cache is behind a new global default", cached: []client.Object{tenantDefault}, fresh: []client.Object{tenantDefault, global}, want: classTenantDefault, cacheReads: 1, freshReads: 1},
+		{name: "promotion the cache has not seen", cached: []client.Object{tenantDefault, plain}, fresh: []client.Object{tenantDefault, global}, want: classTenantDefault, cacheReads: 1, freshReads: 1},
+		{name: "demotion the cache has not seen keeps the explicit class", cached: []client.Object{tenantDefault, global}, fresh: []client.Object{tenantDefault, plain}, want: classGlobalDefault, freshReads: 1},
+		{name: "class the API server does not know is explicit", cached: []client.Object{tenantDefault, global}, fresh: []client.Object{tenantDefault}, want: classGlobalDefault, freshReads: 1},
+		{name: "failed API read", cached: []client.Object{tenantDefault, global}, freshErr: errors.New("apiserver unavailable"), wantErr: `get PriorityClass "cluster-default": apiserver unavailable`, want: classGlobalDefault, freshReads: 1},
+		{name: "without an API reader the cache decides", cached: []client.Object{tenantDefault, global}, noFresh: true, want: classTenantDefault, cacheReads: 2},
+		{name: "without an API reader an unknown class is explicit", cached: []client.Object{tenantDefault}, noFresh: true, want: classGlobalDefault, cacheReads: 1},
+		{name: "configured class the cache has not seen", cached: []client.Object{global}, fresh: []client.Object{tenantDefault, global}, want: classTenantDefault, cacheReads: 1, freshReads: 2},
+		{name: "configured class missing everywhere", cached: []client.Object{global}, fresh: []client.Object{global}, wantErr: `PriorityClass "tenant-default" does not exist`, want: classGlobalDefault, cacheReads: 1, freshReads: 2},
+		{name: "replace reads only the configured class", action: rules.MutationActionReplace, cached: []client.Object{tenantDefault}, fresh: []client.Object{tenantDefault, global}, want: classTenantDefault, cacheReads: 1},
+		{name: "replace finds a configured class the cache has not seen", action: rules.MutationActionReplace, fresh: []client.Object{tenantDefault}, want: classTenantDefault, cacheReads: 1, freshReads: 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cached, fresh := priorityClassFixtureOf(t, tc.cached...), priorityClassFixtureOf(t, tc.fresh...)
@@ -316,6 +321,7 @@ func TestPriorityClassMutationCacheStates(t *testing.T) {
 
 			require.Equal(t, tc.want != classGlobalDefault, changed)
 			require.Equal(t, tc.want, pod.Spec.PriorityClassName)
+			require.Equal(t, tc.cacheReads, cached.gets.Load(), "cache reads")
 			require.Equal(t, tc.freshReads, fresh.gets.Load(), "API reads")
 		})
 	}

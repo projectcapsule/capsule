@@ -228,6 +228,8 @@ var _ = Describe("PriorityClass namespace profiles", Label("tenant", "rules", "w
 		}
 		deny(ownerA, deployment("denied", gold), "spec.template", fmt.Sprintf("priority class %q at spec.priorityClassName is not allowed by namespace rule", gold))
 		deny(ownerA, pod(templates, gold), "is not allowed by namespace rule")
+		// Its Pods would only get a class when they are created, so it must name one.
+		deny(ownerA, deployment("classless", ""), "spec.template", "priority class is required at spec.priorityClassName because class rules target deployment")
 
 		workload := deployment("allowed", silver)
 		Eventually(func() error { return ownerA.Create(ctx, workload) }, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())

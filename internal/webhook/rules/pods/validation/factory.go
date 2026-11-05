@@ -46,10 +46,12 @@ type podRuleValidator struct {
 		*corev1.Pod,
 		[]*apirules.NamespaceRuleEnforceBody,
 	) (*ruleengine.Evaluation, error)
-	// read replaces evaluate for validators that read a referenced object.
+	// read replaces evaluate for validators that read a referenced object. It
+	// also receives the admitted object: the Pod itself or its controller.
 	read func(
 		context.Context,
 		client.Reader,
+		client.Object,
 		*corev1.Pod,
 		[]*apirules.NamespaceRuleEnforceBody,
 	) (*ruleengine.Evaluation, error)
@@ -58,26 +60,52 @@ type podRuleValidator struct {
 	subresource string
 	changed     func(old, pod *corev1.Pod) bool
 	// policy reports whether a rule carries this validator's policy. When set,
-	// only a matching conditional rule that carries it checks an unchanged value
-	// again; otherwise any conditional workload rule does.
+	// only conditional rules that carry it check an unchanged value again;
+	// otherwise any conditional workload rule does.
 	policy func(*apirules.NamespaceRuleEnforceBody) bool
 }
 
-// recheck reports whether an update that keeps the value must still be
-// evaluated. Bodies are the rules whose conditions matched this request.
-func (v *podRuleValidator) recheck(conditional bool, bodies []*apirules.NamespaceRuleEnforceBody) bool {
-	if v.policy == nil {
-		return conditional
+// scope returns the rules to evaluate, and false to skip the validator. An
+// update that keeps the value is only evaluated because of conditional rules.
+// All holds every rule, matched those whose conditions match this request.
+func (v *podRuleValidator) scope(old []*corev1.Pod, pod *corev1.Pod, conditional bool, all, matched []*apirules.NamespaceRuleEnforceBody) ([]*apirules.NamespaceRuleEnforceBody, bool) {
+	if len(old) == 0 || old[0] == nil || v.changed == nil || v.changed(old[0], pod) {
+		return matched, true
 	}
 
-	return slices.ContainsFunc(bodies, func(body *apirules.NamespaceRuleEnforceBody) bool {
+	if v.policy == nil {
+		return matched, conditional
+	}
+
+	isConditional := func(body *apirules.NamespaceRuleEnforceBody) bool {
 		return body != nil && len(body.Conditions) > 0 && v.policy(body)
-	})
+	}
+	isAudit := func(body *apirules.NamespaceRuleEnforceBody) bool {
+		return body.Action.OrDefault() == apirules.ActionTypeAudit
+	}
+
+	// A condition of an allow or deny rule may have started or stopped matching:
+	// take the decision again, whichever rules match now.
+	if slices.ContainsFunc(all, func(body *apirules.NamespaceRuleEnforceBody) bool { return isConditional(body) && !isAudit(body) }) {
+		return matched, true
+	}
+
+	// Audit rules never decide. Record the conditional ones that match without
+	// evaluating the allow and deny rules this update would otherwise skip.
+	var audits []*apirules.NamespaceRuleEnforceBody
+
+	for _, body := range matched {
+		if isConditional(body) && isAudit(body) {
+			audits = append(audits, body)
+		}
+	}
+
+	return audits, len(audits) > 0
 }
 
-func (v *podRuleValidator) run(ctx context.Context, reader client.Reader, pod *corev1.Pod, bodies []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
+func (v *podRuleValidator) run(ctx context.Context, reader client.Reader, object client.Object, pod *corev1.Pod, bodies []*apirules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error) {
 	if v.read != nil {
-		return v.read(ctx, reader, pod, bodies)
+		return v.read(ctx, reader, object, pod, bodies)
 	}
 
 	return v.evaluate(pod, bodies)
@@ -243,6 +271,7 @@ func (h *podRules) validateWorkloadRules(
 	}
 
 	evaluator := ruleengine.NewConditionEvaluator(h.compiler, req.AdmissionRequest)
+	all := enforceBodies
 
 	var err error
 
@@ -256,7 +285,9 @@ func (h *podRules) validateWorkloadRules(
 
 	for i := range h.rules {
 		rule := &h.rules[i]
-		if len(old) > 0 && old[0] != nil && rule.changed != nil && !rule.changed(old[0], pod) && !rule.recheck(conditional, enforceBodies) {
+
+		bodies, ok := rule.scope(old, pod, conditional, all, enforceBodies)
+		if !ok {
 			continue
 		}
 
@@ -268,7 +299,7 @@ func (h *podRules) validateWorkloadRules(
 			continue
 		}
 
-		evaluation, err := rule.run(ctx, reader, pod, enforceBodies)
+		evaluation, err := rule.run(ctx, reader, object, pod, bodies)
 		if err != nil {
 			return err
 		}
@@ -317,7 +348,9 @@ func (h *podRules) validateWorkloadRules(
 	return nil
 }
 
-// Placement and resource policies do not run on subresources.
+// Placement, resource and class policies do not run on subresources. A class
+// policy needs the pod target, so a rule without it never evaluates conditions
+// for the class alone.
 func hasWorkloadPolicy(body apirules.NamespaceRuleEnforceWorkloadsBody, subresource string, linux bool) bool {
 	if linux && (subresource == "" || subresource == "ephemeralcontainers") && (len(body.Security.SeccompProfiles) > 0 || len(body.Security.AppArmorProfiles) > 0) {
 		return true
@@ -329,5 +362,6 @@ func hasWorkloadPolicy(body apirules.NamespaceRuleEnforceWorkloadsBody, subresou
 	}
 
 	return subresource == "" && (len(body.Placement.NodeSelector) > 0 || len(body.Placement.Tolerations) > 0 ||
-		len(body.Placement.TopologySpreadConstraints) > 0 || len(body.Placement.Affinity) > 0 || body.Resources != nil || body.Classes.HasPolicies())
+		len(body.Placement.TopologySpreadConstraints) > 0 || len(body.Placement.Affinity) > 0 || body.Resources != nil ||
+		(body.Classes.HasPolicies() && (len(body.Targets) == 0 || slices.Contains(body.Targets, apirules.ValidatePod))))
 }

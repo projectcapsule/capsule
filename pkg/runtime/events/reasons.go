@@ -36,6 +36,7 @@ const (
 	ReasonMissingStorageClass    string = "MissingStorageClass"
 	ReasonForbiddenStorageClass  string = "ForbiddenStorageClass"
 	ReasonForbiddenPriorityClass string = "ForbiddenPriorityClass"
+	ReasonMissingPriorityClass   string = "MissingPriorityClass"
 	ReasonForbiddenRuntimeClass  string = "ForbiddenRuntimeClass"
 	ReasonForbiddenIngressClass  string = "ForbiddenIngressClass"
 	ReasonMissingIngressClass    string = "MissingIngressClass"

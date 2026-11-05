@@ -20,7 +20,10 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
-const priorityClassPath = "spec.priorityClassName"
+const (
+	priorityClassSetName = "priority class"
+	priorityClassPath    = "spec.priorityClassName"
+)
 
 // classLookupError is a failed read of a referenced class: a server error,
 // never a rule decision.
@@ -68,22 +71,32 @@ func (c *priorityClassReader) get(ctx context.Context) (*schedulingv1.PriorityCl
 
 // validatePriorityClasses matches the class a Pod or Pod template names. The
 // built-in Priority admission plugin assigns the cluster's global default class
-// before webhooks run, so an empty name means the Pod has no class at all.
+// before webhooks run, so an empty name means the Pod has no class at all. It
+// resolves the class of a controller template only when its Pods are created.
 func (h *podRules) validatePriorityClasses(
 	ctx context.Context,
 	reader client.Reader,
+	object client.Object,
 	pod *corev1.Pod,
 	enforceBodies []*apirules.NamespaceRuleEnforceBody,
 ) (*ruleengine.Evaluation, error) {
-	if pod == nil || pod.Spec.PriorityClassName == "" || !slices.ContainsFunc(enforceBodies, appliesToPriorityClasses) {
+	if pod == nil || !slices.ContainsFunc(enforceBodies, appliesToPriorityClasses) {
 		return nil, nil
+	}
+
+	if pod.Spec.PriorityClassName == "" {
+		if _, isPod := object.(*corev1.Pod); isPod {
+			return nil, nil
+		}
+
+		return missingPriorityClass(object, enforceBodies), nil
 	}
 
 	name := pod.Spec.PriorityClassName
 	classes := &priorityClassReader{reader: reader, name: name}
 
 	evaluation, err := evaluatePodRules(pod, enforceBodies, podRuleSet[apirules.WorkloadClassMatch]{
-		Name:        "priority class",
+		Name:        priorityClassSetName,
 		EventReason: events.ReasonForbiddenPriorityClass,
 		Values: func(*corev1.Pod) []ruleengine.Value {
 			return []ruleengine.Value{{Value: name, Path: priorityClassPath}}
@@ -131,6 +144,52 @@ func (h *podRules) validatePriorityClasses(
 	}
 
 	return evaluation, err
+}
+
+// missingPriorityClass handles a controller template without a class like a
+// missing ingress hostname: allow and deny rules reject it, audit rules record
+// it. Its Pods would get the cluster's global default class when they are
+// created, which a rule that only targets the controller never sees.
+func missingPriorityClass(object client.Object, bodies []*apirules.NamespaceRuleEnforceBody) *ruleengine.Evaluation {
+	evaluation := &ruleengine.Evaluation{}
+	value := ruleengine.Value{Path: priorityClassPath}
+	audited, enforced := false, false
+
+	for _, body := range bodies {
+		if !appliesToPriorityClasses(body) {
+			continue
+		}
+
+		if body.Action.OrDefault() == apirules.ActionTypeAudit {
+			audited = true
+		} else {
+			enforced = true
+		}
+	}
+
+	if audited {
+		evaluation.Audits = append(evaluation.Audits, &ruleengine.Decision{
+			SetName:     priorityClassSetName,
+			EventReason: events.ReasonNamespaceRuleAudit,
+			Action:      apirules.ActionTypeAudit,
+			Value:       value,
+			Message:     fmt.Sprintf("empty priority class detected at %s by audit namespace rule", priorityClassPath),
+		})
+	}
+
+	if enforced {
+		target, _ := apirules.WorkloadTargetForGVK(object.GetObjectKind().GroupVersionKind())
+
+		evaluation.Blocking = &ruleengine.Decision{
+			SetName:     priorityClassSetName,
+			EventReason: events.ReasonMissingPriorityClass,
+			Action:      apirules.ActionTypeDeny,
+			Value:       value,
+			Message:     fmt.Sprintf("priority class is required at %s because class rules target %s", priorityClassPath, target),
+		}
+	}
+
+	return evaluation
 }
 
 // priorityClassesToMatch returns the entries of a rule to match against the

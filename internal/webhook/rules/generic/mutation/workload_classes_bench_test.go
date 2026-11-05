@@ -91,7 +91,9 @@ func BenchmarkPriorityClassMutation(b *testing.B) {
 						}
 					}
 
-					reader := &priorityClasses{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(classes...).Build()}
+					// The cache and the API server hold the same classes; reads are counted apart.
+					cached := &priorityClasses{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(classes...).Build()}
+					api := &priorityClasses{Client: cached.Client}
 
 					// The Pod as the built-in Priority plugin hands it to webhooks.
 					input := func(tenant int) (string, int64, string) {
@@ -124,7 +126,7 @@ func BenchmarkPriorityClassMutation(b *testing.B) {
 							conditions = ruleengine.NewConditionEvaluator(compiler, admissionv1.AdmissionRequest{Operation: admissionv1.Create})
 						}
 
-						changed, err := MutateWorkloadResources(b.Context(), obj, corev1.SchemeGroupVersion.WithKind("Pod"), bodies[tenant], conditions, reader)
+						changed, err := MutateWorkloadResources(b.Context(), obj, corev1.SchemeGroupVersion.WithKind("Pod"), bodies[tenant], conditions, cached, api)
 						if err != nil || changed != wantChanged {
 							b.Fatalf("changed=%v error=%v", changed, err)
 						}
@@ -140,7 +142,8 @@ func BenchmarkPriorityClassMutation(b *testing.B) {
 						}
 					}
 
-					b.ReportMetric(float64(reader.gets.Load())/float64(b.N), "class-reads/op")
+					b.ReportMetric(float64(cached.gets.Load())/float64(b.N), "cache-reads/op")
+					b.ReportMetric(float64(api.gets.Load())/float64(b.N), "api-reads/op")
 				})
 			}
 		}
