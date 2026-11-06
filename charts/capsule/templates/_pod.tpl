@@ -45,7 +45,11 @@ spec:
   tolerations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
-  {{- with .Values.affinity }}
+  {{- $affinity := deepCopy (.Values.affinity | default dict) }}
+  {{- if and .Values.antiAffinity.enabled (eq .Values.manager.kind "Deployment") (not (hasKey $affinity "podAntiAffinity")) }}
+    {{- $_ := set $affinity "podAntiAffinity" (include "capsule.defaultPodAntiAffinity" . | fromYaml) }}
+  {{- end }}
+  {{- with $affinity }}
   affinity:
     {{- toYaml . | nindent 4 }}
   {{- end }}
