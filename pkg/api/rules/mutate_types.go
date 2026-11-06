@@ -116,8 +116,9 @@ type WorkloadClassMutation struct {
 	// the class must exist, and a scheduling nodeSelector that conflicts with
 	// the Pod rejects it. The constraints of the final class are restored when
 	// a replace of nodeSelector or tolerations removes them, also when the
-	// class itself did not change. Constraints merged for a class a later
-	// entry replaced are residual: they are retained but not restored. The
+	// class itself did not change. Constraints the Pod already carries for a
+	// class an entry replaces are residual: they are retained but not restored,
+	// while a class replaced within the entries leaves nothing behind. The
 	// conditions of a later entry see the overhead and the constraints of the
 	// class assigned before them. Capsule does not create the RuntimeClass.
 	// Omitted or null leaves the Pod unchanged. Tenant and Namespace templates

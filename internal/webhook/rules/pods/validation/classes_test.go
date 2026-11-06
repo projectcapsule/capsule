@@ -92,7 +92,7 @@ var classKinds = []classKind{
 	{
 		name: "runtime", set: "runtime class", path: "spec.runtimeClassName", allowed: "Allowed runtime classes",
 		object: "RuntimeClass", field: "runtimeClassName",
-		forbidden: events.ReasonForbiddenRuntimeClass,
+		forbidden: events.ReasonForbiddenRuntimeClass, missing: events.ReasonMissingRuntimeClass,
 		class: func(name string, labels map[string]string) client.Object {
 			return &nodev1.RuntimeClass{Name: name, Labels: labels, Handler: "runc"}
 		},
@@ -699,96 +699,66 @@ func omittedClassCases(kind classKind) []omittedClassCase {
 	}
 }
 
-// Kubernetes resolves the priority class of a controller template only when
-// its Pods are created, so a rule that targets the controller cannot let it be
-// omitted.
-func TestPriorityClassRulesOmittedTemplateClass(t *testing.T) {
-	kind := classKinds[0]
-	require.NotEmpty(t, kind.missing)
+// A controller template resolves its class only when its Pods are created:
+// Kubernetes assigns the default priority class then, and a Tenant default or
+// a mutation rule can assign a runtime class the same way. A rule that targets
+// the controller never sees that class, so it cannot let the template omit one.
+func TestClassRulesOmittedTemplateClass(t *testing.T) {
+	for _, kind := range classKinds {
+		require.NotEmpty(t, kind.missing)
 
-	for _, tc := range omittedClassCases(kind) {
-		t.Run(tc.name, func(t *testing.T) {
-			reader := kind.fixture(t)
-			recorder := &classEvents{EventRecorder: events.NewEventRecorder(nil, logr.Discard(), nil, nil)}
-			h := TemplateRules(nil, nil, nil, nil)
-			obj, req := kind.template(t, rules.ValidateDeployment, "")
+		for _, tc := range omittedClassCases(kind) {
+			t.Run(kind.name+"/"+tc.name, func(t *testing.T) {
+				reader := kind.fixture(t)
+				recorder := &classEvents{EventRecorder: events.NewEventRecorder(nil, logr.Discard(), nil, nil)}
+				h := TemplateRules(nil, nil, nil, nil)
+				obj, req := kind.template(t, rules.ValidateDeployment, "")
 
-			var wanted []string
-			for range tc.audits {
-				wanted = append(wanted, events.ReasonNamespaceRuleAudit)
-			}
-
-			response := h.OnCreate(nil, reader, obj, nil, recorder, &capsulev1beta2.Tenant{}, tc.bodies)(t.Context(), req)
-			if tc.matched {
-				wanted = append(wanted, events.ReasonMissingPriorityClass)
-
-				require.NotNil(t, response)
-				require.False(t, response.Allowed)
-				require.EqualValues(t, http.StatusForbidden, response.Result.Code)
-				require.Contains(t, response.Result.Message, "spec.template: priority class is required at spec.priorityClassName because class rules target deployment")
-			} else {
-				require.Nil(t, response)
-			}
-
-			require.Equal(t, wanted, recorder.reasons)
-			require.Zero(t, reader.gets.Load(), "a missing class needs no read")
-
-			// An update that keeps the class omitted is not checked again; dropping it is.
-			req.Operation = admissionv1.Update
-			require.Nil(t, h.OnUpdate(nil, reader, obj.DeepCopy(), obj, nil, events.NewDiscardRecorder(), &capsulev1beta2.Tenant{}, tc.bodies)(t.Context(), req))
-
-			named, _ := kind.template(t, rules.ValidateDeployment, "gold")
-			require.Equal(t, tc.matched, h.OnUpdate(nil, reader, named, obj, nil, events.NewDiscardRecorder(), &capsulev1beta2.Tenant{}, tc.bodies)(t.Context(), req) != nil)
-		})
-	}
-}
-
-// Kubernetes has no default RuntimeClass, so nothing assigns a class to the
-// Pods of a controller template later: an omitted runtime class is never
-// matched, whatever the rule targets or decides.
-func TestRuntimeClassRulesOmittedTemplateClass(t *testing.T) {
-	kind := classKinds[1]
-	require.Empty(t, kind.missing)
-
-	for _, tc := range omittedClassCases(kind) {
-		t.Run(tc.name, func(t *testing.T) {
-			reader := kind.fixture(t)
-			recorder := &classEvents{EventRecorder: events.NewEventRecorder(nil, logr.Discard(), nil, nil)}
-			h := TemplateRules(nil, nil, nil, nil)
-			obj, req := kind.template(t, rules.ValidateDeployment, "")
-
-			require.Nil(t, h.OnCreate(nil, reader, obj, nil, recorder, &capsulev1beta2.Tenant{}, tc.bodies)(t.Context(), req))
-			require.Empty(t, recorder.reasons, "an omitted runtime class is neither rejected nor audited")
-
-			// Dropping the class of a template is not checked either.
-			req.Operation = admissionv1.Update
-			named, _ := kind.template(t, rules.ValidateDeployment, "gold")
-			require.Nil(t, h.OnUpdate(nil, reader, named, obj, nil, recorder, &capsulev1beta2.Tenant{}, tc.bodies)(t.Context(), req))
-			require.Empty(t, recorder.reasons)
-			require.Zero(t, reader.gets.Load(), "an omitted class needs no read")
-
-			// The same rules still judge a class the template names: only the one they
-			// do not admit is rejected, and none when they do not decide for the template.
-			for _, name := range []string{"gold", "silver"} {
-				template, createReq := kind.template(t, rules.ValidateDeployment, name)
-				response := h.OnCreate(nil, reader, template, nil, events.NewDiscardRecorder(), &capsulev1beta2.Tenant{}, tc.bodies)(t.Context(), createReq)
-
-				// Adding it to a template that had none is an update that changes the class.
-				updated := h.OnUpdate(nil, reader, obj, template, nil, events.NewDiscardRecorder(), &capsulev1beta2.Tenant{}, tc.bodies)(t.Context(), req)
-
-				if name != tc.rejected {
-					require.Nil(t, response, "class %s", name)
-					require.Nil(t, updated, "class %s", name)
-
-					continue
+				var wanted []string
+				for range tc.audits {
+					wanted = append(wanted, events.ReasonNamespaceRuleAudit)
 				}
 
-				require.NotNil(t, response)
-				require.False(t, response.Allowed)
-				require.Contains(t, response.Result.Message, `spec.template: runtime class "`+name+`" at spec.runtimeClassName`)
-				require.NotNil(t, updated)
-			}
-		})
+				response := h.OnCreate(nil, reader, obj, nil, recorder, &capsulev1beta2.Tenant{}, tc.bodies)(t.Context(), req)
+				if tc.matched {
+					wanted = append(wanted, kind.missing)
+
+					require.NotNil(t, response)
+					require.False(t, response.Allowed)
+					require.EqualValues(t, http.StatusForbidden, response.Result.Code)
+					require.Contains(t, response.Result.Message, "spec.template: "+kind.set+" is required at "+kind.path+" because class rules target deployment")
+				} else {
+					require.Nil(t, response)
+				}
+
+				require.Equal(t, wanted, recorder.reasons)
+				require.Zero(t, reader.gets.Load(), "a missing class needs no read")
+
+				// An update that keeps the class omitted is not checked again; dropping it is.
+				req.Operation = admissionv1.Update
+				require.Nil(t, h.OnUpdate(nil, reader, obj.DeepCopy(), obj, nil, events.NewDiscardRecorder(), &capsulev1beta2.Tenant{}, tc.bodies)(t.Context(), req))
+
+				named, _ := kind.template(t, rules.ValidateDeployment, "gold")
+				require.Equal(t, tc.matched, h.OnUpdate(nil, reader, named, obj, nil, events.NewDiscardRecorder(), &capsulev1beta2.Tenant{}, tc.bodies)(t.Context(), req) != nil)
+
+				// The same rules still judge a class the template names: only the
+				// one they do not admit is rejected.
+				for _, name := range []string{"gold", "silver"} {
+					template, createReq := kind.template(t, rules.ValidateDeployment, name)
+					response := h.OnCreate(nil, reader, template, nil, events.NewDiscardRecorder(), &capsulev1beta2.Tenant{}, tc.bodies)(t.Context(), createReq)
+
+					if name != tc.rejected {
+						require.Nil(t, response, "class %s", name)
+
+						continue
+					}
+
+					require.NotNil(t, response)
+					require.False(t, response.Allowed)
+					require.Contains(t, response.Result.Message, "spec.template: "+kind.set+` "`+name+`" at `+kind.path)
+				}
+			})
+		}
 	}
 }
 

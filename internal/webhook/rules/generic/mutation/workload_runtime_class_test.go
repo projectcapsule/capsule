@@ -538,10 +538,11 @@ func TestRuntimeClassMutationReinvocation(t *testing.T) {
 }
 
 // A later entry's conditions see the Pod as the entries before them left it:
-// the overhead and the scheduling of a class an earlier entry assigned are
-// settled before the conditions run, in the same pass, since no later webhook
-// change is guaranteed to trigger a reinvocation. The constraints merged for
-// the settled class stay residual when the condition replaces the class.
+// they evaluate against a view in which the overhead and the scheduling of a
+// class an earlier entry assigned are settled, in the same pass, since no
+// later webhook change is guaranteed to trigger a reinvocation. The Pod itself
+// keeps only the outcome: a class the condition replaced leaves no constraints
+// behind.
 func TestRuntimeClassMutationConditionSeesAssignedClass(t *testing.T) {
 	classes := runtimeClassFixture(t)
 	bodies := []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{
@@ -557,21 +558,24 @@ func TestRuntimeClassMutationConditionSeesAssignedClass(t *testing.T) {
 	require.Nil(t, pod.Spec.Overhead, "a scheduling-only class defines no overhead")
 	require.Equal(t, "true", pod.Spec.NodeSelector["runtime-"+classSecondDefault], "the node selector of the class the condition assigned must not be lost")
 	require.Subset(t, pod.Spec.Tolerations, runtimeClassObject(classSecondDefault).Scheduling.Tolerations)
-	// What was settled for the replaced class stays on the Pod.
-	require.Equal(t, "true", pod.Spec.NodeSelector["runtime-"+classTenantDefault])
-	require.EqualValues(t, 2, classes.gets.Load(), "the settle and the closing reconciliation read one class each")
+	// The replaced intermediate class leaves nothing on the Pod.
+	require.NotContains(t, pod.Spec.NodeSelector, "runtime-"+classTenantDefault)
+	require.NotSubset(t, pod.Spec.Tolerations, runtimeClassObject(classTenantDefault).Scheduling.Tolerations)
+	require.EqualValues(t, 2, classes.gets.Load(), "the view and the closing reconciliation read one class each")
 
-	// The settled Pod gives a second call nothing to change or read.
+	// The settled Pod gives a second call nothing to change or read: the
+	// intermediate selector the condition matched on never reached the Pod.
 	changed, err = MutatePodPlacement(t.Context(), pod, bodies, mutationConditions(t), noReads{tb: t})
 	require.NoError(t, err)
 	require.False(t, changed)
+	require.Equal(t, classSecondDefault, runtimeClassOf(pod))
 }
 
-// A conditional entry sees the constraints the settle merged and can replace
-// them away in the same pass: the closing reconciliation restores the settled
-// class, guarded by the placement the settle left behind, not only by the one
-// the Pod arrived with.
-func TestRuntimeClassMutationGuardsSettledConstraints(t *testing.T) {
+// A conditional entry sees the constraints of the assigned class through the
+// view and can replace the Pod's placement in the same pass: the closing
+// reconciliation still carries the constraints of the class, and the class is
+// read once for the whole invocation.
+func TestRuntimeClassMutationConditionalReplaceKeepsClassConstraints(t *testing.T) {
 	bodies := []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{
 		runtimeClassMutation("", classSecondDefault),
 		{Action: rules.MutationActionReplace,
@@ -585,9 +589,9 @@ func TestRuntimeClassMutationGuardsSettledConstraints(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, changed)
 	require.Equal(t, classSecondDefault, runtimeClassOf(pod))
-	require.Equal(t, map[string]string{"pool": "conditioned", "runtime-" + classSecondDefault: "true"}, pod.Spec.NodeSelector, "the replacement keeps the last word on the Pod's own keys while the class's selector is restored")
+	require.Equal(t, map[string]string{"pool": "conditioned", "runtime-" + classSecondDefault: "true"}, pod.Spec.NodeSelector, "the replacement keeps the last word on the Pod's own keys while the class's selector is carried")
 	require.Equal(t, runtimeClassObject(classSecondDefault).Scheduling.Tolerations, pod.Spec.Tolerations)
-	require.EqualValues(t, 2, classes.gets.Load(), "the settle and the restoration read the class once each")
+	require.EqualValues(t, 1, classes.gets.Load(), "one invocation reads each distinct class at most once")
 
 	// A reinvocation replays the replacement and the restoration: one read, and
 	// the Pod ends where the first call left it.
@@ -756,10 +760,11 @@ func TestRuntimeClassMutationConditions(t *testing.T) {
 		{Action: rules.MutationActionReplace, Conditions: []rules.AdmissionCondition{{Expression: "false"}}, Workloads: rules.WorkloadMutation{Classes: rules.WorkloadClassMutation{Runtime: "skipped"}}},
 	}
 
-	// Later entries see the class an earlier entry assigned, settled with its
-	// overhead and scheduling before their conditions run. The constraints of
-	// the settled first class stay residual after the second replaces it, and
-	// the final scheduling-only class leaves no overhead.
+	// Later entries see the class an earlier entry assigned, with its overhead
+	// and scheduling settled in the view their conditions evaluate against.
+	// Only the class the entries end at is derived on the Pod: its scheduling
+	// is merged, it has no overhead, and the replaced first class leaves
+	// nothing behind.
 	classless := pod("")
 	require.True(t, mutate(classless, chain...))
 
@@ -777,7 +782,7 @@ func TestRuntimeClassMutationConditions(t *testing.T) {
 
 	selector, _, err := unstructured.NestedStringMap(classless.Object, "spec", "nodeSelector")
 	require.NoError(t, err)
-	require.Equal(t, map[string]string{"keep": "yes", "observed": "yes", "runtime-" + classSecondDefault: "true", "runtime-" + classTenantDefault: "true"}, selector)
+	require.Equal(t, map[string]string{"keep": "yes", "observed": "yes", "runtime-" + classSecondDefault: "true"}, selector)
 
 	// A Pod that names a class is left alone by the merge and by its conditions.
 	explicit := pod(classCustom)

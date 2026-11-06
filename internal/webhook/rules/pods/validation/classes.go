@@ -76,15 +76,18 @@ var (
 		object: func() client.Object { return &schedulingv1.PriorityClass{} },
 	}
 
-	// Kubernetes has no default RuntimeClass. A Pod or Pod template without a
-	// class keeps the default runtime of its node, also after admission, so an
-	// omitted class is never matched.
+	// Kubernetes has no default RuntimeClass, but a Pod of a controller template
+	// is not necessarily classless when it runs: a Tenant default or a mutation
+	// rule can assign a class as the Pods are created, which a rule that only
+	// targets the controller never sees. An omitted class on a Pod itself is
+	// final — mutation has already run — and is never matched.
 	runtimeClasses = &workloadClass{
 		set:       "runtime class",
 		path:      "spec.runtimeClassName",
 		kind:      "RuntimeClass",
 		allowed:   "Allowed runtime classes",
 		forbidden: events.ReasonForbiddenRuntimeClass,
+		missing:   events.ReasonMissingRuntimeClass,
 		name:      func(pod *corev1.Pod) string { return ptr.Deref(pod.Spec.RuntimeClassName, "") },
 		applies:   appliesToRuntimeClasses,
 		matches: func(body *apirules.NamespaceRuleEnforceBody) []apirules.WorkloadClassMatch {
@@ -159,9 +162,22 @@ func (h *podRules) validateRuntimeClasses(
 	pod *corev1.Pod,
 	enforceBodies []*apirules.NamespaceRuleEnforceBody,
 ) (*ruleengine.Evaluation, error) {
-	// Most Pods name no runtime class and nothing assigns one later: no rule can
-	// match them, so the rules are not even scanned.
-	if pod == nil || ptr.Deref(pod.Spec.RuntimeClassName, "") == "" || !slices.ContainsFunc(enforceBodies, appliesToRuntimeClasses) {
+	// Most Pods name no runtime class, and the class of a Pod is final by the
+	// time it is validated: no rule can match it, so the rules are not even
+	// scanned. A controller template without a class stays checked: a Tenant
+	// default or a mutation rule can assign a class to its Pods later, which a
+	// rule that only targets the controller never sees.
+	if pod == nil {
+		return nil, nil
+	}
+
+	if ptr.Deref(pod.Spec.RuntimeClassName, "") == "" {
+		if _, isPod := object.(*corev1.Pod); isPod {
+			return nil, nil
+		}
+	}
+
+	if !slices.ContainsFunc(enforceBodies, appliesToRuntimeClasses) {
 		return nil, nil
 	}
 

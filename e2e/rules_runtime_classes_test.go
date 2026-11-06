@@ -271,19 +271,25 @@ var _ = Describe("RuntimeClass namespace profiles", Label("tenant", "rules", "wo
 		deny(ownerA, deployment("denied", sandboxed), "spec.template", fmt.Sprintf("runtime class %q at spec.runtimeClassName is not allowed by namespace rule", sandboxed))
 		deny(ownerA, pod(templates, sandboxed), "is not allowed by namespace rule")
 
-		// Nothing assigns a runtime class to its Pods later, so a template may omit it.
-		classless := deployment("classless", "")
-		Eventually(func() error { return ownerA.Create(ctx, classless) }, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		// A Tenant default or a mutation rule can assign a class to its Pods
+		// later, which this Deployment-only rule never sees: the template can
+		// no longer omit the class it is judged by.
+		deny(ownerA, deployment("classless", ""), "spec.template", "runtime class is required at spec.runtimeClassName because class rules target deployment")
 
 		workload := deployment("allowed", standard)
 		Eventually(func() error { return ownerA.Create(ctx, workload) }, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
-		// The other profiles do not target Deployments, so their templates are not checked.
+		// The other profiles do not target Deployments, so their templates are not
+		// checked, named or classless.
 		unchecked := deployment("unchecked", plain)
 		unchecked.Namespace = selected.Name
 		Eventually(func() error { return ownerA.Create(ctx, unchecked) }, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
-		for _, target := range []*appsv1.Deployment{workload, classless} {
+		uncheckedClassless := deployment("unchecked-classless", "")
+		uncheckedClassless.Namespace = selected.Name
+		Eventually(func() error { return ownerA.Create(ctx, uncheckedClassless) }, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		for _, target := range []*appsv1.Deployment{workload} {
 			Eventually(func(g Gomega) {
 				current := &appsv1.Deployment{}
 				g.Expect(ownerA.Get(ctx, client.ObjectKeyFromObject(target), current)).To(Succeed())
@@ -316,7 +322,7 @@ var _ = Describe("RuntimeClass namespace profiles", Label("tenant", "rules", "wo
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 		stored := &appsv1.Deployment{}
-		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(classless), stored)).To(Succeed())
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(uncheckedClassless), stored)).To(Succeed())
 		Expect(stored.Spec.Template.Spec.RuntimeClassName).To(BeNil())
 
 		By("rejecting an empty matcher without changing the active policy")

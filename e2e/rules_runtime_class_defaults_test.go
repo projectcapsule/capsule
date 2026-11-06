@@ -9,6 +9,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -168,19 +169,29 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 					runtimeClassProfile([]string{"conflicted"}, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{
 						{Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{prefix + "/scheduled": "elsewhere"}}}},
 					}}),
-					// The conditional entry is gated on the label of the metadata
-					// entry, the controlled later mutator: the metadata webhook runs
-					// after this one and labels the Pod, so the API server reinvokes
-					// this webhook, and the replacement that then swaps the node
-					// selector proves the second pass ran, after the plugin's final
-					// run.
+					// The conditional entry is gated on the tenant label that only the
+					// tenant-assignment webhook adds, after this one: the condition is
+					// false on the first invocation, the label lands, and the API
+					// server reinvokes this webhook. The replacement that then swaps
+					// the node selector proves the second pass ran, after the
+					// plugin's final run. The first-pass marker below records that
+					// the gate was indeed absent initially.
 					runtimeClassProfile([]string{"reinvoked"}, &rules.NamespaceRuleBodyNamespace{
-						Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeAllow, Metadata: []rules.MetadataRule{{Kinds: []string{"Pod"}, Labels: map[string]rules.MetadataValueRule{prefix + "/reinvoke": {Default: new("true"), Values: []apiruntime.ExpressionMatch{{Exact: []string{"true"}}}}}}}},
 						Mutate: []rules.NamespaceRuleMutation{
 							runtimeClassDefault(rules.MutationActionMerge, restored.Name),
 							{Action: rules.MutationActionReplace,
-								Conditions: []rules.AdmissionCondition{{Name: "after-later-webhook", Expression: fmt.Sprintf("has(object.metadata.labels) && '%s/reinvoke' in object.metadata.labels", prefix)}},
+								Conditions: []rules.AdmissionCondition{{Name: "after-later-webhook", Expression: fmt.Sprintf("has(object.metadata.labels) && '%s' in object.metadata.labels", meta.NewTenantLabel)}},
 								Workloads:  rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{poolKey: "reinvoked"}}}},
+						},
+					}),
+					// The marker label is defaulted only while the tenant label is
+					// absent: it can land on the first invocation alone, proving the
+					// gate of the replacement was false there.
+					runtimeClassProfile([]string{"reinvoked"}, &rules.NamespaceRuleBodyNamespace{
+						Enforce: &rules.NamespaceRuleEnforceBody{
+							Action:     rules.ActionTypeAllow,
+							Conditions: []rules.AdmissionCondition{{Name: "first-pass", Expression: fmt.Sprintf("!has(object.metadata.labels) || !('%s' in object.metadata.labels)", meta.NewTenantLabel)}},
+							Metadata:   []rules.MetadataRule{{Kinds: []string{"Pod"}, Labels: map[string]rules.MetadataValueRule{prefix + "/first": {Default: new("true"), Values: []apiruntime.ExpressionMatch{{Exact: []string{"true"}}}}}}},
 						},
 					}),
 					// A later entry's condition reads the selector the class of the
@@ -205,6 +216,14 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 					runtimeClassProfile([]string{"confined"}, &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{
 						Action:    rules.ActionTypeAllow,
 						Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Classes: rules.WorkloadClassEnforcement{Runtime: []rules.WorkloadClassMatch{{Exact: []string{name + "-default", custom.Name}}}}},
+					}}),
+					// A Deployment-only allow list next to a Pod default: the default
+					// would assign a class to the Pods later, which this rule never
+					// sees, so a classless template cannot pass it.
+					runtimeClassProfile([]string{"controller"}, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{runtimeClassDefault(rules.MutationActionMerge, name+"-default")}}),
+					runtimeClassProfile([]string{"controller"}, &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{
+						Action:    rules.ActionTypeAllow,
+						Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: []rules.WorkloadValidationTarget{rules.ValidateDeployment}, Classes: rules.WorkloadClassEnforcement{Runtime: []rules.WorkloadClassMatch{{Exact: []string{custom.Name}}}}},
 					}}),
 				},
 			}}
@@ -245,9 +264,11 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 			case "placement", "conflicted":
 				expectProfile(ns, 1, "")
 			case "reinvoked":
-				expectProfile(ns, 1, restored.Name)
+				expectProfile(ns, 2, restored.Name)
 			case "staged":
 				expectProfile(ns, 1, scheduled.Name)
+			case "controller":
+				expectProfile(ns, 2, defaults[tenant].Name)
 			case "chain":
 				expectProfile(ns, 1, defaults[tenant].Name)
 			case "missing":
@@ -266,7 +287,7 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 		evictingNS := newNamespace(0, "evicting")
 		placementNS, conflictedNS := newNamespace(0, "placement"), newNamespace(0, "conflicted")
 		reinvokedNS := newNamespace(0, "reinvoked")
-		stagedNS := newNamespace(0, "staged")
+		stagedNS, controllerNS := newNamespace(0, "staged"), newNamespace(0, "controller")
 		tenantBNS := newNamespace(1, "merge")
 
 		sequence := 0
@@ -366,20 +387,20 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 		By("restoring the scheduling of the class when a replacement lands on reinvocation")
-		// The first pass assigns the class and settles its selector; the
-		// conditional replacement is gated on a label only the metadata webhook
-		// adds afterwards — the profile's own controlled later mutation — so it
-		// cannot land before the API server calls this webhook again. The
-		// replaced pool key on the persisted Pod proves that second pass ran
-		// after the plugin's final run, when only the webhook's own restoration
-		// can put the selector of the class back, and the overhead of the first
-		// pass must survive untouched.
+		// The first pass assigns the class; the conditional replacement is gated
+		// on the tenant label that only the tenant-assignment webhook adds, after
+		// this one — the first-pass marker proves the gate was absent then. The
+		// replaced pool key on the persisted Pod proves a second pass ran after
+		// the plugin's final run, when only the webhook's own restoration can put
+		// the selector of the class back, and the overhead of the first pass must
+		// survive untouched.
 		trigger := newPod(reinvokedNS, "")
 		Eventually(func() error { return owners[0].Create(ctx, trigger) }, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		Eventually(func(g Gomega) {
 			stored := &corev1.Pod{}
 			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trigger), stored)).To(Succeed())
-			g.Expect(stored.Labels).To(HaveKeyWithValue(prefix+"/reinvoke", "true"), "the metadata entry must label the Pod after the first pass")
+			g.Expect(stored.Labels).To(HaveKeyWithValue(prefix+"/first", "true"), "the marker must land on the first pass, while the tenant label is absent")
+			g.Expect(stored.Labels).To(HaveKeyWithValue(meta.NewTenantLabel, tenants[0].Name), "the tenant-assignment webhook must have labeled the Pod")
 			g.Expect(stored.Spec.NodeSelector).To(HaveKeyWithValue(poolKey, "reinvoked"), "the conditional replacement must land on the second pass")
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		expectRuntimeClass(ctx, trigger, restored, map[string]string{poolKey: "reinvoked"})
@@ -459,6 +480,39 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 			g.Expect(failure.Message).To(ContainSubstring(fmt.Sprintf("runtime class %q at spec.runtimeClassName is not allowed by namespace rule", bare.Name)))
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		ExpectPodsForDeployment(ctx, confinedNS.Name, outside, 0)
+
+		By("requiring a class on controller templates that class rules target")
+		// The template of a Deployment is not necessarily classless when its Pods
+		// run: the profile's default would assign one later, which this
+		// Deployment-only allow rule never sees. A classless template is
+		// rejected; one naming the admitted class passes, and the merge default
+		// preserves it on the Pods.
+		deployment := func(name, class string) *appsv1.Deployment {
+			workload := MakeDeployment(controllerNS.Name, name, 1, map[string]string{"env": "e2e"}, "")
+			workload.Labels = map[string]string{"env": "e2e"}
+			workload.Spec.Template.Spec.SchedulingGates = []corev1.PodSchedulingGate{{Name: "example.com/e2e-runtime-class"}}
+
+			if class != "" {
+				workload.Spec.Template.Spec.RuntimeClassName = &class
+			}
+
+			return workload
+		}
+
+		classlessTemplate := deployment("classless", "")
+		templateErr := owners[0].Create(ctx, classlessTemplate)
+		Expect(templateErr).To(HaveOccurred(), "a classless template must not pass a Deployment-only class rule")
+		Expect(templateErr.Error()).To(ContainSubstring("spec.template: runtime class is required at spec.runtimeClassName because class rules target deployment"))
+		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(classlessTemplate), &appsv1.Deployment{}))).To(BeTrue())
+
+		classed := deployment("classed", custom.Name)
+		Eventually(func() error { return owners[0].Create(ctx, classed) }, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		ExpectPodsForDeployment(ctx, controllerNS.Name, classed.Name, 1)
+
+		classedPods := &corev1.PodList{}
+		Expect(k8sClient.List(ctx, classedPods, client.InNamespace(controllerNS.Name), client.MatchingLabels{"app": classed.Name})).To(Succeed())
+		Expect(classedPods.Items).To(HaveLen(1))
+		expectRuntimeClass(ctx, &classedPods.Items[0], custom, nil)
 
 		By("rejecting a Pod whose default class does not exist")
 		rejected(owners[0], newPod(missingNS, ""), fmt.Sprintf("RuntimeClass %q not found", prefix+"-absent"))

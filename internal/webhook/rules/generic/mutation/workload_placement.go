@@ -14,6 +14,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	apirules "github.com/projectcapsule/capsule/pkg/api/rules"
 	"github.com/projectcapsule/capsule/pkg/ruleengine"
 )
@@ -28,13 +29,21 @@ const maxPlacementNodeTerms = 256
 // Runtime class mutations read the assigned RuntimeClass through the last of
 // those readers, the authoritative one, and only when the entries changed the
 // class of the Pod or disturbed the scheduling of the class it names: nothing
-// downstream rejects stale or dropped scheduling constraints. The overhead and
-// the scheduling of an assigned class are settled before a later entry
-// evaluates its conditions, so conditions see the Pod as the entries before
-// them left it.
+// downstream rejects stale or dropped scheduling constraints. One invocation
+// reads each distinct class at most once. The conditions of a later entry
+// evaluate against a view of the Pod in which the overhead and the scheduling
+// of the class assigned before them are settled, while the Pod itself keeps
+// only the outcome of the whole pass.
 func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules.NamespaceRuleBodyNamespace, conditions *ruleengine.ConditionEvaluator, classes ...client.Reader) (bool, error) {
 	if pod == nil || !slices.ContainsFunc(bodies, func(body *apirules.NamespaceRuleBodyNamespace) bool { return body != nil && len(body.Mutate) > 0 }) {
 		return false, nil
+	}
+
+	// Condition views and the closing reconciliation can resolve the same class:
+	// a request-scoped cache keeps the authoritative read single. The generic
+	// mutating route has one handler, so the router does not wrap the reader.
+	if n := len(classes); n > 0 && classes[n-1] != nil {
+		classes = append(slices.Clone(classes[:n-1]), utils.NewRequestCachingReader(classes[n-1]))
 	}
 
 	before := podPlacement(pod).DeepCopy()
@@ -43,7 +52,7 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 	originalSecrets := pod.Spec.ImagePullSecrets
 	// The runtime class stays out of the placement snapshot, which the compiler
 	// keeps on the stack as long as podPlacement is small enough to inline.
-	settled := settledRuntimeClass{name: ptr.Deref(pod.Spec.RuntimeClassName, ""), guard: before}
+	runtimeClass := ptr.Deref(pod.Spec.RuntimeClassName, "")
 
 	var containers []workloadMutationContainer
 
@@ -65,14 +74,7 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 				continue
 			}
 
-			// Conditions honor the documented mutation order: the overhead and
-			// the scheduling of a class an earlier entry assigned are settled
-			// before a later entry reads the Pod, not after the pass.
-			if err := settled.settle(ctx, pod, mutation, classes); err != nil {
-				return false, err
-			}
-
-			matched, err := matchesMutationConditions(ctx, conditions, pod, mutation.Conditions)
+			matched, err := matchesMutationConditions(ctx, conditions, conditionView(ctx, pod, runtimeClass, before, classes, mutation), mutation.Conditions)
 			if err != nil {
 				return false, fmt.Errorf("rules[%d].mutate[%d]: %w", i, j, err)
 			}
@@ -104,11 +106,12 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 		}
 	}
 
-	if err := settled.finish(ctx, pod, classes); err != nil {
-		return false, err
+	runtimeClassChanged, err := reconcilePodRuntimeClass(ctx, pod, runtimeClass, before, classes)
+	if err != nil {
+		return false, fmt.Errorf("workloads.classes.runtime: %w", err)
 	}
 
-	return settled.changed || !slices.Equal(originalSecrets, pod.Spec.ImagePullSecrets) || slices.ContainsFunc(containers, workloadMutationContainer.changed) || podPlacementChanged(before, podPlacement(pod)), nil
+	return runtimeClassChanged || !slices.Equal(originalSecrets, pod.Spec.ImagePullSecrets) || slices.ContainsFunc(containers, workloadMutationContainer.changed) || podPlacementChanged(before, podPlacement(pod)), nil
 }
 
 // applyPodPlacementAction merges or replaces the Pod-level placement fields of
