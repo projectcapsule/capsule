@@ -168,21 +168,29 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 					runtimeClassProfile([]string{"conflicted"}, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{
 						{Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{prefix + "/scheduled": "elsewhere"}}}},
 					}}),
-					// The entries see the selector of the assigned class only on the
-					// webhook's reinvocation. The metadata entry is the controlled
-					// later mutator: the metadata webhook runs after this one and
-					// labels the Pod, so the API server reinvokes this webhook, and
-					// the replacement that then swaps the node selector proves the
-					// second pass ran, after the plugin's final run.
+					// The conditional entry is gated on the label of the metadata
+					// entry, the controlled later mutator: the metadata webhook runs
+					// after this one and labels the Pod, so the API server reinvokes
+					// this webhook, and the replacement that then swaps the node
+					// selector proves the second pass ran, after the plugin's final
+					// run.
 					runtimeClassProfile([]string{"reinvoked"}, &rules.NamespaceRuleBodyNamespace{
 						Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeAllow, Metadata: []rules.MetadataRule{{Kinds: []string{"Pod"}, Labels: map[string]rules.MetadataValueRule{prefix + "/reinvoke": {Default: new("true"), Values: []apiruntime.ExpressionMatch{{Exact: []string{"true"}}}}}}}},
 						Mutate: []rules.NamespaceRuleMutation{
 							runtimeClassDefault(rules.MutationActionMerge, restored.Name),
 							{Action: rules.MutationActionReplace,
-								Conditions: []rules.AdmissionCondition{{Name: "after-restore", Expression: fmt.Sprintf("has(object.spec.nodeSelector) && '%s/restored' in object.spec.nodeSelector", prefix)}},
+								Conditions: []rules.AdmissionCondition{{Name: "after-later-webhook", Expression: fmt.Sprintf("has(object.metadata.labels) && '%s/reinvoke' in object.metadata.labels", prefix)}},
 								Workloads:  rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{poolKey: "reinvoked"}}}},
 						},
 					}),
+					// A later entry's condition reads the selector the class of the
+					// first entry injects: the derived fields are settled before the
+					// condition runs, in the same admission pass.
+					runtimeClassProfile([]string{"staged"}, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{
+						runtimeClassDefault(rules.MutationActionMerge, scheduled.Name),
+						{Conditions: []rules.AdmissionCondition{{Name: "sees-class-selector", Expression: fmt.Sprintf("has(object.spec.nodeSelector) && '%s/scheduled' in object.spec.nodeSelector", prefix)}},
+							Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{prefix + "/stage": "in-pass"}}}},
+					}}),
 					// Entries that replace the class in turn, next to one that changes the Pod
 					// again when the API server calls the webhook a second time.
 					runtimeClassProfile([]string{"chain"}, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{
@@ -238,6 +246,8 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 				expectProfile(ns, 1, "")
 			case "reinvoked":
 				expectProfile(ns, 1, restored.Name)
+			case "staged":
+				expectProfile(ns, 1, scheduled.Name)
 			case "chain":
 				expectProfile(ns, 1, defaults[tenant].Name)
 			case "missing":
@@ -256,6 +266,7 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 		evictingNS := newNamespace(0, "evicting")
 		placementNS, conflictedNS := newNamespace(0, "placement"), newNamespace(0, "conflicted")
 		reinvokedNS := newNamespace(0, "reinvoked")
+		stagedNS := newNamespace(0, "staged")
 		tenantBNS := newNamespace(1, "merge")
 
 		sequence := 0
@@ -355,11 +366,10 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 		By("restoring the scheduling of the class when a replacement lands on reinvocation")
-		// The first pass assigns the class, and only its closing merge carries the
-		// class's selector onto the Pod: no entry of that pass sees it. The
-		// metadata webhook then labels the Pod — the profile's own controlled
-		// later mutation — and the API server calls this webhook again. The
-		// conditional entry now finds the selector and swaps the whole map. The
+		// The first pass assigns the class and settles its selector; the
+		// conditional replacement is gated on a label only the metadata webhook
+		// adds afterwards — the profile's own controlled later mutation — so it
+		// cannot land before the API server calls this webhook again. The
 		// replaced pool key on the persisted Pod proves that second pass ran
 		// after the plugin's final run, when only the webhook's own restoration
 		// can put the selector of the class back, and the overhead of the first
@@ -373,6 +383,19 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 			g.Expect(stored.Spec.NodeSelector).To(HaveKeyWithValue(poolKey, "reinvoked"), "the conditional replacement must land on the second pass")
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		expectRuntimeClass(ctx, trigger, restored, map[string]string{poolKey: "reinvoked"})
+
+		By("settling the constraints of an assigned class before a later condition")
+		// No reinvocation is arranged here: the second entry's condition must see
+		// the selector of the class the first entry assigned within one pass, or
+		// the staged selector would never land.
+		staged := newPod(stagedNS, "")
+		Eventually(func() error { return owners[0].Create(ctx, staged) }, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Eventually(func(g Gomega) {
+			stored := &corev1.Pod{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(staged), stored)).To(Succeed())
+			g.Expect(stored.Spec.NodeSelector).To(HaveKeyWithValue(prefix+"/stage", "in-pass"), "the later condition must see the selector of the assigned class in the same pass")
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		expectRuntimeClass(ctx, staged, scheduled, map[string]string{prefix + "/stage": "in-pass"})
 
 		By("leaving non-selected namespaces and the other tenant's defaults alone")
 		unselected := newPod(otherNS, "")

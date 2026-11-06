@@ -169,7 +169,8 @@ func mutatePodClasses(ctx context.Context, pod *corev1.Pod, mutation *apirules.N
 // selects the Pod. Kubernetes has no default RuntimeClass, so merge only fills
 // an omitted class and replace sets it on every Pod. Only the name is set
 // here: reconcilePodRuntimeClass settles the overhead and the scheduling of
-// the class the entries end at.
+// the class before a later entry evaluates its conditions, and of the class
+// the entries end at.
 func mutatePodRuntimeClass(pod *corev1.Pod, mutation *apirules.NamespaceRuleMutation) {
 	name := mutation.Workloads.Classes.Runtime
 	if name == "" || !mutation.Workloads.GetWorkloadTargets(apirules.ValidatePod) {
@@ -182,6 +183,47 @@ func mutatePodRuntimeClass(pod *corev1.Pod, mutation *apirules.NamespaceRuleMuta
 	}
 
 	pod.Spec.RuntimeClassName = new(name)
+}
+
+// settledRuntimeClass tracks the class whose derived fields are on the Pod and
+// the placement its restoration protects, so conditions and the closing
+// reconciliation see every class assignment settled exactly once.
+type settledRuntimeClass struct {
+	name    string
+	guard   *apirules.WorkloadMutation
+	changed bool
+}
+
+// settle applies the overhead and the scheduling of a class an earlier entry
+// assigned before an entry with conditions reads the Pod. Entries without
+// conditions cost nothing: chains of unconditioned replacements still settle
+// only the class they end at.
+func (s *settledRuntimeClass) settle(ctx context.Context, pod *corev1.Pod, mutation *apirules.NamespaceRuleMutation, readers []client.Reader) error {
+	if len(mutation.Conditions) == 0 || ptr.Deref(pod.Spec.RuntimeClassName, "") == s.name {
+		return nil
+	}
+
+	if err := s.finish(ctx, pod, readers); err != nil {
+		return err
+	}
+
+	s.name = ptr.Deref(pod.Spec.RuntimeClassName, "")
+	s.guard = podPlacement(pod).DeepCopy()
+
+	return nil
+}
+
+// finish settles the class the entries ended at and records whether the Pod's
+// class, overhead, or scheduling changed.
+func (s *settledRuntimeClass) finish(ctx context.Context, pod *corev1.Pod, readers []client.Reader) error {
+	changed, err := reconcilePodRuntimeClass(ctx, pod, s.name, s.guard, readers)
+	if err != nil {
+		return fmt.Errorf("workloads.classes.runtime: %w", err)
+	}
+
+	s.changed = s.changed || changed
+
+	return nil
 }
 
 // reconcilePodRuntimeClass applies the overhead and the scheduling of the
@@ -204,10 +246,12 @@ func mutatePodRuntimeClass(pod *corev1.Pod, mutation *apirules.NamespaceRuleMuta
 // touched it.
 //
 // Only the outcome counts, not each assignment: entries that replace the class
-// in turn end where the Pod started, and nothing is read or merged. The
-// constraints merged for a replaced class stay on the Pod: they cannot be told
-// apart from the Pod's own, and removing them could lift a restriction another
-// mutation relies on.
+// in turn end where the Pod started, and nothing is read or merged — unless a
+// later entry carries conditions, which settle the class assigned before them
+// so they see the Pod as the documented mutation order left it. The
+// constraints merged for a settled class a later entry replaced stay on the
+// Pod: they cannot be told apart from the Pod's own, and removing them could
+// lift a restriction another mutation relies on.
 //
 // It reports whether the runtime class changed. The class is read only for an
 // assignment or a disturbed placement.
@@ -218,10 +262,22 @@ func reconcilePodRuntimeClass(ctx context.Context, pod *corev1.Pod, arrival stri
 	}
 
 	assigned := name != arrival
-	if !assigned &&
-		equality.Semantic.DeepEqual(before.Placement.NodeSelector, pod.Spec.NodeSelector) &&
-		equality.Semantic.DeepEqual(before.Placement.Tolerations, pod.Spec.Tolerations) {
-		return false, nil
+	if !assigned {
+		selectorPreserved := true
+		for key, value := range before.Placement.NodeSelector {
+			if current, ok := pod.Spec.NodeSelector[key]; !ok || current != value {
+				selectorPreserved = false
+				break
+			}
+		}
+
+		originalTolerations := before.Placement.Tolerations
+		tolerationsPreserved := len(originalTolerations) == 0 ||
+			(len(pod.Spec.Tolerations) >= len(originalTolerations) &&
+				equality.Semantic.DeepEqual(originalTolerations, pod.Spec.Tolerations[:len(originalTolerations)]))
+		if selectorPreserved && tolerationsPreserved {
+			return false, nil
+		}
 	}
 
 	class, err := getRuntimeClass(ctx, readers, name)

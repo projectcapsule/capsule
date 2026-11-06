@@ -4852,10 +4852,12 @@ spec:
                                       a Pod, Capsule applies the overhead and the scheduling constraints of the
                                       assigned RuntimeClass, as the API server does for the class a Pod names:
                                       the class must exist, and a scheduling nodeSelector that conflicts with
-                                      the Pod rejects it. Scheduling constraints merged for a replaced class
-                                      are retained. A replace of nodeSelector or tolerations also replaces
-                                      constraints merged for the class a Pod arrived with: repeat them in the
-                                      replaced value to keep them. Capsule does not create the RuntimeClass.
+                                      the Pod rejects it. The constraints of the final class are restored when
+                                      a replace of nodeSelector or tolerations removes them, also when the
+                                      class itself did not change. Constraints merged for a class a later
+                                      entry replaced are residual: they are retained but not restored. The
+                                      conditions of a later entry see the overhead and the constraints of the
+                                      class assigned before them. Capsule does not create the RuntimeClass.
                                       Omitted or null leaves the Pod unchanged. Tenant and Namespace templates
                                       are supported; rendered names must satisfy native RuntimeClass name
                                       validation. Requires the pod target or omitted/empty targets.

@@ -537,17 +537,78 @@ func TestRuntimeClassMutationReinvocation(t *testing.T) {
 	require.Zero(t, classes.gets.Load())
 }
 
-// Nothing follows the second call. A class that a condition selects only then,
-// from what the first call merged into the Pod, is assigned after the built-in
-// RuntimeClass plugin's last pass: the webhook itself carries the overhead and
-// the scheduling of that class, or a scheduling-only replacement would pass
-// validation without its node selector and tolerations and the Pod could be
-// scheduled onto incompatible nodes.
-func TestRuntimeClassMutationAssignedOnReinvocation(t *testing.T) {
+// A later entry's conditions see the Pod as the entries before them left it:
+// the overhead and the scheduling of a class an earlier entry assigned are
+// settled before the conditions run, in the same pass, since no later webhook
+// change is guaranteed to trigger a reinvocation. The constraints merged for
+// the settled class stay residual when the condition replaces the class.
+func TestRuntimeClassMutationConditionSeesAssignedClass(t *testing.T) {
 	classes := runtimeClassFixture(t)
 	bodies := []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{
 		runtimeClassMutation("", classTenantDefault),
 		{Action: rules.MutationActionReplace, Conditions: []rules.AdmissionCondition{{Expression: `'runtime-tenant-default' in object.spec.nodeSelector`}}, Workloads: rules.WorkloadMutation{Classes: rules.WorkloadClassMutation{Runtime: classSecondDefault}}},
+	}}}
+
+	pod := admittedRuntimePod("")
+	changed, err := MutatePodPlacement(t.Context(), pod, bodies, mutationConditions(t), classes)
+	require.NoError(t, err)
+	require.True(t, changed)
+	require.Equal(t, classSecondDefault, runtimeClassOf(pod))
+	require.Nil(t, pod.Spec.Overhead, "a scheduling-only class defines no overhead")
+	require.Equal(t, "true", pod.Spec.NodeSelector["runtime-"+classSecondDefault], "the node selector of the class the condition assigned must not be lost")
+	require.Subset(t, pod.Spec.Tolerations, runtimeClassObject(classSecondDefault).Scheduling.Tolerations)
+	// What was settled for the replaced class stays on the Pod.
+	require.Equal(t, "true", pod.Spec.NodeSelector["runtime-"+classTenantDefault])
+	require.EqualValues(t, 2, classes.gets.Load(), "the settle and the closing reconciliation read one class each")
+
+	// The settled Pod gives a second call nothing to change or read.
+	changed, err = MutatePodPlacement(t.Context(), pod, bodies, mutationConditions(t), noReads{tb: t})
+	require.NoError(t, err)
+	require.False(t, changed)
+}
+
+// A conditional entry sees the constraints the settle merged and can replace
+// them away in the same pass: the closing reconciliation restores the settled
+// class, guarded by the placement the settle left behind, not only by the one
+// the Pod arrived with.
+func TestRuntimeClassMutationGuardsSettledConstraints(t *testing.T) {
+	bodies := []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{
+		runtimeClassMutation("", classSecondDefault),
+		{Action: rules.MutationActionReplace,
+			Conditions: []rules.AdmissionCondition{{Expression: `'runtime-second-default' in object.spec.nodeSelector`}},
+			Workloads:  rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{"pool": "conditioned"}}}},
+	}}}
+
+	classes := runtimeClassFixture(t)
+	pod := admittedRuntimePod("")
+	changed, err := MutatePodPlacement(t.Context(), pod, bodies, mutationConditions(t), classes)
+	require.NoError(t, err)
+	require.True(t, changed)
+	require.Equal(t, classSecondDefault, runtimeClassOf(pod))
+	require.Equal(t, map[string]string{"pool": "conditioned", "runtime-" + classSecondDefault: "true"}, pod.Spec.NodeSelector, "the replacement keeps the last word on the Pod's own keys while the class's selector is restored")
+	require.Equal(t, runtimeClassObject(classSecondDefault).Scheduling.Tolerations, pod.Spec.Tolerations)
+	require.EqualValues(t, 2, classes.gets.Load(), "the settle and the restoration read the class once each")
+
+	// A reinvocation replays the replacement and the restoration: one read, and
+	// the Pod ends where the first call left it.
+	classes = runtimeClassFixture(t)
+	changed, err = MutatePodPlacement(t.Context(), pod, bodies, mutationConditions(t), classes)
+	require.NoError(t, err)
+	require.False(t, changed)
+	require.Equal(t, map[string]string{"pool": "conditioned", "runtime-" + classSecondDefault: "true"}, pod.Spec.NodeSelector)
+	require.EqualValues(t, 1, classes.gets.Load())
+}
+
+// A condition on something only a later webhook adds matches after the
+// built-in RuntimeClass plugin's last pass: the webhook itself carries the
+// overhead and the scheduling of the class it then assigns, or a
+// scheduling-only replacement would pass validation without its node selector
+// and tolerations and the Pod could be scheduled onto incompatible nodes.
+func TestRuntimeClassMutationAssignedOnReinvocation(t *testing.T) {
+	classes := runtimeClassFixture(t)
+	bodies := []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{
+		runtimeClassMutation("", classTenantDefault),
+		{Action: rules.MutationActionReplace, Conditions: []rules.AdmissionCondition{{Expression: `has(object.metadata.labels) && 'second-pass' in object.metadata.labels`}}, Workloads: rules.WorkloadMutation{Classes: rules.WorkloadClassMutation{Runtime: classSecondDefault}}},
 	}}}
 	mutate := func(pod *corev1.Pod) (*corev1.Pod, bool) {
 		object, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pod)
@@ -566,15 +627,18 @@ func TestRuntimeClassMutationAssignedOnReinvocation(t *testing.T) {
 		return mutated, changed
 	}
 
-	// First call: the scheduling of the assigned class is merged only after the
-	// entries have run, so nothing on the Pod matches the condition yet.
+	// First call: nothing on the Pod matches the condition yet, and the settle
+	// before it already carries the default class's overhead and scheduling.
 	first, changed := mutate(admittedRuntimePod(""))
 	require.True(t, changed)
 	require.Equal(t, classTenantDefault, runtimeClassOf(first))
 	require.Equal(t, runtimeClassObject(classTenantDefault).Overhead.PodFixed, first.Spec.Overhead)
+	require.EqualValues(t, 1, classes.gets.Load())
 
-	// The built-in plugin finds the Pod consistent and adds nothing; another
-	// webhook's change still reinvokes this one, and the condition now matches.
+	// The built-in plugin finds the Pod consistent and adds nothing; a later
+	// webhook labels the Pod, this one is reinvoked, and the condition matches.
+	first.Labels = map[string]string{"second-pass": "true"}
+
 	second, changed := mutate(first)
 	require.True(t, changed)
 	require.Equal(t, classSecondDefault, runtimeClassOf(second))
@@ -692,8 +756,10 @@ func TestRuntimeClassMutationConditions(t *testing.T) {
 		{Action: rules.MutationActionReplace, Conditions: []rules.AdmissionCondition{{Expression: "false"}}, Workloads: rules.WorkloadMutation{Classes: rules.WorkloadClassMutation{Runtime: "skipped"}}},
 	}
 
-	// Later entries see the class an earlier entry assigned. Only the class the
-	// entries end at is derived: its scheduling is merged, and it has no overhead.
+	// Later entries see the class an earlier entry assigned, settled with its
+	// overhead and scheduling before their conditions run. The constraints of
+	// the settled first class stay residual after the second replaces it, and
+	// the final scheduling-only class leaves no overhead.
 	classless := pod("")
 	require.True(t, mutate(classless, chain...))
 
@@ -711,7 +777,7 @@ func TestRuntimeClassMutationConditions(t *testing.T) {
 
 	selector, _, err := unstructured.NestedStringMap(classless.Object, "spec", "nodeSelector")
 	require.NoError(t, err)
-	require.Equal(t, map[string]string{"keep": "yes", "observed": "yes", "runtime-" + classSecondDefault: "true"}, selector)
+	require.Equal(t, map[string]string{"keep": "yes", "observed": "yes", "runtime-" + classSecondDefault: "true", "runtime-" + classTenantDefault: "true"}, selector)
 
 	// A Pod that names a class is left alone by the merge and by its conditions.
 	explicit := pod(classCustom)

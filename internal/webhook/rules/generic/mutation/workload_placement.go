@@ -28,7 +28,10 @@ const maxPlacementNodeTerms = 256
 // Runtime class mutations read the assigned RuntimeClass through the last of
 // those readers, the authoritative one, and only when the entries changed the
 // class of the Pod or disturbed the scheduling of the class it names: nothing
-// downstream rejects stale or dropped scheduling constraints.
+// downstream rejects stale or dropped scheduling constraints. The overhead and
+// the scheduling of an assigned class are settled before a later entry
+// evaluates its conditions, so conditions see the Pod as the entries before
+// them left it.
 func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules.NamespaceRuleBodyNamespace, conditions *ruleengine.ConditionEvaluator, classes ...client.Reader) (bool, error) {
 	if pod == nil || !slices.ContainsFunc(bodies, func(body *apirules.NamespaceRuleBodyNamespace) bool { return body != nil && len(body.Mutate) > 0 }) {
 		return false, nil
@@ -40,7 +43,7 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 	originalSecrets := pod.Spec.ImagePullSecrets
 	// The runtime class stays out of the placement snapshot, which the compiler
 	// keeps on the stack as long as podPlacement is small enough to inline.
-	runtimeClass := ptr.Deref(pod.Spec.RuntimeClassName, "")
+	settled := settledRuntimeClass{name: ptr.Deref(pod.Spec.RuntimeClassName, ""), guard: before}
 
 	var containers []workloadMutationContainer
 
@@ -60,6 +63,13 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 
 			if (len(mutation.Workloads.Targets) > 0 || mutation.Workloads.Security.ReadOnlyRootFilesystem != nil || mutation.Workloads.Registries.ImagePullPolicy != "") && !mutationAppliesToPod(pod, mutation.Workloads) {
 				continue
+			}
+
+			// Conditions honor the documented mutation order: the overhead and
+			// the scheduling of a class an earlier entry assigned are settled
+			// before a later entry reads the Pod, not after the pass.
+			if err := settled.settle(ctx, pod, mutation, classes); err != nil {
+				return false, err
 			}
 
 			matched, err := matchesMutationConditions(ctx, conditions, pod, mutation.Conditions)
@@ -94,12 +104,11 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 		}
 	}
 
-	runtimeClassChanged, err := reconcilePodRuntimeClass(ctx, pod, runtimeClass, before, classes)
-	if err != nil {
-		return false, fmt.Errorf("workloads.classes.runtime: %w", err)
+	if err := settled.finish(ctx, pod, classes); err != nil {
+		return false, err
 	}
 
-	return runtimeClassChanged || !slices.Equal(originalSecrets, pod.Spec.ImagePullSecrets) || slices.ContainsFunc(containers, workloadMutationContainer.changed) || podPlacementChanged(before, podPlacement(pod)), nil
+	return settled.changed || !slices.Equal(originalSecrets, pod.Spec.ImagePullSecrets) || slices.ContainsFunc(containers, workloadMutationContainer.changed) || podPlacementChanged(before, podPlacement(pod)), nil
 }
 
 // applyPodPlacementAction merges or replaces the Pod-level placement fields of
