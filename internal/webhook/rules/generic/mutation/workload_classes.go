@@ -207,8 +207,7 @@ func conditionView(ctx context.Context, pod *corev1.Pod, arrival string, before 
 	view.Spec.NodeSelector = maps.Clone(pod.Spec.NodeSelector)
 
 	if _, err := reconcilePodRuntimeClass(ctx, &view, arrival, before, readers); err != nil {
-		var lookup *runtimeClassLookupError
-		if errors.As(err, &lookup) {
+		if _, failed := errors.AsType[*runtimeClassLookupError](err); failed {
 			return nil, err
 		}
 
