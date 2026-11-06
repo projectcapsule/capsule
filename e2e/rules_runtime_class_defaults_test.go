@@ -22,6 +22,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 )
 
 func runtimeClassDefault(action rules.MutationAction, class string, conditions ...rules.AdmissionCondition) rules.NamespaceRuleMutation {
@@ -168,14 +169,20 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 						{Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{prefix + "/scheduled": "elsewhere"}}}},
 					}}),
 					// The entries see the selector of the assigned class only on the
-					// webhook's reinvocation: the replacement that then swaps the node
-					// selector proves a second pass ran, after the plugin's final run.
-					runtimeClassProfile([]string{"reinvoked"}, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{
-						runtimeClassDefault(rules.MutationActionMerge, restored.Name),
-						{Action: rules.MutationActionReplace,
-							Conditions: []rules.AdmissionCondition{{Name: "after-restore", Expression: fmt.Sprintf("has(object.spec.nodeSelector) && '%s/restored' in object.spec.nodeSelector", prefix)}},
-							Workloads:  rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{poolKey: "reinvoked"}}}},
-					}}),
+					// webhook's reinvocation. The metadata entry is the controlled
+					// later mutator: the metadata webhook runs after this one and
+					// labels the Pod, so the API server reinvokes this webhook, and
+					// the replacement that then swaps the node selector proves the
+					// second pass ran, after the plugin's final run.
+					runtimeClassProfile([]string{"reinvoked"}, &rules.NamespaceRuleBodyNamespace{
+						Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeAllow, Metadata: []rules.MetadataRule{{Kinds: []string{"Pod"}, Labels: map[string]rules.MetadataValueRule{prefix + "/reinvoke": {Default: new("true"), Values: []apiruntime.ExpressionMatch{{Exact: []string{"true"}}}}}}}},
+						Mutate: []rules.NamespaceRuleMutation{
+							runtimeClassDefault(rules.MutationActionMerge, restored.Name),
+							{Action: rules.MutationActionReplace,
+								Conditions: []rules.AdmissionCondition{{Name: "after-restore", Expression: fmt.Sprintf("has(object.spec.nodeSelector) && '%s/restored' in object.spec.nodeSelector", prefix)}},
+								Workloads:  rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{poolKey: "reinvoked"}}}},
+						},
+					}),
 					// Entries that replace the class in turn, next to one that changes the Pod
 					// again when the API server calls the webhook a second time.
 					runtimeClassProfile([]string{"chain"}, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{
@@ -349,14 +356,23 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 
 		By("restoring the scheduling of the class when a replacement lands on reinvocation")
 		// The first pass assigns the class, and only its closing merge carries the
-		// class's selector onto the Pod: no entry of that pass sees it. Later
-		// admission work changes the Pod and the API server calls the webhook
-		// again; the conditional entry now finds the selector and swaps the whole
-		// map. The replaced pool key on the persisted Pod proves that second pass
-		// ran after the plugin's final run, when only the webhook's own
-		// restoration can put the selector of the class back, and the overhead of
-		// the first pass must survive untouched.
-		createPod(owners[0], reinvokedNS, "", restored, map[string]string{poolKey: "reinvoked"})
+		// class's selector onto the Pod: no entry of that pass sees it. The
+		// metadata webhook then labels the Pod — the profile's own controlled
+		// later mutation — and the API server calls this webhook again. The
+		// conditional entry now finds the selector and swaps the whole map. The
+		// replaced pool key on the persisted Pod proves that second pass ran
+		// after the plugin's final run, when only the webhook's own restoration
+		// can put the selector of the class back, and the overhead of the first
+		// pass must survive untouched.
+		trigger := newPod(reinvokedNS, "")
+		Eventually(func() error { return owners[0].Create(ctx, trigger) }, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Eventually(func(g Gomega) {
+			stored := &corev1.Pod{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trigger), stored)).To(Succeed())
+			g.Expect(stored.Labels).To(HaveKeyWithValue(prefix+"/reinvoke", "true"), "the metadata entry must label the Pod after the first pass")
+			g.Expect(stored.Spec.NodeSelector).To(HaveKeyWithValue(poolKey, "reinvoked"), "the conditional replacement must land on the second pass")
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		expectRuntimeClass(ctx, trigger, restored, map[string]string{poolKey: "reinvoked"})
 
 		By("leaving non-selected namespaces and the other tenant's defaults alone")
 		unselected := newPod(otherNS, "")

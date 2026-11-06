@@ -277,19 +277,17 @@ func mergeRuntimeClassTolerations(pod, class []corev1.Toleration) []corev1.Toler
 	merged := make([]corev1.Toleration, 0, len(pod)+len(class))
 	merged = append(merged, pod...)
 
-next:
 	for _, toleration := range class {
-		for _, kept := range merged {
-			// Of two equal tolerations, the first is kept.
-			if toleratesSuperset(kept, toleration) {
-				continue next
-			}
-		}
+		covered := slices.ContainsFunc(merged, func(kept corev1.Toleration) bool {
+			return toleratesSuperset(kept, toleration)
+		})
 
 		merged = slices.DeleteFunc(merged, func(kept corev1.Toleration) bool {
-			return toleratesSuperset(toleration, kept)
+			return toleratesSuperset(toleration, kept) && !toleratesSuperset(kept, toleration)
 		})
-		merged = append(merged, *toleration.DeepCopy())
+		if !covered {
+			merged = append(merged, *toleration.DeepCopy())
+		}
 	}
 
 	return merged
