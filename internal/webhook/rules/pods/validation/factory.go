@@ -323,26 +323,29 @@ func (h *podRules) validateWorkloadRules(
 			continue
 		}
 
-		// Audit is observational only. It must always be emitted when matched,
-		// but it must never influence allow/deny decisions.
-		for _, audit := range evaluation.Audits {
-			recorder.LabeledEvent(
-				object,
-				corev1.EventTypeNormal,
-				events.ReasonNamespaceRuleAudit,
-				events.ActionRuleAudit,
-				audit.Message,
-			).
-				WithRelated(tnt).
-				WithTenantLabel(tnt).
-				WithRequestAnnotations(req).
-				Emit(ctx)
+		// Audit is observational only. It must be emitted whenever a persisted
+		// request matches, but it must never influence allow/deny decisions.
+		// A dry run persists nothing, so neither audit nor denial leaves an Event.
+		if req.DryRun == nil || !*req.DryRun {
+			for _, audit := range evaluation.Audits {
+				recorder.LabeledEvent(
+					object,
+					corev1.EventTypeNormal,
+					events.ReasonNamespaceRuleAudit,
+					events.ActionRuleAudit,
+					audit.Message,
+				).
+					WithRelated(tnt).
+					WithTenantLabel(tnt).
+					WithRequestAnnotations(req).
+					Emit(ctx)
+			}
 		}
 
 		if err := evaluation.BlockingError(); err != nil {
 			var decisionErr *ruleengine.DecisionError
 
-			if errors.As(err, &decisionErr) && decisionErr.Decision != nil {
+			if (req.DryRun == nil || !*req.DryRun) && errors.As(err, &decisionErr) && decisionErr.Decision != nil {
 				recorder.LabeledEvent(
 					object,
 					corev1.EventTypeWarning,

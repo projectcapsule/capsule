@@ -263,6 +263,63 @@ func TestClassRules(t *testing.T) {
 	}
 }
 
+// A dry run takes the same decision but persists nothing: neither an audit nor
+// a denial of a workload rule leaves an Event for a Pod that is never created.
+// The webhook router already discards Events of dry-run requests; the handler
+// must not rely on the recorder it is handed.
+func TestWorkloadRulesDryRunEvents(t *testing.T) {
+	no, yes := false, true
+
+	for _, kind := range classKinds {
+		for _, action := range []rules.ActionType{rules.ActionTypeAudit, rules.ActionTypeDeny, rules.ActionTypeAllow} {
+			for _, operation := range []admissionv1.Operation{admissionv1.Create, admissionv1.Update} {
+				for _, dryRun := range []*bool{nil, &no, &yes} {
+					name := "omitted"
+					if dryRun != nil {
+						name = fmt.Sprint(*dryRun)
+					}
+
+					t.Run(fmt.Sprintf("%s/%s/%s/dryRun=%s", kind.name, action, operation, name), func(t *testing.T) {
+						reader := kind.fixture(t)
+						recorder := &classEvents{EventRecorder: events.NewEventRecorder(nil, logr.Discard(), nil, nil)}
+						bodies := []*rules.NamespaceRuleBodyNamespace{kind.body(action, classNames("gold"))}
+
+						pod := kind.pod("gold")
+						req := admission.Request{Operation: operation, DryRun: dryRun}
+						h := PodRules(nil, nil, nil, nil)
+
+						var response *admission.Response
+						if operation == admissionv1.Update {
+							response = h.OnUpdate(nil, reader, kind.pod("silver"), pod, nil, recorder, &capsulev1beta2.Tenant{}, bodies)(t.Context(), req)
+						} else {
+							response = h.OnCreate(nil, reader, pod, nil, recorder, &capsulev1beta2.Tenant{}, bodies)(t.Context(), req)
+						}
+
+						if action == rules.ActionTypeDeny {
+							require.NotNil(t, response, "a dry run takes the same decision")
+							require.False(t, response.Allowed)
+							require.Contains(t, response.Result.Message, kind.denied("gold"))
+						} else {
+							require.Nil(t, response)
+						}
+
+						if action == rules.ActionTypeAllow || (dryRun != nil && *dryRun) {
+							require.Empty(t, recorder.reasons, "a dry run must not persist an Event")
+						} else {
+							reason := events.ReasonNamespaceRuleAudit
+							if action == rules.ActionTypeDeny {
+								reason = kind.forbidden
+							}
+
+							require.Equal(t, []string{reason}, recorder.reasons)
+						}
+					})
+				}
+			}
+		}
+	}
+}
+
 // One rule can carry several kinds of class. Each list judges its own Pod
 // field and reads its own class object; neither grants or restricts the other.
 func TestClassRulesKeepKindsApart(t *testing.T) {

@@ -440,6 +440,55 @@ func TestRuntimeClassMutationAssignedOnReinvocation(t *testing.T) {
 	require.EqualValues(t, 2, classes.gets.Load(), "each call reads the class it assigns")
 }
 
+// The toleration merge keeps the superset, as the plugin does: the class the
+// webhook assigns must never narrow a broader toleration the Pod carries, such
+// as an unlimited NoExecute toleration against one the class limits in time,
+// which would let the Pod be evicted earlier.
+func TestRuntimeClassMutationPreservesBroaderTolerations(t *testing.T) {
+	limited := func(seconds int64) corev1.Toleration {
+		return corev1.Toleration{Key: "dedicated", Operator: corev1.TolerationOpEqual, Value: "true", Effect: corev1.TaintEffectNoExecute, TolerationSeconds: &seconds}
+	}
+	unlimited := corev1.Toleration{Key: "dedicated", Operator: corev1.TolerationOpEqual, Value: "true", Effect: corev1.TaintEffectNoExecute}
+	exists := corev1.Toleration{Key: "dedicated", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoExecute}
+	other := corev1.Toleration{Key: "other", Operator: corev1.TolerationOpExists}
+
+	for _, tc := range []struct {
+		name   string
+		pod    []corev1.Toleration
+		class  []corev1.Toleration
+		merged []corev1.Toleration
+	}{
+		{name: "an unlimited toleration of the Pod is not limited in time", pod: []corev1.Toleration{unlimited}, class: []corev1.Toleration{limited(60)}, merged: []corev1.Toleration{unlimited}},
+		{name: "a longer toleration of the Pod is kept over a shorter one", pod: []corev1.Toleration{limited(600)}, class: []corev1.Toleration{limited(60)}, merged: []corev1.Toleration{limited(600)}},
+		{name: "a broader toleration of the class subsumes the Pod's", pod: []corev1.Toleration{limited(60)}, class: []corev1.Toleration{unlimited}, merged: []corev1.Toleration{unlimited}},
+		{name: "an identical toleration is kept once", pod: []corev1.Toleration{unlimited}, class: []corev1.Toleration{unlimited}, merged: []corev1.Toleration{unlimited}},
+		{name: "an Exists toleration of the Pod covers the class's", pod: []corev1.Toleration{exists}, class: []corev1.Toleration{limited(60)}, merged: []corev1.Toleration{exists}},
+		{name: "a class toleration for every effect subsumes the Pod's", pod: []corev1.Toleration{exists}, class: []corev1.Toleration{{Key: "dedicated", Operator: corev1.TolerationOpExists}}, merged: []corev1.Toleration{{Key: "dedicated", Operator: corev1.TolerationOpExists}}},
+		{name: "unrelated tolerations stay next to the merged one", pod: []corev1.Toleration{other}, class: []corev1.Toleration{limited(60)}, merged: []corev1.Toleration{other, limited(60)}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			classes := priorityClassFixtureOf(t, &nodev1.RuntimeClass{Name: "evicting", Handler: "runc",
+				Scheduling: &nodev1.Scheduling{Tolerations: tc.class}})
+			bodies := []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{runtimeClassMutation(rules.MutationActionReplace, "evicting")}}}
+
+			pod := admittedRuntimePod("")
+			pod.Spec.Tolerations = tc.pod
+
+			changed, err := MutatePodPlacement(t.Context(), pod, bodies, nil, classes)
+			require.NoError(t, err)
+			require.True(t, changed)
+			require.Equal(t, "evicting", runtimeClassOf(pod))
+			require.Equal(t, tc.merged, pod.Spec.Tolerations)
+
+			// The settled Pod gives a reinvocation nothing to change or read.
+			changed, err = MutatePodPlacement(t.Context(), pod, bodies, nil, noReads{tb: t})
+			require.NoError(t, err)
+			require.False(t, changed)
+			require.Equal(t, tc.merged, pod.Spec.Tolerations)
+		})
+	}
+}
+
 func TestRuntimeClassMutationDoesNotAliasTheRule(t *testing.T) {
 	bodies := []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{runtimeClassMutation(rules.MutationActionReplace, classTenantDefault)}}}
 	first, second := admittedRuntimePod(""), admittedRuntimePod(classCustom)

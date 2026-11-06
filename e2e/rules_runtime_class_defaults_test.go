@@ -118,6 +118,17 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 		bare := newClass(prefix+"-bare", nil, nil)
 		dedicated := corev1.Toleration{Key: prefix + "/dedicated", Operator: corev1.TolerationOpExists}
 
+		// A class whose toleration is limited in time: assigning it must not narrow
+		// a broader toleration the Pod already carries.
+		evictionSeconds := int64(60)
+		evicting := &nodev1.RuntimeClass{Name: prefix + "-evicting", Labels: map[string]string{"env": "e2e"}, Handler: "e2e-runtime-class",
+			Scheduling: &nodev1.Scheduling{
+				NodeSelector: map[string]string{prefix + "/evicting": "true"},
+				Tolerations:  []corev1.Toleration{{Key: prefix + "/evict", Operator: corev1.TolerationOpEqual, Value: "true", Effect: corev1.TaintEffectNoExecute, TolerationSeconds: &evictionSeconds}},
+			}}
+		Expect(k8sClient.Create(ctx, evicting)).To(Succeed())
+		DeferCleanup(DeleteInBackground, evicting)
+
 		var (
 			tenants  []*capsulev1beta2.Tenant
 			owners   []client.Client
@@ -149,6 +160,7 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 					}}),
 					runtimeClassProfile([]string{"bare"}, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{runtimeClassDefault(rules.MutationActionReplace, bare.Name)}}),
 					runtimeClassProfile([]string{"scheduled"}, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{runtimeClassDefault(rules.MutationActionReplace, scheduled.Name)}}),
+					runtimeClassProfile([]string{"evicting"}, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{runtimeClassDefault(rules.MutationActionReplace, evicting.Name)}}),
 					// Entries that replace the class in turn, next to one that changes the Pod
 					// again when the API server calls the webhook a second time.
 					runtimeClassProfile([]string{"chain"}, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{
@@ -198,6 +210,8 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 				expectProfile(ns, 1, bare.Name)
 			case "scheduled":
 				expectProfile(ns, 1, scheduled.Name)
+			case "evicting":
+				expectProfile(ns, 1, evicting.Name)
 			case "chain":
 				expectProfile(ns, 1, defaults[tenant].Name)
 			case "missing":
@@ -213,6 +227,7 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 
 		mergeNS, replaceNS, bareNS, chainNS := newNamespace(0, "merge"), newNamespace(0, "replace"), newNamespace(0, "bare"), newNamespace(0, "chain")
 		otherNS, missingNS, confinedNS, scheduledNS := newNamespace(0, "other"), newNamespace(0, "missing"), newNamespace(0, "confined"), newNamespace(0, "scheduled")
+		evictingNS := newNamespace(0, "evicting")
 		tenantBNS := newNamespace(1, "merge")
 
 		sequence := 0
@@ -258,6 +273,25 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 		// webhook's own merge constrains the Pod to the nodes of its runtime.
 		createPod(owners[0], scheduledNS, "", scheduled, nil)
 		createPod(owners[0], scheduledNS, custom.Name, scheduled, custom.Scheduling.NodeSelector)
+
+		By("keeping a broader toleration the Pod carries over the one the class limits in time")
+		// The class tolerates its taint for a minute; the Pod tolerates it without
+		// a limit. The merge keeps the superset, as the API server's own plugin
+		// does, so the assignment cannot let the Pod be evicted earlier.
+		broader := corev1.Toleration{Key: prefix + "/evict", Operator: corev1.TolerationOpEqual, Value: "true", Effect: corev1.TaintEffectNoExecute}
+		tolerant := newPod(evictingNS, "")
+		tolerant.Spec.Tolerations = []corev1.Toleration{broader}
+		Eventually(func() error { return owners[0].Create(ctx, tolerant) }, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Eventually(func(g Gomega) {
+			stored := &corev1.Pod{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(tolerant), stored)).To(Succeed())
+			g.Expect(stored.Spec.RuntimeClassName).To(HaveValue(Equal(evicting.Name)))
+			g.Expect(stored.Spec.NodeSelector).To(HaveKeyWithValue(prefix+"/evicting", "true"))
+			g.Expect(stored.Spec.Tolerations).To(ContainElement(broader))
+			g.Expect(stored.Spec.Tolerations).NotTo(ContainElement(evicting.Scheduling.Tolerations[0]))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		// A Pod without a toleration of its own receives the class's limited one.
+		createPod(owners[0], evictingNS, "", evicting, nil)
 
 		By("keeping the overhead of the final class when the API server calls the webhook again")
 		// Capsule derives the overhead, the node selector, and the toleration of the

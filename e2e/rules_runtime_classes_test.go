@@ -180,17 +180,26 @@ var _ = Describe("RuntimeClass namespace profiles", Label("tenant", "rules", "wo
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		}
 
-		By("preserving dry-run decisions without persisting Pods")
+		By("preserving dry-run decisions without persisting Pods or Events")
 		dry := pod(named, standard)
 		err := ownerA.Create(ctx, dry, client.DryRunAll)
 		Expect(err).To(HaveOccurred(), "dry-run denial must preserve enforcement")
 		Expect(err.Error()).To(ContainSubstring("is denied by namespace rule"))
-		Expect(ownerA.Create(ctx, pod(named, sandboxed), client.DryRunAll)).To(Succeed())
+		dryAudited := pod(named, sandboxed)
+		Expect(ownerA.Create(ctx, dryAudited, client.DryRunAll)).To(Succeed())
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(dry), dry))).To(BeTrue())
 
 		By("allowing the last matching rule and auditing the decision")
 		audited := create(ownerA, pod(named, sandboxed))
 		expectEvents(audited, events.ReasonNamespaceRuleAudit)
+
+		// The audit of the live Pod arrived, so the dry runs above have been
+		// processed: neither the denied nor the audited one left an Event.
+		dryEvents := &eventsv1.EventList{}
+		Expect(k8sClient.List(ctx, dryEvents, client.InNamespace(named.Name))).To(Succeed())
+		for _, event := range dryEvents.Items {
+			Expect(event.Regarding.Name).NotTo(BeElementOf(dry.Name, dryAudited.Name))
+		}
 
 		By("rejecting classes the profile denies or does not list")
 		denied := pod(named, plain)

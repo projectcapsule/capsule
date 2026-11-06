@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -238,11 +239,82 @@ func reconcilePodRuntimeClass(ctx context.Context, pod *corev1.Pod, arrival stri
 		pod.Spec.NodeSelector[key] = value
 	}
 
-	for _, toleration := range class.Scheduling.Tolerations {
-		upsertPlacement(&pod.Spec.Tolerations, *toleration.DeepCopy(), sameToleration)
+	if len(class.Scheduling.Tolerations) > 0 {
+		pod.Spec.Tolerations = mergeRuntimeClassTolerations(pod.Spec.Tolerations, class.Scheduling.Tolerations)
 	}
 
 	return true, nil
+}
+
+// mergeRuntimeClassTolerations merges the tolerations of the class into the
+// Pod's, as the plugin does: of two tolerations where one tolerates a superset
+// of the other, only the superset is kept. A toleration of the class never
+// narrows a broader one the Pod carries, such as an unlimited NoExecute
+// toleration against one the class limits in time, which would let the Pod be
+// evicted earlier.
+func mergeRuntimeClassTolerations(pod, class []corev1.Toleration) []corev1.Toleration {
+	all := make([]corev1.Toleration, 0, len(pod)+len(class))
+	all = append(all, pod...)
+
+	for _, toleration := range class {
+		all = append(all, *toleration.DeepCopy())
+	}
+
+	merged := make([]corev1.Toleration, 0, len(all))
+
+next:
+	for i, toleration := range all {
+		for _, kept := range merged {
+			if toleratesSuperset(kept, toleration) {
+				continue next
+			}
+		}
+
+		for _, later := range all[i+1:] {
+			// Of two equal tolerations, the first is kept.
+			if !equality.Semantic.DeepEqual(&toleration, &later) && toleratesSuperset(later, toleration) {
+				continue next
+			}
+		}
+
+		merged = append(merged, toleration)
+	}
+
+	return merged
+}
+
+// toleratesSuperset reports whether ss tolerates a superset of t, with the
+// comparison of the plugin.
+func toleratesSuperset(ss, t corev1.Toleration) bool {
+	if equality.Semantic.DeepEqual(&t, &ss) {
+		return true
+	}
+
+	if t.Key != ss.Key &&
+		// An empty key with Exists matches every key and value.
+		(ss.Key != "" || ss.Operator != corev1.TolerationOpExists) {
+		return false
+	}
+
+	// An empty effect matches every effect.
+	if t.Effect != ss.Effect && ss.Effect != "" {
+		return false
+	}
+
+	if ss.Effect == corev1.TaintEffectNoExecute && ss.TolerationSeconds != nil {
+		if t.TolerationSeconds == nil || *t.TolerationSeconds > *ss.TolerationSeconds {
+			return false
+		}
+	}
+
+	switch ss.Operator {
+	case corev1.TolerationOpEqual, "": // An empty operator means Equal.
+		return t.Operator == corev1.TolerationOpEqual && t.Value == ss.Value
+	case corev1.TolerationOpExists:
+		return true
+	default:
+		return false
+	}
 }
 
 // getRuntimeClass resolves the class through the cache, falling back to the
