@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
@@ -195,16 +196,31 @@ func mutatePodRuntimeClass(pod *corev1.Pod, mutation *apirules.NamespaceRuleMuta
 // nothing left to add. Like the plugin, it rejects a class that does not exist
 // and a nodeSelector that conflicts with the Pod's.
 //
+// The scheduling of a class the Pod kept is restored the same way when the
+// entries changed the Pod's node selector or tolerations, against before, the
+// placement the Pod arrived with: a replacement can silently drop the selector
+// that confines the Pod to compatible nodes, and on reinvocation no later
+// plugin pass repairs that. The overhead stays as it is then — no entry
+// touched it.
+//
 // Only the outcome counts, not each assignment: entries that replace the class
 // in turn end where the Pod started, and nothing is read or merged. The
 // constraints merged for a replaced class stay on the Pod: they cannot be told
 // apart from the Pod's own, and removing them could lift a restriction another
 // mutation relies on.
 //
-// It reports whether the runtime class changed. Only then is the class read.
-func reconcilePodRuntimeClass(ctx context.Context, pod *corev1.Pod, arrival string, readers []client.Reader) (bool, error) {
+// It reports whether the runtime class changed. The class is read only for an
+// assignment or a disturbed placement.
+func reconcilePodRuntimeClass(ctx context.Context, pod *corev1.Pod, arrival string, before *apirules.WorkloadMutation, readers []client.Reader) (bool, error) {
 	name := ptr.Deref(pod.Spec.RuntimeClassName, "")
-	if name == arrival {
+	if name == "" {
+		return false, nil
+	}
+
+	assigned := name != arrival
+	if !assigned &&
+		equality.Semantic.DeepEqual(before.Placement.NodeSelector, pod.Spec.NodeSelector) &&
+		equality.Semantic.DeepEqual(before.Placement.Tolerations, pod.Spec.Tolerations) {
 		return false, nil
 	}
 
@@ -217,14 +233,16 @@ func reconcilePodRuntimeClass(ctx context.Context, pod *corev1.Pod, arrival stri
 		return false, fmt.Errorf("RuntimeClass %q not found", name)
 	}
 
-	// The plugin rejects an overhead that differs from the class the Pod names.
-	pod.Spec.Overhead = nil
-	if class.Overhead != nil {
-		pod.Spec.Overhead = class.Overhead.PodFixed.DeepCopy()
+	if assigned {
+		// The plugin rejects an overhead that differs from the class the Pod names.
+		pod.Spec.Overhead = nil
+		if class.Overhead != nil {
+			pod.Spec.Overhead = class.Overhead.PodFixed.DeepCopy()
+		}
 	}
 
 	if class.Scheduling == nil {
-		return true, nil
+		return assigned, nil
 	}
 
 	for key, value := range class.Scheduling.NodeSelector {
@@ -243,7 +261,7 @@ func reconcilePodRuntimeClass(ctx context.Context, pod *corev1.Pod, arrival stri
 		pod.Spec.Tolerations = mergeRuntimeClassTolerations(pod.Spec.Tolerations, class.Scheduling.Tolerations)
 	}
 
-	return true, nil
+	return assigned, nil
 }
 
 // mergeRuntimeClassTolerations merges the tolerations of the class into the
@@ -312,38 +330,41 @@ func toleratesSuperset(ss, t corev1.Toleration) bool {
 		return t.Operator == corev1.TolerationOpEqual && t.Value == ss.Value
 	case corev1.TolerationOpExists:
 		return true
+	case corev1.TolerationOpLt, corev1.TolerationOpGt:
+		// Numeric bounds are not ordered here: only the identical toleration,
+		// settled above, collapses. Keeping both preserves the union.
+		return false
 	default:
 		return false
 	}
 }
 
-// getRuntimeClass resolves the class through the cache, falling back to the
-// API server for one the cache does not know yet, such as a class created
-// moments ago. It returns nil for a class that does not exist.
+// getRuntimeClass resolves the class through the last of the given readers,
+// the authoritative one. The merge is the only application of the class's
+// scheduling when the assignment happens on reinvocation, after the plugin's
+// final pass, and nothing downstream rejects outdated constraints: unlike the
+// priority value and the overhead, which the API server rechecks against the
+// live class, a stale node selector would be admitted. A cache hit must
+// therefore not shortcut the read; it answers only callers without an API
+// reader. This also finds a class created moments ago. It returns nil for a
+// class that does not exist.
 func getRuntimeClass(ctx context.Context, readers []client.Reader, name string) (*nodev1.RuntimeClass, error) {
-	available := false
-
-	for _, reader := range readers {
+	for _, reader := range slices.Backward(readers) {
 		if reader == nil {
 			continue
 		}
 
-		available = true
 		class := &nodev1.RuntimeClass{}
+		if err := reader.Get(ctx, client.ObjectKey{Name: name}, class); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil, nil
+			}
 
-		err := reader.Get(ctx, client.ObjectKey{Name: name}, class)
-		if err == nil {
-			return class, nil
-		}
-
-		if !apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("get RuntimeClass %q: %w", name, err)
 		}
+
+		return class, nil
 	}
 
-	if !available {
-		return nil, errors.New("RuntimeClass lookup is unavailable")
-	}
-
-	return nil, nil
+	return nil, errors.New("RuntimeClass lookup is unavailable")
 }

@@ -39,10 +39,11 @@ func runtimeClassProfile(profiles []string, body *rules.NamespaceRuleBodyNamespa
 // the class it assigns and the API server derives for the class a Pod names:
 // the overhead of the class, and its scheduling constraints next to the ones
 // the Pod already carried. replaced is the list of a rule that replaces the
-// tolerations: the toleration of the class is merged next to it when the class
-// is assigned, but the webhook is reinvoked once later admission work changed
-// the Pod, and the replace then has the last word while the class stays. The
-// overhead and the node selector of the class persist either way.
+// tolerations: the webhook is reinvoked once later admission work changed the
+// Pod, the replace swaps the list again, and the toleration of the class is
+// restored next to it — a replacement must never strip the constraints that
+// confine the Pod to compatible nodes. The overhead and the node selector of
+// the class persist either way.
 func expectRuntimeClass(ctx context.Context, pod *corev1.Pod, class *nodev1.RuntimeClass, retained map[string]string, replaced ...corev1.Toleration) {
 	Eventually(func(g Gomega) {
 		stored := &corev1.Pod{}
@@ -62,11 +63,7 @@ func expectRuntimeClass(ctx context.Context, pod *corev1.Pod, class *nodev1.Runt
 			}
 
 			for _, toleration := range class.Scheduling.Tolerations {
-				if len(replaced) > 0 {
-					g.Expect(stored.Spec.Tolerations).NotTo(ContainElement(toleration))
-				} else {
-					g.Expect(stored.Spec.Tolerations).To(ContainElement(toleration))
-				}
+				g.Expect(stored.Spec.Tolerations).To(ContainElement(toleration))
 			}
 		}
 
@@ -161,6 +158,14 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 					runtimeClassProfile([]string{"bare"}, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{runtimeClassDefault(rules.MutationActionReplace, bare.Name)}}),
 					runtimeClassProfile([]string{"scheduled"}, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{runtimeClassDefault(rules.MutationActionReplace, scheduled.Name)}}),
 					runtimeClassProfile([]string{"evicting"}, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{runtimeClassDefault(rules.MutationActionReplace, evicting.Name)}}),
+					// A placement replacement next to a class the Pod names on its own:
+					// the replaced selector must not strip the scheduling of the class.
+					runtimeClassProfile([]string{"placement"}, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{
+						{Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{poolKey: "placement"}}}},
+					}}),
+					runtimeClassProfile([]string{"conflicted"}, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{
+						{Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{prefix + "/scheduled": "elsewhere"}}}},
+					}}),
 					// Entries that replace the class in turn, next to one that changes the Pod
 					// again when the API server calls the webhook a second time.
 					runtimeClassProfile([]string{"chain"}, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{
@@ -212,6 +217,8 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 				expectProfile(ns, 1, scheduled.Name)
 			case "evicting":
 				expectProfile(ns, 1, evicting.Name)
+			case "placement", "conflicted":
+				expectProfile(ns, 1, "")
 			case "chain":
 				expectProfile(ns, 1, defaults[tenant].Name)
 			case "missing":
@@ -228,6 +235,7 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 		mergeNS, replaceNS, bareNS, chainNS := newNamespace(0, "merge"), newNamespace(0, "replace"), newNamespace(0, "bare"), newNamespace(0, "chain")
 		otherNS, missingNS, confinedNS, scheduledNS := newNamespace(0, "other"), newNamespace(0, "missing"), newNamespace(0, "confined"), newNamespace(0, "scheduled")
 		evictingNS := newNamespace(0, "evicting")
+		placementNS, conflictedNS := newNamespace(0, "placement"), newNamespace(0, "conflicted")
 		tenantBNS := newNamespace(1, "merge")
 
 		sequence := 0
@@ -298,12 +306,33 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 		// class the entries end at. Later admission work changes the Pod and the
 		// webhook is called again: the entries replace the class in turn and the
 		// tolerations once more, and since the Pod ends with the same class, the
-		// replaced list is final while the overhead and node selector persist.
+		// toleration of the class is restored next to the replaced list while the
+		// overhead and node selector persist.
 		createPod(owners[0], chainNS, "", forced[0], nil, dedicated)
 		createPod(owners[0], chainNS, custom.Name, forced[0], custom.Scheduling.NodeSelector, dedicated)
 
 		By("rejecting a replacement whose node selector conflicts with the replaced class")
 		rejected(owners[0], newPod(replaceNS, conflicting.Name), "runtimeClass.scheduling.nodeSelector", poolKey)
+
+		By("restoring the scheduling of a named class after a placement replacement")
+		// The profile replaces the node selector of every Pod. For a Pod that
+		// names a scheduling-only class, the replacement would strip the selector
+		// that confines the Pod to the nodes of its runtime, and nothing after
+		// the webhook would put it back: Capsule restores the scheduling of the
+		// class next to the replaced selector.
+		createPod(owners[0], placementNS, scheduled.Name, scheduled, map[string]string{poolKey: "placement"})
+
+		// A replacement that contradicts the selector of the class cannot be
+		// restored and rejects the Pod; one without a class keeps the replacement.
+		rejected(owners[0], newPod(conflictedNS, scheduled.Name), "runtimeClass.scheduling.nodeSelector", prefix+"/scheduled")
+		classless := newPod(conflictedNS, "")
+		Eventually(func() error { return owners[0].Create(ctx, classless) }, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Eventually(func(g Gomega) {
+			stored := &corev1.Pod{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(classless), stored)).To(Succeed())
+			g.Expect(stored.Spec.RuntimeClassName).To(BeNil())
+			g.Expect(stored.Spec.NodeSelector).To(HaveKeyWithValue(prefix+"/scheduled", "elsewhere"))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 		By("leaving non-selected namespaces and the other tenant's defaults alone")
 		unselected := newPod(otherNS, "")
@@ -442,5 +471,23 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		expectProfile(otherNS, 3, forced[0].Name)
 		createPod(owners[0], otherNS, "", forced[0], nil)
+
+		By("carrying the constraints the class holds at admission, not cached ones")
+		// The scheduling of an assigned class is read from the API server when
+		// the Pod is admitted: a Pod created right after the class changed must
+		// carry the new constraint, which nothing downstream would reject.
+		Eventually(func() error {
+			current := &nodev1.RuntimeClass{}
+			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(scheduled), current); err != nil {
+				return err
+			}
+
+			current.Scheduling.NodeSelector[prefix+"/phase"] = "two"
+
+			return k8sClient.Update(ctx, current)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		scheduled.Scheduling.NodeSelector[prefix+"/phase"] = "two"
+		createPod(owners[0], scheduledNS, "", scheduled, nil)
 	})
 })

@@ -304,10 +304,11 @@ func TestRuntimeClassMutationReconcileErrors(t *testing.T) {
 	}
 }
 
-// A class the cache does not know yet, such as one created moments ago, is
-// read from the API server.
-func TestRuntimeClassMutationFreshFallback(t *testing.T) {
-	cached := priorityClassFixtureOf(t)
+// The class is read from the API server alone, never the cache: one created
+// moments ago is found, and the cache is not consulted even when it knows the
+// name.
+func TestRuntimeClassMutationAuthoritativeRead(t *testing.T) {
+	cached := runtimeClassFixture(t)
 	fresh := runtimeClassFixture(t)
 	pod := admittedRuntimePod("")
 
@@ -316,8 +317,151 @@ func TestRuntimeClassMutationFreshFallback(t *testing.T) {
 	require.True(t, changed)
 	require.Equal(t, classTenantDefault, runtimeClassOf(pod))
 	require.Equal(t, runtimeClassObject(classTenantDefault).Overhead.PodFixed, pod.Spec.Overhead)
-	require.EqualValues(t, 1, cached.gets.Load())
+	require.EqualValues(t, 0, cached.gets.Load(), "a cache hit must not shortcut the authoritative read")
 	require.EqualValues(t, 1, fresh.gets.Load())
+}
+
+// A placement entry can drop or narrow the scheduling of the class the Pod
+// already names without changing the class: on reinvocation no later plugin
+// pass repairs that, and nothing downstream rejects the missing selector that
+// confines the Pod to compatible nodes. The scheduling of the class is
+// restored like an assignment; the overhead was not touched and stays.
+func TestRuntimeClassMutationRestoresSchedulingAfterPlacementChange(t *testing.T) {
+	replaceSelector := func(selector map[string]string) []*rules.NamespaceRuleBodyNamespace {
+		return []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{{Action: rules.MutationActionReplace,
+			Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: selector}}}}}}
+	}
+
+	t.Run("a replaced node selector gets the selector of the class back", func(t *testing.T) {
+		classes := runtimeClassFixture(t)
+		pod := admittedRuntimePod(classCustom)
+		bodies := replaceSelector(map[string]string{"pool": "dedicated"})
+
+		changed, err := MutatePodPlacement(t.Context(), pod, bodies, nil, classes)
+		require.NoError(t, err)
+		require.True(t, changed)
+		require.Equal(t, map[string]string{"pool": "dedicated", "runtime-" + classCustom: "true"}, pod.Spec.NodeSelector)
+		require.Equal(t, runtimeClassObject(classCustom).Scheduling.Tolerations, pod.Spec.Tolerations)
+		require.Equal(t, runtimeClassObject(classCustom).Overhead.PodFixed, pod.Spec.Overhead)
+		require.EqualValues(t, 1, classes.gets.Load())
+
+		// A reinvocation replays the replacement and the restoration: one more
+		// read, and the Pod ends where the first call left it.
+		changed, err = MutatePodPlacement(t.Context(), pod, bodies, nil, classes)
+		require.NoError(t, err)
+		require.False(t, changed)
+		require.Equal(t, map[string]string{"pool": "dedicated", "runtime-" + classCustom: "true"}, pod.Spec.NodeSelector)
+		require.EqualValues(t, 2, classes.gets.Load())
+	})
+
+	t.Run("a merge cannot narrow the toleration of the class in time", func(t *testing.T) {
+		unlimited := corev1.Toleration{Key: "dedicated", Operator: corev1.TolerationOpEqual, Value: "true", Effect: corev1.TaintEffectNoExecute}
+		class := &nodev1.RuntimeClass{Name: "evicting", Handler: "runc", Scheduling: &nodev1.Scheduling{Tolerations: []corev1.Toleration{unlimited}}}
+		narrowed := *unlimited.DeepCopy()
+		narrowed.TolerationSeconds = new(int64(60))
+
+		pod := admittedRuntimePod("")
+		pod.Spec.RuntimeClassName = new(class.Name)
+		admitRuntimeClass(pod, class)
+
+		classes := priorityClassFixtureOf(t, class)
+		changed, err := MutatePodPlacement(t.Context(), pod, []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{
+			{Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{Tolerations: []corev1.Toleration{narrowed}}}},
+		}}}, nil, classes)
+		require.NoError(t, err)
+		require.False(t, changed, "the restored toleration leaves the Pod as it arrived")
+		require.Equal(t, []corev1.Toleration{unlimited}, pod.Spec.Tolerations, "the Pod must not be evicted earlier than the class tolerates")
+		require.EqualValues(t, 1, classes.gets.Load())
+	})
+
+	t.Run("a replacement that conflicts with the class rejects the Pod", func(t *testing.T) {
+		pod := admittedRuntimePod(classCustom)
+
+		changed, err := MutatePodPlacement(t.Context(), pod, replaceSelector(map[string]string{"runtime-" + classCustom: "false"}), nil, runtimeClassFixture(t))
+		require.ErrorContains(t, err, "workloads.classes.runtime: conflict: runtimeClass.scheduling.nodeSelector[runtime-custom] = true; pod.spec.nodeSelector[runtime-custom] = false")
+		require.False(t, changed)
+	})
+
+	t.Run("a disturbed Pod whose class is gone is rejected", func(t *testing.T) {
+		pod := admittedRuntimePod(classCustom)
+
+		changed, err := MutatePodPlacement(t.Context(), pod, replaceSelector(map[string]string{"pool": "dedicated"}), nil, priorityClassFixtureOf(t))
+		require.ErrorContains(t, err, `workloads.classes.runtime: RuntimeClass "custom" not found`)
+		require.False(t, changed)
+	})
+
+	t.Run("a Pod without a class reads nothing", func(t *testing.T) {
+		pod := admittedRuntimePod("")
+
+		changed, err := MutatePodPlacement(t.Context(), pod, replaceSelector(map[string]string{"pool": "dedicated"}), nil, noReads{tb: t})
+		require.NoError(t, err)
+		require.True(t, changed)
+		require.Equal(t, map[string]string{"pool": "dedicated"}, pod.Spec.NodeSelector)
+	})
+
+	t.Run("an untouched placement reads nothing", func(t *testing.T) {
+		pod := admittedRuntimePod(classCustom)
+
+		changed, err := MutatePodPlacement(t.Context(), pod, []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{
+			{Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{Scheduler: "custom-scheduler"}}},
+		}}}, nil, noReads{tb: t})
+		require.NoError(t, err)
+		require.True(t, changed)
+		require.Equal(t, "custom-scheduler", pod.Spec.SchedulerName)
+	})
+}
+
+// Numeric toleration operators are never ordered into one another: only the
+// identical toleration collapses, and the union of distinct bounds is kept.
+func TestRuntimeClassMutationNumericTolerationOperators(t *testing.T) {
+	bound := func(operator corev1.TolerationOperator, value string) corev1.Toleration {
+		return corev1.Toleration{Key: "pressure", Operator: operator, Value: value, Effect: corev1.TaintEffectNoSchedule}
+	}
+
+	require.True(t, toleratesSuperset(bound(corev1.TolerationOpLt, "60"), bound(corev1.TolerationOpLt, "60")))
+	require.False(t, toleratesSuperset(bound(corev1.TolerationOpLt, "600"), bound(corev1.TolerationOpLt, "60")))
+	require.False(t, toleratesSuperset(bound(corev1.TolerationOpLt, "60"), bound(corev1.TolerationOpLt, "600")))
+	require.False(t, toleratesSuperset(bound(corev1.TolerationOpGt, "60"), bound(corev1.TolerationOpLt, "60")))
+	require.False(t, toleratesSuperset(bound(corev1.TolerationOpLt, "60"), bound(corev1.TolerationOpGt, "60")))
+	require.True(t, toleratesSuperset(bound(corev1.TolerationOpGt, "60"), bound(corev1.TolerationOpGt, "60")))
+
+	merged := mergeRuntimeClassTolerations(
+		[]corev1.Toleration{bound(corev1.TolerationOpLt, "600")},
+		[]corev1.Toleration{bound(corev1.TolerationOpLt, "60"), bound(corev1.TolerationOpLt, "600"), bound(corev1.TolerationOpGt, "10")},
+	)
+	require.Equal(t, []corev1.Toleration{bound(corev1.TolerationOpLt, "600"), bound(corev1.TolerationOpLt, "60"), bound(corev1.TolerationOpGt, "10")}, merged)
+}
+
+// The cache can lag behind a class whose constraints just changed. The merge
+// is the only application of the scheduling of a class assigned on
+// reinvocation, after the plugin's final pass, and nothing downstream rejects
+// an outdated node selector: the Pod must carry the live constraints of the
+// class, read authoritatively.
+func TestRuntimeClassMutationStaleCacheReinvocation(t *testing.T) {
+	current := runtimeClassObject(classSecondDefault)
+	stale := current.DeepCopy()
+	stale.Scheduling = &nodev1.Scheduling{NodeSelector: map[string]string{"retired-pool": "true"}}
+
+	cached, api := priorityClassFixtureOf(t, stale), priorityClassFixtureOf(t, current)
+	bodies := []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{runtimeClassMutation(rules.MutationActionReplace, classSecondDefault)}}}
+
+	// The plugin's final pass is over: this reinvocation is the only chance to
+	// carry the constraints of the class the entry assigns.
+	pod := admittedRuntimePod("")
+	changed, err := MutatePodPlacement(t.Context(), pod, bodies, nil, cached, api)
+	require.NoError(t, err)
+	require.True(t, changed)
+	require.Equal(t, classSecondDefault, runtimeClassOf(pod))
+	require.Equal(t, "true", pod.Spec.NodeSelector["runtime-"+classSecondDefault], "the live node selector of the class must be carried")
+	require.NotContains(t, pod.Spec.NodeSelector, "retired-pool", "stale cached constraints must not be applied")
+	require.Subset(t, pod.Spec.Tolerations, current.Scheduling.Tolerations)
+	require.EqualValues(t, 0, cached.gets.Load(), "the stale cache must not be consulted")
+	require.EqualValues(t, 1, api.gets.Load())
+
+	// The settled Pod gives a further reinvocation nothing to change or read.
+	changed, err = MutatePodPlacement(t.Context(), pod, bodies, nil, noReads{tb: t})
+	require.NoError(t, err)
+	require.False(t, changed)
 }
 
 // The first call settles the class, its overhead, and its scheduling, so the
@@ -333,23 +477,32 @@ func TestRuntimeClassMutationReinvocation(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
 		mutations []rules.NamespaceRuleMutation
-		// changed tells whether the second call still changes the Pod.
-		changed bool
+		// reads tells how often the class is read across both calls.
+		reads int64
+		// tolerations tells what both calls end with; empty means the
+		// scheduling of the class alone.
+		tolerations []corev1.Toleration
 	}{
-		{name: "merge", mutations: []rules.NamespaceRuleMutation{runtimeClassMutation("", classTenantDefault)}},
-		{name: "replace", mutations: []rules.NamespaceRuleMutation{runtimeClassMutation(rules.MutationActionReplace, classTenantDefault)}},
-		{name: "replaces in turn", mutations: []rules.NamespaceRuleMutation{runtimeClassMutation(rules.MutationActionReplace, classSecondDefault), runtimeClassMutation(rules.MutationActionReplace, classTenantDefault)}},
-		{name: "merge before a replace", mutations: []rules.NamespaceRuleMutation{runtimeClassMutation("", classSecondDefault), runtimeClassMutation(rules.MutationActionReplace, classTenantDefault)}},
-		// Replace swaps the whole toleration list. On the first call the toleration
-		// of the class is merged back for the class the entries assigned; a second
-		// call ends at the class the Pod arrived with, so the replace has the last
-		// word and a rule has to repeat the toleration to keep it.
-		{name: "replaces in turn next to another change", mutations: []rules.NamespaceRuleMutation{runtimeClassMutation(rules.MutationActionReplace, classSecondDefault), runtimeClassMutation(rules.MutationActionReplace, classTenantDefault), dedicated}, changed: true},
+		{name: "merge", mutations: []rules.NamespaceRuleMutation{runtimeClassMutation("", classTenantDefault)}, reads: 1},
+		{name: "replace", mutations: []rules.NamespaceRuleMutation{runtimeClassMutation(rules.MutationActionReplace, classTenantDefault)}, reads: 1},
+		{name: "replaces in turn", mutations: []rules.NamespaceRuleMutation{runtimeClassMutation(rules.MutationActionReplace, classSecondDefault), runtimeClassMutation(rules.MutationActionReplace, classTenantDefault)}, reads: 1},
+		{name: "merge before a replace", mutations: []rules.NamespaceRuleMutation{runtimeClassMutation("", classSecondDefault), runtimeClassMutation(rules.MutationActionReplace, classTenantDefault)}, reads: 1},
+		// Replace swaps the whole toleration list, and the merge restores the
+		// toleration of the class the Pod names, as the plugin would: on the
+		// second call that costs one more read, and the Pod ends where the
+		// first call left it.
+		{name: "replaces in turn next to another change", mutations: []rules.NamespaceRuleMutation{runtimeClassMutation(rules.MutationActionReplace, classSecondDefault), runtimeClassMutation(rules.MutationActionReplace, classTenantDefault), dedicated}, reads: 2,
+			tolerations: append(dedicated.Workloads.Placement.Tolerations, class.Scheduling.Tolerations...)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			classes := runtimeClassFixture(t)
 			bodies := []*rules.NamespaceRuleBodyNamespace{{Mutate: tc.mutations}}
 			pod := admittedRuntimePod("")
+
+			expected := tc.tolerations
+			if expected == nil {
+				expected = class.Scheduling.Tolerations
+			}
 
 			changed, err := MutatePodPlacement(t.Context(), pod, bodies, nil, classes)
 			require.NoError(t, err)
@@ -357,21 +510,16 @@ func TestRuntimeClassMutationReinvocation(t *testing.T) {
 			require.Equal(t, classTenantDefault, runtimeClassOf(pod))
 			require.Equal(t, class.Overhead.PodFixed, pod.Spec.Overhead)
 			require.Equal(t, "true", pod.Spec.NodeSelector["runtime-"+classTenantDefault])
+			require.Equal(t, expected, pod.Spec.Tolerations)
 
 			changed, err = MutatePodPlacement(t.Context(), pod, bodies, nil, classes)
 			require.NoError(t, err)
-			require.Equal(t, tc.changed, changed)
+			require.False(t, changed, "the second call must leave the Pod as the first left it")
 			require.Equal(t, classTenantDefault, runtimeClassOf(pod))
 			require.Equal(t, class.Overhead.PodFixed, pod.Spec.Overhead, "the overhead of the assigned class must survive the second call")
 			require.Equal(t, "true", pod.Spec.NodeSelector["runtime-"+classTenantDefault])
-
-			if tc.changed {
-				require.Equal(t, dedicated.Workloads.Placement.Tolerations, pod.Spec.Tolerations)
-			} else {
-				require.Equal(t, class.Scheduling.Tolerations, pod.Spec.Tolerations)
-			}
-
-			require.EqualValues(t, 1, classes.gets.Load(), "the class is read once, on the call that changes it")
+			require.Equal(t, expected, pod.Spec.Tolerations, "the toleration of the class must survive the second call")
+			require.Equal(t, tc.reads, classes.gets.Load(), "the class is read on the calls that assign it or disturb its scheduling")
 		})
 	}
 

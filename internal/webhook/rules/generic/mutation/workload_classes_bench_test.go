@@ -227,8 +227,9 @@ func BenchmarkRuntimeClassMutation(b *testing.B) {
 						}
 					}
 
-					// Only an assignment reads the class, once and from the cache; the API
-					// reader serves cache misses alone. Reads are counted apart.
+					// Only an assignment reads the class, once and authoritatively; the
+					// cached reader serves only callers without an API reader. Reads are
+					// counted apart.
 					cached := &priorityClasses{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(classes...).Build()}
 					api := &priorityClasses{Client: cached.Client}
 
@@ -307,5 +308,67 @@ func BenchmarkRuntimeClassMutation(b *testing.B) {
 				})
 			}
 		}
+	}
+}
+
+// BenchmarkRuntimeClassSchedulingRestore measures the restoration of the
+// scheduling of a kept class after a placement entry disturbed it, and the
+// comparison that keeps an undisturbed Pod read-free.
+func BenchmarkRuntimeClassSchedulingRestore(b *testing.B) {
+	for _, mode := range []string{"restore", "untouched"} {
+		b.Run(mode, func(b *testing.B) {
+			scheme := runtime.NewScheme()
+			if err := nodev1.AddToScheme(scheme); err != nil {
+				b.Fatal(err)
+			}
+
+			// A scheduling-only class: nothing downstream would reject a Pod
+			// whose selector a replacement dropped.
+			class := runtimeClassObject(classSecondDefault)
+			cached := &priorityClasses{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(class).Build()}
+			api := &priorityClasses{Client: cached.Client}
+
+			mutation := rules.NamespaceRuleMutation{Action: rules.MutationActionReplace,
+				Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{"pool": "dedicated"}}}}
+			if mode == "untouched" {
+				mutation = rules.NamespaceRuleMutation{Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{Scheduler: "profile-scheduler"}}}
+			}
+
+			bodies := []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{mutation}}}
+
+			pod := &corev1.Pod{APIVersion: "v1", Kind: "Pod", Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "app", Image: "example/app:v1"}}}}
+
+			object, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pod)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			obj := &unstructured.Unstructured{Object: object}
+
+			b.ReportAllocs()
+
+			for b.Loop() {
+				// Reset the Pod as the built-in RuntimeClass plugin hands it to
+				// webhooks: the class it names and that class's scheduling.
+				spec := obj.Object["spec"].(map[string]any)
+				spec["runtimeClassName"] = classSecondDefault
+				spec["nodeSelector"] = map[string]any{"keep": "yes", "runtime-" + classSecondDefault: "true"}
+				spec["tolerations"] = []any{map[string]any{"key": "runtime-" + classSecondDefault, "operator": "Equal", "value": "true", "effect": "NoSchedule"}}
+				delete(spec, "schedulerName")
+
+				changed, err := MutateWorkloadResources(b.Context(), obj, corev1.SchemeGroupVersion.WithKind("Pod"), bodies, nil, cached, api)
+				if err != nil || !changed {
+					b.Fatalf("changed=%v error=%v", changed, err)
+				}
+
+				selected, _, err := unstructured.NestedString(obj.Object, "spec", "nodeSelector", "runtime-"+classSecondDefault)
+				if err != nil || selected != "true" {
+					b.Fatalf("node selector of the kept class=%q error=%v", selected, err)
+				}
+			}
+
+			b.ReportMetric(float64(cached.gets.Load())/float64(b.N), "cache-reads/op")
+			b.ReportMetric(float64(api.gets.Load())/float64(b.N), "api-reads/op")
+		})
 	}
 }

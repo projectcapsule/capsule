@@ -46,7 +46,8 @@ func (*metadataRules) OnDelete(client.Client, client.Reader, *unstructured.Unstr
 // mutate reads the configured PriorityClass through the manager's cached
 // client: the API server rechecks the priority it sets, so a stale value is
 // rejected. Nothing rechecks whether the Pod's own class was the global
-// default, so the API reader answers that.
+// default, so the API reader answers that, as it does for the scheduling of
+// an assigned RuntimeClass, which nothing rechecks either.
 func (h *metadataRules) mutate(c client.Client, reader client.Reader, obj, old *unstructured.Unstructured, bodies []*apirules.NamespaceRuleBodyNamespace) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		gvk := schema.GroupVersionKind{Group: req.Kind.Group, Version: req.Kind.Version, Kind: req.Kind.Kind}
