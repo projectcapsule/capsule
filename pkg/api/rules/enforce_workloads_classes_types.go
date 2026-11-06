@@ -25,6 +25,25 @@ type WorkloadClassEnforcement struct {
 	// +kubebuilder:validation:MaxItems=64
 	// +listType=atomic
 	Priority []WorkloadClassMatch `json:"priority,omitempty"`
+
+	// Runtime matches spec.runtimeClassName of selected Pods and Pod templates
+	// by name, or by the labels of the RuntimeClass. Entries, and the criteria
+	// within each entry, are ORed. An applicable allow list rejects every other
+	// class; audit never grants access. A Pod or Pod template without a class is
+	// not matched: Kubernetes has no default RuntimeClass, so it keeps the default
+	// runtime of its node. An allow list therefore does not require a class; use
+	// a mutation default to assign one. Exact and exp need no read; a label
+	// selector reads the class, and a missing class never matches it. Runtime
+	// rules apply to the pod target and do not run on subresources. An update
+	// that keeps the class is only checked again when an allow or deny class rule
+	// has conditions; conditional audit rules are recorded without taking that
+	// decision again.
+	// Legacy Tenant.spec.runtimeClasses restrictions remain an additional boundary.
+	// +optional
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=64
+	// +listType=atomic
+	Runtime []WorkloadClassMatch `json:"runtime,omitempty"`
 }
 
 // WorkloadClassMatch reuses the shared class name and label matching semantics.
@@ -33,5 +52,5 @@ type WorkloadClassMatch = StorageClassMatch
 
 // HasPolicies reports whether any class matcher is configured.
 func (c WorkloadClassEnforcement) HasPolicies() bool {
-	return len(c.Priority) > 0
+	return len(c.Priority) > 0 || len(c.Runtime) > 0
 }

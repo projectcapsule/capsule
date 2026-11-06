@@ -33,7 +33,7 @@ func TestTenantClassEventHandlerUpdatesClassStatusDirectly(t *testing.T) {
 		Status: capsulev1beta2.TenantStatus{
 			TenantAvailableStatus: capsulev1beta2.TenantAvailableStatus{
 				Classes: capsulev1beta2.TenantAvailableClassesStatus{
-					RuntimeClasses: []string{"sandboxed"},
+					DeviceClasses: []string{"gpu"},
 				},
 			},
 		},
@@ -60,7 +60,7 @@ func TestTenantClassEventHandlerUpdatesClassStatusDirectly(t *testing.T) {
 	if !reflect.DeepEqual(updated.Status.Classes.StorageClasses, []string{"fast"}) {
 		t.Fatalf("storage classes = %#v, want [fast]", updated.Status.Classes.StorageClasses)
 	}
-	if !reflect.DeepEqual(updated.Status.Classes.RuntimeClasses, []string{"sandboxed"}) {
-		t.Fatalf("runtime classes = %#v, want preserved [sandboxed]", updated.Status.Classes.RuntimeClasses)
+	if !reflect.DeepEqual(updated.Status.Classes.DeviceClasses, []string{"gpu"}) {
+		t.Fatalf("device classes = %#v, want preserved [gpu]", updated.Status.Classes.DeviceClasses)
 	}
 }

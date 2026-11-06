@@ -11,6 +11,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -166,6 +167,9 @@ func newPodRules(regexCache *cache.RegexCache, registryCache *cache.RegistryRule
 		}},
 		{read: h.validatePriorityClasses, policy: appliesToPriorityClasses, changed: func(old, pod *corev1.Pod) bool {
 			return old.Spec.PriorityClassName != pod.Spec.PriorityClassName
+		}},
+		{read: h.validateRuntimeClasses, policy: appliesToRuntimeClasses, changed: func(old, pod *corev1.Pod) bool {
+			return ptr.Deref(old.Spec.RuntimeClassName, "") != ptr.Deref(pod.Spec.RuntimeClassName, "")
 		}},
 		{evaluate: h.validateResources},
 		{evaluate: h.validateSchedulers, includeSubresources: true},

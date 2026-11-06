@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apirules "github.com/projectcapsule/capsule/pkg/api/rules"
@@ -24,6 +25,7 @@ const maxPlacementNodeTerms = 256
 // Priority class mutations resolve their PriorityClass through classes: a
 // cached reader for the configured class, optionally followed by an
 // authoritative one that judges the Pod's own class and covers cache misses.
+// Runtime class mutations read nothing.
 func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules.NamespaceRuleBodyNamespace, conditions *ruleengine.ConditionEvaluator, classes ...client.Reader) (bool, error) {
 	if pod == nil || !slices.ContainsFunc(bodies, func(body *apirules.NamespaceRuleBodyNamespace) bool { return body != nil && len(body.Mutate) > 0 }) {
 		return false, nil
@@ -33,6 +35,9 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 	// Secret references are only appended or replaced, never edited in place.
 	// Retain a shallow snapshot so unrelated mutations add no slice allocation.
 	originalSecrets := pod.Spec.ImagePullSecrets
+	// The runtime class stays out of the placement snapshot, which the compiler
+	// keeps on the stack as long as podPlacement is small enough to inline.
+	runtimeClass := ptr.Deref(pod.Spec.RuntimeClassName, "")
 
 	var containers []workloadMutationContainer
 
@@ -78,8 +83,8 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 				return false, fmt.Errorf("rules[%d].mutate[%d].action: unsupported action %q (expected merge or replace)", i, j, mutation.Action)
 			}
 
-			if err := priorityClass.mutate(ctx, pod, mutation); err != nil {
-				return false, fmt.Errorf("rules[%d].mutate[%d].workloads.classes.priority: %w", i, j, err)
+			if err := mutatePodClasses(ctx, pod, mutation, priorityClass); err != nil {
+				return false, fmt.Errorf("rules[%d].mutate[%d].workloads.classes.%w", i, j, err)
 			}
 
 			if hasContainerMutation(mutation.Workloads, linux) {
@@ -92,7 +97,9 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 		}
 	}
 
-	return !slices.Equal(originalSecrets, pod.Spec.ImagePullSecrets) || slices.ContainsFunc(containers, workloadMutationContainer.changed) || podPlacementChanged(before, podPlacement(pod)), nil
+	runtimeClassChanged := resetPodOverhead(pod, runtimeClass)
+
+	return runtimeClassChanged || !slices.Equal(originalSecrets, pod.Spec.ImagePullSecrets) || slices.ContainsFunc(containers, workloadMutationContainer.changed) || podPlacementChanged(before, podPlacement(pod)), nil
 }
 
 func podPlacementChanged(before, after *apirules.WorkloadMutation) bool {

@@ -41,7 +41,7 @@ func priorityClassPod(namespace, name, class string) *corev1.Pod {
 	}
 }
 
-func waitPriorityClassProfile(ctx context.Context, ns *corev1.Namespace, check func(Gomega, []*rules.NamespaceRuleBodyNamespace)) {
+func waitWorkloadClassProfile(ctx context.Context, ns *corev1.Namespace, check func(Gomega, []*rules.NamespaceRuleBodyNamespace)) {
 	Eventually(func(g Gomega) {
 		status := &capsulev1beta2.RuleStatus{}
 		g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: meta.NameForManagedRuleStatus(), Namespace: ns.Name}, status)).To(Succeed())
@@ -108,7 +108,7 @@ var _ = Describe("PriorityClass namespace profiles", Label("tenant", "rules", "w
 		ownerB := impersonationClient(b.Name, withDefaultGroups(nil))
 
 		waitProfile := func(ns *corev1.Namespace, rulesWanted int) {
-			waitPriorityClassProfile(ctx, ns, func(g Gomega, bodies []*rules.NamespaceRuleBodyNamespace) {
+			waitWorkloadClassProfile(ctx, ns, func(g Gomega, bodies []*rules.NamespaceRuleBodyNamespace) {
 				g.Expect(bodies).To(HaveLen(rulesWanted))
 			})
 		}
@@ -298,7 +298,7 @@ var _ = Describe("PriorityClass namespace profiles", Label("tenant", "rules", "w
 			return k8sClient.Update(ctx, current)
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		TenantReady(a, metav1.ConditionTrue, defaultTimeoutInterval)
-		waitPriorityClassProfile(ctx, named, func(g Gomega, bodies []*rules.NamespaceRuleBodyNamespace) {
+		waitWorkloadClassProfile(ctx, named, func(g Gomega, bodies []*rules.NamespaceRuleBodyNamespace) {
 			g.Expect(bodies).To(HaveLen(4))
 			g.Expect(bodies[1].Enforce.Workloads.Classes.Priority).To(Equal([]rules.WorkloadClassMatch{{Exact: []string{silver}}}))
 		})

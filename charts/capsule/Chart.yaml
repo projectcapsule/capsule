@@ -41,6 +41,10 @@ annotations:
       url: https://projectcapsule.dev/
   artifacthub.io/changes: |
     - kind: added
+      description: enforce RuntimeClass references of Pods and controller templates and provide merge or replace class defaults through namespace rules
+    - kind: changed
+      description: tenant status no longer lists available RuntimeClasses, which are now a namespace-specific policy
+    - kind: added
       description: enforce PriorityClass references of Pods and controller templates and provide merge or replace class defaults through namespace rules
     - kind: changed
       description: tenant status no longer lists available PriorityClasses, which are now a namespace-specific policy

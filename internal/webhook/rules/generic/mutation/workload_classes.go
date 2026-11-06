@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
@@ -142,4 +143,73 @@ func (p *podPriorityClass) get(ctx context.Context, reader client.Reader, name s
 	}
 
 	return class, nil
+}
+
+// mutatePodClasses applies the classes one mutation entry assigns. Most entries
+// assign none, so that is settled before either class is looked at. An error
+// names the class it concerns.
+func mutatePodClasses(ctx context.Context, pod *corev1.Pod, mutation *apirules.NamespaceRuleMutation, priorityClass *podPriorityClass) error {
+	if mutation.Workloads.Classes.Priority == "" && mutation.Workloads.Classes.Runtime == "" {
+		return nil
+	}
+
+	if err := priorityClass.mutate(ctx, pod, mutation); err != nil {
+		return fmt.Errorf("priority: %w", err)
+	}
+
+	mutatePodRuntimeClass(pod, mutation)
+
+	return nil
+}
+
+// mutatePodRuntimeClass applies the runtime class of one mutation entry that
+// selects the Pod. Kubernetes has no default RuntimeClass, so merge only fills
+// an omitted class and replace sets it on every Pod.
+//
+// No RuntimeClass is read. The built-in RuntimeClass admission plugin runs
+// before webhooks and once more after a webhook changed the Pod: it rejects a
+// class that does not exist, then derives the overhead and scheduling of the
+// assigned one. The scheduling constraints it merged for a replaced class stay
+// on the Pod: they cannot be told apart from the Pod's own, and removing them
+// could lift a restriction another mutation relies on.
+func mutatePodRuntimeClass(pod *corev1.Pod, mutation *apirules.NamespaceRuleMutation) {
+	name := mutation.Workloads.Classes.Runtime
+	if name == "" || !mutation.Workloads.GetWorkloadTargets(apirules.ValidatePod) {
+		return
+	}
+
+	current := ptr.Deref(pod.Spec.RuntimeClassName, "")
+	if current == name || (current != "" && mutation.Action != apirules.MutationActionReplace) {
+		return
+	}
+
+	pod.Spec.RuntimeClassName = new(name)
+}
+
+// resetPodOverhead drops spec.overhead when the mutations assigned another
+// runtime class than the Pod arrived with. The RuntimeClass admission plugin
+// derived it from that class and rejects an overhead that differs from the
+// class the Pod names; it derives the overhead of the assigned class again.
+//
+// Only the outcome counts, not each assignment. The webhook is called again
+// once the plugin has set the overhead of the assigned class, and entries that
+// replace the class in turn then end where the Pod started: its overhead is the
+// right one, and nothing would derive it another time.
+//
+// That also bounds what conditions can do. A class they select only on that
+// second call, from what the plugin or another webhook added to the Pod in
+// between, is assigned without the overhead and the scheduling of its
+// RuntimeClass. Dropping the overhead keeps the Pod from being admitted with
+// that of another class: the plugin still validates it, and rejects the Pod if
+// the assigned class defines one.
+//
+// It reports whether the runtime class changed.
+func resetPodOverhead(pod *corev1.Pod, runtimeClass string) bool {
+	if ptr.Deref(pod.Spec.RuntimeClassName, "") == runtimeClass {
+		return false
+	}
+
+	pod.Spec.Overhead = nil
+
+	return true
 }
