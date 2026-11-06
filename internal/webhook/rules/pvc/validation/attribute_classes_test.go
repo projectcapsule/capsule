@@ -8,15 +8,20 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"slices"
 	"sync/atomic"
 	"testing"
 
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/require"
 	admissionv1 "k8s.io/api/admission/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,15 +41,32 @@ import (
 
 type classClient struct {
 	client.Client
-	gets, classGets atomic.Int64
-	classErr        error
+	gets, classGets, betaGets atomic.Int64
+	classErr                  error
+	// unserved lists the VolumeAttributesClass API versions the cluster doesn't
+	// serve. Reading one fails like the REST mapper does.
+	unserved []string
 }
 
 func (c *classClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 	c.gets.Add(1)
 
-	if _, ok := obj.(*storagev1.VolumeAttributesClass); ok {
+	version := ""
+
+	switch obj.(type) {
+	case *storagev1.VolumeAttributesClass:
+		version = storagev1.SchemeGroupVersion.Version
+	case *storagev1beta1.VolumeAttributesClass:
+		version = storagev1beta1.SchemeGroupVersion.Version
+		c.betaGets.Add(1)
+	}
+
+	if version != "" {
 		c.classGets.Add(1)
+
+		if slices.Contains(c.unserved, version) {
+			return &apimeta.NoKindMatchError{GroupKind: storagev1.SchemeGroupVersion.WithKind("VolumeAttributesClass").GroupKind(), SearchedVersions: []string{version}}
+		}
 
 		if c.classErr != nil {
 			return c.classErr
@@ -114,13 +136,20 @@ func classFixture(tb testing.TB, profiles ...classProfile) (*classClient, admiss
 	tb.Helper()
 	scheme := runtime.NewScheme()
 	require.NoError(tb, corev1.AddToScheme(scheme))
+	require.NoError(tb, appsv1.AddToScheme(scheme))
+	require.NoError(tb, batchv1.AddToScheme(scheme))
 	require.NoError(tb, storagev1.AddToScheme(scheme))
+	require.NoError(tb, storagev1beta1.AddToScheme(scheme))
 	require.NoError(tb, capsule.AddToScheme(scheme))
 	parameters := map[string]string{"iops": "3000"}
+	// Each class is stored in both versions, as Kubernetes 1.34 and later serve it.
 	objects := []client.Object{
 		&storagev1.VolumeAttributesClass{Name: "gold", Labels: map[string]string{"env": "customer"}, DriverName: "csi.example.com", Parameters: parameters},
 		&storagev1.VolumeAttributesClass{Name: "silver", DriverName: "csi.example.com", Parameters: parameters},
 		&storagev1.VolumeAttributesClass{Name: "bronze", Labels: map[string]string{"env": "internal"}, DriverName: "csi.example.com", Parameters: parameters},
+		&storagev1beta1.VolumeAttributesClass{Name: "gold", Labels: map[string]string{"env": "customer"}, DriverName: "csi.example.com", Parameters: parameters},
+		&storagev1beta1.VolumeAttributesClass{Name: "silver", DriverName: "csi.example.com", Parameters: parameters},
+		&storagev1beta1.VolumeAttributesClass{Name: "bronze", Labels: map[string]string{"env": "internal"}, DriverName: "csi.example.com", Parameters: parameters},
 	}
 	tenants := map[string]*capsule.Tenant{}
 	for _, p := range profiles {
