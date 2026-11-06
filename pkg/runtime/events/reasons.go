@@ -48,6 +48,8 @@ const (
 	ReasonMissingVolumeSnapshotClass   string = "MissingVolumeSnapshotClass"
 	ReasonForbiddenVolumeSnapshotClass string = "ForbiddenVolumeSnapshotClass"
 
+	ReasonForbiddenVolumeAttributesClass string = "ForbiddenVolumeAttributesClass"
+
 	// Nodes.
 	ReasonForbiddenNodeSelectorUpdate string = "ForbiddenNodeSelectorUpdate"
 

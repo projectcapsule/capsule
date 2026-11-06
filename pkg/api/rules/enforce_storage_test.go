@@ -89,3 +89,67 @@ func TestStorageClassMatchHelpers(t *testing.T) {
 		t.Fatalf("issue notation decoded as %+v", decoded)
 	}
 }
+
+func TestStorageAttributeClasses(t *testing.T) {
+	var storage NamespaceRuleEnforceStorageBody
+	if err := json.Unmarshal([]byte(`{"attributeClasses":[{"exact":["internal.example.com"],"exp":"^[a-z0-9-]+\\.example\\.com$","matchLabels":{"env":"customer"}}]}`), &storage); err != nil {
+		t.Fatal(err)
+	}
+	if len(storage.AttributeClasses) != 1 || len(storage.Classes) != 0 {
+		t.Fatalf("issue notation decoded as %+v", storage)
+	}
+	if (NamespaceRuleEnforceBody{Storage: storage}).GetStorageClassTargets(StorageTargetVolumeSnapshot) {
+		t.Fatal("attribute classes must not select snapshot classes")
+	}
+
+	cloned := storage.DeepCopy()
+	cloned.AttributeClasses[0].Exact[0] = "external.example.com"
+	cloned.AttributeClasses[0].MatchLabels["env"] = "internal"
+	if storage.AttributeClasses[0].Exact[0] != "internal.example.com" || storage.AttributeClasses[0].MatchLabels["env"] != "customer" {
+		t.Fatal("deep copy shares attribute class state")
+	}
+
+	data, err := json.Marshal(NamespaceRuleEnforceStorageBody{Classes: []StorageClassMatch{{Exact: []string{"gold"}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != `{"classes":[{"exact":["gold"]}]}` {
+		t.Fatalf("rules without attribute classes encode as %s", data)
+	}
+}
+
+func TestStorageClassesToMatch(t *testing.T) {
+	silver := StorageClassMatch{Exact: []string{"silver"}}
+	csi := StorageClassMatch{Expression: "^csi-"}
+	customer := StorageClassMatch{MatchLabels: map[string]string{"env": "customer"}}
+	invalid := StorageClassMatch{Expression: "("}
+
+	for _, tc := range []struct {
+		name    string
+		action  ActionType
+		classes []StorageClassMatch
+		class   string
+		want    []StorageClassMatch
+	}{
+		{name: "exact match decides an allow rule", action: ActionTypeAllow, classes: []StorageClassMatch{customer, silver, csi}, class: "silver", want: []StorageClassMatch{silver}},
+		{name: "expression match decides a deny rule", action: ActionTypeDeny, classes: []StorageClassMatch{customer, csi}, class: "csi-fast", want: []StorageClassMatch{csi}},
+		// An omitted action defaults to deny, so it stops at the name match like
+		// allow and deny do, instead of keeping every entry like audit.
+		{name: "omitted action is not audit", classes: []StorageClassMatch{customer, silver}, class: "silver", want: []StorageClassMatch{silver}},
+		{name: "no name match keeps every entry", action: ActionTypeAllow, classes: []StorageClassMatch{silver, customer}, class: "gold", want: []StorageClassMatch{silver, customer}},
+		{name: "audit keeps every entry", action: ActionTypeAudit, classes: []StorageClassMatch{customer, silver}, class: "silver", want: []StorageClassMatch{customer, silver}},
+		{name: "invalid expression keeps every entry", action: ActionTypeAllow, classes: []StorageClassMatch{invalid, silver}, class: "silver", want: []StorageClassMatch{invalid, silver}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := StorageClassesToMatch(tc.action, tc.classes, nil, tc.class)
+			if len(got) != len(tc.want) {
+				t.Fatalf("StorageClassesToMatch()=%v, want %v", got, tc.want)
+			}
+			for i := range got {
+				if got[i].Describe() != tc.want[i].Describe() {
+					t.Fatalf("StorageClassesToMatch()=%v, want %v", got, tc.want)
+				}
+			}
+		})
+	}
+}
