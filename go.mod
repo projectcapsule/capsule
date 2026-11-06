@@ -10,7 +10,7 @@ require (
 	github.com/fluxcd/pkg/ssa v0.77.0
 	github.com/go-logr/logr v1.4.4
 	github.com/go-sprout/sprout v1.1.2
-	github.com/google/cel-go v0.31.0
+	github.com/google/cel-go v0.32.0
 	github.com/kubernetes-csi/external-snapshotter/client/v8 v8.6.0
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.42.1
