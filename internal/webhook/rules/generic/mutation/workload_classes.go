@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/utils/ptr"
@@ -164,14 +165,9 @@ func mutatePodClasses(ctx context.Context, pod *corev1.Pod, mutation *apirules.N
 
 // mutatePodRuntimeClass applies the runtime class of one mutation entry that
 // selects the Pod. Kubernetes has no default RuntimeClass, so merge only fills
-// an omitted class and replace sets it on every Pod.
-//
-// No RuntimeClass is read. The built-in RuntimeClass admission plugin runs
-// before webhooks and once more after a webhook changed the Pod: it rejects a
-// class that does not exist, then derives the overhead and scheduling of the
-// assigned one. The scheduling constraints it merged for a replaced class stay
-// on the Pod: they cannot be told apart from the Pod's own, and removing them
-// could lift a restriction another mutation relies on.
+// an omitted class and replace sets it on every Pod. Only the name is set
+// here: reconcilePodRuntimeClass settles the overhead and the scheduling of
+// the class the entries end at.
 func mutatePodRuntimeClass(pod *corev1.Pod, mutation *apirules.NamespaceRuleMutation) {
 	name := mutation.Workloads.Classes.Runtime
 	if name == "" || !mutation.Workloads.GetWorkloadTargets(apirules.ValidatePod) {
@@ -186,30 +182,96 @@ func mutatePodRuntimeClass(pod *corev1.Pod, mutation *apirules.NamespaceRuleMuta
 	pod.Spec.RuntimeClassName = new(name)
 }
 
-// resetPodOverhead drops spec.overhead when the mutations assigned another
-// runtime class than the Pod arrived with. The RuntimeClass admission plugin
-// derived it from that class and rejects an overhead that differs from the
-// class the Pod names; it derives the overhead of the assigned class again.
+// reconcilePodRuntimeClass applies the overhead and the scheduling of the
+// runtime class the mutations assigned, as the built-in RuntimeClass admission
+// plugin does for the class a Pod names. That plugin runs before webhooks and
+// once more after the first webhook pass changed the Pod, but not after a
+// class assigned during the webhook's own reinvocation: left to the plugin, a
+// replacement class with scheduling constraints and no overhead would pass
+// validation without its node selector and tolerations, and the Pod could be
+// scheduled onto incompatible nodes. The merge repeats what the plugin does,
+// so an assignment on either call ends with the same Pod and the plugin finds
+// nothing left to add. Like the plugin, it rejects a class that does not exist
+// and a nodeSelector that conflicts with the Pod's.
 //
-// Only the outcome counts, not each assignment. The webhook is called again
-// once the plugin has set the overhead of the assigned class, and entries that
-// replace the class in turn then end where the Pod started: its overhead is the
-// right one, and nothing would derive it another time.
+// Only the outcome counts, not each assignment: entries that replace the class
+// in turn end where the Pod started, and nothing is read or merged. The
+// constraints merged for a replaced class stay on the Pod: they cannot be told
+// apart from the Pod's own, and removing them could lift a restriction another
+// mutation relies on.
 //
-// That also bounds what conditions can do. A class they select only on that
-// second call, from what the plugin or another webhook added to the Pod in
-// between, is assigned without the overhead and the scheduling of its
-// RuntimeClass. Dropping the overhead keeps the Pod from being admitted with
-// that of another class: the plugin still validates it, and rejects the Pod if
-// the assigned class defines one.
-//
-// It reports whether the runtime class changed.
-func resetPodOverhead(pod *corev1.Pod, runtimeClass string) bool {
-	if ptr.Deref(pod.Spec.RuntimeClassName, "") == runtimeClass {
-		return false
+// It reports whether the runtime class changed. Only then is the class read.
+func reconcilePodRuntimeClass(ctx context.Context, pod *corev1.Pod, arrival string, readers []client.Reader) (bool, error) {
+	name := ptr.Deref(pod.Spec.RuntimeClassName, "")
+	if name == arrival {
+		return false, nil
 	}
 
-	pod.Spec.Overhead = nil
+	class, err := getRuntimeClass(ctx, readers, name)
+	if err != nil {
+		return false, err
+	}
 
-	return true
+	if class == nil {
+		return false, fmt.Errorf("RuntimeClass %q not found", name)
+	}
+
+	// The plugin rejects an overhead that differs from the class the Pod names.
+	pod.Spec.Overhead = nil
+	if class.Overhead != nil {
+		pod.Spec.Overhead = class.Overhead.PodFixed.DeepCopy()
+	}
+
+	if class.Scheduling == nil {
+		return true, nil
+	}
+
+	for key, value := range class.Scheduling.NodeSelector {
+		if existing, ok := pod.Spec.NodeSelector[key]; ok && existing != value {
+			return false, fmt.Errorf("conflict: runtimeClass.scheduling.nodeSelector[%s] = %s; pod.spec.nodeSelector[%s] = %s", key, value, key, existing)
+		}
+
+		if pod.Spec.NodeSelector == nil {
+			pod.Spec.NodeSelector = make(map[string]string, len(class.Scheduling.NodeSelector))
+		}
+
+		pod.Spec.NodeSelector[key] = value
+	}
+
+	for _, toleration := range class.Scheduling.Tolerations {
+		upsertPlacement(&pod.Spec.Tolerations, *toleration.DeepCopy(), sameToleration)
+	}
+
+	return true, nil
+}
+
+// getRuntimeClass resolves the class through the cache, falling back to the
+// API server for one the cache does not know yet, such as a class created
+// moments ago. It returns nil for a class that does not exist.
+func getRuntimeClass(ctx context.Context, readers []client.Reader, name string) (*nodev1.RuntimeClass, error) {
+	available := false
+
+	for _, reader := range readers {
+		if reader == nil {
+			continue
+		}
+
+		available = true
+		class := &nodev1.RuntimeClass{}
+
+		err := reader.Get(ctx, client.ObjectKey{Name: name}, class)
+		if err == nil {
+			return class, nil
+		}
+
+		if !apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("get RuntimeClass %q: %w", name, err)
+		}
+	}
+
+	if !available {
+		return nil, errors.New("RuntimeClass lookup is unavailable")
+	}
+
+	return nil, nil
 }

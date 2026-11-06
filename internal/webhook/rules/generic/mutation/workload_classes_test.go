@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -32,7 +33,7 @@ const (
 	classCustom        = "custom"
 )
 
-// priorityClasses counts the PriorityClass reads of a mutation.
+// priorityClasses counts the class reads of a mutation.
 type priorityClasses struct {
 	client.Client
 	gets atomic.Int64
@@ -54,6 +55,7 @@ func priorityClassFixtureOf(tb testing.TB, classes ...client.Object) *priorityCl
 
 	scheme := runtime.NewScheme()
 	require.NoError(tb, schedulingv1.AddToScheme(scheme))
+	require.NoError(tb, nodev1.AddToScheme(scheme))
 
 	return &priorityClasses{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(classes...).Build()}
 }

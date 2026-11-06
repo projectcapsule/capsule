@@ -9,6 +9,7 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -174,12 +175,29 @@ func BenchmarkRuntimeClassMutation(b *testing.B) {
 						compiler = c
 					}
 
+					scheme := runtime.NewScheme()
+					if err := nodev1.AddToScheme(scheme); err != nil {
+						b.Fatal(err)
+					}
+
+					// The defaults are scheduling-only classes: assigning one merges its
+					// constraints and leaves no overhead.
+					classes := []client.Object{runtimeClassObject(classCustom)}
+
 					bodies := make([][]*rules.NamespaceRuleBodyNamespace, tenants)
 					objects := make([]*unstructured.Unstructured, tenants)
 					defaults := make([]string, tenants)
 
 					for tenant := range tenants {
 						defaults[tenant] = fmt.Sprintf("tenant-%d-default", tenant)
+						classes = append(classes, &nodev1.RuntimeClass{
+							Name:    defaults[tenant],
+							Handler: "runc",
+							Scheduling: &nodev1.Scheduling{
+								NodeSelector: map[string]string{"runtime-" + defaults[tenant]: "true"},
+								Tolerations:  []corev1.Toleration{{Key: "runtime-" + defaults[tenant], Operator: corev1.TolerationOpEqual, Value: "true", Effect: corev1.TaintEffectNoSchedule}},
+							},
+						})
 
 						pod := &corev1.Pod{APIVersion: "v1", Kind: "Pod", Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "app", Image: "example/app:v1"}}}}
 
@@ -209,8 +227,10 @@ func BenchmarkRuntimeClassMutation(b *testing.B) {
 						}
 					}
 
-					// A runtime class is assigned without reading any class; both readers must stay idle.
-					readers := &priorityClasses{Client: fake.NewClientBuilder().Build()}
+					// Only an assignment reads the class, once and from the cache; the API
+					// reader serves cache misses alone. Reads are counted apart.
+					cached := &priorityClasses{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(classes...).Build()}
+					api := &priorityClasses{Client: cached.Client}
 
 					// The Pod as the built-in RuntimeClass plugin hands it to webhooks.
 					input := func(tenant int) (class string, overhead bool) {
@@ -239,6 +259,8 @@ func BenchmarkRuntimeClassMutation(b *testing.B) {
 
 						delete(spec, "runtimeClassName")
 						delete(spec, "overhead")
+						delete(spec, "nodeSelector")
+						delete(spec, "tolerations")
 
 						if class != "" {
 							spec["runtimeClassName"] = class
@@ -253,7 +275,7 @@ func BenchmarkRuntimeClassMutation(b *testing.B) {
 							conditions = ruleengine.NewConditionEvaluator(compiler, admissionv1.AdmissionRequest{Operation: admissionv1.Create})
 						}
 
-						changed, err := MutateWorkloadResources(b.Context(), obj, corev1.SchemeGroupVersion.WithKind("Pod"), bodies[tenant], conditions, readers, readers)
+						changed, err := MutateWorkloadResources(b.Context(), obj, corev1.SchemeGroupVersion.WithKind("Pod"), bodies[tenant], conditions, cached, api)
 						if err != nil || changed != wantChanged {
 							b.Fatalf("changed=%v error=%v", changed, err)
 						}
@@ -271,9 +293,17 @@ func BenchmarkRuntimeClassMutation(b *testing.B) {
 						if _, found := obj.Object["spec"].(map[string]any)["overhead"]; found && changed {
 							b.Fatal("the overhead of the replaced class was kept")
 						}
+
+						if changed {
+							selected, _, err := unstructured.NestedString(obj.Object, "spec", "nodeSelector", "runtime-"+defaults[tenant])
+							if err != nil || selected != "true" {
+								b.Fatalf("node selector of the assigned class=%q error=%v", selected, err)
+							}
+						}
 					}
 
-					b.ReportMetric(float64(readers.gets.Load())/float64(b.N), "class-reads/op")
+					b.ReportMetric(float64(cached.gets.Load())/float64(b.N), "cache-reads/op")
+					b.ReportMetric(float64(api.gets.Load())/float64(b.N), "api-reads/op")
 				})
 			}
 		}

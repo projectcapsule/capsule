@@ -25,7 +25,8 @@ const maxPlacementNodeTerms = 256
 // Priority class mutations resolve their PriorityClass through classes: a
 // cached reader for the configured class, optionally followed by an
 // authoritative one that judges the Pod's own class and covers cache misses.
-// Runtime class mutations read nothing.
+// Runtime class mutations read the assigned RuntimeClass through the same
+// readers, and only when the entries changed the class of the Pod.
 func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules.NamespaceRuleBodyNamespace, conditions *ruleengine.ConditionEvaluator, classes ...client.Reader) (bool, error) {
 	if pod == nil || !slices.ContainsFunc(bodies, func(body *apirules.NamespaceRuleBodyNamespace) bool { return body != nil && len(body.Mutate) > 0 }) {
 		return false, nil
@@ -97,7 +98,10 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 		}
 	}
 
-	runtimeClassChanged := resetPodOverhead(pod, runtimeClass)
+	runtimeClassChanged, err := reconcilePodRuntimeClass(ctx, pod, runtimeClass, classes)
+	if err != nil {
+		return false, fmt.Errorf("workloads.classes.runtime: %w", err)
+	}
 
 	return runtimeClassChanged || !slices.Equal(originalSecrets, pod.Spec.ImagePullSecrets) || slices.ContainsFunc(containers, workloadMutationContainer.changed) || podPlacementChanged(before, podPlacement(pod)), nil
 }

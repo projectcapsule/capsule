@@ -110,20 +110,17 @@ type WorkloadClassMutation struct {
 	// Runtime sets spec.runtimeClassName on Pod creation. Merge fills an omitted
 	// class and preserves every class a Pod names: Kubernetes has no default
 	// RuntimeClass, so an omitted class is unset. The first applicable merge
-	// wins. Replace always sets the class. Capsule sets the name only, and
-	// clears spec.overhead when it changes the class of a Pod: the API server
-	// then derives the overhead and the scheduling of the assigned RuntimeClass,
-	// and rejects a class that does not exist or whose nodeSelector conflicts
-	// with the Pod. It does so once: a class that conditions select only
-	// afterwards, from what the API server or another webhook added to the Pod,
-	// gets neither, and the Pod is rejected if that class defines an overhead.
-	// Scheduling constraints merged from a replaced class are retained. A
-	// replace of nodeSelector or tolerations also replaces those of the
-	// RuntimeClass: repeat them in the replaced value. Capsule neither reads nor
-	// creates the RuntimeClass. Omitted or null leaves the Pod unchanged. Tenant
-	// and Namespace templates are supported; rendered names must satisfy native
-	// RuntimeClass name validation. Requires the pod target or omitted/empty
-	// targets.
+	// wins. Replace always sets the class. When the entries change the class of
+	// a Pod, Capsule applies the overhead and the scheduling constraints of the
+	// assigned RuntimeClass, as the API server does for the class a Pod names:
+	// the class must exist, and a scheduling nodeSelector that conflicts with
+	// the Pod rejects it. Scheduling constraints merged for a replaced class
+	// are retained. A replace of nodeSelector or tolerations also replaces
+	// constraints merged for the class a Pod arrived with: repeat them in the
+	// replaced value to keep them. Capsule does not create the RuntimeClass.
+	// Omitted or null leaves the Pod unchanged. Tenant and Namespace templates
+	// are supported; rendered names must satisfy native RuntimeClass name
+	// validation. Requires the pod target or omitted/empty targets.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=4096

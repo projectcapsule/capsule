@@ -35,12 +35,14 @@ func runtimeClassProfile(profiles []string, body *rules.NamespaceRuleBodyNamespa
 	}
 }
 
-// expectRuntimeClass verifies the class together with what the API server
-// derives from it once Capsule has assigned it: the overhead of the class, and
-// its scheduling constraints next to the ones the Pod already carried. replaced
-// is the list of a rule that replaces the tolerations: the API server merges
-// those of the class before the rule is applied a last time, so they are
-// replaced like every other toleration.
+// expectRuntimeClass verifies the class together with what Capsule merges for
+// the class it assigns and the API server derives for the class a Pod names:
+// the overhead of the class, and its scheduling constraints next to the ones
+// the Pod already carried. replaced is the list of a rule that replaces the
+// tolerations: the toleration of the class is merged next to it when the class
+// is assigned, but the webhook is reinvoked once later admission work changed
+// the Pod, and the replace then has the last word while the class stays. The
+// overhead and the node selector of the class persist either way.
 func expectRuntimeClass(ctx context.Context, pod *corev1.Pod, class *nodev1.RuntimeClass, retained map[string]string, replaced ...corev1.Toleration) {
 	Eventually(func(g Gomega) {
 		stored := &corev1.Pod{}
@@ -109,6 +111,9 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 
 		custom := newClass(prefix+"-custom", corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("100m")}, map[string]string{prefix + "/custom": "true"})
 		conflicting := newClass(prefix+"-conflicting", nil, map[string]string{poolKey: "elsewhere"})
+		// A class with scheduling constraints and no overhead: nothing but the
+		// webhook's own merge would reject or constrain a Pod it is assigned to.
+		scheduled := newClass(prefix+"-scheduled", nil, map[string]string{prefix + "/scheduled": "true"})
 		forbidden := newClass(prefix+"-forbidden", nil, nil)
 		bare := newClass(prefix+"-bare", nil, nil)
 		dedicated := corev1.Toleration{Key: prefix + "/dedicated", Operator: corev1.TolerationOpExists}
@@ -133,7 +138,7 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 						runtimeClassDefault(rules.MutationActionReplace, forbidden.Name, rules.AdmissionCondition{Name: "deny-class", Expression: `has(object.metadata.labels) && 'deny-class' in object.metadata.labels && object.metadata.labels['deny-class'] == 'true'`}),
 					}}),
 					runtimeClassProfile([]string{"replace"}, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{runtimeClassDefault(rules.MutationActionReplace, name+"-forced")}}),
-					// This class does not exist: applying it would make the API server reject the Pod.
+					// This class does not exist: Capsule rejects the Pod when applying it.
 					runtimeClassProfile([]string{"merge", "replace"}, &rules.NamespaceRuleBodyNamespace{
 						Audience: []rules.Audience{{Kind: rules.AudienceKindUser, Name: "not-the-runtime-class-owner"}},
 						Mutate:   []rules.NamespaceRuleMutation{runtimeClassDefault(rules.MutationActionReplace, prefix+"-wrong-audience")},
@@ -143,6 +148,7 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 						Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Classes: rules.WorkloadClassEnforcement{Runtime: []rules.WorkloadClassMatch{{Exact: []string{forbidden.Name}}}}},
 					}}),
 					runtimeClassProfile([]string{"bare"}, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{runtimeClassDefault(rules.MutationActionReplace, bare.Name)}}),
+					runtimeClassProfile([]string{"scheduled"}, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{runtimeClassDefault(rules.MutationActionReplace, scheduled.Name)}}),
 					// Entries that replace the class in turn, next to one that changes the Pod
 					// again when the API server calls the webhook a second time.
 					runtimeClassProfile([]string{"chain"}, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{
@@ -190,6 +196,8 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 				expectProfile(ns, 4, defaults[tenant].Name)
 			case "bare":
 				expectProfile(ns, 1, bare.Name)
+			case "scheduled":
+				expectProfile(ns, 1, scheduled.Name)
 			case "chain":
 				expectProfile(ns, 1, defaults[tenant].Name)
 			case "missing":
@@ -204,7 +212,7 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 		}
 
 		mergeNS, replaceNS, bareNS, chainNS := newNamespace(0, "merge"), newNamespace(0, "replace"), newNamespace(0, "bare"), newNamespace(0, "chain")
-		otherNS, missingNS, confinedNS := newNamespace(0, "other"), newNamespace(0, "missing"), newNamespace(0, "confined")
+		otherNS, missingNS, confinedNS, scheduledNS := newNamespace(0, "other"), newNamespace(0, "missing"), newNamespace(0, "confined"), newNamespace(0, "scheduled")
 		tenantBNS := newNamespace(1, "merge")
 
 		sequence := 0
@@ -236,23 +244,31 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 		createPod(owners[0], mergeNS, custom.Name, custom, nil)
 		createPod(owners[0], mergeNS, defaults[0].Name, defaults[0], nil)
 
-		By("replacing every class and deriving the overhead of the replacement")
+		By("replacing every class and carrying the overhead of the replacement")
 		createPod(owners[0], replaceNS, "", forced[0], nil)
 		// The API server set the overhead and the node selector of the class the Pod
-		// named before the mutation. It only admits the replacement without that overhead.
+		// named before the mutation. Capsule replaces the overhead with the one of
+		// the class it assigns and merges that class's scheduling constraints.
 		createPod(owners[0], replaceNS, custom.Name, forced[0], custom.Scheduling.NodeSelector)
 		createPod(owners[0], bareNS, custom.Name, bare, custom.Scheduling.NodeSelector)
 
+		By("carrying the constraints of a scheduling-only replacement class")
+		// The class defines no overhead, so the API server's validation accepts the
+		// Pod with or without the class's node selector and tolerations: only the
+		// webhook's own merge constrains the Pod to the nodes of its runtime.
+		createPod(owners[0], scheduledNS, "", scheduled, nil)
+		createPod(owners[0], scheduledNS, custom.Name, scheduled, custom.Scheduling.NodeSelector)
+
 		By("keeping the overhead of the final class when the API server calls the webhook again")
-		// The API server derives the overhead and the toleration of the class Capsule
-		// assigned and then reinvokes the webhook. The entries replace the class in
-		// turn again and the tolerations once more: the Pod changes, but ends with the
-		// same class, so its overhead must survive that second call. Nothing follows
-		// it, so the replaced list is final and the toleration of the class is not on it.
+		// Capsule derives the overhead, the node selector, and the toleration of the
+		// class the entries end at. Later admission work changes the Pod and the
+		// webhook is called again: the entries replace the class in turn and the
+		// tolerations once more, and since the Pod ends with the same class, the
+		// replaced list is final while the overhead and node selector persist.
 		createPod(owners[0], chainNS, "", forced[0], nil, dedicated)
 		createPod(owners[0], chainNS, custom.Name, forced[0], custom.Scheduling.NodeSelector, dedicated)
 
-		By("leaving a replacement that conflicts with the replaced class to the API server")
+		By("rejecting a replacement whose node selector conflicts with the replaced class")
 		rejected(owners[0], newPod(replaceNS, conflicting.Name), "runtimeClass.scheduling.nodeSelector", poolKey)
 
 		By("leaving non-selected namespaces and the other tenant's defaults alone")
