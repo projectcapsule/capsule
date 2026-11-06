@@ -432,6 +432,66 @@ func TestRuntimeClassMutationNumericTolerationOperators(t *testing.T) {
 	require.Equal(t, []corev1.Toleration{bound(corev1.TolerationOpLt, "600"), bound(corev1.TolerationOpLt, "60"), bound(corev1.TolerationOpGt, "10")}, merged)
 }
 
+// A failed read of an intermediate class must not let a condition silently
+// select a different policy: evaluated against the unresolved Pod, the
+// selector-absence condition below would be true and replace the class. The
+// failure propagates as a server error instead. A class that merely does not
+// exist is no failure: the condition sees the unresolved Pod, and a later
+// entry may replace the class with one that exists.
+func TestRuntimeClassMutationConditionViewLookupFailure(t *testing.T) {
+	chain := func(first string) []*rules.NamespaceRuleBodyNamespace {
+		return []*rules.NamespaceRuleBodyNamespace{{Mutate: []rules.NamespaceRuleMutation{
+			runtimeClassMutation("", first),
+			{Action: rules.MutationActionReplace,
+				Conditions: []rules.AdmissionCondition{{Expression: `!has(object.spec.nodeSelector)`}},
+				Workloads:  rules.WorkloadMutation{Classes: rules.WorkloadClassMutation{Runtime: classCustom}}},
+		}}}
+	}
+	bare := func() *corev1.Pod {
+		return &corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "app", Image: "example.com/app:v1"}}}}
+	}
+
+	// The healthy baseline: the view carries the selector of the first class,
+	// the condition is false, and the first class is kept.
+	classes := runtimeClassFixture(t)
+	pod := bare()
+	changed, err := MutatePodPlacement(t.Context(), pod, chain(classSecondDefault), mutationConditions(t), classes)
+	require.NoError(t, err)
+	require.True(t, changed)
+	require.Equal(t, classSecondDefault, runtimeClassOf(pod))
+
+	// The same chain with a failing read is rejected, not resolved differently.
+	pod = bare()
+	changed, err = MutatePodPlacement(t.Context(), pod, chain(classSecondDefault), mutationConditions(t), failsFor{Reader: runtimeClassFixture(t), name: classSecondDefault})
+	require.ErrorContains(t, err, `workloads.classes.runtime: get RuntimeClass "second-default": injected read failure`)
+	require.False(t, changed)
+
+	// A first class that does not exist leaves the condition to the unresolved
+	// Pod: the replacement rescues the chain, and only the final class counts.
+	classes = runtimeClassFixture(t)
+	pod = bare()
+	changed, err = MutatePodPlacement(t.Context(), pod, chain("absent"), mutationConditions(t), classes)
+	require.NoError(t, err)
+	require.True(t, changed)
+	require.Equal(t, classCustom, runtimeClassOf(pod))
+	require.Equal(t, "true", pod.Spec.NodeSelector["runtime-"+classCustom])
+	require.EqualValues(t, 2, classes.gets.Load(), "the missing class and the final class are read once each")
+}
+
+// failsFor fails reads of one class by name and delegates every other read.
+type failsFor struct {
+	client.Reader
+	name string
+}
+
+func (f failsFor) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if key.Name == f.name {
+		return errors.New("injected read failure")
+	}
+
+	return f.Reader.Get(ctx, key, obj, opts...)
+}
+
 // The cache can lag behind a class whose constraints just changed. The merge
 // is the only application of the scheduling of a class assigned on
 // reinvocation, after the plugin's final pass, and nothing downstream rejects

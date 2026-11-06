@@ -187,15 +187,18 @@ func mutatePodRuntimeClass(pod *corev1.Pod, mutation *apirules.NamespaceRuleMuta
 }
 
 // conditionView returns the Pod the conditions of one entry evaluate against.
+// conditionView returns the Pod the conditions of one entry evaluate against.
 // The overhead and the scheduling of a class an earlier entry assigned are
 // shown as settled, so conditions see the Pod as the documented mutation order
 // leaves it, while the Pod itself keeps only the outcome of the whole pass: a
-// class replaced in turn leaves no constraints behind. A class that cannot be
-// read or that conflicts changes nothing here; the closing reconciliation
-// decides whether the Pod is rejected.
-func conditionView(ctx context.Context, pod *corev1.Pod, arrival string, before *apirules.WorkloadMutation, readers []client.Reader, mutation *apirules.NamespaceRuleMutation) *corev1.Pod {
+// class replaced in turn leaves no constraints behind. A class that does not
+// exist or that conflicts changes nothing here — the closing reconciliation
+// decides whether the Pod is rejected — but a failed lookup propagates:
+// evaluated against the unresolved Pod, a condition could silently select a
+// different policy on an API error.
+func conditionView(ctx context.Context, pod *corev1.Pod, arrival string, before *apirules.WorkloadMutation, readers []client.Reader, mutation *apirules.NamespaceRuleMutation) (*corev1.Pod, error) {
 	if len(mutation.Conditions) == 0 || ptr.Deref(pod.Spec.RuntimeClassName, "") == arrival {
-		return pod
+		return pod, nil
 	}
 
 	view := *pod
@@ -204,10 +207,15 @@ func conditionView(ctx context.Context, pod *corev1.Pod, arrival string, before 
 	view.Spec.NodeSelector = maps.Clone(pod.Spec.NodeSelector)
 
 	if _, err := reconcilePodRuntimeClass(ctx, &view, arrival, before, readers); err != nil {
-		return pod
+		var lookup *runtimeClassLookupError
+		if errors.As(err, &lookup) {
+			return nil, err
+		}
+
+		return pod, nil
 	}
 
-	return &view
+	return &view, nil
 }
 
 // reconcilePodRuntimeClass applies the overhead and the scheduling of the
@@ -374,6 +382,14 @@ func toleratesSuperset(ss, t corev1.Toleration) bool {
 	}
 }
 
+// runtimeClassLookupError is a failed read of a RuntimeClass: a server error,
+// never a state of the class or a rule decision.
+type runtimeClassLookupError struct{ err error }
+
+func (e *runtimeClassLookupError) Error() string { return e.err.Error() }
+
+func (e *runtimeClassLookupError) Unwrap() error { return e.err }
+
 // getRuntimeClass resolves the class through the last of the given readers,
 // the authoritative one. The merge is the only application of the class's
 // scheduling when the assignment happens on reinvocation, after the plugin's
@@ -382,7 +398,8 @@ func toleratesSuperset(ss, t corev1.Toleration) bool {
 // live class, a stale node selector would be admitted. A cache hit must
 // therefore not shortcut the read; it answers only callers without an API
 // reader. This also finds a class created moments ago. It returns nil for a
-// class that does not exist.
+// class that does not exist, and a runtimeClassLookupError for a read that
+// failed.
 func getRuntimeClass(ctx context.Context, readers []client.Reader, name string) (*nodev1.RuntimeClass, error) {
 	for _, reader := range slices.Backward(readers) {
 		if reader == nil {
@@ -395,11 +412,11 @@ func getRuntimeClass(ctx context.Context, readers []client.Reader, name string) 
 				return nil, nil
 			}
 
-			return nil, fmt.Errorf("get RuntimeClass %q: %w", name, err)
+			return nil, &runtimeClassLookupError{err: fmt.Errorf("get RuntimeClass %q: %w", name, err)}
 		}
 
 		return class, nil
 	}
 
-	return nil, errors.New("RuntimeClass lookup is unavailable")
+	return nil, &runtimeClassLookupError{err: errors.New("RuntimeClass lookup is unavailable")}
 }

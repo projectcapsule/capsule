@@ -40,11 +40,8 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 	}
 
 	// Condition views and the closing reconciliation can resolve the same class:
-	// a request-scoped cache keeps the authoritative read single. The generic
-	// mutating route has one handler, so the router does not wrap the reader.
-	if n := len(classes); n > 0 && classes[n-1] != nil {
-		classes = append(slices.Clone(classes[:n-1]), utils.NewRequestCachingReader(classes[n-1]))
-	}
+	// a request-scoped cache keeps the authoritative read single.
+	classes = cachedClassReaders(bodies, classes)
 
 	before := podPlacement(pod).DeepCopy()
 	// Secret references are only appended or replaced, never edited in place.
@@ -74,7 +71,12 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 				continue
 			}
 
-			matched, err := matchesMutationConditions(ctx, conditions, conditionView(ctx, pod, runtimeClass, before, classes, mutation), mutation.Conditions)
+			view, err := conditionView(ctx, pod, runtimeClass, before, classes, mutation)
+			if err != nil {
+				return false, fmt.Errorf("workloads.classes.runtime: %w", err)
+			}
+
+			matched, err := matchesMutationConditions(ctx, conditions, view, mutation.Conditions)
 			if err != nil {
 				return false, fmt.Errorf("rules[%d].mutate[%d]: %w", i, j, err)
 			}
@@ -112,6 +114,28 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 	}
 
 	return runtimeClassChanged || !slices.Equal(originalSecrets, pod.Spec.ImagePullSecrets) || slices.ContainsFunc(containers, workloadMutationContainer.changed) || podPlacementChanged(before, podPlacement(pod)), nil
+}
+
+// cachedClassReaders wraps the authoritative reader in a request-scoped cache
+// when an entry can assign a runtime class — the only mutation whose class can
+// be read twice, by a condition view and the closing reconciliation. Other
+// mutations skip the cache's allocations. The generic mutating route has one
+// handler, so the router does not wrap the reader itself.
+func cachedClassReaders(bodies []*apirules.NamespaceRuleBodyNamespace, classes []client.Reader) []client.Reader {
+	n := len(classes)
+	if n == 0 || classes[n-1] == nil || !slices.ContainsFunc(bodies, hasRuntimeClassMutation) {
+		return classes
+	}
+
+	return append(slices.Clone(classes[:n-1]), utils.NewRequestCachingReader(classes[n-1]))
+}
+
+// hasRuntimeClassMutation reports whether a body carries an entry that can
+// assign a runtime class, the only mutation whose class can be read twice.
+func hasRuntimeClassMutation(body *apirules.NamespaceRuleBodyNamespace) bool {
+	return body != nil && slices.ContainsFunc(body.Mutate, func(mutation apirules.NamespaceRuleMutation) bool {
+		return mutation.Workloads.Classes.Runtime != ""
+	})
 }
 
 // applyPodPlacementAction merges or replaces the Pod-level placement fields of

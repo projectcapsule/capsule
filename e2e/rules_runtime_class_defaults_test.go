@@ -202,6 +202,15 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 						{Conditions: []rules.AdmissionCondition{{Name: "sees-class-selector", Expression: fmt.Sprintf("has(object.spec.nodeSelector) && '%s/scheduled' in object.spec.nodeSelector", prefix)}},
 							Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{prefix + "/stage": "in-pass"}}}},
 					}}),
+					// An intermediate class that does not exist is no read failure:
+					// the condition sees the unresolved Pod, and the later entry
+					// replaces the class with one that exists.
+					runtimeClassProfile([]string{"rescued"}, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{
+						runtimeClassDefault(rules.MutationActionMerge, prefix+"-absent"),
+						{Action: rules.MutationActionReplace,
+							Conditions: []rules.AdmissionCondition{{Name: "rescue-absent", Expression: fmt.Sprintf("has(object.spec.runtimeClassName) && object.spec.runtimeClassName == '%s-absent'", prefix)}},
+							Workloads:  rules.WorkloadMutation{Classes: rules.WorkloadClassMutation{Runtime: scheduled.Name}}},
+					}}),
 					// Entries that replace the class in turn, next to one that changes the Pod
 					// again when the API server calls the webhook a second time.
 					runtimeClassProfile([]string{"chain"}, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{
@@ -267,6 +276,8 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 				expectProfile(ns, 2, restored.Name)
 			case "staged":
 				expectProfile(ns, 1, scheduled.Name)
+			case "rescued":
+				expectProfile(ns, 1, prefix+"-absent")
 			case "controller":
 				expectProfile(ns, 2, defaults[tenant].Name)
 			case "chain":
@@ -288,6 +299,7 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 		placementNS, conflictedNS := newNamespace(0, "placement"), newNamespace(0, "conflicted")
 		reinvokedNS := newNamespace(0, "reinvoked")
 		stagedNS, controllerNS := newNamespace(0, "staged"), newNamespace(0, "controller")
+		rescuedNS := newNamespace(0, "rescued")
 		tenantBNS := newNamespace(1, "merge")
 
 		sequence := 0
@@ -417,6 +429,14 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 			g.Expect(stored.Spec.NodeSelector).To(HaveKeyWithValue(prefix+"/stage", "in-pass"), "the later condition must see the selector of the assigned class in the same pass")
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		expectRuntimeClass(ctx, staged, scheduled, map[string]string{prefix + "/stage": "in-pass"})
+
+		By("letting a later entry replace an intermediate class that does not exist")
+		// The first entry assigns a class that does not exist — no read failure,
+		// so the condition evaluates against the unresolved Pod and the
+		// replacement rescues the chain: only the class the entries end at is
+		// read and enforced. The missing profile proves the counterpart, where
+		// the absent class stays final and rejects the Pod.
+		createPod(owners[0], rescuedNS, "", scheduled, nil)
 
 		By("leaving non-selected namespaces and the other tenant's defaults alone")
 		unselected := newPod(otherNS, "")
