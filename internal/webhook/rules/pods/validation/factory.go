@@ -11,6 +11,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -167,6 +168,9 @@ func newPodRules(regexCache *cache.RegexCache, registryCache *cache.RegistryRule
 		{read: h.validatePriorityClasses, policy: appliesToPriorityClasses, changed: func(old, pod *corev1.Pod) bool {
 			return old.Spec.PriorityClassName != pod.Spec.PriorityClassName
 		}},
+		{read: h.validateRuntimeClasses, policy: appliesToRuntimeClasses, changed: func(old, pod *corev1.Pod) bool {
+			return ptr.Deref(old.Spec.RuntimeClassName, "") != ptr.Deref(pod.Spec.RuntimeClassName, "")
+		}},
 		{evaluate: h.validateResources},
 		{evaluate: h.validateSchedulers, includeSubresources: true},
 		{evaluate: h.validateQoSClasses, includeSubresources: true},
@@ -319,44 +323,60 @@ func (h *podRules) validateWorkloadRules(
 			continue
 		}
 
-		// Audit is observational only. It must always be emitted when matched,
-		// but it must never influence allow/deny decisions.
-		for _, audit := range evaluation.Audits {
-			recorder.LabeledEvent(
-				object,
-				corev1.EventTypeNormal,
-				events.ReasonNamespaceRuleAudit,
-				events.ActionRuleAudit,
-				audit.Message,
-			).
-				WithRelated(tnt).
-				WithTenantLabel(tnt).
-				WithRequestAnnotations(req).
-				Emit(ctx)
-		}
+		blockingErr := evaluation.BlockingError()
+		emitWorkloadRuleEvents(ctx, req, recorder, object, tnt, evaluation, blockingErr)
 
-		if err := evaluation.BlockingError(); err != nil {
-			var decisionErr *ruleengine.DecisionError
-
-			if errors.As(err, &decisionErr) && decisionErr.Decision != nil {
-				recorder.LabeledEvent(
-					object,
-					corev1.EventTypeWarning,
-					decisionErr.Decision.EventReason,
-					events.ActionValidationDenied,
-					decisionErr.Decision.Message,
-				).
-					WithRelated(tnt).
-					WithTenantLabel(tnt).
-					WithRequestAnnotations(req).
-					Emit(ctx)
-			}
-
-			return err
+		if blockingErr != nil {
+			return blockingErr
 		}
 	}
 
 	return nil
+}
+
+// emitWorkloadRuleEvents records the audit trail of one evaluation and the
+// denial it ends in. Audit is observational only: it must be emitted whenever
+// a persisted request matches, but it must never influence allow/deny
+// decisions. A dry run persists nothing, so neither audit nor denial leaves
+// an Event.
+func emitWorkloadRuleEvents(
+	ctx context.Context, req admission.Request, recorder events.EventRecorder,
+	object client.Object, tnt *capsulev1beta2.Tenant,
+	evaluation *ruleengine.Evaluation, blockingErr error,
+) {
+	if req.DryRun != nil && *req.DryRun {
+		return
+	}
+
+	for _, audit := range evaluation.Audits {
+		recorder.LabeledEvent(
+			object,
+			corev1.EventTypeNormal,
+			events.ReasonNamespaceRuleAudit,
+			events.ActionRuleAudit,
+			audit.Message,
+		).
+			WithRelated(tnt).
+			WithTenantLabel(tnt).
+			WithRequestAnnotations(req).
+			Emit(ctx)
+	}
+
+	var decisionErr *ruleengine.DecisionError
+
+	if errors.As(blockingErr, &decisionErr) && decisionErr.Decision != nil {
+		recorder.LabeledEvent(
+			object,
+			corev1.EventTypeWarning,
+			decisionErr.Decision.EventReason,
+			events.ActionValidationDenied,
+			decisionErr.Decision.Message,
+		).
+			WithRelated(tnt).
+			WithTenantLabel(tnt).
+			WithRequestAnnotations(req).
+			Emit(ctx)
+	}
 }
 
 // Placement, resource and class policies do not run on subresources. A class

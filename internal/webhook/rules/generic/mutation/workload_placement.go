@@ -11,8 +11,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	apirules "github.com/projectcapsule/capsule/pkg/api/rules"
 	"github.com/projectcapsule/capsule/pkg/ruleengine"
 )
@@ -24,15 +26,30 @@ const maxPlacementNodeTerms = 256
 // Priority class mutations resolve their PriorityClass through classes: a
 // cached reader for the configured class, optionally followed by an
 // authoritative one that judges the Pod's own class and covers cache misses.
+// Runtime class mutations read the assigned RuntimeClass through the last of
+// those readers, the authoritative one, and only when the entries changed the
+// class of the Pod or disturbed the scheduling of the class it names: nothing
+// downstream rejects stale or dropped scheduling constraints. One invocation
+// reads each distinct class at most once. The conditions of a later entry
+// evaluate against a view of the Pod in which the overhead and the scheduling
+// of the class assigned before them are settled, while the Pod itself keeps
+// only the outcome of the whole pass.
 func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules.NamespaceRuleBodyNamespace, conditions *ruleengine.ConditionEvaluator, classes ...client.Reader) (bool, error) {
 	if pod == nil || !slices.ContainsFunc(bodies, func(body *apirules.NamespaceRuleBodyNamespace) bool { return body != nil && len(body.Mutate) > 0 }) {
 		return false, nil
 	}
 
+	// Condition views and the closing reconciliation can resolve the same class:
+	// a request-scoped cache keeps the authoritative read single.
+	classes = cachedClassReaders(bodies, classes)
+
 	before := podPlacement(pod).DeepCopy()
 	// Secret references are only appended or replaced, never edited in place.
 	// Retain a shallow snapshot so unrelated mutations add no slice allocation.
 	originalSecrets := pod.Spec.ImagePullSecrets
+	// The runtime class stays out of the placement snapshot, which the compiler
+	// keeps on the stack as long as podPlacement is small enough to inline.
+	runtimeClass := ptr.Deref(pod.Spec.RuntimeClassName, "")
 
 	var containers []workloadMutationContainer
 
@@ -54,7 +71,12 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 				continue
 			}
 
-			matched, err := matchesMutationConditions(ctx, conditions, pod, mutation.Conditions)
+			view, err := conditionView(ctx, pod, runtimeClass, before, classes, mutation)
+			if err != nil {
+				return false, fmt.Errorf("workloads.classes.runtime: %w", err)
+			}
+
+			matched, err := matchesMutationConditions(ctx, conditions, view, mutation.Conditions)
 			if err != nil {
 				return false, fmt.Errorf("rules[%d].mutate[%d]: %w", i, j, err)
 			}
@@ -64,22 +86,16 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 			}
 
 			switch mutation.Action {
-			case "", apirules.MutationActionMerge:
-				if mutation.Workloads.GetWorkloadTargets(apirules.ValidatePod) {
-					if err := mergePodPlacement(pod, &mutation.Workloads); err != nil {
-						return false, fmt.Errorf("rules[%d].mutate[%d].workloads: %w", i, j, err)
-					}
-				}
-			case apirules.MutationActionReplace:
-				if mutation.Workloads.GetWorkloadTargets(apirules.ValidatePod) {
-					replacePodPlacement(pod, &mutation.Workloads)
+			case "", apirules.MutationActionMerge, apirules.MutationActionReplace:
+				if err := applyPodPlacementAction(pod, mutation); err != nil {
+					return false, fmt.Errorf("rules[%d].mutate[%d].%w", i, j, err)
 				}
 			default:
 				return false, fmt.Errorf("rules[%d].mutate[%d].action: unsupported action %q (expected merge or replace)", i, j, mutation.Action)
 			}
 
-			if err := priorityClass.mutate(ctx, pod, mutation); err != nil {
-				return false, fmt.Errorf("rules[%d].mutate[%d].workloads.classes.priority: %w", i, j, err)
+			if err := mutatePodClasses(ctx, pod, mutation, priorityClass); err != nil {
+				return false, fmt.Errorf("rules[%d].mutate[%d].workloads.classes.%w", i, j, err)
 			}
 
 			if hasContainerMutation(mutation.Workloads, linux) {
@@ -92,7 +108,54 @@ func MutatePodPlacement(ctx context.Context, pod *corev1.Pod, bodies []*apirules
 		}
 	}
 
-	return !slices.Equal(originalSecrets, pod.Spec.ImagePullSecrets) || slices.ContainsFunc(containers, workloadMutationContainer.changed) || podPlacementChanged(before, podPlacement(pod)), nil
+	runtimeClassChanged, err := reconcilePodRuntimeClass(ctx, pod, runtimeClass, before, classes)
+	if err != nil {
+		return false, fmt.Errorf("workloads.classes.runtime: %w", err)
+	}
+
+	return runtimeClassChanged || !slices.Equal(originalSecrets, pod.Spec.ImagePullSecrets) || slices.ContainsFunc(containers, workloadMutationContainer.changed) || podPlacementChanged(before, podPlacement(pod)), nil
+}
+
+// cachedClassReaders wraps the authoritative reader in a request-scoped cache
+// when an entry can assign a runtime class — the only mutation whose class can
+// be read twice, by a condition view and the closing reconciliation. Other
+// mutations skip the cache's allocations. The generic mutating route has one
+// handler, so the router does not wrap the reader itself.
+func cachedClassReaders(bodies []*apirules.NamespaceRuleBodyNamespace, classes []client.Reader) []client.Reader {
+	n := len(classes)
+	if n == 0 || classes[n-1] == nil || !slices.ContainsFunc(bodies, hasRuntimeClassMutation) {
+		return classes
+	}
+
+	return append(slices.Clone(classes[:n-1]), utils.NewRequestCachingReader(classes[n-1]))
+}
+
+// hasRuntimeClassMutation reports whether a body carries an entry that can
+// assign a runtime class, the only mutation whose class can be read twice.
+func hasRuntimeClassMutation(body *apirules.NamespaceRuleBodyNamespace) bool {
+	return body != nil && slices.ContainsFunc(body.Mutate, func(mutation apirules.NamespaceRuleMutation) bool {
+		return mutation.Workloads.Classes.Runtime != ""
+	})
+}
+
+// applyPodPlacementAction merges or replaces the Pod-level placement fields of
+// one matched entry. Class, container, and registry work stays with the caller.
+func applyPodPlacementAction(pod *corev1.Pod, mutation *apirules.NamespaceRuleMutation) error {
+	if !mutation.Workloads.GetWorkloadTargets(apirules.ValidatePod) {
+		return nil
+	}
+
+	if mutation.Action == apirules.MutationActionReplace {
+		replacePodPlacement(pod, &mutation.Workloads)
+
+		return nil
+	}
+
+	if err := mergePodPlacement(pod, &mutation.Workloads); err != nil {
+		return fmt.Errorf("workloads: %w", err)
+	}
+
+	return nil
 }
 
 func podPlacementChanged(before, after *apirules.WorkloadMutation) bool {

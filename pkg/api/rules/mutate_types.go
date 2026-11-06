@@ -29,9 +29,9 @@ type NamespaceRuleMutation struct {
 	Conditions []AdmissionCondition `json:"conditions,omitempty"`
 
 	// Action chooses how explicitly supplied properties are applied.
-	// Merge fills an empty schedulerName, an omitted priority class and absent security profiles, sets hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy,
+	// Merge fills an empty schedulerName, an omitted priority or runtime class and absent security profiles, sets hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy,
 	// and map keys, adds missing imagePullSecrets by name, upserts lists, and conjoins required affinity.
-	// Replace replaces each supplied property in full: scheduler, classes.priority, hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy, nodeSelector,
+	// Replace replaces each supplied property in full: scheduler, classes.priority, classes.runtime, hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy, nodeSelector,
 	// registries.imagePullSecrets, tolerations, topologySpreadConstraints, affinity, or security profiles. Omitted properties are
 	// retained. Supplying affinity replaces all its branches, including omitted ones.
 	// ListenerSet parent references are atomic: merge fills an absent or null
@@ -106,6 +106,28 @@ type WorkloadClassMutation struct {
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=4096
 	Priority string `json:"priority,omitempty"`
+
+	// Runtime sets spec.runtimeClassName on Pod creation. Merge fills an omitted
+	// class and preserves every class a Pod names: Kubernetes has no default
+	// RuntimeClass, so an omitted class is unset. The first applicable merge
+	// wins. Replace always sets the class. When the entries change the class of
+	// a Pod, Capsule applies the overhead and the scheduling constraints of the
+	// assigned RuntimeClass, as the API server does for the class a Pod names:
+	// the class must exist, and a scheduling nodeSelector that conflicts with
+	// the Pod rejects it. The constraints of the final class are restored when
+	// a replace of nodeSelector or tolerations removes them, also when the
+	// class itself did not change. Constraints the Pod already carries for a
+	// class an entry replaces are residual: they are retained but not restored,
+	// while a class replaced within the entries leaves nothing behind. The
+	// conditions of a later entry see the overhead and the constraints of the
+	// class assigned before them. Capsule does not create the RuntimeClass.
+	// Omitted or null leaves the Pod unchanged. Tenant and Namespace templates
+	// are supported; rendered names must satisfy native RuntimeClass name
+	// validation. Requires the pod target or omitted/empty targets.
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=4096
+	Runtime string `json:"runtime,omitempty"`
 }
 
 // WorkloadPlacementMutation contains native Pod scheduling values.
@@ -213,7 +235,7 @@ func (w WorkloadMutation) GetWorkloadTargets(target WorkloadValidationTarget) bo
 
 // HasPodProperties reports whether any Pod-level property is configured.
 func (w WorkloadMutation) HasPodProperties() bool {
-	return w.Placement.Scheduler != "" || w.Security.HostUsers != nil || w.Placement.NodeSelector != nil || w.Placement.Tolerations != nil || w.Placement.TopologySpreadConstraints != nil || w.Placement.Affinity != nil || w.Security.SeccompProfile != nil || w.Security.AppArmorProfile != nil || w.Registries.ImagePullSecrets != nil || w.Classes.Priority != ""
+	return w.Placement.Scheduler != "" || w.Security.HostUsers != nil || w.Placement.NodeSelector != nil || w.Placement.Tolerations != nil || w.Placement.TopologySpreadConstraints != nil || w.Placement.Affinity != nil || w.Security.SeccompProfile != nil || w.Security.AppArmorProfile != nil || w.Registries.ImagePullSecrets != nil || w.Classes != (WorkloadClassMutation{})
 }
 
 // HasProperties reports whether any workload mutation property is supplied.
