@@ -372,3 +372,35 @@ func BenchmarkRuntimeClassSchedulingRestore(b *testing.B) {
 		})
 	}
 }
+
+// BenchmarkRuntimeClassTolerationMerge verifies the merge scales with what the
+// class adds, not with the square of the Pod's own toleration list.
+func BenchmarkRuntimeClassTolerationMerge(b *testing.B) {
+	toleration := func(scope string, i int) corev1.Toleration {
+		return corev1.Toleration{Key: fmt.Sprintf("%s-%d", scope, i), Operator: corev1.TolerationOpEqual, Value: "true", Effect: corev1.TaintEffectNoSchedule}
+	}
+
+	for _, pods := range []int{8, 128, 1024} {
+		for _, classes := range []int{1, 8} {
+			b.Run(fmt.Sprintf("pod=%d/class=%d", pods, classes), func(b *testing.B) {
+				pod := make([]corev1.Toleration, pods)
+				for i := range pod {
+					pod[i] = toleration("pod", i)
+				}
+
+				class := make([]corev1.Toleration, classes)
+				for i := range class {
+					class[i] = toleration("class", i)
+				}
+
+				b.ReportAllocs()
+
+				for b.Loop() {
+					if merged := mergeRuntimeClassTolerations(pod, class); len(merged) != pods+classes {
+						b.Fatalf("merged %d tolerations, want %d", len(merged), pods+classes)
+					}
+				}
+			})
+		}
+	}
+}

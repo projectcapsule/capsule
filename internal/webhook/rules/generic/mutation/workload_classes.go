@@ -265,37 +265,31 @@ func reconcilePodRuntimeClass(ctx context.Context, pod *corev1.Pod, arrival stri
 }
 
 // mergeRuntimeClassTolerations merges the tolerations of the class into the
-// Pod's, as the plugin does: of two tolerations where one tolerates a superset
-// of the other, only the superset is kept. A toleration of the class never
-// narrows a broader one the Pod carries, such as an unlimited NoExecute
-// toleration against one the class limits in time, which would let the Pod be
-// evicted earlier.
+// Pod's, as the plugin does: a toleration of the class is left out when a kept
+// one tolerates a superset of it, and it replaces the kept tolerations it
+// covers. A toleration of the class never narrows a broader one the Pod
+// carries, such as an unlimited NoExecute toleration against one the class
+// limits in time, which would let the Pod be evicted earlier. The Pod's own
+// tolerations are never measured against one another: the list stays as its
+// author wrote it, and the work stays proportional to what the class adds
+// instead of the square of what the Pod carries.
 func mergeRuntimeClassTolerations(pod, class []corev1.Toleration) []corev1.Toleration {
-	all := make([]corev1.Toleration, 0, len(pod)+len(class))
-	all = append(all, pod...)
-
-	for _, toleration := range class {
-		all = append(all, *toleration.DeepCopy())
-	}
-
-	merged := make([]corev1.Toleration, 0, len(all))
+	merged := make([]corev1.Toleration, 0, len(pod)+len(class))
+	merged = append(merged, pod...)
 
 next:
-	for i, toleration := range all {
+	for _, toleration := range class {
 		for _, kept := range merged {
+			// Of two equal tolerations, the first is kept.
 			if toleratesSuperset(kept, toleration) {
 				continue next
 			}
 		}
 
-		for _, later := range all[i+1:] {
-			// Of two equal tolerations, the first is kept.
-			if !equality.Semantic.DeepEqual(&toleration, &later) && toleratesSuperset(later, toleration) {
-				continue next
-			}
-		}
-
-		merged = append(merged, toleration)
+		merged = slices.DeleteFunc(merged, func(kept corev1.Toleration) bool {
+			return toleratesSuperset(toleration, kept)
+		})
+		merged = append(merged, *toleration.DeepCopy())
 	}
 
 	return merged

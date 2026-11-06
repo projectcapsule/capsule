@@ -111,6 +111,7 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 		// A class with scheduling constraints and no overhead: nothing but the
 		// webhook's own merge would reject or constrain a Pod it is assigned to.
 		scheduled := newClass(prefix+"-scheduled", nil, map[string]string{prefix + "/scheduled": "true"})
+		restored := newClass(prefix+"-restored", corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("150m")}, map[string]string{prefix + "/restored": "true"})
 		forbidden := newClass(prefix+"-forbidden", nil, nil)
 		bare := newClass(prefix+"-bare", nil, nil)
 		dedicated := corev1.Toleration{Key: prefix + "/dedicated", Operator: corev1.TolerationOpExists}
@@ -166,6 +167,15 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 					runtimeClassProfile([]string{"conflicted"}, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{
 						{Action: rules.MutationActionReplace, Workloads: rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{prefix + "/scheduled": "elsewhere"}}}},
 					}}),
+					// The entries see the selector of the assigned class only on the
+					// webhook's reinvocation: the replacement that then swaps the node
+					// selector proves a second pass ran, after the plugin's final run.
+					runtimeClassProfile([]string{"reinvoked"}, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{
+						runtimeClassDefault(rules.MutationActionMerge, restored.Name),
+						{Action: rules.MutationActionReplace,
+							Conditions: []rules.AdmissionCondition{{Name: "after-restore", Expression: fmt.Sprintf("has(object.spec.nodeSelector) && '%s/restored' in object.spec.nodeSelector", prefix)}},
+							Workloads:  rules.WorkloadMutation{Placement: rules.WorkloadPlacementMutation{NodeSelector: map[string]string{poolKey: "reinvoked"}}}},
+					}}),
 					// Entries that replace the class in turn, next to one that changes the Pod
 					// again when the API server calls the webhook a second time.
 					runtimeClassProfile([]string{"chain"}, &rules.NamespaceRuleBodyNamespace{Mutate: []rules.NamespaceRuleMutation{
@@ -219,6 +229,8 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 				expectProfile(ns, 1, evicting.Name)
 			case "placement", "conflicted":
 				expectProfile(ns, 1, "")
+			case "reinvoked":
+				expectProfile(ns, 1, restored.Name)
 			case "chain":
 				expectProfile(ns, 1, defaults[tenant].Name)
 			case "missing":
@@ -236,6 +248,7 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 		otherNS, missingNS, confinedNS, scheduledNS := newNamespace(0, "other"), newNamespace(0, "missing"), newNamespace(0, "confined"), newNamespace(0, "scheduled")
 		evictingNS := newNamespace(0, "evicting")
 		placementNS, conflictedNS := newNamespace(0, "placement"), newNamespace(0, "conflicted")
+		reinvokedNS := newNamespace(0, "reinvoked")
 		tenantBNS := newNamespace(1, "merge")
 
 		sequence := 0
@@ -333,6 +346,17 @@ var _ = Describe("RuntimeClass default namespace profiles", Label("tenant", "rul
 			g.Expect(stored.Spec.RuntimeClassName).To(BeNil())
 			g.Expect(stored.Spec.NodeSelector).To(HaveKeyWithValue(prefix+"/scheduled", "elsewhere"))
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		By("restoring the scheduling of the class when a replacement lands on reinvocation")
+		// The first pass assigns the class, and only its closing merge carries the
+		// class's selector onto the Pod: no entry of that pass sees it. Later
+		// admission work changes the Pod and the API server calls the webhook
+		// again; the conditional entry now finds the selector and swaps the whole
+		// map. The replaced pool key on the persisted Pod proves that second pass
+		// ran after the plugin's final run, when only the webhook's own
+		// restoration can put the selector of the class back, and the overhead of
+		// the first pass must survive untouched.
+		createPod(owners[0], reinvokedNS, "", restored, map[string]string{poolKey: "reinvoked"})
 
 		By("leaving non-selected namespaces and the other tenant's defaults alone")
 		unselected := newPod(otherNS, "")
