@@ -268,3 +268,91 @@ func BenchmarkWorkloadClassKindsAdmission(b *testing.B) {
 		}
 	}
 }
+
+// BenchmarkTemplateClassUpdates measures a controller-template update that
+// keeps its class. It is evaluated like a create — any update can precede Pods
+// created from the template — so this is the steady-state update cost.
+func BenchmarkTemplateClassUpdates(b *testing.B) {
+	for _, kind := range classKinds {
+		for _, mode := range []string{"allow-name", "allow-selector", "untargeted"} {
+			b.Run(kind.name+"/"+mode, func(b *testing.B) {
+				h := TemplateRules(nil, nil, nil, nil)
+
+				body := kind.body(rules.ActionTypeAllow, classNames("gold"))
+				if mode == "allow-selector" {
+					body = kind.body(rules.ActionTypeAllow, classLabels("env", "customer"))
+				}
+
+				body.Enforce.Workloads.Targets = []rules.WorkloadValidationTarget{rules.ValidateDeployment}
+				if mode == "untargeted" {
+					body.Enforce.Workloads.Targets = []rules.WorkloadValidationTarget{rules.ValidateStatefulSet}
+				}
+
+				obj, req := kind.template(b, rules.ValidateDeployment, "gold")
+				req.Operation = admissionv1.Update
+				old := obj.DeepCopy()
+				reader := kind.fixture(b)
+
+				call := h.OnUpdate(nil, reader, old, obj, nil, events.NewDiscardRecorder(), &capsulev1beta2.Tenant{}, []*rules.NamespaceRuleBodyNamespace{body})
+				if response := call(b.Context(), req); response != nil {
+					b.Fatalf("unexpected response: %v", response)
+				}
+
+				reader.gets.Store(0)
+				b.ReportAllocs()
+
+				for b.Loop() {
+					if response := call(b.Context(), req); response != nil {
+						b.Fatalf("unexpected response: %v", response)
+					}
+				}
+
+				b.ReportMetric(float64(reader.gets.Load())/float64(b.N), "class-reads/op")
+			})
+		}
+	}
+}
+
+// BenchmarkTemplateClassScale measures the scale-up enforcement path with its
+// parent read, and the scale-down and untargeted skips that avoid it.
+func BenchmarkTemplateClassScale(b *testing.B) {
+	for _, kind := range classKinds {
+		for _, mode := range []string{"allow", "scale-down", "untargeted"} {
+			b.Run(kind.name+"/"+mode, func(b *testing.B) {
+				h := TemplateRules(nil, nil, nil, nil)
+
+				body := kind.body(rules.ActionTypeAllow, classNames("gold"))
+				body.Enforce.Workloads.Targets = []rules.WorkloadValidationTarget{rules.ValidateDeployment}
+
+				if mode == "untargeted" {
+					body.Enforce.Workloads.Targets = []rules.WorkloadValidationTarget{rules.ValidateStatefulSet}
+				}
+
+				parent, _ := kind.template(b, rules.ValidateDeployment, "gold")
+				reader := kind.scaleFixture(b, parent)
+				req := scaleRequest("apps", "deployments")
+
+				old, obj := scaleObject(0, ""), scaleObject(3, "")
+				if mode == "scale-down" {
+					old, obj = scaleObject(3, ""), scaleObject(1, "")
+				}
+
+				call := h.OnUpdate(nil, reader, old, obj, nil, events.NewDiscardRecorder(), &capsulev1beta2.Tenant{}, []*rules.NamespaceRuleBodyNamespace{body})
+				if response := call(b.Context(), req); response != nil {
+					b.Fatalf("unexpected response: %v", response)
+				}
+
+				reader.gets.Store(0)
+				b.ReportAllocs()
+
+				for b.Loop() {
+					if response := call(b.Context(), req); response != nil {
+						b.Fatalf("unexpected response: %v", response)
+					}
+				}
+
+				b.ReportMetric(float64(reader.gets.Load())/float64(b.N), "reads/op")
+			})
+		}
+	}
+}

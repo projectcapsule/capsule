@@ -17,22 +17,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/projectcapsule/capsule/pkg/api/rules"
+	"github.com/projectcapsule/capsule/pkg/runtime/workloads"
 )
 
 func budgetScaleGVK(req admission.Request) schema.GroupVersionKind {
 	// Scale's Kind is autoscaling/Scale; Resource identifies the parent.
-	switch {
-	case req.Resource.Group == "apps" && req.Resource.Resource == "deployments":
-		return schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}
-	case req.Resource.Group == "apps" && req.Resource.Resource == "statefulsets":
-		return schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "StatefulSet"}
-	case req.Resource.Group == "apps" && req.Resource.Resource == "replicasets":
-		return schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "ReplicaSet"}
-	case req.Resource.Group == "" && req.Resource.Resource == "replicationcontrollers":
-		return schema.GroupVersionKind{Version: "v1", Kind: "ReplicationController"}
-	default:
-		return schema.GroupVersionKind{}
-	}
+	return workloads.ScaleWorkloadGVK(req.Resource)
 }
 
 func isBudgetScale(req admission.Request) bool {

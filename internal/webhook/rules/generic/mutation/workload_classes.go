@@ -187,7 +187,6 @@ func mutatePodRuntimeClass(pod *corev1.Pod, mutation *apirules.NamespaceRuleMuta
 }
 
 // conditionView returns the Pod the conditions of one entry evaluate against.
-// conditionView returns the Pod the conditions of one entry evaluate against.
 // The overhead and the scheduling of a class an earlier entry assigned are
 // shown as settled, so conditions see the Pod as the documented mutation order
 // leaves it, while the Pod itself keeps only the outcome of the whole pass: a

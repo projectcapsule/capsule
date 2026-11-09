@@ -16,12 +16,14 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/require"
 	admissionv1 "k8s.io/api/admission/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -573,11 +575,17 @@ func TestClassRulesUnchangedClassUpdates(t *testing.T) {
 					targeted[i].Enforce.Workloads.Targets = []rules.WorkloadValidationTarget{rules.ValidateDeployment}
 				}
 
+				// A controller update can precede Pods created from the template
+				// under the controller's identity, so a template update that keeps
+				// the class is evaluated like a create.
 				obj, templateReq := kind.template(t, rules.ValidateDeployment, "silver")
 				templateReq.Operation = admissionv1.Update
 				previous := obj.DeepCopy()
 				previous.SetLabels(map[string]string{"tier": "silver"})
-				require.Equal(t, tc.denied, templates.OnUpdate(nil, kind.fixture(t), previous, obj, nil, events.NewDiscardRecorder(), tenant, targeted)(t.Context(), templateReq) != nil, "template update that keeps the class")
+				require.NotNil(t, templates.OnUpdate(nil, kind.fixture(t), previous, obj, nil, events.NewDiscardRecorder(), tenant, targeted)(t.Context(), templateReq), "template update that keeps the class is evaluated like a create")
+
+				allowed, _ := kind.template(t, rules.ValidateDeployment, "gold")
+				require.Nil(t, templates.OnUpdate(nil, kind.fixture(t), allowed.DeepCopy(), allowed, nil, events.NewDiscardRecorder(), tenant, targeted)(t.Context(), templateReq), "template update that keeps an admitted class")
 			})
 		}
 	}
@@ -734,9 +742,10 @@ func TestClassRulesOmittedTemplateClass(t *testing.T) {
 				require.Equal(t, wanted, recorder.reasons)
 				require.Zero(t, reader.gets.Load(), "a missing class needs no read")
 
-				// An update that keeps the class omitted is not checked again; dropping it is.
+				// An update that keeps the class omitted is evaluated like a
+				// create: the controller's Pods may be created right after it.
 				req.Operation = admissionv1.Update
-				require.Nil(t, h.OnUpdate(nil, reader, obj.DeepCopy(), obj, nil, events.NewDiscardRecorder(), &capsulev1beta2.Tenant{}, tc.bodies)(t.Context(), req))
+				require.Equal(t, tc.matched, h.OnUpdate(nil, reader, obj.DeepCopy(), obj, nil, events.NewDiscardRecorder(), &capsulev1beta2.Tenant{}, tc.bodies)(t.Context(), req) != nil)
 
 				named, _ := kind.template(t, rules.ValidateDeployment, "gold")
 				require.Equal(t, tc.matched, h.OnUpdate(nil, reader, named, obj, nil, events.NewDiscardRecorder(), &capsulev1beta2.Tenant{}, tc.bodies)(t.Context(), req) != nil)
@@ -833,11 +842,13 @@ func TestClassRulesControllerTemplates(t *testing.T) {
 					require.Equal(t, tc.reads, reader.gets.Load(), tc.class)
 					require.Equal(t, original, obj)
 
-					// An update that keeps the class is not checked again; changing it is.
+					// An update that keeps the class is evaluated like a create:
+					// it can precede Pods created from the unchanged template.
 					req.Operation = admissionv1.Update
 					reader.gets.Store(0)
-					require.Nil(t, h.OnUpdate(nil, reader, obj.DeepCopy(), obj, nil, recorder, tenant, bodies)(t.Context(), req), tc.class)
-					require.Zero(t, reader.gets.Load())
+					response = h.OnUpdate(nil, reader, obj.DeepCopy(), obj, nil, recorder, tenant, bodies)(t.Context(), req)
+					require.Equal(t, tc.denied, response != nil, tc.class)
+					require.Equal(t, tc.reads, reader.gets.Load(), tc.class)
 
 					old, _ := kind.template(t, target, "gold")
 					if tc.class == "gold" {
@@ -917,5 +928,175 @@ func TestClassRulesConcurrentRequests(t *testing.T) {
 			require.EqualValues(t, 32, reader.gets.Load(), "only bronze and silver need their labels")
 			require.Equal(t, 1, regex.Stats())
 		})
+	}
+}
+
+// scaleFixture stores the classes of this kind next to the scaled parents.
+func (k classKind) scaleFixture(tb testing.TB, parents ...client.Object) *classReads {
+	tb.Helper()
+
+	scheme := classScheme(tb)
+	require.NoError(tb, appsv1.AddToScheme(scheme))
+	require.NoError(tb, corev1.AddToScheme(scheme))
+
+	return &classReads{Reader: fake.NewClientBuilder().WithScheme(scheme).WithObjects(append([]client.Object{
+		k.class("gold", map[string]string{"env": "customer", "tier": "gold"}),
+		k.class("silver", nil),
+		k.class("bronze", map[string]string{"env": "internal"}),
+	}, parents...)...).Build()}
+}
+
+// scaleObject is the autoscaling/v1 Scale payload of a scale subresource request.
+func scaleObject(replicas int64, uid string) *unstructured.Unstructured {
+	obj := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "autoscaling/v1", "kind": "Scale",
+		"metadata": map[string]any{"name": "example", "namespace": "tenant-a"},
+		"spec":     map[string]any{"replicas": replicas},
+	}}
+	if uid != "" {
+		obj.SetUID(types.UID(uid))
+	}
+
+	return obj
+}
+
+func scaleRequest(group, resource string) admission.Request {
+	return admission.Request{
+		Kind:        metav1.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "Scale"},
+		Resource:    metav1.GroupVersionResource{Group: group, Version: "v1", Resource: resource},
+		SubResource: "scale",
+		Operation:   admissionv1.Update,
+		Namespace:   "tenant-a",
+		Name:        "example"}
+}
+
+// A scale-up creates Pods from the unchanged parent template under the
+// controller's identity, which an audience-scoped rule never matches, so class
+// rules judge the scale request itself. A scale-down creates no Pods and is
+// never evaluated.
+func TestClassRulesScaleRequests(t *testing.T) {
+	compiler, err := cache.NewCELCache()
+	require.NoError(t, err)
+
+	for _, kind := range classKinds {
+		t.Run(kind.name, func(t *testing.T) {
+			h := TemplateRules(nil, nil, nil, compiler)
+			tenant := &capsulev1beta2.Tenant{Name: "tenant-a"}
+			body := kind.body(rules.ActionTypeAllow, classNames("gold"))
+			body.Enforce.Workloads.Targets = []rules.WorkloadValidationTarget{rules.ValidateDeployment}
+			bodies := []*rules.NamespaceRuleBodyNamespace{body}
+			req := scaleRequest("apps", "deployments")
+
+			parent, _ := kind.template(t, rules.ValidateDeployment, "silver")
+
+			// A scale-up of a template class the rules do not admit is rejected;
+			// events concern the parent workload.
+			reader := kind.scaleFixture(t, parent.DeepCopy())
+			recorder := &templateRecorder{EventRecorder: events.NewEventRecorder(nil, logr.Discard(), nil, nil)}
+			response := h.OnUpdate(nil, reader, scaleObject(0, ""), scaleObject(3, ""), nil, recorder, tenant, bodies)(t.Context(), req)
+			require.NotNil(t, response)
+			require.False(t, response.Allowed)
+			require.Contains(t, response.Result.Message, "spec.template: "+kind.rejected("silver"))
+			require.EqualValues(t, 1, reader.gets.Load(), "one parent read; the name decides without a class read")
+			regarding, ok := recorder.regarding.(*unstructured.Unstructured)
+			require.True(t, ok, "events must concern the parent workload")
+			require.Equal(t, "Deployment", regarding.GetKind())
+
+			// An admitted class scales up freely.
+			allowed, _ := kind.template(t, rules.ValidateDeployment, "gold")
+			reader = kind.scaleFixture(t, allowed)
+			require.Nil(t, h.OnUpdate(nil, reader, scaleObject(0, ""), scaleObject(3, ""), nil, events.NewDiscardRecorder(), tenant, bodies)(t.Context(), req))
+			require.EqualValues(t, 1, reader.gets.Load())
+
+			// A scale-down or an unchanged replica count creates no Pods.
+			reader = kind.scaleFixture(t, parent.DeepCopy())
+			require.Nil(t, h.OnUpdate(nil, reader, scaleObject(3, ""), scaleObject(1, ""), nil, events.NewDiscardRecorder(), tenant, bodies)(t.Context(), req))
+			require.Nil(t, h.OnUpdate(nil, reader, scaleObject(3, ""), scaleObject(3, ""), nil, events.NewDiscardRecorder(), tenant, bodies)(t.Context(), req))
+			require.Zero(t, reader.gets.Load())
+
+			// Rules without class policies for the kind never read the parent.
+			other := kind.body(rules.ActionTypeAllow, classNames("gold"))
+			other.Enforce.Workloads.Targets = []rules.WorkloadValidationTarget{rules.ValidateStatefulSet}
+			require.Nil(t, h.OnUpdate(nil, reader, scaleObject(0, ""), scaleObject(3, ""), nil, events.NewDiscardRecorder(), tenant, []*rules.NamespaceRuleBodyNamespace{other})(t.Context(), req))
+			require.Zero(t, reader.gets.Load())
+
+			// An unsupported scale resource is not a workload scale.
+			require.Nil(t, h.OnUpdate(nil, reader, scaleObject(0, ""), scaleObject(3, ""), nil, events.NewDiscardRecorder(), tenant, bodies)(t.Context(), scaleRequest("apps", "daemonsets")))
+			require.Zero(t, reader.gets.Load())
+
+			// A template without a class cannot prove what class its Pods get.
+			omitted, _ := kind.template(t, rules.ValidateDeployment, "")
+			reader = kind.scaleFixture(t, omitted)
+			response = h.OnUpdate(nil, reader, scaleObject(0, ""), scaleObject(3, ""), nil, events.NewDiscardRecorder(), tenant, bodies)(t.Context(), req)
+			require.NotNil(t, response)
+			require.Contains(t, response.Result.Message, kind.set+" is required at "+kind.path)
+
+			// Audit rules record a matching scale-up without blocking it.
+			audit := kind.body(rules.ActionTypeAudit, classNames("silver"))
+			audit.Enforce.Workloads.Targets = []rules.WorkloadValidationTarget{rules.ValidateDeployment}
+			reader = kind.scaleFixture(t, parent.DeepCopy())
+			auditRecorder := &classEvents{EventRecorder: events.NewEventRecorder(nil, logr.Discard(), nil, nil)}
+			require.Nil(t, h.OnUpdate(nil, reader, scaleObject(0, ""), scaleObject(3, ""), nil, auditRecorder, tenant, []*rules.NamespaceRuleBodyNamespace{audit})(t.Context(), req))
+			require.Equal(t, []string{events.ReasonNamespaceRuleAudit}, auditRecorder.reasons)
+
+			// A failed parent read is a server error, never an allow.
+			reader = kind.scaleFixture(t, parent.DeepCopy())
+			reader.err = errors.New("apiserver unavailable")
+			response = h.OnUpdate(nil, reader, scaleObject(0, ""), scaleObject(3, ""), nil, events.NewDiscardRecorder(), tenant, bodies)(t.Context(), req)
+			require.NotNil(t, response)
+			require.False(t, response.Allowed)
+			require.EqualValues(t, http.StatusInternalServerError, response.Result.Code)
+			require.Contains(t, response.Result.Message, "read scale parent")
+
+			// A scale raced by a delete and recreate of the parent is retried.
+			recreated := parent.DeepCopy()
+			recreated.SetUID("recreated")
+			reader = kind.scaleFixture(t, recreated)
+			response = h.OnUpdate(nil, reader, scaleObject(0, "original"), scaleObject(3, "original"), nil, events.NewDiscardRecorder(), tenant, bodies)(t.Context(), req)
+			require.NotNil(t, response)
+			require.EqualValues(t, http.StatusInternalServerError, response.Result.Code)
+			require.Contains(t, response.Result.Message, "scale parent changed")
+
+			// Conditions evaluate against the parent workload, not the Scale.
+			conditional := kind.body(rules.ActionTypeAllow, classNames("gold"))
+			conditional.Enforce.Workloads.Targets = []rules.WorkloadValidationTarget{rules.ValidateDeployment}
+			conditional.Enforce.Conditions = []rules.AdmissionCondition{{Expression: "object.metadata.labels['blocked'] == 'no'"}}
+			reader = kind.scaleFixture(t, parent.DeepCopy())
+			require.Nil(t, h.OnUpdate(nil, reader, scaleObject(0, ""), scaleObject(3, ""), nil, events.NewDiscardRecorder(), tenant, []*rules.NamespaceRuleBodyNamespace{conditional})(t.Context(), req))
+
+			conditional.Enforce.Conditions[0].Expression = "object.metadata.labels['blocked'] == 'yes'"
+			response = h.OnUpdate(nil, reader, scaleObject(0, ""), scaleObject(3, ""), nil, events.NewDiscardRecorder(), tenant, []*rules.NamespaceRuleBodyNamespace{conditional})(t.Context(), req)
+			require.NotNil(t, response)
+			require.Contains(t, response.Result.Message, kind.rejected("silver"))
+		})
+	}
+}
+
+// The scale subresources of every native scalable controller reach the same
+// template class enforcement.
+func TestClassRulesScaleParents(t *testing.T) {
+	for _, kind := range classKinds {
+		for _, parent := range []struct {
+			group, resource string
+			target          rules.WorkloadValidationTarget
+		}{
+			{"apps", "deployments", rules.ValidateDeployment},
+			{"apps", "statefulsets", rules.ValidateStatefulSet},
+			{"apps", "replicasets", rules.ValidateReplicaSet},
+			{"", "replicationcontrollers", rules.ValidateReplicationController},
+		} {
+			t.Run(kind.name+"/"+parent.resource, func(t *testing.T) {
+				h := TemplateRules(nil, nil, nil, nil)
+				body := kind.body(rules.ActionTypeDeny, classNames("silver"))
+				body.Enforce.Workloads.Targets = []rules.WorkloadValidationTarget{parent.target}
+				obj, _ := kind.template(t, parent.target, "silver")
+				reader := kind.scaleFixture(t, obj)
+
+				response := h.OnUpdate(nil, reader, scaleObject(0, ""), scaleObject(3, ""), nil, events.NewDiscardRecorder(), &capsulev1beta2.Tenant{}, []*rules.NamespaceRuleBodyNamespace{body})(t.Context(), scaleRequest(parent.group, parent.resource))
+				require.NotNil(t, response)
+				require.False(t, response.Allowed)
+				require.Contains(t, response.Result.Message, kind.denied("silver"))
+			})
+		}
 	}
 }

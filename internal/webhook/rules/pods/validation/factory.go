@@ -64,6 +64,12 @@ type podRuleValidator struct {
 	// only conditional rules that carry it check an unchanged value again;
 	// otherwise any conditional workload rule does.
 	policy func(*apirules.NamespaceRuleEnforceBody) bool
+	// templateUpdates evaluates this validator on every controller-template
+	// update even when its value is unchanged. Any such update can precede new
+	// Pods created from the template under the controller's identity, which an
+	// audience-scoped rule never matches, so the update itself is the last
+	// admission the rule's audience performs.
+	templateUpdates bool
 }
 
 // scope returns the rules to evaluate on an update, and false to skip the
@@ -165,10 +171,10 @@ func newPodRules(regexCache *cache.RegexCache, registryCache *cache.RegistryRule
 		{evaluate: h.validateAffinity, changed: func(old, pod *corev1.Pod) bool {
 			return !equality.Semantic.DeepEqual(old.Spec.Affinity, pod.Spec.Affinity) || !equality.Semantic.DeepEqual(old.Labels, pod.Labels)
 		}},
-		{read: h.validatePriorityClasses, policy: appliesToPriorityClasses, changed: func(old, pod *corev1.Pod) bool {
+		{read: h.validatePriorityClasses, policy: appliesToPriorityClasses, templateUpdates: true, changed: func(old, pod *corev1.Pod) bool {
 			return old.Spec.PriorityClassName != pod.Spec.PriorityClassName
 		}},
-		{read: h.validateRuntimeClasses, policy: appliesToRuntimeClasses, changed: func(old, pod *corev1.Pod) bool {
+		{read: h.validateRuntimeClasses, policy: appliesToRuntimeClasses, templateUpdates: true, changed: func(old, pod *corev1.Pod) bool {
 			return ptr.Deref(old.Spec.RuntimeClassName, "") != ptr.Deref(pod.Spec.RuntimeClassName, "")
 		}},
 		{evaluate: h.validateResources},
@@ -293,12 +299,17 @@ func (h *podRules) validateWorkloadRules(
 		previous = old[0]
 	}
 
+	// Pod class fields are immutable and a Pod update creates no Pods, so an
+	// unchanged value on a Pod may narrow the rules. A controller template
+	// keeps full evaluation where the validator demands it.
+	_, isPod := object.(*corev1.Pod)
+
 	for i := range h.rules {
 		rule := &h.rules[i]
 		bodies := enforceBodies
 
 		// A create evaluates every rule that matched; only updates narrow them.
-		if previous != nil {
+		if previous != nil && (isPod || !rule.templateUpdates) {
 			var ok bool
 
 			if bodies, ok = rule.scope(previous, pod, conditional, all, enforceBodies); !ok {
