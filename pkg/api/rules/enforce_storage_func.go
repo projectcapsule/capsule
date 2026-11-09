@@ -39,3 +39,32 @@ func (m StorageClassMatch) Describe() string {
 
 	return strings.Join(parts, "; ")
 }
+
+// StorageClassesToMatch returns the entries of a rule to match against a class
+// name. The entries of an allow or deny rule are ORed, so the first one that
+// matches the name decides the rule: matching the others could only read the
+// class object for nothing, and a failed read would turn the decision into a
+// server error. Audit rules keep every entry, since each match is recorded.
+func StorageClassesToMatch(action ActionType, classes []StorageClassMatch, matcher runtime.ExpressionRegexMatcher, name string) []StorageClassMatch {
+	if action.OrDefault() == ActionTypeAudit {
+		return classes
+	}
+
+	for i, match := range classes {
+		if !match.HasNameMatch() {
+			continue
+		}
+
+		matched, err := match.NameMatch().MatchesWithExpressionMatcher(matcher, name)
+		if err != nil {
+			// Matching every entry reports the invalid expression.
+			return classes
+		}
+
+		if matched {
+			return classes[i : i+1]
+		}
+	}
+
+	return classes
+}

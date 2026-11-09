@@ -34,6 +34,17 @@ type NamespaceRuleEnforceStorageBody struct {
 	// +kubebuilder:validation:MaxItems=64
 	// +listType=atomic
 	Classes []StorageClassMatch `json:"classes,omitempty"`
+
+	// AttributeClasses matches PersistentVolumeClaim
+	// spec.volumeAttributesClassName. Entries are ORed. Targets don't apply. A
+	// claim without a class is not matched, since Kubernetes then applies none.
+	// Updates are only matched when they change the class to one other than
+	// status.currentVolumeAttributesClassName: restoring the applied class
+	// cancels a modification.
+	// +optional
+	// +kubebuilder:validation:MaxItems=64
+	// +listType=atomic
+	AttributeClasses []StorageClassMatch `json:"attributeClasses,omitempty"`
 }
 
 // StorageValidationTarget names a kind whose class reference is validated.

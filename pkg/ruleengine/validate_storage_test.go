@@ -79,6 +79,43 @@ func TestValidateStorageClassRules(t *testing.T) {
 	}
 }
 
+func TestValidateStorageAttributeClassRules(t *testing.T) {
+	labels := metav1.LabelSelector{MatchLabels: map[string]string{"env": "customer"}}
+	gold := []rules.StorageClassMatch{{Exact: []string{"gold"}}}
+
+	for _, tc := range []struct {
+		name    string
+		storage rules.NamespaceRuleEnforceStorageBody
+		want    string
+	}{
+		{name: "every matcher", storage: rules.NamespaceRuleEnforceStorageBody{AttributeClasses: []rules.StorageClassMatch{{Exact: []string{"internal.example.com"}, Expression: `^[a-z0-9-]+\.example\.com$`, LabelSelector: labels}}}},
+		{name: "template selector", storage: rules.NamespaceRuleEnforceStorageBody{AttributeClasses: []rules.StorageClassMatch{{MatchLabels: map[string]string{"tenant": "{{ .tenant.metadata.name }}"}}}}},
+		{name: "next to snapshot classes", storage: rules.NamespaceRuleEnforceStorageBody{Targets: []rules.StorageValidationTarget{rules.StorageTargetVolumeSnapshot}, Classes: gold, AttributeClasses: gold}},
+		{
+			name:    "targets select snapshot classes only",
+			storage: rules.NamespaceRuleEnforceStorageBody{Targets: []rules.StorageValidationTarget{rules.StorageTargetVolumeSnapshot}, AttributeClasses: gold},
+			want:    "storage.classes is invalid: classes must be configured when targets are configured",
+		},
+		{name: "empty match", storage: rules.NamespaceRuleEnforceStorageBody{AttributeClasses: []rules.StorageClassMatch{{}}}, want: "storage.attributeClasses[0] is invalid: at least one of exact, exp, matchLabels or matchExpressions must be set"},
+		{name: "invalid regex", storage: rules.NamespaceRuleEnforceStorageBody{AttributeClasses: []rules.StorageClassMatch{{Exact: []string{"gold"}}, {Expression: "("}}}, want: "storage.attributeClasses[1].exp"},
+		{name: "too many exact values", storage: rules.NamespaceRuleEnforceStorageBody{AttributeClasses: []rules.StorageClassMatch{{Exact: make([]string, 65)}}}, want: "storage.attributeClasses[0].exact: at most 64 values"},
+		{name: "invalid label value", storage: rules.NamespaceRuleEnforceStorageBody{AttributeClasses: []rules.StorageClassMatch{{MatchLabels: map[string]string{"env": "invalid!"}}}}, want: "storage.attributeClasses[0].matchLabels"},
+		{name: "invalid operator", storage: rules.NamespaceRuleEnforceStorageBody{AttributeClasses: []rules.StorageClassMatch{{MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "env", Operator: "Unknown"}}}}}, want: "storage.attributeClasses[0].matchExpressions"},
+		{name: "too many classes", storage: rules.NamespaceRuleEnforceStorageBody{AttributeClasses: make([]rules.StorageClassMatch, 65)}, want: "storage.attributeClasses: at most 64 matches are supported"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateStorageRules(0, tc.storage)
+			if tc.want == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error=%v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
 func TestValidateStorageAndNetworkRules(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
