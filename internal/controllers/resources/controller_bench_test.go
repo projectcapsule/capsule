@@ -101,8 +101,8 @@ func BenchmarkControllerReplication(b *testing.B) {
 				configuration := configuration.NewCapsuleConfiguration(b.Context(), c, c, nil, cfg.Name)
 				proc := processor.Processor{Configuration: configuration, GatherClient: c, Mapper: mapper, AllowCrossNamespaceSelection: true}
 				collector := NewCollector(c, mapper)
-				globalClients := impersonatedClientLoader[*capsulev1beta2.GlobalTenantResource]{client: c, configuration: configuration, resolve: globalServiceAccount}
-				localClients := impersonatedClientLoader[*capsulev1beta2.TenantResource]{client: c, configuration: configuration, resolve: namespacedServiceAccount}
+				globalClients := impersonatedClientLoader[*capsulev1beta2.GlobalTenantResource]{client: replicationClient{Client: c, reader: c}, configuration: configuration, resolve: globalServiceAccount}
+				localClients := impersonatedClientLoader[*capsulev1beta2.TenantResource]{client: replicationClient{Client: c, reader: c}, configuration: configuration, resolve: namespacedServiceAccount}
 				var r reconcile.Reconciler
 				req := reconcile.Request{Name: global.Name}
 				switch kind {

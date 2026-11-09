@@ -59,7 +59,7 @@ spec:
 			require.Equal(t, tnt.Spec.Rules[0].Enforce.Workloads.Placement.Tolerations, bodies[0].Enforce.Workloads.Placement.Tolerations)
 			require.Equal(t, original, &tnt)
 
-			handler := PodRules(nil, nil, nil)
+			handler := PodRules(nil, nil, nil, nil)
 			recorder := events.NewEventRecorder(nil, logr.Discard(), nil, nil)
 			request := admission.Request{Operation: admissionv1.Create}
 			for _, key := range tc.blocked {

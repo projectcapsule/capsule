@@ -17,6 +17,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
+	"github.com/projectcapsule/capsule/internal/webhook/ingress"
 	apirules "github.com/projectcapsule/capsule/pkg/api/rules"
 	"github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/ruleengine"
@@ -27,15 +28,20 @@ import (
 
 type ingressRules struct {
 	regexCache *cache.RegexCache
+	selectors  *cache.LabelSelectorCache
 	compiler   ruleengine.ConditionCompiler
 }
 
-func IngressRules(regexCache *cache.RegexCache, compilers ...ruleengine.ConditionCompiler) handlers.TypedHandlerWithTenantWithRuleset[*unstructured.Unstructured] {
+func IngressRules(regexCache *cache.RegexCache, selectors *cache.LabelSelectorCache, compilers ...ruleengine.ConditionCompiler) handlers.TypedHandlerWithTenantWithRuleset[*unstructured.Unstructured] {
 	if regexCache == nil {
 		regexCache = cache.NewRegexCache()
 	}
 
-	h := &ingressRules{regexCache: regexCache}
+	if selectors == nil {
+		selectors = cache.NewLabelSelectorCache()
+	}
+
+	h := &ingressRules{regexCache: regexCache, selectors: selectors}
 	if len(compilers) > 0 {
 		h.compiler = compilers[0]
 	}
@@ -45,19 +51,19 @@ func IngressRules(regexCache *cache.RegexCache, compilers ...ruleengine.Conditio
 
 func (h *ingressRules) OnCreate(
 	_ client.Client,
-	_ client.Reader,
+	reader client.Reader,
 	obj *unstructured.Unstructured,
 	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 	bodies []*apirules.NamespaceRuleBodyNamespace,
 ) handlers.Func {
-	return h.validate(obj, recorder, tnt, bodies)
+	return h.validate(reader, obj, recorder, tnt, bodies)
 }
 
 func (h *ingressRules) OnUpdate(
 	_ client.Client,
-	_ client.Reader,
+	reader client.Reader,
 	_ *unstructured.Unstructured,
 	obj *unstructured.Unstructured,
 	_ admission.Decoder,
@@ -65,7 +71,7 @@ func (h *ingressRules) OnUpdate(
 	tnt *capsulev1beta2.Tenant,
 	bodies []*apirules.NamespaceRuleBodyNamespace,
 ) handlers.Func {
-	return h.validate(obj, recorder, tnt, bodies)
+	return h.validate(reader, obj, recorder, tnt, bodies)
 }
 
 func (*ingressRules) OnDelete(
@@ -81,6 +87,7 @@ func (*ingressRules) OnDelete(
 }
 
 func (h *ingressRules) validate(
+	reader client.Reader,
 	obj *unstructured.Unstructured,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
@@ -90,7 +97,7 @@ func (h *ingressRules) validate(
 		gvk := schema.GroupVersionKind{Group: req.Kind.Group, Version: req.Kind.Version, Kind: req.Kind.Kind}
 
 		resourceType, supported := ingressTypeForGVK(gvk)
-		if !supported {
+		if !supported || req.SubResource != "" {
 			return nil
 		}
 
@@ -99,7 +106,7 @@ func (h *ingressRules) validate(
 		enforceBodies, err := ruleengine.FilterEnforcementConditions(ctx,
 			ruleengine.NewConditionEvaluator(h.compiler, req.AdmissionRequest), obj, enforceBodies,
 			func(body *apirules.NamespaceRuleEnforceBody) bool {
-				return len(body.Ingress.Hostnames) > 0 && containsIngressType(body.Ingress.Types, resourceType)
+				return (len(body.Ingress.Hostnames) > 0 && containsIngressType(body.Ingress.Types, resourceType)) || appliesIngressClasses(body, resourceType)
 			})
 		if err != nil {
 			return ad.Deny(fmt.Errorf("enforce: %w", err).Error())
@@ -110,8 +117,25 @@ func (h *ingressRules) validate(
 			return ad.Deny(err.Error())
 		}
 
+		if evaluation == nil || evaluation.Blocking == nil {
+			classes, err := h.evaluateClasses(ctx, reader, obj, resourceType, enforceBodies)
+			if err != nil {
+				return ad.Deny(err.Error())
+			}
+
+			if evaluation == nil {
+				evaluation = classes
+			} else {
+				evaluation.Append(classes)
+			}
+		}
+
 		if evaluation == nil {
 			return nil
+		}
+
+		if req.DryRun != nil && *req.DryRun {
+			recorder = events.NewDiscardRecorder()
 		}
 
 		for _, audit := range evaluation.Audits {
@@ -132,7 +156,7 @@ func (h *ingressRules) validate(
 			recorder.LabeledEvent(
 				obj,
 				corev1.EventTypeWarning,
-				events.ReasonForbiddenIngressHostname,
+				evaluation.Blocking.EventReason,
 				events.ActionValidationDenied,
 				err.Error(),
 			).
@@ -225,9 +249,11 @@ func (h *ingressRules) evaluate(
 
 //nolint:exhaustive
 func ingressTypeForGVK(gvk schema.GroupVersionKind) (apirules.IngressType, bool) {
+	if kind, supported := ingress.ClassTypeForGVK(gvk); supported {
+		return kind, true
+	}
+
 	switch {
-	case gvk.Group == "networking.k8s.io" && gvk.Version == "v1" && gvk.Kind == string(apirules.IngressTypeIngress):
-		return apirules.IngressTypeIngress, true
 	case gvk.Group == "route.openshift.io" && gvk.Version == "v1" && gvk.Kind == string(apirules.IngressTypeRoute):
 		return apirules.IngressTypeRoute, true
 	case gvk.Group == "gateway.networking.k8s.io" && gvk.Version == "v1":
@@ -235,7 +261,6 @@ func ingressTypeForGVK(gvk schema.GroupVersionKind) (apirules.IngressType, bool)
 		switch resourceType {
 		case apirules.IngressTypeListenerSet,
 			apirules.IngressTypeHTTPRoute,
-			apirules.IngressTypeGateway,
 			apirules.IngressTypeTLSRoute,
 			apirules.IngressTypeGRPCRoute:
 			return resourceType, true

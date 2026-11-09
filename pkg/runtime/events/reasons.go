@@ -36,7 +36,9 @@ const (
 	ReasonMissingStorageClass    string = "MissingStorageClass"
 	ReasonForbiddenStorageClass  string = "ForbiddenStorageClass"
 	ReasonForbiddenPriorityClass string = "ForbiddenPriorityClass"
+	ReasonMissingPriorityClass   string = "MissingPriorityClass"
 	ReasonForbiddenRuntimeClass  string = "ForbiddenRuntimeClass"
+	ReasonMissingRuntimeClass    string = "MissingRuntimeClass"
 	ReasonForbiddenIngressClass  string = "ForbiddenIngressClass"
 	ReasonMissingIngressClass    string = "MissingIngressClass"
 	ReasonForbiddenGatewayClass  string = "ForbiddenGatewayClass"
@@ -46,6 +48,8 @@ const (
 
 	ReasonMissingVolumeSnapshotClass   string = "MissingVolumeSnapshotClass"
 	ReasonForbiddenVolumeSnapshotClass string = "ForbiddenVolumeSnapshotClass"
+
+	ReasonForbiddenVolumeAttributesClass string = "ForbiddenVolumeAttributesClass"
 
 	// Nodes.
 	ReasonForbiddenNodeSelectorUpdate string = "ForbiddenNodeSelectorUpdate"

@@ -159,7 +159,7 @@ dev-install-gw-api-crds:
 
 # Distributions with a CSI snapshot controller ship these CRDs; keep theirs.
 SNAPSHOTTER         := none
-SNAPSHOTTER_VERSION := v8.6.0
+SNAPSHOTTER_VERSION := v8.7.0
 SNAPSHOTTER_LOOKUP  := kubernetes-csi/external-snapshotter
 dev-install-snapshot-crds:
 	@$(KUBECTL) get crd volumesnapshots.snapshot.storage.k8s.io >/dev/null 2>&1 || \

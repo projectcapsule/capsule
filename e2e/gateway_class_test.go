@@ -196,7 +196,7 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 
 				return t.Status.Classes.GatewayClasses, nil
 			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf(exact.GetName(), exactU.GetName(), authorized.GetName(), unauthorized.GetName()))
+				Should(BeEmpty())
 		})
 
 		ns := NewNamespace("", map[string]string{
@@ -269,7 +269,7 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 
 				return t.Status.Classes.GatewayClasses, nil
 			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf(exact.GetName(), exactU.GetName(), unauthorized.GetName()))
+				Should(BeEmpty())
 		})
 
 	})
@@ -296,7 +296,7 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 
 				return t.Status.Classes.GatewayClasses, nil
 			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf(exactU.GetName(), authorized.GetName()))
+				Should(BeEmpty())
 		})
 
 		ns := NewNamespace("", map[string]string{
@@ -367,7 +367,7 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 
 				return t.Status.Classes.GatewayClasses, nil
 			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf(exactU.GetName()))
+				Should(BeEmpty())
 
 			for _, crd := range []*gatewayv1.GatewayClass{exactU} {
 				EventuallyDeletion(crd)
@@ -386,7 +386,7 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 
 				return t.Status.Classes.GatewayClasses, nil
 			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf())
+				Should(BeEmpty())
 		})
 
 	})
@@ -412,7 +412,7 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 
 				return t.Status.Classes.GatewayClasses, nil
 			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf(exactU.GetName(), authorized.GetName()))
+				Should(BeEmpty())
 		})
 
 		ns := NewNamespace("", map[string]string{
@@ -509,7 +509,7 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 
 				return t.Status.Classes.GatewayClasses, nil
 			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf(exact.GetName(), authorized.GetName()))
+				Should(BeEmpty())
 		})
 
 		ns := NewNamespace("", map[string]string{
@@ -558,7 +558,7 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 
 				return t.Status.Classes.GatewayClasses, nil
 			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf(exact.GetName()))
+				Should(BeEmpty())
 
 			for _, crd := range []*gatewayv1.GatewayClass{exact} {
 				EventuallyDeletion(crd)
@@ -577,7 +577,7 @@ var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant",
 
 				return t.Status.Classes.GatewayClasses, nil
 			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf())
+				Should(BeEmpty())
 		})
 	})
 })

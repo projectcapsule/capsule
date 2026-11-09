@@ -90,7 +90,7 @@ func TestPlaygroundPlacementExamples(t *testing.T) {
 			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, pod); err != nil {
 				t.Fatal(err)
 			}
-			response = podvalidation.PodRules(nil, nil, compiler).OnCreate(nil, nil, pod, nil, recorder, tenant, bodies)(t.Context(), req)
+			response = podvalidation.PodRules(nil, nil, nil, compiler).OnCreate(nil, nil, pod, nil, recorder, tenant, bodies)(t.Context(), req)
 			if name == "denied" {
 				if response == nil || response.Allowed {
 					t.Fatal("explicit windows selector must be denied")

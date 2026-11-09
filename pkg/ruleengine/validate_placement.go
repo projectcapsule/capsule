@@ -214,7 +214,7 @@ func validateMutations(index int, mutations []rules.NamespaceRuleMutation) error
 			return fmt.Errorf("%s.action: unsupported mutation action %q", path, mutation.Action)
 		}
 
-		if mutation.Workloads.HasProperties() || len(mutation.Workloads.Targets) > 0 || (mutation.Ingress.ListenerSets.ParentRef == nil && mutation.Devices.Class == "") {
+		if mutation.Workloads.HasProperties() || len(mutation.Workloads.Targets) > 0 || (mutation.Ingress.ListenerSets.ParentRef == nil && mutation.Ingress.Class == "" && len(mutation.Ingress.Types) == 0 && mutation.Devices.Class == "") {
 			if err := validateMutationPlacement(path+".workloads", mutation.Workloads); err != nil {
 				return err
 			}
@@ -247,6 +247,10 @@ func validateMutationPlacement(path string, workload rules.WorkloadMutation) err
 	}
 
 	if err := validateSecurityProfileMutation(path+".security", workload); err != nil {
+		return err
+	}
+
+	if err := validateClassMutation(path+".classes", workload.Classes); err != nil {
 		return err
 	}
 

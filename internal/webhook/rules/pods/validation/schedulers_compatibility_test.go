@@ -51,7 +51,7 @@ func TestSchedulerFieldsCompose(t *testing.T) {
 func TestLegacySchedulerAdmissionConditionsAndOrder(t *testing.T) {
 	compiler, err := cache.NewCELCache()
 	require.NoError(t, err)
-	h := PodRules(nil, nil, compiler)
+	h := PodRules(nil, nil, nil, compiler)
 	pod := schedulerPodForTest("legacy")
 	body := &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{
 		Action: rules.ActionTypeDeny,

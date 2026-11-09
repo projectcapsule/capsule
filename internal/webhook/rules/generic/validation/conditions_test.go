@@ -64,7 +64,7 @@ func TestEnforcementConditionsGateMetadataAndIngress(t *testing.T) {
 				}
 				var response *admission.Response
 				if kind == "Ingress" {
-					response = IngressRules(nil, compiler).OnCreate(nil, nil, obj, nil, recorder, tenant, bodies)(t.Context(), req)
+					response = IngressRules(nil, nil, compiler).OnCreate(nil, nil, obj, nil, recorder, tenant, bodies)(t.Context(), req)
 				} else {
 					metadata := &metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "tenant-a", Labels: obj.GetLabels()}}
 					response = GenericRules(nil, compiler).OnCreate(nil, nil, metadata, nil, recorder, tenant, bodies)(t.Context(), req)

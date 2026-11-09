@@ -1,0 +1,58 @@
+// Copyright 2020-2026 Project Capsule Authors
+// SPDX-License-Identifier: Apache-2.0
+
+package rules
+
+// WorkloadClassEnforcement contains matchers for the classes referenced by Pods.
+// +kubebuilder:object:generate=true
+type WorkloadClassEnforcement struct {
+	// Priority matches spec.priorityClassName of selected Pods and Pod templates
+	// by name, or by the labels of the PriorityClass. Entries, and the criteria
+	// within each entry, are ORed. An applicable allow list rejects every other
+	// class; audit never grants access. A Pod without a class is not matched:
+	// Kubernetes assigns the cluster's global default class before admission, so
+	// that name is matched like an explicit one. A controller template gets its
+	// class only when its Pods are created, so an allow or deny rule that targets
+	// the controller requires the template to name one; audit rules record its
+	// absence. Exact and exp need no read; a label selector reads the class, and
+	// a missing class never matches it. Priority rules apply to the pod target
+	// and do not run on subresources. An update that keeps the class is only
+	// checked again when an allow or deny class rule has conditions; conditional
+	// audit rules are recorded without taking that decision again.
+	// Legacy Tenant.spec.priorityClasses restrictions remain an additional boundary.
+	// +optional
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=64
+	// +listType=atomic
+	Priority []WorkloadClassMatch `json:"priority,omitempty"`
+
+	// Runtime matches spec.runtimeClassName of selected Pods and Pod templates
+	// by name, or by the labels of the RuntimeClass. Entries, and the criteria
+	// within each entry, are ORed. An applicable allow list rejects every other
+	// class; audit never grants access. A Pod without a class is not matched:
+	// Kubernetes has no default RuntimeClass, mutation has already run, and the
+	// Pod keeps the default runtime of its node. A controller template is not
+	// necessarily classless when its Pods run — a Tenant default or a mutation
+	// rule can assign a class then — so an allow or deny rule that targets the
+	// controller requires the template to name one; audit rules record its
+	// absence. Exact and exp need no read; a label selector reads the class,
+	// and a missing class never matches it. Runtime rules apply to the pod
+	// target and do not run on subresources. An update that keeps the class is
+	// only checked again when an allow or deny class rule has conditions;
+	// conditional audit rules are recorded without taking that decision again.
+	// Legacy Tenant.spec.runtimeClasses restrictions remain an additional boundary.
+	// +optional
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=64
+	// +listType=atomic
+	Runtime []WorkloadClassMatch `json:"runtime,omitempty"`
+}
+
+// WorkloadClassMatch reuses the shared class name and label matching semantics.
+// +kubebuilder:object:generate=false
+type WorkloadClassMatch = StorageClassMatch
+
+// HasPolicies reports whether any class matcher is configured.
+func (c WorkloadClassEnforcement) HasPolicies() bool {
+	return len(c.Priority) > 0 || len(c.Runtime) > 0
+}

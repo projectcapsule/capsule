@@ -122,8 +122,10 @@ Before implementing a change:
 | `pkg/runtime/indexers/`, `pkg/runtime/predicates/` | Indexed lookups and event filtering. Register needed indexes through the existing manager setup. |
 | `pkg/runtime/`, `pkg/utils/` | Existing runtime and utility helpers. Prefer the most specific existing package over adding miscellaneous helpers. |
 | `internal/metrics/` | Existing metric recorders and lifecycle cleanup. |
+| `internal/mocks/` | Generated client mocks (`make mocks` via mockgen). Regenerate instead of hand-editing. |
 | `e2e/` | Ginkgo/Gomega integration tests against an existing Kubernetes cluster, with shared clients and lifecycle helpers. |
 | `e2e/stress/` | KWOK/KinD setup and tenant workload seeding for scalability investigations. |
+| `playground/` | Local kind + Flux demo environment (Capsule, Capsule Proxy, Dex, Headlamp). Not part of controller code or test validation. |
 | `charts/capsule/` | Helm templates, values, schema, generated CRDs, and chart documentation. |
 | `hack/`, `.github/` | Development tooling, generation, lint configuration, and CI. Extend the existing workflows. |
 
@@ -518,7 +520,10 @@ and `go.mod` instead of independently selecting newer tools.
 | Full e2e in GitHub Actions | `make e2e` and `make e2e-openshift` (installs MicroShift on the host and is CI only) are the full-suite CI entry points; every lane runs them as two jobs, `E2E_PHASE=parallel` and `E2E_PHASE=config`, so a lane takes setup plus the longer phase. Without `E2E_PHASE` both phases run in order on one cluster. Local execution uses the scoped commands above. `E2E_PROCS=<n>` overrides the number of parallel Ginkgo processes. |
 | Local e2e cleanup | `make e2e-destroy` after preserving observations and completing the relevant run. |
 | Focused benchmarks | `go test ./path/to/changed/package -run '^$' -bench 'BenchmarkName' -benchmem -count=5` (replace path/name). |
+| Controller benchmarks | `make bench-controllers` runs `./internal/controllers/...` benchmarks; `BENCH_FILTER`, `BENCH_TIME`, and `BENCH_COUNT` override the defaults. |
 | Existing benchmark examples | `go test ./pkg/tenant ./internal/controllers/resources -run '^$' -bench . -benchmem -count=5`. |
+| Regenerate mocks | `make mocks` regenerates `internal/mocks/client/mock.go` with mockgen; do not hand-edit it. |
+| License headers | `make license-headers` applies the copyright/SPDX headers via the configured tool. |
 | Existing chart checks | `make helm-lint`; use `make helm-test` for installation behavior. Running existing checks does not require adding chart tests. |
 | Chart schema | `make helm-schema` when the values schema needs updating. |
 | Diff hygiene | `git diff --check` and review the full diff, including new files. |

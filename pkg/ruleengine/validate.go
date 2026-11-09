@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/netip"
 	"regexp"
+	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -146,16 +147,16 @@ func validateIngressRules(
 	ruleIndex int,
 	ingress rules.NamespaceRuleEnforceIngressBody,
 ) error {
-	if len(ingress.Types) == 0 && len(ingress.Hostnames) > 0 {
+	if len(ingress.Types) == 0 && (len(ingress.Hostnames) > 0 || len(ingress.Classes) > 0) {
 		return fmt.Errorf(
-			"rules[%d].enforce.ingress.types is invalid: types must be configured when hostnames are configured",
+			"rules[%d].enforce.ingress.types is invalid: types must be configured when hostnames or classes are configured",
 			ruleIndex,
 		)
 	}
 
-	if len(ingress.Types) > 0 && len(ingress.Hostnames) == 0 {
+	if len(ingress.Types) > 0 && len(ingress.Hostnames) == 0 && len(ingress.Classes) == 0 {
 		return fmt.Errorf(
-			"rules[%d].enforce.ingress.hostnames is invalid: hostnames must be configured when types are configured",
+			"rules[%d].enforce.ingress.hostnames is invalid: hostnames or classes must be configured when types are configured",
 			ruleIndex,
 		)
 	}
@@ -187,7 +188,13 @@ func validateIngressRules(
 		}
 	}
 
-	return nil
+	if len(ingress.Classes) > 0 {
+		if !slices.Contains(ingress.Types, rules.IngressTypeIngress) && !slices.Contains(ingress.Types, rules.IngressTypeGateway) {
+			return fmt.Errorf("rules[%d].enforce.ingress.classes: types must include Ingress or Gateway", ruleIndex)
+		}
+	}
+
+	return validateClassMatches(fmt.Sprintf("rules[%d].enforce.ingress.classes", ruleIndex), ingress.Classes)
 }
 
 func validateAudience(ruleIndex int, audience []rules.Audience) error {
@@ -242,6 +249,18 @@ func validateWorkloadRules(
 
 	if err := validateSecurityProfileRules(ruleIndex, workloads); err != nil {
 		return err
+	}
+
+	for _, classes := range []struct {
+		field   string
+		matches []rules.WorkloadClassMatch
+	}{{"priority", workloads.Classes.Priority}, {"runtime", workloads.Classes.Runtime}} {
+		if err := validateClassMatches(
+			fmt.Sprintf("rules[%d].enforce.workloads.classes.%s", ruleIndex, classes.field),
+			classes.matches,
+		); err != nil {
+			return err
+		}
 	}
 
 	for j, registry := range workloads.Registries {

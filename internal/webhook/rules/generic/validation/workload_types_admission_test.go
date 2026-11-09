@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	admissionv1 "k8s.io/api/admission/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,14 +44,14 @@ func TestTemplateAdmissionSharesRequestReads(t *testing.T) {
 	require.NoError(t, capsulev1beta2.AddToScheme(scheme))
 	var objects []client.Object
 	for _, name := range []string{"a", "b"} {
-		tnt := &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: name, UID: types.UID(name)}}
-		ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name, OwnerReferences: []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: name, UID: tnt.UID}}}}
-		rs := &capsulev1beta2.RuleStatus{ObjectMeta: metav1.ObjectMeta{Name: meta.NameForManagedRuleStatus(), Namespace: name}}
+		tnt := &capsulev1beta2.Tenant{Name: name, UID: types.UID(name)}
+		ns := &corev1.Namespace{Name: name, OwnerReferences: []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: name, UID: tnt.UID}}}
+		rs := &capsulev1beta2.RuleStatus{Name: meta.NameForManagedRuleStatus(), Namespace: name}
 		rs.Status.Rules = []*rules.NamespaceRuleBodyNamespace{{Enforce: &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: []rules.WorkloadValidationTarget{rules.ValidateDeployment}, Placement: rules.WorkloadPlacementEnforcement{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{name}}}}}}}}
 		objects = append(objects, tnt, ns, rs)
 	}
 	cl := &typeAdmissionClient{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()}
-	chain := Register(nil, nil, nil, nil, podvalidation.TemplateRules(nil, nil, nil)).GetHandlers()
+	chain := Register(nil, nil, nil, nil, podvalidation.TemplateRules(nil, nil, nil, nil)).GetHandlers()
 	for _, namespace := range []string{"a", "b"} {
 		cl.gets.Store(0)
 		req := requestWithKind("apps", "Deployment")
@@ -94,14 +95,14 @@ func TestTemplateAdmissionSharesRequestReads(t *testing.T) {
 	for _, kind := range []string{"Service", "ConfigMap", "Deployment"} {
 		req := requestWithKind("example.com", kind)
 		req.Namespace = "a"
-		h := &templateBridge{next: podvalidation.TemplateRules(nil, nil, nil)}
+		h := &templateBridge{next: podvalidation.TemplateRules(nil, nil, nil, nil)}
 		require.Nil(t, h.OnCreate(cl, cl, nil, admission.NewDecoder(scheme), nil, nil, nil)(t.Context(), req))
 		req.Kind.Group = "apps"
 		req.SubResource = "status"
 		require.Nil(t, h.OnUpdate(cl, cl, nil, nil, admission.NewDecoder(scheme), nil, nil, nil)(t.Context(), req))
 	}
 	require.Zero(t, cl.gets.Load(), "excluded requests skip resolution")
-	bridge := &templateBridge{next: podvalidation.TemplateRules(nil, nil, nil)}
+	bridge := &templateBridge{next: podvalidation.TemplateRules(nil, nil, nil, nil)}
 	req := requestWithKind("apps", "Deployment")
 	for _, body := range []*rules.NamespaceRuleBodyNamespace{
 		nil,
@@ -126,9 +127,9 @@ func BenchmarkTemplateHandlerChain(b *testing.B) {
 					requests := make([]admission.Request, tenants)
 					for i := range tenants {
 						name := fmt.Sprintf("tenant-%d", i)
-						tnt := &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: name, UID: types.UID(name)}}
-						ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name, OwnerReferences: []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: name, UID: tnt.UID}}}}
-						rs := &capsulev1beta2.RuleStatus{ObjectMeta: metav1.ObjectMeta{Name: meta.NameForManagedRuleStatus(), Namespace: name}}
+						tnt := &capsulev1beta2.Tenant{Name: name, UID: types.UID(name)}
+						ns := &corev1.Namespace{Name: name, OwnerReferences: []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: name, UID: tnt.UID}}}
+						rs := &capsulev1beta2.RuleStatus{Name: meta.NameForManagedRuleStatus(), Namespace: name}
 						for range count {
 							rs.Status.Rules = append(rs.Status.Rules, &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: []rules.WorkloadValidationTarget{rules.ValidateDeployment}, Placement: rules.WorkloadPlacementEnforcement{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"blocked"}}}}}}})
 						}
@@ -140,7 +141,7 @@ func BenchmarkTemplateHandlerChain(b *testing.B) {
 					cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
 					chain := Register(nil, nil, nil, nil, nil).GetHandlers()
 					if enabled {
-						chain = Register(nil, nil, nil, nil, podvalidation.TemplateRules(nil, nil, nil)).GetHandlers()
+						chain = Register(nil, nil, nil, nil, podvalidation.TemplateRules(nil, nil, nil, nil)).GetHandlers()
 					}
 					decoder := admission.NewDecoder(scheme)
 					b.ReportAllocs()
@@ -187,15 +188,15 @@ func TestWorkloadTypeAdmissionProfilesAndReads(t *testing.T) {
 					typ = rules.ValidateJob
 				}
 				body := &rules.NamespaceRuleBodyNamespace{Audience: []rules.Audience{{Kind: rules.AudienceKindUser, Name: name}}, Enforce: typePolicy(rules.ActionTypeDeny, typ)}
-				tnt := &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: name, UID: types.UID(name)}, Spec: capsulev1beta2.TenantSpec{Rules: []*rules.NamespaceRuleBodyTenant{{NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"profile": "selected"}}, NamespaceRuleBodyNamespace: body}}}}
+				tnt := &capsulev1beta2.Tenant{Name: name, UID: types.UID(name), Spec: capsulev1beta2.TenantSpec{Rules: []*rules.NamespaceRuleBodyTenant{{NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"profile": "selected"}}, NamespaceRuleBodyNamespace: body}}}}
 				objects = append(objects, tnt)
 				for _, profile := range []string{"selected", "other"} {
-					ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name + "-" + profile, Labels: map[string]string{meta.TenantLabel: name, "profile": profile}, OwnerReferences: []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: name, UID: tnt.UID}}}}
+					ns := &corev1.Namespace{Name: name + "-" + profile, Labels: map[string]string{meta.TenantLabel: name, "profile": profile}, OwnerReferences: []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: name, UID: tnt.UID}}}
 					objects = append(objects, ns)
 					if statusPresent {
 						projected, err := tenant.BuildNamespaceRuleBodyStatus(scheme, ns, tnt)
 						require.NoError(t, err)
-						rs := &capsulev1beta2.RuleStatus{ObjectMeta: metav1.ObjectMeta{Name: meta.NameForManagedRuleStatus(), Namespace: ns.Name}}
+						rs := &capsulev1beta2.RuleStatus{Name: meta.NameForManagedRuleStatus(), Namespace: ns.Name}
 						rs.Status.Rules = projected
 						objects = append(objects, rs)
 					}
@@ -220,7 +221,7 @@ func TestWorkloadTypeAdmissionProfilesAndReads(t *testing.T) {
 						req.Namespace = tc.namespace
 						req.Operation = operation
 						req.UserInfo = authenticationv1.UserInfo{Username: tc.user}
-						obj := &metav1.PartialObjectMetadata{TypeMeta: metav1.TypeMeta{APIVersion: tc.group + "/v1", Kind: tc.kind}, ObjectMeta: metav1.ObjectMeta{Name: "app", Namespace: tc.namespace}}
+						obj := &metav1.PartialObjectMetadata{APIVersion: tc.group + "/v1", Kind: tc.kind, Name: "app", Namespace: tc.namespace}
 						req.Object.Raw, err = json.Marshal(obj)
 						require.NoError(t, err)
 						req.OldObject = req.Object
@@ -269,4 +270,83 @@ func TestWorkloadTypeAdmissionProfilesAndReads(t *testing.T) {
 			require.Contains(t, response.Result.Message, "tenant read unavailable")
 		})
 	}
+}
+
+// A scale-up creates Pods from the unchanged parent template under the
+// controller's identity, which an audience-scoped class rule never matches, so
+// the scale request itself is the enforcement point.
+func TestWorkloadScaleAdmissionEnforcesClasses(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, capsulev1beta2.AddToScheme(scheme))
+	require.NoError(t, appsv1.AddToScheme(scheme))
+
+	tnt := &capsulev1beta2.Tenant{Name: "a", UID: types.UID("a")}
+	ns := &corev1.Namespace{Name: "a", OwnerReferences: []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: "a", UID: tnt.UID}}}
+	rs := &capsulev1beta2.RuleStatus{Name: meta.NameForManagedRuleStatus(), Namespace: "a"}
+	rs.Status.Rules = []*rules.NamespaceRuleBodyNamespace{{
+		Audience: []rules.Audience{{Kind: rules.AudienceKindUser, Name: "owner"}},
+		Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeDeny, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
+			Targets: []rules.WorkloadValidationTarget{rules.ValidateDeployment},
+			Classes: rules.WorkloadClassEnforcement{Runtime: []rules.WorkloadClassMatch{{Exact: []string{"forbidden"}}}},
+		}},
+	}}
+
+	forbidden := "forbidden"
+	parent := &appsv1.Deployment{
+		Name: "app", Namespace: "a",
+		Spec: appsv1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "app"}},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "app"}},
+				Spec:       corev1.PodSpec{RuntimeClassName: &forbidden, Containers: []corev1.Container{{Name: "app", Image: "example.com/app:v1"}}},
+			},
+		},
+	}
+
+	cl := &typeAdmissionClient{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(tnt, ns, rs, parent).Build()}
+	chain := Register(nil, nil, nil, nil, podvalidation.TemplateRules(nil, nil, nil, nil)).GetHandlers()
+
+	run := func(user string, oldReplicas, newReplicas int) *admission.Response {
+		req := admission.Request{
+			Kind:        metav1.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "Scale"},
+			Resource:    metav1.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
+			SubResource: "scale",
+			Operation:   admissionv1.Update,
+			Namespace:   "a",
+			Name:        "app",
+			UserInfo:    authenticationv1.UserInfo{Username: user}}
+		req.Object.Raw = fmt.Appendf(nil, `{"apiVersion":"autoscaling/v1","kind":"Scale","metadata":{"name":"app","namespace":"a"},"spec":{"replicas":%d}}`, newReplicas)
+		req.OldObject.Raw = fmt.Appendf(nil, `{"apiVersion":"autoscaling/v1","kind":"Scale","metadata":{"name":"app","namespace":"a"},"spec":{"replicas":%d}}`, oldReplicas)
+
+		reader := webhookutils.NewRequestCachingReader(cl)
+
+		var response *admission.Response
+
+		for _, handler := range chain {
+			response = handler.OnUpdate(cl, reader, admission.NewDecoder(scheme), testEventRecorder{})(t.Context(), req)
+			if response != nil {
+				break
+			}
+		}
+
+		return response
+	}
+
+	// The rule's audience scales up a parent that keeps the forbidden class.
+	cl.gets.Store(0)
+	response := run("owner", 0, 3)
+	require.NotNil(t, response)
+	require.False(t, response.Allowed)
+	require.Contains(t, response.Result.Message, `runtime class "forbidden"`)
+	require.Equal(t, int64(4), cl.gets.Load(), "tenant resolution and one parent read")
+	require.Zero(t, cl.lists.Load())
+
+	// A user outside the rule's audience is not judged by it.
+	require.Nil(t, run("someone-else", 0, 3))
+
+	// A scale-down creates no Pods and never reads the parent.
+	cl.gets.Store(0)
+	require.Nil(t, run("owner", 3, 1))
+	require.Equal(t, int64(3), cl.gets.Load(), "a scale-down performs only the tenant resolution reads")
 }

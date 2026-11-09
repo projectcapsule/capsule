@@ -77,7 +77,7 @@ func (w *genericValidating) GetHandlers() []handlers.Handler {
 			return supported && req.SubResource == ""
 		},
 		ingressHandler(w.configuration,
-			IngressRules(w.regexCache, w.compiler),
+			IngressRules(w.regexCache, w.selectorCache, w.compiler),
 		),
 	))
 

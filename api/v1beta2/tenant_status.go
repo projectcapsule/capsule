@@ -91,11 +91,14 @@ type TenantAvailableStatus struct {
 type TenantAvailableClassesStatus struct {
 	// Available Storageclasses (Only collected if any matching condition is specified)
 	StorageClasses []string `json:"storage,omitempty"`
-	// Available PriorityClasses
+	// Deprecated: retained for API compatibility, but no longer populated.
+	// Priority classes are enforced through namespace rules.
 	PriorityClasses []string `json:"priority,omitempty"`
-	// Available StorageClasses
+	// Deprecated: retained for API compatibility, but no longer populated.
+	// Runtime classes are enforced through namespace rules.
 	RuntimeClasses []string `json:"runtime,omitempty"`
-	// Available GatewayClasses
+	// Deprecated: retained for API compatibility, but no longer populated.
+	// Ingress/Gateway classes are enforced through namespace rules.
 	GatewayClasses []string `json:"gateway,omitempty"`
 	// Available DeviceClasses
 	DeviceClasses []string `json:"device,omitempty"`

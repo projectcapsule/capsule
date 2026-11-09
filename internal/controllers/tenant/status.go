@@ -11,10 +11,8 @@ import (
 	"sort"
 
 	"github.com/go-logr/logr"
-	nodev1 "k8s.io/api/node/v1"
 	resources "k8s.io/api/resource/v1"
 	resourcesv1beta2 "k8s.io/api/resource/v1beta2"
-	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -23,7 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
@@ -276,6 +273,10 @@ func (r *Manager) collectRBAC(ctx context.Context, tnt *capsulev1beta2.Tenant) (
 }
 
 func (r *Manager) collectAvailableResources(ctx context.Context, log logr.Logger, tnt *capsulev1beta2.Tenant) (err error) {
+	// Class policy is namespace-specific. Retire the old tenant-wide snapshots.
+	//nolint:staticcheck // Clear the deprecated snapshots when reconciling existing Tenants.
+	tnt.Status.Classes.PriorityClasses, tnt.Status.Classes.RuntimeClasses, tnt.Status.Classes.GatewayClasses = nil, nil, nil
+
 	if r.classes.deviceVersion != "" {
 		log.V(5).Info("collecting available deviceclasses")
 
@@ -293,26 +294,6 @@ func (r *Manager) collectAvailableResources(ctx context.Context, log logr.Logger
 	}
 
 	log.V(5).Info("collected available storageclasses", "size", len(tnt.Status.Classes.StorageClasses))
-
-	if err = r.collectAvailablePriorityClasses(ctx, tnt); err != nil {
-		return err
-	}
-
-	if r.classes.gateway {
-		log.V(5).Info("collected available priorityclasses", "size", len(tnt.Status.Classes.PriorityClasses))
-
-		if err = r.collectAvailableGatewayClasses(ctx, tnt); err != nil {
-			return err
-		}
-
-		log.V(5).Info("collected available gatewayclasses", "size", len(tnt.Status.Classes.GatewayClasses))
-	}
-
-	if err = r.collectAvailableRuntimeClasses(ctx, tnt); err != nil {
-		return err
-	}
-
-	log.V(5).Info("collected available runtimeclasses", "size", len(tnt.Status.Classes.RuntimeClasses))
 
 	return nil
 }
@@ -341,45 +322,6 @@ func (r *Manager) collectAvailableStorageClasses(ctx context.Context, tnt *capsu
 		r.reader,
 		tnt.Spec.StorageClasses,
 		&storagev1.StorageClassList{},
-	); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (r *Manager) collectAvailablePriorityClasses(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
-	if tnt.Status.Classes.PriorityClasses, err = listObjectNamesBySelector(
-		ctx,
-		r.reader,
-		tnt.Spec.PriorityClasses,
-		&schedulingv1.PriorityClassList{},
-	); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (r *Manager) collectAvailableGatewayClasses(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
-	if tnt.Status.Classes.GatewayClasses, err = listObjectNamesBySelector(
-		ctx,
-		r.reader,
-		tnt.Spec.GatewayOptions.AllowedClasses,
-		&gatewayv1.GatewayClassList{},
-	); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (r *Manager) collectAvailableRuntimeClasses(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
-	if tnt.Status.Classes.RuntimeClasses, err = listObjectNamesBySelector(
-		ctx,
-		r.reader,
-		tnt.Spec.RuntimeClasses,
-		&nodev1.RuntimeClassList{},
 	); err != nil {
 		return err
 	}

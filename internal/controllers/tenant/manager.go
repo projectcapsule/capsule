@@ -15,12 +15,9 @@ import (
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	nodev1 "k8s.io/api/node/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -36,7 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
@@ -45,7 +41,6 @@ import (
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
-	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 	tenantutils "github.com/projectcapsule/capsule/pkg/tenant"
 )
@@ -78,7 +73,6 @@ type Manager struct {
 
 type supportedClasses struct {
 	deviceVersion string
-	gateway       bool
 }
 
 func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
@@ -124,16 +118,6 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 		Watches(
 			&storagev1.StorageClass{},
 			r.tenantClassEventHandler(r.collectAvailableStorageClasses),
-			builder.WithPredicates(predicates.ClassChanged()),
-		).
-		Watches(
-			&schedulingv1.PriorityClass{},
-			r.tenantClassEventHandler(r.collectAvailablePriorityClasses),
-			builder.WithPredicates(predicates.ClassChanged()),
-		).
-		Watches(
-			&nodev1.RuntimeClass{},
-			r.tenantClassEventHandler(r.collectAvailableRuntimeClasses),
 			builder.WithPredicates(predicates.ClassChanged()),
 		).
 		Watches(
@@ -221,21 +205,6 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 			builder.WithPredicates(predicates.PromotedServiceaccountPredicate{}),
 		).
 		WithOptions(ctrlConfig.Runtime.ToControllerOptions())
-
-	// GatewayClass is Optional
-	r.classes.gateway = gvk.HasGVK(mgr.GetRESTMapper(), schema.GroupVersionKind{
-		Group:   "gateway.networking.k8s.io",
-		Version: "v1",
-		Kind:    "GatewayClass",
-	})
-
-	if r.classes.gateway {
-		ctrlBuilder = ctrlBuilder.Watches(
-			&gatewayv1.GatewayClass{},
-			r.tenantClassEventHandler(r.collectAvailableGatewayClasses),
-			builder.WithPredicates(predicates.ClassChanged()),
-		)
-	}
 
 	if deviceClass := r.discoverDeviceClass(mgr.GetRESTMapper()); deviceClass != nil {
 		ctrlBuilder = ctrlBuilder.Watches(
