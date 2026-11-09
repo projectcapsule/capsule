@@ -1171,6 +1171,8 @@ webhooks:
           expression: '!has(request.subResource) || request.subResource == ""'
         - name: ignore-events
           expression: 'request.resource.resource != "events"'
+        - name: ignore-authorization-reviews
+          expression: 'request.resource.group != "authorization.k8s.io"'
 
       # -- [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy)
       reinvocationPolicy: Never
