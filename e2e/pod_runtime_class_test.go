@@ -115,8 +115,9 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 	customerUni := &nodev1.RuntimeClass{
 		Name: "customer-runu",
 		Labels: map[string]string{
-			"name": "customer-runu",
-			"env":  "e2e",
+			"name":        "customer-runu",
+			"environment": "unikernels",
+			"env":         "e2e",
 		},
 		Handler: "custom-handler",
 	}
@@ -147,12 +148,17 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 		req, err := labels.NewRequirement("env", selection.Equals, []string{"e2e"})
 		Expect(err).NotTo(HaveOccurred())
 
+		// Other specs create RuntimeClasses in parallel. Only the fixtures of this
+		// file carry the environment label, so the sweep leaves theirs alone.
+		own, err := labels.NewRequirement("environment", selection.Exists, nil)
+		Expect(err).NotTo(HaveOccurred())
+
 		var list nodev1.RuntimeClassList
 		Expect(k8sClient.List(
 			context.TODO(),
 			&list,
 			client.MatchingLabelsSelector{
-				Selector: labels.NewSelector().Add(*req),
+				Selector: labels.NewSelector().Add(*req, *own),
 			},
 		)).Should(Succeed())
 
@@ -183,7 +189,7 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 
 				return t.Status.Classes.RuntimeClasses, nil
 			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf(all))
+				Should(BeEmpty())
 		})
 
 		By("providing any runtimeclass", func() {
@@ -229,7 +235,7 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 
 				return t.Status.Classes.RuntimeClasses, nil
 			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf(customerUni.GetName(), customerContainerd.GetName(), legacy.GetName(), disallowed.GetName()))
+				Should(BeEmpty())
 		})
 	})
 
@@ -254,7 +260,7 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 
 					return t.Status.Classes.RuntimeClasses, nil
 				}, defaultTimeoutInterval, defaultPollInterval).
-					Should(ConsistOf(customerContainerd.GetName(), customerKubevirt.GetName(), legacy.GetName()))
+					Should(BeEmpty())
 			})
 
 			pod := &corev1.Pod{
@@ -301,7 +307,7 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 
 				return t.Status.Classes.RuntimeClasses, nil
 			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf(customerContainerd.GetName(), customerKubevirt.GetName(), legacy.GetName()))
+				Should(BeEmpty())
 		})
 
 		pod := &corev1.Pod{
@@ -347,7 +353,7 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 
 				return t.Status.Classes.RuntimeClasses, nil
 			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf(customerContainerd.GetName(), customerKubevirt.GetName(), legacy.GetName()))
+				Should(BeEmpty())
 		})
 
 		for i, rt := range []string{"hardened-crio", "hardened-containerd", "hardened-dockerd"} {
@@ -355,7 +361,8 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 			runtime := &nodev1.RuntimeClass{
 				Name: runtimeName,
 				Labels: map[string]string{
-					"env": "e2e",
+					"environment": "hardened",
+					"env":         "e2e",
 				},
 				Handler: "custom-handler",
 			}
@@ -375,7 +382,7 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 
 					return t.Status.Classes.RuntimeClasses, nil
 				}, defaultTimeoutInterval, defaultPollInterval).
-					Should(ContainElement(runtime.GetName()))
+					Should(BeEmpty())
 			})
 
 			pod := &corev1.Pod{
@@ -439,7 +446,7 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 
 					return t.Status.Classes.RuntimeClasses, nil
 				}, defaultTimeoutInterval, defaultPollInterval).
-					Should(ContainElement(runtime.GetName()))
+					Should(BeEmpty())
 			})
 
 			pod := &corev1.Pod{
@@ -479,7 +486,7 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 
 				return t.Status.Classes.RuntimeClasses, nil
 			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf("customer-containerd-0", "customer-crio-1", "customer-dockerd-2", customerContainerd.GetName(), customerKubevirt.GetName(), legacy.GetName()))
+				Should(BeEmpty())
 		})
 	})
 
@@ -505,7 +512,7 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 
 				return t.Status.Classes.RuntimeClasses, nil
 			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf(defaultRuntime.GetName(), customerContainerd.GetName(), customerKubevirt.GetName(), legacy.GetName()))
+				Should(BeEmpty())
 		})
 
 		pod := corev1.Pod{

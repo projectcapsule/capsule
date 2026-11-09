@@ -15,7 +15,6 @@ import (
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	nodev1 "k8s.io/api/node/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -119,11 +118,6 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 		Watches(
 			&storagev1.StorageClass{},
 			r.tenantClassEventHandler(r.collectAvailableStorageClasses),
-			builder.WithPredicates(predicates.ClassChanged()),
-		).
-		Watches(
-			&nodev1.RuntimeClass{},
-			r.tenantClassEventHandler(r.collectAvailableRuntimeClasses),
 			builder.WithPredicates(predicates.ClassChanged()),
 		).
 		Watches(

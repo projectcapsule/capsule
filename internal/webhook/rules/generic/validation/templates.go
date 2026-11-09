@@ -5,7 +5,9 @@ package validation
 
 import (
 	"context"
+	"slices"
 
+	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -64,7 +66,26 @@ func (*templateBridge) OnDelete(client.Client, client.Reader, genericObject, adm
 
 func matchesTemplatePolicies(req admission.Request, bodies []*rules.NamespaceRuleBodyNamespace) bool {
 	gvk := schema.GroupVersionKind{Group: req.Kind.Group, Version: req.Kind.Version, Kind: req.Kind.Kind}
-	if req.SubResource != "" || len(workloads.PodTemplatePath(gvk)) == 0 {
+
+	// A scale-up creates Pods from the unchanged parent template under the
+	// controller's identity, so class rules targeting the parent kind must
+	// judge the scale request itself.
+	if req.SubResource != "" {
+		if req.SubResource != "scale" || req.Operation != admissionv1.Update {
+			return false
+		}
+
+		gvk = workloads.ScaleWorkloadGVK(req.Resource)
+		if gvk.Empty() {
+			return false
+		}
+
+		return slices.ContainsFunc(bodies, func(body *rules.NamespaceRuleBodyNamespace) bool {
+			return body != nil && body.Enforce != nil && body.Enforce.Workloads.Classes.HasPolicies() && templateTargets(body.Enforce.Workloads.Targets, gvk)
+		})
+	}
+
+	if len(workloads.PodTemplatePath(gvk)) == 0 {
 		return false
 	}
 
@@ -73,11 +94,20 @@ func matchesTemplatePolicies(req admission.Request, bodies []*rules.NamespaceRul
 			continue
 		}
 
-		for _, target := range body.Enforce.Workloads.Targets {
-			gk, valid := target.GroupKind()
-			if valid && gk == gvk.GroupKind() {
-				return true
-			}
+		if templateTargets(body.Enforce.Workloads.Targets, gvk) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// templateTargets reports whether any target names the controller kind.
+func templateTargets(targets []rules.WorkloadValidationTarget, gvk schema.GroupVersionKind) bool {
+	for _, target := range targets {
+		gk, valid := target.GroupKind()
+		if valid && gk == gvk.GroupKind() {
+			return true
 		}
 	}
 

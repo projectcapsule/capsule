@@ -38,6 +38,7 @@ const (
 	ReasonForbiddenPriorityClass string = "ForbiddenPriorityClass"
 	ReasonMissingPriorityClass   string = "MissingPriorityClass"
 	ReasonForbiddenRuntimeClass  string = "ForbiddenRuntimeClass"
+	ReasonMissingRuntimeClass    string = "MissingRuntimeClass"
 	ReasonForbiddenIngressClass  string = "ForbiddenIngressClass"
 	ReasonMissingIngressClass    string = "MissingIngressClass"
 	ReasonForbiddenGatewayClass  string = "ForbiddenGatewayClass"

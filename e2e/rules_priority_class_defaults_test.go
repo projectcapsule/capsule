@@ -101,7 +101,7 @@ var _ = Describe("PriorityClass default namespace profiles", Label("tenant", "ru
 		}
 
 		expectProfile := func(ns *corev1.Namespace, count int, class string) {
-			waitPriorityClassProfile(ctx, ns, func(g Gomega, bodies []*rules.NamespaceRuleBodyNamespace) {
+			waitWorkloadClassProfile(ctx, ns, func(g Gomega, bodies []*rules.NamespaceRuleBodyNamespace) {
 				g.Expect(bodies).To(HaveLen(count))
 
 				if count > 0 {
@@ -298,7 +298,7 @@ var _ = Describe("PriorityClass defaults with a cluster global default", Serial,
 			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 			NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 			DeferCleanup(DeleteNamespaceInBackground, ctx, ns.Name)
-			waitPriorityClassProfile(ctx, ns, func(g Gomega, bodies []*rules.NamespaceRuleBodyNamespace) { g.Expect(bodies).To(HaveLen(count)) })
+			waitWorkloadClassProfile(ctx, ns, func(g Gomega, bodies []*rules.NamespaceRuleBodyNamespace) { g.Expect(bodies).To(HaveLen(count)) })
 
 			return ns
 		}

@@ -22,6 +22,11 @@ func TestWorkloadClassGeneratedSchemas(t *testing.T) {
 		return `["` + strings.Join(strings.Split(strings.Repeat("gold ", n)[:5*n-1], " "), `","`) + `"]`
 	}
 
+	type schemaCase struct {
+		object string
+		valid  bool
+	}
+
 	for _, resource := range []string{"tenants", "rulestatuses"} {
 		data, err := os.ReadFile("../../charts/capsule/crds/capsule.clastix.io_" + resource + ".yaml")
 		require.NoError(t, err)
@@ -29,97 +34,95 @@ func TestWorkloadClassGeneratedSchemas(t *testing.T) {
 		var crd apiextensionsv1.CustomResourceDefinition
 		require.NoError(t, yaml.UnmarshalStrict(data, &crd))
 
-		enforcement, mutation := 0, 0
+		for _, class := range workloadClassFields {
+			enforcement, mutation := 0, 0
 
-		var visit func(apiextensionsv1.JSONSchemaProps, string)
+			var visit func(apiextensionsv1.JSONSchemaProps, string)
 
-		visit = func(schema apiextensionsv1.JSONSchemaProps, path string) {
-			// Tenant status keeps a deprecated classes.priority list of plain names.
-			priority, ok := schema.Properties["classes"].Properties["priority"]
-			if ok && (priority.Type == "string" || priority.Items.Schema.Type == "object") {
-				cases := []struct {
-					object string
-					valid  bool
-				}{
-					{`{}`, true},
-					{`{"classes":{}}`, true},
-					{`{"classes":{"priority":"tenant-default"}}`, true},
-					{`{"classes":{"priority":"{{ .tenant.metadata.name }}-default"}}`, true},
-					{`{"classes":{"priority":"` + strings.Repeat("a", 4096) + `"}}`, true},
-					{`{"classes":{"priority":"` + strings.Repeat("a", 4097) + `"}}`, false},
-					{`{"classes":{"priority":""}}`, false},
-					{`{"classes":{"priority":["tenant-default"]}}`, false},
-					{`{"classes":"tenant-default"}`, false},
-				}
-
-				if priority.Type == "array" {
-					enforcement++
-
-					require.Equal(t, "atomic", *priority.XListType)
-					require.EqualValues(t, 64, *priority.MaxItems)
-
-					for _, name := range []string{"exact", "exp", "matchLabels", "matchExpressions"} {
-						require.Contains(t, priority.Items.Schema.Properties, name)
-					}
-
-					cases = []struct {
-						object string
-						valid  bool
-					}{
+			visit = func(schema apiextensionsv1.JSONSchemaProps, path string) {
+				// Tenant status keeps deprecated classes lists of plain names.
+				property, ok := schema.Properties["classes"].Properties[class.name]
+				if ok && (property.Type == "string" || property.Items.Schema.Type == "object") {
+					cases := []schemaCase{
 						{`{}`, true},
 						{`{"classes":{}}`, true},
-						{`{"classes":{"priority":[{"exact":["internal.example.com"],"exp":"^[a-z0-9-]+\\.example\\.com$","matchLabels":{"env":"customer"}}]}}`, true},
-						{`{"classes":{"priority":[{"matchExpressions":[{"key":"env","operator":"Exists"}]}]}}`, true},
-						{`{"classes":{"priority":[{"exact":` + names(64) + `}]}}`, true},
-						{`{"classes":{"priority":[{"exact":` + names(65) + `}]}}`, false},
-						{`{"classes":{"priority":[]}}`, false},
-						{`{"classes":{"priority":[{"exact":[]}]}}`, false},
-						{`{"classes":{"priority":[{"exact":[""]}]}}`, false},
-						{`{"classes":{"priority":[{"exp":""}]}}`, false},
-						{`{"classes":{"priority":[{"matchLabels":["env"]}]}}`, false},
-						{`{"classes":{"priority":["gold"]}}`, false},
-						{`{"classes":{"priority":"gold"}}`, false},
+						{`{"classes":{"NAME":"tenant-default"}}`, true},
+						{`{"classes":{"NAME":"{{ .tenant.metadata.name }}-default"}}`, true},
+						{`{"classes":{"NAME":"` + strings.Repeat("a", 4096) + `"}}`, true},
+						{`{"classes":{"NAME":"` + strings.Repeat("a", 4097) + `"}}`, false},
+						{`{"classes":{"NAME":""}}`, false},
+						{`{"classes":{"NAME":["tenant-default"]}}`, false},
+						{`{"classes":"tenant-default"}`, false},
 					}
-				} else {
-					mutation++
 
-					require.Equal(t, "string", priority.Type)
+					if property.Type == "array" {
+						enforcement++
+
+						require.Equal(t, "atomic", *property.XListType)
+						require.EqualValues(t, 64, *property.MaxItems)
+
+						for _, name := range []string{"exact", "exp", "matchLabels", "matchExpressions"} {
+							require.Contains(t, property.Items.Schema.Properties, name)
+						}
+
+						cases = []schemaCase{
+							{`{}`, true},
+							{`{"classes":{}}`, true},
+							{`{"classes":{"NAME":[{"exact":["internal.example.com"],"exp":"^[a-z0-9-]+\\.example\\.com$","matchLabels":{"env":"customer"}}]}}`, true},
+							{`{"classes":{"NAME":[{"matchExpressions":[{"key":"env","operator":"Exists"}]}]}}`, true},
+							{`{"classes":{"NAME":[{"exact":` + names(64) + `}]}}`, true},
+							{`{"classes":{"NAME":[{"exact":` + names(65) + `}]}}`, false},
+							{`{"classes":{"NAME":[]}}`, false},
+							{`{"classes":{"NAME":[{"exact":[]}]}}`, false},
+							{`{"classes":{"NAME":[{"exact":[""]}]}}`, false},
+							{`{"classes":{"NAME":[{"exp":""}]}}`, false},
+							{`{"classes":{"NAME":[{"matchLabels":["env"]}]}}`, false},
+							{`{"classes":{"NAME":["gold"]}}`, false},
+							{`{"classes":{"NAME":"gold"}}`, false},
+						}
+					} else {
+						mutation++
+
+						require.Equal(t, "string", property.Type)
+					}
+
+					var internal apiextensions.JSONSchemaProps
+					require.NoError(t, apiextensionsv1.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&schema, &internal, nil))
+
+					validator, _, err := crdvalidation.NewSchemaValidator(&internal)
+					require.NoError(t, err)
+
+					for _, tc := range cases {
+						object := strings.ReplaceAll(tc.object, "NAME", class.name)
+
+						var obj any
+						require.NoError(t, json.Unmarshal([]byte(object), &obj))
+
+						errs := crdvalidation.ValidateCustomResource(field.NewPath(path), obj, validator)
+						require.Equal(t, tc.valid, len(errs) == 0, "%s: %.120s: %v", path, object, errs)
+					}
 				}
 
-				var internal apiextensions.JSONSchemaProps
-				require.NoError(t, apiextensionsv1.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&schema, &internal, nil))
+				for name, property := range schema.Properties {
+					visit(property, path+"/"+name)
+				}
 
-				validator, _, err := crdvalidation.NewSchemaValidator(&internal)
-				require.NoError(t, err)
-
-				for _, tc := range cases {
-					var obj any
-					require.NoError(t, json.Unmarshal([]byte(tc.object), &obj))
-
-					errs := crdvalidation.ValidateCustomResource(field.NewPath(path), obj, validator)
-					require.Equal(t, tc.valid, len(errs) == 0, "%s: %.120s: %v", path, tc.object, errs)
+				if schema.Items != nil && schema.Items.Schema != nil {
+					visit(*schema.Items.Schema, path+"/*")
 				}
 			}
 
-			for name, property := range schema.Properties {
-				visit(property, path+"/"+name)
+			for _, version := range crd.Spec.Versions {
+				visit(*version.Schema.OpenAPIV3Schema, resource+"/"+version.Name)
 			}
 
-			if schema.Items != nil && schema.Items.Schema != nil {
-				visit(*schema.Items.Schema, path+"/*")
+			// A class rule and a class default are available wherever rules are stored.
+			require.Positive(t, enforcement, class.name)
+			require.Equal(t, enforcement, mutation, class.name)
+
+			if resource == "tenants" {
+				require.Equal(t, 1, enforcement, class.name)
 			}
-		}
-
-		for _, version := range crd.Spec.Versions {
-			visit(*version.Schema.OpenAPIV3Schema, resource+"/"+version.Name)
-		}
-
-		// A class rule and a class default are available wherever rules are stored.
-		require.Positive(t, enforcement)
-		require.Equal(t, enforcement, mutation)
-
-		if resource == "tenants" {
-			require.Equal(t, 1, enforcement)
 		}
 	}
 }

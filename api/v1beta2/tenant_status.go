@@ -94,7 +94,8 @@ type TenantAvailableClassesStatus struct {
 	// Deprecated: retained for API compatibility, but no longer populated.
 	// Priority classes are enforced through namespace rules.
 	PriorityClasses []string `json:"priority,omitempty"`
-	// Available StorageClasses
+	// Deprecated: retained for API compatibility, but no longer populated.
+	// Runtime classes are enforced through namespace rules.
 	RuntimeClasses []string `json:"runtime,omitempty"`
 	// Deprecated: retained for API compatibility, but no longer populated.
 	// Ingress/Gateway classes are enforced through namespace rules.

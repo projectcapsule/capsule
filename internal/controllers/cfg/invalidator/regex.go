@@ -102,7 +102,7 @@ func collectRegexExpressionsFromNamespaceRule(
 		}
 	}
 
-	for _, classes := range [][]rules.StorageClassMatch{rule.Enforce.Storage.Classes, rule.Enforce.Storage.AttributeClasses, rule.Enforce.Workloads.Classes.Priority} {
+	for _, classes := range [][]rules.StorageClassMatch{rule.Enforce.Storage.Classes, rule.Enforce.Storage.AttributeClasses, rule.Enforce.Workloads.Classes.Priority, rule.Enforce.Workloads.Classes.Runtime} {
 		for _, class := range classes {
 			if class.Expression != "" {
 				expr := class.NameMatch().ExpressionRegex

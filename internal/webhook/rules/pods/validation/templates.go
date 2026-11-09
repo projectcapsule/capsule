@@ -5,6 +5,8 @@ package validation
 
 import (
 	"context"
+	"fmt"
+	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -43,6 +45,10 @@ func (*templateRules) OnDelete(client.Client, client.Reader, *unstructured.Unstr
 
 func (h *templateRules) validate(reader client.Reader, old, obj *unstructured.Unstructured, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant, bodies []*rules.NamespaceRuleBodyNamespace) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
+		if req.SubResource == "scale" {
+			return h.validateScale(ctx, reader, old, obj, recorder, tnt, bodies, req)
+		}
+
 		gvk := schema.GroupVersionKind{Group: req.Kind.Group, Version: req.Kind.Version, Kind: req.Kind.Kind}
 
 		path := workloads.PodTemplatePath(gvk)
@@ -79,4 +85,88 @@ func (h *templateRules) validate(reader client.Reader, old, obj *unstructured.Un
 
 		return nil
 	}
+}
+
+// appliesToClasses reports whether a rule carries any Pod-level class policy.
+func appliesToClasses(body *rules.NamespaceRuleEnforceBody) bool {
+	return appliesToPriorityClasses(body) || appliesToRuntimeClasses(body)
+}
+
+// validateScale enforces class rules when a scale-up creates Pods from an
+// unchanged controller template. Those Pods are created under the controller's
+// identity, which an audience-scoped rule never matches, so the scale request
+// itself is the last admission the rule's audience performs. A scale-down
+// creates no Pods and is never evaluated.
+func (h *templateRules) validateScale(ctx context.Context, reader client.Reader, old, obj *unstructured.Unstructured, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant, bodies []*rules.NamespaceRuleBodyNamespace, req admission.Request) *admission.Response {
+	gvk := workloads.ScaleWorkloadGVK(req.Resource)
+	if gvk.Empty() || obj == nil || old == nil || !scaledUp(old, obj) {
+		return nil
+	}
+
+	enforce := ruleengine.WorkloadEnforcement(ruleengine.EnforceBodiesFromNamespaceRules(bodies), gvk)
+	if !slices.ContainsFunc(enforce, appliesToClasses) {
+		return nil
+	}
+
+	parent := &unstructured.Unstructured{}
+	parent.SetGroupVersionKind(gvk)
+
+	if err := reader.Get(ctx, client.ObjectKey{Namespace: req.Namespace, Name: req.Name}, parent); err != nil {
+		return handlers.ErroredResponse(fmt.Errorf("read scale parent: %w", err))
+	}
+
+	if uid := obj.GetUID(); uid != "" && uid != parent.GetUID() {
+		return handlers.ErroredResponse(fmt.Errorf("scale parent changed; retry"))
+	}
+
+	pod, err := workloads.PodFromTemplate(parent)
+	if err != nil {
+		return ad.Deny(err.Error())
+	}
+
+	enforce, err = ruleengine.FilterEnforcementConditions(ctx, ruleengine.NewConditionEvaluator(h.pod.compiler, req.AdmissionRequest), parent, enforce, appliesToClasses)
+	if err != nil {
+		return ad.Deny(fmt.Sprintf("enforce: %v", err))
+	}
+
+	prefix := strings.Join(workloads.PodTemplatePath(gvk), ".") + ": "
+
+	for _, validate := range []func(context.Context, client.Reader, client.Object, *corev1.Pod, []*rules.NamespaceRuleEnforceBody) (*ruleengine.Evaluation, error){
+		h.pod.validatePriorityClasses,
+		h.pod.validateRuntimeClasses,
+	} {
+		evaluation, err := validate(ctx, reader, parent, pod, enforce)
+		if err != nil {
+			return rejection(prefix, err)
+		}
+
+		if evaluation == nil {
+			continue
+		}
+
+		blockingErr := evaluation.BlockingError()
+		emitWorkloadRuleEvents(ctx, req, recorder, parent, tnt, evaluation, blockingErr)
+
+		if blockingErr != nil {
+			return rejection(prefix, blockingErr)
+		}
+	}
+
+	return nil
+}
+
+// scaledUp reports whether the scale update raises the replica count. A
+// malformed replica field keeps the request evaluated rather than skipped.
+func scaledUp(old, obj *unstructured.Unstructured) bool {
+	previous, _, err := unstructured.NestedInt64(old.Object, "spec", "replicas")
+	if err != nil {
+		return true
+	}
+
+	current, _, err := unstructured.NestedInt64(obj.Object, "spec", "replicas")
+	if err != nil {
+		return true
+	}
+
+	return current > previous
 }
