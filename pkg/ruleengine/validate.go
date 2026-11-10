@@ -198,8 +198,13 @@ func validateIngressRules(
 }
 
 func validateAudience(ruleIndex int, audience []rules.Audience) error {
+	return ValidateAudience(fmt.Sprintf("rules[%d].audience", ruleIndex), audience)
+}
+
+// ValidateAudience validates the identity model shared by rules and triggers.
+func ValidateAudience(pathPrefix string, audience []rules.Audience) error {
 	for i, subject := range audience {
-		path := fmt.Sprintf("rules[%d].audience[%d]", ruleIndex, i)
+		path := fmt.Sprintf("%s[%d]", pathPrefix, i)
 		if strings.TrimSpace(subject.Name) == "" {
 			return fmt.Errorf("%s.name is invalid: name is empty", path)
 		}

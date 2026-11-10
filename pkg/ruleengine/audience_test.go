@@ -41,12 +41,12 @@ func TestMatchesAudience(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			matched, err := matchesAudience(t.Context(), cl, cfg, tt.tnt, req, tt.audience)
+			matched, err := MatchesAudience(t.Context(), cl, cfg, tt.tnt, req, tt.audience)
 			if err != nil {
-				t.Fatalf("matchesAudience() error = %v", err)
+				t.Fatalf("MatchesAudience() error = %v", err)
 			}
 			if matched != tt.want {
-				t.Fatalf("matchesAudience() = %v, want %v", matched, tt.want)
+				t.Fatalf("MatchesAudience() = %v, want %v", matched, tt.want)
 			}
 		})
 	}

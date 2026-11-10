@@ -76,6 +76,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/owners"
 	"github.com/projectcapsule/capsule/internal/webhook/pod"
 	"github.com/projectcapsule/capsule/internal/webhook/pvc"
+	replicationwebhook "github.com/projectcapsule/capsule/internal/webhook/replication"
 	"github.com/projectcapsule/capsule/internal/webhook/resourcepool"
 	"github.com/projectcapsule/capsule/internal/webhook/route"
 	rulesgenericmutation "github.com/projectcapsule/capsule/internal/webhook/rules/generic/mutation"
@@ -655,6 +656,15 @@ func main() {
 	impersonationCache := cache.NewImpersonationCache()
 	regexCache := cache.NewRegexCache()
 	labelSelectorCache := cache.NewLabelSelectorCache()
+
+	triggerRecorder := metrics.MustMakeTriggerRecorder()
+
+	triggerDispatcher := resources.NewTriggerDispatcher(manager.GetClient(), manager.GetAPIReader(), ctrl.Log.WithName("replication-triggers"), triggerRecorder)
+	if err := manager.Add(triggerDispatcher); err != nil {
+		setupLog.Error(err, "unable to register trigger dispatcher")
+		os.Exit(1)
+	}
+
 	registryCache := cache.NewRegistryRuleSetCache(regexCache)
 	jsonPathCache := cache.NewJSONPathCache()
 
@@ -736,6 +746,7 @@ func main() {
 			pvcrules.AttributeClassHandler(cfg, regexCache, labelSelectorCache, celCache),
 		),
 		route.GenericReplicasHandler(),
+		route.ReplicationTriggers(replicationwebhook.TriggerHandler(cfg, triggerDispatcher, ctrl.Log.WithName("replication-triggers"))),
 		route.GenericManagedHandler(cfg),
 		route.Pod(
 			pod.Handler(cfg,
@@ -991,6 +1002,8 @@ func main() {
 		manager.GetEventRecorder("admission-ctrl"),
 		controllerConfig,
 		directCfg,
+		celCache,
+		triggerRecorder,
 	); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "admission")
 		os.Exit(1)

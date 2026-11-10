@@ -10,7 +10,9 @@ import (
 	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
+	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 )
 
@@ -20,11 +22,15 @@ func Add(
 	recorder events.EventRecorder,
 	cfg utils.ControllerOptions,
 	capsuleConfig configuration.Configuration,
+	conditions *cache.CELCache,
+	triggerMetrics *metrics.TriggerRecorder,
 ) (err error) {
 	if err = (&validatingReconciler{
-		client:        mgr.GetClient(),
-		log:           log.WithName("admission"),
-		configuration: capsuleConfig,
+		triggerMetrics: triggerMetrics,
+		conditions:     conditions,
+		client:         mgr.GetClient(),
+		log:            log.WithName("admission"),
+		configuration:  capsuleConfig,
 	}).SetupWithManager(mgr, cfg); err != nil {
 		return fmt.Errorf("unable to create validating admission controller: %w", err)
 	}

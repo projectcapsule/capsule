@@ -42,7 +42,7 @@ func FilterNamespaceRulesByAudience(
 			out = append(out, bodies[:i]...)
 		}
 
-		matched, err := matchesAudience(ctx, c, cfg, tnt, req, body.Audience)
+		matched, err := MatchesAudience(ctx, c, cfg, tnt, req, body.Audience)
 		if err != nil {
 			return nil, err
 		}
@@ -59,7 +59,13 @@ func FilterNamespaceRulesByAudience(
 	return out, nil
 }
 
-func matchesAudience(ctx context.Context, c client.Client, cfg configuration.Configuration, tnt *capsulev1beta2.Tenant, req admission.Request, audience []rules.Audience) (bool, error) {
+// MatchesAudience shares namespace-rule identity semantics with replication triggers.
+// An empty audience matches all requests; nonempty entries are alternatives.
+func MatchesAudience(ctx context.Context, c client.Client, cfg configuration.Configuration, tnt *capsulev1beta2.Tenant, req admission.Request, audience []rules.Audience) (bool, error) {
+	if len(audience) == 0 {
+		return true, nil
+	}
+
 	for _, subject := range audience {
 		switch subject.Kind {
 		case rules.AudienceKindUser:

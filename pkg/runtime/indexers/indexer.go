@@ -46,6 +46,8 @@ func AddToManager(ctx context.Context, log logr.Logger, mgr manager.Manager) err
 		tenantresource.ProtectedItems{Obj: &capsulev1beta2.TenantResource{}},
 		tenantresource.GlobalDependencies{},
 		tenantresource.NamespacedDependencies{},
+		tenantresource.Triggers{Obj: &capsulev1beta2.TenantResource{}},
+		tenantresource.Triggers{Obj: &capsulev1beta2.GlobalTenantResource{}},
 		customquota.NamespacedTargetReference{},
 		customquota.NamespacedObjectUIDReference{},
 		customquota.GlobalTargetReference{},

@@ -6,6 +6,7 @@ package webhook
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/attribute"
@@ -25,11 +26,32 @@ type RegistrationOptions struct {
 	EnableTracing bool
 }
 
+type requestPathKey struct{}
+
+// RequestPath exposes the native predicate identity carried by trigger routes.
+func RequestPath(ctx context.Context) string {
+	path, _ := ctx.Value(requestPathKey{}).(string)
+
+	return path
+}
+
+func WithRequestPath(ctx context.Context, path string) context.Context {
+	return context.WithValue(ctx, requestPathKey{}, path)
+}
+
 func Register(manager controllerruntime.Manager, recorder events.EventRecorder, options RegistrationOptions, webhookList ...handlers.Webhook) error {
 	server := manager.GetWebhookServer()
 
 	for _, wh := range webhookList {
+		var withContext func(context.Context, *http.Request) context.Context
+		if strings.HasSuffix(wh.GetPath(), "/") {
+			withContext = func(ctx context.Context, request *http.Request) context.Context {
+				return WithRequestPath(ctx, request.URL.Path)
+			}
+		}
+
 		handler := http.Handler(&webhook.Admission{
+			WithContextFunc: withContext,
 			Handler: &handlerRouter{
 				client:   manager.GetClient(),
 				reader:   manager.GetAPIReader(),

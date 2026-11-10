@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"time"
 
 	"github.com/go-logr/logr"
 	gherrors "github.com/pkg/errors"
@@ -38,6 +39,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	tenantresourceindexer "github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
+	"github.com/projectcapsule/capsule/pkg/runtime/replication"
 	"github.com/projectcapsule/capsule/pkg/runtime/ssa"
 )
 
@@ -92,6 +94,13 @@ func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, ctrlConfig
 			),
 		).
 		Watches(
+			&capsulev1beta2.GlobalTenantResource{},
+			handler.EnqueueRequestsFromMapFunc(func(_ context.Context, obj client.Object) []reconcile.Request {
+				return []reconcile.Request{{Name: obj.GetName()}}
+			}),
+			builder.WithPredicates(predicates.NewTriggerRequestedPredicate(replication.TriggerAnnotation)),
+		).
+		Watches(
 			&capsulev1beta2.CapsuleConfiguration{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueAllResources),
 			builder.WithPredicates(
@@ -134,6 +143,12 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 	requeue := reconcile.Result{
 		RequeueAfter: jitteredResync(tntResource.Spec.ResyncPeriod.Duration),
 	}
+	started := time.Now()
+
+	remaining, triggerRequest := triggerSchedule(tntResource, &tntResource.Spec.TenantResourceCommonSpec, &tntResource.Status.TenantResourceCommonStatus, started)
+	if remaining > 0 {
+		return reconcile.Result{RequeueAfter: remaining}, nil
+	}
 
 	patchHelper, err := patch.NewHelper(tntResource, r.client)
 	if err != nil {
@@ -150,6 +165,10 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 		if statusErr != nil {
 			reconcileErr = statusErr
 		}
+
+		finishTrigger(&tntResource.Status.TenantResourceCommonStatus, triggerRequest, started, reconcileErr)
+		res.RequeueAfter = triggerRetryAfter(&tntResource.Spec.TenantResourceCommonSpec, res.RequeueAfter, reconcileErr)
+		recordNextResync(tntResource, &tntResource.Spec.TenantResourceCommonSpec, &tntResource.Status.TenantResourceCommonStatus, requeue.RequeueAfter)
 
 		if uerr := r.updateStatus(ctx, tntResource, reconcileErr); uerr != nil {
 			if caperrors.IgnoreGone(uerr) {
@@ -185,6 +204,14 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 	// On Deletion these checks are skipped.
 	//nolint:nestif
 	if tntResource.DeletionTimestamp.IsZero() {
+		if len(tntResource.Spec.Triggers) > 0 {
+			if validationErr := replication.ValidateTriggers(&tntResource.Spec.TenantResourceCommonSpec, false, r.conditions); validationErr != nil {
+				statusErr = validationErr
+
+				return requeue, nil
+			}
+		}
+
 		if tntResource.Spec.IsCordoned() {
 			log.V(5).Info("global tenant resource cordoned")
 
@@ -223,12 +250,20 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 	}
 
 	// Best-Effort for Updating the status
+	startTrigger(&tntResource.Status.TenantResourceCommonStatus, triggerRequest, started)
+
 	if updateErr := r.updateReconcilingStatus(ctx, tntResource); updateErr != nil {
 		if caperrors.IgnoreGone(updateErr) {
 			return reconcile.Result{}, nil
 		}
 
 		log.Error(updateErr, "failed to update status")
+
+		if triggerRequest != "" {
+			statusErr = updateErr
+
+			return requeue, nil
+		}
 	}
 
 	if c == nil {
@@ -528,11 +563,12 @@ func (r *globalResourceController) updateReconcilingStatus(ctx context.Context, 
 			return err
 		}
 
-		if latest.Status.ObservedGeneration == instance.GetGeneration() {
+		if latest.Status.ObservedGeneration == instance.GetGeneration() && reflect.DeepEqual(latest.Status.Trigger, instance.Status.Trigger) {
 			return nil
 		}
 
 		latest.Status.ServiceAccount = instance.Status.ServiceAccount
+		latest.Status.Trigger = instance.Status.Trigger.DeepCopy()
 
 		latest.Status.Conditions.UpdateConditionByType(meta.NewReadyConditionReconcilingReason(instance))
 

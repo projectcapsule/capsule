@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"time"
 
 	"github.com/go-logr/logr"
 	gherrors "github.com/pkg/errors"
@@ -37,6 +38,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	tenantresourceindexer "github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
+	"github.com/projectcapsule/capsule/pkg/runtime/replication"
 	"github.com/projectcapsule/capsule/pkg/runtime/ssa"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
 	"github.com/projectcapsule/capsule/pkg/tenant"
@@ -93,6 +95,13 @@ func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager, ctrlCo
 		).
 		Watches(
 			&capsulev1beta2.TenantResource{},
+			handler.EnqueueRequestsFromMapFunc(func(_ context.Context, obj client.Object) []reconcile.Request {
+				return []reconcile.Request{{Name: obj.GetName(), Namespace: obj.GetNamespace()}}
+			}),
+			builder.WithPredicates(predicates.NewTriggerRequestedPredicate(replication.TriggerAnnotation)),
+		).
+		Watches(
+			&capsulev1beta2.TenantResource{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueDependentTenantResources),
 			builder.WithPredicates(predicates.DependencyStateChangedPredicate{}),
 		).
@@ -141,6 +150,12 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 	requeue := reconcile.Result{
 		RequeueAfter: jitteredResync(tntResource.Spec.ResyncPeriod.Duration),
 	}
+	started := time.Now()
+
+	remaining, triggerRequest := triggerSchedule(tntResource, &tntResource.Spec.TenantResourceCommonSpec, &tntResource.Status.TenantResourceCommonStatus, started)
+	if remaining > 0 {
+		return reconcile.Result{RequeueAfter: remaining}, nil
+	}
 
 	patchHelper, err := patch.NewHelper(tntResource, r.client)
 	if err != nil {
@@ -157,6 +172,10 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 		if statusErr != nil {
 			reconcileErr = statusErr
 		}
+
+		finishTrigger(&tntResource.Status.TenantResourceCommonStatus, triggerRequest, started, reconcileErr)
+		res.RequeueAfter = triggerRetryAfter(&tntResource.Spec.TenantResourceCommonSpec, res.RequeueAfter, reconcileErr)
+		recordNextResync(tntResource, &tntResource.Spec.TenantResourceCommonSpec, &tntResource.Status.TenantResourceCommonStatus, requeue.RequeueAfter)
 
 		if uerr := r.updateStatus(ctx, tntResource, reconcileErr); uerr != nil {
 			if caperrors.IgnoreGone(uerr) {
@@ -192,6 +211,14 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 	// On Deletion these checks are skipped.
 	//nolint:nestif
 	if tntResource.DeletionTimestamp.IsZero() {
+		if len(tntResource.Spec.Triggers) > 0 {
+			if validationErr := replication.ValidateTriggers(&tntResource.Spec.TenantResourceCommonSpec, true, r.conditions); validationErr != nil {
+				statusErr = validationErr
+
+				return requeue, nil
+			}
+		}
+
 		if tntResource.Spec.IsCordoned() {
 			log.V(5).Info("tenant resource cordoned")
 
@@ -233,12 +260,20 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 	}
 
 	// Best-Effort for Updating the status
+	startTrigger(&tntResource.Status.TenantResourceCommonStatus, triggerRequest, started)
+
 	if updateErr := r.updateReconcilingStatus(ctx, tntResource); updateErr != nil {
 		if caperrors.IgnoreGone(updateErr) {
 			return reconcile.Result{}, nil
 		}
 
 		log.Error(updateErr, "failed to update status")
+
+		if triggerRequest != "" {
+			statusErr = updateErr
+
+			return requeue, nil
+		}
 	}
 
 	if c == nil {
@@ -541,11 +576,12 @@ func (r *namespacedResourceController) updateReconcilingStatus(ctx context.Conte
 			return err
 		}
 
-		if latest.Status.ObservedGeneration == instance.GetGeneration() {
+		if latest.Status.ObservedGeneration == instance.GetGeneration() && reflect.DeepEqual(latest.Status.Trigger, instance.Status.Trigger) {
 			return nil
 		}
 
 		latest.Status.ServiceAccount = instance.Status.ServiceAccount
+		latest.Status.Trigger = instance.Status.Trigger.DeepCopy()
 
 		latest.Status.Conditions.UpdateConditionByType(meta.NewReadyConditionReconcilingReason(instance))
 

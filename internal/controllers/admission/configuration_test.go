@@ -22,6 +22,8 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	admissionapi "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
+	"github.com/projectcapsule/capsule/pkg/runtime/replication"
 )
 
 type admissionConfigurationFixture struct {
@@ -61,7 +63,7 @@ func newAdmissionConfigurationFixture(t *testing.T, kind string, count int, fall
 		object.Spec.Admission.Validating.Webhooks = append(object.Spec.Admission.Validating.Webhooks,
 			&admissionapi.ValidatingWebhook{Name: name, Options: options, SideEffects: &sideEffects, AdmissionReviewVersions: []string{"v1"}})
 	}
-	f := &admissionConfigurationFixture{client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(object).Build()}
+	f := &admissionConfigurationFixture{client: fake.NewClientBuilder().WithScheme(scheme).WithIndex(&capsulev1beta2.GlobalTenantResource{}, replication.TriggerIndexerField, (tenantresource.Triggers{}).Func()).WithIndex(&capsulev1beta2.TenantResource{}, replication.TriggerIndexerField, (tenantresource.Triggers{}).Func()).WithObjects(object).Build()}
 	cached := interceptor.NewClient(f.client, interceptor.Funcs{
 		Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 			if _, ok := obj.(*capsulev1beta2.CapsuleConfiguration); ok {
