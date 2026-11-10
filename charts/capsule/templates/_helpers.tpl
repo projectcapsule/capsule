@@ -170,6 +170,19 @@ null-defaulted as the capsule-proxy subchart schema/defaults require a boolean).
 {{- end }}
 
 {{/*
+Pod anti-affinity preferring different nodes for the Capsule pods
+*/}}
+{{- define "capsule.defaultPodAntiAffinity" -}}
+preferredDuringSchedulingIgnoredDuringExecution:
+  - weight: 100
+    podAffinityTerm:
+      topologyKey: kubernetes.io/hostname
+      labelSelector:
+        matchLabels:
+          {{- include "capsule.selectorLabels" . | nindent 10 }}
+{{- end }}
+
+{{/*
 Pod annotations required on OpenShift
 */}}
 {{- define "capsule.openshiftAnnotations" -}}

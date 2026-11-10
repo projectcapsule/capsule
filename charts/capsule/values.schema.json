@@ -6,6 +6,15 @@
             "description": "Set affinity rules for the Capsule pod",
             "type": "object"
         },
+        "antiAffinity": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "description": "Prefer scheduling the Capsule pods on different nodes. Ignored when `affinity.podAntiAffinity` is set. Only applies when `manager.kind` is `Deployment`.",
+                    "type": "boolean"
+                }
+            }
+        },
         "certManager": {
             "type": "object",
             "properties": {

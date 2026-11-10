@@ -76,6 +76,7 @@ and [replication documentation](https://projectcapsule.dev/docs/replications/).
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | affinity | object | `{}` | Set affinity rules for the Capsule pod |
+| antiAffinity.enabled | bool | `true` | Prefer scheduling the Capsule pods on different nodes. Ignored when `affinity.podAntiAffinity` is set. Only applies when `manager.kind` is `Deployment`. |
 | certManager.additionalSANS | list | `[]` | Specify additional SANS to add to the certificate |
 | certManager.generateCertificates | bool | `true` | Specifies whether capsule webhooks certificates should be generated using cert-manager |
 | conversions.service.caBundle | string | `""` | CABundle for the webhook service |
