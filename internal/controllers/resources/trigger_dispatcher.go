@@ -71,10 +71,15 @@ func (d *TriggerDispatcher) Start(ctx context.Context) error {
 				}
 
 				dispatchCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-				err := d.dispatch(dispatchCtx, target)
+				delay, err := d.dispatch(dispatchCtx, target, time.Now())
 
 				cancel()
-				d.pending.Complete(target, time.Now(), err != nil)
+
+				if err == nil && delay > 0 {
+					d.pending.Defer(target, time.Now(), delay)
+				} else {
+					d.pending.Complete(target, time.Now(), err != nil)
+				}
 
 				if err != nil {
 					d.metrics.Notifications.WithLabelValues("retry").Inc()
@@ -115,33 +120,50 @@ func (d *TriggerDispatcher) prune(ctx context.Context) error {
 	return nil
 }
 
-func (d *TriggerDispatcher) dispatch(ctx context.Context, target replication.Target) error {
+func (d *TriggerDispatcher) dispatch(ctx context.Context, target replication.Target, now time.Time) (time.Duration, error) {
 	var (
-		obj  client.Object
-		spec *capsulev1beta2.TenantResourceCommonSpec
+		obj    client.Object
+		spec   *capsulev1beta2.TenantResourceCommonSpec
+		status *capsulev1beta2.TenantResourceCommonStatus
 	)
 
 	if target.Namespace == "" {
 		r := &capsulev1beta2.GlobalTenantResource{}
 		obj = r
 		spec = &r.Spec.TenantResourceCommonSpec
+		status = &r.Status.TenantResourceCommonStatus
 	} else {
 		r := &capsulev1beta2.TenantResource{}
 		obj = r
 		spec = &r.Spec.TenantResourceCommonSpec
+		status = &r.Status.TenantResourceCommonStatus
 	}
 
 	if err := d.reader.Get(ctx, client.ObjectKey{Name: target.Name, Namespace: target.Namespace}, obj); err != nil {
-		return client.IgnoreNotFound(err)
+		return 0, client.IgnoreNotFound(err)
 	}
 
 	if obj.GetUID() != target.UID || !obj.GetDeletionTimestamp().IsZero() || spec.IsCordoned() || len(spec.Triggers) == 0 {
-		return nil
+		return 0, nil
+	}
+
+	// Keep a single outstanding token. Replacing an unacknowledged token can
+	// enqueue a second reconcile before the leader has persisted its start time.
+	// Subsequent events remain in the bounded local queue until it is handled.
+	interval := replication.Interval(spec)
+	if pendingTriggerRequest(obj, spec, status) != "" {
+		return min(interval, time.Minute), nil
+	}
+
+	if status.Trigger != nil {
+		if remaining := status.Trigger.LastTriggeredAt.Add(interval).Sub(now); remaining > 0 {
+			return remaining, nil
+		}
 	}
 
 	base, ok := obj.DeepCopyObject().(client.Object)
 	if !ok {
-		return fmt.Errorf("unexpected replication object %T", obj)
+		return 0, fmt.Errorf("unexpected replication object %T", obj)
 	}
 
 	annotations := obj.GetAnnotations()
@@ -152,5 +174,5 @@ func (d *TriggerDispatcher) dispatch(ctx context.Context, target replication.Tar
 	annotations[replication.TriggerAnnotation] = string(uuid.NewUUID())
 	obj.SetAnnotations(annotations)
 	// Optimistic locking never overwrites another replica's notification or a spec edit.
-	return d.client.Patch(ctx, obj, client.MergeFromWithOptions(base, client.MergeFromWithOptimisticLock{}))
+	return 0, d.client.Patch(ctx, obj, client.MergeFromWithOptions(base, client.MergeFromWithOptimisticLock{}))
 }

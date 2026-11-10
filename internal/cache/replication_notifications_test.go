@@ -109,3 +109,39 @@ func BenchmarkReplicationNotifications(b *testing.B) {
 		})
 	}
 }
+
+func TestNotificationIntervalDecreasePreservesSettlingAndRetry(t *testing.T) {
+	for _, state := range []string{"settling", "cooldown", "retry", "deferred", "during-defer"} {
+		t.Run(state, func(t *testing.T) {
+			c := NewReplicationNotifications()
+			now := time.Unix(100, 0)
+			target := replication.Target{Name: "a", UID: "one"}
+			c.Notify(target, 24*time.Hour, now)
+			if state == "settling" {
+				c.Notify(target, time.Second, now)
+				if _, ok := c.Next(now); ok {
+					t.Fatal("policy edit bypassed settling")
+				}
+				return
+			}
+			c.Next(now.Add(time.Second))
+			if state == "deferred" || state == "during-defer" {
+				if state == "during-defer" {
+					c.Notify(target, time.Second, now.Add(time.Second))
+				}
+				c.Defer(target, now.Add(time.Second), 24*time.Hour)
+			} else {
+				c.Complete(target, now.Add(time.Second), state == "retry")
+			}
+			c.Notify(target, time.Second, now.Add(1500*time.Millisecond))
+			if state == "retry" {
+				if _, ok := c.Next(now.Add(1500 * time.Millisecond)); ok {
+					t.Fatal("policy edit bypassed retry backoff")
+				}
+			}
+			if _, ok := c.Next(now.Add(2 * time.Second)); !ok {
+				t.Fatal("shorter policy retained day-long deadline")
+			}
+		})
+	}
+}

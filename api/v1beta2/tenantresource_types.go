@@ -30,8 +30,7 @@ type TenantResourceCommonStatus struct {
 	// Trigger records the last admission notification handled by this controller.
 	// +optional
 	Trigger *TenantResourceTriggerStatus `json:"trigger,omitempty"`
-	// NextResyncAt is the periodic deadline for trigger-enabled replications.
-	// It prevents pending trigger cooldowns from delaying periodic recovery.
+	// NextResyncAt is the next periodic resync deadline for trigger-enabled replications.
 	// +optional
 	NextResyncAt *metav1.MicroTime `json:"nextResyncAt,omitempty"`
 }

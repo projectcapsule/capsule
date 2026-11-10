@@ -10,36 +10,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/runtime/replication"
 )
 
-// triggerSchedule leaves lifecycle/spec/manual requests unthrottled. The pending
-// token is never removed from metadata, so a new notification arriving during a
-// reconciliation cannot be accidentally acknowledged by that reconciliation.
-func triggerSchedule(obj client.Object, spec *capsulev1beta2.TenantResourceCommonSpec, status *capsulev1beta2.TenantResourceCommonStatus, now time.Time) (time.Duration, string) {
+// Only the dispatcher throttles trigger notifications. Controllers must remain
+// responsive to dependency, namespace, tenant, configuration and periodic events,
+// even while an earlier trigger token is pending.
+func pendingTriggerRequest(obj client.Object, spec *capsulev1beta2.TenantResourceCommonSpec, status *capsulev1beta2.TenantResourceCommonStatus) string {
 	request := obj.GetAnnotations()[replication.TriggerAnnotation]
 	if len(spec.Triggers) == 0 || request == "" || (status.Trigger != nil && status.Trigger.ObservedRequest == request) {
-		return 0, ""
+		return ""
 	}
 
-	if status.NextResyncAt != nil && !now.Before(status.NextResyncAt.Time) {
-		return 0, request
-	}
-
-	if status.Trigger != nil && obj.GetDeletionTimestamp().IsZero() && status.ObservedGeneration == obj.GetGeneration() && obj.GetAnnotations()[meta.ReconcileAnnotation] == "" {
-		if remaining := status.Trigger.LastTriggeredAt.Add(replication.Interval(spec)).Sub(now); remaining > 0 {
-			// An immediate watch event consumes an existing delayed queue item.
-			// Explicitly preserve the earlier periodic wakeup when coalescing it.
-			if status.NextResyncAt != nil {
-				remaining = min(remaining, status.NextResyncAt.Sub(now))
-			}
-
-			return remaining, request
-		}
-	}
-
-	return 0, request
+	return request
 }
 
 func recordNextResync(obj client.Object, spec *capsulev1beta2.TenantResourceCommonSpec, status *capsulev1beta2.TenantResourceCommonStatus, delay time.Duration) {
@@ -71,8 +54,7 @@ func startTrigger(status *capsulev1beta2.TenantResourceCommonStatus, request str
 	status.Trigger.ObservedRequest = observed
 }
 
-// Failed attempts retain their pending token and retry under the same interval,
-// rather than waiting for a possibly very long periodic resync.
+// Failed attempts retain their pending token for the controller's retry path.
 func finishTrigger(status *capsulev1beta2.TenantResourceCommonStatus, request string, now time.Time, reconcileError error) bool {
 	if request == "" {
 		return false

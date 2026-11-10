@@ -43,6 +43,13 @@ func TestNativeManagedConditionOldAndNew(t *testing.T) {
 			}
 		})
 	}
+	for _, tenantName := range []string{"controller", "resources", "replications"} {
+		obj := map[string]any{"metadata": map[string]any{"labels": map[string]any{"capsule.clastix.io/managed-by": tenantName, "projectcapsule.dev/tenant": tenantName}}}
+		value, _, err := program.ContextEval(t.Context(), map[string]any{"object": obj, "oldObject": obj})
+		if err != nil || value.Value() != true {
+			t.Fatalf("tenant %s incorrectly excluded: %v %v", tenantName, value, err)
+		}
+	}
 	var wg sync.WaitGroup
 	for range 32 {
 		wg.Go(func() {
@@ -70,6 +77,44 @@ func TestNativeManagedConditionOldAndNew(t *testing.T) {
 	cold.Wait()
 	if len(c.triggerConditions) != 1 {
 		t.Fatal("concurrent native misses published duplicate entries")
+	}
+}
+
+func TestNativeBookkeepingExclusionPreservesUserUpdates(t *testing.T) {
+	t.Setenv("SERVICE_ACCOUNT", "capsule")
+	t.Setenv("NAMESPACE", "capsule-system")
+	c, err := NewCELCache()
+	if err != nil {
+		t.Fatal(err)
+	}
+	hook := replication.Webhook(&capsulev1beta2.TenantResourceTrigger{}, "", admissionv1.WebhookClientConfig{})
+	var expression string
+	for _, condition := range hook.MatchConditions {
+		if condition.Name == "capsule-trigger-bookkeeping" {
+			expression = condition.Expression
+		}
+	}
+	if expression == "" {
+		t.Fatal("missing native bookkeeping gate")
+	}
+	if err := c.ValidateTriggerCondition(expression); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		user, group, resource, operation string
+		want                             bool
+	}{
+		{"system:serviceaccount:capsule-system:capsule", capsulev1beta2.GroupVersion.Group, "tenantresources", "UPDATE", false},
+		{"system:serviceaccount:capsule-system:capsule", capsulev1beta2.GroupVersion.Group, "globaltenantresources", "UPDATE", false},
+		{"alice", capsulev1beta2.GroupVersion.Group, "tenantresources", "UPDATE", true},
+		{"system:serviceaccount:capsule-system:capsule", "", "secrets", "UPDATE", true},
+		{"system:serviceaccount:capsule-system:capsule", capsulev1beta2.GroupVersion.Group, "tenantresources", "CREATE", true},
+	} {
+		request := map[string]any{"operation": tc.operation, "resource": map[string]any{"group": tc.group, "resource": tc.resource}, "userInfo": map[string]any{"username": tc.user}}
+		value, _, err := c.triggerConditions[expression].Program.ContextEval(t.Context(), map[string]any{"request": request})
+		if err != nil || value.Value() != tc.want {
+			t.Fatalf("%+v: result=%v err=%v", tc, value, err)
+		}
 	}
 }
 

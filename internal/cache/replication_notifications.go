@@ -15,7 +15,9 @@ const MaxReplicationNotifications = 4096
 type notification struct {
 	due, last        time.Time
 	interval         time.Duration
+	claimedInterval  time.Duration
 	pending, running bool
+	cooldown         bool
 }
 
 // ReplicationNotifications bounds pending work and coalesces bursts. No lock is
@@ -42,6 +44,10 @@ func (c *ReplicationNotifications) Notify(target replication.Target, interval ti
 
 		entry = &notification{due: now.Add(250 * time.Millisecond), interval: interval}
 		c.entries[target] = entry
+	}
+
+	if interval < entry.interval && entry.cooldown {
+		entry.due = minTime(entry.due, maxTime(now, entry.last.Add(interval)))
 	}
 
 	entry.interval = interval
@@ -74,6 +80,7 @@ func (c *ReplicationNotifications) Next(now time.Time) (replication.Target, bool
 
 		entry.pending = false
 		entry.running = true
+		entry.claimedInterval = entry.interval
 
 		return target, true
 	}
@@ -92,6 +99,7 @@ func (c *ReplicationNotifications) Complete(target replication.Target, now time.
 
 	entry.running = false
 	if retry {
+		entry.cooldown = false
 		entry.pending = true
 		entry.due = now.Add(time.Second)
 
@@ -99,7 +107,46 @@ func (c *ReplicationNotifications) Complete(target replication.Target, now time.
 	}
 
 	entry.last = now
+	entry.cooldown = true
 	entry.due = now.Add(entry.interval)
+}
+
+// Defer keeps a claimed event pending without recording a successful dispatch.
+// A policy decrease observed during I/O must also shorten this new deadline.
+func (c *ReplicationNotifications) Defer(target replication.Target, now time.Time, delay time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	entry := c.entries[target]
+	if entry == nil {
+		return
+	}
+
+	entry.running = false
+	entry.pending = true
+	entry.cooldown = true
+
+	entry.due = now.Add(delay)
+
+	if entry.interval < entry.claimedInterval {
+		entry.due = minTime(entry.due, maxTime(now, entry.last.Add(entry.interval)))
+	}
+}
+
+func minTime(a, b time.Time) time.Time {
+	if a.Before(b) {
+		return a
+	}
+
+	return b
+}
+
+func maxTime(a, b time.Time) time.Time {
+	if a.After(b) {
+		return a
+	}
+
+	return b
 }
 
 // Prune retires deleted, cordoned, and unsubscribed incarnations independently

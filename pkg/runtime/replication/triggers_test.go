@@ -140,7 +140,13 @@ func TestManagedTriggerEligibility(t *testing.T) {
 	if replication.Managed(nil) || replication.Managed(&metav1.PartialObjectMetadata{Labels: map[string]string{meta.TenantLabel: "tenant-a", "app.kubernetes.io/managed-by": "helm"}}) {
 		t.Fatal("ordinary tenant resources were excluded")
 	}
-	for _, key := range []string{meta.NewManagedByCapsuleLabel, meta.ManagedByCapsuleLabel, meta.CreatedByCapsuleLabel, meta.ProtectedByCapsuleLabel} {
+	for _, name := range []string{"controller", "resources", "replications"} {
+		if replication.Managed(&metav1.PartialObjectMetadata{Labels: map[string]string{meta.ManagedByCapsuleLabel: name, meta.NewTenantLabel: name}}) {
+			t.Fatalf("tenant %s was treated as a management marker", name)
+		}
+	}
+
+	for _, key := range []string{meta.NewManagedByCapsuleLabel, meta.CreatedByCapsuleLabel, meta.ProtectedByCapsuleLabel} {
 		for _, value := range []string{meta.ValueController, meta.ValueControllerResources, meta.ValueControllerReplications} {
 			if !replication.Managed(&metav1.PartialObjectMetadata{Labels: map[string]string{key: value}}) {
 				t.Fatalf("missing %s=%s", key, value)

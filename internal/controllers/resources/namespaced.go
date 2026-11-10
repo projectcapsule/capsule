@@ -152,10 +152,7 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 	}
 	started := time.Now()
 
-	remaining, triggerRequest := triggerSchedule(tntResource, &tntResource.Spec.TenantResourceCommonSpec, &tntResource.Status.TenantResourceCommonStatus, started)
-	if remaining > 0 {
-		return reconcile.Result{RequeueAfter: remaining}, nil
-	}
+	triggerRequest := pendingTriggerRequest(tntResource, &tntResource.Spec.TenantResourceCommonSpec, &tntResource.Status.TenantResourceCommonStatus)
 
 	patchHelper, err := patch.NewHelper(tntResource, r.client)
 	if err != nil {

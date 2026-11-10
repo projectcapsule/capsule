@@ -156,9 +156,45 @@ func TestTriggerHandlerAudienceUpdatesAndObsoletePredicates(t *testing.T) {
 	}
 }
 
+func TestSelfSubscriptionSkipsBookkeepingButPreservesUserUpdates(t *testing.T) {
+	t.Setenv("SERVICE_ACCOUNT", "capsule")
+	t.Setenv("NAMESPACE", "capsule-system")
+	run, _, req, n, calls, parent, c := triggerFixture(t, 0)
+	parent.Spec.Triggers[0].Audience = nil
+	parent.Spec.Triggers[0].APIGroups = []string{capsulev1beta2.GroupVersion.Group}
+	parent.Spec.Triggers[0].Resources = []string{"tenantresources"}
+	if err := c.Update(t.Context(), parent); err != nil {
+		t.Fatal(err)
+	}
+	req.Resource = metav1.GroupVersionResource{Group: capsulev1beta2.GroupVersion.Group, Version: "v1beta2", Resource: "tenantresources"}
+	req.Kind = metav1.GroupVersionKind{Group: capsulev1beta2.GroupVersion.Group, Version: "v1beta2", Kind: "TenantResource"}
+	req.Name = parent.Name
+	var err error
+	req.Object.Raw, err = json.Marshal(parent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.OldObject = req.Object
+	ctx := runtimewebhook.WithRequestPath(t.Context(), triggers.TriggerPath+triggers.MatchID(&parent.Spec.Triggers[0]))
+	req.UserInfo.Username = "system:serviceaccount:capsule-system:capsule"
+	calls.Store(0)
+	if response := run(ctx, req); response != nil {
+		t.Fatal("bookkeeping terminated admission")
+	}
+	if n.calls.Load() != 0 || calls.Load() != 0 {
+		t.Fatal("self notification queued work or performed lookups")
+	}
+	req.UserInfo.Username = "alice"
+	if response := run(ctx, req); response != nil || n.calls.Load() != 1 {
+		t.Fatal("genuine user update was excluded")
+	}
+}
+
 func BenchmarkTriggerAdmission(b *testing.B) {
+	b.Setenv("SERVICE_ACCOUNT", "capsule")
+	b.Setenv("NAMESPACE", "capsule-system")
 	for _, count := range []int{0, 100, 1000} {
-		for _, outcome := range []string{"match", "audience-skip", "managed-skip", "dry-run"} {
+		for _, outcome := range []string{"match", "audience-skip", "managed-skip", "dry-run", "bookkeeping-skip"} {
 			b.Run(fmt.Sprintf("unrelated=%d/%s", count, outcome), func(b *testing.B) {
 				run, ctx, req, n, calls, _, _ := triggerFixture(b, count)
 				switch outcome {
@@ -168,6 +204,10 @@ func BenchmarkTriggerAdmission(b *testing.B) {
 					req.Object.Raw = []byte(`{"metadata":{"labels":{"projectcapsule.dev/managed-by":"controller"}}}`)
 				case "dry-run":
 					req.DryRun = new(true)
+				case "bookkeeping-skip":
+					req.Resource.Group = capsulev1beta2.GroupVersion.Group
+					req.Resource.Resource = "tenantresources"
+					req.UserInfo.Username = "system:serviceaccount:capsule-system:capsule"
 				}
 				b.ReportAllocs()
 				for b.Loop() {

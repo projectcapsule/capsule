@@ -798,9 +798,8 @@ spec:
                   type: object
                 type: array
               nextResyncAt:
-                description: |-
-                  NextResyncAt is the periodic deadline for trigger-enabled replications.
-                  It prevents pending trigger cooldowns from delaying periodic recovery.
+                description: NextResyncAt is the next periodic resync deadline for
+                  trigger-enabled replications.
                 format: date-time
                 type: string
               observedGeneration:

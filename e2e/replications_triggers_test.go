@@ -69,7 +69,7 @@ var _ = Describe("Replication admission triggers", Label("replications", "replic
 				trigger.NamespaceSelector = &metav1.LabelSelector{MatchLabels: map[string]string{"trigger-source": prefix}}
 				outputTrigger.NamespaceSelector = trigger.NamespaceSelector.DeepCopy()
 			}
-			common := capsulev1beta2.TenantResourceCommonSpec{TriggerMinInterval: metav1.Duration{Duration: 4 * time.Second}, ResyncPeriod: metav1.Duration{Duration: 24 * time.Hour}, Triggers: []capsulev1beta2.TenantResourceTrigger{trigger, outputTrigger}, Resources: []capsulev1beta2.ResourceSpec{{NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"trigger-source": prefix}}, Context: &template.TemplateContext{Resources: []*template.TemplateResourceReference{{Index: "sources", APIVersion: "v1", Kind: "Secret", Namespace: source.Name, Selector: selector}}}, Generators: []capsulev1beta2.TemplateItemSpec{{Template: fmt.Sprintf("apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: trigger-output\n  labels:\n    trigger-run: %s\ndata:\n  count: '{{ if $.sources }}{{ len $.sources }}{{ else }}0{{ end }}'\n  values: '{{ range $.sources }}{{ index .data \"value\" }}{{ end }}'\n", prefix)}}}}}
+			common := capsulev1beta2.TenantResourceCommonSpec{TriggerMinInterval: metav1.Duration{Duration: 24 * time.Hour}, ResyncPeriod: metav1.Duration{Duration: 24 * time.Hour}, Triggers: []capsulev1beta2.TenantResourceTrigger{trigger, outputTrigger}, Resources: []capsulev1beta2.ResourceSpec{{NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"trigger-source": prefix}}, Context: &template.TemplateContext{Resources: []*template.TemplateResourceReference{{Index: "sources", APIVersion: "v1", Kind: "Secret", Namespace: source.Name, Selector: selector}}}, Generators: []capsulev1beta2.TemplateItemSpec{{Template: fmt.Sprintf("apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: trigger-output\n  labels:\n    trigger-run: %s\ndata:\n  count: '{{ if $.sources }}{{ len $.sources }}{{ else }}0{{ end }}'\n  values: '{{ range $.sources }}{{ index .data \"value\" }}{{ end }}'\n", prefix)}}}}}
 			var resource client.Object
 			if global {
 				resource = &capsulev1beta2.GlobalTenantResource{Name: prefix, Labels: map[string]string{"env": "e2e", "trigger-test": prefix}, Spec: capsulev1beta2.GlobalTenantResourceSpec{TenantResourceCommonSpec: common, Scope: api.ResourceScopeNamespace, TenantSelector: metav1.LabelSelector{MatchLabels: map[string]string{"trigger-run": prefix + "-0"}}}}
@@ -98,6 +98,36 @@ var _ = Describe("Replication admission triggers", Label("replications", "replic
 					s = obj.Status.TenantResourceCommonStatus
 				}
 				return s
+			}
+			updateTriggers := func(edit func(*capsulev1beta2.TenantResourceCommonSpec)) {
+				Eventually(func() error {
+					var obj client.Object
+					var spec *capsulev1beta2.TenantResourceCommonSpec
+					if global {
+						r := &capsulev1beta2.GlobalTenantResource{}
+						obj = r
+						spec = &r.Spec.TenantResourceCommonSpec
+					} else {
+						r := &capsulev1beta2.TenantResource{}
+						obj = r
+						spec = &r.Spec.TenantResourceCommonSpec
+					}
+					if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(resource), obj); err != nil {
+						return err
+					}
+					edit(spec)
+					return k8sClient.Update(ctx, obj)
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+				Eventually(func(g Gomega) {
+					var obj client.Object
+					if global {
+						obj = &capsulev1beta2.GlobalTenantResource{}
+					} else {
+						obj = &capsulev1beta2.TenantResource{}
+					}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(resource), obj)).To(Succeed())
+					g.Expect(status().ObservedGeneration).To(Equal(obj.GetGeneration()))
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			}
 			Eventually(func(g Gomega) {
 				var obj client.Object
@@ -166,6 +196,10 @@ var _ = Describe("Replication admission triggers", Label("replications", "replic
 				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			}
 			first := status().Trigger.LastTriggeredAt
+			By("shortening an existing day-long notification cooldown")
+			updateTriggers(func(spec *capsulev1beta2.TenantResourceCommonSpec) {
+				spec.TriggerMinInterval.Duration = 4 * time.Second
+			})
 			for _, value := range []string{"one", "two", "three", "final"} {
 				update(value)
 			}
@@ -199,38 +233,101 @@ var _ = Describe("Replication admission triggers", Label("replications", "replic
 				g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: "trigger-output", Namespace: source.Name}, cm)).To(Succeed())
 				g.Expect(cm.Data["count"]).To(Equal("0"))
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-			By("rejecting invalid trigger configuration while real tenants are present")
-			updateTriggers := func(edit func(*capsulev1beta2.TenantResourceCommonSpec)) {
+			By("recovering a dependency while a day-long trigger token is pending")
+			dependencyCommon := capsulev1beta2.TenantResourceCommonSpec{ResyncPeriod: metav1.Duration{Duration: 24 * time.Hour}, DependsOn: []meta.LocalRFC1123ObjectReference{{Name: meta.RFC1123Name(prefix + "-missing")}}, Resources: []capsulev1beta2.ResourceSpec{{NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"projectcapsule.dev/trigger-dependency": prefix}}, RawItems: []capsulev1beta2.RawExtension{{Raw: []byte(`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"trigger-dependency-output"}}`)}}}}}
+			var dependency client.Object
+			if global {
+				dependency = &capsulev1beta2.GlobalTenantResource{Name: prefix + "-dependency", Labels: map[string]string{"env": "e2e", "trigger-test": prefix}, Spec: capsulev1beta2.GlobalTenantResourceSpec{TenantResourceCommonSpec: dependencyCommon, Scope: api.ResourceScopeNamespace, TenantSelector: metav1.LabelSelector{MatchLabels: map[string]string{"trigger-run": prefix + "-0"}}}}
+			} else {
+				dependency = &capsulev1beta2.TenantResource{Name: prefix + "-dependency", Namespace: source.Name, Spec: capsulev1beta2.TenantResourceSpec{TenantResourceCommonSpec: dependencyCommon}}
+			}
+			Expect(k8sClient.Create(ctx, dependency)).To(Succeed())
+			updateTriggers(func(spec *capsulev1beta2.TenantResourceCommonSpec) {
+				spec.TriggerMinInterval.Duration = 24 * time.Hour
+				spec.DependsOn = []meta.LocalRFC1123ObjectReference{{Name: meta.RFC1123Name(dependency.GetName())}}
+			})
+			Eventually(func() bool {
+				s := status()
+				condition := s.Conditions.GetConditionByType(meta.ReadyCondition)
+				return condition != nil && condition.Status == metav1.ConditionFalse
+			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
+			stagePending := func(token string) {
 				Eventually(func() error {
-					var obj client.Object
-					var spec *capsulev1beta2.TenantResourceCommonSpec
-					if global {
-						r := &capsulev1beta2.GlobalTenantResource{}
-						obj = r
-						spec = &r.Spec.TenantResourceCommonSpec
-					} else {
-						r := &capsulev1beta2.TenantResource{}
-						obj = r
-						spec = &r.Spec.TenantResourceCommonSpec
-					}
-					if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(resource), obj); err != nil {
-						return err
-					}
-					edit(spec)
-					return k8sClient.Update(ctx, obj)
-				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-				Eventually(func(g Gomega) {
 					var obj client.Object
 					if global {
 						obj = &capsulev1beta2.GlobalTenantResource{}
 					} else {
 						obj = &capsulev1beta2.TenantResource{}
 					}
-					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(resource), obj)).To(Succeed())
-					g.Expect(status().ObservedGeneration).To(Equal(obj.GetGeneration()))
+					if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(resource), obj); err != nil {
+						return err
+					}
+					annotations := obj.GetAnnotations()
+					if annotations == nil {
+						annotations = map[string]string{}
+					}
+					annotations[replication.TriggerAnnotation] = token
+					obj.SetAnnotations(annotations)
+					return k8sClient.Update(ctx, obj)
 				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			}
-			By("using the current audience after a policy update")
+			pending := "dependency-pending-" + prefix
+			stagePending(pending)
+			Expect(status().Trigger.ObservedRequest).NotTo(Equal(pending))
+			Eventually(func() error {
+				var obj client.Object
+				var spec *capsulev1beta2.TenantResourceCommonSpec
+				if global {
+					r := &capsulev1beta2.GlobalTenantResource{}
+					obj = r
+					spec = &r.Spec.TenantResourceCommonSpec
+				} else {
+					r := &capsulev1beta2.TenantResource{}
+					obj = r
+					spec = &r.Spec.TenantResourceCommonSpec
+				}
+				if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(dependency), obj); err != nil {
+					return err
+				}
+				spec.DependsOn = nil
+				return k8sClient.Update(ctx, obj)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			Eventually(func(g Gomega) {
+				var obj client.Object
+				var childStatus *capsulev1beta2.TenantResourceCommonStatus
+				if global {
+					r := &capsulev1beta2.GlobalTenantResource{}
+					obj = r
+					childStatus = &r.Status.TenantResourceCommonStatus
+				} else {
+					r := &capsulev1beta2.TenantResource{}
+					obj = r
+					childStatus = &r.Status.TenantResourceCommonStatus
+				}
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(dependency), obj)).To(Succeed())
+				g.Expect(childStatus.ObservedGeneration).To(Equal(obj.GetGeneration()))
+				g.Expect(meta.IsStatusConditionTrue(childStatus.Conditions, meta.ReadyCondition)).To(BeTrue(), fmt.Sprintf("dependency status: %+v", childStatus))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			Eventually(func(g Gomega) {
+				s := status()
+				g.Expect(s.Trigger.ObservedRequest).To(Equal(pending))
+				g.Expect(meta.IsStatusConditionTrue(s.Conditions, meta.ReadyCondition)).To(BeTrue())
+			}, 15*time.Second, defaultPollInterval).Should(Succeed())
+			updateTriggers(func(spec *capsulev1beta2.TenantResourceCommonSpec) { spec.DependsOn = nil })
+			By("reconciling namespace removal while a trigger cooldown is pending")
+			pending = "namespace-pending-" + prefix
+			stagePending(pending)
+			Expect(owner.CoreV1().Namespaces().Delete(ctx, peer.Name, metav1.DeleteOptions{})).To(Succeed())
+			DeleteNamespaceInBackground(ctx, peer.Name)
+			TenantNamespaceReady(tenants[0], source, 1)
+			Eventually(func(g Gomega) {
+				s := status()
+				g.Expect(s.Trigger.ObservedRequest).To(Equal(pending))
+				g.Expect(meta.IsStatusConditionTrue(s.Conditions, meta.ReadyCondition)).To(BeTrue())
+				cm := &corev1.ConfigMap{}
+				g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: "trigger-output", Namespace: source.Name}, cm)).To(Succeed())
+				g.Expect(cm.Data["count"]).To(Equal("0"))
+			}, 15*time.Second, defaultPollInterval).Should(Succeed())
 			By("allowing periodic recovery to handle pending work during a longer cooldown")
 			updateTriggers(func(spec *capsulev1beta2.TenantResourceCommonSpec) {
 				spec.TriggerMinInterval.Duration = 30 * time.Second
@@ -276,7 +373,7 @@ var _ = Describe("Replication admission triggers", Label("replications", "replic
 			createSecret(source.Name, "source-owner-after-policy", map[string]string{"trigger-run": prefix}, false)
 			Consistently(func() string { return status().Trigger.ObservedRequest }, 2*time.Second, 200*time.Millisecond).Should(Equal(baseline))
 			selectedOwner := impersonationClientSet(owners[0].Name, []string{"projectcapsule.dev", owners[0].Name, prefix + "-selected"})
-			_, err = selectedOwner.CoreV1().Secrets(source.Name).Create(ctx, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "source-selected-after-policy", Labels: map[string]string{"trigger-run": prefix}}, Data: map[string][]byte{"value": []byte("selected")}}, metav1.CreateOptions{})
+			_, err = selectedOwner.CoreV1().Secrets(source.Name).Create(ctx, &corev1.Secret{Name: "source-selected-after-policy", Labels: map[string]string{"trigger-run": prefix}, Data: map[string][]byte{"value": []byte("selected")}}, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			Eventually(func() string { return status().Trigger.ObservedRequest }, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Equal(baseline))
 			if global {
@@ -287,7 +384,7 @@ var _ = Describe("Replication admission triggers", Label("replications", "replic
 				})
 				waitPredicate(trigger)
 				baseline = status().Trigger.ObservedRequest
-				_, err = selectedOwner.CoreV1().Secrets(source.Name).Create(ctx, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "source-after-selector", Labels: map[string]string{"trigger-run": prefix}}, Data: map[string][]byte{"value": []byte("excluded")}}, metav1.CreateOptions{})
+				_, err = selectedOwner.CoreV1().Secrets(source.Name).Create(ctx, &corev1.Secret{Name: "source-after-selector", Labels: map[string]string{"trigger-run": prefix}, Data: map[string][]byte{"value": []byte("excluded")}}, metav1.CreateOptions{})
 				Expect(err).NotTo(HaveOccurred())
 				Consistently(func() string { return status().Trigger.ObservedRequest }, 2*time.Second, 200*time.Millisecond).Should(Equal(baseline))
 			}

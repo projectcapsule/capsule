@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	admissionrequestv1 "k8s.io/api/admission/v1"
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -20,6 +21,8 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	admissionapi "github.com/projectcapsule/capsule/pkg/runtime/admission"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 // Target identifies a replication incarnation, so delayed work cannot affect a
@@ -35,7 +38,7 @@ type Notifier interface {
 
 const (
 	TriggerPath            = "/replications/triggers/"
-	TriggerAnnotation      = "reconcile.projectcapsule.dev/triggeredAt"
+	TriggerAnnotation      = meta.ReplicationTriggerAnnotation
 	TriggerIndexerField    = "spec.triggers.match"
 	TriggerEnabledKey      = "enabled"
 	DefaultTriggerInterval = 10 * time.Second
@@ -77,7 +80,9 @@ func Managed(obj *metav1.PartialObjectMetadata) bool {
 		return false
 	}
 
-	for _, key := range []string{meta.NewManagedByCapsuleLabel, meta.ManagedByCapsuleLabel, meta.CreatedByCapsuleLabel, meta.ProtectedByCapsuleLabel} {
+	// The legacy managed-by label holds a tenant name, not a management role.
+	// In particular, controller/resources/replications are valid tenant names.
+	for _, key := range []string{meta.NewManagedByCapsuleLabel, meta.CreatedByCapsuleLabel, meta.ProtectedByCapsuleLabel} {
 		switch obj.Labels[key] {
 		case meta.ValueController, meta.ValueControllerResources, meta.ValueControllerReplications:
 			return true
@@ -99,6 +104,15 @@ func Managed(obj *metav1.PartialObjectMetadata) bool {
 	return false
 }
 
+// BookkeepingRequest excludes controller updates to replication parents, including
+// notification patches and status writes. User changes remain eligible even when
+// the parent subscribes to its own kind. No persistent management marker is added.
+func BookkeepingRequest(req *admissionrequestv1.AdmissionRequest) bool {
+	return req.Operation == admissionrequestv1.Update && req.Resource.Group == capsulev1beta2.GroupVersion.Group &&
+		(req.Resource.Resource == "tenantresources" || req.Resource.Resource == "globaltenantresources") &&
+		users.IsControllerServiceAccount(req.UserInfo.Username)
+}
+
 // Webhook lets the API server evaluate native admission CEL (including
 // authorizer) and selectors. The path carries the exact predicate identity.
 func Webhook(trigger *capsulev1beta2.TenantResourceTrigger, namespace string, client admissionv1.WebhookClientConfig) admissionv1.ValidatingWebhook {
@@ -115,6 +129,12 @@ func Webhook(trigger *capsulev1beta2.TenantResourceTrigger, namespace string, cl
 	conditions = append(conditions, admissionv1.MatchCondition{Name: "capsule-trigger-dry-run", Expression: "!request.dryRun"})
 
 	conditions = append(conditions, admissionv1.MatchCondition{Name: "capsule-trigger-unmanaged", Expression: unmanagedExpression("object") + " && " + unmanagedExpression("oldObject")})
+
+	name, controllerNamespace := configuration.ControllerServiceAccount()
+	if name != "" && controllerNamespace != "" {
+		username := "system:serviceaccount:" + controllerNamespace + ":" + name
+		conditions = append(conditions, admissionv1.MatchCondition{Name: "capsule-trigger-bookkeeping", Expression: "!(request.operation == 'UPDATE' && request.resource.group == " + admissionapi.CelQuote(capsulev1beta2.GroupVersion.Group) + " && request.resource.resource in ['tenantresources', 'globaltenantresources'] && request.userInfo.username == " + admissionapi.CelQuote(username) + ")"})
+	}
 
 	if namespace != "" {
 		conditions = append(conditions, admissionv1.MatchCondition{Name: "capsule-trigger-namespace", Expression: "request.namespace == " + admissionapi.CelQuote(namespace)})
@@ -136,7 +156,7 @@ func Webhook(trigger *capsulev1beta2.TenantResourceTrigger, namespace string, cl
 }
 
 func unmanagedExpression(variable string) string {
-	lifecycle := []string{meta.NewManagedByCapsuleLabel, meta.ManagedByCapsuleLabel, meta.CreatedByCapsuleLabel, meta.ProtectedByCapsuleLabel}
+	lifecycle := []string{meta.NewManagedByCapsuleLabel, meta.CreatedByCapsuleLabel, meta.ProtectedByCapsuleLabel}
 	legacy := []string{meta.ResourcesLabel, meta.ReplicationProtectionLabel, meta.LimitRangeLabel, meta.NetworkPolicyLabel, meta.ResourceQuotaLabel, meta.RuleQuotaLabel, meta.RolebindingLabel}
 
 	return fmt.Sprintf("(%[1]s == null || !has(%[1]s.metadata) || ((!has(%[1]s.metadata.labels) || !%[1]s.metadata.labels.exists(k, (k in %[2]s && %[1]s.metadata.labels[k] in ['controller','resources','replications']) || k in %[3]s)) && (!has(%[1]s.metadata.ownerReferences) || !%[1]s.metadata.ownerReferences.exists(o, o.apiVersion.startsWith('%[4]s/')))))", variable, admissionapi.CelStringList(lifecycle), admissionapi.CelStringList(legacy), capsulev1beta2.GroupVersion.Group)
