@@ -214,7 +214,7 @@ func validateMutations(index int, mutations []rules.NamespaceRuleMutation) error
 			return fmt.Errorf("%s.action: unsupported mutation action %q", path, mutation.Action)
 		}
 
-		if mutation.Workloads.HasProperties() || len(mutation.Workloads.Targets) > 0 || (mutation.Ingress.ListenerSets.ParentRef == nil && mutation.Ingress.Class == "" && len(mutation.Ingress.Types) == 0 && mutation.Devices.Class == "") {
+		if mutation.Workloads.HasProperties() || len(mutation.Workloads.Targets) > 0 || (mutation.Ingress.ListenerSets.ParentRef == nil && mutation.Ingress.Class == "" && len(mutation.Ingress.Types) == 0 && mutation.Devices.Class == "" && mutation.Storage.AttributeClass == "") {
 			if err := validateMutationPlacement(path+".workloads", mutation.Workloads); err != nil {
 				return err
 			}
@@ -225,6 +225,10 @@ func validateMutations(index int, mutations []rules.NamespaceRuleMutation) error
 		}
 
 		if err := validateDeviceMutation(path+".devices.class", mutation); err != nil {
+			return err
+		}
+
+		if err := validateStorageMutation(path+".storage.attributeClass", mutation.Storage); err != nil {
 			return err
 		}
 	}
