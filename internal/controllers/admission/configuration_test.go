@@ -84,7 +84,7 @@ func newAdmissionConfigurationFixture(t *testing.T, kind string, count int, fall
 	cfg := configuration.NewCapsuleConfiguration(t.Context(), cached, direct, nil, object.Name)
 	f.reconciler = &mutatingReconciler{client: cached, configuration: cfg, log: logr.Discard()}
 	if kind == "validating" {
-		f.reconciler = &validatingReconciler{client: cached, configuration: cfg, log: logr.Discard()}
+		f.reconciler = &validatingReconciler{delivery: testDeliveryKey(), client: cached, configuration: cfg, log: logr.Discard()}
 	}
 	return f
 }

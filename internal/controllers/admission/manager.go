@@ -14,6 +14,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/replication"
 )
 
 func Add(
@@ -24,9 +25,11 @@ func Add(
 	capsuleConfig configuration.Configuration,
 	conditions *cache.CELCache,
 	triggerMetrics *metrics.TriggerRecorder,
+	delivery *replication.DeliveryKey,
 ) (err error) {
 	if err = (&validatingReconciler{
 		triggerMetrics: triggerMetrics,
+		delivery:       delivery,
 		conditions:     conditions,
 		client:         mgr.GetClient(),
 		log:            log.WithName("admission"),

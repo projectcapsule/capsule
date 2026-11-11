@@ -25,13 +25,22 @@ func pendingTriggerRequest(obj client.Object, spec *capsulev1beta2.TenantResourc
 	return request
 }
 
-func recordNextResync(obj client.Object, spec *capsulev1beta2.TenantResourceCommonSpec, status *capsulev1beta2.TenantResourceCommonStatus, delay time.Duration) {
-	status.NextResyncAt = nil
+func recordNextResync(obj client.Object, spec *capsulev1beta2.TenantResourceCommonSpec, status *capsulev1beta2.TenantResourceCommonStatus, delay time.Duration, now time.Time) time.Duration {
+	if len(spec.Triggers) == 0 || delay <= 0 || spec.IsCordoned() || !obj.GetDeletionTimestamp().IsZero() {
+		status.NextResyncAt = nil
 
-	if len(spec.Triggers) > 0 && delay > 0 && !spec.IsCordoned() && obj.GetDeletionTimestamp().IsZero() {
-		next := metav1.NewMicroTime(time.Now().Add(delay))
-		status.NextResyncAt = &next
+		return delay
 	}
+
+	next := now.Add(delay)
+	if previous := status.NextResyncAt; previous != nil && previous.After(now) && previous.Time.Before(next) {
+		next = previous.Time
+	}
+
+	stamp := metav1.NewMicroTime(next)
+	status.NextResyncAt = &stamp
+
+	return next.Sub(now)
 }
 
 func recordTrigger(status *capsulev1beta2.TenantResourceCommonStatus, request string, now time.Time) {

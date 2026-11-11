@@ -42,6 +42,7 @@ type validatingReconciler struct {
 	log            logr.Logger
 	conditions     *cache.CELCache
 	triggerMetrics *metrics.TriggerRecorder
+	delivery       *replication.DeliveryKey
 }
 
 func (r *validatingReconciler) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
@@ -290,6 +291,12 @@ func (r *validatingReconciler) validatingWebhooks(
 }
 
 func (r *validatingReconciler) triggerWebhooks(ctx context.Context, config *admissionv1.WebhookClientConfig) ([]admissionv1.ValidatingWebhook, error) {
+	// Authentication is required only for notifications. Keep the existing
+	// enforcement configuration reconciling if key initialization failed.
+	if r.delivery == nil {
+		return nil, nil
+	}
+
 	global := &capsulev1beta2.GlobalTenantResourceList{}
 	local := &capsulev1beta2.TenantResourceList{}
 
@@ -324,7 +331,7 @@ func (r *validatingReconciler) triggerWebhooks(ctx context.Context, config *admi
 		for i := range spec.Triggers {
 			id := replication.MatchID(&spec.Triggers[i])
 			if _, exists := hooks[id]; !exists {
-				hooks[id] = replication.Webhook(&spec.Triggers[i], "", *config)
+				hooks[id] = replication.Webhook(&spec.Triggers[i], "", *config, r.delivery)
 			}
 
 			if namespace == "" {

@@ -165,7 +165,11 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 
 		finishTrigger(&tntResource.Status.TenantResourceCommonStatus, triggerRequest, started, reconcileErr)
 		res.RequeueAfter = triggerRetryAfter(&tntResource.Spec.TenantResourceCommonSpec, res.RequeueAfter, reconcileErr)
-		recordNextResync(tntResource, &tntResource.Spec.TenantResourceCommonSpec, &tntResource.Status.TenantResourceCommonStatus, requeue.RequeueAfter)
+		// Preserve the earliest outstanding periodic wakeup when another event
+		// reconciles the same key before that deadline.
+		if periodic := recordNextResync(tntResource, &tntResource.Spec.TenantResourceCommonSpec, &tntResource.Status.TenantResourceCommonStatus, requeue.RequeueAfter, time.Now()); periodic > 0 && res.RequeueAfter > 0 {
+			res.RequeueAfter = min(res.RequeueAfter, periodic)
+		}
 
 		if uerr := r.updateStatus(ctx, tntResource, reconcileErr); uerr != nil {
 			if caperrors.IgnoreGone(uerr) {

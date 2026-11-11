@@ -8,9 +8,10 @@ import (
 	"sync"
 	"testing"
 
+	admissionv1 "k8s.io/api/admissionregistration/v1"
+
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/runtime/replication"
-	admissionv1 "k8s.io/api/admissionregistration/v1"
 )
 
 func TestNativeManagedConditionOldAndNew(t *testing.T) {
@@ -18,7 +19,7 @@ func TestNativeManagedConditionOldAndNew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hook := replication.Webhook(&capsulev1beta2.TenantResourceTrigger{}, "", admissionv1.WebhookClientConfig{})
+	hook := replication.Webhook(&capsulev1beta2.TenantResourceTrigger{}, "", admissionv1.WebhookClientConfig{}, testDeliveryKey(t))
 	var expression string
 	for _, condition := range hook.MatchConditions {
 		if condition.Name == "capsule-trigger-unmanaged" {
@@ -87,7 +88,7 @@ func TestNativeBookkeepingExclusionPreservesUserUpdates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hook := replication.Webhook(&capsulev1beta2.TenantResourceTrigger{}, "", admissionv1.WebhookClientConfig{})
+	hook := replication.Webhook(&capsulev1beta2.TenantResourceTrigger{}, "", admissionv1.WebhookClientConfig{}, testDeliveryKey(t))
 	var expression string
 	for _, condition := range hook.MatchConditions {
 		if condition.Name == "capsule-trigger-bookkeeping" {
@@ -156,4 +157,13 @@ func BenchmarkNativeTriggerConditions(b *testing.B) {
 			}
 		})
 	}
+}
+
+func testDeliveryKey(tb testing.TB) *replication.DeliveryKey {
+	tb.Helper()
+	key, err := replication.NewDeliveryKey(make([]byte, 32))
+	if err != nil {
+		tb.Fatal(err)
+	}
+	return key
 }

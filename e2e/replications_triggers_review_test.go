@@ -5,6 +5,7 @@ package e2e
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -52,6 +53,8 @@ var _ = Describe("Replication trigger review regressions", Label("replications",
 		}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
 		waitForReplicationTrigger(trigger)
 		Consistently(func() string { return read().Annotations[replication.TriggerAnnotation] }, 2*time.Second, 200*time.Millisecond).Should(BeEmpty())
+		deadline := read().Status.NextResyncAt
+		Expect(deadline).NotTo(BeNil())
 		actor := impersonationClient(owner.Name, withDefaultGroups(nil))
 		By("allowing a genuine user spec update to trigger reconciliation")
 		Eventually(func() error {
@@ -71,6 +74,7 @@ var _ = Describe("Replication trigger review regressions", Label("replications",
 			g.Expect(fresh.Status.Trigger.ObservedRequest).To(Equal(fresh.Annotations[replication.TriggerAnnotation]))
 			g.Expect(fresh.Status.Trigger.ObservedRequest).NotTo(BeEmpty())
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Expect(read().Status.NextResyncAt.Time.After(deadline.Time)).To(BeFalse(), "trigger must not postpone the outstanding periodic deadline")
 		token := read().Status.Trigger.ObservedRequest
 		Consistently(func() string { return read().Annotations[replication.TriggerAnnotation] }, 4*time.Second, 200*time.Millisecond).Should(Equal(token))
 		By("keeping later user metadata changes eligible after an internal patch")
@@ -157,7 +161,7 @@ func waitForReplicationTrigger(trigger capsulev1beta2.TenantResourceTrigger) {
 		found := false
 		for _, config := range list.Items {
 			for _, hook := range config.Webhooks {
-				if hook.ClientConfig.Service != nil && hook.ClientConfig.Service.Path != nil && *hook.ClientConfig.Service.Path == replication.TriggerPath+replication.MatchID(&trigger) {
+				if hook.ClientConfig.Service != nil && hook.ClientConfig.Service.Path != nil && strings.HasPrefix(*hook.ClientConfig.Service.Path, replication.TriggerPath+replication.MatchID(&trigger)+"/") {
 					g.Expect(hook.FailurePolicy).NotTo(BeNil())
 					g.Expect(*hook.FailurePolicy).To(Equal(registrationv1.Ignore))
 					found = true

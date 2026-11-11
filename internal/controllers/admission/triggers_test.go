@@ -5,6 +5,7 @@ package admission
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	admissionv1 "k8s.io/api/admissionregistration/v1"
@@ -87,7 +88,7 @@ func BenchmarkTriggerRegistration(b *testing.B) {
 					b.Fatal(err)
 				}
 			}
-			r := &validatingReconciler{client: schemeClient}
+			r := &validatingReconciler{delivery: testDeliveryKey(), client: schemeClient}
 			url := "https://capsule.example.com"
 			config := &admissionv1.WebhookClientConfig{URL: &url}
 			b.ReportAllocs()
@@ -96,10 +97,44 @@ func BenchmarkTriggerRegistration(b *testing.B) {
 				if err != nil || len(hooks) != 1 {
 					b.Fatalf("grouping failed: %v %+v", err, hooks)
 				}
-				if *hooks[0].ClientConfig.URL != url+replication.TriggerPath+replication.MatchID(&trigger) {
+				if *hooks[0].ClientConfig.URL != url+testDeliveryKey().Path(replication.MatchID(&trigger)) {
 					b.Fatal("incorrect route")
 				}
 			}
 		})
+	}
+}
+
+func testDeliveryKey() *replication.DeliveryKey {
+	key, _ := replication.NewDeliveryKey(make([]byte, 32))
+	return key
+}
+
+func TestTriggerRegistrationRequiresDeliveryAuthentication(t *testing.T) {
+	c := newAdmissionBenchmarkClient(t)
+	source := &capsulev1beta2.TenantResource{Name: "source", Namespace: "ns", Spec: capsulev1beta2.TenantResourceSpec{TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{Triggers: []capsulev1beta2.TenantResourceTrigger{{Name: "events"}}}}}
+	if err := c.Create(t.Context(), source); err != nil {
+		t.Fatal(err)
+	}
+	r := &validatingReconciler{client: c}
+	if hooks, err := r.triggerWebhooks(t.Context(), nil); err != nil || len(hooks) != 0 {
+		t.Fatal("published unauthenticated trigger")
+	}
+
+	f := newAdmissionConfigurationFixture(t, "validating", 1, false)
+	r = f.reconciler.(*validatingReconciler)
+	r.delivery = nil
+	if err := f.client.Create(t.Context(), &capsulev1beta2.TenantResource{Name: "fallback", Namespace: source.Namespace, Spec: source.Spec}); err != nil {
+		t.Fatal(err)
+	}
+
+	hooks, err := r.validatingWebhooks(t.Context(), r.configuration.Admission().Validating)
+	if err != nil || len(hooks) == 0 {
+		t.Fatalf("credential outage disabled enforcement: hooks=%d err=%v", len(hooks), err)
+	}
+	for _, hook := range hooks {
+		if strings.HasPrefix(hook.Name, "trigger-") {
+			t.Fatal("registered a trigger without delivery authentication")
+		}
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -151,7 +152,7 @@ var _ = Describe("Replication admission triggers", Label("replications", "replic
 					found := false
 					for _, cfg := range list.Items {
 						for _, hook := range cfg.Webhooks {
-							if hook.ClientConfig.Service != nil && hook.ClientConfig.Service.Path != nil && *hook.ClientConfig.Service.Path == replication.TriggerPath+id {
+							if hook.ClientConfig.Service != nil && hook.ClientConfig.Service.Path != nil && strings.HasPrefix(*hook.ClientConfig.Service.Path, replication.TriggerPath+id+"/") {
 								found = true
 							}
 						}
@@ -367,11 +368,15 @@ var _ = Describe("Replication admission triggers", Label("replications", "replic
 			}, 8*time.Second, 200*time.Millisecond).Should(Succeed())
 			By("using the current audience after a policy update")
 			updateTriggers(func(spec *capsulev1beta2.TenantResourceCommonSpec) {
+				spec.TriggerMinInterval.Duration = time.Second
 				spec.Triggers[0].Audience = []rules.Audience{{Kind: rules.AudienceKindGroup, Name: prefix + "-selected"}}
 			})
+			// Let earlier notifications settle beyond the new cooldown before
+			// measuring a negative case; later positives must not mask them.
+			Eventually(func() time.Duration { return time.Since(status().Trigger.LastTriggeredAt.Time) }, defaultTimeoutInterval, defaultPollInterval).Should(BeNumerically(">", 2*time.Second))
 			baseline = status().Trigger.ObservedRequest
 			createSecret(source.Name, "source-owner-after-policy", map[string]string{"trigger-run": prefix}, false)
-			Consistently(func() string { return status().Trigger.ObservedRequest }, 2*time.Second, 200*time.Millisecond).Should(Equal(baseline))
+			Consistently(func() string { return status().Trigger.ObservedRequest }, 3*time.Second, 200*time.Millisecond).Should(Equal(baseline))
 			selectedOwner := impersonationClientSet(owners[0].Name, []string{"projectcapsule.dev", owners[0].Name, prefix + "-selected"})
 			_, err = selectedOwner.CoreV1().Secrets(source.Name).Create(ctx, &corev1.Secret{Name: "source-selected-after-policy", Labels: map[string]string{"trigger-run": prefix}, Data: map[string][]byte{"value": []byte("selected")}}, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
@@ -383,10 +388,14 @@ var _ = Describe("Replication admission triggers", Label("replications", "replic
 					spec.Triggers[0].NamespaceSelector = trigger.NamespaceSelector.DeepCopy()
 				})
 				waitPredicate(trigger)
+				Eventually(func(g Gomega) {
+					s := status()
+					g.Expect(time.Since(s.Trigger.LastTriggeredAt.Time)).To(BeNumerically(">", 2*time.Second))
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 				baseline = status().Trigger.ObservedRequest
 				_, err = selectedOwner.CoreV1().Secrets(source.Name).Create(ctx, &corev1.Secret{Name: "source-after-selector", Labels: map[string]string{"trigger-run": prefix}, Data: map[string][]byte{"value": []byte("excluded")}}, metav1.CreateOptions{})
 				Expect(err).NotTo(HaveOccurred())
-				Consistently(func() string { return status().Trigger.ObservedRequest }, 2*time.Second, 200*time.Millisecond).Should(Equal(baseline))
+				Consistently(func() string { return status().Trigger.ObservedRequest }, 3*time.Second, 200*time.Millisecond).Should(Equal(baseline))
 			}
 			By("rejecting invalid trigger configuration while real tenants are present")
 			for _, invalid := range []struct {

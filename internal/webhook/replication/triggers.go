@@ -52,6 +52,10 @@ func (h *triggerHandler) OnDelete(c client.Client, _ client.Reader, decoder admi
 
 func (h *triggerHandler) handle(c client.Client, decoder admission.Decoder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
+		if !triggers.AuthenticatedDelivery(ctx) {
+			return nil
+		}
+
 		if req.Namespace == "" || (req.DryRun != nil && *req.DryRun) || triggers.BookkeepingRequest(&req.AdmissionRequest) {
 			return nil
 		}

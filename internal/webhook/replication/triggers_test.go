@@ -7,6 +7,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -81,7 +83,7 @@ func triggerFixture(tb testing.TB, unrelated int) (handlers.Func, context.Contex
 	h := TriggerHandler(configuration.NewCapsuleConfiguration(tb.Context(), c, c, nil, "capsule"), notifier, logr.Discard())
 	object, _ := json.Marshal(&corev1.Secret{Name: "source", Namespace: "team-a"})
 	req := admission.Request{Namespace: "team-a", Name: "source", Operation: admissionv1.Update, Resource: metav1.GroupVersionResource{Version: "v1", Resource: "secrets"}, Kind: metav1.GroupVersionKind{Version: "v1", Kind: "Secret"}, UserInfo: authenticationv1.UserInfo{Username: "alice"}, Object: runtime.RawExtension{Raw: object}, OldObject: runtime.RawExtension{Raw: object}}
-	ctx := runtimewebhook.WithRequestPath(tb.Context(), triggers.TriggerPath+triggers.MatchID(&trigger))
+	ctx := authenticatedContext(tb, triggers.MatchID(&trigger))
 	return h.OnUpdate(c, c, admission.NewDecoder(scheme), nil), ctx, req, notifier, calls, local, c
 }
 
@@ -175,7 +177,7 @@ func TestSelfSubscriptionSkipsBookkeepingButPreservesUserUpdates(t *testing.T) {
 		t.Fatal(err)
 	}
 	req.OldObject = req.Object
-	ctx := runtimewebhook.WithRequestPath(t.Context(), triggers.TriggerPath+triggers.MatchID(&parent.Spec.Triggers[0]))
+	ctx := authenticatedContext(t, triggers.MatchID(&parent.Spec.Triggers[0]))
 	req.UserInfo.Username = "system:serviceaccount:capsule-system:capsule"
 	calls.Store(0)
 	if response := run(ctx, req); response != nil {
@@ -255,5 +257,29 @@ func BenchmarkTriggerAdmissionObjectSize(b *testing.B) {
 				}
 			})
 		}
+	}
+}
+
+func authenticatedContext(tb testing.TB, id string) context.Context {
+	tb.Helper()
+	key, err := triggers.NewDeliveryKey(make([]byte, 32))
+	if err != nil {
+		tb.Fatal(err)
+	}
+	var ctx context.Context
+	key.WrapHandler(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		ctx = runtimewebhook.WithRequestPath(r.Context(), r.URL.Path)
+	})).ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, key.Path(id), nil).WithContext(tb.Context()))
+	if ctx == nil {
+		tb.Fatal("delivery authentication failed")
+	}
+	return ctx
+}
+
+func TestUnauthenticatedTriggerHandlerSkipsAllWork(t *testing.T) {
+	run, _, req, n, calls, parent, _ := triggerFixture(t, 1000)
+	ctx := runtimewebhook.WithRequestPath(t.Context(), triggers.TriggerPath+triggers.MatchID(&parent.Spec.Triggers[0]))
+	if run(ctx, req) != nil || calls.Load() != 0 || n.calls.Load() != 0 {
+		t.Fatal("unsigned delivery performed work")
 	}
 }

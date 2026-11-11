@@ -307,3 +307,28 @@ func BenchmarkTriggerDispatch(b *testing.B) {
 		}
 	}
 }
+
+func TestNextResyncPreservesEarliestDeadline(t *testing.T) {
+	now := time.Unix(100, 0)
+	obj := &capsulev1beta2.TenantResource{}
+	spec := &capsulev1beta2.TenantResourceCommonSpec{Triggers: []capsulev1beta2.TenantResourceTrigger{{Name: "events"}}}
+	status := &capsulev1beta2.TenantResourceCommonStatus{}
+	if got := recordNextResync(obj, spec, status, time.Minute, now); got != time.Minute {
+		t.Fatalf("initial delay=%s", got)
+	}
+	deadline := status.NextResyncAt.Time
+	if got := recordNextResync(obj, spec, status, time.Minute, now.Add(10*time.Second)); got != 50*time.Second || !status.NextResyncAt.Time.Equal(deadline) {
+		t.Fatalf("postponed outstanding resync: delay=%s deadline=%v", got, status.NextResyncAt)
+	}
+	if got := recordNextResync(obj, spec, status, 5*time.Second, now.Add(20*time.Second)); got != 5*time.Second {
+		t.Fatalf("did not shorten deadline: %s", got)
+	}
+	if got := recordNextResync(obj, spec, status, time.Minute, now.Add(25*time.Second)); got != time.Minute {
+		t.Fatalf("elapsed deadline not advanced: %s", got)
+	}
+	spec.Triggers = nil
+	recordNextResync(obj, spec, status, time.Minute, now)
+	if status.NextResyncAt != nil {
+		t.Fatal("retained deadline after trigger removal")
+	}
+}

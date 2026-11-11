@@ -72,6 +72,12 @@ func Register(manager controllerruntime.Manager, recorder events.EventRecorder, 
 			)
 		}
 
+		if wrapper, ok := wh.(interface {
+			WrapHandler(http.Handler) http.Handler
+		}); ok {
+			handler = wrapper.WrapHandler(handler)
+		}
+
 		server.Register(wh.GetPath(), handler)
 	}
 

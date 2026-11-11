@@ -421,6 +421,11 @@ func main() {
 
 	directCfg := configuration.NewCapsuleConfiguration(ctx, directClient, directClient, restConfig, controllerConfig.ConfigurationName)
 
+	deliveryKey, err := admission.LoadTriggerDeliveryKey(ctx, directClient, ns, directCfg.GetConfigObject())
+	if err != nil {
+		setupLog.Error(err, "replication triggers disabled: unable to initialize delivery authentication; existing admission handlers remain enabled")
+	}
+
 	tlsReconciler := &tlscontroller.Reconciler{}
 
 	if directCfg.EnableTLSConfiguration() {
@@ -746,7 +751,7 @@ func main() {
 			pvcrules.AttributeClassHandler(cfg, regexCache, labelSelectorCache, celCache),
 		),
 		route.GenericReplicasHandler(),
-		route.ReplicationTriggers(replicationwebhook.TriggerHandler(cfg, triggerDispatcher, ctrl.Log.WithName("replication-triggers"))),
+		route.ReplicationTriggers(replicationwebhook.TriggerHandler(cfg, triggerDispatcher, ctrl.Log.WithName("replication-triggers")), deliveryKey),
 		route.GenericManagedHandler(cfg),
 		route.Pod(
 			pod.Handler(cfg,
@@ -1004,6 +1009,7 @@ func main() {
 		directCfg,
 		celCache,
 		triggerRecorder,
+		deliveryKey,
 	); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "admission")
 		os.Exit(1)

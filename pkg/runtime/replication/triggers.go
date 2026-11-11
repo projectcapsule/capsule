@@ -115,7 +115,7 @@ func BookkeepingRequest(req *admissionrequestv1.AdmissionRequest) bool {
 
 // Webhook lets the API server evaluate native admission CEL (including
 // authorizer) and selectors. The path carries the exact predicate identity.
-func Webhook(trigger *capsulev1beta2.TenantResourceTrigger, namespace string, client admissionv1.WebhookClientConfig) admissionv1.ValidatingWebhook {
+func Webhook(trigger *capsulev1beta2.TenantResourceTrigger, namespace string, client admissionv1.WebhookClientConfig, delivery *DeliveryKey) admissionv1.ValidatingWebhook {
 	id := MatchID(trigger)
 
 	rule := *trigger.RuleWithOperations.DeepCopy()
@@ -142,7 +142,7 @@ func Webhook(trigger *capsulev1beta2.TenantResourceTrigger, namespace string, cl
 
 	return admissionv1.ValidatingWebhook{
 		Name:                    "trigger-" + id[:40] + ".projectcapsule.dev",
-		ClientConfig:            admissionapi.DynamicClientWithPath(client, TriggerPath+id),
+		ClientConfig:            admissionapi.DynamicClientWithPath(client, delivery.Path(id)),
 		Rules:                   []admissionv1.RuleWithOperations{rule},
 		NamespaceSelector:       trigger.NamespaceSelector.DeepCopy(),
 		ObjectSelector:          trigger.ObjectSelector.DeepCopy(),

@@ -34,7 +34,7 @@ func TestNativeTriggerRegistration(t *testing.T) {
 	trigger.MatchConditions = []admissionv1.MatchCondition{{Name: "changed", Expression: "request.operation != 'UPDATE' || object.data != oldObject.data"}, {Name: "authorized", Expression: "authorizer.requestResource.check('update').allowed()"}}
 	original := trigger.DeepCopy()
 	url := "https://capsule.example.com"
-	hook := replication.Webhook(&trigger, "tenant-a", admissionv1.WebhookClientConfig{URL: &url})
+	hook := replication.Webhook(&trigger, "tenant-a", admissionv1.WebhookClientConfig{URL: &url}, testDeliveryKey(t))
 	if !reflect.DeepEqual(original, &trigger) {
 		t.Fatal("registration mutated API input")
 	}
@@ -55,7 +55,7 @@ func TestNativeTriggerRegistration(t *testing.T) {
 		t.Fatal("selector update reused an obsolete group")
 	}
 	trigger.Operations = []admissionv1.OperationType{admissionv1.OperationAll}
-	wildcard := replication.Webhook(&trigger, "", admissionv1.WebhookClientConfig{URL: &url})
+	wildcard := replication.Webhook(&trigger, "", admissionv1.WebhookClientConfig{URL: &url}, testDeliveryKey(t))
 	if !reflect.DeepEqual(wildcard.Rules[0].Operations, []admissionv1.OperationType{admissionv1.Create, admissionv1.Update, admissionv1.Delete}) {
 		t.Fatal("wildcard should observe only persistent write operations")
 	}
@@ -169,4 +169,13 @@ func BenchmarkTriggerPredicate(b *testing.B) {
 			b.Fatal("empty predicate")
 		}
 	}
+}
+
+func testDeliveryKey(tb testing.TB) *replication.DeliveryKey {
+	tb.Helper()
+	key, err := replication.NewDeliveryKey(make([]byte, 32))
+	if err != nil {
+		tb.Fatal(err)
+	}
+	return key
 }

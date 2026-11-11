@@ -56,7 +56,7 @@ func BenchmarkControllerAdmission(b *testing.B) {
 				configuration := configuration.NewCapsuleConfiguration(b.Context(), c, c, nil, cfg.Name)
 				var r reconcile.Reconciler = &mutatingReconciler{client: c, configuration: configuration, log: logr.Discard()}
 				if kind == "validating" {
-					r = &validatingReconciler{client: c, configuration: configuration, log: logr.Discard()}
+					r = &validatingReconciler{delivery: testDeliveryKey(), client: c, configuration: configuration, log: logr.Discard()}
 				}
 				req := reconcile.Request{Name: kind}
 				if _, err := r.Reconcile(b.Context(), req); err != nil {
