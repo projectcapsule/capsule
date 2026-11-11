@@ -27,7 +27,9 @@ type CELCache struct {
 	resourceConditions int
 	triggerMu          sync.RWMutex
 	triggerCompiler    admissioncel.Compiler
-	triggerConditions  map[string]admissioncel.CompilationResult
+	triggerConditions  map[string]struct{}
+	triggerOrder       []string
+	triggerNext        int
 }
 
 // Resource policies can be edited independently of the quota invalidation
@@ -139,6 +141,8 @@ func (c *CELCache) Reset() {
 	c.mu.Unlock()
 	c.triggerMu.Lock()
 	clear(c.triggerConditions)
+	c.triggerOrder = nil
+	c.triggerNext = 0
 	c.triggerMu.Unlock()
 }
 

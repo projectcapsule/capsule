@@ -10,8 +10,11 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -25,6 +28,7 @@ import (
 	triggers "github.com/projectcapsule/capsule/pkg/runtime/replication"
 	"github.com/projectcapsule/capsule/pkg/runtime/ssa"
 	runtimewebhook "github.com/projectcapsule/capsule/pkg/runtime/webhook"
+	"github.com/projectcapsule/capsule/pkg/runtime/workloads"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
@@ -38,19 +42,19 @@ func TriggerHandler(cfg configuration.Configuration, notifier triggers.Notifier,
 	return &triggerHandler{configuration: cfg, notifier: notifier, log: log}
 }
 
-func (h *triggerHandler) OnCreate(c client.Client, _ client.Reader, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
-	return h.handle(c, decoder)
+func (h *triggerHandler) OnCreate(c client.Client, reader client.Reader, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+	return h.handle(c, reader, decoder)
 }
 
-func (h *triggerHandler) OnUpdate(c client.Client, _ client.Reader, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
-	return h.handle(c, decoder)
+func (h *triggerHandler) OnUpdate(c client.Client, reader client.Reader, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+	return h.handle(c, reader, decoder)
 }
 
-func (h *triggerHandler) OnDelete(c client.Client, _ client.Reader, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
-	return h.handle(c, decoder)
+func (h *triggerHandler) OnDelete(c client.Client, reader client.Reader, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+	return h.handle(c, reader, decoder)
 }
 
-func (h *triggerHandler) handle(c client.Client, decoder admission.Decoder) handlers.Func {
+func (h *triggerHandler) handle(c client.Client, reader client.Reader, decoder admission.Decoder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if !triggers.AuthenticatedDelivery(ctx) {
 			return nil
@@ -69,7 +73,8 @@ func (h *triggerHandler) handle(c client.Client, decoder admission.Decoder) hand
 			return nil
 		}
 
-		if h.managedRequest(req, decoder) {
+		managed, sourceUID := h.managedRequest(req, decoder)
+		if managed {
 			return nil
 		}
 
@@ -90,6 +95,7 @@ func (h *triggerHandler) handle(c client.Client, decoder admission.Decoder) hand
 		}
 
 		audience := &triggerAudience{handler: h, client: c, request: req, results: make(map[rules.Audience]bool)}
+		parentChecked, parentManaged := req.SubResource == "", false
 		eligible := func(obj client.Object, spec *capsulev1beta2.TenantResourceCommonSpec) bool {
 			if spec.IsCordoned() || !obj.GetDeletionTimestamp().IsZero() {
 				return false
@@ -98,7 +104,12 @@ func (h *triggerHandler) handle(c client.Client, decoder admission.Decoder) hand
 			for i := range spec.Triggers {
 				trigger := &spec.Triggers[i]
 				if triggers.MatchID(trigger) == id && audience.matches(ctx, trigger.Audience) {
-					return true
+					if !parentChecked {
+						parentChecked = true
+						parentManaged = h.managedParent(ctx, c, reader, req, sourceUID)
+					}
+
+					return !parentManaged
 				}
 			}
 
@@ -123,7 +134,9 @@ func (h *triggerHandler) handle(c client.Client, decoder admission.Decoder) hand
 	}
 }
 
-func (h *triggerHandler) managedRequest(req admission.Request, decoder admission.Decoder) bool {
+func (h *triggerHandler) managedRequest(req admission.Request, decoder admission.Decoder) (bool, types.UID) {
+	var uid types.UID
+
 	for _, raw := range [][]byte{req.Object.Raw, req.OldObject.Raw} {
 		if len(raw) == 0 || string(raw) == "null" {
 			continue
@@ -133,22 +146,72 @@ func (h *triggerHandler) managedRequest(req admission.Request, decoder admission
 		if err := decoder.DecodeRaw(runtime.RawExtension{Raw: raw}, &obj); err != nil {
 			h.log.Error(err, "cannot decode trigger metadata")
 
-			return true
+			return true, uid
 		}
 
-		if triggers.Managed(&obj) {
-			return true
-		}
-		// Legacy co-managed targets may lack lifecycle labels. Their SSA
-		// manager identities conservatively suppress notifications as well.
-		if len(ssa.ReplicationOwnerPrefixes(&obj, "")) > 0 {
-			return true
+		if uid != "" && obj.UID != "" && uid != obj.UID {
+			return true, uid
 		}
 
-		for _, field := range obj.ManagedFields {
-			if strings.HasPrefix(field.Manager, meta.FieldManagerCapsulePrefix+"/") {
-				return true
-			}
+		if obj.UID != "" {
+			uid = obj.UID
+		}
+
+		if managedMetadata(&obj) {
+			return true, uid
+		}
+	}
+
+	return false, uid
+}
+
+// Subresources can project away all management metadata (notably Scale).
+// Read the named parent through the admission reader only after an applicable
+// subscription and audience have matched. A missing/uncertain parent never
+// creates a notification, and never denies the original Kubernetes operation.
+func (h *triggerHandler) managedParent(ctx context.Context, c client.Client, reader client.Reader, req admission.Request, uid types.UID) bool {
+	if reader == nil {
+		return true
+	}
+
+	gvk := schema.GroupVersionKind{}
+	if req.SubResource == "scale" {
+		gvk = workloads.ScaleWorkloadGVK(req.Resource)
+	}
+
+	if gvk.Empty() {
+		var err error
+
+		gvk, err = c.RESTMapper().KindFor(schema.GroupVersionResource(req.Resource))
+		if err != nil {
+			h.log.Error(err, "cannot resolve trigger subresource parent kind")
+
+			return true
+		}
+	}
+
+	parent := &metav1.PartialObjectMetadata{}
+	parent.SetGroupVersionKind(gvk)
+
+	if err := reader.Get(ctx, client.ObjectKey{Namespace: req.Namespace, Name: req.Name}, parent); err != nil {
+		if !apierrors.IsNotFound(err) {
+			h.log.Error(err, "cannot read trigger subresource parent")
+		}
+
+		return true
+	}
+
+	return (uid != "" && uid != parent.UID) || managedMetadata(parent)
+}
+
+func managedMetadata(obj *metav1.PartialObjectMetadata) bool {
+	if triggers.Managed(obj) || len(ssa.ReplicationOwnerPrefixes(obj, "")) > 0 {
+		return true
+	}
+
+	for _, field := range obj.ManagedFields {
+		if strings.HasPrefix(field.Manager, meta.FieldManagerCapsulePrefix+"/") {
+			return true
 		}
 	}
 

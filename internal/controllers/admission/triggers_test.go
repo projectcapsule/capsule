@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
@@ -136,5 +137,49 @@ func TestTriggerRegistrationRequiresDeliveryAuthentication(t *testing.T) {
 		if strings.HasPrefix(hook.Name, "trigger-") {
 			t.Fatal("registered a trigger without delivery authentication")
 		}
+	}
+}
+
+func TestTriggerRegistrationDeletionStart(t *testing.T) {
+	for _, global := range []bool{false, true} {
+		t.Run(fmt.Sprintf("global=%t", global), func(t *testing.T) {
+			f := newAdmissionConfigurationFixture(t, "validating", 1, false)
+			r := f.reconciler.(*validatingReconciler)
+			trigger := capsulev1beta2.TenantResourceTrigger{Name: "events", Operations: []admissionv1.OperationType{admissionv1.Update}, APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"secrets"}}
+			spec := capsulev1beta2.TenantResourceCommonSpec{Triggers: []capsulev1beta2.TenantResourceTrigger{trigger}}
+			var source client.Object = &capsulev1beta2.TenantResource{Name: "source", Namespace: "tenant-a", Finalizers: []string{"projectcapsule.dev/test-hold"}, Spec: capsulev1beta2.TenantResourceSpec{TenantResourceCommonSpec: spec}}
+			if global {
+				source = &capsulev1beta2.GlobalTenantResource{Name: "source", Finalizers: []string{"projectcapsule.dev/test-hold"}, Spec: capsulev1beta2.GlobalTenantResourceSpec{TenantResourceCommonSpec: spec}}
+			}
+			if err := f.client.Create(t.Context(), source); err != nil {
+				t.Fatal(err)
+			}
+			hooks, err := r.triggerWebhooks(t.Context(), r.configuration.Admission().Validating.Client)
+			if err != nil || len(hooks) != 1 {
+				t.Fatalf("initial hooks=%d err=%v", len(hooks), err)
+			}
+			old := source.DeepCopyObject().(client.Object)
+			if err := f.client.Delete(t.Context(), source); err != nil {
+				t.Fatal(err)
+			}
+			if err := f.client.Get(t.Context(), client.ObjectKeyFromObject(source), source); err != nil {
+				t.Fatal(err)
+			}
+			if source.GetDeletionTimestamp().IsZero() || source.GetGeneration() != old.GetGeneration() {
+				t.Fatal("fixture did not preserve generation at deletion start")
+			}
+			if !triggerSourceChanged().Update(event.UpdateEvent{ObjectOld: old, ObjectNew: source}) {
+				t.Fatal("watch discarded deletion start")
+			}
+			hooks, err = r.triggerWebhooks(t.Context(), r.configuration.Admission().Validating.Client)
+			if err != nil || len(hooks) != 0 {
+				t.Fatalf("retained deleting subscriptions: %d %v", len(hooks), err)
+			}
+			unchanged := old.DeepCopyObject().(client.Object)
+			unchanged.SetResourceVersion("status-only")
+			if triggerSourceChanged().Update(event.UpdateEvent{ObjectOld: old, ObjectNew: unchanged}) {
+				t.Fatal("watch admits status-only writes")
+			}
+		})
 	}
 }

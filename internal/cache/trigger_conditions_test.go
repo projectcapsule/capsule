@@ -8,7 +8,10 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/google/cel-go/cel"
 	admissionv1 "k8s.io/api/admissionregistration/v1"
+	admissioncel "k8s.io/apiserver/pkg/admission/plugin/cel"
+	"k8s.io/apiserver/pkg/cel/environment"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/runtime/replication"
@@ -29,7 +32,7 @@ func TestNativeManagedConditionOldAndNew(t *testing.T) {
 	if err := c.ValidateTriggerCondition(expression); err != nil {
 		t.Fatal(err)
 	}
-	program := c.triggerConditions[expression].Program
+	program := nativeTriggerProgram(t, c, expression)
 	plain := map[string]any{"metadata": map[string]any{"name": "source"}}
 	managed := map[string]any{"metadata": map[string]any{"labels": map[string]any{"projectcapsule.dev/managed-by": "replications"}}}
 	for _, tc := range []struct {
@@ -112,7 +115,7 @@ func TestNativeBookkeepingExclusionPreservesUserUpdates(t *testing.T) {
 		{"system:serviceaccount:capsule-system:capsule", capsulev1beta2.GroupVersion.Group, "tenantresources", "CREATE", true},
 	} {
 		request := map[string]any{"operation": tc.operation, "resource": map[string]any{"group": tc.group, "resource": tc.resource}, "userInfo": map[string]any{"username": tc.user}}
-		value, _, err := c.triggerConditions[expression].Program.ContextEval(t.Context(), map[string]any{"request": request})
+		value, _, err := nativeTriggerProgram(t, c, expression).ContextEval(t.Context(), map[string]any{"request": request})
 		if err != nil || value.Value() != tc.want {
 			t.Fatalf("%+v: result=%v err=%v", tc, value, err)
 		}
@@ -166,4 +169,13 @@ func testDeliveryKey(tb testing.TB) *replication.DeliveryKey {
 		tb.Fatal(err)
 	}
 	return key
+}
+
+func nativeTriggerProgram(t *testing.T, c *CELCache, expression string) cel.Program {
+	t.Helper()
+	result := c.triggerCompiler.CompileCELExpression(triggerExpression(expression), admissioncel.OptionalVariableDeclarations{HasAuthorizer: true}, environment.NewExpressions)
+	if result.Error != nil {
+		t.Fatal(result.Error)
+	}
+	return result.Program
 }

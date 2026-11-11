@@ -68,10 +68,14 @@ func (r *validatingReconciler) SetupWithManager(mgr ctrl.Manager, ctrlConfig uti
 				predicates.NamesMatchingPredicate{Names: []string{ctrlConfig.ConfigurationName}},
 			),
 		).
-		Watches(&capsulev1beta2.TenantResource{}, handler.EnqueueRequestsFromMapFunc(r.enqueueTriggerConfiguration), builder.WithPredicates(predicate.GenerationChangedPredicate{})).
-		Watches(&capsulev1beta2.GlobalTenantResource{}, handler.EnqueueRequestsFromMapFunc(r.enqueueTriggerConfiguration), builder.WithPredicates(predicate.GenerationChangedPredicate{})).
+		Watches(&capsulev1beta2.TenantResource{}, handler.EnqueueRequestsFromMapFunc(r.enqueueTriggerConfiguration), builder.WithPredicates(triggerSourceChanged())).
+		Watches(&capsulev1beta2.GlobalTenantResource{}, handler.EnqueueRequestsFromMapFunc(r.enqueueTriggerConfiguration), builder.WithPredicates(triggerSourceChanged())).
 		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
 		Complete(r)
+}
+
+func triggerSourceChanged() predicate.Predicate {
+	return predicate.Or(predicate.GenerationChangedPredicate{}, predicates.DeletionChangedPredicate{})
 }
 
 func (r *validatingReconciler) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {

@@ -13,6 +13,12 @@ import (
 
 type triggerExpression string
 
+// Keep the published working set warm: 128 native groups x 60 conditions,
+// with headroom for built-in predicates. Only successful validation is
+// retained: execution belongs to the API server, so keeping its programs here
+// would unnecessarily retain thousands of compiled artifacts.
+const maxTriggerConditions = 8192
+
 func (e triggerExpression) GetExpression() string    { return string(e) }
 func (e triggerExpression) ReturnTypes() []*cel.Type { return []*cel.Type{cel.BoolType} }
 
@@ -57,14 +63,18 @@ func (c *CELCache) ValidateTriggerCondition(expression string) error {
 	}
 
 	if c.triggerConditions == nil {
-		c.triggerConditions = make(map[string]admissioncel.CompilationResult)
+		c.triggerConditions = make(map[string]struct{})
 	}
 
-	if len(c.triggerConditions) >= maxResourceConditions {
-		clear(c.triggerConditions)
+	if len(c.triggerOrder) == maxTriggerConditions {
+		delete(c.triggerConditions, c.triggerOrder[c.triggerNext])
+		c.triggerOrder[c.triggerNext] = expression
+		c.triggerNext = (c.triggerNext + 1) % maxTriggerConditions
+	} else {
+		c.triggerOrder = append(c.triggerOrder, expression)
 	}
 
-	c.triggerConditions[expression] = compiled
+	c.triggerConditions[expression] = struct{}{}
 
 	return nil
 }
