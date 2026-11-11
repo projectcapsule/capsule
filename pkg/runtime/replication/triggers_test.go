@@ -179,3 +179,28 @@ func testDeliveryKey(tb testing.TB) *replication.DeliveryKey {
 	}
 	return key
 }
+
+func TestStructuralTriggerValidationDefersOnlyCompilation(t *testing.T) {
+	trigger := validTrigger()
+	trigger.MatchConditions = []admissionv1.MatchCondition{{Name: "condition", Expression: "object["}}
+	spec := &capsulev1beta2.TenantResourceCommonSpec{Triggers: []capsulev1beta2.TenantResourceTrigger{trigger}}
+	if err := replication.ValidateTriggerStructure(spec, true); err != nil {
+		t.Fatal(err)
+	}
+	compiler, err := cache.NewCELCache()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := replication.ValidateTriggers(spec, true, compiler); err == nil {
+		t.Fatal("admission accepted invalid CEL")
+	}
+	spec.Triggers[0].MatchConditions[0].Name = "capsule-trigger-reserved"
+	if err := replication.ValidateTriggerStructure(spec, true); err == nil {
+		t.Fatal("structure accepted reserved condition name")
+	}
+	spec.Triggers[0].MatchConditions[0].Name = "condition"
+	spec.Triggers[0].MatchConditions[0].Expression = ""
+	if err := replication.ValidateTriggerStructure(spec, true); err == nil {
+		t.Fatal("structure accepted an empty expression")
+	}
+}

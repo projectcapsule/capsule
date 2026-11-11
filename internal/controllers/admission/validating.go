@@ -6,8 +6,10 @@ package admission
 
 import (
 	"context"
+	"fmt"
 	"maps"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -20,11 +22,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/internal/controllers/tls"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
@@ -40,7 +40,7 @@ type validatingReconciler struct {
 
 	configuration  configuration.Configuration
 	log            logr.Logger
-	conditions     *cache.CELCache
+	conditions     replication.ConditionValidator
 	triggerMetrics *metrics.TriggerRecorder
 	delivery       *replication.DeliveryKey
 }
@@ -72,10 +72,6 @@ func (r *validatingReconciler) SetupWithManager(mgr ctrl.Manager, ctrlConfig uti
 		Watches(&capsulev1beta2.GlobalTenantResource{}, handler.EnqueueRequestsFromMapFunc(r.enqueueTriggerConfiguration), builder.WithPredicates(triggerSourceChanged())).
 		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
 		Complete(r)
-}
-
-func triggerSourceChanged() predicate.Predicate {
-	return predicate.Or(predicate.GenerationChangedPredicate{}, predicates.DeletionChangedPredicate{})
 }
 
 func (r *validatingReconciler) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
@@ -194,7 +190,7 @@ func (r *validatingReconciler) reconcileValidatingConfiguration(
 			return budgetErr
 		}
 
-		obj.Webhooks = bounded
+		obj.Webhooks = r.validateBoundedTriggers(bounded)
 
 		if r.triggerMetrics != nil {
 			r.triggerMetrics.OmittedRegistrations.Set(float64(omitted))
@@ -326,7 +322,7 @@ func (r *validatingReconciler) triggerWebhooks(ctx context.Context, config *admi
 	globalGroups := make(map[string]bool)
 
 	add := func(spec *capsulev1beta2.TenantResourceCommonSpec, namespace string) {
-		if err := replication.ValidateTriggers(spec, namespace != "", r.conditions); err != nil {
+		if err := replication.ValidateTriggerStructure(spec, namespace != ""); err != nil {
 			r.log.Error(err, "skipping invalid replication triggers", "namespace", namespace)
 
 			return
@@ -374,6 +370,43 @@ func (r *validatingReconciler) triggerWebhooks(ctx context.Context, config *admi
 	}
 
 	return out, nil
+}
+
+// Compilation happens only after group, byte and enforcement budgets have been
+// applied, including the actual CA bundle. Omitted groups cannot churn the CEL
+// cache or delay enforcement updates with thousands of needless compilations.
+func (r *validatingReconciler) validateBoundedTriggers(hooks []admissionv1.ValidatingWebhook) []admissionv1.ValidatingWebhook {
+	out := hooks[:0]
+
+	for _, hook := range hooks {
+		var conditionError error
+
+		if isTriggerRegistration(hook) {
+			for _, condition := range hook.MatchConditions {
+				if strings.HasPrefix(condition.Name, "capsule-trigger-") {
+					continue
+				}
+
+				if r.conditions == nil {
+					conditionError = fmt.Errorf("trigger match condition compiler is unavailable")
+				} else {
+					conditionError = r.conditions.ValidateTriggerCondition(condition.Expression)
+				}
+
+				if conditionError != nil {
+					r.log.Error(conditionError, "skipping invalid trigger registration", "webhook", hook.Name)
+
+					break
+				}
+			}
+		}
+
+		if conditionError == nil {
+			out = append(out, hook)
+		}
+	}
+
+	return out
 }
 
 func validatingWebhookCABundlesByName(

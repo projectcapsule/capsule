@@ -20,6 +20,17 @@ import (
 type ConditionValidator interface{ ValidateTriggerCondition(string) error }
 
 func ValidateTriggers(spec *capsulev1beta2.TenantResourceCommonSpec, namespaced bool, compiler ConditionValidator) error {
+	return validateTriggers(spec, namespaced, compiler, true)
+}
+
+// ValidateTriggerStructure checks the candidate shape without compiling CEL.
+// Registration uses this before applying its serialized publication budget;
+// admission and resource controllers must continue using ValidateTriggers.
+func ValidateTriggerStructure(spec *capsulev1beta2.TenantResourceCommonSpec, namespaced bool) error {
+	return validateTriggers(spec, namespaced, nil, false)
+}
+
+func validateTriggers(spec *capsulev1beta2.TenantResourceCommonSpec, namespaced bool, compiler ConditionValidator, compileConditions bool) error {
 	if spec == nil {
 		return fmt.Errorf("replication specification is required")
 	}
@@ -72,7 +83,7 @@ func ValidateTriggers(spec *capsulev1beta2.TenantResourceCommonSpec, namespaced 
 			return fmt.Errorf("%s exceeds audience or match condition limit", path)
 		}
 
-		if err := validateTriggerConditions(t, path, compiler); err != nil {
+		if err := validateTriggerConditions(t, path, compiler, compileConditions); err != nil {
 			return err
 		}
 	}
@@ -168,7 +179,7 @@ func validateTriggerResources(resources []string, path string) error {
 	return nil
 }
 
-func validateTriggerConditions(t *capsulev1beta2.TenantResourceTrigger, path string, compiler ConditionValidator) error {
+func validateTriggerConditions(t *capsulev1beta2.TenantResourceTrigger, path string, compiler ConditionValidator, compileConditions bool) error {
 	conditionNames := make(map[string]bool)
 
 	for _, condition := range t.MatchConditions {
@@ -181,6 +192,10 @@ func validateTriggerConditions(t *capsulev1beta2.TenantResourceTrigger, path str
 		}
 
 		conditionNames[condition.Name] = true
+
+		if !compileConditions {
+			continue
+		}
 
 		if compiler == nil {
 			return fmt.Errorf("%s match condition compiler is unavailable", path)
