@@ -655,14 +655,14 @@ trace-install:
 		--set 'manager.resources=null'\
 		--set 'manager.livenessProbe.failureThreshold=10' \
 		--set 'manager.readinessProbe.failureThreshold=10' \
-		--values charts/capsule/ci/tracing-values.yaml \
+		--values charts/capsule/ci/tracing.yaml \
 		capsule \
 		./charts/capsule
 
 .PHONY: trace-e2e
 trace-e2e: kind
 	$(MAKE) docker-build-capsule-trace
-	$(KIND) create cluster --wait=60s --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION) --config hack/kind-cluster.yml
+	$(KIND) create cluster --wait=60s --name capsule-tracing --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION) --config ./hack/kind-cluster.yaml
 	$(MAKE) e2e-load-image CLUSTER_NAME=capsule-tracing IMAGE=$(CAPSULE_IMG) VERSION=tracing
 	$(MAKE) trace-install
 	$(MAKE) e2e-install-deps
