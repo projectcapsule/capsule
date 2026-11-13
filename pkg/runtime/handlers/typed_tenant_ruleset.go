@@ -7,13 +7,10 @@ import (
 	"context"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 	"github.com/projectcapsule/capsule/pkg/ruleengine"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
@@ -60,12 +57,6 @@ type TypedTenantWithRulesetHandler[T client.Object] struct {
 	Configuration configuration.Configuration
 }
 
-type rulesetReadResult struct {
-	rules []*rules.NamespaceRuleBodyNamespace
-	found bool
-	err   error
-}
-
 func (h *TypedTenantWithRulesetHandler[T]) OnCreate(
 	c client.Client,
 	reader client.Reader,
@@ -77,9 +68,7 @@ func (h *TypedTenantWithRulesetHandler[T]) OnCreate(
 			return nil
 		}
 
-		rulesetResult := h.readRulesetAsync(ctx, reader, req.Namespace)
-
-		tnt, ns, err := h.resolveTenant(ctx, reader, req)
+		tnt, ns, rs, err := h.resolveTenant(ctx, c, reader, req)
 		if err != nil {
 			return ErroredResponse(err)
 		}
@@ -93,7 +82,7 @@ func (h *TypedTenantWithRulesetHandler[T]) OnCreate(
 			return ErroredResponse(err)
 		}
 
-		ruleBlocks, err := h.resolveRuleset(c, ns, tnt, <-rulesetResult)
+		ruleBlocks, err := h.resolveRuleset(c, ns, tnt, rs)
 		if err != nil {
 			return ErroredResponse(err)
 		}
@@ -128,9 +117,7 @@ func (h *TypedTenantWithRulesetHandler[T]) OnUpdate(
 			return nil
 		}
 
-		rulesetResult := h.readRulesetAsync(ctx, reader, req.Namespace)
-
-		tnt, ns, err := h.resolveTenant(ctx, reader, req)
+		tnt, ns, rs, err := h.resolveTenant(ctx, c, reader, req)
 		if err != nil {
 			return ErroredResponse(err)
 		}
@@ -149,7 +136,7 @@ func (h *TypedTenantWithRulesetHandler[T]) OnUpdate(
 			return ErroredResponse(err)
 		}
 
-		ruleBlocks, err := h.resolveRuleset(c, ns, tnt, <-rulesetResult)
+		ruleBlocks, err := h.resolveRuleset(c, ns, tnt, rs)
 		if err != nil {
 			return ErroredResponse(err)
 		}
@@ -180,51 +167,21 @@ func (h *TypedTenantWithRulesetHandler[T]) OnDelete(
 	}
 }
 
+// resolveTenant reads the Namespace, its Tenant and the managed RuleStatus
+// from the manager cache first; see
+// tenant.GetTenantRuleStatusByNamespaceCacheFirst for the fallbacks to the API
+// reader.
 func (h *TypedTenantWithRulesetHandler[T]) resolveTenant(
 	ctx context.Context,
 	c client.Reader,
+	reader client.Reader,
 	req admission.Request,
-) (*capsulev1beta2.Tenant, *corev1.Namespace, error) {
+) (*capsulev1beta2.Tenant, *corev1.Namespace, *capsulev1beta2.RuleStatus, error) {
 	if req.Namespace == "" {
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 
-	return tenant.GetTenantByNamespaceWithSnapshot(ctx, c, req.Namespace)
-}
-
-func (h *TypedTenantWithRulesetHandler[T]) readRulesetAsync(
-	ctx context.Context,
-	reader client.Reader,
-	namespace string,
-) <-chan rulesetReadResult {
-	result := make(chan rulesetReadResult, 1)
-
-	go func() {
-		rs := &capsulev1beta2.RuleStatus{}
-		key := types.NamespacedName{
-			Namespace: namespace,
-			Name:      meta.NameForManagedRuleStatus(),
-		}
-
-		err := reader.Get(ctx, key, rs)
-
-		switch {
-		case err == nil:
-			result <- rulesetReadResult{
-				rules: rs.Status.Rules,
-				// A newly published spec can precede its effective status. Use
-				// the existing namespace-rendering fallback until this generation
-				// has been processed, rather than allowing with an empty ruleset.
-				found: rs.Status.ObservedGeneration == rs.Generation,
-			}
-		case apierrors.IsNotFound(err):
-			result <- rulesetReadResult{}
-		default:
-			result <- rulesetReadResult{err: err}
-		}
-	}()
-
-	return result
+	return tenant.GetTenantRuleStatusByNamespaceCacheFirst(ctx, c, reader, req.Namespace)
 }
 
 // Resolve the corresponding managed ruleset for this namespace.
@@ -233,14 +190,13 @@ func (h *TypedTenantWithRulesetHandler[T]) resolveRuleset(
 	c client.Client,
 	ns *corev1.Namespace,
 	tnt *capsulev1beta2.Tenant,
-	result rulesetReadResult,
+	rs *capsulev1beta2.RuleStatus,
 ) ([]*rules.NamespaceRuleBodyNamespace, error) {
-	if result.err != nil {
-		return nil, result.err
-	}
-
-	if result.found {
-		return result.rules, nil
+	// A newly published spec can precede its effective status. Use the
+	// existing namespace-rendering fallback until this generation has been
+	// processed, rather than allowing with an empty ruleset.
+	if tenant.IsRuleStatusObserved(rs) {
+		return rs.Status.Rules, nil
 	}
 
 	// Use the exact ownership snapshot, including on single-handler routes.

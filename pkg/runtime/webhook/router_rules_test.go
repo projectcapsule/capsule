@@ -62,7 +62,8 @@ func rulesRouterFixture(tb testing.TB, tenants, ruleCount int, metadataAction, n
 		for _, selected := range []bool{true, false} {
 			namespace := fmt.Sprintf("%s-selected-%v", name, selected)
 			ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace, OwnerReferences: []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: name, UID: tnt.UID}}}}
-			rs := &capsulev1beta2.RuleStatus{ObjectMeta: metav1.ObjectMeta{Name: meta.NameForManagedRuleStatus(), Namespace: namespace}}
+			rs := &capsulev1beta2.RuleStatus{ObjectMeta: metav1.ObjectMeta{Name: meta.NameForManagedRuleStatus(), Namespace: namespace,
+				OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(tnt, capsulev1beta2.GroupVersion.WithKind("Tenant"))}}}
 			if selected {
 				for n := range ruleCount {
 					key := fmt.Sprintf("unmatched-%d", n)
@@ -93,9 +94,43 @@ func rulesRouterFixture(tb testing.TB, tenants, ruleCount int, metadataAction, n
 			}})
 		}
 	}
-	cl := &routerCountingClient{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).WithStatusSubresource(&capsulev1beta2.RuleStatus{}).Build()}
+	base := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).WithStatusSubresource(&capsulev1beta2.RuleStatus{}).Build()
+	// The manager cache and the API reader share one store; the returned
+	// client counts the API reads only.
+	cl := &routerCountingClient{Client: base}
 	chain := genericvalidation.Register(cache.NewRegexCache(), nil, nil, nil, nil, networkvalidation.Handler(nil, nil)).GetHandlers()
-	return &handlerRouter{client: cl, reader: cl, decoder: admission.NewDecoder(scheme), handlers: chain, recorder: events.NewDiscardRecorder()}, cl, requests
+	return &handlerRouter{client: &routerCountingClient{Client: base}, reader: cl, decoder: admission.NewDecoder(scheme), handlers: chain, recorder: events.NewDiscardRecorder()}, cl, requests
+}
+
+// withColdCache gives the router an empty manager cache, so every admission
+// read falls back to the API reader.
+func withColdCache(router *handlerRouter) {
+	router.client = fake.NewClientBuilder().WithScheme(router.client.Scheme()).Build()
+}
+
+// TestRouterRulesAPIReadsByCacheState covers both read paths of the chain. A
+// warm cache answers the Namespace, Tenant and RuleStatus reads. With a cold
+// cache the API reader is asked for each of them once per request, shared by
+// the handlers of the chain.
+func TestRouterRulesAPIReadsByCacheState(t *testing.T) {
+	for _, warm := range []bool{true, false} {
+		t.Run(fmt.Sprintf("warm=%v", warm), func(t *testing.T) {
+			router, cl, requests := rulesRouterFixture(t, 2, 1, rules.ActionTypeAudit, rules.ActionTypeDeny)
+			wantGets := int64(0)
+			if !warm {
+				withColdCache(router)
+				wantGets = 3
+			}
+			for i, req := range requests {
+				cl.gets.Store(0)
+				cl.lists.Store(0)
+				response := router.Handle(t.Context(), req)
+				require.Equal(t, i%2 != 0, response.Allowed)
+				require.Equal(t, wantGets, cl.gets.Load())
+				require.Zero(t, cl.lists.Load())
+			}
+		})
+	}
 }
 
 func TestRouterComposedRulesDryRun(t *testing.T) {
@@ -126,7 +161,8 @@ func TestRouterComposedRulesDryRun(t *testing.T) {
 						if selected && tc.denial != "" {
 							require.Contains(t, response.Result.Message, tc.denial)
 						}
-						require.EqualValues(t, 3, cl.gets.Load())
+						// The warm cache answers the Namespace, Tenant and RuleStatus reads.
+						require.Zero(t, cl.gets.Load())
 						require.Zero(t, cl.lists.Load())
 						emitted := drainEvents(t, recorder, writes)
 						if !selected || (dryRun != nil && *dryRun) {

@@ -91,7 +91,7 @@ func TestDeviceDefaultBeta1Registration(t *testing.T) {
 					require.Equal(t, "v1beta1", req.Kind.Version, "wildcard mutation receives the original version")
 					reads.Store(0)
 					response := Register(nil, nil).GetHandlers()[0].OnCreate(c, c, decoder, events.NewDiscardRecorder())(t.Context(), req)
-					require.EqualValues(t, 3, reads.Load(), "defaulting must not read DeviceClasses or unrelated tenants")
+					require.EqualValues(t, profileReads(fallback), reads.Load(), "defaulting must not read DeviceClasses or unrelated tenants")
 					if explicit != "" {
 						require.Nil(t, response, "an explicit class must continue the chain unchanged")
 						return

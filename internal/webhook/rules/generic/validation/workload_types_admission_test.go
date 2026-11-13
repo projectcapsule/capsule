@@ -32,6 +32,12 @@ import (
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
+// ruleStatusController is the controller reference that the tenant
+// controller sets on the managed RuleStatus of a Tenant namespace.
+func ruleStatusController(tnt *capsulev1beta2.Tenant) []metav1.OwnerReference {
+	return []metav1.OwnerReference{*metav1.NewControllerRef(tnt, capsulev1beta2.GroupVersion.WithKind("Tenant"))}
+}
+
 type typeAdmissionClient struct {
 	client.Client
 	gets, lists atomic.Int64
@@ -47,6 +53,7 @@ func TestTemplateAdmissionSharesRequestReads(t *testing.T) {
 		tnt := &capsulev1beta2.Tenant{Name: name, UID: types.UID(name)}
 		ns := &corev1.Namespace{Name: name, OwnerReferences: []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: name, UID: tnt.UID}}}
 		rs := &capsulev1beta2.RuleStatus{Name: meta.NameForManagedRuleStatus(), Namespace: name}
+		rs.OwnerReferences = ruleStatusController(tnt)
 		rs.Status.Rules = []*rules.NamespaceRuleBodyNamespace{{Enforce: &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: []rules.WorkloadValidationTarget{rules.ValidateDeployment}, Placement: rules.WorkloadPlacementEnforcement{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{name}}}}}}}}
 		objects = append(objects, tnt, ns, rs)
 	}
@@ -130,6 +137,7 @@ func BenchmarkTemplateHandlerChain(b *testing.B) {
 						tnt := &capsulev1beta2.Tenant{Name: name, UID: types.UID(name)}
 						ns := &corev1.Namespace{Name: name, OwnerReferences: []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: name, UID: tnt.UID}}}
 						rs := &capsulev1beta2.RuleStatus{Name: meta.NameForManagedRuleStatus(), Namespace: name}
+						rs.OwnerReferences = ruleStatusController(tnt)
 						for range count {
 							rs.Status.Rules = append(rs.Status.Rules, &rules.NamespaceRuleBodyNamespace{Enforce: &rules.NamespaceRuleEnforceBody{Workloads: rules.NamespaceRuleEnforceWorkloadsBody{Targets: []rules.WorkloadValidationTarget{rules.ValidateDeployment}, Placement: rules.WorkloadPlacementEnforcement{Schedulers: []apiruntime.ExpressionMatch{{Exact: []string{"blocked"}}}}}}})
 						}
@@ -197,12 +205,15 @@ func TestWorkloadTypeAdmissionProfilesAndReads(t *testing.T) {
 						projected, err := tenant.BuildNamespaceRuleBodyStatus(scheme, ns, tnt)
 						require.NoError(t, err)
 						rs := &capsulev1beta2.RuleStatus{Name: meta.NameForManagedRuleStatus(), Namespace: ns.Name}
+						rs.OwnerReferences = ruleStatusController(tnt)
 						rs.Status.Rules = projected
 						objects = append(objects, rs)
 					}
 				}
 			}
 			cl := &typeAdmissionClient{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()}
+			// cl is the manager cache; api counts the API reads of the same store.
+			api := &typeAdmissionClient{Client: cl.Client}
 			for _, tc := range []struct {
 				namespace, user, group, kind string
 				denied                       bool
@@ -217,6 +228,8 @@ func TestWorkloadTypeAdmissionProfilesAndReads(t *testing.T) {
 					t.Run(tc.namespace+"/"+tc.user+"/"+tc.kind+"/"+string(operation), func(t *testing.T) {
 						cl.gets.Store(0)
 						cl.lists.Store(0)
+						api.gets.Store(0)
+						api.lists.Store(0)
 						req := requestWithKind(tc.group, tc.kind)
 						req.Namespace = tc.namespace
 						req.Operation = operation
@@ -230,9 +243,9 @@ func TestWorkloadTypeAdmissionProfilesAndReads(t *testing.T) {
 						var response *admission.Response
 						for _, handler := range chain {
 							if operation == admissionv1.Create {
-								response = handler.OnCreate(cl, cl, admission.NewDecoder(scheme), testEventRecorder{})(t.Context(), req)
+								response = handler.OnCreate(cl, api, admission.NewDecoder(scheme), testEventRecorder{})(t.Context(), req)
 							} else {
-								response = handler.OnUpdate(cl, cl, admission.NewDecoder(scheme), testEventRecorder{})(t.Context(), req)
+								response = handler.OnUpdate(cl, api, admission.NewDecoder(scheme), testEventRecorder{})(t.Context(), req)
 							}
 							if response != nil {
 								break
@@ -247,8 +260,16 @@ func TestWorkloadTypeAdmissionProfilesAndReads(t *testing.T) {
 							require.Nil(t, response)
 							require.Equal(t, 1, spy.calls, "allows must continue the chain")
 						}
-						require.EqualValues(t, 3, cl.gets.Load(), "fallback reuses the ownership Namespace snapshot")
-						require.Zero(t, cl.lists.Load())
+						// The Namespace, Tenant and RuleStatus come from the cache. Without
+						// a RuleStatus the API reader is asked for it, and for the
+						// Namespace and Tenant the fallback renders from, once.
+						wantAPI := int64(0)
+						if !statusPresent {
+							wantAPI = 3
+						}
+						require.EqualValues(t, 3, cl.gets.Load(), "one cached snapshot")
+						require.Equal(t, wantAPI, api.gets.Load(), "fallback reuses the ownership Namespace snapshot")
+						require.Zero(t, cl.lists.Load()+api.lists.Load())
 					})
 				}
 			}
@@ -284,6 +305,7 @@ func TestWorkloadScaleAdmissionEnforcesClasses(t *testing.T) {
 	tnt := &capsulev1beta2.Tenant{Name: "a", UID: types.UID("a")}
 	ns := &corev1.Namespace{Name: "a", OwnerReferences: []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: "a", UID: tnt.UID}}}
 	rs := &capsulev1beta2.RuleStatus{Name: meta.NameForManagedRuleStatus(), Namespace: "a"}
+	rs.OwnerReferences = ruleStatusController(tnt)
 	rs.Status.Rules = []*rules.NamespaceRuleBodyNamespace{{
 		Audience: []rules.Audience{{Kind: rules.AudienceKindUser, Name: "owner"}},
 		Enforce: &rules.NamespaceRuleEnforceBody{Action: rules.ActionTypeDeny, Workloads: rules.NamespaceRuleEnforceWorkloadsBody{

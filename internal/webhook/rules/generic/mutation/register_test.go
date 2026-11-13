@@ -39,6 +39,7 @@ func mutationRegistrationFixture(tb testing.TB, tenants int) (client.WithWatch, 
 	tnt := &capsulev1beta2.Tenant{Name: "tenant", UID: "tenant-uid"}
 	ns := &corev1.Namespace{Name: "selected", OwnerReferences: []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: tnt.Name, UID: tnt.UID}}}
 	status := &capsulev1beta2.RuleStatus{Name: meta.NameForManagedRuleStatus(), Namespace: ns.Name, Generation: 1,
+		OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(tnt, capsulev1beta2.GroupVersion.WithKind("Tenant"))},
 		Status: capsulev1beta2.RuleStatusStatus{ObservedGeneration: 1, Rules: []*rules.NamespaceRuleBodyNamespace{{Enforce: &rules.NamespaceRuleEnforceBody{
 			Action: rules.ActionTypeAllow, Metadata: []rules.MetadataRule{{Kinds: []string{"ConfigMap"}, Labels: map[string]rules.MetadataValueRule{"managed": {Managed: new("value")}}}},
 		}}}},
@@ -54,6 +55,19 @@ func mutationRegistrationFixture(tb testing.TB, tenants int) (client.WithWatch, 
 		return c.Get(ctx, key, obj, opts...)
 	}})
 	return c, reads, admission.NewDecoder(scheme)
+}
+
+// profileReads is the number of Gets of the profile lookup when one client is
+// both the manager cache and the API reader: the Namespace, its Tenant and
+// the RuleStatus from the cache. When the cache misses the RuleStatus, the
+// API reader is asked for it, and then for the Namespace and the Tenant the
+// rules are rendered from.
+func profileReads(ruleStatusMissing bool) int64 {
+	if ruleStatusMissing {
+		return 6
+	}
+
+	return 3
 }
 
 func mutationRegistrationRequest(tb testing.TB, kind, subresource string) admission.Request {

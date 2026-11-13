@@ -49,7 +49,8 @@ func testMutationTenantProfilesAudienceAndReads(t *testing.T, imagePullPolicy, i
 		fixtures = append(fixtures, tnt)
 		for _, profile := range []string{"selected", "plain"} {
 			ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name + "-" + profile, OwnerReferences: []metav1.OwnerReference{{APIVersion: capsule.GroupVersion.String(), Kind: "Tenant", Name: name, UID: tnt.UID}}}}
-			status := &capsule.RuleStatus{ObjectMeta: metav1.ObjectMeta{Name: meta.NameForManagedRuleStatus(), Namespace: ns.Name}}
+			status := &capsule.RuleStatus{ObjectMeta: metav1.ObjectMeta{Name: meta.NameForManagedRuleStatus(), Namespace: ns.Name,
+				OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(tnt, capsule.GroupVersion.WithKind("Tenant"))}}}
 			if profile == "selected" {
 				body := rootFilesystemBody(new(i == 0), rules.ValidatePod)
 				if imagePullPolicy {
@@ -137,9 +138,14 @@ func testMutationTenantProfilesAudienceAndReads(t *testing.T, imagePullPolicy, i
 					require.Equal(t, map[string]any{"readOnlyRootFilesystem": *tc.want}, response.Patches[0].Value)
 				}
 			}
-			// Existing wrapper reads: namespace, its owning Tenant, and namespace RuleStatus.
+			// Existing wrapper reads: namespace, its owning Tenant, and namespace RuleStatus,
+			// from the cache. A failed cached RuleStatus read is retried once on the API reader.
 			// The mutation adds no reads or cluster-wide lists, even on a skipped profile.
-			require.EqualValues(t, 3, reads.Load())
+			wantReads := int64(3)
+			if tc.readError {
+				wantReads = 4
+			}
+			require.EqualValues(t, wantReads, reads.Load())
 		})
 	}
 }

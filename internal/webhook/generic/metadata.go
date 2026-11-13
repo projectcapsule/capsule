@@ -27,13 +27,13 @@ func TenantAssignmentHandler() handlers.Handler {
 }
 
 func (r *tenantAssignmentHandler) OnCreate(
-	_ client.Client,
+	c client.Client,
 	reader client.Reader,
 	decoder admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return r.handle(ctx, reader, decoder, req)
+		return r.handle(ctx, c, reader, decoder, req)
 	}
 }
 
@@ -49,7 +49,7 @@ func (r *tenantAssignmentHandler) OnDelete(
 }
 
 func (r *tenantAssignmentHandler) OnUpdate(
-	_ client.Client,
+	c client.Client,
 	reader client.Reader,
 	decoder admission.Decoder,
 	_ events.EventRecorder,
@@ -84,13 +84,14 @@ func (r *tenantAssignmentHandler) OnUpdate(
 			}
 		}
 
-		return r.assign(ctx, reader, obj, req)
+		return r.assign(ctx, c, reader, obj, req)
 	}
 }
 
 func (r *tenantAssignmentHandler) handle(
 	ctx context.Context,
 	c client.Reader,
+	reader client.Reader,
 	decoder admission.Decoder,
 	req admission.Request,
 ) *admission.Response {
@@ -103,16 +104,19 @@ func (r *tenantAssignmentHandler) handle(
 		return ad.ErroredResponse(err)
 	}
 
-	return r.assign(ctx, c, obj, req)
+	return r.assign(ctx, c, reader, obj, req)
 }
 
+// assign reads the Namespace from the cache c first; see
+// tenant.GetTenantNameByNamespaceCacheFirst for the fallbacks to the API reader.
 func (r *tenantAssignmentHandler) assign(
 	ctx context.Context,
 	c client.Reader,
+	reader client.Reader,
 	obj *metav1.PartialObjectMetadata,
 	req admission.Request,
 ) *admission.Response {
-	tnt, err := tenant.GetTenantNameByNamespace(ctx, c, req.Namespace)
+	tnt, err := tenant.GetTenantNameByNamespaceCacheFirst(ctx, c, reader, req.Namespace)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil

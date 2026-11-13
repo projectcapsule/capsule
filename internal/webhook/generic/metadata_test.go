@@ -145,7 +145,9 @@ func TestTenantAssignmentFinalizerCompletion(t *testing.T) {
 				req.Namespace = ""
 			}
 			before, oldBefore := string(req.Object.Raw), string(req.OldObject.Raw)
-			response := TenantAssignmentHandler().OnUpdate(c, c, admission.NewDecoder(c.Scheme()), nil)(t.Context(), req)
+			// A cold manager cache: every Namespace read goes to the API reader c.
+			cache := fake.NewClientBuilder().WithScheme(c.Scheme()).Build()
+			response := TenantAssignmentHandler().OnUpdate(cache, c, admission.NewDecoder(c.Scheme()), nil)(t.Context(), req)
 			require.Equal(t, before, string(req.Object.Raw))
 			require.Equal(t, oldBefore, string(req.OldObject.Raw))
 			if skip || mode == "no-namespace" || strings.HasPrefix(mode, "malformed") {
@@ -190,11 +192,90 @@ func TestTenantAssignmentCreateStillUsesNamespaceOwnership(t *testing.T) {
 	require.Equal(t, 2, *reads)
 }
 
+// tenantAssignmentStore is a counting reader over its own objects, so a test
+// can tell the manager cache from the API reader.
+func tenantAssignmentStore(t testing.TB, objects ...client.Object) (client.Client, *int) {
+	t.Helper()
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, capsulev1beta2.AddToScheme(scheme))
+	reads := new(int)
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).WithInterceptorFuncs(interceptor.Funcs{
+		Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+			if _, ok := obj.(*corev1.Namespace); !ok {
+				t.Fatalf("tenant label assignment must read only the Namespace, read %T", obj)
+			}
+			*reads++
+			return c.Get(ctx, key, obj, opts...)
+		},
+	}).Build()
+	return c, reads
+}
+
+func TestTenantAssignmentReadsTheCacheFirst(t *testing.T) {
+	ref := func(name string, uid types.UID) metav1.OwnerReference {
+		return metav1.OwnerReference{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: name, UID: uid}
+	}
+	namespace := func(refs ...metav1.OwnerReference) *corev1.Namespace {
+		return &corev1.Namespace{Name: "team", UID: "team-uid", OwnerReferences: refs}
+	}
+	terminating := func(ns *corev1.Namespace) *corev1.Namespace {
+		stamp := metav1.Now()
+		ns.DeletionTimestamp, ns.Finalizers = &stamp, []string{"kubernetes"}
+		return ns
+	}
+	for _, tc := range []struct {
+		name       string
+		cache, api []client.Object
+		want       string
+		apiReads   int
+	}{
+		{"hit", []client.Object{namespace(ref("tenant-a", "a-uid"))}, []client.Object{namespace(ref("tenant-a", "a-uid"))}, "tenant-a", 0},
+		{"cold cache", nil, []client.Object{namespace(ref("tenant-a", "a-uid"))}, "tenant-a", 1},
+		{"terminating cached Namespace", []client.Object{terminating(namespace(ref("tenant-a", "a-uid")))}, []client.Object{namespace(ref("tenant-b", "b-uid"))}, "tenant-b", 1},
+		{"cached Namespace without Tenant ownerReference", []client.Object{namespace()}, []client.Object{namespace(ref("tenant-a", "a-uid"))}, "tenant-a", 1},
+		{"duplicate Tenant ownerReferences", []client.Object{namespace(ref("tenant-a", "a-uid"), ref("tenant-b", "b-uid"))}, []client.Object{namespace(ref("tenant-b", "b-uid"))}, "tenant-b", 1},
+		{"Tenant ownerReference without UID", []client.Object{namespace(ref("tenant-a", ""))}, []client.Object{namespace(ref("tenant-b", "b-uid"))}, "tenant-b", 1},
+		{"unowned API Namespace", []client.Object{namespace()}, []client.Object{namespace()}, "", 1},
+	} {
+		for _, operation := range []admissionv1.Operation{admissionv1.Create, admissionv1.Update} {
+			t.Run(tc.name+"/"+string(operation), func(t *testing.T) {
+				cache, cacheReads := tenantAssignmentStore(t, tc.cache...)
+				api, apiReads := tenantAssignmentStore(t, tc.api...)
+				obj := tenantAssignmentObject("team", "forged-tenant")
+				obj.DeletionTimestamp, obj.Finalizers = nil, nil
+				req := tenantAssignmentRequest(t, obj, obj)
+				req.Operation = operation
+				h := TenantAssignmentHandler()
+				handle := h.OnCreate(cache, api, admission.NewDecoder(cache.Scheme()), nil)
+				if operation == admissionv1.Update {
+					handle = h.OnUpdate(cache, api, admission.NewDecoder(cache.Scheme()), nil)
+				}
+				response := handle(t.Context(), req)
+				require.Equal(t, 1, *cacheReads, "the cached Namespace is read first")
+				require.Equal(t, tc.apiReads, *apiReads, "the API reader answers only the fallback")
+				if tc.want == "" {
+					require.Nil(t, response)
+					return
+				}
+				require.NotNil(t, response)
+				require.True(t, response.Allowed)
+				require.NotEmpty(t, response.Patches)
+				for _, p := range response.Patches {
+					require.Equal(t, tc.want, p.Value)
+				}
+			})
+		}
+	}
+}
+
 func BenchmarkTenantAssignmentAdmission(b *testing.B) {
 	for _, tenants := range []int{1, 1000} {
 		for _, size := range []int{0, 16 * 1024} {
 			for _, mode := range []string{"create", "active-update", "last-finalizer", "retained-finalizer", "retag"} {
 				b.Run(fmt.Sprintf("tenants=%d/payload=%d/%s", tenants, size, mode), func(b *testing.B) {
+					// A warm manager cache and an API reader c with the same objects.
+					cache, _ := tenantAssignmentFixture(b, tenants)
 					c, reads := tenantAssignmentFixture(b, tenants)
 					old := tenantAssignmentObject("tenant-0-ns", "tenant-0")
 					old.Data["payload"] = strings.Repeat("x", size)
@@ -210,10 +291,10 @@ func BenchmarkTenantAssignmentAdmission(b *testing.B) {
 					}
 					req := tenantAssignmentRequest(b, old, obj)
 					h := TenantAssignmentHandler()
-					handle := h.OnUpdate(c, c, admission.NewDecoder(c.Scheme()), nil)
+					handle := h.OnUpdate(cache, c, admission.NewDecoder(c.Scheme()), nil)
 					if mode == "create" {
 						req.Operation = admissionv1.Create
-						handle = h.OnCreate(c, c, admission.NewDecoder(c.Scheme()), nil)
+						handle = h.OnCreate(cache, c, admission.NewDecoder(c.Scheme()), nil)
 					}
 					b.ReportAllocs()
 					for b.Loop() {
@@ -226,12 +307,9 @@ func BenchmarkTenantAssignmentAdmission(b *testing.B) {
 							b.Fatalf("unexpected response: %+v", response)
 						}
 					}
-					want := b.N
-					if mode == "last-finalizer" {
-						want = 0
-					}
-					if *reads != want {
-						b.Fatalf("namespace GETs=%d, want=%d", *reads, want)
+					// The warm cache answers every Namespace read.
+					if *reads != 0 {
+						b.Fatalf("API namespace GETs=%d, want=0", *reads)
 					}
 					b.ReportMetric(float64(*reads)/float64(b.N), "namespace-GET/op")
 				})

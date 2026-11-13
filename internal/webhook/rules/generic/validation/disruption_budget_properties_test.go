@@ -227,6 +227,7 @@ func TestBudgetScaleAdmissionChain(t *testing.T) {
 				scheme := overlapScheme(t)
 				tnt := &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: "a", UID: "a"}}
 				rs := &capsulev1beta2.RuleStatus{ObjectMeta: metav1.ObjectMeta{Name: meta.NameForManagedRuleStatus(), Namespace: "a"}}
+				rs.OwnerReferences = ruleStatusController(tnt)
 				body := replicaRule(rules.ActionTypeAllow, new(int64(1)), nil, rules.WorkloadValidationTarget(kind))
 				if tc.condition != "" {
 					body.Enforce.Conditions = []rules.AdmissionCondition{{Name: "scope", Expression: tc.condition}}
@@ -272,6 +273,7 @@ func BenchmarkDisruptionBudgetProperties(b *testing.B) {
 						ns := fmt.Sprintf("tenant-%d", i)
 						tnt := &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: ns, UID: types.UID(ns)}}
 						rs := &capsulev1beta2.RuleStatus{ObjectMeta: metav1.ObjectMeta{Name: meta.NameForManagedRuleStatus(), Namespace: ns}}
+						rs.OwnerReferences = ruleStatusController(tnt)
 						for range count {
 							rs.Status.Rules = append(rs.Status.Rules, replicaRule(rules.ActionTypeAllow, new(int64(1)), nil))
 						}

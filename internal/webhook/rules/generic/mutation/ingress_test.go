@@ -59,7 +59,7 @@ func TestListenerSetMutationRegistrationReadsAndFallback(t *testing.T) {
 			require.NotNil(t, response)
 			require.True(t, response.Allowed)
 			require.NotEmpty(t, response.Patches)
-			require.EqualValues(t, 3, reads.Load(), "reference defaulting must not read the Gateway")
+			require.EqualValues(t, profileReads(fallback), reads.Load(), "reference defaulting must not read the Gateway")
 			reads.Store(0)
 			req.SubResource, req.Operation = "status", admissionv1.Update
 			req.Object.Raw = []byte("invalid JSON")

@@ -89,6 +89,7 @@ func TestManagedMetadataAdmissionRespectsAudience(t *testing.T) {
 		Name: "tenant-ns", Labels: map[string]string{meta.TenantLabel: tnt.Name},
 		OwnerReferences: []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: tnt.Name, UID: tnt.UID}}}
 	rs := &capsulev1beta2.RuleStatus{Name: meta.NameForManagedRuleStatus(), Namespace: ns.Name}
+	rs.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(tnt, capsulev1beta2.GroupVersion.WithKind("Tenant"))}
 	rs.Status.Rules = bodies
 	config := &capsulev1beta2.CapsuleConfiguration{Name: "capsule"}
 	config.Status.Users = rbac.UserListSpec{{Kind: rbac.GroupOwner, Name: "capsule-users"}}
