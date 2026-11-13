@@ -67,6 +67,10 @@ func pendingRulesFixture(tb testing.TB, state string, tenants, count int) (clien
 			continue
 		}
 		rs := &capsulev1beta2.RuleStatus{Name: meta.NameForManagedRuleStatus(), Namespace: name, Generation: 2}
+		// The tenant controller sets the Tenant of the namespace as controller.
+		controller := ns.OwnerReferences[0]
+		controller.Controller = new(true)
+		rs.OwnerReferences = []metav1.OwnerReference{controller}
 		if name == "selected" {
 			for range count {
 				rs.Spec = append(rs.Spec, body.DeepCopy())
@@ -128,7 +132,14 @@ func TestRulesetAdmissionEnforcesPendingProfiles(t *testing.T) {
 					} else {
 						require.Nil(t, response, "allowed requests must continue the handler chain")
 					}
-					require.Equal(t, 1, reads, "fallback must reuse the ownership snapshot")
+					// One store serves as cache and API reader. Without an observed
+					// RuleStatus the Namespace is read again from the API reader,
+					// and the rendering reuses that snapshot.
+					wantReads := 1
+					if state != "current" {
+						wantReads = 2
+					}
+					require.Equal(t, wantReads, reads, "fallback must reuse the ownership snapshot")
 				}
 			})
 		}
@@ -136,9 +147,19 @@ func TestRulesetAdmissionEnforcesPendingProfiles(t *testing.T) {
 }
 
 func TestPendingRulesetReadErrorsDoNotAllowRequests(t *testing.T) {
-	for _, target := range []string{"ruleset", "namespace", "tenant"} {
-		t.Run(target, func(t *testing.T) {
+	// A cold cache sends every read to the failing API reader. With a warm
+	// cache only the pending RuleStatus is read from the API reader.
+	for _, tc := range []struct {
+		target string
+		warm   bool
+	}{{"ruleset", false}, {"namespace", false}, {"tenant", false}, {"ruleset", true}} {
+		target := tc.target
+		t.Run(fmt.Sprintf("%s/warm=%v", target, tc.warm), func(t *testing.T) {
 			cl, handler := pendingRulesFixture(t, "pending", 2, 1)
+			cache := client.Client(fake.NewClientBuilder().WithScheme(cl.Scheme()).Build())
+			if tc.warm {
+				cache = cl
+			}
 			readErr := errors.New("profile reader unavailable")
 			var reads atomic.Int32
 			rulesetDone := make(chan struct{})
@@ -158,7 +179,7 @@ func TestPendingRulesetReadErrorsDoNotAllowRequests(t *testing.T) {
 				}
 				return c.Get(ctx, key, obj, opts...)
 			}})
-			fn := handler.OnCreate(reader, reader, admission.NewDecoder(cl.Scheme()), events.NewDiscardRecorder())
+			fn := handler.OnCreate(cache, reader, admission.NewDecoder(cl.Scheme()), events.NewDiscardRecorder())
 			req := pendingRulesRequest(t, "selected", admissionv1.Create, corev1.ServiceTypeNodePort)
 			response := fn(t.Context(), req)
 			<-rulesetDone

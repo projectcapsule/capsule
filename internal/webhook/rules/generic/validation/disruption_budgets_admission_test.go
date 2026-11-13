@@ -53,6 +53,7 @@ func TestDisruptionBudgetProfilesThroughAdmissionChain(t *testing.T) {
 					objects = append(objects, overlapNamespace(name, namespace, selected), overlapPDB(namespace, "one", &metav1.LabelSelector{}), overlapPDB(namespace, "two", &metav1.LabelSelector{}))
 					if statusPresent {
 						rs := &capsulev1beta2.RuleStatus{ObjectMeta: metav1.ObjectMeta{Name: meta.NameForManagedRuleStatus(), Namespace: namespace}}
+						rs.OwnerReferences = ruleStatusController(tnt)
 						if selected {
 							rs.Status.Rules = []*rules.NamespaceRuleBodyNamespace{body}
 						}
@@ -61,6 +62,8 @@ func TestDisruptionBudgetProfilesThroughAdmissionChain(t *testing.T) {
 				}
 			}
 			cl := &typeAdmissionClient{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()}
+			// cl is the manager cache; api counts the API reads of the same store.
+			api := &typeAdmissionClient{Client: cl.Client}
 			cfg := configuration.NewCapsuleConfiguration(t.Context(), cl, cl, nil, "capsule")
 			handlers := Register(nil, nil, cfg, nil, nil).GetHandlers()
 			for _, name := range []string{"a", "b"} {
@@ -78,7 +81,9 @@ func TestDisruptionBudgetProfilesThroughAdmissionChain(t *testing.T) {
 							req.OldObject.Raw = []byte(fmt.Sprintf(`{"apiVersion":"v1","kind":"Pod","metadata":{"name":"app","namespace":%q}}`, namespace))
 							cl.gets.Store(0)
 							cl.lists.Store(0)
-							reader := webhookutils.NewRequestCachingReader(cl)
+							api.gets.Store(0)
+							api.lists.Store(0)
+							reader := webhookutils.NewRequestCachingReader(api)
 							var response *admission.Response
 							for _, h := range handlers {
 								handler := h.OnCreate(cl, reader, admission.NewDecoder(scheme), testEventRecorder{})
@@ -97,13 +102,19 @@ func TestDisruptionBudgetProfilesThroughAdmissionChain(t *testing.T) {
 							} else {
 								require.Nil(t, response)
 							}
-							// The request reader reuses the authoritative namespace read,
-							// including the Tenant-rule fallback when RuleStatus is absent.
+							// The Namespace, Tenant and RuleStatus come from the cache. When
+							// the RuleStatus is absent the API reader is asked for it, and for
+							// the Namespace and Tenant the Tenant-rule fallback renders from.
+							wantAPI := int64(0)
+							if !statusPresent {
+								wantAPI = 3
+							}
 							require.Equal(t, int64(3), cl.gets.Load(), "reuse tenant/ruleset resolution")
+							require.Equal(t, wantAPI, api.gets.Load(), "reuse tenant/ruleset resolution")
 							if denied {
-								require.Equal(t, int64(1), cl.lists.Load())
+								require.Equal(t, int64(1), cl.lists.Load()+api.lists.Load())
 							} else {
-								require.Zero(t, cl.lists.Load())
+								require.Zero(t, cl.lists.Load()+api.lists.Load())
 							}
 						}
 					}
@@ -125,6 +136,7 @@ func BenchmarkDisruptionBudgetAdmission(b *testing.B) {
 						ns := fmt.Sprintf("tenant-%d", i)
 						tnt := &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: ns, UID: types.UID(ns)}}
 						rs := &capsulev1beta2.RuleStatus{ObjectMeta: metav1.ObjectMeta{Name: meta.NameForManagedRuleStatus(), Namespace: ns}}
+						rs.OwnerReferences = ruleStatusController(tnt)
 						if mode != "skip" {
 							rs.Status.Rules = []*rules.NamespaceRuleBodyNamespace{overlapRule(rules.ActionTypeAllow, false, rules.ValidatePod, rules.ValidateDeployment)}
 						}
@@ -185,6 +197,7 @@ func TestDisruptionBudgetWritesThroughAdmissionChain(t *testing.T) {
 	tnt := &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: "a", UID: "a"}}
 	ns := overlapNamespace("a", "a", true)
 	rs := &capsulev1beta2.RuleStatus{ObjectMeta: metav1.ObjectMeta{Name: meta.NameForManagedRuleStatus(), Namespace: "a"}}
+	rs.OwnerReferences = ruleStatusController(tnt)
 	rs.Status.Rules = []*rules.NamespaceRuleBodyNamespace{overlapRule(rules.ActionTypeAllow, false, rules.ValidateDeployment)}
 	existing := overlapObject("deployment", "web", "a", map[string]string{"app": "web"})
 	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(tnt, ns, rs, existing, overlapPDB("a", "first", &metav1.LabelSelector{})).Build()
@@ -219,6 +232,7 @@ func TestDisruptionBudgetPodStatus(t *testing.T) {
 	tnt := &capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: "a", UID: "a"}}
 	ns := overlapNamespace("a", "a", true)
 	rs := &capsulev1beta2.RuleStatus{ObjectMeta: metav1.ObjectMeta{Name: meta.NameForManagedRuleStatus(), Namespace: "a"}}
+	rs.OwnerReferences = ruleStatusController(tnt)
 	rs.Status.Rules = []*rules.NamespaceRuleBodyNamespace{overlapRule(rules.ActionTypeAllow, false)}
 	selector := &metav1.LabelSelector{MatchLabels: map[string]string{"app": "web"}}
 	cl := &typeAdmissionClient{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(tnt, ns, rs, overlapPDB("a", "one", selector), overlapPDB("a", "two", selector)).Build()}

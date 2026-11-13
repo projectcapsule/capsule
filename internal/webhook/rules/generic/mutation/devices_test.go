@@ -238,7 +238,7 @@ func TestDeviceDefaultRegistrationAndEnforcement(t *testing.T) {
 				req.DryRun = new(true)
 				reads.Store(0)
 				response := Register(nil, nil).GetHandlers()[0].OnCreate(c, c, decoder, events.NewDiscardRecorder())(t.Context(), req)
-				require.EqualValues(t, 3, reads.Load(), "defaulting must not read the DeviceClass")
+				require.EqualValues(t, profileReads(fallback), reads.Load(), "defaulting must not read the DeviceClass")
 				if explicit == "" {
 					require.NotNil(t, response)
 					require.True(t, response.Allowed)

@@ -59,6 +59,7 @@ func TestGatewayClassAdmissionVersions(t *testing.T) {
 					tenant := &capsulev1beta2.Tenant{Name: "tenant", UID: "tenant"}
 					ns := overlapNamespace(tenant.Name, "selected", true)
 					status := &capsulev1beta2.RuleStatus{Name: meta.NameForManagedRuleStatus(), Namespace: ns.Name}
+					status.OwnerReferences = ruleStatusController(tenant)
 					status.Status.Rules = []*rules.NamespaceRuleBodyNamespace{{Enforce: body}}
 					classReads := 0
 					c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(tenant, ns, status,

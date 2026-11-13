@@ -1183,6 +1183,47 @@ data:
 				expectConfigMapAbsent(ns, "gtr-filtered-config")
 			}
 		})
+
+		// The controller writes the replicated object shortly after the
+		// namespace appears, while the admission caches may not hold it yet: the
+		// metadata webhook must still label it for the Tenant of the namespace.
+		It("applies raw items to namespaces created after the GlobalTenantResource", Label("admission-cache"), func() {
+			gtr := newRawConfigMapGlobalTenantResource("gtr-apply-new-namespaces", map[string]string{
+				"mode": "late",
+			})
+			gtr.Spec.TenantSelector = tenantASelector()
+			renameFirstRawConfigMap(gtr, "gtr-late-config")
+
+			createGlobalTenantResource(gtr)
+
+			for _, ns := range tenantANamespaces {
+				expectConfigMapData(ns, "gtr-late-config", map[string]string{"mode": "late"})
+			}
+
+			lateA := prefix + "-a-late"
+			lateB := prefix + "-b-late"
+			// AfterEach deletes allNamespaces.
+			allNamespaces = append(allNamespaces, lateA, lateB)
+
+			NamespaceCreation(NewNamespace(lateA, map[string]string{
+				apimeta.TenantLabel: tenantA.GetName(),
+			}), tenantAOwner, defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(NewNamespace(lateB, map[string]string{
+				apimeta.TenantLabel: tenantB.GetName(),
+			}), tenantBOwner, defaultTimeoutInterval).Should(Succeed())
+
+			expectConfigMapData(lateA, "gtr-late-config", map[string]string{"mode": "late"})
+			Eventually(func(g Gomega) {
+				cm := &corev1.ConfigMap{}
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: lateA, Name: "gtr-late-config"}, cm)).To(Succeed())
+				// The replication controller does not set this label: only the
+				// metadata webhook sets it to the Tenant name.
+				g.Expect(cm.GetLabels()).To(HaveKeyWithValue(apimeta.ManagedByCapsuleLabel, tenantA.GetName()))
+				g.Expect(cm.GetLabels()).To(HaveKeyWithValue(apimeta.NewTenantLabel, tenantA.GetName()))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+			expectConfigMapAbsent(lateB, "gtr-late-config")
+		})
 	})
 
 	Context("apply lifecycle", func() {

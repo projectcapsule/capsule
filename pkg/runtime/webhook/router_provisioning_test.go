@@ -6,6 +6,7 @@ package webhook
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -62,6 +63,7 @@ func provisioningRouterFixture(tb testing.TB, state, route, outcome string, tena
 			objects = append(objects, ns)
 			if state != "missing" {
 				rs := &capsulev1beta2.RuleStatus{Name: meta.NameForManagedRuleStatus(), Namespace: ns.Name, Generation: 2}
+				rs.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(tnt, capsulev1beta2.GroupVersion.WithKind("Tenant"))}
 				if profile == "guarded" {
 					rs.Spec = bodies
 				}
@@ -87,8 +89,11 @@ func provisioningRouterFixture(tb testing.TB, state, route, outcome string, tena
 			requests = append(requests, req)
 		}
 	}
-	cl := &routerCountingClient{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()}
-	router := &handlerRouter{client: cl, reader: cl, decoder: admission.NewDecoder(scheme), recorder: events.NewDiscardRecorder()}
+	base := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
+	// The manager cache and the API reader share one store; the returned
+	// client counts the API reads only.
+	cl := &routerCountingClient{Client: base}
+	router := &handlerRouter{client: &routerCountingClient{Client: base}, reader: cl, decoder: admission.NewDecoder(scheme), recorder: events.NewDiscardRecorder()}
 	if route == "mutating" {
 		router.handlers = rulesmutation.Register(nil, nil).GetHandlers()
 	} else {
@@ -98,14 +103,26 @@ func provisioningRouterFixture(tb testing.TB, state, route, outcome string, tena
 }
 
 func TestProvisioningRoutesReuseOwnershipSnapshot(t *testing.T) {
-	for _, state := range []string{"missing", "pending", "current"} {
+	for _, state := range []string{"missing", "pending", "current", "missing/cold", "pending/cold", "current/cold"} {
 		for _, route := range []string{"mutating", "validating"} {
 			for _, outcome := range []string{"allow", "deny", "skip"} {
 				if route == "mutating" && outcome == "deny" {
 					continue
 				}
 				t.Run(state+"/"+route+"/"+outcome, func(t *testing.T) {
-					router, cl, requests := provisioningRouterFixture(t, state, route, outcome, 2, 1)
+					ruleState, cold := strings.CutSuffix(state, "/cold")
+					router, cl, requests := provisioningRouterFixture(t, ruleState, route, outcome, 2, 1)
+					// A cold cache sends the Namespace, Tenant and RuleStatus reads to
+					// the API reader, once per request. A warm cache answers them. A
+					// missing or pending RuleStatus is read from the API, and so are
+					// the Namespace and Tenant the rules are then rendered from.
+					wantGets := int64(3)
+					switch {
+					case cold:
+						withColdCache(router)
+					case ruleState == "current":
+						wantGets = 0
+					}
 					if route == "mutating" {
 						require.Len(t, router.handlers, 1, "exercise the production single-handler route")
 					}
@@ -123,7 +140,6 @@ func TestProvisioningRoutesReuseOwnershipSnapshot(t *testing.T) {
 							if route == "mutating" && outcome == "allow" {
 								require.Equal(t, selected, len(response.Patches) > 0)
 							}
-							wantGets := int64(3)
 							if outcome == "skip" {
 								wantGets = 0
 							}

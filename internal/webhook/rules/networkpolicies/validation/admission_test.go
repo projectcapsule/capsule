@@ -90,6 +90,7 @@ func admissionFixture(tb testing.TB, tenants int, status bool, bodies func(int) 
 		objects = append(objects, tnt, ns)
 		if status {
 			rs := &capsulev1beta2.RuleStatus{ObjectMeta: metav1.ObjectMeta{Name: meta.NameForManagedRuleStatus(), Namespace: name}}
+			rs.OwnerReferences = ruleStatusController(tnt)
 			rs.Status.Rules = bodies(i)
 			objects = append(objects, rs)
 		}
@@ -111,13 +112,25 @@ func admissionFixture(tb testing.TB, tenants int, status bool, bodies func(int) 
 	return &countingClient{Client: cl}, admission.NewDecoder(scheme), requests
 }
 
+// ruleStatusController is the controller reference that the tenant
+// controller sets on the managed RuleStatus of a Tenant namespace.
+func ruleStatusController(tnt *capsulev1beta2.Tenant) []metav1.OwnerReference {
+	return []metav1.OwnerReference{*metav1.NewControllerRef(tnt, capsulev1beta2.GroupVersion.WithKind("Tenant"))}
+}
+
 func runChain(ctx context.Context, cl *countingClient, decoder admission.Decoder, chain []handlers.Handler, req admission.Request) *admission.Response {
-	reader := webhookutils.NewRequestCachingReader(cl)
+	return runChainWithReader(ctx, cl, cl, decoder, chain, req)
+}
+
+// runChainWithReader runs the chain with cache as the manager cache and api
+// behind the per-request reader, as the router does.
+func runChainWithReader(ctx context.Context, cache, api *countingClient, decoder admission.Decoder, chain []handlers.Handler, req admission.Request) *admission.Response {
+	reader := webhookutils.NewRequestCachingReader(api)
 	recorder := events.NewEventRecorder(nil, logr.Discard(), nil, nil)
 	for _, handler := range chain {
-		handle := handler.OnCreate(cl, reader, decoder, recorder)
+		handle := handler.OnCreate(cache, reader, decoder, recorder)
 		if req.Operation == admissionv1.Update {
-			handle = handler.OnUpdate(cl, reader, decoder, recorder)
+			handle = handler.OnUpdate(cache, reader, decoder, recorder)
 		}
 		if response := handle(ctx, req); response != nil {
 			return response
@@ -143,23 +156,35 @@ func TestNetworkPolicyAdmissionProfilesReadsAndFallback(t *testing.T) {
 						return []*rules.NamespaceRuleBodyNamespace{{Enforce: cidrRule(rules.ActionTypeDeny, cidr)}}
 					}, ingress)
 					chain := genericvalidation.Register(nil, nil, nil, nil, nil, Handler(nil, nil)).GetHandlers()
+					// cl is the manager cache; api counts the API reads of the same store.
+					api := &countingClient{Client: cl.Client}
 					for i, req := range requests {
 						for _, operation := range []admissionv1.Operation{admissionv1.Create, admissionv1.Update} {
 							cl.gets.Store(0)
 							cl.lists.Store(0)
+							api.gets.Store(0)
+							api.lists.Store(0)
 							req.Operation = operation
 							req.OldObject.Raw = []byte(`{"apiVersion":"networking.k8s.io/v1","kind":"NetworkPolicy","metadata":{"name":"policy"},"spec":{"podSelector":{},"policyTypes":["Egress"]}}`)
-							response := runChain(t.Context(), cl, decoder, chain, req)
+							response := runChainWithReader(t.Context(), cl, api, decoder, chain, req)
 							if i == 0 {
 								require.NotNil(t, response)
 								require.Contains(t, response.Result.Message, "networkPolicy "+direction+" CIDR")
 							} else {
 								require.Nil(t, response)
 							}
-							// Fallback rendering reuses the Namespace snapshot from tenant
-							// resolution, so both paths share the same three request reads.
-							require.Equal(t, int64(3), cl.gets.Load(), "Namespace, Tenant and RuleStatus reads remain shared")
-							require.Zero(t, cl.lists.Load())
+							// The generic and the NetworkPolicy handlers each read the
+							// Namespace, Tenant and RuleStatus from the cache. Without a
+							// RuleStatus the API reader is asked for it and for the Namespace
+							// and Tenant the rules are rendered from, once, shared by the
+							// request.
+							wantAPI := int64(0)
+							if !status {
+								wantAPI = 3
+							}
+							require.Equal(t, int64(6), cl.gets.Load(), "one cached snapshot per handler")
+							require.Equal(t, wantAPI, api.gets.Load(), "API reads remain shared")
+							require.Zero(t, cl.lists.Load()+api.lists.Load())
 						}
 					}
 					cl.failTenant = true
