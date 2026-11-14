@@ -92,8 +92,8 @@ spec:
           namespaces:
             - '*'
           resources:
-            - rulestatus
-            - rulestatus/status
+            - rulestatuses
+            - rulestatuses/status
             - customquotas
             - customquotas/status
             - tenantresources
