@@ -15,6 +15,7 @@ import (
 	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	celruntime "github.com/projectcapsule/capsule/pkg/runtime/cel"
+	"github.com/projectcapsule/capsule/pkg/runtime/replication"
 )
 
 // Convert only missing policies. Narrow patches retain deprecated settings and
@@ -42,6 +43,11 @@ func mutateReplicationPolicy(req admission.Request, decoder admission.Decoder, c
 		}
 
 		spec = &resource.Spec.TenantResourceCommonSpec
+	}
+
+	validator, _ := conditions.(replication.ConditionValidator)
+	if err := replication.ValidateTriggers(spec, req.Resource.Resource == "tenantresources", validator); err != nil {
+		return ad.Denyf("%v", err)
 	}
 
 	policy := apiruntime.ResourceReplicationPolicy{

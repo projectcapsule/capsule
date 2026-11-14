@@ -540,6 +540,260 @@ spec:
                     type: object
                 type: object
                 x-kubernetes-map-type: atomic
+              triggerMinInterval:
+                default: 10s
+                description: |-
+                  TriggerMinInterval bounds triggered reconciliation frequency across all triggers
+                  on this resource. Events within the interval coalesce into one pending reconcile.
+                  Spec changes, deletion, manual requests, and periodic resyncs retain their behavior.
+                type: string
+                x-kubernetes-validations:
+                - message: triggerMinInterval must be between 1s and 24h
+                  rule: duration(self) >= duration('1s') && duration(self) <= duration('24h')
+              triggers:
+                description: |-
+                  Triggers request reconciliation on matching namespaced admission attempts.
+                  Capsule-managed resources never trigger reconciliation. Delivery is best effort;
+                  resyncPeriod remains the recovery mechanism for missed or pre-persistence events.
+                items:
+                  description: |-
+                    TenantResourceTrigger requests best-effort reconciliation on matching admission attempts.
+                    Resource behavior and replication destinations remain defined by resources.
+                  properties:
+                    apiGroups:
+                      description: |-
+                        apiGroups is the API groups the resources belong to. '*' is all groups.
+                        If '*' is present, the length of the slice must be one.
+                        Required.
+                      items:
+                        type: string
+                      type: array
+                      x-kubernetes-list-type: atomic
+                    apiVersions:
+                      description: |-
+                        apiVersions is the API versions the resources belong to. '*' is all versions.
+                        If '*' is present, the length of the slice must be one.
+                        Required.
+                      items:
+                        type: string
+                      type: array
+                      x-kubernetes-list-type: atomic
+                    audience:
+                      description: Audience uses the same identity matching as namespace
+                        rules. Empty matches everyone.
+                      items:
+                        properties:
+                          kind:
+                            enum:
+                            - User
+                            - Group
+                            - ServiceAccount
+                            - Custom
+                            type: string
+                          name:
+                            type: string
+                        required:
+                        - kind
+                        - name
+                        type: object
+                      maxItems: 64
+                      type: array
+                    matchConditions:
+                      description: MatchConditions are native admission CEL conditions.
+                        All must match.
+                      items:
+                        description: MatchCondition represents a condition which must
+                          by fulfilled for a request to be sent to a webhook.
+                        properties:
+                          expression:
+                            description: |-
+                              expression represents the expression which will be evaluated by CEL. Must evaluate to bool.
+                              CEL expressions have access to the contents of the AdmissionRequest and Authorizer, organized into CEL variables:
+
+                              'object' - The object from the incoming request. The value is null for DELETE requests.
+                              'oldObject' - The existing object. The value is null for CREATE requests.
+                              'request' - Attributes of the admission request(/pkg/apis/admission/types.go#AdmissionRequest).
+                              'authorizer' - A CEL Authorizer. May be used to perform authorization checks for the principal (user or service account) of the request.
+                                See https://pkg.go.dev/k8s.io/apiserver/pkg/cel/library#Authz
+                              'authorizer.requestResource' - A CEL ResourceCheck constructed from the 'authorizer' and configured with the
+                                request resource.
+                              Documentation on CEL: https://kubernetes.io/docs/reference/using-api/cel/
+
+                              Required.
+                            type: string
+                          name:
+                            description: |-
+                              name is an identifier for this match condition, used for strategic merging of MatchConditions,
+                              as well as providing an identifier for logging purposes. A good name should be descriptive of
+                              the associated expression.
+                              Name must be a qualified name consisting of alphanumeric characters, '-', '_' or '.', and
+                              must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or
+                              '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]') with an
+                              optional DNS subdomain prefix and '/' (e.g. 'example.com/MyName')
+
+                              Required.
+                            type: string
+                        required:
+                        - expression
+                        - name
+                        type: object
+                      maxItems: 60
+                      type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
+                    name:
+                      description: Name uniquely identifies this trigger.
+                      maxLength: 63
+                      minLength: 1
+                      pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                      type: string
+                    namespaceSelector:
+                      description: |-
+                        NamespaceSelector selects event source namespaces for GlobalTenantResources.
+                        TenantResources always observe only their own namespace and cannot set this field.
+                      properties:
+                        matchExpressions:
+                          description: matchExpressions is a list of label selector
+                            requirements. The requirements are ANDed.
+                          items:
+                            description: |-
+                              A label selector requirement is a selector that contains values, a key, and an operator that
+                              relates the key and values.
+                            properties:
+                              key:
+                                description: key is the label key that the selector
+                                  applies to.
+                                type: string
+                              operator:
+                                description: |-
+                                  operator represents a key's relationship to a set of values.
+                                  Valid operators are In, NotIn, Exists and DoesNotExist.
+                                type: string
+                              values:
+                                description: |-
+                                  values is an array of string values. If the operator is In or NotIn,
+                                  the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                  the values array must be empty. This array is replaced during a strategic
+                                  merge patch.
+                                items:
+                                  type: string
+                                type: array
+                                x-kubernetes-list-type: atomic
+                            required:
+                            - key
+                            - operator
+                            type: object
+                          type: array
+                          x-kubernetes-list-type: atomic
+                        matchLabels:
+                          additionalProperties:
+                            type: string
+                          description: |-
+                            matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                            map is equivalent to an element of matchExpressions, whose key field is "key", the
+                            operator is "In", and the values array contains only "value". The requirements are ANDed.
+                          type: object
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    objectSelector:
+                      description: ObjectSelector matches the labels of either the
+                        old or new admission object.
+                      properties:
+                        matchExpressions:
+                          description: matchExpressions is a list of label selector
+                            requirements. The requirements are ANDed.
+                          items:
+                            description: |-
+                              A label selector requirement is a selector that contains values, a key, and an operator that
+                              relates the key and values.
+                            properties:
+                              key:
+                                description: key is the label key that the selector
+                                  applies to.
+                                type: string
+                              operator:
+                                description: |-
+                                  operator represents a key's relationship to a set of values.
+                                  Valid operators are In, NotIn, Exists and DoesNotExist.
+                                type: string
+                              values:
+                                description: |-
+                                  values is an array of string values. If the operator is In or NotIn,
+                                  the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                  the values array must be empty. This array is replaced during a strategic
+                                  merge patch.
+                                items:
+                                  type: string
+                                type: array
+                                x-kubernetes-list-type: atomic
+                            required:
+                            - key
+                            - operator
+                            type: object
+                          type: array
+                          x-kubernetes-list-type: atomic
+                        matchLabels:
+                          additionalProperties:
+                            type: string
+                          description: |-
+                            matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                            map is equivalent to an element of matchExpressions, whose key field is "key", the
+                            operator is "In", and the values array contains only "value". The requirements are ANDed.
+                          type: object
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    operations:
+                      description: |-
+                        operations is the operations the admission hook cares about - CREATE, UPDATE, DELETE, CONNECT or *
+                        for all of those operations and any future admission operations that are added.
+                        If '*' is present, the length of the slice must be one.
+                        Required.
+                      items:
+                        description: OperationType specifies an operation for a request.
+                        type: string
+                      type: array
+                      x-kubernetes-list-type: atomic
+                    resources:
+                      description: |-
+                        resources is a list of resources this rule applies to.
+
+                        For example:
+                        'pods' means pods.
+                        'pods/log' means the log subresource of pods.
+                        '*' means all resources, but not subresources.
+                        'pods/*' means all subresources of pods.
+                        '*/scale' means all scale subresources.
+                        '*/*' means all resources and their subresources.
+
+                        If wildcard is present, the validation rule will ensure resources do not
+                        overlap with each other.
+
+                        Depending on the enclosing object, subresources might not be allowed.
+                        Required.
+                      items:
+                        type: string
+                      type: array
+                      x-kubernetes-list-type: atomic
+                    scope:
+                      description: |-
+                        scope specifies the scope of this rule.
+                        Valid values are "Cluster", "Namespaced", and "*"
+                        "Cluster" means that only cluster-scoped resources will match this rule.
+                        Namespace API objects are cluster-scoped.
+                        "Namespaced" means that only namespaced resources will match this rule.
+                        "*" means that there are no scope restrictions.
+                        Subresources match the scope of their parent resource.
+                        Default is "*".
+                      type: string
+                  required:
+                  - name
+                  type: object
+                maxItems: 32
+                type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
             required:
             - resources
             - resyncPeriod
@@ -606,6 +860,11 @@ spec:
                   - type
                   type: object
                 type: array
+              nextResyncAt:
+                description: NextResyncAt is the next periodic resync deadline for
+                  trigger-enabled replications.
+                format: date-time
+                type: string
               observedGeneration:
                 description: ObservedGeneration is the most recent generation the
                   controller has observed.
@@ -746,6 +1005,23 @@ spec:
               size:
                 description: Number of managed resources.
                 type: integer
+              trigger:
+                description: Trigger records the last admission notification handled
+                  by this controller.
+                properties:
+                  lastTriggeredAt:
+                    description: LastTriggeredAt is the start of the last triggered
+                      reconcile, including failed attempts.
+                    format: date-time
+                    type: string
+                  observedRequest:
+                    description: ObservedRequest identifies the notification included
+                      in the last triggered reconcile.
+                    type: string
+                required:
+                - lastTriggeredAt
+                - observedRequest
+                type: object
             required:
             - size
             type: object

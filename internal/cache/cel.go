@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sync"
 
+	admissioncel "k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
 
 	celruntime "github.com/projectcapsule/capsule/pkg/runtime/cel"
@@ -24,6 +25,11 @@ type CELCache struct {
 	compiler           *celruntime.Compiler
 	data               map[celCacheKey]*celruntime.CompiledExpression
 	resourceConditions int
+	triggerMu          sync.RWMutex
+	triggerCompiler    admissioncel.Compiler
+	triggerConditions  map[string]struct{}
+	triggerOrder       []string
+	triggerNext        int
 }
 
 // Resource policies can be edited independently of the quota invalidation
@@ -129,10 +135,15 @@ func (c *CELCache) Reset() {
 	}
 
 	c.mu.Lock()
-	defer c.mu.Unlock()
 
 	c.data = make(map[celCacheKey]*celruntime.CompiledExpression)
 	c.resourceConditions = 0
+	c.mu.Unlock()
+	c.triggerMu.Lock()
+	clear(c.triggerConditions)
+	c.triggerOrder = nil
+	c.triggerNext = 0
+	c.triggerMu.Unlock()
 }
 
 // ResetQuotaExpressions retires quota programs while preserving admission

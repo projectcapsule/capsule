@@ -4,11 +4,13 @@
 package v1beta2
 
 import (
+	admissionv1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rules"
 	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
 )
@@ -25,9 +27,66 @@ type TenantResourceCommonStatus struct {
 	// Serviceaccount used for impersonation
 	//+optional
 	ServiceAccount *meta.NamespacedRFC1123ObjectReferenceWithNamespace `json:"serviceAccount,omitzero"`
+	// Trigger records the last admission notification handled by this controller.
+	// +optional
+	Trigger *TenantResourceTriggerStatus `json:"trigger,omitempty"`
+	// NextResyncAt is the next periodic resync deadline for trigger-enabled replications.
+	// +optional
+	NextResyncAt *metav1.MicroTime `json:"nextResyncAt,omitempty"`
+}
+
+type TenantResourceTriggerStatus struct {
+	// ObservedRequest identifies the notification included in the last triggered reconcile.
+	ObservedRequest string `json:"observedRequest"`
+	// LastTriggeredAt is the start of the last triggered reconcile, including failed attempts.
+	LastTriggeredAt metav1.MicroTime `json:"lastTriggeredAt"`
+}
+
+// TenantResourceTrigger requests best-effort reconciliation on matching admission attempts.
+// Resource behavior and replication destinations remain defined by resources.
+type TenantResourceTrigger struct {
+	admissionv1.RuleWithOperations `json:",inline"`
+
+	// Name uniquely identifies this trigger.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	Name string `json:"name"`
+	// Audience uses the same identity matching as namespace rules. Empty matches everyone.
+	// +optional
+	// +kubebuilder:validation:MaxItems=64
+	Audience []rules.Audience `json:"audience,omitempty"`
+	// NamespaceSelector selects event source namespaces for GlobalTenantResources.
+	// TenantResources always observe only their own namespace and cannot set this field.
+	// +optional
+	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty"`
+	// ObjectSelector matches the labels of either the old or new admission object.
+	// +optional
+	ObjectSelector *metav1.LabelSelector `json:"objectSelector,omitempty"`
+	// MatchConditions are native admission CEL conditions. All must match.
+	// +optional
+	// +kubebuilder:validation:MaxItems=60
+	// +listType=map
+	// +listMapKey=name
+	MatchConditions []admissionv1.MatchCondition `json:"matchConditions,omitempty"`
 }
 
 type TenantResourceCommonSpec struct {
+	// Triggers request reconciliation on matching namespaced admission attempts.
+	// Capsule-managed resources never trigger reconciliation. Delivery is best effort;
+	// resyncPeriod remains the recovery mechanism for missed or pre-persistence events.
+	// +optional
+	// +kubebuilder:validation:MaxItems=32
+	// +listType=map
+	// +listMapKey=name
+	Triggers []TenantResourceTrigger `json:"triggers,omitempty"`
+	// TriggerMinInterval bounds triggered reconciliation frequency across all triggers
+	// on this resource. Events within the interval coalesce into one pending reconcile.
+	// Spec changes, deletion, manual requests, and periodic resyncs retain their behavior.
+	// +optional
+	// +kubebuilder:default="10s"
+	// +kubebuilder:validation:XValidation:rule="duration(self) >= duration('1s') && duration(self) <= duration('24h')",message="triggerMinInterval must be between 1s and 24h"
+	TriggerMinInterval metav1.Duration `json:"triggerMinInterval,omitzero"`
 	// Deprecated: configure resources[].policy instead. Admission converts Settings
 	// into policies for blocks without one. Retained as a compatibility fallback
 	// for stored resources that have not passed through admission again.
