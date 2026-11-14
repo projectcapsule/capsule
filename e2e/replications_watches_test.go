@@ -24,6 +24,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
+	admissionapi "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/replication"
 	"github.com/projectcapsule/capsule/pkg/template"
 )
@@ -274,7 +275,7 @@ var _ = Describe("Replication resource watches", Label("replications", "replicat
 		}
 	})
 
-	It("rejects admission-only trigger properties while real tenants are present", func() {
+	It("reports invalid watch specifications through controller status", func() {
 		ctx := context.Background()
 		prefix := "watch-validation-" + rand.String(6)
 		owners, namespaces := watchNamespaces(prefix)
@@ -297,9 +298,24 @@ var _ = Describe("Replication resource watches", Label("replications", "replicat
 			test.change(&spec.Triggers[0])
 			parent := &capsulev1beta2.TenantResource{Name: prefix + "-" + test.name, Namespace: namespaces[0].Name, Spec: capsulev1beta2.TenantResourceSpec{TenantResourceCommonSpec: spec}}
 			err := actor.Create(ctx, parent)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring(test.reason))
-			Expect(apierrors.IsNotFound(actor.Get(ctx, client.ObjectKeyFromObject(parent), &capsulev1beta2.TenantResource{}))).To(BeTrue())
+			if test.name == "audience" {
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(test.reason))
+				Expect(apierrors.IsNotFound(actor.Get(ctx, client.ObjectKeyFromObject(parent), &capsulev1beta2.TenantResource{}))).To(BeTrue())
+				continue
+			}
+			Expect(err).To(Succeed())
+			Eventually(func(g Gomega) {
+				fresh := &capsulev1beta2.TenantResource{}
+				g.Expect(actor.Get(ctx, client.ObjectKeyFromObject(parent), fresh)).To(Succeed())
+				g.Expect(fresh.Status.ObservedGeneration).To(Equal(fresh.Generation))
+				condition := fresh.Status.Conditions.GetConditionByType(meta.ReadyCondition)
+				g.Expect(condition).NotTo(BeNil())
+				g.Expect(condition.Status).To(Equal(metav1.ConditionFalse))
+				g.Expect(condition.Message).To(ContainSubstring(test.reason))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKey{Namespace: namespaces[0].Name, Name: prefix + "-output"}, &corev1.ConfigMap{}))).To(BeTrue())
+
 		}
 	})
 	It("keeps parent bookkeeping quiet and applies cordon, interval and trigger changes", func() {
@@ -346,15 +362,67 @@ var _ = Describe("Replication resource watches", Label("replications", "replicat
 				g.Expect(fresh.Status.Trigger.ObservedRequest).To(Equal(fresh.Annotations[replication.TriggerAnnotation]))
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		}
-		userEvent("")
-		Eventually(func(g Gomega) {
+		By("establishing the informer baseline with persisted user changes")
+		Eventually(func() error {
+			if watchToken(parent) != "" {
+				return nil
+			}
 			fresh := &capsulev1beta2.TenantResource{}
-			g.Expect(actor.Get(ctx, client.ObjectKeyFromObject(parent), fresh)).To(Succeed())
-			g.Expect(fresh.Status.Trigger).NotTo(BeNil())
-			g.Expect(fresh.Status.Trigger.ObservedRequest).To(Equal(fresh.Annotations[replication.TriggerAnnotation]))
+			if err := actor.Get(ctx, client.ObjectKeyFromObject(parent), fresh); err != nil {
+				return err
+			}
+			if fresh.Annotations == nil {
+				fresh.Annotations = map[string]string{}
+			}
+			fresh.Annotations["projectcapsule.dev/bootstrap"] = rand.String(8)
+			if err := actor.Update(ctx, fresh); err != nil {
+				return err
+			}
+			return fmt.Errorf("waiting for informer baseline")
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		By("draining bootstrap notifications before one-shot delivery")
+		settled := ""
+		Eventually(func() bool {
+			fresh := &capsulev1beta2.TenantResource{}
+			Expect(actor.Get(ctx, client.ObjectKeyFromObject(parent), fresh)).To(Succeed())
+			if fresh.Status.Trigger == nil {
+				return false
+			}
+			current := fresh.Status.Trigger.ObservedRequest
+			if current != settled {
+				settled = current
+				return false
+			}
+			return current != "" && current == fresh.Annotations[replication.TriggerAnnotation]
+		}, defaultTimeoutInterval, 200*time.Millisecond).MustPassRepeatedly(20).Should(BeTrue())
+		userEvent(settled)
 		token := watchToken(parent)
 		Consistently(func() string { return watchToken(parent) }, 4*time.Second, 200*time.Millisecond).Should(Equal(token), "internal notification/status patches must not feed back")
+		By("observing a terminating source before its finalizer is removed")
+		victim := &capsulev1beta2.TenantResource{Name: prefix + "-terminating", Namespace: namespaces[0].Name, Labels: map[string]string{watchSourceLabel: prefix}, Finalizers: []string{"projectcapsule.dev/watch-termination-test"}, Spec: capsulev1beta2.TenantResourceSpec{TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{Cordoned: new(true), Resources: []capsulev1beta2.ResourceSpec{}}}}
+		Expect(actor.Create(ctx, victim)).To(Succeed())
+		DeferCleanup(func() {
+			Eventually(func() error {
+				fresh := &capsulev1beta2.TenantResource{}
+				if err := actor.Get(ctx, client.ObjectKeyFromObject(victim), fresh); err != nil {
+					return client.IgnoreNotFound(err)
+				}
+				fresh.Finalizers = slices.DeleteFunc(fresh.Finalizers, func(value string) bool { return value == "projectcapsule.dev/watch-termination-test" })
+				return actor.Update(ctx, fresh)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		})
+		Eventually(func() string { return watchToken(parent) }, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Equal(token))
+		token = watchToken(parent)
+		Consistently(func() string { return watchToken(parent) }, 3*time.Second, 200*time.Millisecond).Should(Equal(token))
+		Expect(actor.Delete(ctx, victim)).To(Succeed())
+		Eventually(func(g Gomega) {
+			fresh := &capsulev1beta2.TenantResource{}
+			g.Expect(actor.Get(ctx, client.ObjectKeyFromObject(victim), fresh)).To(Succeed())
+			g.Expect(fresh.DeletionTimestamp.IsZero()).To(BeFalse())
+			g.Expect(fresh.Finalizers).To(ContainElement("projectcapsule.dev/watch-termination-test"))
+			g.Expect(watchToken(parent)).NotTo(Equal(token))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
 		By("preserving ordinary spec reconciliation during a trigger cooldown")
 		edit(func(fresh *capsulev1beta2.TenantResource) {
 			fresh.Spec.TriggerMinInterval.Duration = 24 * time.Hour
@@ -482,5 +550,74 @@ var _ = Describe("Replication resource watches", Label("replications", "replicat
 		for _, other := range unrelated {
 			Expect(watchToken(other)).To(BeEmpty())
 		}
+	})
+	It("validates watches in controllers with policy conversion disabled", Label("config"), func() {
+		ctx := context.Background()
+		prefix := "watch-no-webhook-" + rand.String(6)
+		owners, namespaces := watchNamespaces(prefix)
+		original := &capsulev1beta2.CapsuleConfiguration{}
+		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: defaultConfigurationName}, original)).To(Succeed())
+		DeferCleanup(func() {
+			ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+				configuration.Spec.Admission.Mutating.Webhooks = original.Spec.Admission.Mutating.DeepCopy().Webhooks
+			})
+		})
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec.Admission.Mutating.Webhooks = slices.DeleteFunc(configuration.Spec.Admission.Mutating.Webhooks, func(hook *admissionapi.MutatingWebhook) bool {
+				return hook.Name == "replications.mutating.projectcapsule.dev"
+			})
+		})
+		Eventually(func(g Gomega) {
+			configurations := &admissionv1.MutatingWebhookConfigurationList{}
+			g.Expect(k8sClient.List(ctx, configurations)).To(Succeed())
+			for _, configuration := range configurations.Items {
+				for _, hook := range configuration.Webhooks {
+					g.Expect(hook.Name).NotTo(Equal("replications.mutating.projectcapsule.dev"))
+				}
+			}
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		actor := impersonationClient(owners[0].Name, withDefaultGroups(nil))
+		spec := watchBody(prefix, namespaces[0].Name, prefix+"-output")
+		spec.Triggers[0].MatchConditions[0].Expression = "request.operation == 'CREATE'"
+		parent := &capsulev1beta2.TenantResource{Name: prefix, Namespace: namespaces[0].Name, Spec: capsulev1beta2.TenantResourceSpec{TenantResourceCommonSpec: spec}}
+		Expect(actor.Create(ctx, parent)).To(Succeed())
+		Eventually(func(g Gomega) {
+			fresh := &capsulev1beta2.TenantResource{}
+			g.Expect(actor.Get(ctx, client.ObjectKeyFromObject(parent), fresh)).To(Succeed())
+			g.Expect(fresh.Status.ObservedGeneration).To(Equal(fresh.Generation))
+			condition := fresh.Status.Conditions.GetConditionByType(meta.ReadyCondition)
+			g.Expect(condition).NotTo(BeNil())
+			g.Expect(condition.Status).To(Equal(metav1.ConditionFalse))
+			g.Expect(condition.Message).To(ContainSubstring("undeclared"))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKey{Namespace: namespaces[0].Name, Name: prefix + "-output"}, &corev1.ConfigMap{}))).To(BeTrue())
+		By("retaining validation when a new destination namespace is created")
+		freshTenant := &capsulev1beta2.Tenant{}
+		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: namespaces[0].Labels[meta.NewTenantLabel]}, freshTenant)).To(Succeed())
+		destination := NewNamespace("", map[string]string{meta.NewTenantLabel: freshTenant.Name})
+		NamespaceCreation(destination, owners[0], defaultTimeoutInterval).Should(Succeed())
+		DeferCleanup(DeleteNamespaceInBackground, ctx, destination.Name)
+		TenantNamespaceReady(freshTenant, destination, 3)
+		bindServiceAccountToTenantResourceManager(namespaces[0].Name, "default", namespaces[1].Name)
+		bindServiceAccountToTenantResourceManager(namespaces[0].Name, "default", destination.Name)
+		Consistently(func() bool {
+			return apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKey{Namespace: destination.Name, Name: prefix + "-output"}, &corev1.ConfigMap{}))
+		}, 2*time.Second, 200*time.Millisecond).Should(BeTrue())
+
+		other := &capsulev1beta2.TenantResource{Name: prefix, Namespace: namespaces[2].Name, Spec: capsulev1beta2.TenantResourceSpec{TenantResourceCommonSpec: watchBody(prefix, namespaces[2].Name, prefix+"-other")}}
+		bob := impersonationClient(owners[1].Name, withDefaultGroups(nil))
+		Expect(bob.Create(ctx, other)).To(Succeed())
+		waitWatchReady(other)
+		Eventually(func() error {
+			fresh := &capsulev1beta2.TenantResource{}
+			if err := actor.Get(ctx, client.ObjectKeyFromObject(parent), fresh); err != nil {
+				return err
+			}
+			fresh.Spec.Triggers[0].MatchConditions[0].Expression = "true"
+			return actor.Update(ctx, fresh)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		waitWatchReady(parent)
+		expectConfigMapData(namespaces[0].Name, prefix+"-output", map[string]string{"value": "missing"})
+		expectConfigMapData(destination.Name, prefix+"-output", map[string]string{"value": "missing"})
 	})
 })

@@ -56,6 +56,7 @@ type globalResourceController struct {
 
 	impersonation *cache.ImpersonationCache
 	conditions    *cache.CELCache
+	triggers      *cache.PreparedReplicationTriggers
 }
 
 func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
@@ -206,7 +207,7 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 	//nolint:nestif
 	if tntResource.DeletionTimestamp.IsZero() {
 		if len(tntResource.Spec.Triggers) > 0 {
-			if validationErr := replication.ValidateTriggerStructure(&tntResource.Spec.TenantResourceCommonSpec, false); validationErr != nil {
+			if validationErr := r.triggers.Validate(tntResource.UID, tntResource.Generation, &tntResource.Spec.TenantResourceCommonSpec, false, r.conditions); validationErr != nil {
 				statusErr = validationErr
 
 				return requeue, nil

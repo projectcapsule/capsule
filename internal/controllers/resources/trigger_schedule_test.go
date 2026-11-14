@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -22,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/processor"
@@ -29,6 +31,58 @@ import (
 	resourceindex "github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
 	"github.com/projectcapsule/capsule/pkg/runtime/replication"
 )
+
+func TestControllersReportInvalidWatchCELWithoutAdmission(t *testing.T) {
+	for _, global := range []bool{false, true} {
+		t.Run(fmt.Sprint(global), func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			if err := capsulev1beta2.AddToScheme(scheme); err != nil {
+				t.Fatal(err)
+			}
+			common := capsulev1beta2.TenantResourceCommonSpec{Cordoned: new(false), ResyncPeriod: metav1.Duration{Duration: time.Hour}, Triggers: []capsulev1beta2.TenantResourceTrigger{{Name: "events", Operations: []admissionv1.OperationType{admissionv1.Update}, APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"configmaps"}, MatchConditions: []admissionv1.MatchCondition{{Name: "invalid", Expression: "request.operation == 'UPDATE'"}}}}}
+			var object client.Object
+			if global {
+				object = &capsulev1beta2.GlobalTenantResource{Name: "invalid", UID: "invalid-global", Generation: 2, Spec: capsulev1beta2.GlobalTenantResourceSpec{TenantResourceCommonSpec: common}}
+			} else {
+				object = &capsulev1beta2.TenantResource{Name: "invalid", Namespace: "a", UID: "invalid-local", Generation: 2, Spec: capsulev1beta2.TenantResourceSpec{TenantResourceCommonSpec: common}}
+			}
+			c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(object).WithStatusSubresource(object).Build()
+			conditions, _ := cache.NewCELCache()
+			namespaceController := &NamespaceTrigger{conditions: conditions}
+			var scopedError error
+			if global {
+				scopedError = namespaceController.replicateGlobal(t.Context(), logr.Discard(), object.(*capsulev1beta2.GlobalTenantResource), capsulev1beta2.Tenant{}, &corev1.Namespace{})
+			} else {
+				scopedError = namespaceController.replicateNamespaced(t.Context(), logr.Discard(), object.(*capsulev1beta2.TenantResource), capsulev1beta2.Tenant{}, &corev1.Namespace{})
+			}
+			if scopedError == nil || !strings.Contains(scopedError.Error(), "undeclared") {
+				t.Fatalf("namespace reconciliation bypassed validation: %v", scopedError)
+			}
+			var controller reconcile.Reconciler
+			if global {
+				controller = &globalResourceController{client: c, reader: c, conditions: conditions, metrics: metrics.NewGlobalTenantResourceRecorder()}
+			} else {
+				controller = &namespacedResourceController{client: c, reader: c, conditions: conditions, metrics: metrics.NewTenantResourceRecorder()}
+			}
+			if _, err := controller.Reconcile(t.Context(), reconcile.Request{NamespacedName: client.ObjectKeyFromObject(object)}); err != nil {
+				t.Fatal(err)
+			}
+			if err := c.Get(t.Context(), client.ObjectKeyFromObject(object), object); err != nil {
+				t.Fatal(err)
+			}
+			var status *capsulev1beta2.TenantResourceCommonStatus
+			if global {
+				status = &object.(*capsulev1beta2.GlobalTenantResource).Status.TenantResourceCommonStatus
+			} else {
+				status = &object.(*capsulev1beta2.TenantResource).Status.TenantResourceCommonStatus
+			}
+			condition := status.Conditions.GetConditionByType(meta.ReadyCondition)
+			if status.ObservedGeneration != 2 || condition == nil || condition.Status != metav1.ConditionFalse || !strings.Contains(condition.Message, "undeclared") {
+				t.Fatalf("invalid watch reported ready: %+v", status)
+			}
+		})
+	}
+}
 
 func TestPendingTriggerPreservesAcknowledgement(t *testing.T) {
 	now := time.Unix(100, 0)

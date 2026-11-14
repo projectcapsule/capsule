@@ -59,7 +59,7 @@ func FilterNamespaceRulesByAudience(
 	return out, nil
 }
 
-// MatchesAudience shares namespace-rule identity semantics with replication triggers.
+// MatchesAudience evaluates the request identities selected by a namespace rule.
 // An empty audience matches all requests; nonempty entries are alternatives.
 func MatchesAudience(ctx context.Context, c client.Client, cfg configuration.Configuration, tnt *capsulev1beta2.Tenant, req admission.Request, audience []rules.Audience) (bool, error) {
 	if len(audience) == 0 {

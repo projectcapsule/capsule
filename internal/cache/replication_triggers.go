@@ -9,6 +9,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/runtime/replication"
 )
 
@@ -35,6 +36,19 @@ type PreparedReplicationTriggers struct {
 
 func NewPreparedReplicationTriggers() *PreparedReplicationTriggers {
 	return &PreparedReplicationTriggers{entries: make(map[types.UID]preparedReplication)}
+}
+
+// Validate reuses the current prepared subscription on ordinary reconciliation.
+// Invalid specifications must surface in resource status even when no admission
+// webhook is installed. Cold or omitted subscriptions use the shared CEL cache.
+func (c *PreparedReplicationTriggers) Validate(uid types.UID, generation int64, spec *capsulev1beta2.TenantResourceCommonSpec, namespaced bool, compiler replication.ConditionValidator) error {
+	if c != nil {
+		if _, ok := c.Get(uid, generation); ok {
+			return nil
+		}
+	}
+
+	return replication.ValidateTriggers(spec, namespaced, compiler)
 }
 
 func (c *PreparedReplicationTriggers) Get(uid types.UID, generation int64) (*replication.PreparedTriggers, bool) {

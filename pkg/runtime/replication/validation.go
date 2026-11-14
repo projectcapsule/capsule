@@ -6,7 +6,6 @@ package replication
 import (
 	"fmt"
 	"slices"
-	"strings"
 	"time"
 
 	admissionv1 "k8s.io/api/admissionregistration/v1"
@@ -22,8 +21,8 @@ func ValidateTriggers(spec *capsulev1beta2.TenantResourceCommonSpec, namespaced 
 	return validateTriggers(spec, namespaced, compiler, true)
 }
 
-// ValidateTriggerStructure is used by periodic reconciliation; expensive CEL
-// compilation belongs to admission and watch subscription preparation.
+// ValidateTriggerStructure checks the bounded watch shape before preparation.
+// Controllers validate CEL through shared compiled/prepared caches.
 func ValidateTriggerStructure(spec *capsulev1beta2.TenantResourceCommonSpec, namespaced bool) error {
 	return validateTriggers(spec, namespaced, nil, false)
 }
@@ -147,8 +146,8 @@ func validateTriggerConditions(t *capsulev1beta2.TenantResourceTrigger, path str
 			return fmt.Errorf("%s.matchConditions expression must contain 1 to 4096 bytes", path)
 		}
 
-		if condition.Name == "" || len(validation.IsQualifiedName(condition.Name)) > 0 || conditionNames[condition.Name] || strings.HasPrefix(condition.Name, "capsule-trigger-") {
-			return fmt.Errorf("%s.matchConditions requires unique valid names outside capsule-trigger-", path)
+		if condition.Name == "" || len(validation.IsQualifiedName(condition.Name)) > 0 || conditionNames[condition.Name] {
+			return fmt.Errorf("%s.matchConditions requires unique valid names", path)
 		}
 
 		conditionNames[condition.Name] = true

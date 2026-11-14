@@ -10,8 +10,6 @@ import (
 	"time"
 
 	admissionv1 "k8s.io/api/admissionregistration/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	clientcache "k8s.io/client-go/tools/cache"
 )
@@ -22,7 +20,7 @@ type runningResourceWatch struct {
 }
 
 func (r *ResourceWatches) Start(ctx context.Context) error {
-	running := make(map[schema.GroupVersionResource]runningResourceWatch)
+	running := make(map[resourceWatchKey]runningResourceWatch)
 
 	var workers sync.WaitGroup
 	for range 2 {
@@ -76,29 +74,30 @@ func (r *ResourceWatches) Start(ctx context.Context) error {
 	}
 }
 
-func (r *ResourceWatches) syncWatches(ctx context.Context, running map[schema.GroupVersionResource]runningResourceWatch) {
+func (r *ResourceWatches) syncWatches(ctx context.Context, running map[resourceWatchKey]runningResourceWatch) {
 	r.mu.Lock()
 	desired := maps.Clone(r.desired)
 	r.mu.Unlock()
 
-	for resource, watch := range running {
-		if _, ok := desired[resource]; !ok {
+	for key, watch := range running {
+		if _, ok := desired[key]; !ok {
 			watch.cancel()
 			<-watch.done
-			delete(running, resource)
+			delete(running, key)
 		}
 	}
 
-	for resource := range desired {
-		if _, ok := running[resource]; ok {
+	for key := range desired {
+		if _, ok := running[key]; ok {
 			continue
 		}
 
 		watchCtx, cancel := context.WithCancel(ctx)
+		resource := key.resource
 
-		informer := dynamicinformer.NewFilteredDynamicInformer(r.dynamic, resource, metav1.NamespaceAll, 0, clientcache.Indexers{}, nil).Informer()
+		informer := dynamicinformer.NewFilteredDynamicInformer(r.dynamic, resource, key.namespace, 0, clientcache.Indexers{}, nil).Informer()
 		if r.newInformer != nil {
-			informer = r.newInformer(resource)
+			informer = r.newInformer(resource, key.namespace)
 		}
 
 		if err := informer.SetWatchErrorHandlerWithContext(func(_ context.Context, _ *clientcache.Reflector, err error) {
@@ -130,7 +129,7 @@ func (r *ResourceWatches) syncWatches(ctx context.Context, running map[schema.Gr
 
 		done := make(chan struct{})
 
-		running[resource] = runningResourceWatch{cancel: cancel, done: done}
+		running[key] = runningResourceWatch{cancel: cancel, done: done}
 
 		go func() { defer close(done); informer.RunWithContext(watchCtx) }()
 	}

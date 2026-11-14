@@ -110,7 +110,7 @@ func watchFixtureFor(tb testing.TB, unrelated int) *watchFixture {
 	mapper.Add(corev1.SchemeGroupVersion.WithKind("Node"), apimeta.RESTScopeRoot)
 	compiler, _ := cache.NewCELCache()
 	dyn := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, map[schema.GroupVersionResource]string{configMapsGVR: "ConfigMapList", {Version: "v1", Resource: "secrets"}: "SecretList"})
-	f.watcher = NewResourceWatches(f.client, dyn, mapper, logr.Discard(), compiler, cache.NewLabelSelectorCache(), f.notifications, metrics.NewTriggerRecorder())
+	f.watcher = NewResourceWatches(f.client, dyn, mapper, logr.Discard(), compiler, cache.NewLabelSelectorCache(), cache.NewPreparedReplicationTriggers(), f.notifications, metrics.NewTriggerRecorder())
 	if _, err := f.watcher.Reconcile(tb.Context(), reconcile.Request{}); err != nil {
 		tb.Fatal(err)
 	}
@@ -280,8 +280,8 @@ func TestWatchDiscoveryAndReadFailures(t *testing.T) {
 		if _, err := f.watcher.Reconcile(t.Context(), reconcile.Request{}); err != nil {
 			t.Fatal(err)
 		}
-		for gvr := range f.watcher.desired {
-			if gvr.Resource == resource {
+		for key := range f.watcher.desired {
+			if key.resource.Resource == resource {
 				t.Fatal("unsupported resource watch started")
 			}
 		}
@@ -309,6 +309,46 @@ func TestWatchQueueHasBoundedSaturation(t *testing.T) {
 	}
 	if len(f.notifications.take()) != 0 {
 		t.Fatal("enqueue performed notification work synchronously")
+	}
+}
+
+func TestLocalWatchCountIsBounded(t *testing.T) {
+	f := watchFixtureFor(t, 0)
+	if err := f.client.Delete(t.Context(), &capsulev1beta2.GlobalTenantResource{Name: "global"}); err != nil {
+		t.Fatal(err)
+	}
+	for i := range maxResourceWatches + 10 {
+		name := fmt.Sprintf("namespace-%03d", i)
+		source := &capsulev1beta2.TenantResource{Name: "source", Namespace: name, UID: types.UID(name), Generation: 1, Spec: capsulev1beta2.TenantResourceSpec{TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{Triggers: []capsulev1beta2.TenantResourceTrigger{{Name: "events", Operations: []admissionv1.OperationType{admissionv1.Update}, APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"configmaps"}}}}}}
+		if err := f.client.Create(t.Context(), source); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := f.watcher.Reconcile(t.Context(), reconcile.Request{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.watcher.desired) != maxResourceWatches {
+		t.Fatalf("stream limit: %d", len(f.watcher.desired))
+	}
+	for key := range f.watcher.desired {
+		if key.namespace == "" {
+			t.Fatal("local capacity overflow opened a cluster-wide watch")
+		}
+	}
+}
+
+func BenchmarkWatchSubscriptionPlanning(b *testing.B) {
+	for _, count := range []int{0, 100, 1000} {
+		b.Run(fmt.Sprintf("subscriptions=%d", count+3), func(b *testing.B) {
+			f := watchFixtureFor(b, count)
+			b.ReportAllocs()
+			for b.Loop() {
+				if _, err := f.watcher.Reconcile(b.Context(), reconcile.Request{}); err != nil {
+					b.Fatal(err)
+				}
+			}
+			b.ReportMetric(float64(f.lists)/float64(b.N), "LIST/op")
+		})
 	}
 }
 

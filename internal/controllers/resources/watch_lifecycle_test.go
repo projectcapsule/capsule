@@ -35,7 +35,10 @@ func TestSharedWatchStartupInitialListAndShutdown(t *testing.T) {
 	}
 	var watchStarts atomic.Int64
 	informer := dynamicinformer.NewFilteredDynamicInformer(dynamic, configMapsGVR, metav1.NamespaceAll, 0, clientcache.Indexers{}, nil).Informer()
-	f.watcher.newInformer = func(schema.GroupVersionResource) clientcache.SharedIndexInformer { watchStarts.Add(1); return informer }
+	f.watcher.newInformer = func(schema.GroupVersionResource, string) clientcache.SharedIndexInformer {
+		watchStarts.Add(1)
+		return informer
+	}
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	done := make(chan error, 1)
@@ -110,11 +113,92 @@ func TestBookkeepingComparisonPreservesUserChanges(t *testing.T) {
 	if before.GetAnnotations()["user"] != "keep" {
 		t.Fatal("comparison mutated input")
 	}
+	after = before.DeepCopy()
+	now := metav1.Now()
+	after.SetDeletionTimestamp(&now)
+	if bookkeepingEvent(resource, before, after) {
+		t.Fatal("deletion timestamp transition ignored")
+	}
+	before = after.DeepCopy()
+	after.SetFinalizers([]string{"projectcapsule.dev/test"})
+	if !bookkeepingEvent(resource, before, after) {
+		t.Fatal("finalizer-only update should remain quiet")
+	}
 	f := watchFixtureFor(t, 0)
 	canceled, cancel := context.WithCancel(t.Context())
 	cancel()
 	f.watcher.enqueueEvent(canceled, resource, admissionv1.Create, nil, after)
 	if len(f.watcher.events) != 0 {
 		t.Fatal("canceled stream accepted an event")
+	}
+}
+
+func TestLocalWatchScopesAndGlobalReplacement(t *testing.T) {
+	f := watchFixtureFor(t, 0)
+	global := &capsulev1beta2.GlobalTenantResource{}
+	if err := f.client.Get(t.Context(), client.ObjectKey{Name: "global"}, global); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.client.Delete(t.Context(), global); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.watcher.Reconcile(t.Context(), reconcile.Request{}); err != nil {
+		t.Fatal(err)
+	}
+	for _, namespace := range []string{"a", "b"} {
+		if _, ok := f.watcher.desired[resourceWatchKey{resource: configMapsGVR, namespace: namespace}]; !ok {
+			t.Fatalf("missing local watch: %s", namespace)
+		}
+	}
+	if len(f.watcher.desired) != 2 {
+		t.Fatal("local subscriptions opened cluster-wide or duplicate watches")
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	running := map[resourceWatchKey]runningResourceWatch{}
+	f.watcher.syncWatches(ctx, running)
+	defer func() {
+		cancel()
+		for _, watch := range running {
+			<-watch.done
+		}
+	}()
+	dynamic := f.watcher.dynamic.(*dynamicfake.FakeDynamicClient)
+	if err := wait.PollUntilContextTimeout(t.Context(), time.Millisecond, 5*time.Second, true, func(context.Context) (bool, error) {
+		seen := map[string]bool{}
+		for _, action := range dynamic.Actions() {
+			if action.GetVerb() == "list" || action.GetVerb() == "watch" {
+				if action.GetNamespace() != "a" && action.GetNamespace() != "b" {
+					t.Fatalf("unscoped informer action: %s", action.GetNamespace())
+				}
+				seen[action.GetVerb()+action.GetNamespace()] = true
+			}
+		}
+		return len(seen) == 4, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	global.ResourceVersion = ""
+	if err := f.client.Create(t.Context(), global); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.watcher.Reconcile(t.Context(), reconcile.Request{}); err != nil {
+		t.Fatal(err)
+	}
+	f.watcher.syncWatches(ctx, running)
+	if len(running) != 1 {
+		t.Fatal("global subscription did not replace local streams")
+	}
+	if _, ok := running[resourceWatchKey{resource: configMapsGVR}]; !ok {
+		t.Fatal("missing global stream")
+	}
+	if err := f.client.Delete(t.Context(), global); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.watcher.Reconcile(t.Context(), reconcile.Request{}); err != nil {
+		t.Fatal(err)
+	}
+	f.watcher.syncWatches(ctx, running)
+	if len(running) != 2 {
+		t.Fatal("removing global subscription did not restore local streams")
 	}
 }

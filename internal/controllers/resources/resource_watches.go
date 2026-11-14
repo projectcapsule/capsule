@@ -36,11 +36,17 @@ import (
 
 const maxResourceWatches = 64
 
-// ResourceWatches owns one informer per explicit GVR on the elected replica.
+type resourceWatchKey struct {
+	resource  schema.GroupVersionResource
+	namespace string
+}
+
+// ResourceWatches shares namespace-scoped informers on the elected replica.
+// A global subscription replaces local informers for the same GVR.
 // The controller maintains the watch set; event handling uses the registered
 // manager-cache index and immutable prepared source projections.
 type ResourceWatches struct {
-	newInformer func(schema.GroupVersionResource) clientcache.SharedIndexInformer
+	newInformer func(schema.GroupVersionResource, string) clientcache.SharedIndexInformer
 	client      client.Client
 	dynamic     dynamic.Interface
 	mapper      apimeta.RESTMapper
@@ -51,13 +57,13 @@ type ResourceWatches struct {
 	notifier    replication.Notifier
 	metrics     *metrics.TriggerRecorder
 	mu          sync.Mutex
-	desired     map[schema.GroupVersionResource]schema.GroupVersionKind
+	desired     map[resourceWatchKey]schema.GroupVersionKind
 	changed     chan struct{}
 	events      chan resourceWatchEvent
 }
 
-func NewResourceWatches(c client.Client, dyn dynamic.Interface, mapper apimeta.RESTMapper, log logr.Logger, conditions *cache.CELCache, selectors *cache.LabelSelectorCache, notifier replication.Notifier, recorder *metrics.TriggerRecorder) *ResourceWatches {
-	return &ResourceWatches{client: c, dynamic: dyn, mapper: mapper, log: log, conditions: conditions, selectors: selectors, prepared: cache.NewPreparedReplicationTriggers(), notifier: notifier, metrics: recorder, desired: make(map[schema.GroupVersionResource]schema.GroupVersionKind), changed: make(chan struct{}, 1), events: make(chan resourceWatchEvent, 256)}
+func NewResourceWatches(c client.Client, dyn dynamic.Interface, mapper apimeta.RESTMapper, log logr.Logger, conditions *cache.CELCache, selectors *cache.LabelSelectorCache, prepared *cache.PreparedReplicationTriggers, notifier replication.Notifier, recorder *metrics.TriggerRecorder) *ResourceWatches {
+	return &ResourceWatches{client: c, dynamic: dyn, mapper: mapper, log: log, conditions: conditions, selectors: selectors, prepared: prepared, notifier: notifier, metrics: recorder, desired: make(map[resourceWatchKey]schema.GroupVersionKind), changed: make(chan struct{}, 1), events: make(chan resourceWatchEvent, 256)}
 }
 
 func (r *ResourceWatches) NeedLeaderElection() bool { return true }
@@ -139,28 +145,11 @@ func (r *ResourceWatches) Reconcile(ctx context.Context, _ reconcile.Request) (r
 		return a.GetNamespace()+"/"+a.GetName() < b.GetNamespace()+"/"+b.GetName()
 	})
 
-	resources := make(map[schema.GroupVersionResource]struct{})
+	resources := make(map[schema.GroupVersionResource]map[string]struct{})
 	omitted := 0
 
 	for _, source := range sources {
-		spec := triggerSpec(source)
-
-		count := 0
-
-		for _, trigger := range spec.Triggers {
-			count += len(trigger.MatchConditions)
-		}
-
-		encoded, err := json.Marshal(spec.Triggers)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-
-		fingerprint := sha256.Sum256(encoded)
-
-		prepared, err := r.prepared.GetOrBuild(source.GetUID(), source.GetGeneration(), count, fingerprint, func() (*replication.PreparedTriggers, error) {
-			return replication.PrepareTriggers(spec, source.GetNamespace() != "", r.selectors, r.conditions)
-		})
+		prepared, err := r.prepareSource(source)
 		if err != nil {
 			r.prepared.Delete(source.GetUID())
 
@@ -172,7 +161,13 @@ func (r *ResourceWatches) Reconcile(ctx context.Context, _ reconcile.Request) (r
 		}
 
 		for _, resource := range prepared.Resources() {
-			resources[resource] = struct{}{}
+			namespaces := resources[resource]
+			if namespaces == nil {
+				namespaces = make(map[string]struct{})
+				resources[resource] = namespaces
+			}
+
+			namespaces[source.GetNamespace()] = struct{}{}
 		}
 	}
 
@@ -183,7 +178,7 @@ func (r *ResourceWatches) Reconcile(ctx context.Context, _ reconcile.Request) (r
 
 	sort.Slice(keys, func(i, j int) bool { return keys[i].String() < keys[j].String() })
 
-	desired := make(map[schema.GroupVersionResource]schema.GroupVersionKind)
+	desired := make(map[resourceWatchKey]schema.GroupVersionKind)
 	for _, resource := range keys {
 		if len(desired) >= maxResourceWatches {
 			omitted++
@@ -225,7 +220,29 @@ func (r *ResourceWatches) Reconcile(ctx context.Context, _ reconcile.Request) (r
 			continue
 		}
 
-		desired[resource] = kind
+		namespaces := resources[resource]
+		if _, global := namespaces[""]; global {
+			desired[resourceWatchKey{resource: resource}] = kind
+
+			continue
+		}
+
+		orderedNamespaces := make([]string, 0, len(namespaces))
+		for namespace := range namespaces {
+			orderedNamespaces = append(orderedNamespaces, namespace)
+		}
+
+		sort.Strings(orderedNamespaces)
+
+		for _, namespace := range orderedNamespaces {
+			if len(desired) >= maxResourceWatches {
+				omitted++
+
+				continue
+			}
+
+			desired[resourceWatchKey{resource: resource, namespace: namespace}] = kind
+		}
 	}
 
 	r.metrics.OmittedWatches.Set(float64(omitted))
@@ -242,4 +259,28 @@ func (r *ResourceWatches) Reconcile(ctx context.Context, _ reconcile.Request) (r
 	}
 
 	return reconcile.Result{RequeueAfter: 30 * time.Second}, nil
+}
+
+func (r *ResourceWatches) prepareSource(source client.Object) (*replication.PreparedTriggers, error) {
+	if prepared, ok := r.prepared.Get(source.GetUID(), source.GetGeneration()); ok {
+		return prepared, nil
+	}
+
+	spec := triggerSpec(source)
+	count := 0
+
+	for _, trigger := range spec.Triggers {
+		count += len(trigger.MatchConditions)
+	}
+
+	encoded, err := json.Marshal(spec.Triggers)
+	if err != nil {
+		return nil, err
+	}
+
+	fingerprint := sha256.Sum256(encoded)
+
+	return r.prepared.GetOrBuild(source.GetUID(), source.GetGeneration(), count, fingerprint, func() (*replication.PreparedTriggers, error) {
+		return replication.PrepareTriggers(spec, source.GetNamespace() != "", r.selectors, r.conditions)
+	})
 }

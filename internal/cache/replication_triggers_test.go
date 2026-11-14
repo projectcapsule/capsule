@@ -8,11 +8,47 @@ import (
 	"sync"
 	"testing"
 
+	admissionv1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/runtime/replication"
 )
+
+type triggerValidationCounter struct{ calls int }
+
+func (c *triggerValidationCounter) ValidateTriggerCondition(string) error { c.calls++; return nil }
+
+func TestPreparedSubscriptionsValidateColdAndCurrentGenerations(t *testing.T) {
+	prepared := NewPreparedReplicationTriggers()
+	compiler := &triggerValidationCounter{}
+	spec := &capsulev1beta2.TenantResourceCommonSpec{Triggers: []capsulev1beta2.TenantResourceTrigger{{Name: "events", Operations: []admissionv1.OperationType{admissionv1.Update}, APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"configmaps"}, MatchConditions: []admissionv1.MatchCondition{{Name: "changed", Expression: "object.data != oldObject.data"}}}}}
+	if err := prepared.Validate("a", 1, spec, true, compiler); err != nil || compiler.calls != 1 {
+		t.Fatalf("cold validation: calls=%d err=%v", compiler.calls, err)
+	}
+	if _, err := prepared.GetOrBuild("a", 1, 1, [32]byte{1}, func() (*replication.PreparedTriggers, error) { return emptyPrepared(t), nil }); err != nil {
+		t.Fatal(err)
+	}
+	if err := prepared.Validate("a", 1, spec, true, compiler); err != nil || compiler.calls != 1 {
+		t.Fatalf("current generation recompiled: calls=%d err=%v", compiler.calls, err)
+	}
+	for _, source := range []struct {
+		uid        types.UID
+		generation int64
+	}{{"b", 1}, {"a", 2}} {
+		if err := prepared.Validate(source.uid, source.generation, spec, true, compiler); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if compiler.calls != 3 {
+		t.Fatal("validation leaked across resource identity or generation")
+	}
+	cel, _ := NewCELCache()
+	spec.Triggers[0].MatchConditions[0].Expression = "request.operation == 'UPDATE'"
+	if err := prepared.Validate("a", 2, spec, true, cel); err == nil {
+		t.Fatal("invalid CEL accepted without admission")
+	}
+}
 
 func emptyPrepared(tb testing.TB) *replication.PreparedTriggers {
 	tb.Helper()
@@ -128,6 +164,32 @@ func BenchmarkPreparedWatchSubscription(b *testing.B) {
 					c.Delete("a")
 				}
 				if _, err := c.GetOrBuild("a", 1, 0, [32]byte{}, build); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkWatchSpecValidation(b *testing.B) {
+	for _, prepared := range []bool{false, true} {
+		b.Run(fmt.Sprintf("prepared=%t", prepared), func(b *testing.B) {
+			compiler, _ := NewCELCache()
+			cache := NewPreparedReplicationTriggers()
+			spec := &capsulev1beta2.TenantResourceCommonSpec{Triggers: []capsulev1beta2.TenantResourceTrigger{{Name: "events", Operations: []admissionv1.OperationType{admissionv1.Update}, APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"configmaps"}, MatchConditions: []admissionv1.MatchCondition{{Name: "changed", Expression: "object.data != oldObject.data"}}}}}
+			if err := cache.Validate("a", 1, spec, true, compiler); err != nil {
+				b.Fatal(err)
+			}
+			if prepared {
+				if _, err := cache.GetOrBuild("a", 1, 1, [32]byte{1}, func() (*replication.PreparedTriggers, error) {
+					return replication.PrepareTriggers(spec, true, NewLabelSelectorCache(), compiler)
+				}); err != nil {
+					b.Fatal(err)
+				}
+			}
+			b.ReportAllocs()
+			for b.Loop() {
+				if err := cache.Validate("a", 1, spec, true, compiler); err != nil {
 					b.Fatal(err)
 				}
 			}

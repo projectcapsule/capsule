@@ -67,6 +67,10 @@ func bookkeepingEvent(resource schema.GroupVersionResource, oldObject, object *u
 		return false
 	}
 
+	if !oldObject.GetDeletionTimestamp().Equal(object.GetDeletionTimestamp()) {
+		return false
+	}
+
 	oldAnnotations, newAnnotations := oldObject.GetAnnotations(), object.GetAnnotations()
 	for _, key := range []string{replication.TriggerAnnotation, meta.ReconcileAnnotation} {
 		delete(oldAnnotations, key)

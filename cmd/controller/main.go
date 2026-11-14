@@ -657,6 +657,7 @@ func main() {
 	labelSelectorCache := cache.NewLabelSelectorCache()
 
 	triggerRecorder := metrics.MustMakeTriggerRecorder()
+	preparedTriggers := cache.NewPreparedReplicationTriggers()
 
 	triggerDispatcher := resources.NewTriggerDispatcher(manager.GetClient(), manager.GetAPIReader(), ctrl.Log.WithName("replication-triggers"), triggerRecorder)
 	if err := manager.Add(triggerDispatcher); err != nil {
@@ -989,12 +990,13 @@ func main() {
 		controllerConfig,
 		impersonationCache,
 		celCache,
+		preparedTriggers,
 	); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "tenantresources")
 		os.Exit(1)
 	}
 
-	if err := resources.NewResourceWatches(manager.GetClient(), dynamicClient, manager.GetRESTMapper(), ctrl.Log.WithName("resource-watches"), celCache, labelSelectorCache, triggerDispatcher, triggerRecorder).SetupWithManager(manager, controllerConfig); err != nil {
+	if err := resources.NewResourceWatches(manager.GetClient(), dynamicClient, manager.GetRESTMapper(), ctrl.Log.WithName("resource-watches"), celCache, labelSelectorCache, preparedTriggers, triggerDispatcher, triggerRecorder).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create resource watch controller")
 		os.Exit(1)
 	}
