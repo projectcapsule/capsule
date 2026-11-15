@@ -45,7 +45,8 @@ func TestPreparedSubscriptionsValidateColdAndCurrentGenerations(t *testing.T) {
 	}
 	cel, _ := NewCELCache()
 	spec.Triggers[0].MatchConditions[0].Expression = "request.operation == 'UPDATE'"
-	if err := prepared.Validate("a", 2, spec, true, cel); err == nil {
+	// A persisted spec edit always increments generation.
+	if err := prepared.Validate("a", 3, spec, true, cel); err == nil {
 		t.Fatal("invalid CEL accepted without admission")
 	}
 }

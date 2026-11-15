@@ -64,7 +64,7 @@ func TestInvalidValidationDoesNotThrashTheCompileCache(t *testing.T) {
 		t.Fatal("planning forgot validation failure")
 	}
 	c.PruneActive(map[types.UID]int64{"a": 2})
-	if len(c.failures) != 0 {
+	if len(c.validations) != 0 {
 		t.Fatal("generation update retained old failure")
 	}
 	spec.Triggers[31].MatchConditions[59].Expression = "true"
@@ -88,17 +88,17 @@ func TestValidationFailurePublicationIsBoundedAndGenerationSafe(t *testing.T) {
 		t.Fatal("invalid edit retained its old programs")
 	}
 	c.Delete("a")
-	if len(c.failures) != 0 {
+	if len(c.validations) != 0 {
 		t.Fatal("deleted source retained a validation failure")
 	}
 	for index := range MaxPreparedReplications + 10 {
 		_ = c.Validate(types.UID(fmt.Sprint(index)), 1, spec, true, compiler)
 	}
-	if len(c.failures) != MaxPreparedReplications {
+	if len(c.validations) != MaxPreparedReplications {
 		t.Fatal("validation failure retention is unbounded")
 	}
 	c.PruneActive(map[types.UID]int64{})
-	if len(c.failures) != 0 {
+	if len(c.validations) != 0 {
 		t.Fatal("deleted sources survived pruning")
 	}
 	started, release := make(chan struct{}), make(chan struct{})
@@ -114,7 +114,7 @@ func TestValidationFailurePublicationIsBoundedAndGenerationSafe(t *testing.T) {
 	if err := <-done; err == nil {
 		t.Fatal("old invalid input unexpectedly validated")
 	}
-	if _, ok := c.Get("a", 2); !ok || len(c.failures) != 0 {
+	if _, ok := c.Get("a", 2); !ok || len(c.validations) != 0 {
 		t.Fatal("late failed validation poisoned a newer generation")
 	}
 }
@@ -173,7 +173,7 @@ func TestConcurrentValidationFailuresStayIsolated(t *testing.T) {
 		})
 	}
 	workers.Wait()
-	if len(c.failures) != 2 || calls.Load() > 32 {
-		t.Fatalf("concurrent failure reuse: entries=%d validations=%d", len(c.failures), calls.Load())
+	if len(c.validations) != 2 || calls.Load() > 32 {
+		t.Fatalf("concurrent failure reuse: entries=%d validations=%d", len(c.validations), calls.Load())
 	}
 }
