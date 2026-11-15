@@ -5,6 +5,7 @@ package resources
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"sort"
 
@@ -31,6 +32,41 @@ import (
 type resourceWatchIdentity struct {
 	account   cache.Key
 	transport capsulev1beta2.ServiceAccountClient
+}
+
+// Trust is sampled once per planning pass, outside event matching. Only the
+// selected CA bundle changes the stream revision, not unrelated Secret edits.
+type watchTrustRevision struct {
+	read   bool
+	bundle [sha256.Size]byte
+	err    error
+}
+
+func (key resourceWatchKey) usesCASecret() bool {
+	return key.identity.account != (cache.Key{}) && key.identity.transport.CASecretName != "" && !key.identity.transport.SkipTLSVerify
+}
+
+func (r *ResourceWatches) withWatchTrust(ctx context.Context, key resourceWatchKey, trust *watchTrustRevision) (resourceWatchKey, error) {
+	if !key.usesCASecret() {
+		return key, nil
+	}
+
+	if !trust.read {
+		trust.read = true
+
+		base, err := r.configuration.ServiceAccountClient(ctx)
+		if err != nil {
+			r.log.Error(err, "cannot load resource watch CA; periodic reconciliation remains active")
+		} else {
+			trust.bundle = sha256.Sum256(base.CAData)
+		}
+
+		trust.err = err
+	}
+
+	key.caBundle = trust.bundle
+
+	return key, trust.err
 }
 
 // Resolve through the same helpers as replication, with one configuration read
@@ -124,6 +160,12 @@ func (r *ResourceWatches) resourceInformer(ctx context.Context, key resourceWatc
 	base, err := r.configuration.ServiceAccountClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load watch execution configuration: %w", err)
+	}
+
+	// A second rotation between planning and construction must not publish a
+	// client under the previous trust revision. The next planning pass retries.
+	if key.usesCASecret() && sha256.Sum256(base.CAData) != key.caBundle {
+		return nil, fmt.Errorf("resource watch CA changed since planning")
 	}
 
 	// Clients have the bounded stream lifetime. Reusing a process-wide client

@@ -41,6 +41,7 @@ type resourceWatchKey struct {
 	resource  schema.GroupVersionResource
 	namespace string
 	identity  resourceWatchIdentity
+	caBundle  [sha256.Size]byte
 }
 
 // ResourceWatches shares namespace-scoped informers on the elected replica.
@@ -204,6 +205,8 @@ func (r *ResourceWatches) Reconcile(ctx context.Context, _ reconcile.Request) (r
 	sort.Slice(keys, func(i, j int) bool { return keys[i].String() < keys[j].String() })
 
 	desired := make(map[resourceWatchKey]schema.GroupVersionKind)
+	trust := watchTrustRevision{}
+
 	for _, resource := range keys {
 		if len(desired) >= maxResourceWatches {
 			omitted++
@@ -248,6 +251,13 @@ func (r *ResourceWatches) Reconcile(ctx context.Context, _ reconcile.Request) (r
 		streams := resourceWatchKeys(resource, resources[resource])
 		for _, key := range streams {
 			if len(desired) >= maxResourceWatches {
+				omitted++
+
+				continue
+			}
+
+			key, err = r.withWatchTrust(ctx, key, &trust)
+			if err != nil {
 				omitted++
 
 				continue
