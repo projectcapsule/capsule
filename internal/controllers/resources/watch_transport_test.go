@@ -100,7 +100,7 @@ func TestWatchEndpointUsesIdentitySnapshotInsteadOfLiveTransport(t *testing.T) {
 		t.Fatal(err)
 	}
 	local.Spec.ServiceAccount = &meta.LocalRFC1123ObjectReference{Name: "reader"}
-	local.Spec.Triggers[0].MatchConditions = []admissionv1.MatchCondition{{Name: "private-probe", Expression: "object.data.value == 'B-private'"}}
+	local.Spec.Triggers[0].MatchConditions = []capsulev1beta2.TenantResourceTriggerCondition{{Name: "private-probe", Expression: "object.data.value == 'B-private'"}}
 	local.Generation++
 	if err := f.client.Update(t.Context(), local); err != nil {
 		t.Fatal(err)

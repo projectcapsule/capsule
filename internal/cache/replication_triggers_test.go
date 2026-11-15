@@ -22,7 +22,7 @@ func (c *triggerValidationCounter) ValidateTriggerCondition(string) error { c.ca
 func TestPreparedSubscriptionsValidateColdAndCurrentGenerations(t *testing.T) {
 	prepared := NewPreparedReplicationTriggers()
 	compiler := &triggerValidationCounter{}
-	spec := &capsulev1beta2.TenantResourceCommonSpec{Triggers: []capsulev1beta2.TenantResourceTrigger{{Name: "events", Operations: []admissionv1.OperationType{admissionv1.Update}, APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"configmaps"}, MatchConditions: []admissionv1.MatchCondition{{Name: "changed", Expression: "object.data != oldObject.data"}}}}}
+	spec := &capsulev1beta2.TenantResourceCommonSpec{Triggers: []capsulev1beta2.TenantResourceTrigger{{Name: "events", Operations: []admissionv1.OperationType{admissionv1.Update}, APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"configmaps"}, MatchConditions: []capsulev1beta2.TenantResourceTriggerCondition{{Name: "changed", Expression: "object.data != oldObject.data"}}}}}
 	if err := prepared.Validate("a", 1, spec, true, compiler); err != nil || compiler.calls != 1 {
 		t.Fatalf("cold validation: calls=%d err=%v", compiler.calls, err)
 	}
@@ -177,7 +177,7 @@ func BenchmarkWatchSpecValidation(b *testing.B) {
 		b.Run(fmt.Sprintf("prepared=%t", prepared), func(b *testing.B) {
 			compiler, _ := NewCELCache()
 			cache := NewPreparedReplicationTriggers()
-			spec := &capsulev1beta2.TenantResourceCommonSpec{Triggers: []capsulev1beta2.TenantResourceTrigger{{Name: "events", Operations: []admissionv1.OperationType{admissionv1.Update}, APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"configmaps"}, MatchConditions: []admissionv1.MatchCondition{{Name: "changed", Expression: "object.data != oldObject.data"}}}}}
+			spec := &capsulev1beta2.TenantResourceCommonSpec{Triggers: []capsulev1beta2.TenantResourceTrigger{{Name: "events", Operations: []admissionv1.OperationType{admissionv1.Update}, APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"configmaps"}, MatchConditions: []capsulev1beta2.TenantResourceTriggerCondition{{Name: "changed", Expression: "object.data != oldObject.data"}}}}}
 			if err := cache.Validate("a", 1, spec, true, compiler); err != nil {
 				b.Fatal(err)
 			}

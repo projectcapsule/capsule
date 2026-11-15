@@ -38,7 +38,7 @@ func BenchmarkPreparedWatchMatching(b *testing.B) {
 					trigger.Name = fmt.Sprintf("source-%d", i)
 					trigger.ObjectSelector = &metav1.LabelSelector{MatchLabels: map[string]string{"source": trigger.Name}}
 					for condition := range size.conditions {
-						trigger.MatchConditions = append(trigger.MatchConditions, admissionv1.MatchCondition{Name: fmt.Sprintf("changed-%d", condition), Expression: "operation == 'UPDATE' && object.data != oldObject.data"})
+						trigger.MatchConditions = append(trigger.MatchConditions, capsulev1beta2.TenantResourceTriggerCondition{Name: fmt.Sprintf("changed-%d", condition), Expression: "operation == 'UPDATE' && object.data != oldObject.data"})
 					}
 					spec.Triggers = append(spec.Triggers, trigger)
 				}
@@ -112,6 +112,12 @@ func TestWatchTriggerValidation(t *testing.T) {
 		want string
 	}{
 		{"valid", func(*capsulev1beta2.TenantResourceTrigger) {}, ""},
+		{"namespaced-scope", func(s *capsulev1beta2.TenantResourceTrigger) { s.Scope = new(admissionv1.NamespacedScope) }, ""},
+		{"cluster-scope", func(s *capsulev1beta2.TenantResourceTrigger) { s.Scope = new(admissionv1.ClusterScope) }, "Namespaced"},
+		{"all-scopes", func(s *capsulev1beta2.TenantResourceTrigger) { s.Scope = new(admissionv1.AllScopes) }, "Namespaced"},
+		{"all-observed-operations", func(s *capsulev1beta2.TenantResourceTrigger) {
+			s.Operations = []admissionv1.OperationType{admissionv1.Create, admissionv1.Update, admissionv1.Delete}
+		}, ""},
 		{"wildcard-resource", func(s *capsulev1beta2.TenantResourceTrigger) { s.Resources = []string{"*"} }, "top-level"},
 		{"subresource", func(s *capsulev1beta2.TenantResourceTrigger) { s.Resources = []string{"deployments/scale"} }, "top-level"},
 		{"wildcard-group", func(s *capsulev1beta2.TenantResourceTrigger) { s.APIGroups = []string{"*"} }, "explicit"},
@@ -127,19 +133,19 @@ func TestWatchTriggerValidation(t *testing.T) {
 			s.Audience = []rules.Audience{{Kind: rules.AudienceKindUser, Name: "alice"}}
 		}, "request identities"},
 		{"request-cel", func(s *capsulev1beta2.TenantResourceTrigger) {
-			s.MatchConditions = []admissionv1.MatchCondition{{Name: "request", Expression: "request.operation == 'CREATE'"}}
+			s.MatchConditions = []capsulev1beta2.TenantResourceTriggerCondition{{Name: "request", Expression: "request.operation == 'CREATE'"}}
 		}, "undeclared"},
 		{"authorizer-cel", func(s *capsulev1beta2.TenantResourceTrigger) {
-			s.MatchConditions = []admissionv1.MatchCondition{{Name: "auth", Expression: "authorizer.group('apps').resource('deployments').check('create').allowed()"}}
+			s.MatchConditions = []capsulev1beta2.TenantResourceTriggerCondition{{Name: "auth", Expression: "authorizer.group('apps').resource('deployments').check('create').allowed()"}}
 		}, "undeclared"},
 		{"state-cel", func(s *capsulev1beta2.TenantResourceTrigger) {
-			s.MatchConditions = []admissionv1.MatchCondition{{Name: "state", Expression: "operation != 'UPDATE' || object.data != oldObject.data"}}
+			s.MatchConditions = []capsulev1beta2.TenantResourceTriggerCondition{{Name: "state", Expression: "operation != 'UPDATE' || object.data != oldObject.data"}}
 		}, ""},
 		{"invalid-cel", func(s *capsulev1beta2.TenantResourceTrigger) {
-			s.MatchConditions = []admissionv1.MatchCondition{{Name: "bad", Expression: "object["}}
+			s.MatchConditions = []capsulev1beta2.TenantResourceTriggerCondition{{Name: "bad", Expression: "object["}}
 		}, "compile"},
 		{"non-boolean", func(s *capsulev1beta2.TenantResourceTrigger) {
-			s.MatchConditions = []admissionv1.MatchCondition{{Name: "bad", Expression: "object.metadata.name"}}
+			s.MatchConditions = []capsulev1beta2.TenantResourceTriggerCondition{{Name: "bad", Expression: "object.metadata.name"}}
 		}, "bool"},
 		{"namespace-selector-local", func(s *capsulev1beta2.TenantResourceTrigger) { s.NamespaceSelector = &metav1.LabelSelector{} }, "only supported"},
 		{"empty-operations", func(s *capsulev1beta2.TenantResourceTrigger) { s.Operations = nil }, "requires"},
@@ -168,7 +174,7 @@ func TestPreparedWatchConditionsAndSelectors(t *testing.T) {
 	trigger := watchTrigger()
 	trigger.NamespaceSelector = selector
 	trigger.ObjectSelector = &metav1.LabelSelector{MatchLabels: map[string]string{"source": "yes"}}
-	trigger.MatchConditions = []admissionv1.MatchCondition{{Name: "state", Expression: "operation != 'UPDATE' || object.data != oldObject.data"}}
+	trigger.MatchConditions = []capsulev1beta2.TenantResourceTriggerCondition{{Name: "state", Expression: "operation != 'UPDATE' || object.data != oldObject.data"}}
 	spec := &capsulev1beta2.TenantResourceCommonSpec{Triggers: []capsulev1beta2.TenantResourceTrigger{trigger}}
 	prepared, err := replication.PrepareTriggers(spec, false, cache.NewLabelSelectorCache(), compiler)
 	if err != nil {

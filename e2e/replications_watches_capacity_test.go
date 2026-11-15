@@ -43,7 +43,7 @@ var _ = Describe("Replication watch preparation capacity", Serial, Label("replic
 				trigger.Name = fmt.Sprintf("events-%d", triggerIndex)
 				trigger.MatchConditions = nil
 				for condition := range 60 {
-					trigger.MatchConditions = append(trigger.MatchConditions, admissionv1.MatchCondition{Name: fmt.Sprintf("condition-%d", condition), Expression: "true"})
+					trigger.MatchConditions = append(trigger.MatchConditions, capsulev1beta2.TenantResourceTriggerCondition{Name: fmt.Sprintf("condition-%d", condition), Expression: "true"})
 				}
 				spec.Triggers = append(spec.Triggers, trigger)
 			}

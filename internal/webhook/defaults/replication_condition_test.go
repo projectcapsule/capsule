@@ -75,7 +75,7 @@ func BenchmarkReplicationWatchConfigurationConversion(b *testing.B) {
 			decoder := admission.NewDecoder(scheme)
 			spec := capsulev1beta2.TenantResourceCommonSpec{Resources: []capsulev1beta2.ResourceSpec{{Policy: &apiruntime.ResourceReplicationPolicy{}}}}
 			for i := range count {
-				spec.Triggers = append(spec.Triggers, capsulev1beta2.TenantResourceTrigger{Name: fmt.Sprintf("source-%d", i), Operations: []registrationv1.OperationType{registrationv1.Update}, APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"configmaps"}, MatchConditions: []registrationv1.MatchCondition{{Name: "state", Expression: "object != null"}}})
+				spec.Triggers = append(spec.Triggers, capsulev1beta2.TenantResourceTrigger{Name: fmt.Sprintf("source-%d", i), Operations: []registrationv1.OperationType{registrationv1.Update}, APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"configmaps"}, MatchConditions: []capsulev1beta2.TenantResourceTriggerCondition{{Name: "state", Expression: "object != null"}}})
 			}
 			req := replicationPolicyRequest(b, "TenantResource", spec)
 			run := func() {
@@ -99,7 +99,7 @@ func TestReplicationPolicyConversionDoesNotValidateWatchTriggers(t *testing.T) {
 	}
 	decoder := admission.NewDecoder(scheme)
 	for _, kind := range []string{"TenantResource", "GlobalTenantResource"} {
-		spec := capsulev1beta2.TenantResourceCommonSpec{Triggers: []capsulev1beta2.TenantResourceTrigger{{Name: "events", Operations: []registrationv1.OperationType{registrationv1.Update}, APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"configmaps"}, MatchConditions: []registrationv1.MatchCondition{{Name: "invalid", Expression: "request.operation == 'UPDATE'"}}}}, Resources: []capsulev1beta2.ResourceSpec{{}}}
+		spec := capsulev1beta2.TenantResourceCommonSpec{Triggers: []capsulev1beta2.TenantResourceTrigger{{Name: "events", Operations: []registrationv1.OperationType{registrationv1.Update}, APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"configmaps"}, MatchConditions: []capsulev1beta2.TenantResourceTriggerCondition{{Name: "invalid", Expression: "request.operation == 'UPDATE'"}}}}, Resources: []capsulev1beta2.ResourceSpec{{}}}
 		response := mutateReplicationPolicy(replicationPolicyRequest(t, kind, spec), decoder, nil)
 		if response == nil || !response.Allowed || len(response.Patches) != 1 {
 			t.Fatalf("%s: trigger configuration affected policy conversion: %#v", kind, response)

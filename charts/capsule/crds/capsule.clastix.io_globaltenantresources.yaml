@@ -562,18 +562,15 @@ spec:
                   properties:
                     apiGroups:
                       description: |-
-                        apiGroups is the API groups the resources belong to. '*' is all groups.
-                        If '*' is present, the length of the slice must be one.
-                        Required.
+                        APIGroups selects explicit API groups. Use "" for the core API group.
+                        Wildcards are unsupported.
                       items:
                         type: string
                       type: array
                       x-kubernetes-list-type: atomic
                     apiVersions:
-                      description: |-
-                        apiVersions is the API versions the resources belong to. '*' is all versions.
-                        If '*' is present, the length of the slice must be one.
-                        Required.
+                      description: APIVersions selects explicit API versions, such
+                        as "v1". Wildcards are unsupported.
                       items:
                         type: string
                       type: array
@@ -602,36 +599,21 @@ spec:
                       description: MatchConditions are CEL conditions over object,
                         oldObject and operation. All must match.
                       items:
-                        description: MatchCondition represents a condition which must
-                          by fulfilled for a request to be sent to a webhook.
+                        description: TenantResourceTriggerCondition filters an observed
+                          resource change using CEL.
                         properties:
                           expression:
                             description: |-
-                              expression represents the expression which will be evaluated by CEL. Must evaluate to bool.
-                              CEL expressions have access to the contents of the AdmissionRequest and Authorizer, organized into CEL variables:
-
-                              'object' - The object from the incoming request. The value is null for DELETE requests.
-                              'oldObject' - The existing object. The value is null for CREATE requests.
-                              'request' - Attributes of the admission request(/pkg/apis/admission/types.go#AdmissionRequest).
-                              'authorizer' - A CEL Authorizer. May be used to perform authorization checks for the principal (user or service account) of the request.
-                                See https://pkg.go.dev/k8s.io/apiserver/pkg/cel/library#Authz
-                              'authorizer.requestResource' - A CEL ResourceCheck constructed from the 'authorizer' and configured with the
-                                request resource.
-                              Documentation on CEL: https://kubernetes.io/docs/reference/using-api/cel/
-
-                              Required.
+                              Expression must evaluate to bool using only the observed event variables:
+                              object is the new persisted object (null for DELETE), oldObject is the previous
+                              persisted object (null for CREATE), and operation is "CREATE", "UPDATE", or "DELETE".
+                              Admission request and authorizer variables are unavailable. For example:
+                              operation != 'UPDATE' || object.data != oldObject.data
                             type: string
                           name:
                             description: |-
-                              name is an identifier for this match condition, used for strategic merging of MatchConditions,
-                              as well as providing an identifier for logging purposes. A good name should be descriptive of
-                              the associated expression.
-                              Name must be a qualified name consisting of alphanumeric characters, '-', '_' or '.', and
-                              must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or
-                              '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]') with an
-                              optional DNS subdomain prefix and '/' (e.g. 'example.com/MyName')
-
-                              Required.
+                              Name uniquely identifies this condition within a trigger. It must be a Kubernetes
+                              qualified name, optionally prefixed with a DNS subdomain and '/'.
                             type: string
                         required:
                         - expression
@@ -745,10 +727,8 @@ spec:
                       x-kubernetes-map-type: atomic
                     operations:
                       description: |-
-                        operations is the operations the admission hook cares about - CREATE, UPDATE, DELETE, CONNECT or *
-                        for all of those operations and any future admission operations that are added.
-                        If '*' is present, the length of the slice must be one.
-                        Required.
+                        Operations selects observed CREATE, UPDATE, and DELETE events.
+                        A single "*" selects all three. CONNECT is unsupported by watches.
                       items:
                         description: OperationType specifies an operation for a request.
                         type: string
@@ -756,35 +736,15 @@ spec:
                       x-kubernetes-list-type: atomic
                     resources:
                       description: |-
-                        resources is a list of resources this rule applies to.
-
-                        For example:
-                        'pods' means pods.
-                        'pods/log' means the log subresource of pods.
-                        '*' means all resources, but not subresources.
-                        'pods/*' means all subresources of pods.
-                        '*/scale' means all scale subresources.
-                        '*/*' means all resources and their subresources.
-
-                        If wildcard is present, the validation rule will ensure resources do not
-                        overlap with each other.
-
-                        Depending on the enclosing object, subresources might not be allowed.
-                        Required.
+                        Resources selects explicit plural top-level resource names, such as "configmaps".
+                        Wildcards are unsupported. Subresources, such as "pods/log", are unsupported.
                       items:
                         type: string
                       type: array
                       x-kubernetes-list-type: atomic
                     scope:
-                      description: |-
-                        scope specifies the scope of this rule.
-                        Valid values are "Cluster", "Namespaced", and "*"
-                        "Cluster" means that only cluster-scoped resources will match this rule.
-                        Namespace API objects are cluster-scoped.
-                        "Namespaced" means that only namespaced resources will match this rule.
-                        "*" means that there are no scope restrictions.
-                        Subresources match the scope of their parent resource.
-                        Default is "*".
+                      description: Scope may be omitted or set to "Namespaced". Watches
+                        only observe namespaced resources.
                       type: string
                   required:
                   - name

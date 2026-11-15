@@ -46,7 +46,24 @@ type TenantResourceTriggerStatus struct {
 // Resource behavior and replication destinations remain defined by resources.
 // +kubebuilder:validation:XValidation:rule="has(self.operations) && size(self.operations) <= 3 && has(self.apiGroups) && has(self.apiVersions) && has(self.resources) && size(self.apiGroups) <= 8 && size(self.apiVersions) <= 8 && size(self.resources) <= 8 && size(self.apiGroups) * size(self.apiVersions) * size(self.resources) <= 16",message="watch triggers require at most 16 explicit group/version/resource combinations"
 type TenantResourceTrigger struct {
-	admissionv1.RuleWithOperations `json:",inline"`
+	// Operations selects observed CREATE, UPDATE, and DELETE events.
+	// A single "*" selects all three. CONNECT is unsupported by watches.
+	// +listType=atomic
+	Operations []admissionv1.OperationType `json:"operations,omitempty"`
+	// APIGroups selects explicit API groups. Use "" for the core API group.
+	// Wildcards are unsupported.
+	// +listType=atomic
+	APIGroups []string `json:"apiGroups,omitempty"`
+	// APIVersions selects explicit API versions, such as "v1". Wildcards are unsupported.
+	// +listType=atomic
+	APIVersions []string `json:"apiVersions,omitempty"`
+	// Resources selects explicit plural top-level resource names, such as "configmaps".
+	// Wildcards are unsupported. Subresources, such as "pods/log", are unsupported.
+	// +listType=atomic
+	Resources []string `json:"resources,omitempty"`
+	// Scope may be omitted or set to "Namespaced". Watches only observe namespaced resources.
+	// +optional
+	Scope *admissionv1.ScopeType `json:"scope,omitempty"`
 
 	// Name uniquely identifies this trigger.
 	// +kubebuilder:validation:MinLength=1
@@ -69,7 +86,20 @@ type TenantResourceTrigger struct {
 	// +kubebuilder:validation:MaxItems=60
 	// +listType=map
 	// +listMapKey=name
-	MatchConditions []admissionv1.MatchCondition `json:"matchConditions,omitempty"`
+	MatchConditions []TenantResourceTriggerCondition `json:"matchConditions,omitempty"`
+}
+
+// TenantResourceTriggerCondition filters an observed resource change using CEL.
+type TenantResourceTriggerCondition struct {
+	// Name uniquely identifies this condition within a trigger. It must be a Kubernetes
+	// qualified name, optionally prefixed with a DNS subdomain and '/'.
+	Name string `json:"name"`
+	// Expression must evaluate to bool using only the observed event variables:
+	// object is the new persisted object (null for DELETE), oldObject is the previous
+	// persisted object (null for CREATE), and operation is "CREATE", "UPDATE", or "DELETE".
+	// Admission request and authorizer variables are unavailable. For example:
+	// operation != 'UPDATE' || object.data != oldObject.data
+	Expression string `json:"expression"`
 }
 
 type TenantResourceCommonSpec struct {

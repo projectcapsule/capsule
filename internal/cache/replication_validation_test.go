@@ -31,7 +31,7 @@ func validationSpec(count int) *capsulev1beta2.TenantResourceCommonSpec {
 			spec.Triggers = append(spec.Triggers, capsulev1beta2.TenantResourceTrigger{Name: fmt.Sprintf("events-%d", index/60), Operations: []admissionv1.OperationType{admissionv1.Update}, APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"configmaps"}})
 		}
 		trigger := &spec.Triggers[len(spec.Triggers)-1]
-		trigger.MatchConditions = append(trigger.MatchConditions, admissionv1.MatchCondition{Name: fmt.Sprintf("condition-%d", index), Expression: fmt.Sprintf("object.metadata.name != 'value-%d'", index)})
+		trigger.MatchConditions = append(trigger.MatchConditions, capsulev1beta2.TenantResourceTriggerCondition{Name: fmt.Sprintf("condition-%d", index), Expression: fmt.Sprintf("object.metadata.name != 'value-%d'", index)})
 	}
 	return spec
 }

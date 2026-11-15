@@ -37,7 +37,7 @@ func TestWatchEventsNeverEvaluateAnotherExecutionIdentity(t *testing.T) {
 				t.Fatal(err)
 			}
 			local.Spec.ServiceAccount = &meta.LocalRFC1123ObjectReference{Name: "restricted"}
-			local.Spec.Triggers[0].MatchConditions = []admissionv1.MatchCondition{{Name: "private-predicate", Expression: expression}}
+			local.Spec.Triggers[0].MatchConditions = []capsulev1beta2.TenantResourceTriggerCondition{{Name: "private-predicate", Expression: expression}}
 			local.Generation++
 			if err := f.client.Update(t.Context(), local); err != nil {
 				t.Fatal(err)

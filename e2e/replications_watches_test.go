@@ -16,6 +16,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/watch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -67,7 +69,7 @@ func watchNamespaces(prefix string) ([]rbac.UserSpec, []*corev1.Namespace) {
 }
 
 func watchRule(prefix string) capsulev1beta2.TenantResourceTrigger {
-	return capsulev1beta2.TenantResourceTrigger{Name: "changes", Operations: []admissionv1.OperationType{admissionv1.OperationAll}, APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"configmaps"}, ObjectSelector: &metav1.LabelSelector{MatchLabels: map[string]string{watchSourceLabel: prefix}}, MatchConditions: []admissionv1.MatchCondition{{Name: "data-changed", Expression: "operation != 'UPDATE' || object.data != oldObject.data"}}}
+	return capsulev1beta2.TenantResourceTrigger{Name: "changes", Operations: []admissionv1.OperationType{admissionv1.OperationAll}, APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"configmaps"}, ObjectSelector: &metav1.LabelSelector{MatchLabels: map[string]string{watchSourceLabel: prefix}}, MatchConditions: []capsulev1beta2.TenantResourceTriggerCondition{{Name: "data-changed", Expression: "operation != 'UPDATE' || object.data != oldObject.data"}}}
 }
 
 func watchBody(prefix, sourceNamespace, output string) capsulev1beta2.TenantResourceCommonSpec {
@@ -132,11 +134,48 @@ func changeWatchInput(actor client.Client, source *corev1.ConfigMap, value strin
 	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 }
 
+func expectWatchAPIHelp(ctx context.Context) {
+	GinkgoHelper()
+	for _, name := range []string{"tenantresources", "globaltenantresources"} {
+		crd := &unstructured.Unstructured{}
+		crd.SetGroupVersionKind(schema.GroupVersionKind{Group: "apiextensions.k8s.io", Version: "v1", Kind: "CustomResourceDefinition"})
+		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: name + "." + capsulev1beta2.GroupVersion.Group}, crd)).To(Succeed())
+		versions, found, err := unstructured.NestedSlice(crd.Object, "spec", "versions")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(found).To(BeTrue())
+		checked := false
+		for _, version := range versions {
+			value := version.(map[string]any)
+			if value["name"] != "v1beta2" {
+				continue
+			}
+			properties, found, err := unstructured.NestedMap(value, "schema", "openAPIV3Schema", "properties", "spec", "properties", "triggers", "items", "properties")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(found).To(BeTrue())
+			for _, field := range []string{"apiGroups", "apiVersions", "resources"} {
+				Expect(properties[field].(map[string]any)["description"]).To(ContainSubstring("Wildcards are unsupported"), field)
+			}
+			Expect(properties["operations"].(map[string]any)["description"]).To(ContainSubstring("CONNECT is unsupported"))
+			Expect(properties["scope"].(map[string]any)["description"]).To(ContainSubstring(`omitted or set to "Namespaced"`))
+			expression, found, err := unstructured.NestedString(properties, "matchConditions", "items", "properties", "expression", "description")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(found).To(BeTrue())
+			Expect(expression).To(ContainSubstring("operation != 'UPDATE' || object.data != oldObject.data"))
+			Expect(expression).To(ContainSubstring("Admission request and authorizer variables are unavailable"))
+			Expect(expression).NotTo(ContainSubstring("'request' -"))
+			checked = true
+		}
+		Expect(checked).To(BeTrue(), name+" v1beta2 schema must be installed")
+	}
+}
+
 var _ = Describe("Replication resource watches", Label("replications", "replication-watches"), func() {
 	It("observes persisted state with namespace profiles, CEL, managed exclusion and tenant isolation", func() {
 		ctx := context.Background()
 		prefix := "watch-profile-" + rand.String(6)
 		owners, namespaces := watchNamespaces(prefix)
+		By("exposing watch-specific API help for the event filters used below")
+		expectWatchAPIHelp(ctx)
 		actor := impersonationClient(owners[0].Name, withDefaultGroups(nil))
 		source := &corev1.ConfigMap{Name: prefix + "-input", Namespace: namespaces[0].Name, Labels: map[string]string{watchSourceLabel: prefix, watchInputLabel: prefix}, Data: map[string]string{"value": "initial"}}
 		Expect(actor.Create(ctx, source)).To(Succeed())
@@ -302,6 +341,15 @@ var _ = Describe("Replication resource watches", Label("replications", "replicat
 			{"request", func(trigger *capsulev1beta2.TenantResourceTrigger) {
 				trigger.MatchConditions[0].Expression = "request.userInfo.username == 'alice'"
 			}, "undeclared"},
+			{"authorizer", func(trigger *capsulev1beta2.TenantResourceTrigger) {
+				trigger.MatchConditions[0].Expression = "authorizer.group('apps').resource('deployments').check('create').allowed()"
+			}, "undeclared"},
+			{"connect", func(trigger *capsulev1beta2.TenantResourceTrigger) {
+				trigger.Operations = []admissionv1.OperationType{admissionv1.Connect}
+			}, "unsupported operation"},
+			{"wildcard-group", func(trigger *capsulev1beta2.TenantResourceTrigger) { trigger.APIGroups = []string{"*"} }, "explicit valid groups"},
+			{"wildcard-version", func(trigger *capsulev1beta2.TenantResourceTrigger) { trigger.APIVersions = []string{"*"} }, "explicit valid versions"},
+			{"cluster-scope", func(trigger *capsulev1beta2.TenantResourceTrigger) { trigger.Scope = new(admissionv1.ClusterScope) }, "scope must be Namespaced"},
 			{"wildcard", func(trigger *capsulev1beta2.TenantResourceTrigger) { trigger.Resources = []string{"*"} }, "explicit top-level"},
 			{"subresource", func(trigger *capsulev1beta2.TenantResourceTrigger) { trigger.Resources = []string{"deployments/scale"} }, "explicit top-level"},
 		} {
@@ -385,7 +433,7 @@ var _ = Describe("Replication resource watches", Label("replications", "replicat
 		restricted.NamespaceSelector = &metav1.LabelSelector{MatchLabels: map[string]string{"projectcapsule.dev/watch-case": "excluded-" + prefix}}
 		open := watchRule(prefix)
 		open.Name, open.Operations = "unrestricted", []admissionv1.OperationType{admissionv1.Update}
-		open.MatchConditions = []admissionv1.MatchCondition{{Name: "source-namespace", Expression: fmt.Sprintf("object.metadata.namespace == '%s'", namespaces[0].Name)}}
+		open.MatchConditions = []capsulev1beta2.TenantResourceTriggerCondition{{Name: "source-namespace", Expression: fmt.Sprintf("object.metadata.namespace == '%s'", namespaces[0].Name)}}
 		common := capsulev1beta2.TenantResourceCommonSpec{Triggers: []capsulev1beta2.TenantResourceTrigger{restricted, open}, ResyncPeriod: metav1.Duration{Duration: 24 * time.Hour}, TriggerMinInterval: metav1.Duration{Duration: time.Second}, Resources: []capsulev1beta2.ResourceSpec{}}
 		target := &capsulev1beta2.GlobalTenantResource{Name: prefix, Spec: capsulev1beta2.GlobalTenantResourceSpec{Scope: "Namespace", TenantSelector: metav1.LabelSelector{MatchLabels: map[string]string{"projectcapsule.dev/watch-tenant": "0" + prefix}}, TenantResourceCommonSpec: common}}
 		Expect(k8sClient.Create(ctx, target)).To(Succeed())

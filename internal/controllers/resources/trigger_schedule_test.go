@@ -39,7 +39,7 @@ func TestControllersReportInvalidWatchCELWithoutAdmission(t *testing.T) {
 			if err := capsulev1beta2.AddToScheme(scheme); err != nil {
 				t.Fatal(err)
 			}
-			common := capsulev1beta2.TenantResourceCommonSpec{Cordoned: new(false), ResyncPeriod: metav1.Duration{Duration: time.Hour}, Triggers: []capsulev1beta2.TenantResourceTrigger{{Name: "events", Operations: []admissionv1.OperationType{admissionv1.Update}, APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"configmaps"}, MatchConditions: []admissionv1.MatchCondition{{Name: "invalid", Expression: "request.operation == 'UPDATE'"}}}}}
+			common := capsulev1beta2.TenantResourceCommonSpec{Cordoned: new(false), ResyncPeriod: metav1.Duration{Duration: time.Hour}, Triggers: []capsulev1beta2.TenantResourceTrigger{{Name: "events", Operations: []admissionv1.OperationType{admissionv1.Update}, APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"configmaps"}, MatchConditions: []capsulev1beta2.TenantResourceTriggerCondition{{Name: "invalid", Expression: "request.operation == 'UPDATE'"}}}}}
 			var object client.Object
 			if global {
 				object = &capsulev1beta2.GlobalTenantResource{Name: "invalid", UID: "invalid-global", Generation: 2, Spec: capsulev1beta2.GlobalTenantResourceSpec{TenantResourceCommonSpec: common}}

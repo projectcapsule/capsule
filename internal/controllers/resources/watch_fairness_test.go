@@ -54,7 +54,7 @@ func fairWatchSource(namespace, name, account string, large bool) *capsulev1beta
 	if large {
 		count = 32
 		for index := range 60 {
-			trigger.MatchConditions = append(trigger.MatchConditions, admissionv1.MatchCondition{Name: fmt.Sprintf("condition-%d", index), Expression: "true"})
+			trigger.MatchConditions = append(trigger.MatchConditions, capsulev1beta2.TenantResourceTriggerCondition{Name: fmt.Sprintf("condition-%d", index), Expression: "true"})
 		}
 	}
 	for index := range count {
