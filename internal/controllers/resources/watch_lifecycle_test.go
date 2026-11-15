@@ -35,9 +35,9 @@ func TestSharedWatchStartupInitialListAndShutdown(t *testing.T) {
 	}
 	var watchStarts atomic.Int64
 	informer := dynamicinformer.NewFilteredDynamicInformer(dynamic, configMapsGVR, metav1.NamespaceAll, 0, clientcache.Indexers{}, nil).Informer()
-	f.watcher.newInformer = func(schema.GroupVersionResource, string) clientcache.SharedIndexInformer {
+	f.watcher.newInformer = func(context.Context, resourceWatchKey, schema.GroupVersionKind) (clientcache.SharedIndexInformer, error) {
 		watchStarts.Add(1)
-		return informer
+		return informer, nil
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
@@ -127,7 +127,7 @@ func TestBookkeepingComparisonPreservesUserChanges(t *testing.T) {
 	f := watchFixtureFor(t, 0)
 	canceled, cancel := context.WithCancel(t.Context())
 	cancel()
-	f.watcher.enqueueEvent(canceled, resource, admissionv1.Create, nil, after)
+	f.watcher.enqueueEvent(canceled, resource, resourceWatchIdentity{}, admissionv1.Create, nil, after)
 	if len(f.watcher.events) != 0 {
 		t.Fatal("canceled stream accepted an event")
 	}

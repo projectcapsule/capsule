@@ -8,7 +8,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"maps"
 	"sort"
 	"sync"
 	"time"
@@ -31,6 +30,8 @@ import (
 	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 	"github.com/projectcapsule/capsule/pkg/runtime/replication"
 )
 
@@ -39,42 +40,49 @@ const maxResourceWatches = 64
 type resourceWatchKey struct {
 	resource  schema.GroupVersionResource
 	namespace string
+	identity  resourceWatchIdentity
 }
 
 // ResourceWatches shares namespace-scoped informers on the elected replica.
-// A global subscription replaces local informers for the same GVR.
+// Stream sharing preserves each subscription's execution identity and scope.
 // The controller maintains the watch set; event handling uses the registered
 // manager-cache index and immutable prepared source projections.
 type ResourceWatches struct {
-	newInformer func(schema.GroupVersionResource, string) clientcache.SharedIndexInformer
-	client      client.Client
-	dynamic     dynamic.Interface
-	mapper      apimeta.RESTMapper
-	log         logr.Logger
-	conditions  *cache.CELCache
-	selectors   *cache.LabelSelectorCache
-	prepared    *cache.PreparedReplicationTriggers
-	notifier    replication.Notifier
-	metrics     *metrics.TriggerRecorder
-	mu          sync.Mutex
-	desired     map[resourceWatchKey]schema.GroupVersionKind
-	changed     chan struct{}
-	events      chan resourceWatchEvent
+	newInformer       func(context.Context, resourceWatchKey, schema.GroupVersionKind) (clientcache.SharedIndexInformer, error)
+	client            client.Client
+	configuration     configuration.Configuration
+	configurationName string
+	dynamic           dynamic.Interface
+	mapper            apimeta.RESTMapper
+	log               logr.Logger
+	conditions        *cache.CELCache
+	selectors         *cache.LabelSelectorCache
+	prepared          *cache.PreparedReplicationTriggers
+	notifier          replication.Notifier
+	metrics           *metrics.TriggerRecorder
+	mu                sync.Mutex
+	desired           map[resourceWatchKey]schema.GroupVersionKind
+	changed           chan struct{}
+	events            chan resourceWatchEvent
 }
 
-func NewResourceWatches(c client.Client, dyn dynamic.Interface, mapper apimeta.RESTMapper, log logr.Logger, conditions *cache.CELCache, selectors *cache.LabelSelectorCache, prepared *cache.PreparedReplicationTriggers, notifier replication.Notifier, recorder *metrics.TriggerRecorder) *ResourceWatches {
-	return &ResourceWatches{client: c, dynamic: dyn, mapper: mapper, log: log, conditions: conditions, selectors: selectors, prepared: prepared, notifier: notifier, metrics: recorder, desired: make(map[resourceWatchKey]schema.GroupVersionKind), changed: make(chan struct{}, 1), events: make(chan resourceWatchEvent, 256)}
+func NewResourceWatches(c client.Client, dyn dynamic.Interface, mapper apimeta.RESTMapper, log logr.Logger, cfg configuration.Configuration, conditions *cache.CELCache, selectors *cache.LabelSelectorCache, prepared *cache.PreparedReplicationTriggers, notifier replication.Notifier, recorder *metrics.TriggerRecorder) *ResourceWatches {
+	return &ResourceWatches{client: c, dynamic: dyn, mapper: mapper, log: log, configuration: cfg, conditions: conditions, selectors: selectors, prepared: prepared, notifier: notifier, metrics: recorder, desired: make(map[resourceWatchKey]schema.GroupVersionKind), changed: make(chan struct{}, 1), events: make(chan resourceWatchEvent, 256)}
 }
 
 func (r *ResourceWatches) NeedLeaderElection() bool { return true }
 
 func (r *ResourceWatches) SetupWithManager(mgr ctrl.Manager, options utils.ControllerOptions) error {
+	r.configurationName = options.ConfigurationName
+
 	enqueue := handler.EnqueueRequestsFromMapFunc(func(context.Context, client.Object) []reconcile.Request {
 		return []reconcile.Request{{Name: "resource-watches"}}
 	})
+
 	if err := ctrl.NewControllerManagedBy(mgr).Named("capsule/resources/watches").
 		Watches(&capsulev1beta2.TenantResource{}, enqueue, builder.WithPredicates(watchSubscriptionChanged())).
 		Watches(&capsulev1beta2.GlobalTenantResource{}, enqueue, builder.WithPredicates(watchSubscriptionChanged())).
+		Watches(&capsulev1beta2.CapsuleConfiguration{}, enqueue, builder.WithPredicates(predicates.CapsuleConfigSpecImpersonationChangedPredicate{}, predicates.NamesMatchingPredicate{Names: []string{options.ConfigurationName}})).
 		WithOptions(options.Runtime.ToControllerOptions()).Complete(reconcile.Func(func(ctx context.Context, _ reconcile.Request) (reconcile.Result, error) {
 		return r.Reconcile(ctx, reconcile.Request{})
 	})); err != nil {
@@ -113,6 +121,10 @@ func watchSubscriptionChanged() predicate.Predicate {
 }
 
 func (r *ResourceWatches) Reconcile(ctx context.Context, _ reconcile.Request) (reconcile.Result, error) {
+	if r.configuration == nil {
+		return reconcile.Result{}, fmt.Errorf("watch execution configuration is unavailable")
+	}
+
 	local := &capsulev1beta2.TenantResourceList{}
 	global := &capsulev1beta2.GlobalTenantResourceList{}
 
@@ -145,8 +157,13 @@ func (r *ResourceWatches) Reconcile(ctx context.Context, _ reconcile.Request) (r
 		return a.GetNamespace()+"/"+a.GetName() < b.GetNamespace()+"/"+b.GetName()
 	})
 
-	resources := make(map[schema.GroupVersionResource]map[string]struct{})
+	resources := make(map[schema.GroupVersionResource]map[resourceWatchIdentity]map[string]struct{})
 	omitted := 0
+
+	props, err := r.watchProperties(ctx)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
 
 	for _, source := range sources {
 		prepared, err := r.prepareSource(source)
@@ -160,11 +177,19 @@ func (r *ResourceWatches) Reconcile(ctx context.Context, _ reconcile.Request) (r
 			continue
 		}
 
+		identity := watchIdentity(source, props)
+
 		for _, resource := range prepared.Resources() {
-			namespaces := resources[resource]
+			identities := resources[resource]
+			if identities == nil {
+				identities = make(map[resourceWatchIdentity]map[string]struct{})
+				resources[resource] = identities
+			}
+
+			namespaces := identities[identity]
 			if namespaces == nil {
 				namespaces = make(map[string]struct{})
-				resources[resource] = namespaces
+				identities[identity] = namespaces
 			}
 
 			namespaces[source.GetNamespace()] = struct{}{}
@@ -220,42 +245,28 @@ func (r *ResourceWatches) Reconcile(ctx context.Context, _ reconcile.Request) (r
 			continue
 		}
 
-		namespaces := resources[resource]
-		if _, global := namespaces[""]; global {
-			desired[resourceWatchKey{resource: resource}] = kind
-
-			continue
-		}
-
-		orderedNamespaces := make([]string, 0, len(namespaces))
-		for namespace := range namespaces {
-			orderedNamespaces = append(orderedNamespaces, namespace)
-		}
-
-		sort.Strings(orderedNamespaces)
-
-		for _, namespace := range orderedNamespaces {
+		streams := resourceWatchKeys(resource, resources[resource])
+		for _, key := range streams {
 			if len(desired) >= maxResourceWatches {
 				omitted++
 
 				continue
 			}
 
-			desired[resourceWatchKey{resource: resource, namespace: namespace}] = kind
+			desired[key] = kind
 		}
 	}
 
 	r.metrics.OmittedWatches.Set(float64(omitted))
 	r.mu.Lock()
-	changed := !maps.Equal(r.desired, desired)
 	r.desired = desired
 	r.mu.Unlock()
 
-	if changed {
-		select {
-		case r.changed <- struct{}{}:
-		default:
-		}
+	// Also retry streams whose construction failed (for example while the
+	// configured CA Secret was unavailable). Healthy streams are reused.
+	select {
+	case r.changed <- struct{}{}:
+	default:
 	}
 
 	return reconcile.Result{RequeueAfter: 30 * time.Second}, nil

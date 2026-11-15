@@ -84,7 +84,7 @@ func ImpersonatedKubernetesClientForServiceAccount(
 		UserName: GetServiceAccountFullName(reference),
 	}
 
-	k8sClient, err := client.New(imp, client.Options{Scheme: scheme})
+	k8sClient, err := client.NewWithWatch(imp, client.Options{Scheme: scheme})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create impersonated client: %w", err)
 	}

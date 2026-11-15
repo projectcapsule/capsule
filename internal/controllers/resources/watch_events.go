@@ -27,6 +27,7 @@ type resourceWatchEvent struct {
 	resource          schema.GroupVersionResource
 	operation         admissionv1.OperationType
 	oldObject, object *unstructured.Unstructured
+	identity          resourceWatchIdentity
 }
 
 func watchObject(value any) *unstructured.Unstructured {
@@ -82,7 +83,7 @@ func bookkeepingEvent(resource schema.GroupVersionResource, oldObject, object *u
 	return maps.Equal(oldAnnotations, newAnnotations)
 }
 
-func (r *ResourceWatches) enqueueEvent(ctx context.Context, resource schema.GroupVersionResource, operation admissionv1.OperationType, oldValue, value any) {
+func (r *ResourceWatches) enqueueEvent(ctx context.Context, resource schema.GroupVersionResource, identity resourceWatchIdentity, operation admissionv1.OperationType, oldValue, value any) {
 	if ctx.Err() != nil {
 		return
 	}
@@ -105,7 +106,7 @@ func (r *ResourceWatches) enqueueEvent(ctx context.Context, resource schema.Grou
 		}
 	}
 
-	event := resourceWatchEvent{done: ctx.Done(), resource: resource, operation: operation, oldObject: oldObject, object: object}
+	event := resourceWatchEvent{done: ctx.Done(), resource: resource, identity: identity, operation: operation, oldObject: oldObject, object: object}
 	select {
 	case r.events <- event:
 		r.metrics.Events.WithLabelValues("queued").Inc()
@@ -115,6 +116,10 @@ func (r *ResourceWatches) enqueueEvent(ctx context.Context, resource schema.Grou
 }
 
 func (r *ResourceWatches) matchEvent(ctx context.Context, event resourceWatchEvent) {
+	if r.configuration == nil {
+		return
+	}
+
 	source := event.object
 	if source == nil {
 		source = event.oldObject
@@ -141,8 +146,25 @@ func (r *ResourceWatches) matchEvent(ctx context.Context, event resourceWatchEve
 
 	namespaceRead, namespaceFailed := false, false
 
+	if len(local.Items)+len(global.Items) == 0 {
+		return
+	}
+
+	props, err := r.watchProperties(ctx)
+	if err != nil {
+		r.log.Error(err, "cannot resolve watch execution configuration")
+
+		return
+	}
+
 	match := func(object client.Object, spec *capsulev1beta2.TenantResourceCommonSpec) {
 		if ctx.Err() != nil || spec.IsCordoned() || !object.GetDeletionTimestamp().IsZero() {
+			return
+		}
+
+		// A privileged or differently impersonated stream must never supply
+		// object contents to another replication's selectors or CEL programs.
+		if watchIdentity(object, props) != event.identity {
 			return
 		}
 

@@ -110,7 +110,7 @@ func watchFixtureFor(tb testing.TB, unrelated int) *watchFixture {
 	mapper.Add(corev1.SchemeGroupVersion.WithKind("Node"), apimeta.RESTScopeRoot)
 	compiler, _ := cache.NewCELCache()
 	dyn := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, map[schema.GroupVersionResource]string{configMapsGVR: "ConfigMapList", {Version: "v1", Resource: "secrets"}: "SecretList"})
-	f.watcher = NewResourceWatches(f.client, dyn, mapper, logr.Discard(), compiler, cache.NewLabelSelectorCache(), cache.NewPreparedReplicationTriggers(), f.notifications, metrics.NewTriggerRecorder())
+	f.watcher = NewResourceWatches(f.client, dyn, mapper, logr.Discard(), watchConfiguration{}, compiler, cache.NewLabelSelectorCache(), cache.NewPreparedReplicationTriggers(), f.notifications, metrics.NewTriggerRecorder())
 	if _, err := f.watcher.Reconcile(tb.Context(), reconcile.Request{}); err != nil {
 		tb.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func TestWatchEventsSelectorsOperationsAndIsolation(t *testing.T) {
 				after = nil
 				before = clientcache.DeletedFinalStateUnknown{Obj: old}
 			}
-			f.watcher.enqueueEvent(t.Context(), configMapsGVR, operation, before, after)
+			f.watcher.enqueueEvent(t.Context(), configMapsGVR, resourceWatchIdentity{}, operation, before, after)
 			f.watcher.matchEvent(t.Context(), <-f.watcher.events)
 			targets := f.notifications.take()
 			if targets["local-a"] != 1 || targets["global"] != 1 || len(targets) != 2 {
@@ -149,7 +149,7 @@ func TestWatchEventsSelectorsOperationsAndIsolation(t *testing.T) {
 				t.Fatalf("LIST=%d GET=%d", f.lists, f.gets)
 			}
 			object = sourceObject("b")
-			f.watcher.enqueueEvent(t.Context(), configMapsGVR, admissionv1.Create, nil, object)
+			f.watcher.enqueueEvent(t.Context(), configMapsGVR, resourceWatchIdentity{}, admissionv1.Create, nil, object)
 			f.watcher.matchEvent(t.Context(), <-f.watcher.events)
 			targets = f.notifications.take()
 			if len(targets) != 1 || targets["local-b"] != 1 {
@@ -198,7 +198,7 @@ func TestWatchEventSkipsAndBookkeeping(t *testing.T) {
 			case "canceled":
 				cancel()
 			}
-			f.watcher.enqueueEvent(ctx, resource, admissionv1.Update, old, object)
+			f.watcher.enqueueEvent(ctx, resource, resourceWatchIdentity{}, admissionv1.Update, old, object)
 			if len(f.watcher.events) > 0 {
 				f.watcher.matchEvent(t.Context(), <-f.watcher.events)
 			}
@@ -227,7 +227,7 @@ func TestWatchSubscriptionUpdatesAndRemoval(t *testing.T) {
 		t.Fatal(err)
 	}
 	object := sourceObject("a")
-	f.watcher.enqueueEvent(t.Context(), configMapsGVR, admissionv1.Create, nil, object)
+	f.watcher.enqueueEvent(t.Context(), configMapsGVR, resourceWatchIdentity{}, admissionv1.Create, nil, object)
 	f.watcher.matchEvent(t.Context(), <-f.watcher.events)
 	if targets := f.notifications.take(); targets["local-a"] != 0 || targets["global"] != 1 {
 		t.Fatalf("stale selector used: %v", targets)
@@ -302,7 +302,7 @@ func TestWatchQueueHasBoundedSaturation(t *testing.T) {
 	f := watchFixtureFor(t, 0)
 	object := sourceObject("a")
 	for range cap(f.watcher.events) + 10 {
-		f.watcher.enqueueEvent(t.Context(), configMapsGVR, admissionv1.Create, nil, object)
+		f.watcher.enqueueEvent(t.Context(), configMapsGVR, resourceWatchIdentity{}, admissionv1.Create, nil, object)
 	}
 	if len(f.watcher.events) != cap(f.watcher.events) {
 		t.Fatal("event queue capacity not enforced")
@@ -370,7 +370,7 @@ func BenchmarkWatchEventSkip(b *testing.B) {
 			}
 			b.ReportAllocs()
 			for b.Loop() {
-				f.watcher.enqueueEvent(b.Context(), configMapsGVR, admissionv1.Update, before, after)
+				f.watcher.enqueueEvent(b.Context(), configMapsGVR, resourceWatchIdentity{}, admissionv1.Update, before, after)
 				select {
 				case event := <-f.watcher.events:
 					f.watcher.matchEvent(b.Context(), event)

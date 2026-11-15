@@ -996,7 +996,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := resources.NewResourceWatches(manager.GetClient(), dynamicClient, manager.GetRESTMapper(), ctrl.Log.WithName("resource-watches"), celCache, labelSelectorCache, preparedTriggers, triggerDispatcher, triggerRecorder).SetupWithManager(manager, controllerConfig); err != nil {
+	if err := resources.NewResourceWatches(manager.GetClient(), dynamicClient, manager.GetRESTMapper(), ctrl.Log.WithName("resource-watches"), cfg, celCache, labelSelectorCache, preparedTriggers, triggerDispatcher, triggerRecorder).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create resource watch controller")
 		os.Exit(1)
 	}

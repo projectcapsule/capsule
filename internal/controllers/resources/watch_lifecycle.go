@@ -10,7 +10,6 @@ import (
 	"time"
 
 	admissionv1 "k8s.io/api/admissionregistration/v1"
-	"k8s.io/client-go/dynamic/dynamicinformer"
 	clientcache "k8s.io/client-go/tools/cache"
 )
 
@@ -87,7 +86,7 @@ func (r *ResourceWatches) syncWatches(ctx context.Context, running map[resourceW
 		}
 	}
 
-	for key := range desired {
+	for key, kind := range desired {
 		if _, ok := running[key]; ok {
 			continue
 		}
@@ -95,9 +94,18 @@ func (r *ResourceWatches) syncWatches(ctx context.Context, running map[resourceW
 		watchCtx, cancel := context.WithCancel(ctx)
 		resource := key.resource
 
-		informer := dynamicinformer.NewFilteredDynamicInformer(r.dynamic, resource, key.namespace, 0, clientcache.Indexers{}, nil).Informer()
+		factory := r.resourceInformer
 		if r.newInformer != nil {
-			informer = r.newInformer(resource, key.namespace)
+			factory = r.newInformer
+		}
+
+		informer, err := factory(watchCtx, key, kind)
+		if err != nil {
+			cancel()
+			r.metrics.Events.WithLabelValues("watch-error").Inc()
+			r.log.Error(err, "cannot create resource watch")
+
+			continue
 		}
 
 		if err := informer.SetWatchErrorHandlerWithContext(func(_ context.Context, _ *clientcache.Reflector, err error) {
@@ -115,11 +123,13 @@ func (r *ResourceWatches) syncWatches(ctx context.Context, running map[resourceW
 		if _, err := informer.AddEventHandler(clientcache.ResourceEventHandlerDetailedFuncs{
 			AddFunc: func(obj any, initial bool) {
 				if !initial {
-					r.enqueueEvent(watchCtx, resource, admissionv1.Create, nil, obj)
+					r.enqueueEvent(watchCtx, resource, key.identity, admissionv1.Create, nil, obj)
 				}
 			},
-			UpdateFunc: func(oldObject, object any) { r.enqueueEvent(watchCtx, resource, admissionv1.Update, oldObject, object) },
-			DeleteFunc: func(obj any) { r.enqueueEvent(watchCtx, resource, admissionv1.Delete, obj, nil) },
+			UpdateFunc: func(oldObject, object any) {
+				r.enqueueEvent(watchCtx, resource, key.identity, admissionv1.Update, oldObject, object)
+			},
+			DeleteFunc: func(obj any) { r.enqueueEvent(watchCtx, resource, key.identity, admissionv1.Delete, obj, nil) },
 		}); err != nil {
 			cancel()
 			r.log.Error(err, "cannot attach resource watch")

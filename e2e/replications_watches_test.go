@@ -323,6 +323,8 @@ var _ = Describe("Replication resource watches", Label("replications", "replicat
 		prefix := "watch-lifecycle-" + rand.String(6)
 		owners, namespaces := watchNamespaces(prefix)
 		actor := impersonationClient(owners[0].Name, withDefaultGroups(nil))
+		bindWatchSubscriptionAccess(namespaces[0].Name, "default", []string{"get", "list", "watch"})
+
 		trigger := watchRule(prefix)
 		trigger.APIGroups = []string{capsulev1beta2.GroupVersion.Group}
 		trigger.APIVersions = []string{"v1beta2"}
