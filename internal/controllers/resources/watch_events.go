@@ -6,6 +6,7 @@ package resources
 import (
 	"context"
 	"maps"
+	"slices"
 	"strings"
 
 	admissionv1 "k8s.io/api/admissionregistration/v1"
@@ -14,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientcache "k8s.io/client-go/tools/cache"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -76,6 +78,13 @@ func bookkeepingEvent(resource schema.GroupVersionResource, oldObject, object *u
 		return false
 	}
 
+	if !slices.EqualFunc(oldObject.GetOwnerReferences(), object.GetOwnerReferences(), func(a, b metav1.OwnerReference) bool {
+		return a.APIVersion == b.APIVersion && a.Kind == b.Kind && a.Name == b.Name && a.UID == b.UID &&
+			ptr.Equal(a.Controller, b.Controller) && ptr.Equal(a.BlockOwnerDeletion, b.BlockOwnerDeletion)
+	}) {
+		return false
+	}
+
 	oldAnnotations, newAnnotations := oldObject.GetAnnotations(), object.GetAnnotations()
 	for _, key := range []string{replication.TriggerAnnotation, meta.ReconcileAnnotation} {
 		delete(oldAnnotations, key)
@@ -83,7 +92,7 @@ func bookkeepingEvent(resource schema.GroupVersionResource, oldObject, object *u
 	}
 	// Watch events have no actor identity. Ignore parent status/finalizer and
 	// internal request-token changes by their contents, while preserving spec,
-	// label and other annotation changes from any writer.
+	// label, ownership and other annotation changes from any writer.
 	return maps.Equal(oldAnnotations, newAnnotations)
 }
 

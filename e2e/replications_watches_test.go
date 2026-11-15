@@ -556,6 +556,53 @@ var _ = Describe("Replication resource watches", Label("replications", "replicat
 		userEvent(settled)
 		token := watchToken(parent)
 		Consistently(func() string { return watchToken(parent) }, 4*time.Second, 200*time.Millisecond).Should(Equal(token), "internal notification/status patches must not feed back")
+		By("observing non-Capsule ownership changes without a generation change")
+		anchor := &corev1.ConfigMap{Name: prefix + "-owner", Namespace: namespaces[0].Name}
+		Expect(actor.Create(ctx, anchor)).To(Succeed())
+		references := []metav1.OwnerReference{{APIVersion: "v1", Kind: "ConfigMap", Name: anchor.Name, UID: anchor.UID}}
+		for _, owners := range [][]metav1.OwnerReference{references, nil} {
+			previous := watchToken(parent)
+			var generation int64
+			edit(func(fresh *capsulev1beta2.TenantResource) {
+				generation = fresh.Generation
+				fresh.OwnerReferences = owners
+			})
+			Eventually(func(g Gomega) {
+				fresh := &capsulev1beta2.TenantResource{}
+				g.Expect(actor.Get(ctx, client.ObjectKeyFromObject(parent), fresh)).To(Succeed())
+				g.Expect(fresh.Generation).To(Equal(generation))
+				g.Expect(fresh.OwnerReferences).To(Equal(owners))
+				g.Expect(fresh.Status.Trigger).NotTo(BeNil())
+				g.Expect(fresh.Status.Trigger.ObservedRequest).NotTo(Equal(previous))
+				g.Expect(fresh.Status.Trigger.ObservedRequest).To(Equal(fresh.Annotations[replication.TriggerAnnotation]))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			token = watchToken(parent)
+			Consistently(func() string { return watchToken(parent) }, 2*time.Second, 200*time.Millisecond).Should(Equal(token), "acknowledging ownership changes must not feed back")
+		}
+		By("excluding an ownership change in another tenant")
+		bob := impersonationClient(owners[1].Name, withDefaultGroups(nil))
+		otherAnchor := &corev1.ConfigMap{Name: prefix + "-owner", Namespace: namespaces[2].Name}
+		Expect(bob.Create(ctx, otherAnchor)).To(Succeed())
+		other := &capsulev1beta2.TenantResource{Name: prefix, Namespace: namespaces[2].Name, Labels: map[string]string{watchSourceLabel: prefix}, Spec: capsulev1beta2.TenantResourceSpec{TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{Cordoned: new(true), Resources: []capsulev1beta2.ResourceSpec{}}}}
+		Expect(bob.Create(ctx, other)).To(Succeed())
+		Eventually(func() error {
+			fresh := &capsulev1beta2.TenantResource{}
+			if err := bob.Get(ctx, client.ObjectKeyFromObject(other), fresh); err != nil {
+				return err
+			}
+			fresh.OwnerReferences = []metav1.OwnerReference{{APIVersion: "v1", Kind: "ConfigMap", Name: otherAnchor.Name, UID: otherAnchor.UID}}
+			return bob.Update(ctx, fresh)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Eventually(func(g Gomega) {
+			fresh := &capsulev1beta2.TenantResource{}
+			g.Expect(bob.Get(ctx, client.ObjectKeyFromObject(other), fresh)).To(Succeed())
+			g.Expect(fresh.OwnerReferences).To(HaveLen(1))
+			g.Expect(fresh.OwnerReferences[0].UID).To(Equal(otherAnchor.UID))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Consistently(func() string { return watchToken(parent) }, 3*time.Second, 200*time.Millisecond).Should(Equal(token))
+		for _, namespace := range namespaces[1:] {
+			Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: namespace.Name, Name: prefix + "-output"}, &corev1.ConfigMap{})).To(Satisfy(apierrors.IsNotFound))
+		}
 		By("observing a terminating source before its finalizer is removed")
 		victim := &capsulev1beta2.TenantResource{Name: prefix + "-terminating", Namespace: namespaces[0].Name, Labels: map[string]string{watchSourceLabel: prefix}, Finalizers: []string{"projectcapsule.dev/watch-termination-test"}, Spec: capsulev1beta2.TenantResourceSpec{TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{Cordoned: new(true), Resources: []capsulev1beta2.ResourceSpec{}}}}
 		Expect(actor.Create(ctx, victim)).To(Succeed())
