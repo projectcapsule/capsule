@@ -361,6 +361,9 @@ func TestLocalWatchCountIsBounded(t *testing.T) {
 	}
 	for i := range maxResourceWatches + 10 {
 		name := fmt.Sprintf("namespace-%03d", i)
+		if err := f.client.Create(t.Context(), &corev1.Namespace{Name: name, UID: types.UID(name)}); err != nil {
+			t.Fatal(err)
+		}
 		source := &capsulev1beta2.TenantResource{Name: "source", Namespace: name, UID: types.UID(name), Generation: 1, Spec: capsulev1beta2.TenantResourceSpec{TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{Triggers: []capsulev1beta2.TenantResourceTrigger{{Name: "events", Operations: []admissionv1.OperationType{admissionv1.Update}, APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"configmaps"}}}}}}
 		if err := f.client.Create(t.Context(), source); err != nil {
 			t.Fatal(err)

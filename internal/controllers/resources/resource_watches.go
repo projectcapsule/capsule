@@ -67,10 +67,14 @@ type ResourceWatches struct {
 	desired           map[resourceWatchKey]schema.GroupVersionKind
 	changed           chan struct{}
 	events            chan resourceWatchEvent
+	now               func() time.Time
+	rotationDue       time.Time
+	priorityGroup     string
+	nextPriorityGroup string
 }
 
 func NewResourceWatches(c client.Client, dyn dynamic.Interface, mapper apimeta.RESTMapper, log logr.Logger, cfg configuration.Configuration, conditions *cache.CELCache, selectors *cache.LabelSelectorCache, prepared *cache.PreparedReplicationTriggers, notifier replication.Notifier, recorder *metrics.TriggerRecorder) *ResourceWatches {
-	return &ResourceWatches{client: c, dynamic: dyn, mapper: mapper, log: log, configuration: cfg, conditions: conditions, selectors: selectors, prepared: prepared, notifier: notifier, metrics: recorder, desired: make(map[resourceWatchKey]schema.GroupVersionKind), changed: make(chan struct{}, 1), events: make(chan resourceWatchEvent, 256)}
+	return &ResourceWatches{client: c, dynamic: dyn, mapper: mapper, log: log, configuration: cfg, conditions: conditions, selectors: selectors, prepared: prepared, notifier: notifier, metrics: recorder, desired: make(map[resourceWatchKey]schema.GroupVersionKind), changed: make(chan struct{}, 1), events: make(chan resourceWatchEvent, 256), now: time.Now}
 }
 
 func (r *ResourceWatches) NeedLeaderElection() bool { return true }
@@ -161,18 +165,33 @@ func (r *ResourceWatches) Reconcile(ctx context.Context, _ reconcile.Request) (r
 		return a.GetNamespace()+"/"+a.GetName() < b.GetNamespace()+"/"+b.GetName()
 	})
 
-	resources := make(map[schema.GroupVersionResource]map[resourceWatchIdentity]map[string]struct{})
-	omitted := 0
+	plan, omitted, err := r.planSources(ctx, sources)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	retain := make(map[types.UID]struct{}, len(plan.selected))
+	for _, source := range plan.selected {
+		retain[source.GetUID()] = struct{}{}
+	}
+
+	r.prepared.RetainPrepared(retain)
+
+	groups := make(map[string]*watchKeySet)
+	opportunity := make(map[string]bool)
 
 	props, err := r.watchProperties(ctx)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
-	for _, source := range sources {
+	for _, source := range plan.selected {
+		owner := plan.owners[source.GetUID()]
+
 		prepared, err := r.prepareSource(source)
 		if err != nil {
 			omitted++
+			opportunity[owner] = true
 
 			r.log.Error(err, "cannot prepare resource watches; periodic reconciliation remains active", "name", source.GetName(), "namespace", source.GetNamespace())
 
@@ -181,91 +200,62 @@ func (r *ResourceWatches) Reconcile(ctx context.Context, _ reconcile.Request) (r
 
 		identity := watchIdentity(source, props)
 
-		for _, resource := range prepared.Resources() {
-			identities := resources[resource]
-			if identities == nil {
-				identities = make(map[resourceWatchIdentity]map[string]struct{})
-				resources[resource] = identities
+		resources := prepared.Resources()
+		if len(resources) == 0 {
+			opportunity[owner] = true
+		}
+
+		for _, resource := range resources {
+			group := groups[owner]
+			if group == nil {
+				group = &watchKeySet{}
+				groups[owner] = group
 			}
 
-			namespaces := identities[identity]
-			if namespaces == nil {
-				namespaces = make(map[string]struct{})
-				identities[identity] = namespaces
-			}
-
-			namespaces[source.GetNamespace()] = struct{}{}
+			group.add(resourceWatchKey{resource: resource, namespace: source.GetNamespace(), identity: identity})
 		}
 	}
 
-	keys := make([]schema.GroupVersionResource, 0, len(resources))
-	for resource := range resources {
-		keys = append(keys, resource)
-	}
+	selected, capacityOmitted := planWatchKeys(plan.order, groups, opportunity)
+	omitted += capacityOmitted
 
-	sort.Slice(keys, func(i, j int) bool { return keys[i].String() < keys[j].String() })
+	r.nextWatchGroup(plan.order, opportunity)
 
 	desired := make(map[resourceWatchKey]schema.GroupVersionKind)
 	trust := watchTrustRevision{}
 
-	for _, resource := range keys {
-		if len(desired) >= maxResourceWatches {
+	type discovered struct {
+		kind schema.GroupVersionKind
+		err  error
+	}
+
+	resources := make(map[schema.GroupVersionResource]discovered)
+	for key := range selected {
+		mapping, known := resources[key.resource]
+		if !known {
+			mapping.kind, mapping.err = r.discoverWatchResource(key.resource)
+
+			resources[key.resource] = mapping
+
+			if mapping.err != nil {
+				r.log.Error(mapping.err, "cannot discover trigger resource", "resource", key.resource.String())
+			}
+		}
+
+		if mapping.err != nil {
 			omitted++
 
 			continue
 		}
 
-		kind, err := r.mapper.KindFor(resource)
+		trusted, err := r.withWatchTrust(ctx, key, &trust)
 		if err != nil {
 			omitted++
 
-			r.log.Error(err, "cannot discover trigger resource", "resource", resource.String())
-
 			continue
 		}
 
-		mapping, err := r.mapper.RESTMapping(kind.GroupKind(), kind.Version)
-		if err != nil {
-			omitted++
-
-			r.log.Error(err, "cannot map trigger resource", "resource", resource.String())
-
-			continue
-		}
-
-		if mapping.Resource != resource {
-			omitted++
-
-			r.log.Error(fmt.Errorf("watch requires the canonical plural resource name"), "cannot watch trigger resource", "resource", resource.String())
-
-			continue
-		}
-
-		if mapping.Scope.Name() != apimeta.RESTScopeNameNamespace {
-			omitted++
-
-			r.log.Error(fmt.Errorf("watch requires a namespaced resource"), "cannot watch trigger resource", "resource", resource.String())
-
-			continue
-		}
-
-		streams := resourceWatchKeys(resource, resources[resource])
-		for _, key := range streams {
-			if len(desired) >= maxResourceWatches {
-				omitted++
-
-				continue
-			}
-
-			key, err = r.withWatchTrust(ctx, key, &trust)
-			if err != nil {
-				omitted++
-
-				continue
-			}
-
-			desired[key] = kind
-		}
+		desired[trusted] = mapping.kind
 	}
 
 	r.metrics.OmittedWatches.Set(float64(omitted))

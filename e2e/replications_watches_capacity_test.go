@@ -115,10 +115,101 @@ var _ = Describe("Replication watch preparation capacity", Serial, Label("replic
 		waitWatchReady(omitted)
 		expectConfigMapData(omitted.Namespace, omitted.Name, map[string]string{"value": "recovered"})
 		Expect(watchToken(omitted)).To(BeEmpty())
+		By("rebalancing retained programs when another tenant starts a large subscription")
+		otherPrefix := prefix + "-other"
+		otherActor := impersonationClient(owners[1].Name, withDefaultGroups(nil))
+		otherInput := &corev1.ConfigMap{Name: otherPrefix + "-input", Namespace: namespaces[2].Name, Labels: map[string]string{watchSourceLabel: prefix, watchInputLabel: otherPrefix}, Data: map[string]string{"value": "other-initial"}}
+		Expect(otherActor.Create(ctx, otherInput)).To(Succeed())
+		otherSpec := watchBody(otherPrefix, namespaces[2].Name, otherPrefix)
+		otherSpec.Triggers = parents[0].Spec.DeepCopy().Triggers
+		otherSpec.Resources[0].NamespaceSelector = &metav1.LabelSelector{MatchLabels: map[string]string{"kubernetes.io/metadata.name": namespaces[2].Name}}
+		other := &capsulev1beta2.TenantResource{Name: otherPrefix, Namespace: namespaces[2].Name, Spec: capsulev1beta2.TenantResourceSpec{TenantResourceCommonSpec: otherSpec}}
+		Expect(otherActor.Create(ctx, other)).To(Succeed())
+		waitWatchReady(other)
+		Eventually(func() error {
+			if watchToken(other) != "" {
+				return nil
+			}
+			fresh := &corev1.ConfigMap{}
+			if err := otherActor.Get(ctx, client.ObjectKeyFromObject(otherInput), fresh); err != nil {
+				return err
+			}
+			fresh.Data["value"] = rand.String(8)
+			if err := otherActor.Update(ctx, fresh); err != nil {
+				return err
+			}
+			return fmt.Errorf("waiting for tenant B's rebalanced subscription")
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		changeWatchInput(otherActor, otherInput, "other-updated")
+		expectConfigMapData(other.Namespace, other.Name, map[string]string{"value": "other-updated"})
+		for _, namespace := range namespaces[:2] {
+			Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKey{Namespace: namespace.Name, Name: other.Name}, &corev1.ConfigMap{}))).To(BeTrue())
+		}
 		for _, namespace := range namespaces[1:] {
 			for _, parent := range parents {
 				Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKey{Namespace: namespace.Name, Name: parent.Name}, &corev1.ConfigMap{}))).To(BeTrue())
 			}
 		}
+	})
+
+	It("keeps another tenant responsive when forbidden identities fill the stream budget", func() {
+		ctx := context.Background()
+		prefix := "watch-fair-" + rand.String(6)
+		owners, namespaces := watchNamespaces(prefix)
+		attackerNamespace, targetNamespace := namespaces[0].Name, namespaces[2].Name
+		attackerOwner, targetOwner := owners[0], owners[1]
+		// Put the noisy tenant first in the previous namespace-sorted plan.
+		if attackerNamespace > targetNamespace {
+			attackerNamespace, targetNamespace = targetNamespace, attackerNamespace
+			attackerOwner, targetOwner = targetOwner, attackerOwner
+		}
+		attacker := impersonationClient(attackerOwner.Name, withDefaultGroups(nil))
+		target := impersonationClient(targetOwner.Name, withDefaultGroups(nil))
+		var noisy []*capsulev1beta2.TenantResource
+		for index := range 32 {
+			name := fmt.Sprintf("%s-%02d", prefix, index)
+			Expect(attacker.Create(ctx, &corev1.ServiceAccount{Name: name, Namespace: attackerNamespace})).To(Succeed())
+			trigger := watchRule(prefix)
+			trigger.Resources = []string{"configmaps", "secrets"}
+			parent := &capsulev1beta2.TenantResource{Name: name, Namespace: attackerNamespace, Spec: capsulev1beta2.TenantResourceSpec{ServiceAccount: &meta.LocalRFC1123ObjectReference{Name: meta.RFC1123Name(name)}, TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{Triggers: []capsulev1beta2.TenantResourceTrigger{trigger}, Resources: []capsulev1beta2.ResourceSpec{}, ResyncPeriod: metav1.Duration{Duration: 24 * time.Hour}}}}
+			Expect(attacker.Create(ctx, parent)).To(Succeed())
+			noisy = append(noisy, parent)
+		}
+		for _, parent := range noisy {
+			waitWatchReady(parent)
+		}
+		trigger := watchRule(prefix)
+		trigger.Resources = []string{"secrets"}
+		trigger.Operations = []admissionv1.OperationType{admissionv1.Update}
+		parent := &capsulev1beta2.TenantResource{Name: prefix, Namespace: targetNamespace, Spec: capsulev1beta2.TenantResourceSpec{TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{Triggers: []capsulev1beta2.TenantResourceTrigger{trigger}, Resources: []capsulev1beta2.ResourceSpec{}, ResyncPeriod: metav1.Duration{Duration: 24 * time.Hour}, TriggerMinInterval: metav1.Duration{Duration: time.Second}}}}
+		Expect(target.Create(ctx, parent)).To(Succeed())
+		waitWatchReady(parent)
+		input := &corev1.Secret{Name: prefix, Namespace: targetNamespace, Labels: map[string]string{watchSourceLabel: prefix}, Data: map[string][]byte{"value": []byte("initial")}}
+		Expect(target.Create(ctx, input)).To(Succeed())
+		By("delivering the permitted tenant's persisted changes despite the other tenant's denied LIST requests")
+		Eventually(func() error {
+			if watchToken(parent) != "" {
+				return nil
+			}
+			fresh := &corev1.Secret{}
+			if err := target.Get(ctx, client.ObjectKeyFromObject(input), fresh); err != nil {
+				return err
+			}
+			fresh.Data["value"] = []byte(rand.String(8))
+			if err := target.Update(ctx, fresh); err != nil {
+				return err
+			}
+			return fmt.Errorf("waiting for the permitted tenant's fair watch opportunity")
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		By("preserving authorization and withholding notifications from the forbidden identities")
+		err := attacker.Get(ctx, client.ObjectKeyFromObject(input), &corev1.Secret{})
+		Expect(apierrors.IsForbidden(err)).To(BeTrue())
+		Expect(err.Error()).To(ContainSubstring("cannot get resource \"secrets\""))
+		for _, denied := range noisy {
+			Expect(watchToken(denied)).To(BeEmpty())
+		}
+		persisted := &corev1.Secret{}
+		Expect(target.Get(ctx, client.ObjectKeyFromObject(input), persisted)).To(Succeed())
+		Expect(persisted.Data["value"]).NotTo(BeEmpty())
 	})
 })

@@ -184,6 +184,32 @@ func (c *PreparedReplicationTriggers) PruneActive(active map[types.UID]int64) {
 	}
 }
 
+// RetainPrepared releases programs omitted by the current fair plan. Keep their
+// validation proof within the existing result bound so eviction does not force
+// repeated validation on ordinary resource reconciliation.
+func (c *PreparedReplicationTriggers) RetainPrepared(retain map[types.UID]struct{}) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for uid, value := range c.entries {
+		if _, ok := retain[uid]; ok {
+			continue
+		}
+
+		c.conditions -= value.conditions
+		delete(c.entries, uid)
+
+		previous, exists := c.validations[uid]
+		if previous.generation >= value.generation && exists {
+			continue
+		}
+
+		if exists || len(c.validations) < MaxPreparedReplications {
+			c.validations[uid] = triggerValidation{generation: value.generation}
+		}
+	}
+}
+
 func (c *PreparedReplicationTriggers) Delete(uid types.UID) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

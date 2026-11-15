@@ -136,9 +136,9 @@ func TestWatchTrustReadsAreBoundedAndSkippedWhenUnused(t *testing.T) {
 				if _, err := f.watcher.Reconcile(t.Context(), reconcile.Request{}); err != nil {
 					t.Fatal(err)
 				}
-				wantGets := 2 // configuration projection and one pinned CA Secret
+				wantGets := 4 // configuration, two namespace snapshots, one pinned CA Secret
 				if skipTLS {
-					wantGets = 1
+					wantGets = 3
 				}
 				if f.gets != wantGets || f.lists != 2 {
 					t.Fatalf("skipTLS=%t GET=%d LIST=%d", skipTLS, f.gets, f.lists)
@@ -153,7 +153,7 @@ func TestWatchTrustReadsAreBoundedAndSkippedWhenUnused(t *testing.T) {
 			if _, err := f.watcher.Reconcile(t.Context(), reconcile.Request{}); err != nil {
 				t.Fatal(err)
 			}
-			if f.gets != 1 {
+			if f.gets != 3 {
 				t.Fatal("controller streams read an unused CA Secret")
 			}
 		})
@@ -165,6 +165,41 @@ func TestWatchConstructionRejectsTrustChangedAfterPlanning(t *testing.T) {
 	key := resourceWatchKey{resource: configMapsGVR, namespace: "a", identity: resourceWatchIdentity{account: cache.Key{Namespace: "a", Name: "reader"}, transport: capsulev1beta2.ServiceAccountClient{CASecretName: "watch-ca", CASecretNamespace: "capsule-system", CASecretKey: "ca.crt"}}, caBundle: sha256.Sum256([]byte("old-ca"))}
 	if _, err := f.watcher.resourceInformer(t.Context(), key, corev1.SchemeGroupVersion.WithKind("ConfigMap")); err == nil || !strings.Contains(err.Error(), "CA changed since planning") {
 		t.Fatalf("expected changed-trust rejection, got %v", err)
+	}
+}
+
+func TestEmptyPinnedCARejectsWatchPlanningAndConstruction(t *testing.T) {
+	f, secret, _ := watchTrustFixture(t, 0)
+	secret.Data["ca.crt"] = nil
+	if err := f.client.Update(t.Context(), secret); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.watcher.Reconcile(t.Context(), reconcile.Request{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.watcher.desired) != 1 {
+		t.Error("empty pinned CA retained impersonated streams")
+	}
+	key := resourceWatchKey{resource: configMapsGVR, namespace: "a", identity: resourceWatchIdentity{account: cache.Key{Namespace: "a", Name: "reader"}, transport: capsulev1beta2.ServiceAccountClient{CASecretName: "watch-ca", CASecretNamespace: "capsule-system", CASecretKey: "ca.crt"}}, caBundle: sha256.Sum256(nil)}
+	if _, err := f.watcher.resourceInformer(t.Context(), key, corev1.SchemeGroupVersion.WithKind("ConfigMap")); err == nil || !strings.Contains(err.Error(), "empty") {
+		t.Fatalf("empty pinned CA allowed system-trust fallback: %v", err)
+	}
+}
+
+func TestExplicitTLSVerificationSkipStillIgnoresEmptyCA(t *testing.T) {
+	f, secret, object := watchTrustFixture(t, 0)
+	secret.Data["ca.crt"] = nil
+	object.Spec.Impersonation.SkipTLSVerify = true
+	for _, value := range []client.Object{secret, object} {
+		if err := f.client.Update(t.Context(), value); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := f.watcher.Reconcile(t.Context(), reconcile.Request{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.watcher.desired) != 3 {
+		t.Fatal("explicit TLS verification skip was overridden by the unused empty CA")
 	}
 }
 

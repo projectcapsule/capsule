@@ -155,7 +155,11 @@ func TestWatchIdentityIncludesDefaultsNamespaceAndTransport(t *testing.T) {
 	}
 	global := &capsulev1beta2.GlobalTenantResource{Spec: capsulev1beta2.GlobalTenantResourceSpec{ServiceAccount: &meta.NamespacedRFC1123ObjectReferenceWithNamespace{Name: "reader", Namespace: "a"}}}
 	identity := watchIdentity(global, capsulev1beta2.ServiceAccountClient{})
-	streams := resourceWatchKeys(configMapsGVR, map[resourceWatchIdentity]map[string]struct{}{identity: {"": {}, "a": {}}, {}: {"a": {}}})
+	keys := &watchKeySet{}
+	for _, key := range []resourceWatchKey{{resource: configMapsGVR, identity: identity}, {resource: configMapsGVR, namespace: "a", identity: identity}, {resource: configMapsGVR, namespace: "a"}} {
+		keys.add(key)
+	}
+	streams, _ := planWatchKeys([]string{"system"}, map[string]*watchKeySet{"system": keys}, map[string]bool{})
 	if len(streams) != 3 {
 		t.Fatal("global stream retired a local stream with independent authorization")
 	}

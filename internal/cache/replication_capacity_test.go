@@ -197,3 +197,24 @@ func TestNewerValidationSurvivesStaleInformerPruning(t *testing.T) {
 		})
 	}
 }
+
+func TestFairEvictionPreservesValidationWithoutRetainingPrograms(t *testing.T) {
+	c := NewPreparedReplicationTriggers()
+	if _, err := c.GetOrBuild("source", 1, 1920, [32]byte{1}, func() (*replication.PreparedTriggers, error) { return emptyPrepared(t), nil }); err != nil {
+		t.Fatal(err)
+	}
+	c.RetainPrepared(map[types.UID]struct{}{})
+	if _, ok := c.Get("source", 1); ok || c.conditions != 0 {
+		t.Fatal("evicted source retained programs or condition capacity")
+	}
+	if err := c.Validate("source", 1, validationSpec(1920), true, triggerValidationFunc(func(string) error {
+		t.Fatal("fair eviction recompiled an unchanged validated source")
+		return nil
+	})); err != nil {
+		t.Fatal(err)
+	}
+	c.PruneActive(map[types.UID]int64{})
+	if len(c.validations) != 0 {
+		t.Fatal("deleted evicted source retained validation")
+	}
+}

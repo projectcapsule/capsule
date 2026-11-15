@@ -26,7 +26,7 @@ import (
 )
 
 var _ = Describe("Replication watch CA rotation", Label("config", "replications", "replication-watches", "watch-ca"), func() {
-	It("recovers after an in-place CA update without leaking across execution identities or tenants", func() {
+	DescribeTable("recovers after an in-place CA update without leaking across execution identities or tenants", func(emptyCA bool) {
 		ctx := context.Background()
 		prefix := "watch-ca-" + rand.String(6)
 		owners, namespaces := watchNamespaces(prefix)
@@ -39,6 +39,9 @@ var _ = Describe("Replication watch CA rotation", Label("config", "replications"
 		untrusted, err := cert.NewSelfSignedCACert(cert.Config{CommonName: prefix}, key)
 		Expect(err).NotTo(HaveOccurred())
 		secret := &corev1.Secret{Name: prefix, Namespace: ControllerNamespace, Data: map[string][]byte{"ca.crt": pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: untrusted.Raw})}}
+		if emptyCA {
+			secret.Data["ca.crt"] = nil
+		}
 		Expect(k8sClient.Create(ctx, secret)).To(Succeed())
 		DeferCleanup(DeleteInBackground, secret)
 		DeferCleanup(func() {
@@ -125,5 +128,5 @@ var _ = Describe("Replication watch CA rotation", Label("config", "replications"
 		current := &capsulev1beta2.CapsuleConfiguration{}
 		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: defaultConfigurationName}, current)).To(Succeed())
 		Expect(current.Spec.Impersonation).To(Equal(props), "recovery must not require editing CapsuleConfiguration")
-	})
+	}, Entry("untrusted bundle", false), Entry("empty bundle", true))
 })

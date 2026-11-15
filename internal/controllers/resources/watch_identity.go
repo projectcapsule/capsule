@@ -7,7 +7,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"sort"
 
 	"github.com/go-logr/logr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic/dynamicinformer"
+	"k8s.io/client-go/rest"
 	clientcache "k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -46,6 +46,19 @@ func (key resourceWatchKey) usesCASecret() bool {
 	return key.identity.account != (cache.Key{}) && key.identity.transport.CASecretName != "" && !key.identity.transport.SkipTLSVerify
 }
 
+func (r *ResourceWatches) watchRESTConfig(ctx context.Context, key resourceWatchKey) (*rest.Config, error) {
+	base, err := configuration.ServiceAccountRESTConfig(ctx, r.client, r.baseREST, key.identity.transport)
+	if err != nil {
+		return nil, err
+	}
+
+	if key.usesCASecret() && len(base.CAData) == 0 {
+		return nil, fmt.Errorf("resource watch CA Secret %q has empty CA data", key.identity.transport.CASecretName)
+	}
+
+	return base, nil
+}
+
 func (r *ResourceWatches) withWatchTrust(ctx context.Context, key resourceWatchKey, trust *watchTrustRevision) (resourceWatchKey, error) {
 	if !key.usesCASecret() {
 		return key, nil
@@ -54,7 +67,7 @@ func (r *ResourceWatches) withWatchTrust(ctx context.Context, key resourceWatchK
 	if !trust.read {
 		trust.read = true
 
-		base, err := configuration.ServiceAccountRESTConfig(ctx, r.client, r.baseREST, key.identity.transport)
+		base, err := r.watchRESTConfig(ctx, key)
 		if err != nil {
 			r.log.Error(err, "cannot load resource watch CA; periodic reconciliation remains active")
 		} else {
@@ -119,45 +132,12 @@ func watchIdentity(source client.Object, props capsulev1beta2.ServiceAccountClie
 	return resourceWatchIdentity{account: cache.Key{Namespace: account.Namespace.String(), Name: account.Name.String()}, transport: props}
 }
 
-func resourceWatchKeys(resource schema.GroupVersionResource, identities map[resourceWatchIdentity]map[string]struct{}) []resourceWatchKey {
-	var keys []resourceWatchKey
-
-	for identity, namespaces := range identities {
-		if _, global := namespaces[""]; global {
-			keys = append(keys, resourceWatchKey{resource: resource, identity: identity})
-
-			// A namespaced execution identity may be allowed to watch one
-			// namespace but forbidden to list/watch cluster-wide. Its global
-			// subscription must not retire permitted local streams.
-			if identity.account == (cache.Key{}) {
-				continue
-			}
-		}
-
-		for namespace := range namespaces {
-			if namespace == "" {
-				continue
-			}
-
-			keys = append(keys, resourceWatchKey{resource: resource, namespace: namespace, identity: identity})
-		}
-	}
-
-	sort.Slice(keys, func(i, j int) bool {
-		a, b := keys[i], keys[j]
-
-		return a.identity.account.Namespace+"/"+a.identity.account.Name+"/"+a.namespace < b.identity.account.Namespace+"/"+b.identity.account.Name+"/"+b.namespace
-	})
-
-	return keys
-}
-
 func (r *ResourceWatches) resourceInformer(ctx context.Context, key resourceWatchKey, kind schema.GroupVersionKind) (clientcache.SharedIndexInformer, error) {
 	if key.identity.account == (cache.Key{}) {
 		return dynamicinformer.NewFilteredDynamicInformer(r.dynamic, key.resource, key.namespace, 0, clientcache.Indexers{}, nil).Informer(), nil
 	}
 
-	base, err := configuration.ServiceAccountRESTConfig(ctx, r.client, r.baseREST, key.identity.transport)
+	base, err := r.watchRESTConfig(ctx, key)
 	if err != nil {
 		return nil, fmt.Errorf("load watch execution configuration: %w", err)
 	}
