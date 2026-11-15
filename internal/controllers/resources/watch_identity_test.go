@@ -209,10 +209,15 @@ func BenchmarkWatchConfigurationProjection(b *testing.B) {
 type watchHTTPConfiguration struct {
 	watchConfiguration
 	endpoint string
+	insecure bool
+	reads    *atomic.Int64
 }
 
 func (c watchHTTPConfiguration) ServiceAccountClient(context.Context) (*rest.Config, error) {
-	return &rest.Config{Host: c.endpoint}, nil
+	if c.reads != nil {
+		c.reads.Add(1)
+	}
+	return &rest.Config{Host: c.endpoint, Insecure: c.insecure}, nil
 }
 
 func TestImpersonatedWatchRejectsForbiddenReadsWithoutControllerFallback(t *testing.T) {
@@ -240,6 +245,7 @@ func TestImpersonatedWatchRejectsForbiddenReadsWithoutControllerFallback(t *test
 	defer server.Close()
 	f := watchFixtureFor(t, 0)
 	f.watcher.configuration = watchHTTPConfiguration{endpoint: server.URL}
+	f.watcher.baseREST = &rest.Config{Host: server.URL}
 	key := resourceWatchKey{resource: schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, namespace: "a", identity: resourceWatchIdentity{account: cache.Key{Namespace: "a", Name: "restricted"}}}
 	informer, err := f.watcher.resourceInformer(t.Context(), key, schema.GroupVersionKind{Version: "v1", Kind: "Secret"})
 	if err != nil {

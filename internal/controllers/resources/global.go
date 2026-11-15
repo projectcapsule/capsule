@@ -129,7 +129,7 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 	log.V(5).Info("start processing")
 
 	tntResource := &capsulev1beta2.GlobalTenantResource{}
-	if err = r.client.Get(ctx, request.NamespacedName, tntResource); err != nil {
+	if err = readReplicationSource(ctx, r.client, r.reader, request.NamespacedName, tntResource); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.V(5).Info("Request object not found, could have been deleted after reconcile request")
 
@@ -208,7 +208,7 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 	if tntResource.DeletionTimestamp.IsZero() {
 		if len(tntResource.Spec.Triggers) > 0 {
 			if validationErr := r.triggers.Validate(tntResource.UID, tntResource.Generation, &tntResource.Spec.TenantResourceCommonSpec, false, r.conditions); validationErr != nil {
-				statusErr = validationErr
+				statusErr = triggerValidationError{validationErr}
 
 				return requeue, nil
 			}

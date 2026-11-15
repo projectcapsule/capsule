@@ -78,6 +78,29 @@ func watchTrigger() capsulev1beta2.TenantResourceTrigger {
 	return capsulev1beta2.TenantResourceTrigger{Name: "changes", Operations: []admissionv1.OperationType{admissionv1.OperationAll}, APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"configmaps"}}
 }
 
+func TestPreparedMatchingSkipsOnlyNamespaceRestrictedAlternatives(t *testing.T) {
+	compiler, _ := cache.NewCELCache()
+	restricted, unrestricted := watchTrigger(), watchTrigger()
+	restricted.Name = "restricted"
+	restricted.NamespaceSelector = &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "blocked", Operator: metav1.LabelSelectorOpDoesNotExist}}}
+	unrestricted.Name, unrestricted.Resources = "unrestricted", []string{"secrets"}
+	prepared, err := replication.PrepareTriggers(&capsulev1beta2.TenantResourceCommonSpec{Triggers: []capsulev1beta2.TenantResourceTrigger{restricted, unrestricted}}, false, cache.NewLabelSelectorCache(), compiler)
+	if err != nil {
+		t.Fatal(err)
+	}
+	object := &unstructured.Unstructured{Object: map[string]any{"metadata": map[string]any{"labels": map[string]any{}}}}
+	for _, available := range []bool{false, true} {
+		for _, resource := range []string{"configmaps", "secrets"} {
+			key := replication.ResourceKey(schema.GroupVersionResource{Version: "v1", Resource: resource}, admissionv1.Create)
+			got, err := prepared.MatchesWithNamespace(t.Context(), key, admissionv1.Create, nil, available, nil, object)
+			want := resource == "secrets" || available
+			if err != nil || got != want {
+				t.Fatalf("resource=%s available=%t matched=%t err=%v", resource, available, got, err)
+			}
+		}
+	}
+}
+
 func TestWatchTriggerValidation(t *testing.T) {
 	compiler, err := cache.NewCELCache()
 	if err != nil {

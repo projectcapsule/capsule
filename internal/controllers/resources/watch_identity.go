@@ -54,7 +54,7 @@ func (r *ResourceWatches) withWatchTrust(ctx context.Context, key resourceWatchK
 	if !trust.read {
 		trust.read = true
 
-		base, err := r.configuration.ServiceAccountClient(ctx)
+		base, err := configuration.ServiceAccountRESTConfig(ctx, r.client, r.baseREST, key.identity.transport)
 		if err != nil {
 			r.log.Error(err, "cannot load resource watch CA; periodic reconciliation remains active")
 		} else {
@@ -157,7 +157,7 @@ func (r *ResourceWatches) resourceInformer(ctx context.Context, key resourceWatc
 		return dynamicinformer.NewFilteredDynamicInformer(r.dynamic, key.resource, key.namespace, 0, clientcache.Indexers{}, nil).Informer(), nil
 	}
 
-	base, err := r.configuration.ServiceAccountClient(ctx)
+	base, err := configuration.ServiceAccountRESTConfig(ctx, r.client, r.baseREST, key.identity.transport)
 	if err != nil {
 		return nil, fmt.Errorf("load watch execution configuration: %w", err)
 	}

@@ -25,6 +25,11 @@ type preparedReplication struct {
 	triggers    *replication.PreparedTriggers
 }
 
+type failedTriggerValidation struct {
+	generation int64
+	err        error
+}
+
 // PreparedReplicationTriggers retains only current immutable source projections.
 // Readers cannot mutate the published artifacts. Generation/UID checks prevent a
 // stale index or delayed event from using an edited or recreated subscription.
@@ -32,10 +37,11 @@ type PreparedReplicationTriggers struct {
 	mu         sync.RWMutex
 	entries    map[types.UID]preparedReplication
 	conditions int
+	failures   map[types.UID]failedTriggerValidation
 }
 
 func NewPreparedReplicationTriggers() *PreparedReplicationTriggers {
-	return &PreparedReplicationTriggers{entries: make(map[types.UID]preparedReplication)}
+	return &PreparedReplicationTriggers{entries: make(map[types.UID]preparedReplication), failures: make(map[types.UID]failedTriggerValidation)}
 }
 
 // Validate reuses the current prepared subscription on ordinary reconciliation.
@@ -46,9 +52,24 @@ func (c *PreparedReplicationTriggers) Validate(uid types.UID, generation int64, 
 		if _, ok := c.Get(uid, generation); ok {
 			return nil
 		}
+
+		if err := c.validationFailure(uid, generation); err != nil {
+			return err
+		}
 	}
 
-	return replication.ValidateTriggers(spec, namespaced, compiler)
+	err := replication.ValidateTriggers(spec, namespaced, compiler)
+	if err != nil && c != nil {
+		c.rememberValidationFailure(uid, generation, err)
+	} else if c != nil {
+		c.mu.Lock()
+		if failure := c.failures[uid]; failure.generation <= generation {
+			delete(c.failures, uid)
+		}
+		c.mu.Unlock()
+	}
+
+	return err
 }
 
 func (c *PreparedReplicationTriggers) Get(uid types.UID, generation int64) (*replication.PreparedTriggers, bool) {
@@ -67,6 +88,10 @@ func (c *PreparedReplicationTriggers) GetOrBuild(uid types.UID, generation int64
 
 	if value, ok := c.Get(uid, generation); ok {
 		return value, nil
+	}
+
+	if err := c.validationFailure(uid, generation); err != nil {
+		return nil, err
 	}
 
 	c.mu.Lock()
@@ -91,6 +116,8 @@ func (c *PreparedReplicationTriggers) GetOrBuild(uid types.UID, generation int64
 
 	value, err := build()
 	if err != nil {
+		c.rememberValidationFailure(uid, generation, err)
+
 		return nil, err
 	}
 
@@ -98,6 +125,11 @@ func (c *PreparedReplicationTriggers) GetOrBuild(uid types.UID, generation int64
 	defer c.mu.Unlock()
 
 	previous = c.entries[uid]
+
+	if failure := c.failures[uid]; failure.generation >= generation && failure.err != nil {
+		return nil, failure.err
+	}
+
 	if previous.triggers != nil && previous.generation >= generation {
 		if previous.generation == generation {
 			return previous.triggers, nil
@@ -112,6 +144,7 @@ func (c *PreparedReplicationTriggers) GetOrBuild(uid types.UID, generation int64
 
 	c.conditions += conditions - previous.conditions
 	c.entries[uid] = preparedReplication{generation: generation, fingerprint: fingerprint, conditions: conditions, triggers: value}
+	delete(c.failures, uid)
 
 	return value, nil
 }
@@ -126,6 +159,12 @@ func (c *PreparedReplicationTriggers) PruneActive(active map[types.UID]int64) {
 			delete(c.entries, uid)
 		}
 	}
+
+	for uid, failure := range c.failures {
+		if generation, ok := active[uid]; !ok || generation != failure.generation {
+			delete(c.failures, uid)
+		}
+	}
 }
 
 func (c *PreparedReplicationTriggers) Delete(uid types.UID) {
@@ -136,4 +175,53 @@ func (c *PreparedReplicationTriggers) Delete(uid types.UID) {
 		c.conditions -= value.conditions
 		delete(c.entries, uid)
 	}
+
+	delete(c.failures, uid)
+}
+
+func (c *PreparedReplicationTriggers) validationFailure(uid types.UID, generation int64) error {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	value := c.failures[uid]
+	if value.generation == generation {
+		return value.err
+	}
+
+	return nil
+}
+
+// Publish failures like prepared artifacts: compile outside the shared lock,
+// then fence publication against newer generations. The bounded failure set
+// retains no source objects or evaluation results.
+func (c *PreparedReplicationTriggers) rememberValidationFailure(uid types.UID, generation int64, err error) {
+	if uid == "" {
+		return
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	previous, exists := c.failures[uid]
+
+	prepared := c.entries[uid]
+
+	if previous.generation > generation || prepared.generation > generation {
+		return
+	}
+
+	if prepared.triggers != nil {
+		c.conditions -= prepared.conditions
+		delete(c.entries, uid)
+	}
+
+	if !exists && len(c.failures) >= MaxPreparedReplications {
+		return
+	}
+
+	if c.failures == nil {
+		c.failures = make(map[types.UID]failedTriggerValidation)
+	}
+
+	c.failures[uid] = failedTriggerValidation{generation: generation, err: err}
 }

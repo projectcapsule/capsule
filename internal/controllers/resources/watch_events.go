@@ -89,6 +89,14 @@ func (r *ResourceWatches) enqueueEvent(ctx context.Context, resource schema.Grou
 	}
 
 	oldObject, object := watchObject(oldValue), watchObject(value)
+	if oldObject != nil && object != nil && oldObject.GetUID() != object.GetUID() {
+		// Informer relists can report a same-name recreation as an update.
+		// These are independent objects, including for managed exclusion.
+		r.enqueueEvent(ctx, resource, identity, admissionv1.Delete, oldObject, nil)
+		r.enqueueEvent(ctx, resource, identity, admissionv1.Create, nil, object)
+
+		return
+	}
 
 	source := object
 
@@ -101,7 +109,7 @@ func (r *ResourceWatches) enqueueEvent(ctx context.Context, resource schema.Grou
 	}
 
 	if oldObject != nil && object != nil {
-		if oldObject.GetUID() != object.GetUID() || oldObject.GetResourceVersion() == object.GetResourceVersion() || bookkeepingEvent(resource, oldObject, object) {
+		if oldObject.GetResourceVersion() == object.GetResourceVersion() || bookkeepingEvent(resource, oldObject, object) {
 			return
 		}
 	}
@@ -187,11 +195,7 @@ func (r *ResourceWatches) matchEvent(ctx context.Context, event resourceWatchEve
 			}
 		}
 
-		if prepared.NeedsNamespace() && namespaceFailed {
-			return
-		}
-
-		matched, err := prepared.Matches(ctx, key, event.operation, namespaceLabels, event.oldObject, event.object)
+		matched, err := prepared.MatchesWithNamespace(ctx, key, event.operation, namespaceLabels, !namespaceFailed, event.oldObject, event.object)
 		if err != nil {
 			r.metrics.Events.WithLabelValues("condition-error").Inc()
 

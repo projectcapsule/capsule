@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -21,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
+	"k8s.io/client-go/rest"
 	clientcache "k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -36,6 +38,45 @@ import (
 )
 
 var configMapsGVR = schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}
+
+func TestWatchUIDReplacementPreservesIndependentOperations(t *testing.T) {
+	for _, test := range []struct {
+		name                string
+		oldManaged, managed bool
+		want                []admissionv1.OperationType
+	}{
+		{name: "unmanaged", want: []admissionv1.OperationType{admissionv1.Delete, admissionv1.Create}},
+		{name: "managed-old", oldManaged: true, want: []admissionv1.OperationType{admissionv1.Create}},
+		{name: "managed-new", managed: true, want: []admissionv1.OperationType{admissionv1.Delete}},
+		{name: "managed-both", oldManaged: true, managed: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			f := watchFixtureFor(t, 0)
+			old, object := sourceObject("a"), sourceObject("a")
+			object.SetUID("replacement")
+			object.SetResourceVersion("new-version")
+			if test.oldManaged {
+				old.SetLabels(map[string]string{meta.NewManagedByCapsuleLabel: meta.ValueController})
+			}
+			if test.managed {
+				object.SetLabels(map[string]string{meta.NewManagedByCapsuleLabel: meta.ValueController})
+			}
+			identity := resourceWatchIdentity{account: cache.Key{Namespace: "a", Name: "reader"}}
+			f.watcher.enqueueEvent(t.Context(), configMapsGVR, identity, admissionv1.Update, old, object)
+			var got []admissionv1.OperationType
+			for len(f.watcher.events) > 0 {
+				event := <-f.watcher.events
+				got = append(got, event.operation)
+				if event.identity != identity || (event.operation == admissionv1.Delete && (event.object != nil || event.oldObject.GetUID() != old.GetUID())) || (event.operation == admissionv1.Create && (event.oldObject != nil || event.object.GetUID() != object.GetUID())) {
+					t.Fatal("replacement lost identity or old/new object semantics")
+				}
+			}
+			if !slices.Equal(got, test.want) {
+				t.Fatalf("got operations %v, want %v", got, test.want)
+			}
+		})
+	}
+}
 
 type watchNotifications struct {
 	mu      sync.Mutex
@@ -111,6 +152,7 @@ func watchFixtureFor(tb testing.TB, unrelated int) *watchFixture {
 	compiler, _ := cache.NewCELCache()
 	dyn := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, map[schema.GroupVersionResource]string{configMapsGVR: "ConfigMapList", {Version: "v1", Resource: "secrets"}: "SecretList"})
 	f.watcher = NewResourceWatches(f.client, dyn, mapper, logr.Discard(), watchConfiguration{}, compiler, cache.NewLabelSelectorCache(), cache.NewPreparedReplicationTriggers(), f.notifications, metrics.NewTriggerRecorder())
+	f.watcher.baseREST = &rest.Config{Host: "https://unused.example"}
 	if _, err := f.watcher.Reconcile(tb.Context(), reconcile.Request{}); err != nil {
 		tb.Fatal(err)
 	}
@@ -384,4 +426,24 @@ func BenchmarkWatchEventSkip(b *testing.B) {
 			b.ReportMetric(float64(f.gets)/float64(b.N), "GET/op")
 		})
 	}
+}
+
+func BenchmarkWatchUIDReplacement(b *testing.B) {
+	f := watchFixtureFor(b, 1000)
+	before := sourceObject("a")
+	after := before.DeepCopy()
+	after.SetUID("replacement")
+	after.SetResourceVersion("replacement-version")
+	b.ReportAllocs()
+	for b.Loop() {
+		f.watcher.enqueueEvent(b.Context(), configMapsGVR, resourceWatchIdentity{}, admissionv1.Update, before, after)
+		for range 2 {
+			f.watcher.matchEvent(b.Context(), <-f.watcher.events)
+		}
+		if targets := f.notifications.take(); len(targets) != 2 || targets["local-a"] != 2 || targets["global"] != 2 {
+			b.Fatalf("replacement notifications: %v", targets)
+		}
+	}
+	b.ReportMetric(float64(f.lists)/float64(b.N), "LIST/op")
+	b.ReportMetric(float64(f.gets)/float64(b.N), "GET/op")
 }

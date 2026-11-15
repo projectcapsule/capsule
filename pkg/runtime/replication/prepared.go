@@ -103,6 +103,12 @@ func (p *PreparedTriggers) Resources() []schema.GroupVersionResource {
 func (p *PreparedTriggers) NeedsNamespace() bool { return p.needsNamespace }
 
 func (p *PreparedTriggers) Matches(ctx context.Context, key string, operation admissionv1.OperationType, namespaceLabels map[string]string, oldObject, object *unstructured.Unstructured) (bool, error) {
+	return p.MatchesWithNamespace(ctx, key, operation, namespaceLabels, true, oldObject, object)
+}
+
+// MatchesWithNamespace skips only alternatives requiring namespace labels when
+// namespace metadata is unavailable. Unrestricted alternatives remain eligible.
+func (p *PreparedTriggers) MatchesWithNamespace(ctx context.Context, key string, operation admissionv1.OperationType, namespaceLabels map[string]string, namespaceAvailable bool, oldObject, object *unstructured.Unstructured) (bool, error) {
 	var (
 		evaluationError error
 		activation      map[string]any
@@ -113,6 +119,10 @@ func (p *PreparedTriggers) Matches(ctx context.Context, key string, operation ad
 
 	for _, rule := range p.rules {
 		if _, ok := rule.keys[key]; !ok {
+			continue
+		}
+
+		if !namespaceAvailable && !rule.namespace.Empty() {
 			continue
 		}
 

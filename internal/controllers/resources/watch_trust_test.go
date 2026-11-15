@@ -136,7 +136,7 @@ func TestWatchTrustReadsAreBoundedAndSkippedWhenUnused(t *testing.T) {
 				if _, err := f.watcher.Reconcile(t.Context(), reconcile.Request{}); err != nil {
 					t.Fatal(err)
 				}
-				wantGets := 3 // projection, REST configuration, one CA Secret
+				wantGets := 2 // configuration projection and one pinned CA Secret
 				if skipTLS {
 					wantGets = 1
 				}
@@ -162,7 +162,7 @@ func TestWatchTrustReadsAreBoundedAndSkippedWhenUnused(t *testing.T) {
 
 func TestWatchConstructionRejectsTrustChangedAfterPlanning(t *testing.T) {
 	f, _, _ := watchTrustFixture(t, 0)
-	key := resourceWatchKey{resource: configMapsGVR, namespace: "a", identity: resourceWatchIdentity{account: cache.Key{Namespace: "a", Name: "reader"}, transport: capsulev1beta2.ServiceAccountClient{CASecretName: "watch-ca"}}, caBundle: sha256.Sum256([]byte("old-ca"))}
+	key := resourceWatchKey{resource: configMapsGVR, namespace: "a", identity: resourceWatchIdentity{account: cache.Key{Namespace: "a", Name: "reader"}, transport: capsulev1beta2.ServiceAccountClient{CASecretName: "watch-ca", CASecretNamespace: "capsule-system", CASecretKey: "ca.crt"}}, caBundle: sha256.Sum256([]byte("old-ca"))}
 	if _, err := f.watcher.resourceInformer(t.Context(), key, corev1.SchemeGroupVersion.WithKind("ConfigMap")); err == nil || !strings.Contains(err.Error(), "CA changed since planning") {
 		t.Fatalf("expected changed-trust rejection, got %v", err)
 	}

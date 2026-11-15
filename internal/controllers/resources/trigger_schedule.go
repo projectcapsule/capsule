@@ -4,6 +4,8 @@
 package resources
 
 import (
+	"context"
+	"errors"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,6 +14,51 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/runtime/replication"
 )
+
+type triggerValidationError struct{ error }
+
+func (e triggerValidationError) Unwrap() error { return e.error }
+
+// Trigger scheduling and subsequent status writes must start from the same
+// authoritative annotation/acknowledgement snapshot, including retained trigger
+// state after subscriptions are removed. Other replications keep cached reads.
+func readReplicationSource(ctx context.Context, cached, reader client.Reader, key client.ObjectKey, object client.Object) error {
+	if err := cached.Get(ctx, key, object); err != nil {
+		return err
+	}
+
+	triggered := object.GetAnnotations()[replication.TriggerAnnotation] != ""
+	switch object := object.(type) {
+	case *capsulev1beta2.TenantResource:
+		triggered = triggered || len(object.Spec.Triggers) > 0 || object.Status.Trigger != nil
+		if triggered {
+			*object = capsulev1beta2.TenantResource{TypeMeta: object.TypeMeta}
+		}
+	case *capsulev1beta2.GlobalTenantResource:
+		triggered = triggered || len(object.Spec.Triggers) > 0 || object.Status.Trigger != nil
+		if triggered {
+			*object = capsulev1beta2.GlobalTenantResource{TypeMeta: object.TypeMeta}
+		}
+	}
+
+	if !triggered {
+		return nil
+	}
+
+	// Clear mutable fields before decoding, while preserving the API identity
+	// used by owner references. Omitted fields must not retain cached
+	// subscriptions, annotations or acknowledgements after removal.
+	gvk := object.GetObjectKind().GroupVersionKind()
+
+	if err := reader.Get(ctx, key, object); err != nil {
+		return err
+	}
+
+	// The typed REST decoder clears GVK, unlike the manager cache.
+	object.GetObjectKind().SetGroupVersionKind(gvk)
+
+	return nil
+}
 
 // Only the dispatcher throttles trigger notifications. Controllers must remain
 // responsive to dependency, namespace, tenant, configuration and periodic events,
@@ -87,11 +134,17 @@ func finishTrigger(status *capsulev1beta2.TenantResourceCommonStatus, request st
 // Retry transient apply/dependency failures promptly even before the first event,
 // including the initial protected-resource ownership handshake.
 func triggerRetryAfter(spec *capsulev1beta2.TenantResourceCommonSpec, scheduled time.Duration, reconcileError error) time.Duration {
-	if reconcileError != nil && len(spec.Triggers) > 0 {
-		interval := min(replication.Interval(spec), time.Minute)
-		if scheduled == 0 || scheduled > interval {
-			return interval
-		}
+	if reconcileError == nil || len(spec.Triggers) == 0 {
+		return scheduled
+	}
+
+	if _, ok := errors.AsType[triggerValidationError](reconcileError); ok {
+		return scheduled
+	}
+
+	interval := min(replication.Interval(spec), time.Minute)
+	if scheduled == 0 || scheduled > interval {
+		return interval
 	}
 
 	return scheduled

@@ -191,6 +191,9 @@ func TestTriggerInitialApplyRetryPreservesLegacyResync(t *testing.T) {
 	}
 	legacy.Triggers = []capsulev1beta2.TenantResourceTrigger{{Name: "events"}}
 	legacy.TriggerMinInterval.Duration = 4 * time.Second
+	if got := triggerRetryAfter(legacy, 24*time.Hour, triggerValidationError{err}); got != 24*time.Hour {
+		t.Fatal("permanent trigger configuration error entered the fast retry path")
+	}
 	if got := triggerRetryAfter(legacy, 24*time.Hour, err); got != 4*time.Second {
 		t.Fatal("initial apply failure waits for long resync")
 	}

@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
 	clientcache "k8s.io/client-go/tools/cache"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -53,6 +54,7 @@ type ResourceWatches struct {
 	client            client.Client
 	configuration     configuration.Configuration
 	configurationName string
+	baseREST          *rest.Config
 	dynamic           dynamic.Interface
 	mapper            apimeta.RESTMapper
 	log               logr.Logger
@@ -75,6 +77,7 @@ func (r *ResourceWatches) NeedLeaderElection() bool { return true }
 
 func (r *ResourceWatches) SetupWithManager(mgr ctrl.Manager, options utils.ControllerOptions) error {
 	r.configurationName = options.ConfigurationName
+	r.baseREST = rest.CopyConfig(mgr.GetConfig())
 
 	enqueue := handler.EnqueueRequestsFromMapFunc(func(context.Context, client.Object) []reconcile.Request {
 		return []reconcile.Request{{Name: "resource-watches"}}
@@ -169,8 +172,6 @@ func (r *ResourceWatches) Reconcile(ctx context.Context, _ reconcile.Request) (r
 	for _, source := range sources {
 		prepared, err := r.prepareSource(source)
 		if err != nil {
-			r.prepared.Delete(source.GetUID())
-
 			omitted++
 
 			r.log.Error(err, "cannot prepare resource watches; periodic reconciliation remains active", "name", source.GetName(), "namespace", source.GetNamespace())

@@ -17,6 +17,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/watch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -222,6 +223,14 @@ var _ = Describe("Replication resource watches", Label("replications", "replicat
 		Expect(actor.Delete(ctx, source)).To(Succeed())
 		expectConfigMapData(namespaces[0].Name, prefix+"-local", map[string]string{"value": "missing"})
 		expectConfigMapData(namespaces[0].Name, prefix+"-global", map[string]string{"value": "missing"})
+		By("observing a same-name replacement without affecting another namespace profile or tenant")
+		replacement := &corev1.ConfigMap{Name: source.Name, Namespace: source.Namespace, Labels: map[string]string{watchSourceLabel: prefix, watchInputLabel: prefix}, Data: map[string]string{"value": "replacement"}}
+		Expect(actor.Create(ctx, replacement)).To(Succeed())
+		Expect(replacement.UID).NotTo(Equal(source.UID))
+		expectConfigMapData(namespaces[0].Name, prefix+"-local", map[string]string{"value": "replacement"})
+		expectConfigMapData(namespaces[0].Name, prefix+"-global", map[string]string{"value": "replacement"})
+		Consistently(func() string { return watchToken(other) }, 3*time.Second, 200*time.Millisecond).Should(BeEmpty())
+		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKey{Namespace: namespaces[1].Name, Name: prefix + "-global"}, &corev1.ConfigMap{}))).To(BeTrue())
 		By("retaining normal managed-resource enforcement")
 		Eventually(func() error {
 			fresh := &corev1.ConfigMap{}
@@ -240,6 +249,7 @@ var _ = Describe("Replication resource watches", Label("replications", "replicat
 			Expect(err.Error()).To(ContainSubstring("is managed by a tenant capsule replication"))
 			return nil
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		expectConfigMapData(namespaces[0].Name, prefix+"-local", map[string]string{"value": "replacement"})
 		By("using updated source namespace labels without changing destination profiles")
 		previousGlobal := watchToken(global)
 		Eventually(func() error {
@@ -280,6 +290,7 @@ var _ = Describe("Replication resource watches", Label("replications", "replicat
 		prefix := "watch-validation-" + rand.String(6)
 		owners, namespaces := watchNamespaces(prefix)
 		actor := impersonationClient(owners[0].Name, withDefaultGroups(nil))
+		var repair *capsulev1beta2.TenantResource
 		for _, test := range []struct {
 			name   string
 			change func(*capsulev1beta2.TenantResourceTrigger)
@@ -295,6 +306,7 @@ var _ = Describe("Replication resource watches", Label("replications", "replicat
 			{"subresource", func(trigger *capsulev1beta2.TenantResourceTrigger) { trigger.Resources = []string{"deployments/scale"} }, "explicit top-level"},
 		} {
 			spec := watchBody(prefix, namespaces[0].Name, prefix+"-output")
+			spec.Resources[0].NamespaceSelector = &metav1.LabelSelector{MatchLabels: map[string]string{"kubernetes.io/metadata.name": namespaces[0].Name}}
 			test.change(&spec.Triggers[0])
 			parent := &capsulev1beta2.TenantResource{Name: prefix + "-" + test.name, Namespace: namespaces[0].Name, Spec: capsulev1beta2.TenantResourceSpec{TenantResourceCommonSpec: spec}}
 			err := actor.Create(ctx, parent)
@@ -315,8 +327,104 @@ var _ = Describe("Replication resource watches", Label("replications", "replicat
 				g.Expect(condition.Message).To(ContainSubstring(test.reason))
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKey{Namespace: namespaces[0].Name, Name: prefix + "-output"}, &corev1.ConfigMap{}))).To(BeTrue())
-
+			// Simulate the dispatcher's pending notification without changing
+			// the invalid specification or its generation.
+			Eventually(func() error {
+				fresh := &capsulev1beta2.TenantResource{}
+				if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(parent), fresh); err != nil {
+					return err
+				}
+				if fresh.Annotations == nil {
+					fresh.Annotations = map[string]string{}
+				}
+				fresh.Annotations[replication.TriggerAnnotation] = "invalid-" + test.name
+				return k8sClient.Update(ctx, fresh)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			last := metav1.MicroTime{}
+			Eventually(func() (bool, error) {
+				fresh := &capsulev1beta2.TenantResource{}
+				if err := actor.Get(ctx, client.ObjectKeyFromObject(parent), fresh); err != nil {
+					return false, err
+				}
+				if fresh.Status.Trigger == nil {
+					return false, nil
+				}
+				Expect(fresh.Status.Trigger.ObservedRequest).To(BeEmpty())
+				if !last.Equal(&fresh.Status.Trigger.LastTriggeredAt) {
+					last = fresh.Status.Trigger.LastTriggeredAt
+					return false, nil
+				}
+				return true, nil
+			}, defaultTimeoutInterval, 200*time.Millisecond).MustPassRepeatedly(15).Should(BeTrue(), "permanent validation errors must stop fast triggered attempts")
+			repair = parent
 		}
+		By("resuming the selected namespace profile after correcting the specification")
+		Eventually(func() error {
+			fresh := &capsulev1beta2.TenantResource{}
+			if err := actor.Get(ctx, client.ObjectKeyFromObject(repair), fresh); err != nil {
+				return err
+			}
+			fresh.Spec.Triggers = []capsulev1beta2.TenantResourceTrigger{watchRule(prefix)}
+			return actor.Update(ctx, fresh)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		waitWatchReady(repair)
+		expectConfigMapData(namespaces[0].Name, prefix+"-output", map[string]string{"value": "missing"})
+		for _, namespace := range namespaces[1:] {
+			Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKey{Namespace: namespace.Name, Name: prefix + "-output"}, &corev1.ConfigMap{}))).To(BeTrue())
+		}
+	})
+
+	It("combines namespace-restricted and unrestricted resource alternatives", func() {
+		ctx := context.Background()
+		prefix := "watch-alternatives-" + rand.String(6)
+		owners, namespaces := watchNamespaces(prefix)
+		actor := impersonationClient(owners[0].Name, withDefaultGroups(nil))
+		bob := impersonationClient(owners[1].Name, withDefaultGroups(nil))
+		restricted := watchRule(prefix)
+		restricted.Name, restricted.Resources, restricted.MatchConditions = "restricted", []string{"secrets"}, nil
+		restricted.NamespaceSelector = &metav1.LabelSelector{MatchLabels: map[string]string{"projectcapsule.dev/watch-case": "excluded-" + prefix}}
+		open := watchRule(prefix)
+		open.Name, open.Operations = "unrestricted", []admissionv1.OperationType{admissionv1.Update}
+		open.MatchConditions = []admissionv1.MatchCondition{{Name: "source-namespace", Expression: fmt.Sprintf("object.metadata.namespace == '%s'", namespaces[0].Name)}}
+		common := capsulev1beta2.TenantResourceCommonSpec{Triggers: []capsulev1beta2.TenantResourceTrigger{restricted, open}, ResyncPeriod: metav1.Duration{Duration: 24 * time.Hour}, TriggerMinInterval: metav1.Duration{Duration: time.Second}, Resources: []capsulev1beta2.ResourceSpec{}}
+		target := &capsulev1beta2.GlobalTenantResource{Name: prefix, Spec: capsulev1beta2.GlobalTenantResourceSpec{Scope: "Namespace", TenantSelector: metav1.LabelSelector{MatchLabels: map[string]string{"projectcapsule.dev/watch-tenant": "0" + prefix}}, TenantResourceCommonSpec: common}}
+		Expect(k8sClient.Create(ctx, target)).To(Succeed())
+		DeferCleanup(DeleteInBackground, target)
+		waitWatchReady(target)
+		onlyRestricted := &capsulev1beta2.GlobalTenantResource{Name: prefix + "-restricted", Spec: *target.Spec.DeepCopy()}
+		onlyRestricted.Spec.Triggers = []capsulev1beta2.TenantResourceTrigger{restricted}
+		Expect(k8sClient.Create(ctx, onlyRestricted)).To(Succeed())
+		DeferCleanup(DeleteInBackground, onlyRestricted)
+		waitWatchReady(onlyRestricted)
+		source := &corev1.ConfigMap{Name: prefix, Namespace: namespaces[0].Name, Labels: map[string]string{watchSourceLabel: prefix}, Data: map[string]string{"value": "initial"}}
+		Expect(actor.Create(ctx, source)).To(Succeed())
+		Eventually(func() error {
+			if watchToken(target) != "" {
+				return nil
+			}
+			fresh := &corev1.ConfigMap{}
+			if err := actor.Get(ctx, client.ObjectKeyFromObject(source), fresh); err != nil {
+				return err
+			}
+			fresh.Data["value"] = rand.String(8)
+			if err := actor.Update(ctx, fresh); err != nil {
+				return err
+			}
+			return fmt.Errorf("waiting for unrestricted alternative")
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		before := ""
+		Eventually(func() bool {
+			current := watchToken(target)
+			if current == "" || current != before {
+				before = current
+				return false
+			}
+			return true
+		}, defaultTimeoutInterval, 200*time.Millisecond).MustPassRepeatedly(20).Should(BeTrue())
+		other := &corev1.ConfigMap{Name: prefix, Namespace: namespaces[2].Name, Labels: map[string]string{watchSourceLabel: prefix}, Data: map[string]string{"value": "other-tenant"}}
+		Expect(bob.Create(ctx, other)).To(Succeed())
+		changeWatchInput(bob, other, "other-tenant-update")
+		Consistently(func() []string { return []string{watchToken(target), watchToken(onlyRestricted)} }, 3*time.Second, 200*time.Millisecond).Should(Equal([]string{before, ""}))
 	})
 	It("keeps parent bookkeeping quiet and applies cordon, interval and trigger changes", func() {
 		ctx := context.Background()
@@ -512,6 +620,13 @@ var _ = Describe("Replication resource watches", Label("replications", "replicat
 		for _, other := range unrelated {
 			waitWatchReady(other)
 		}
+		initial := &capsulev1beta2.TenantResource{}
+		Expect(actor.Get(ctx, client.ObjectKeyFromObject(parent), initial)).To(Succeed())
+		observer, err := client.NewWithWatch(cfg, client.Options{Scheme: k8sClient.Scheme()})
+		Expect(err).NotTo(HaveOccurred())
+		updates, err := observer.Watch(ctx, &capsulev1beta2.TenantResourceList{}, &client.ListOptions{Namespace: parent.Namespace, Raw: &metav1.ListOptions{FieldSelector: "metadata.name=" + parent.Name, ResourceVersion: initial.ResourceVersion}})
+		Expect(err).NotTo(HaveOccurred())
+		DeferCleanup(updates.Stop)
 		wave := func(name string) map[string]any {
 			durations := make([]time.Duration, 0, 50)
 			started := time.Now()
@@ -552,6 +667,49 @@ var _ = Describe("Replication resource watches", Label("replications", "replicat
 		for _, other := range unrelated {
 			Expect(watchToken(other)).To(BeEmpty())
 		}
+		By("preserving acknowledgement order across subscription edits and source bursts")
+		final := &capsulev1beta2.TenantResource{}
+		Expect(actor.Get(ctx, client.ObjectKeyFromObject(parent), final)).To(Succeed())
+		requests := map[string]int{"": 0}
+		remember := func(token string) {
+			if _, ok := requests[token]; !ok {
+				requests[token] = len(requests)
+			}
+		}
+		initialAck := ""
+		if initial.Status.Trigger != nil {
+			initialAck = initial.Status.Trigger.ObservedRequest
+		}
+		remember(initialAck)
+		remember(initial.Annotations[replication.TriggerAnnotation])
+		acknowledged := requests[initialAck]
+		Eventually(func() error {
+			select {
+			case update, ok := <-updates.ResultChan():
+				if !ok || update.Type == watch.Error {
+					return StopTrying("acknowledgement observer ended before the final state")
+				}
+				current, ok := update.Object.(*capsulev1beta2.TenantResource)
+				if !ok || current.UID != initial.UID {
+					return StopTrying("acknowledgement observer received an unrelated object")
+				}
+				remember(current.Annotations[replication.TriggerAnnotation])
+				token := ""
+				if current.Status.Trigger != nil {
+					token = current.Status.Trigger.ObservedRequest
+				}
+				index, known := requests[token]
+				if !known || index < acknowledged {
+					return StopTrying("trigger acknowledgement regressed or referenced an unpublished request")
+				}
+				acknowledged = index
+				if current.ResourceVersion == final.ResourceVersion {
+					return nil
+				}
+			default:
+			}
+			return fmt.Errorf("waiting for acknowledgement observer to reach the final API snapshot")
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 	It("validates watches in controllers with policy conversion disabled", Label("config"), func() {
 		ctx := context.Background()
