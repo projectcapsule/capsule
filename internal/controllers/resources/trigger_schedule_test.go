@@ -299,6 +299,8 @@ func TestDispatcherEnforcesPersistedCooldownWithoutReplacingPendingWork(t *testi
 			if pending == "handled" {
 				t.Fatal("eligible notification missing")
 			}
+			// A new elected replica has no local queue/cooldown history.
+			d = NewTriggerDispatcher(c, c, logr.Discard(), metrics.NewTriggerRecorder())
 			if delay, err := d.dispatch(t.Context(), target, now.Add(20*time.Second)); err != nil || delay <= 0 {
 				t.Fatalf("unacknowledged work replaced: delay=%s err=%v", delay, err)
 			}
@@ -307,6 +309,14 @@ func TestDispatcherEnforcesPersistedCooldownWithoutReplacingPendingWork(t *testi
 			}
 			if obj.GetAnnotations()[replication.TriggerAnnotation] != pending {
 				t.Fatal("later event replaced outstanding token")
+			}
+			finishTrigger(status, pending, now.Add(20*time.Second), nil)
+			if err := c.Update(t.Context(), obj); err != nil {
+				t.Fatal(err)
+			}
+			d = NewTriggerDispatcher(c, c, logr.Discard(), metrics.NewTriggerRecorder())
+			if delay, err := d.dispatch(t.Context(), target, now.Add(21*time.Second)); err != nil || delay != 9*time.Second {
+				t.Fatalf("fresh replica ignored acknowledged attempt cooldown: delay=%s err=%v", delay, err)
 			}
 		})
 	}
