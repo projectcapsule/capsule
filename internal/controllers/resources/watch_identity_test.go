@@ -106,15 +106,16 @@ func TestWatchEventsNeverEvaluateAnotherExecutionIdentity(t *testing.T) {
 
 func TestWatchConstructionFailureRetriesWithoutChangingSubscription(t *testing.T) {
 	f := watchFixtureFor(t, 0)
+	f.watcher.baseREST = nil
 	for len(f.watcher.changed) != 0 {
 		<-f.watcher.changed
 	}
 	var attempts atomic.Int64
-	f.watcher.newInformer = func(ctx context.Context, key resourceWatchKey, kind schema.GroupVersionKind) (clientcache.SharedIndexInformer, error) {
+	f.watcher.newStream = func(ctx context.Context, key resourceWatchKey, kind schema.GroupVersionKind) (resourceEventSource, error) {
 		if attempts.Add(1) == 1 {
 			return nil, fmt.Errorf("execution configuration temporarily unavailable")
 		}
-		return f.watcher.resourceInformer(ctx, key, kind)
+		return f.watcher.resourceStream(ctx, key, kind)
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan error, 1)
@@ -251,7 +252,7 @@ func TestImpersonatedWatchRejectsForbiddenReadsWithoutControllerFallback(t *test
 	f.watcher.configuration = watchHTTPConfiguration{endpoint: server.URL}
 	f.watcher.baseREST = &rest.Config{Host: server.URL}
 	key := resourceWatchKey{resource: schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, namespace: "a", identity: resourceWatchIdentity{account: cache.Key{Namespace: "a", Name: "restricted"}}}
-	informer, err := f.watcher.resourceInformer(t.Context(), key, schema.GroupVersionKind{Version: "v1", Kind: "Secret"})
+	informer, err := f.watcher.resourceStream(t.Context(), key, schema.GroupVersionKind{Version: "v1", Kind: "Secret"})
 	if err != nil {
 		t.Fatal(err)
 	}

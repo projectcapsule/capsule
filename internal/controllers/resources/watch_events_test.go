@@ -182,7 +182,7 @@ func TestWatchEventsSelectorsOperationsAndIsolation(t *testing.T) {
 				before = clientcache.DeletedFinalStateUnknown{Obj: old}
 			}
 			f.watcher.enqueueEvent(t.Context(), configMapsGVR, resourceWatchIdentity{}, operation, before, after)
-			f.watcher.matchEvent(t.Context(), <-f.watcher.events)
+			f.watcher.processEvent(t.Context(), <-f.watcher.events)
 			targets := f.notifications.take()
 			if targets["local-a"] != 1 || targets["global"] != 1 || len(targets) != 2 {
 				t.Fatalf("wrong targets: %v", targets)
@@ -192,7 +192,7 @@ func TestWatchEventsSelectorsOperationsAndIsolation(t *testing.T) {
 			}
 			object = sourceObject("b")
 			f.watcher.enqueueEvent(t.Context(), configMapsGVR, resourceWatchIdentity{}, admissionv1.Create, nil, object)
-			f.watcher.matchEvent(t.Context(), <-f.watcher.events)
+			f.watcher.processEvent(t.Context(), <-f.watcher.events)
 			targets = f.notifications.take()
 			if len(targets) != 1 || targets["local-b"] != 1 {
 				t.Fatalf("cross-tenant leak: %v", targets)
@@ -242,7 +242,7 @@ func TestWatchEventSkipsAndBookkeeping(t *testing.T) {
 			}
 			f.watcher.enqueueEvent(ctx, resource, resourceWatchIdentity{}, admissionv1.Update, old, object)
 			if len(f.watcher.events) > 0 {
-				f.watcher.matchEvent(t.Context(), <-f.watcher.events)
+				f.watcher.processEvent(t.Context(), <-f.watcher.events)
 			}
 			if len(f.notifications.take()) != 0 {
 				t.Fatal("ineligible event notified a target")
@@ -270,7 +270,7 @@ func TestWatchSubscriptionUpdatesAndRemoval(t *testing.T) {
 	}
 	object := sourceObject("a")
 	f.watcher.enqueueEvent(t.Context(), configMapsGVR, resourceWatchIdentity{}, admissionv1.Create, nil, object)
-	f.watcher.matchEvent(t.Context(), <-f.watcher.events)
+	f.watcher.processEvent(t.Context(), <-f.watcher.events)
 	if targets := f.notifications.take(); targets["local-a"] != 0 || targets["global"] != 1 {
 		t.Fatalf("stale selector used: %v", targets)
 	}
@@ -419,6 +419,7 @@ func BenchmarkWatchEventSkip(b *testing.B) {
 				select {
 				case event := <-f.watcher.events:
 					f.watcher.matchEvent(b.Context(), event)
+					f.watcher.releaseEvent(event)
 				default:
 				}
 			}
@@ -441,7 +442,9 @@ func BenchmarkWatchUIDReplacement(b *testing.B) {
 	for b.Loop() {
 		f.watcher.enqueueEvent(b.Context(), configMapsGVR, resourceWatchIdentity{}, admissionv1.Update, before, after)
 		for range 2 {
-			f.watcher.matchEvent(b.Context(), <-f.watcher.events)
+			event := <-f.watcher.events
+			f.watcher.matchEvent(b.Context(), event)
+			f.watcher.releaseEvent(event)
 		}
 		if targets := f.notifications.take(); len(targets) != 2 || targets["local-a"] != 2 || targets["global"] != 2 {
 			b.Fatalf("replacement notifications: %v", targets)

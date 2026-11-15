@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/runtime/replication"
 	"github.com/projectcapsule/capsule/pkg/runtime/ssa"
@@ -28,7 +29,10 @@ type resourceWatchEvent struct {
 	operation         admissionv1.OperationType
 	oldObject, object *unstructured.Unstructured
 	identity          resourceWatchIdentity
+	bytes             int64
 }
+
+const maxWatchEventBytes = 8 * 1024 * 1024
 
 func watchObject(value any) *unstructured.Unstructured {
 	if tombstone, ok := value.(clientcache.DeletedFinalStateUnknown); ok {
@@ -104,23 +108,61 @@ func (r *ResourceWatches) enqueueEvent(ctx context.Context, resource schema.Grou
 		source = oldObject
 	}
 
-	if source == nil || source.GetNamespace() == "" || watchManaged(oldObject) || watchManaged(object) {
+	if source == nil || source.GetNamespace() == "" {
 		return
 	}
 
-	if oldObject != nil && object != nil {
-		if oldObject.GetResourceVersion() == object.GetResourceVersion() || bookkeepingEvent(resource, oldObject, object) {
-			return
-		}
+	if oldObject != nil && object != nil && (oldObject.GetResourceVersion() == object.GetResourceVersion() || bookkeepingEvent(resource, oldObject, object)) {
+		return
 	}
 
-	event := resourceWatchEvent{done: ctx.Done(), resource: resource, identity: identity, operation: operation, oldObject: oldObject, object: object}
+	oldBytes, objectBytes := cache.WatchObjectBytes(oldObject), cache.WatchObjectBytes(object)
+	if oldBytes > cache.MaxWatchObjectBytes || objectBytes > cache.MaxWatchObjectBytes {
+		r.metrics.Events.WithLabelValues("object-too-large").Inc()
+
+		return
+	}
+
+	if watchManaged(oldObject) || watchManaged(object) {
+		return
+	}
+
+	event := resourceWatchEvent{done: ctx.Done(), resource: resource, identity: identity, operation: operation, oldObject: oldObject, object: object, bytes: int64(oldBytes + objectBytes)}
+	if !r.reserveEvent(event.bytes) {
+		r.metrics.Events.WithLabelValues("dropped").Inc()
+
+		return
+	}
+
 	select {
 	case r.events <- event:
 		r.metrics.Events.WithLabelValues("queued").Inc()
+	case <-ctx.Done():
+		r.releaseEvent(event)
 	default:
+		r.releaseEvent(event)
 		r.metrics.Events.WithLabelValues("dropped").Inc()
 	}
+}
+
+func (r *ResourceWatches) reserveEvent(size int64) bool {
+	for {
+		used := r.eventBytes.Load()
+		if size > maxWatchEventBytes-used {
+			return false
+		}
+
+		if r.eventBytes.CompareAndSwap(used, used+size) {
+			r.metrics.QueuedBytes.Add(float64(size))
+
+			return true
+		}
+	}
+}
+
+func (r *ResourceWatches) releaseEvent(event resourceWatchEvent) {
+	r.eventBytes.Add(-event.bytes)
+	r.metrics.QueuedBytes.Sub(float64(event.bytes))
 }
 
 func (r *ResourceWatches) matchEvent(ctx context.Context, event resourceWatchEvent) {

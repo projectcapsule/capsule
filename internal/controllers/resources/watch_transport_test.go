@@ -54,7 +54,7 @@ func watchEndpoint(name string, sourceRequests *atomic.Int64) http.Handler {
 	})
 }
 
-func runWatchUntilReadyOrError(t *testing.T, informer clientcache.SharedIndexInformer) error {
+func runWatchUntilReadyOrError(t *testing.T, informer resourceEventSource, inspect ...func()) error {
 	t.Helper()
 	failures := make(chan error, 1)
 	if err := informer.SetWatchErrorHandlerWithContext(func(_ context.Context, _ *clientcache.Reflector, err error) {
@@ -83,6 +83,11 @@ func runWatchUntilReadyOrError(t *testing.T, informer clientcache.SharedIndexInf
 	}); err != nil {
 		t.Fatal(err)
 	}
+	if failure == nil {
+		for _, check := range inspect {
+			check()
+		}
+	}
 	return failure
 }
 
@@ -110,14 +115,14 @@ func TestWatchEndpointUsesIdentitySnapshotInsteadOfLiveTransport(t *testing.T) {
 	}
 	identity := watchIdentity(local, props)
 	key := resourceWatchKey{resource: configMapsGVR, namespace: "a", identity: identity}
-	informer, err := f.watcher.resourceInformer(t.Context(), key, corev1.SchemeGroupVersion.WithKind("ConfigMap"))
+	informer, err := f.watcher.resourceStream(t.Context(), key, corev1.SchemeGroupVersion.WithKind("ConfigMap"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := runWatchUntilReadyOrError(t, informer); err != nil {
+	var objects []any
+	if err := runWatchUntilReadyOrError(t, informer, func() { objects = informer.GetStore().List() }); err != nil {
 		t.Fatal(err)
 	}
-	objects := informer.GetStore().List()
 	if len(objects) != 1 {
 		t.Fatalf("source objects=%d", len(objects))
 	}
@@ -141,7 +146,7 @@ func TestWatchTLSVerificationUsesIdentitySnapshot(t *testing.T) {
 			props := capsulev1beta2.ServiceAccountClient{Endpoint: server.URL, SkipTLSVerify: skip, TenantDefaultServiceAccount: "reader"}
 			f.watcher.configuration = watchHTTPConfiguration{properties: props, endpoint: server.URL, insecure: !skip, reads: &liveReads}
 			identity := watchIdentity(&capsulev1beta2.TenantResource{Namespace: "a"}, props)
-			informer, err := f.watcher.resourceInformer(t.Context(), resourceWatchKey{resource: configMapsGVR, namespace: "a", identity: identity}, corev1.SchemeGroupVersion.WithKind("ConfigMap"))
+			informer, err := f.watcher.resourceStream(t.Context(), resourceWatchKey{resource: configMapsGVR, namespace: "a", identity: identity}, corev1.SchemeGroupVersion.WithKind("ConfigMap"))
 			if err != nil {
 				t.Fatal(err)
 			}

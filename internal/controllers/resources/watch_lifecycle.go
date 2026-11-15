@@ -29,20 +29,7 @@ func (r *ResourceWatches) Start(ctx context.Context) error {
 				case <-ctx.Done():
 					return
 				case event := <-r.events:
-					select {
-					case <-event.done:
-						continue
-					default:
-					}
-
-					eventCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
-					r.matchEvent(eventCtx, event)
-
-					if eventCtx.Err() != nil {
-						r.metrics.Events.WithLabelValues("timed-out").Inc()
-					}
-
-					cancel()
+					r.processEvent(ctx, event)
 				}
 			}
 		})
@@ -58,7 +45,17 @@ func (r *ResourceWatches) Start(ctx context.Context) error {
 		}
 
 		workers.Wait()
-		r.metrics.ActiveWatches.Set(0)
+
+		for {
+			select {
+			case event := <-r.events:
+				r.releaseEvent(event)
+			default:
+				r.metrics.ActiveWatches.Set(0)
+
+				return
+			}
+		}
 	}()
 	// Reconcile may have prepared subscriptions before the leader runnable starts.
 	r.syncWatches(ctx, running)
@@ -94,12 +91,17 @@ func (r *ResourceWatches) syncWatches(ctx context.Context, running map[resourceW
 		watchCtx, cancel := context.WithCancel(ctx)
 		resource := key.resource
 
-		factory := r.resourceInformer
-		if r.newInformer != nil {
-			factory = r.newInformer
+		var (
+			informer resourceEventSource
+			err      error
+		)
+
+		if r.newStream != nil {
+			informer, err = r.newStream(watchCtx, key, kind)
+		} else {
+			informer, err = r.resourceStream(watchCtx, key, kind)
 		}
 
-		informer, err := factory(watchCtx, key, kind)
 		if err != nil {
 			cancel()
 			r.metrics.Events.WithLabelValues("watch-error").Inc()
@@ -145,4 +147,23 @@ func (r *ResourceWatches) syncWatches(ctx context.Context, running map[resourceW
 	}
 
 	r.metrics.ActiveWatches.Set(float64(len(running)))
+}
+
+func (r *ResourceWatches) processEvent(ctx context.Context, event resourceWatchEvent) {
+	defer r.releaseEvent(event)
+
+	select {
+	case <-event.done:
+		return
+	default:
+	}
+
+	eventCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	defer cancel()
+
+	r.matchEvent(eventCtx, event)
+
+	if eventCtx.Err() != nil {
+		r.metrics.Events.WithLabelValues("timed-out").Inc()
+	}
 }

@@ -105,6 +105,7 @@ type TenantResourceTriggerCondition struct {
 type TenantResourceCommonSpec struct {
 	// Triggers request reconciliation on observed namespaced resource changes.
 	// Capsule-managed resources never trigger reconciliation. Delivery is best effort;
+	// bounded watch memory may skip large objects or updates without a retained old state.
 	// resyncPeriod remains the recovery mechanism for missed events.
 	// +optional
 	// +kubebuilder:validation:MaxItems=32

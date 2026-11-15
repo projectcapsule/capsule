@@ -16,9 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/dynamic/dynamicinformer"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
-	clientcache "k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -34,8 +32,11 @@ func TestSharedWatchStartupInitialListAndShutdown(t *testing.T) {
 		t.Fatal(err)
 	}
 	var watchStarts atomic.Int64
-	informer := dynamicinformer.NewFilteredDynamicInformer(dynamic, configMapsGVR, metav1.NamespaceAll, 0, clientcache.Indexers{}, nil).Informer()
-	f.watcher.newInformer = func(context.Context, resourceWatchKey, schema.GroupVersionKind) (clientcache.SharedIndexInformer, error) {
+	informer, err := f.watcher.resourceStream(t.Context(), resourceWatchKey{resource: configMapsGVR}, corev1.SchemeGroupVersion.WithKind("ConfigMap"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.watcher.newStream = func(context.Context, resourceWatchKey, schema.GroupVersionKind) (resourceEventSource, error) {
 		watchStarts.Add(1)
 		return informer, nil
 	}
@@ -135,6 +136,7 @@ func TestBookkeepingComparisonPreservesUserChanges(t *testing.T) {
 
 func TestLocalWatchScopesAndGlobalReplacement(t *testing.T) {
 	f := watchFixtureFor(t, 0)
+	f.watcher.baseREST = nil // Use the injected fake dynamic source.
 	global := &capsulev1beta2.GlobalTenantResource{}
 	if err := f.client.Get(t.Context(), client.ObjectKey{Name: "global"}, global); err != nil {
 		t.Fatal(err)

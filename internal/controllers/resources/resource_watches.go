@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -18,7 +19,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
-	clientcache "k8s.io/client-go/tools/cache"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -45,12 +45,12 @@ type resourceWatchKey struct {
 	caBundle  [sha256.Size]byte
 }
 
-// ResourceWatches shares namespace-scoped informers on the elected replica.
+// ResourceWatches shares namespace-scoped watch streams on the elected replica.
 // Stream sharing preserves each subscription's execution identity and scope.
 // The controller maintains the watch set; event handling uses the registered
 // manager-cache index and immutable prepared source projections.
 type ResourceWatches struct {
-	newInformer       func(context.Context, resourceWatchKey, schema.GroupVersionKind) (clientcache.SharedIndexInformer, error)
+	newStream         func(context.Context, resourceWatchKey, schema.GroupVersionKind) (resourceEventSource, error)
 	client            client.Client
 	configuration     configuration.Configuration
 	configurationName string
@@ -67,6 +67,8 @@ type ResourceWatches struct {
 	desired           map[resourceWatchKey]schema.GroupVersionKind
 	changed           chan struct{}
 	events            chan resourceWatchEvent
+	eventBytes        atomic.Int64
+	listSlots         chan struct{}
 	now               func() time.Time
 	rotationDue       time.Time
 	priorityGroup     string
@@ -74,7 +76,7 @@ type ResourceWatches struct {
 }
 
 func NewResourceWatches(c client.Client, dyn dynamic.Interface, mapper apimeta.RESTMapper, log logr.Logger, cfg configuration.Configuration, conditions *cache.CELCache, selectors *cache.LabelSelectorCache, prepared *cache.PreparedReplicationTriggers, notifier replication.Notifier, recorder *metrics.TriggerRecorder) *ResourceWatches {
-	return &ResourceWatches{client: c, dynamic: dyn, mapper: mapper, log: log, configuration: cfg, conditions: conditions, selectors: selectors, prepared: prepared, notifier: notifier, metrics: recorder, desired: make(map[resourceWatchKey]schema.GroupVersionKind), changed: make(chan struct{}, 1), events: make(chan resourceWatchEvent, 256), now: time.Now}
+	return &ResourceWatches{client: c, dynamic: dyn, mapper: mapper, log: log, configuration: cfg, conditions: conditions, selectors: selectors, prepared: prepared, notifier: notifier, metrics: recorder, desired: make(map[resourceWatchKey]schema.GroupVersionKind), changed: make(chan struct{}, 1), events: make(chan resourceWatchEvent, 256), listSlots: make(chan struct{}, 2), now: time.Now}
 }
 
 func (r *ResourceWatches) NeedLeaderElection() bool { return true }
@@ -82,6 +84,17 @@ func (r *ResourceWatches) NeedLeaderElection() bool { return true }
 func (r *ResourceWatches) SetupWithManager(mgr ctrl.Manager, options utils.ControllerOptions) error {
 	r.configurationName = options.ConfigurationName
 	r.baseREST = rest.CopyConfig(mgr.GetConfig())
+	// One controller-identity client shares its transport and rate limiter across
+	// all streams. The bounded response wrapper applies only to watch LIST calls.
+	watchConfig := rest.CopyConfig(r.baseREST)
+	limitWatchListResponses(watchConfig)
+
+	watchClient, err := dynamic.NewForConfig(watchConfig)
+	if err != nil {
+		return fmt.Errorf("create bounded resource watch client: %w", err)
+	}
+
+	r.dynamic = watchClient
 
 	enqueue := handler.EnqueueRequestsFromMapFunc(func(context.Context, client.Object) []reconcile.Request {
 		return []reconcile.Request{{Name: "resource-watches"}}

@@ -44,7 +44,7 @@ func watchTrustFixture(tb testing.TB, unrelated int) (*watchFixture, *corev1.Sec
 func TestWatchTrustRotationReplacesOnlyAffectedStreams(t *testing.T) {
 	f, secret, _ := watchTrustFixture(t, 0)
 	starts := 0
-	f.watcher.newInformer = func(_ context.Context, key resourceWatchKey, _ schema.GroupVersionKind) (clientcache.SharedIndexInformer, error) {
+	f.watcher.newStream = func(_ context.Context, key resourceWatchKey, _ schema.GroupVersionKind) (resourceEventSource, error) {
 		starts++
 		return dynamicinformer.NewFilteredDynamicInformer(f.watcher.dynamic, key.resource, key.namespace, 0, clientcache.Indexers{}, nil).Informer(), nil
 	}
@@ -163,7 +163,7 @@ func TestWatchTrustReadsAreBoundedAndSkippedWhenUnused(t *testing.T) {
 func TestWatchConstructionRejectsTrustChangedAfterPlanning(t *testing.T) {
 	f, _, _ := watchTrustFixture(t, 0)
 	key := resourceWatchKey{resource: configMapsGVR, namespace: "a", identity: resourceWatchIdentity{account: cache.Key{Namespace: "a", Name: "reader"}, transport: capsulev1beta2.ServiceAccountClient{CASecretName: "watch-ca", CASecretNamespace: "capsule-system", CASecretKey: "ca.crt"}}, caBundle: sha256.Sum256([]byte("old-ca"))}
-	if _, err := f.watcher.resourceInformer(t.Context(), key, corev1.SchemeGroupVersion.WithKind("ConfigMap")); err == nil || !strings.Contains(err.Error(), "CA changed since planning") {
+	if _, err := f.watcher.resourceStream(t.Context(), key, corev1.SchemeGroupVersion.WithKind("ConfigMap")); err == nil || !strings.Contains(err.Error(), "CA changed since planning") {
 		t.Fatalf("expected changed-trust rejection, got %v", err)
 	}
 }
@@ -181,7 +181,7 @@ func TestEmptyPinnedCARejectsWatchPlanningAndConstruction(t *testing.T) {
 		t.Error("empty pinned CA retained impersonated streams")
 	}
 	key := resourceWatchKey{resource: configMapsGVR, namespace: "a", identity: resourceWatchIdentity{account: cache.Key{Namespace: "a", Name: "reader"}, transport: capsulev1beta2.ServiceAccountClient{CASecretName: "watch-ca", CASecretNamespace: "capsule-system", CASecretKey: "ca.crt"}}, caBundle: sha256.Sum256(nil)}
-	if _, err := f.watcher.resourceInformer(t.Context(), key, corev1.SchemeGroupVersion.WithKind("ConfigMap")); err == nil || !strings.Contains(err.Error(), "empty") {
+	if _, err := f.watcher.resourceStream(t.Context(), key, corev1.SchemeGroupVersion.WithKind("ConfigMap")); err == nil || !strings.Contains(err.Error(), "empty") {
 		t.Fatalf("empty pinned CA allowed system-trust fallback: %v", err)
 	}
 }

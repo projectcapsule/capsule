@@ -11,12 +11,9 @@ import (
 	"github.com/go-logr/logr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/rest"
-	clientcache "k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -132,9 +129,15 @@ func watchIdentity(source client.Object, props capsulev1beta2.ServiceAccountClie
 	return resourceWatchIdentity{account: cache.Key{Namespace: account.Namespace.String(), Name: account.Name.String()}, transport: props}
 }
 
-func (r *ResourceWatches) resourceInformer(ctx context.Context, key resourceWatchKey, kind schema.GroupVersionKind) (clientcache.SharedIndexInformer, error) {
+func (r *ResourceWatches) resourceStream(ctx context.Context, key resourceWatchKey, kind schema.GroupVersionKind) (*resourceWatchStream, error) {
+	stream := &resourceWatchStream{owner: r, store: cache.NewReplicationWatchSnapshots(), slots: r.listSlots}
+
 	if key.identity.account == (cache.Key{}) {
-		return dynamicinformer.NewFilteredDynamicInformer(r.dynamic, key.resource, key.namespace, 0, clientcache.Indexers{}, nil).Informer(), nil
+		resource := r.dynamic.Resource(key.resource).Namespace(key.namespace)
+		stream.page = resource.List
+		stream.watch = resource.Watch
+
+		return stream, nil
 	}
 
 	base, err := r.watchRESTConfig(ctx, key)
@@ -142,14 +145,12 @@ func (r *ResourceWatches) resourceInformer(ctx context.Context, key resourceWatc
 		return nil, fmt.Errorf("load watch execution configuration: %w", err)
 	}
 
-	// A second rotation between planning and construction must not publish a
-	// client under the previous trust revision. The next planning pass retries.
 	if key.usesCASecret() && sha256.Sum256(base.CAData) != key.caBundle {
 		return nil, fmt.Errorf("resource watch CA changed since planning")
 	}
 
-	// Clients have the bounded stream lifetime. Reusing a process-wide client
-	// keyed only by account could retain a superseded impersonation endpoint.
+	limitWatchListResponses(base)
+
 	c, err := users.ImpersonatedKubernetesClientForServiceAccount(base, r.client.Scheme(), meta.NamespacedRFC1123ObjectReferenceWithNamespace{
 		Name: meta.RFC1123Name(key.identity.account.Name), Namespace: meta.RFC1123SubdomainName(key.identity.account.Namespace),
 	})
@@ -168,18 +169,15 @@ func (r *ResourceWatches) resourceInformer(ctx context.Context, key resourceWatc
 
 		return object
 	}
+	stream.page = func(ctx context.Context, options metav1.ListOptions) (*unstructured.UnstructuredList, error) {
+		object := list()
+		err := watched.List(ctx, object, &client.ListOptions{Namespace: key.namespace, Raw: &options})
 
-	lw := &clientcache.ListWatch{
-		ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
-			object := list()
-			err := watched.List(ctx, object, &client.ListOptions{Namespace: key.namespace, Raw: &options})
-
-			return object, err
-		},
-		WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
-			return watched.Watch(ctx, list(), &client.ListOptions{Namespace: key.namespace, Raw: &options})
-		},
+		return object, err
+	}
+	stream.watch = func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+		return watched.Watch(ctx, list(), &client.ListOptions{Namespace: key.namespace, Raw: &options})
 	}
 
-	return clientcache.NewSharedIndexInformer(lw, &unstructured.Unstructured{}, 0, clientcache.Indexers{}), nil
+	return stream, nil
 }
