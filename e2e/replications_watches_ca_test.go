@@ -16,6 +16,7 @@ import (
 	. "github.com/onsi/gomega"
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/util/cert"
@@ -47,6 +48,7 @@ var _ = Describe("Replication watch CA rotation", Label("config", "replications"
 		DeferCleanup(func() {
 			ModifyCapsuleConfigurationOpts(func(object *capsulev1beta2.CapsuleConfiguration) {
 				object.Spec.Impersonation = original.Spec.Impersonation
+				object.Spec.CacheInvalidation = original.Spec.CacheInvalidation
 			})
 		})
 		props := original.Spec.Impersonation
@@ -55,6 +57,7 @@ var _ = Describe("Replication watch CA rotation", Label("config", "replications"
 		props.CASecretName, props.CASecretNamespace, props.CASecretKey = meta.RFC1123Name(secret.Name), meta.RFC1123SubdomainName(secret.Namespace), "ca.crt"
 		ModifyCapsuleConfigurationOpts(func(object *capsulev1beta2.CapsuleConfiguration) {
 			object.Spec.Impersonation = props
+			object.Spec.CacheInvalidation.Duration = 24 * time.Hour
 		})
 		common := func() capsulev1beta2.TenantResourceCommonSpec {
 			trigger := watchRule(prefix)
@@ -72,8 +75,28 @@ var _ = Describe("Replication watch CA rotation", Label("config", "replications"
 		Expect(k8sClient.Create(ctx, global)).To(Succeed())
 		DeferCleanup(DeleteInBackground, global)
 		waitWatchReady(global)
-		source := &corev1.ConfigMap{Name: prefix, Namespace: namespace, Labels: map[string]string{watchSourceLabel: prefix}, Data: map[string]string{"value": "initial"}}
+		source := &corev1.ConfigMap{Name: prefix, Namespace: namespace, Labels: map[string]string{watchSourceLabel: prefix, watchInputLabel: prefix}, Data: map[string]string{"value": "initial"}}
 		Expect(actor.Create(ctx, source)).To(Succeed())
+		By("requiring real reads and applies through the cached impersonated client")
+		Eventually(func() error {
+			fresh := &capsulev1beta2.TenantResource{}
+			if err := actor.Get(ctx, client.ObjectKeyFromObject(parent), fresh); err != nil {
+				return err
+			}
+			fresh.Spec.Resources = watchBody(prefix, namespace, prefix+"-output").Resources
+			fresh.Spec.Resources[0].NamespaceSelector = &metav1.LabelSelector{MatchLabels: map[string]string{"kubernetes.io/metadata.name": namespace}}
+			return actor.Update(ctx, fresh)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Eventually(func(g Gomega) {
+			fresh := &capsulev1beta2.TenantResource{}
+			g.Expect(actor.Get(ctx, client.ObjectKeyFromObject(parent), fresh)).To(Succeed())
+			g.Expect(fresh.Status.ObservedGeneration).To(Equal(fresh.Generation))
+			condition := fresh.Status.Conditions.GetConditionByType(meta.ReadyCondition)
+			g.Expect(condition).NotTo(BeNil())
+			g.Expect(condition.Status).To(Equal(metav1.ConditionFalse))
+			g.Expect(condition.Message).To(ContainSubstring("x509:"))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: namespace, Name: prefix + "-output"}, &corev1.ConfigMap{})).To(Satisfy(apierrors.IsNotFound))
 		change := func() error {
 			fresh := &corev1.ConfigMap{}
 			if err := actor.Get(ctx, client.ObjectKeyFromObject(source), fresh); err != nil {
@@ -124,7 +147,13 @@ var _ = Describe("Replication watch CA rotation", Label("config", "replications"
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		AddReportEntry("ca-rotation-recovery", time.Since(rotatedAt).String())
 		waitWatchReady(parent)
+		By("updating the applied resource from fresh input after trust recovers")
+		changeWatchInput(actor, source, "after-ca-rotation")
+		expectConfigMapData(namespace, prefix+"-output", map[string]string{"value": "after-ca-rotation"})
 		Consistently(func() string { return watchToken(other) }, 3*time.Second, 200*time.Millisecond).Should(BeEmpty())
+		for _, excluded := range namespaces[1:] {
+			Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: excluded.Name, Name: prefix + "-output"}, &corev1.ConfigMap{})).To(Satisfy(apierrors.IsNotFound))
+		}
 		current := &capsulev1beta2.CapsuleConfiguration{}
 		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: defaultConfigurationName}, current)).To(Succeed())
 		Expect(current.Spec.Impersonation).To(Equal(props), "recovery must not require editing CapsuleConfiguration")
