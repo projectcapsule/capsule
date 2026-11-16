@@ -117,6 +117,9 @@ var _ = Describe("Replication watch snapshot memory", Serial, Label("replication
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			waitWatchReady(parent)
 		}
+		// Ready reports resource application. A marker event must also pass the
+		// new trigger generations before the one-shot old/new-state assertion.
+		baseline = barrier(baseline)
 		changeWatchInput(actor, source, "warm")
 		Eventually(func(g Gomega) {
 			for i, parent := range parents {
@@ -125,7 +128,9 @@ var _ = Describe("Replication watch snapshot memory", Serial, Label("replication
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		expectConfigMapData(source.Namespace, parents[0].Name, map[string]string{"value": "warm"})
 		By("recovering oversized inputs through periodic reconciliation without retaining or notifying their watch payloads")
-		for _, parent := range parents {
+		beforeReset := make([]string, len(parents))
+		for i, parent := range parents {
+			beforeReset[i] = watchToken(parent)
 			Eventually(func() error {
 				fresh := &capsulev1beta2.TenantResource{}
 				if err := actor.Get(ctx, client.ObjectKeyFromObject(parent), fresh); err != nil {
@@ -136,7 +141,7 @@ var _ = Describe("Replication watch snapshot memory", Serial, Label("replication
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			waitWatchReady(parent)
 		}
-		warm := barrier(baseline)
+		warm := barrier(beforeReset)
 		Eventually(func() error {
 			fresh := &corev1.ConfigMap{}
 			if err := actor.Get(ctx, client.ObjectKeyFromObject(source), fresh); err != nil {

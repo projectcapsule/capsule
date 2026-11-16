@@ -265,14 +265,27 @@ func TestWatchSubscriptionUpdatesAndRemoval(t *testing.T) {
 	if err := f.client.Update(t.Context(), source); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.watcher.Reconcile(t.Context(), reconcile.Request{}); err != nil {
-		t.Fatal(err)
-	}
+	// An event observed before the new generation is prepared must not use
+	// the old selector, even though the resource itself has already changed.
 	object := sourceObject("a")
 	f.watcher.enqueueEvent(t.Context(), configMapsGVR, resourceWatchIdentity{}, admissionv1.Create, nil, object)
 	f.watcher.processEvent(t.Context(), <-f.watcher.events)
 	if targets := f.notifications.take(); targets["local-a"] != 0 || targets["global"] != 1 {
+		t.Fatalf("unprepared generation used an old selector: %v", targets)
+	}
+	if _, err := f.watcher.Reconcile(t.Context(), reconcile.Request{}); err != nil {
+		t.Fatal(err)
+	}
+	f.watcher.enqueueEvent(t.Context(), configMapsGVR, resourceWatchIdentity{}, admissionv1.Create, nil, object)
+	f.watcher.processEvent(t.Context(), <-f.watcher.events)
+	if targets := f.notifications.take(); targets["local-a"] != 0 || targets["global"] != 1 {
 		t.Fatalf("stale selector used: %v", targets)
+	}
+	object.SetLabels(map[string]string{"source": "updated"})
+	f.watcher.enqueueEvent(t.Context(), configMapsGVR, resourceWatchIdentity{}, admissionv1.Create, nil, object)
+	f.watcher.processEvent(t.Context(), <-f.watcher.events)
+	if targets := f.notifications.take(); targets["local-a"] != 1 || len(targets) != 1 {
+		t.Fatalf("prepared generation did not use the updated selector: %v", targets)
 	}
 	source.Spec.Cordoned = new(true)
 	source.Generation++
