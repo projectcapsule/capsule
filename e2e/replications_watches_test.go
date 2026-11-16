@@ -806,12 +806,15 @@ var _ = Describe("Replication resource watches", Label("replications", "replicat
 			return fmt.Errorf("waiting for acknowledgement observer to reach the final API snapshot")
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
-	It("validates watches in controllers with policy conversion disabled", Label("config"), func() {
+	It("validates and delivers watches with policy conversion disabled", Label("config"), func() {
 		ctx := context.Background()
 		prefix := "watch-no-webhook-" + rand.String(6)
 		owners, namespaces := watchNamespaces(prefix)
 		original := &capsulev1beta2.CapsuleConfiguration{}
 		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: defaultConfigurationName}, original)).To(Succeed())
+		Expect(slices.ContainsFunc(original.Spec.Admission.Mutating.Webhooks, func(hook *admissionapi.MutatingWebhook) bool {
+			return hook.Name == "replications.mutating.projectcapsule.dev"
+		})).To(BeTrue(), "the policy conversion webhook must be present before testing its removal")
 		DeferCleanup(func() {
 			ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
 				configuration.Spec.Admission.Mutating.Webhooks = original.Spec.Admission.Mutating.DeepCopy().Webhooks
@@ -874,5 +877,100 @@ var _ = Describe("Replication resource watches", Label("replications", "replicat
 		waitWatchReady(parent)
 		expectConfigMapData(namespaces[0].Name, prefix+"-output", map[string]string{"value": "missing"})
 		expectConfigMapData(destination.Name, prefix+"-output", map[string]string{"value": "missing"})
+
+		By("preparing local and global watches while the conversion webhook remains absent")
+		source := &corev1.ConfigMap{Name: prefix + "-input", Namespace: namespaces[0].Name, Labels: map[string]string{watchSourceLabel: prefix, watchInputLabel: prefix}, Data: map[string]string{"value": "initial"}}
+		Expect(actor.Create(ctx, source)).To(Succeed())
+		otherSource := &corev1.ConfigMap{Name: prefix + "-marker", Namespace: namespaces[2].Name, Labels: map[string]string{watchSourceLabel: prefix}, Data: map[string]string{"value": "initial"}}
+		Expect(bob.Create(ctx, otherSource)).To(Succeed())
+		global := &capsulev1beta2.GlobalTenantResource{Name: prefix, Spec: capsulev1beta2.GlobalTenantResourceSpec{Scope: "Namespace", TenantSelector: metav1.LabelSelector{MatchLabels: map[string]string{"projectcapsule.dev/watch-tenant": "0" + prefix}}, TenantResourceCommonSpec: watchBody(prefix, namespaces[0].Name, prefix+"-global")}}
+		global.Spec.Triggers[0].NamespaceSelector = &metav1.LabelSelector{MatchLabels: map[string]string{"projectcapsule.dev/watch-case": prefix, "projectcapsule.dev/watch-profile": "selected"}}
+		global.Spec.Resources[0].NamespaceSelector = &metav1.LabelSelector{MatchLabels: map[string]string{"kubernetes.io/metadata.name": namespaces[0].Name}}
+		Expect(k8sClient.Create(ctx, global)).To(Succeed())
+		DeferCleanup(DeleteInBackground, global)
+		waitWatchReady(global)
+		Eventually(func() error {
+			if watchToken(parent) != "" && watchToken(global) != "" && watchToken(other) != "" {
+				return nil
+			}
+			for _, input := range []struct {
+				actor  client.Client
+				object *corev1.ConfigMap
+			}{{actor, source}, {bob, otherSource}} {
+				fresh := &corev1.ConfigMap{}
+				if err := input.actor.Get(ctx, client.ObjectKeyFromObject(input.object), fresh); err != nil {
+					return err
+				}
+				fresh.Data["value"] = "boot-" + rand.String(6)
+				if err := input.actor.Update(ctx, fresh); err != nil {
+					return err
+				}
+			}
+			return fmt.Errorf("waiting for local and global watch notification")
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		var localToken, globalToken, otherToken string
+		Eventually(func(g Gomega) {
+			local := &capsulev1beta2.TenantResource{}
+			g.Expect(actor.Get(ctx, client.ObjectKeyFromObject(parent), local)).To(Succeed())
+			g.Expect(local.Status.Trigger).NotTo(BeNil())
+			g.Expect(local.Status.Trigger.ObservedRequest).To(Equal(local.Annotations[replication.TriggerAnnotation]))
+			freshGlobal := &capsulev1beta2.GlobalTenantResource{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(global), freshGlobal)).To(Succeed())
+			g.Expect(freshGlobal.Status.Trigger).NotTo(BeNil())
+			g.Expect(freshGlobal.Status.Trigger.ObservedRequest).To(Equal(freshGlobal.Annotations[replication.TriggerAnnotation]))
+			freshOther := &capsulev1beta2.TenantResource{}
+			g.Expect(bob.Get(ctx, client.ObjectKeyFromObject(other), freshOther)).To(Succeed())
+			g.Expect(freshOther.Status.Trigger).NotTo(BeNil())
+			g.Expect(freshOther.Status.Trigger.ObservedRequest).To(Equal(freshOther.Annotations[replication.TriggerAnnotation]))
+			localToken, globalToken = local.Status.Trigger.ObservedRequest, freshGlobal.Status.Trigger.ObservedRequest
+			otherToken = freshOther.Status.Trigger.ObservedRequest
+		}, defaultTimeoutInterval, 200*time.Millisecond).MustPassRepeatedly(10).Should(Succeed())
+
+		By("delivering a persisted update without policy conversion or periodic resync")
+		changeWatchInput(actor, source, "live-update")
+		Eventually(func(g Gomega) {
+			g.Expect(watchToken(parent)).NotTo(Equal(localToken))
+			g.Expect(watchToken(global)).NotTo(Equal(globalToken))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		waitWatchReady(parent)
+		waitWatchReady(global)
+		expectConfigMapData(source.Namespace, source.Name, map[string]string{"value": "live-update"})
+		expectConfigMapData(namespaces[0].Name, prefix+"-output", map[string]string{"value": "live-update"})
+		expectConfigMapData(destination.Name, prefix+"-output", map[string]string{"value": "live-update"})
+		expectConfigMapData(namespaces[0].Name, prefix+"-global", map[string]string{"value": "live-update"})
+		Consistently(func(g Gomega) {
+			g.Expect(watchToken(other)).To(Equal(otherToken))
+			for _, namespace := range []string{namespaces[1].Name, destination.Name, namespaces[2].Name} {
+				g.Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKey{Namespace: namespace, Name: prefix + "-global"}, &corev1.ConfigMap{}))).To(BeTrue())
+			}
+			g.Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKey{Namespace: namespaces[2].Name, Name: prefix + "-output"}, &corev1.ConfigMap{}))).To(BeTrue())
+		}, 3*time.Second, 200*time.Millisecond).Should(Succeed())
+		expectConfigMapData(namespaces[2].Name, prefix+"-other", map[string]string{"value": "missing"})
+		By("preserving managed-resource protection independently of policy conversion")
+		Eventually(func() error {
+			fresh := &corev1.ConfigMap{}
+			if err := actor.Get(ctx, client.ObjectKey{Namespace: namespaces[0].Name, Name: prefix + "-output"}, fresh); err != nil {
+				return err
+			}
+			fresh.Data["value"] = "unauthorized"
+			err := actor.Update(ctx, fresh)
+			if err == nil {
+				return StopTrying("managed write unexpectedly succeeded")
+			}
+			if apierrors.IsConflict(err) {
+				return err
+			}
+			Expect(apierrors.IsForbidden(err)).To(BeTrue())
+			Expect(err.Error()).To(ContainSubstring("is managed by a tenant capsule replication"))
+			return nil
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		expectConfigMapData(namespaces[0].Name, prefix+"-output", map[string]string{"value": "live-update"})
+		configurations := &admissionv1.MutatingWebhookConfigurationList{}
+		Expect(k8sClient.List(ctx, configurations)).To(Succeed())
+		for _, configuration := range configurations.Items {
+			for _, hook := range configuration.Webhooks {
+				Expect(hook.Name).NotTo(Equal("replications.mutating.projectcapsule.dev"))
+			}
+		}
 	})
 })

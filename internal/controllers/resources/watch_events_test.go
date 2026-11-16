@@ -33,6 +33,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	admissionapi "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
 	"github.com/projectcapsule/capsule/pkg/runtime/replication"
 )
@@ -164,6 +165,37 @@ func watchFixtureFor(tb testing.TB, unrelated int) *watchFixture {
 func sourceObject(namespace string) *unstructured.Unstructured {
 	object := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "v1", "kind": "ConfigMap", "metadata": map[string]any{"name": "source", "namespace": namespace, "uid": "source-uid", "resourceVersion": "1", "labels": map[string]any{"source": "yes"}}, "data": map[string]any{"value": "old"}}}
 	return object
+}
+
+func TestWatchDeliveryWithoutPolicyConversionWebhook(t *testing.T) {
+	f := watchFixtureFor(t, 0)
+	configuration := &capsulev1beta2.CapsuleConfiguration{Name: "watch-configuration", Spec: capsulev1beta2.CapsuleConfigurationSpec{Admission: capsulev1beta2.DynamicAdmission{Mutating: &capsulev1beta2.DynamicMutatingAdmissionConfig{Webhooks: []*admissionapi.MutatingWebhook{{Name: "replications.mutating.projectcapsule.dev"}}}}}}
+	if err := f.client.Create(t.Context(), configuration); err != nil {
+		t.Fatal(err)
+	}
+	f.watcher.configurationName = configuration.Name
+	for _, removed := range []bool{false, true} {
+		t.Run(fmt.Sprintf("removed=%t", removed), func(t *testing.T) {
+			if removed {
+				configuration.Spec.Admission.Mutating.Webhooks = nil
+				if err := f.client.Update(t.Context(), configuration); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := f.watcher.Reconcile(t.Context(), reconcile.Request{}); err != nil {
+				t.Fatal(err)
+			}
+			object := sourceObject("a")
+			old := object.DeepCopy()
+			object.SetResourceVersion("2")
+			object.Object["data"] = map[string]any{"value": "updated"}
+			f.watcher.enqueueEvent(t.Context(), configMapsGVR, resourceWatchIdentity{}, admissionv1.Update, old, object)
+			f.watcher.processEvent(t.Context(), <-f.watcher.events)
+			if targets := f.notifications.take(); len(targets) != 2 || targets["local-a"] != 1 || targets["global"] != 1 {
+				t.Fatalf("watch delivery depended on the conversion webhook or crossed namespace scope: %v", targets)
+			}
+		})
+	}
 }
 
 func TestWatchEventsSelectorsOperationsAndIsolation(t *testing.T) {
