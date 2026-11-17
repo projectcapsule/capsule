@@ -5,6 +5,9 @@ package cache
 
 import (
 	"context"
+	"crypto/sha256"
+	"fmt"
+	"slices"
 	"sync"
 
 	"github.com/go-logr/logr"
@@ -23,12 +26,43 @@ type Key struct {
 
 type ImpersonationCache struct {
 	mu      sync.RWMutex
-	clients map[Key]client.Client
+	clients map[Key]*impersonationClientEntry
+	epoch   uint64
+}
+
+type impersonationClientEntry struct {
+	client     client.Client
+	config     impersonationClientConfig
+	nextProtos []string
+	explicit   bool
+}
+
+// Retain values rather than mutable REST configuration pointers or CA slices.
+// Controller callbacks (proxy, dial and transport wrappers) retain manager lifetime.
+type impersonationClientConfig struct {
+	host, username, password, token, tokenFile string
+	serverName, caFile, certFile, keyFile      string
+	insecure                                   bool
+	ca, cert, key                              [sha256.Size]byte
+	scheme                                     *runtime.Scheme
+}
+
+func impersonationConfig(base *rest.Config, scheme *runtime.Scheme) impersonationClientConfig {
+	return impersonationClientConfig{
+		host: base.Host, username: base.Username, password: base.Password, token: base.BearerToken, tokenFile: base.BearerTokenFile,
+		serverName: base.ServerName, caFile: base.CAFile, certFile: base.CertFile, keyFile: base.KeyFile,
+		insecure: base.Insecure,
+		ca:       sha256.Sum256(base.CAData), cert: sha256.Sum256(base.CertData), key: sha256.Sum256(base.KeyData), scheme: scheme,
+	}
+}
+
+func (e *impersonationClientEntry) matches(config impersonationClientConfig, nextProtos []string) bool {
+	return e != nil && (e.explicit || (e.config == config && slices.Equal(e.nextProtos, nextProtos)))
 }
 
 func NewImpersonationCache() *ImpersonationCache {
 	return &ImpersonationCache{
-		clients: make(map[Key]client.Client),
+		clients: make(map[Key]*impersonationClientEntry),
 	}
 }
 
@@ -37,12 +71,15 @@ func (c *ImpersonationCache) Get(ns, name string) (client.Client, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	cl, ok := c.clients[Key{Namespace: ns, Name: name}]
+	entry, ok := c.clients[Key{Namespace: ns, Name: name}]
+	if !ok {
+		return nil, false
+	}
 
-	return cl, ok
+	return entry.client, true
 }
 
-// Set stores a client explicitly (rarely needed).
+// Set stores an explicit client whose transport lifetime is managed by the caller.
 func (c *ImpersonationCache) Set(namespace, name string, cl client.Client) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -51,7 +88,8 @@ func (c *ImpersonationCache) Set(namespace, name string, cl client.Client) {
 		return
 	}
 
-	c.clients[Key{Namespace: namespace, Name: name}] = cl
+	c.epoch++
+	c.clients[Key{Namespace: namespace, Name: name}] = &impersonationClientEntry{client: cl, explicit: true}
 }
 
 // Invalidate removes one entry.
@@ -60,6 +98,8 @@ func (c *ImpersonationCache) Invalidate(namespace, name string) {
 	defer c.mu.Unlock()
 
 	delete(c.clients, Key{Namespace: namespace, Name: name})
+
+	c.epoch++
 }
 
 // Clear drops all cached clients.
@@ -67,7 +107,8 @@ func (c *ImpersonationCache) Reset() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.clients = make(map[Key]client.Client)
+	c.clients = make(map[Key]*impersonationClientEntry)
+	c.epoch++
 }
 
 // Stats helps you log cache state.
@@ -79,7 +120,7 @@ func (c *ImpersonationCache) Stats() (entries int) {
 }
 
 // LoadOrCreate returns a cached impersonated client for the given service account,
-// creating and caching it if missing.
+// replacing it when the current credentials or transport trust have changed.
 func (c *ImpersonationCache) LoadOrCreate(
 	ctx context.Context,
 	log logr.Logger,
@@ -89,10 +130,30 @@ func (c *ImpersonationCache) LoadOrCreate(
 ) (client.Client, error) {
 	key := Key{Namespace: string(sa.Namespace), Name: string(sa.Name)}
 
-	// Fast path
-	if cl, ok := c.Get(key.Namespace, key.Name); ok {
-		return cl, nil
+	if baseREST == nil {
+		c.mu.RLock()
+		entry := c.clients[key]
+		c.mu.RUnlock()
+
+		if entry != nil && entry.explicit {
+			return entry.client, nil
+		}
+
+		return nil, fmt.Errorf("base impersonation REST configuration is unavailable")
 	}
+
+	config := impersonationConfig(baseREST, scheme)
+
+	c.mu.RLock()
+
+	previous, epoch := c.clients[key], c.epoch
+	if previous.matches(config, baseREST.NextProtos) {
+		c.mu.RUnlock()
+
+		return previous.client, nil
+	}
+
+	c.mu.RUnlock()
 
 	cl, err := users.ImpersonatedKubernetesClientForServiceAccount(
 		baseREST,
@@ -109,11 +170,18 @@ func (c *ImpersonationCache) LoadOrCreate(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if existing := c.clients[key]; existing != nil {
-		return existing, nil
+	if existing := c.clients[key]; existing.matches(config, baseREST.NextProtos) {
+		return existing.client, nil
 	}
 
-	c.clients[key] = cl
+	// An invalidation or another transport publication during construction must
+	// not be overwritten by this earlier snapshot. The caller can still use its
+	// own pinned configuration; a subsequent load rechecks current trust.
+	if c.epoch != epoch || c.clients[key] != previous {
+		return cl, nil
+	}
+
+	c.clients[key] = &impersonationClientEntry{client: cl, config: config, nextProtos: slices.Clone(baseREST.NextProtos)}
 
 	return cl, nil
 }

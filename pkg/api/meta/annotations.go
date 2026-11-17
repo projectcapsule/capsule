@@ -22,7 +22,8 @@ const (
 	ReleaseAnnotation        = "projectcapsule.dev/release"
 	ReleaseAnnotationTrigger = "true"
 
-	ReconcileAnnotation = "reconcile.projectcapsule.dev/requestedAt"
+	ReconcileAnnotation          = "reconcile.projectcapsule.dev/requestedAt"
+	ReplicationTriggerAnnotation = "projectcapsule.dev/replication-trigger"
 
 	AvailableIngressClassesAnnotation       = "capsule.clastix.io/ingress-classes"
 	AvailableIngressClassesRegexpAnnotation = "capsule.clastix.io/ingress-classes-regexp"

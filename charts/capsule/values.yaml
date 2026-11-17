@@ -499,6 +499,12 @@ podDisruptionBudget:
 # -- Set additional ports for the deployment
 ports: []
 
+# Soft pod anti-affinity spreading the Capsule pods over nodes (`kubernetes.io/hostname`).
+# Scheduling still succeeds when only one node is available, e.g. on single-node clusters.
+antiAffinity:
+  # -- Prefer scheduling the Capsule pods on different nodes. Ignored when `affinity.podAntiAffinity` is set. Only applies when `manager.kind` is `Deployment`.
+  enabled: true
+
 # -- Set affinity rules for the Capsule pod
 affinity: {}
 

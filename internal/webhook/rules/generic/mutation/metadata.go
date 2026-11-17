@@ -104,12 +104,25 @@ func (h *metadataRules) mutate(c client.Client, reader client.Reader, obj, old *
 			ingressMutated, err = mutateIngressRules(ctx, obj, gvk, bodies, conditions)
 		}
 
-		devicesMutated := false
-		if err == nil && req.Operation == admissionv1.Create && isDeviceClaim(gvk) {
-			devicesMutated, err = mutateDeviceClassDefaults(ctx, obj, bodies, conditions)
+		classesMutated := false
+		if err == nil && req.Operation == admissionv1.Create {
+			classesMutated, err = mutateClassDefaults(ctx, obj, gvk, bodies, conditions)
 		}
 
-		return mutationResponse(obj, req, metadataMutated || resourcesMutated || ingressMutated || devicesMutated, err)
+		return mutationResponse(obj, req, metadataMutated || resourcesMutated || ingressMutated || classesMutated, err)
+	}
+}
+
+// mutateClassDefaults fills the class defaults of the claims that name one,
+// which only apply when a claim is created.
+func mutateClassDefaults(ctx context.Context, obj *unstructured.Unstructured, gvk schema.GroupVersionKind, bodies []*apirules.NamespaceRuleBodyNamespace, conditions *ruleengine.ConditionEvaluator) (bool, error) {
+	switch {
+	case isDeviceClaim(gvk):
+		return mutateDeviceClassDefaults(ctx, obj, bodies, conditions)
+	case isClaim(gvk):
+		return mutateAttributeClassDefaults(ctx, obj, bodies, conditions)
+	default:
+		return false, nil
 	}
 }
 

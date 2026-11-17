@@ -4,9 +4,11 @@
 package defaults
 
 import (
+	"fmt"
 	"testing"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	registrationv1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -59,6 +61,49 @@ func TestReplicationConditionsAdmission(t *testing.T) {
 	}
 	if conditions.Stats() != 2 {
 		t.Fatalf("condition cache has %d entries, want two shared programs", conditions.Stats())
+	}
+}
+
+func BenchmarkReplicationWatchConfigurationConversion(b *testing.B) {
+	for _, count := range []int{1, 32} {
+		b.Run(fmt.Sprintf("triggers=%d", count), func(b *testing.B) {
+			scheme := runtime.NewScheme()
+			if err := capsulev1beta2.AddToScheme(scheme); err != nil {
+				b.Fatal(err)
+			}
+			compiler, _ := cache.NewCELCache()
+			decoder := admission.NewDecoder(scheme)
+			spec := capsulev1beta2.TenantResourceCommonSpec{Resources: []capsulev1beta2.ResourceSpec{{Policy: &apiruntime.ResourceReplicationPolicy{}}}}
+			for i := range count {
+				spec.Triggers = append(spec.Triggers, capsulev1beta2.TenantResourceTrigger{Name: fmt.Sprintf("source-%d", i), Operations: []registrationv1.OperationType{registrationv1.Update}, APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"configmaps"}, MatchConditions: []capsulev1beta2.TenantResourceTriggerCondition{{Name: "state", Expression: "object != null"}}})
+			}
+			req := replicationPolicyRequest(b, "TenantResource", spec)
+			run := func() {
+				if response := mutateReplicationPolicy(req, decoder, compiler); response != nil && !response.Allowed {
+					b.Fatal(response)
+				}
+			}
+			run()
+			b.ReportAllocs()
+			for b.Loop() {
+				run()
+			}
+		})
+	}
+}
+
+func TestReplicationPolicyConversionDoesNotValidateWatchTriggers(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := capsulev1beta2.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	decoder := admission.NewDecoder(scheme)
+	for _, kind := range []string{"TenantResource", "GlobalTenantResource"} {
+		spec := capsulev1beta2.TenantResourceCommonSpec{Triggers: []capsulev1beta2.TenantResourceTrigger{{Name: "events", Operations: []registrationv1.OperationType{registrationv1.Update}, APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"configmaps"}, MatchConditions: []capsulev1beta2.TenantResourceTriggerCondition{{Name: "invalid", Expression: "request.operation == 'UPDATE'"}}}}, Resources: []capsulev1beta2.ResourceSpec{{}}}
+		response := mutateReplicationPolicy(replicationPolicyRequest(t, kind, spec), decoder, nil)
+		if response == nil || !response.Allowed || len(response.Patches) != 1 {
+			t.Fatalf("%s: trigger configuration affected policy conversion: %#v", kind, response)
+		}
 	}
 }
 

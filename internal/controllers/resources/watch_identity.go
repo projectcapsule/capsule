@@ -1,0 +1,183 @@
+// Copyright 2020-2026 Project Capsule Authors
+// SPDX-License-Identifier: Apache-2.0
+
+package resources
+
+import (
+	"context"
+	"crypto/sha256"
+	"fmt"
+
+	"github.com/go-logr/logr"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/internal/cache"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/users"
+)
+
+// Identity is part of both stream sharing and event provenance. An empty account
+// is the explicitly configured controller execution identity, not a fallback
+// when an impersonated LIST/WATCH fails.
+type resourceWatchIdentity struct {
+	account   cache.Key
+	transport capsulev1beta2.ServiceAccountClient
+}
+
+// Trust is sampled once per planning pass, outside event matching. Only the
+// selected CA bundle changes the stream revision, not unrelated Secret edits.
+type watchTrustRevision struct {
+	read   bool
+	bundle [sha256.Size]byte
+	err    error
+}
+
+func (key resourceWatchKey) usesCASecret() bool {
+	return key.identity.account != (cache.Key{}) && key.identity.transport.CASecretName != "" && !key.identity.transport.SkipTLSVerify
+}
+
+func (r *ResourceWatches) watchRESTConfig(ctx context.Context, key resourceWatchKey) (*rest.Config, error) {
+	base, err := configuration.ServiceAccountRESTConfig(ctx, r.client, r.baseREST, key.identity.transport)
+	if err != nil {
+		return nil, err
+	}
+
+	if key.usesCASecret() && len(base.CAData) == 0 {
+		return nil, fmt.Errorf("resource watch CA Secret %q has empty CA data", key.identity.transport.CASecretName)
+	}
+
+	return base, nil
+}
+
+func (r *ResourceWatches) withWatchTrust(ctx context.Context, key resourceWatchKey, trust *watchTrustRevision) (resourceWatchKey, error) {
+	if !key.usesCASecret() {
+		return key, nil
+	}
+
+	if !trust.read {
+		trust.read = true
+
+		base, err := r.watchRESTConfig(ctx, key)
+		if err != nil {
+			r.log.Error(err, "cannot load resource watch CA; periodic reconciliation remains active")
+		} else {
+			trust.bundle = sha256.Sum256(base.CAData)
+		}
+
+		trust.err = err
+	}
+
+	key.caBundle = trust.bundle
+
+	return key, trust.err
+}
+
+// Resolve through the same helpers as replication, with one configuration read
+// for the whole planning pass/event rather than one read per candidate.
+type watchConfiguration struct {
+	configuration.Configuration
+
+	properties capsulev1beta2.ServiceAccountClient
+}
+
+func (c watchConfiguration) ServiceAccountClientProperties() capsulev1beta2.ServiceAccountClient {
+	return c.properties
+}
+
+func (r *ResourceWatches) watchProperties(ctx context.Context) (capsulev1beta2.ServiceAccountClient, error) {
+	if r.configurationName == "" {
+		return r.configuration.ServiceAccountClientProperties(), nil
+	}
+
+	object := &capsulev1beta2.CapsuleConfiguration{}
+	if err := r.client.Get(ctx, client.ObjectKey{Name: r.configurationName}, object, client.UnsafeDisableDeepCopy); err != nil {
+		return capsulev1beta2.ServiceAccountClient{}, fmt.Errorf("read watch execution configuration: %w", err)
+	}
+
+	return object.Spec.Impersonation, nil
+}
+
+func watchIdentity(source client.Object, props capsulev1beta2.ServiceAccountClient) resourceWatchIdentity {
+	var account *meta.NamespacedRFC1123ObjectReferenceWithNamespace
+
+	cfg := watchConfiguration{properties: props}
+
+	switch object := source.(type) {
+	case *capsulev1beta2.TenantResource:
+		account = namespacedServiceAccount(cfg, logr.Discard(), object)
+	case *capsulev1beta2.GlobalTenantResource:
+		account = globalServiceAccount(cfg, logr.Discard(), object)
+	}
+
+	if account == nil {
+		return resourceWatchIdentity{}
+	}
+
+	// Defaults resolve the account but do not change the transport of an
+	// already resolved account. Retire streams only for relevant changes.
+	props.GlobalDefaultServiceAccount = ""
+	props.GlobalDefaultServiceAccountNamespace = ""
+	props.TenantDefaultServiceAccount = ""
+
+	return resourceWatchIdentity{account: cache.Key{Namespace: account.Namespace.String(), Name: account.Name.String()}, transport: props}
+}
+
+func (r *ResourceWatches) resourceStream(ctx context.Context, key resourceWatchKey, kind schema.GroupVersionKind) (*resourceWatchStream, error) {
+	stream := &resourceWatchStream{owner: r, store: cache.NewReplicationWatchSnapshots(), slots: r.listSlots}
+
+	if key.identity.account == (cache.Key{}) {
+		resource := r.dynamic.Resource(key.resource).Namespace(key.namespace)
+		stream.page = resource.List
+		stream.watch = resource.Watch
+
+		return stream, nil
+	}
+
+	base, err := r.watchRESTConfig(ctx, key)
+	if err != nil {
+		return nil, fmt.Errorf("load watch execution configuration: %w", err)
+	}
+
+	if key.usesCASecret() && sha256.Sum256(base.CAData) != key.caBundle {
+		return nil, fmt.Errorf("resource watch CA changed since planning")
+	}
+
+	limitWatchListResponses(base)
+
+	c, err := users.ImpersonatedKubernetesClientForServiceAccount(base, r.client.Scheme(), meta.NamespacedRFC1123ObjectReferenceWithNamespace{
+		Name: meta.RFC1123Name(key.identity.account.Name), Namespace: meta.RFC1123SubdomainName(key.identity.account.Namespace),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	watched, ok := c.(client.WithWatch)
+	if !ok {
+		return nil, fmt.Errorf("execution client does not support watches")
+	}
+
+	list := func() *unstructured.UnstructuredList {
+		object := &unstructured.UnstructuredList{}
+		object.SetGroupVersionKind(kind.GroupVersion().WithKind(kind.Kind + "List"))
+
+		return object
+	}
+	stream.page = func(ctx context.Context, options metav1.ListOptions) (*unstructured.UnstructuredList, error) {
+		object := list()
+		err := watched.List(ctx, object, &client.ListOptions{Namespace: key.namespace, Raw: &options})
+
+		return object, err
+	}
+	stream.watch = func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+		return watched.Watch(ctx, list(), &client.ListOptions{Namespace: key.namespace, Raw: &options})
+	}
+
+	return stream, nil
+}

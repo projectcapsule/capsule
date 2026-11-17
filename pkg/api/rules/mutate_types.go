@@ -29,9 +29,9 @@ type NamespaceRuleMutation struct {
 	Conditions []AdmissionCondition `json:"conditions,omitempty"`
 
 	// Action chooses how explicitly supplied properties are applied.
-	// Merge fills an empty schedulerName, an omitted priority or runtime class and absent security profiles, sets hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy,
+	// Merge fills an empty schedulerName, an omitted priority, runtime or volume attributes class and absent security profiles, sets hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy,
 	// and map keys, adds missing imagePullSecrets by name, upserts lists, and conjoins required affinity.
-	// Replace replaces each supplied property in full: scheduler, classes.priority, classes.runtime, hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy, nodeSelector,
+	// Replace replaces each supplied property in full: scheduler, classes.priority, classes.runtime, storage.attributeClass, hostUsers, readOnlyRootFilesystem, registries.imagePullPolicy, nodeSelector,
 	// registries.imagePullSecrets, tolerations, topologySpreadConstraints, affinity, or security profiles. Omitted properties are
 	// retained. Supplying affinity replaces all its branches, including omitted ones.
 	// ListenerSet parent references are atomic: merge fills an absent or null
@@ -52,6 +52,10 @@ type NamespaceRuleMutation struct {
 	// Devices configures default DeviceClass references for DRA claims and templates.
 	// +optional
 	Devices DeviceMutation `json:"devices,omitzero"`
+
+	// Storage configures defaults for PersistentVolumeClaims.
+	// +optional
+	Storage StorageMutation `json:"storage,omitzero"`
 }
 
 // WorkloadMutation contains typed native Pod values. Empty maps/lists are

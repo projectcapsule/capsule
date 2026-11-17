@@ -46,6 +46,7 @@ type NamespaceTrigger struct {
 	configuration configuration.Configuration
 	impersonation *cache.ImpersonationCache
 	conditions    *cache.CELCache
+	triggers      *cache.PreparedReplicationTriggers
 	processor     processor.Processor
 	collector     Collector
 
@@ -261,6 +262,12 @@ func (r *NamespaceTrigger) replicateGlobal(
 	tnt capsulev1beta2.Tenant,
 	namespace *corev1.Namespace,
 ) error {
+	if len(tntResource.Spec.Triggers) > 0 {
+		if err := r.triggers.Validate(tntResource.UID, tntResource.Generation, &tntResource.Spec.TenantResourceCommonSpec, false, r.conditions); err != nil {
+			return err
+		}
+	}
+
 	// The resolved ServiceAccount is intentionally discarded: posting it to the status is
 	// a duty of the GlobalTenantResource controller.
 	c, _, err := r.globalClients.Load(ctx, log, tntResource)
@@ -310,6 +317,12 @@ func (r *NamespaceTrigger) replicateNamespaced(
 	tnt capsulev1beta2.Tenant,
 	namespace *corev1.Namespace,
 ) error {
+	if len(tntResource.Spec.Triggers) > 0 {
+		if err := r.triggers.Validate(tntResource.UID, tntResource.Generation, &tntResource.Spec.TenantResourceCommonSpec, true, r.conditions); err != nil {
+			return err
+		}
+	}
+
 	c, _, err := r.namespacedClients.Load(ctx, log, tntResource)
 	if err != nil {
 		return fmt.Errorf("failed to load serviceaccount client: %w", err)

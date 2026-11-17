@@ -4,11 +4,13 @@
 package v1beta2
 
 import (
+	admissionv1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rules"
 	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
 )
@@ -25,9 +27,98 @@ type TenantResourceCommonStatus struct {
 	// Serviceaccount used for impersonation
 	//+optional
 	ServiceAccount *meta.NamespacedRFC1123ObjectReferenceWithNamespace `json:"serviceAccount,omitzero"`
+	// Trigger records the last watch notification handled by this controller.
+	// +optional
+	Trigger *TenantResourceTriggerStatus `json:"trigger,omitempty"`
+	// NextResyncAt is the next periodic resync deadline for trigger-enabled replications.
+	// +optional
+	NextResyncAt *metav1.MicroTime `json:"nextResyncAt,omitempty"`
+}
+
+type TenantResourceTriggerStatus struct {
+	// ObservedRequest identifies the notification included in the last triggered reconcile.
+	ObservedRequest string `json:"observedRequest"`
+	// LastTriggeredAt is the start of the last triggered reconcile, including failed attempts.
+	LastTriggeredAt metav1.MicroTime `json:"lastTriggeredAt"`
+}
+
+// TenantResourceTrigger requests best-effort reconciliation on observed resource changes.
+// Resource behavior and replication destinations remain defined by resources.
+// +kubebuilder:validation:XValidation:rule="has(self.operations) && size(self.operations) <= 3 && has(self.apiGroups) && has(self.apiVersions) && has(self.resources) && size(self.apiGroups) <= 8 && size(self.apiVersions) <= 8 && size(self.resources) <= 8 && size(self.apiGroups) * size(self.apiVersions) * size(self.resources) <= 16",message="watch triggers require at most 16 explicit group/version/resource combinations"
+type TenantResourceTrigger struct {
+	// Operations selects observed CREATE, UPDATE, and DELETE events.
+	// A single "*" selects all three. CONNECT is unsupported by watches.
+	// +listType=atomic
+	Operations []admissionv1.OperationType `json:"operations,omitempty"`
+	// APIGroups selects explicit API groups. Use "" for the core API group.
+	// Wildcards are unsupported.
+	// +listType=atomic
+	APIGroups []string `json:"apiGroups,omitempty"`
+	// APIVersions selects explicit API versions, such as "v1". Wildcards are unsupported.
+	// +listType=atomic
+	APIVersions []string `json:"apiVersions,omitempty"`
+	// Resources selects explicit plural top-level resource names, such as "configmaps".
+	// Wildcards are unsupported. Subresources, such as "pods/log", are unsupported.
+	// +listType=atomic
+	Resources []string `json:"resources,omitempty"`
+	// Scope may be omitted or set to "Namespaced". Watches only observe namespaced resources.
+	// +optional
+	Scope *admissionv1.ScopeType `json:"scope,omitempty"`
+
+	// Name uniquely identifies this trigger.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	Name string `json:"name"`
+	// Deprecated: watches do not carry request identities. Audience must be empty.
+	// +optional
+	// +kubebuilder:validation:MaxItems=0
+	Audience []rules.Audience `json:"audience,omitempty"`
+	// NamespaceSelector selects event source namespaces for GlobalTenantResources.
+	// TenantResources always observe only their own namespace and cannot set this field.
+	// +optional
+	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty"`
+	// ObjectSelector matches the labels of either the old or new observed object.
+	// +optional
+	ObjectSelector *metav1.LabelSelector `json:"objectSelector,omitempty"`
+	// MatchConditions are CEL conditions over object, oldObject and operation. All must match.
+	// +optional
+	// +kubebuilder:validation:MaxItems=60
+	// +listType=map
+	// +listMapKey=name
+	MatchConditions []TenantResourceTriggerCondition `json:"matchConditions,omitempty"`
+}
+
+// TenantResourceTriggerCondition filters an observed resource change using CEL.
+type TenantResourceTriggerCondition struct {
+	// Name uniquely identifies this condition within a trigger. It must be a Kubernetes
+	// qualified name, optionally prefixed with a DNS subdomain and '/'.
+	Name string `json:"name"`
+	// Expression must evaluate to bool using only the observed event variables:
+	// object is the new persisted object (null for DELETE), oldObject is the previous
+	// persisted object (null for CREATE), and operation is "CREATE", "UPDATE", or "DELETE".
+	// Admission request and authorizer variables are unavailable. For example:
+	// operation != 'UPDATE' || object.data != oldObject.data
+	Expression string `json:"expression"`
 }
 
 type TenantResourceCommonSpec struct {
+	// Triggers request reconciliation on observed namespaced resource changes.
+	// Capsule-managed resources never trigger reconciliation. Delivery is best effort;
+	// bounded watch memory may skip large objects or updates without a retained old state.
+	// resyncPeriod remains the recovery mechanism for missed events.
+	// +optional
+	// +kubebuilder:validation:MaxItems=32
+	// +listType=map
+	// +listMapKey=name
+	Triggers []TenantResourceTrigger `json:"triggers,omitempty"`
+	// TriggerMinInterval bounds triggered reconciliation frequency across all triggers
+	// on this resource. Events within the interval coalesce into one pending reconcile.
+	// Spec changes, deletion, manual requests, and periodic resyncs retain their behavior.
+	// +optional
+	// +kubebuilder:default="10s"
+	// +kubebuilder:validation:XValidation:rule="duration(self) >= duration('1s') && duration(self) <= duration('24h')",message="triggerMinInterval must be between 1s and 24h"
+	TriggerMinInterval metav1.Duration `json:"triggerMinInterval,omitzero"`
 	// Deprecated: configure resources[].policy instead. Admission converts Settings
 	// into policies for blocks without one. Retained as a compatibility fallback
 	// for stored resources that have not passed through admission again.
