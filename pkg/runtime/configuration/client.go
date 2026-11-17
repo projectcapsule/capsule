@@ -259,9 +259,18 @@ func (c *capsuleConfiguration) ServiceAccountClientProperties() capsulev1beta2.S
 }
 
 func (c *capsuleConfiguration) ServiceAccountClient(ctx context.Context) (*rest.Config, error) {
-	props := c.ServiceAccountClientProperties()
+	return ServiceAccountRESTConfig(ctx, c.client, c.rest, c.ServiceAccountClientProperties())
+}
 
-	cfg := rest.CopyConfig(c.rest)
+// ServiceAccountRESTConfig applies an immutable transport snapshot to the base
+// credentials. Callers that identify a client by its properties must use that
+// same snapshot here, rather than reloading mutable configuration during setup.
+func ServiceAccountRESTConfig(ctx context.Context, reader client.Client, base *rest.Config, props capsulev1beta2.ServiceAccountClient) (*rest.Config, error) {
+	if base == nil {
+		return nil, fmt.Errorf("base serviceaccount REST configuration is unavailable")
+	}
+
+	cfg := rest.CopyConfig(base)
 
 	if props.Endpoint != "" {
 		cfg.Host = props.Endpoint
@@ -276,6 +285,10 @@ func (c *capsuleConfiguration) ServiceAccountClient(ctx context.Context) (*rest.
 	}
 
 	if props.CASecretName != "" {
+		if reader == nil {
+			return nil, fmt.Errorf("CA Secret reader is unavailable")
+		}
+
 		namespace := props.CASecretNamespace
 		if namespace == "" {
 			namespace = meta.RFC1123SubdomainName(os.Getenv("NAMESPACE"))
@@ -283,7 +296,7 @@ func (c *capsuleConfiguration) ServiceAccountClient(ctx context.Context) (*rest.
 
 		caData, err := fetchCACertFromSecret(
 			ctx,
-			c.client,
+			reader,
 			namespace.String(),
 			props.CASecretName.String(),
 			props.CASecretKey,

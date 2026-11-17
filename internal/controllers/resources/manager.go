@@ -22,12 +22,14 @@ func Add(
 	opts utils.ControllerOptions,
 	impersonation *cache.ImpersonationCache,
 	conditions *cache.CELCache,
+	triggers *cache.PreparedReplicationTriggers,
 ) (err error) {
 	if err = (&NamespaceTrigger{
 		log:           log.WithName("Global"),
 		configuration: configuration,
 		impersonation: impersonation,
 		conditions:    conditions,
+		triggers:      triggers,
 	}).SetupWithManager(mgr, opts); err != nil {
 		return fmt.Errorf("unable to create watcher controller: %w", err)
 	}
@@ -36,6 +38,7 @@ func Add(
 		log:           log.WithName("Global"),
 		configuration: configuration,
 		metrics:       metrics.MustMakeGlobalTenantResourceRecorder(),
+		triggers:      triggers,
 
 		impersonation: impersonation,
 		conditions:    conditions,
@@ -47,6 +50,7 @@ func Add(
 		log:           log.WithName("Namespaced"),
 		configuration: configuration,
 		metrics:       metrics.MustMakeTenantResourceRecorder(),
+		triggers:      triggers,
 
 		impersonation: impersonation,
 		conditions:    conditions,

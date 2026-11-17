@@ -1,0 +1,169 @@
+// Copyright 2020-2026 Project Capsule Authors
+// SPDX-License-Identifier: Apache-2.0
+
+package resources
+
+import (
+	"context"
+	"maps"
+	"sync"
+	"time"
+
+	admissionv1 "k8s.io/api/admissionregistration/v1"
+	clientcache "k8s.io/client-go/tools/cache"
+)
+
+type runningResourceWatch struct {
+	cancel context.CancelFunc
+	done   chan struct{}
+}
+
+func (r *ResourceWatches) Start(ctx context.Context) error {
+	running := make(map[resourceWatchKey]runningResourceWatch)
+
+	var workers sync.WaitGroup
+	for range 2 {
+		workers.Go(func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case event := <-r.events:
+					r.processEvent(ctx, event)
+				}
+			}
+		})
+	}
+
+	defer func() {
+		for _, watch := range running {
+			watch.cancel()
+		}
+
+		for _, watch := range running {
+			<-watch.done
+		}
+
+		workers.Wait()
+
+		for {
+			select {
+			case event := <-r.events:
+				r.releaseEvent(event)
+			default:
+				r.metrics.ActiveWatches.Set(0)
+
+				return
+			}
+		}
+	}()
+	// Reconcile may have prepared subscriptions before the leader runnable starts.
+	r.syncWatches(ctx, running)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-r.changed:
+			r.syncWatches(ctx, running)
+		}
+	}
+}
+
+func (r *ResourceWatches) syncWatches(ctx context.Context, running map[resourceWatchKey]runningResourceWatch) {
+	r.mu.Lock()
+	desired := maps.Clone(r.desired)
+	r.mu.Unlock()
+
+	for key, watch := range running {
+		if _, ok := desired[key]; !ok {
+			watch.cancel()
+			<-watch.done
+			delete(running, key)
+		}
+	}
+
+	for key, kind := range desired {
+		if _, ok := running[key]; ok {
+			continue
+		}
+
+		watchCtx, cancel := context.WithCancel(ctx)
+		resource := key.resource
+
+		var (
+			informer resourceEventSource
+			err      error
+		)
+
+		if r.newStream != nil {
+			informer, err = r.newStream(watchCtx, key, kind)
+		} else {
+			informer, err = r.resourceStream(watchCtx, key, kind)
+		}
+
+		if err != nil {
+			cancel()
+			r.metrics.Events.WithLabelValues("watch-error").Inc()
+			r.log.Error(err, "cannot create resource watch")
+
+			continue
+		}
+
+		if err := informer.SetWatchErrorHandlerWithContext(func(_ context.Context, _ *clientcache.Reflector, err error) {
+			if watchCtx.Err() == nil {
+				r.metrics.Events.WithLabelValues("watch-error").Inc()
+				r.log.Error(err, "resource watch failed; periodic reconciliation remains active", "resource", resource.String())
+			}
+		}); err != nil {
+			cancel()
+			r.log.Error(err, "cannot configure resource watch")
+
+			continue
+		}
+
+		if _, err := informer.AddEventHandler(clientcache.ResourceEventHandlerDetailedFuncs{
+			AddFunc: func(obj any, initial bool) {
+				if !initial {
+					r.enqueueEvent(watchCtx, resource, key.identity, admissionv1.Create, nil, obj)
+				}
+			},
+			UpdateFunc: func(oldObject, object any) {
+				r.enqueueEvent(watchCtx, resource, key.identity, admissionv1.Update, oldObject, object)
+			},
+			DeleteFunc: func(obj any) { r.enqueueEvent(watchCtx, resource, key.identity, admissionv1.Delete, obj, nil) },
+		}); err != nil {
+			cancel()
+			r.log.Error(err, "cannot attach resource watch")
+
+			continue
+		}
+
+		done := make(chan struct{})
+
+		running[key] = runningResourceWatch{cancel: cancel, done: done}
+
+		go func() { defer close(done); informer.RunWithContext(watchCtx) }()
+	}
+
+	r.metrics.ActiveWatches.Set(float64(len(running)))
+}
+
+func (r *ResourceWatches) processEvent(ctx context.Context, event resourceWatchEvent) {
+	defer r.releaseEvent(event)
+
+	select {
+	case <-event.done:
+		return
+	default:
+	}
+
+	eventCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	defer cancel()
+
+	r.matchEvent(eventCtx, event)
+
+	if eventCtx.Err() != nil {
+		r.metrics.Events.WithLabelValues("timed-out").Inc()
+	}
+}
