@@ -502,4 +502,4 @@ metadata:
 
 ## More
 
-See Capsule [tutorial](https://github.com/projectcapsule/capsule/blob/master/docs/content/general/tutorial.md) for more information about how to use Capsule.
+See Capsule [tutorial](https://projectcapsule.dev/docs/quickstart/) for more information about how to use Capsule.
