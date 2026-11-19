@@ -232,10 +232,20 @@ func (p *Processor) applyAccumulatedItems(
 	itemErrors := 0
 	terminatingNamespaces := map[string]bool{}
 
+	var healthTargets appliedHealthTargets
+
+	if opts.TrackHealth {
+		healthTargets = make(appliedHealthTargets, len(acc))
+	}
+
 	for _, item := range acc {
-		if p.applyAccumulatedItem(ctx, log, c, processed, item, opts, terminatingNamespaces) {
+		if p.applyAccumulatedItem(ctx, log, c, processed, item, opts, terminatingNamespaces, healthTargets) {
 			itemErrors++
 		}
+	}
+
+	if opts.TrackHealth {
+		healthTargets.finalize(*processed)
 	}
 
 	return itemErrors
@@ -249,6 +259,7 @@ func (p *Processor) applyAccumulatedItem(
 	item *AccumulatorItem,
 	opts ProcessorOptions,
 	terminatingNamespaces map[string]bool,
+	healthTargets appliedHealthTargets,
 ) bool {
 	or := meta.ObjectReferenceStatus{
 		ResourceID: item.Resource,
@@ -272,7 +283,7 @@ func (p *Processor) applyAccumulatedItem(
 	healthApplied := false
 
 	for _, obj := range *item.Objects {
-		if p.applyAccumulatorObject(ctx, log, c, processed, item, obj, opts, terminatingNamespaces, &or, &healthApplied) {
+		if p.applyAccumulatorObject(ctx, log, c, processed, item, obj, opts, terminatingNamespaces, &or, &healthApplied, healthTargets) {
 			hadError = true
 		}
 	}
@@ -297,6 +308,7 @@ func (p *Processor) applyAccumulatorObject(
 	terminatingNamespaces map[string]bool,
 	or *meta.ObjectReferenceStatus,
 	healthApplied *bool,
+	healthTargets appliedHealthTargets,
 ) bool {
 	fieldOwner := opts.FieldOwnerPrefix + "/" + item.Resource.FieldOwner("")
 
@@ -336,7 +348,7 @@ func (p *Processor) applyAccumulatorObject(
 		obj.Policy,
 	)
 	if opts.TrackHealth && result.ContentVersion != "" && !result.Skipped {
-		or.Health = appliedHealthReference(result, or.Health)
+		or.Health = healthTargets.record(item.Resource, result, or.Health)
 		*healthApplied = err == nil
 	} else if !opts.TrackHealth {
 		or.Health = nil

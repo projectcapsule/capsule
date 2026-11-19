@@ -148,6 +148,95 @@ func TestHealthDeadlineSurvivesUnchangedApplies(t *testing.T) {
 	require.Nil(t, status.Conditions.GetConditionByType(meta.HealthyCondition))
 }
 
+func TestHealthScanRestartsWhenSkippedInventoryChanges(t *testing.T) {
+	for _, change := range []string{"remove-skipped", "reorder", "replace-skipped", "append-skipped"} {
+		t.Run(change, func(t *testing.T) {
+			r, c, parent, _ := healthFixture(t, false)
+			spec, status := healthSource(parent)
+			skipped := meta.ObjectReferenceStatus{Kind: "ConfigMap", Version: "v1", Name: "skipped", Namespace: "tenant-a"}
+			status.ProcessedItems = append(meta.ProcessedItems{skipped}, status.ProcessedItems...)
+			status.Health.Cursor = 1
+			status.Health.Pending, status.Health.Failed, status.Health.Message = true, true, "old scan"
+			if change == "remove-skipped" || change == "reorder" {
+				status.Health.Pending, status.Health.Failed, status.Health.Message = false, false, ""
+			}
+			previous := status.DeepCopy()
+			switch change {
+			case "remove-skipped":
+				status.ProcessedItems = status.ProcessedItems[1:]
+			case "reorder":
+				status.ProcessedItems[0], status.ProcessedItems[1] = status.ProcessedItems[1], status.ProcessedItems[0]
+			case "replace-skipped":
+				status.ProcessedItems[0].Name = "other-skipped"
+			case "append-skipped":
+				status.ProcessedItems = append(status.ProcessedItems, skipped)
+			}
+			require.Equal(t, healthRevision(parent, previous), healthRevision(parent, status), "same rollout, different scan positions")
+			now := time.Now().Add(time.Second)
+			completeHealthApplication(parent, spec, status, previous, nil, now)
+			require.Equal(t, int32(0), status.Health.Cursor)
+			require.False(t, status.Health.Pending)
+			require.False(t, status.Health.Failed)
+			require.Empty(t, status.Health.Message)
+			require.Equal(t, previous.Health.Deadline, status.Health.Deadline)
+			require.Equal(t, previous.Health.StartedAt, status.Health.StartedAt)
+			checks, err := compileHealthChecks(spec, r.conditions)
+			require.NoError(t, err)
+			observeHealthBatch(t.Context(), c, parent, status, checks, now)
+			require.NotEqual(t, metav1.ConditionTrue, status.Conditions.GetConditionByType(meta.HealthyCondition).Status, "the pending target must be checked before declaring success")
+		})
+	}
+}
+
+func TestHealthScanIgnoresNonIdentityInventoryUpdates(t *testing.T) {
+	_, _, parent, _ := healthFixture(t, false)
+	_, status := healthSource(parent)
+	previous := status.DeepCopy()
+	status.ProcessedItems[0].Message = "application refreshed"
+	status.ProcessedItems[0].LastApply = metav1.Now()
+	require.True(t, sameHealthScanInventory(status.ProcessedItems, previous.ProcessedItems))
+	status.ProcessedItems[0].Health.Generation++
+	require.False(t, sameHealthScanInventory(status.ProcessedItems, previous.ProcessedItems))
+	status.ProcessedItems[0].Health = nil
+	require.False(t, sameHealthScanInventory(status.ProcessedItems, previous.ProcessedItems))
+}
+
+func TestHealthScanRestartSurvivesApplicationFailure(t *testing.T) {
+	_, _, parent, _ := healthFixture(t, false)
+	spec, status := healthSource(parent)
+	status.ProcessedItems = append(meta.ProcessedItems{{Name: "skipped"}}, status.ProcessedItems...)
+	status.Health.Cursor = 1
+	previous := status.DeepCopy()
+	status.ProcessedItems = status.ProcessedItems[1:]
+	completeHealthApplication(parent, spec, status, previous, errors.New("temporary application failure"), time.Now())
+	require.True(t, status.Health.Applying)
+	require.Zero(t, status.Health.Cursor)
+	require.Equal(t, previous.Health.Deadline, status.Health.Deadline)
+	retry := status.DeepCopy()
+	completeHealthApplication(parent, spec, status, retry, nil, time.Now())
+	require.False(t, status.Health.Applying)
+	require.Zero(t, status.Health.Cursor)
+	require.Equal(t, previous.Health.Deadline, status.Health.Deadline)
+}
+
+func BenchmarkHealthScanInventory(b *testing.B) {
+	for _, size := range []int{1, 1024} {
+		b.Run(fmt.Sprint(size), func(b *testing.B) {
+			items := make(meta.ProcessedItems, size)
+			for i := range items {
+				items[i] = meta.ObjectReferenceStatus{Name: fmt.Sprint(i), Namespace: "a", Kind: "ConfigMap", Health: &meta.ResourceHealthReference{UID: types.UID(fmt.Sprint(i)), Digest: "revision"}}
+			}
+			other := append(meta.ProcessedItems(nil), items...)
+			b.ReportAllocs()
+			for b.Loop() {
+				if !sameHealthScanInventory(items, other) {
+					b.Fatal("unchanged inventory differs")
+				}
+			}
+		})
+	}
+}
+
 func TestNestedHealthChecksDefaults(t *testing.T) {
 	for _, checks := range []*capsulev1beta2.TenantResourceHealthChecks{nil, {}, {Wait: false}, {Wait: true}} {
 		spec := capsulev1beta2.TenantResourceCommonSpec{HealthChecks: checks, Cordoned: new(false)}
@@ -666,7 +755,7 @@ func TestHealthPatchHasConstantInventoryCostAndClearsCheckpointFlags(t *testing.
 	require.NotNil(t, target)
 }
 
-func TestNamespacedHealthProfileMappingPreservesTenantIsolation(t *testing.T) {
+func TestNamespacedProfileMappingPreservesTenantIsolation(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, capsulev1beta2.AddToScheme(scheme))
 	a := &capsulev1beta2.Tenant{Name: "a", UID: "a", Status: capsulev1beta2.TenantStatus{Namespaces: []string{"a-source", "a-empty"}}}
@@ -677,30 +766,29 @@ func TestNamespacedHealthProfileMappingPreservesTenantIsolation(t *testing.T) {
 	legacy.Spec.HealthChecks.Wait = false
 	other := selected.DeepCopy()
 	other.Namespace = "b-source"
-	index := tenantresourceindexer.NamespacedHealthNamespaces{}
-	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(a, b, selected, legacy, other).WithIndex(index.Object(), index.Field(), index.Func()).Build()
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(a, b, selected, legacy, other).Build()
 	lists := 0
 	counted := interceptor.NewClient(c, interceptor.Funcs{List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
 		options := (&client.ListOptions{}).ApplyOptions(opts)
 		require.IsType(t, &capsulev1beta2.TenantResourceList{}, list)
 		require.Contains(t, []string{"a-source", "a-empty", "b-source"}, options.Namespace)
-		require.Equal(t, index.Field()+"="+options.Namespace, options.FieldSelector.String())
+		require.Nil(t, options.FieldSelector)
 		lists++
 		return c.List(ctx, list, opts...)
 	}})
 	controller := &namespacedResourceController{client: counted, log: logr.Discard()}
 	namespace := &corev1.Namespace{Name: "a-target", OwnerReferences: []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: a.Name, UID: a.UID}}}
-	require.Equal(t, []reconcile.Request{{NamespacedName: client.ObjectKeyFromObject(selected)}}, controller.enqueueHealthTenantResourcesForNamespace(t.Context(), namespace))
+	require.ElementsMatch(t, []reconcile.Request{{NamespacedName: client.ObjectKeyFromObject(selected)}, {NamespacedName: client.ObjectKeyFromObject(legacy)}}, controller.enqueueTenantResourcesForNamespaceProfile(t.Context(), namespace))
 	require.Equal(t, 2, lists)
 	namespace.OwnerReferences[0].UID = "stale"
-	require.Empty(t, controller.enqueueHealthTenantResourcesForNamespace(t.Context(), namespace))
+	require.Empty(t, controller.enqueueTenantResourcesForNamespaceProfile(t.Context(), namespace))
 	require.Equal(t, 2, lists)
 	namespace.OwnerReferences[0].Name = b.Name
 	namespace.OwnerReferences[0].UID = b.UID
-	require.Equal(t, []reconcile.Request{{NamespacedName: client.ObjectKeyFromObject(other)}}, controller.enqueueHealthTenantResourcesForNamespace(t.Context(), namespace))
+	require.Equal(t, []reconcile.Request{{NamespacedName: client.ObjectKeyFromObject(other)}}, controller.enqueueTenantResourcesForNamespaceProfile(t.Context(), namespace))
 	require.Equal(t, 3, lists)
 	namespace.OwnerReferences = nil
-	require.Empty(t, controller.enqueueHealthTenantResourcesForNamespace(t.Context(), namespace))
+	require.Empty(t, controller.enqueueTenantResourcesForNamespaceProfile(t.Context(), namespace))
 	require.Equal(t, 3, lists)
 }
 

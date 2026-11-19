@@ -20,10 +20,11 @@ import (
 )
 
 // Namespace lifecycle events already enqueue all replications in the tenant.
-// Profile changes need only health-enabled sources. Dispatch each namespace once
+// Profile changes select sources in the owning Tenant, including apply-only sources.
+// Dispatch each namespace once
 // rather than repeating both mappings (and mapping unchanged ownership twice).
 func (r *namespacedResourceController) tenantNamespaceHandler() handler.EventHandler {
-	enqueue := func(ctx context.Context, queue workqueue.TypedRateLimitingInterface[reconcile.Request], healthOnly bool, objects ...client.Object) {
+	enqueue := func(ctx context.Context, queue workqueue.TypedRateLimitingInterface[reconcile.Request], profileOnly bool, objects ...client.Object) {
 		seen := make(map[reconcile.Request]struct{})
 
 		for _, obj := range objects {
@@ -35,16 +36,16 @@ func (r *namespacedResourceController) tenantNamespaceHandler() handler.EventHan
 
 			label := obj.GetLabels()[meta.TenantLabel]
 
-			if !healthOnly && label != "" {
+			if !profileOnly && label != "" {
 				requests = r.enqueueTenantResourcesForNamespace(ctx, obj)
 			}
 
-			// An owner-reference-only namespace is still a health dependency.
-			// The health mapper checks the live Tenant UID before selecting sources.
-			if healthOnly || label == "" || !slices.ContainsFunc(obj.GetOwnerReferences(), func(ref metav1.OwnerReference) bool {
+			// Owner-reference-only namespaces can also change the effective profile.
+			// The profile mapper validates the live Tenant UID before selecting sources.
+			if profileOnly || label == "" || !slices.ContainsFunc(obj.GetOwnerReferences(), func(ref metav1.OwnerReference) bool {
 				return tenant.IsTenantOwnerReference(ref) && ref.Name == label
 			}) {
-				requests = append(requests, r.enqueueHealthTenantResourcesForNamespace(ctx, obj)...)
+				requests = append(requests, r.enqueueTenantResourcesForNamespaceProfile(ctx, obj)...)
 			}
 
 			for _, request := range requests {
@@ -76,8 +77,8 @@ func (r *namespacedResourceController) tenantNamespaceHandler() handler.EventHan
 				return
 			}
 
-			terminating := e.ObjectOld.GetDeletionTimestamp().IsZero() != e.ObjectNew.GetDeletionTimestamp().IsZero()
-			enqueue(ctx, queue, !terminating, e.ObjectNew)
+			lifecycle := e.ObjectOld.GetDeletionTimestamp().IsZero() != e.ObjectNew.GetDeletionTimestamp().IsZero()
+			enqueue(ctx, queue, !lifecycle, e.ObjectNew)
 		},
 	}
 }

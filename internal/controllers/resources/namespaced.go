@@ -748,7 +748,7 @@ func ForeachNamespace(
 	return nil
 }
 
-func (r *namespacedResourceController) enqueueHealthTenantResourcesForNamespace(ctx context.Context, obj client.Object) []reconcile.Request {
+func (r *namespacedResourceController) enqueueTenantResourcesForNamespaceProfile(ctx context.Context, obj client.Object) []reconcile.Request {
 	tnt, err := tenant.GetTenantByOwnerreferences(ctx, r.client, obj.GetOwnerReferences())
 	if err != nil || tnt == nil {
 		return nil
@@ -764,8 +764,8 @@ func (r *namespacedResourceController) enqueueHealthTenantResourcesForNamespace(
 
 	for _, namespace := range tnt.Status.Namespaces {
 		var resources capsulev1beta2.TenantResourceList
-		if err := r.client.List(ctx, &resources, client.InNamespace(namespace), client.MatchingFields{tenantresourceindexer.NamespacedHealthNamespacesFieldName: namespace}); err != nil {
-			r.log.Error(err, "cannot list health-enabled tenant replications", "namespace", namespace)
+		if err := r.client.List(ctx, &resources, client.InNamespace(namespace)); err != nil {
+			r.log.Error(err, "cannot list tenant replications for namespace profile", "namespace", namespace)
 
 			return nil
 		}

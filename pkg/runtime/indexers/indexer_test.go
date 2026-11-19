@@ -77,7 +77,7 @@ func TestAddToManagerRegistersIndexers(t *testing.T) {
 			t.Fatalf("expected field %q to be registered; got %#v", field, fields)
 		}
 	}
-	for _, field := range []string{tenantresource.GlobalHealthNamespacesFieldName, tenantresource.NamespacedHealthNamespacesFieldName} {
+	for _, field := range []string{tenantresource.GlobalHealthNamespacesFieldName} {
 		if fields[field] {
 			t.Errorf("replication health index registered in admission process: %s", field)
 		}
@@ -171,7 +171,7 @@ func TestDedicatedReplicationIndexes(t *testing.T) {
 		}
 		fields[call.field] = true
 	}
-	for _, field := range []string{tenantresource.GlobalHealthNamespacesFieldName, tenantresource.NamespacedHealthNamespacesFieldName, replication.TriggerIndexerField, tenantresource.GlobalDependenciesFieldName, tenantresource.NamespacedDependenciesFieldName, tenantresource.ServiceAccountIndexerFieldName, ".status.namespaces"} {
+	for _, field := range []string{tenantresource.GlobalHealthNamespacesFieldName, replication.TriggerIndexerField, tenantresource.GlobalDependenciesFieldName, tenantresource.NamespacedDependenciesFieldName, tenantresource.ServiceAccountIndexerFieldName, ".status.namespaces"} {
 		if !fields[field] {
 			t.Errorf("missing replication index %s", field)
 		}

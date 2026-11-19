@@ -6,8 +6,11 @@ package replications
 import (
 	"context"
 	"fmt"
+	"os"
 
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
+	runtimecache "sigs.k8s.io/controller-runtime/pkg/cache"
 
 	"github.com/projectcapsule/capsule/cmd/controller/common"
 	"github.com/projectcapsule/capsule/internal/cache"
@@ -31,6 +34,16 @@ func Run(ctx context.Context, options common.Options) error {
 		return err
 	}
 
+	handoff := &legacyHandoff{reader: b.DirectClient, namespace: b.Namespace, release: os.Getenv(releaseNameEnvironment), completed: make(chan struct{})}
+	managerOptions.NewCache = func(config *rest.Config, options runtimecache.Options) (runtimecache.Cache, error) {
+		c, err := runtimecache.New(config, options)
+		if err != nil {
+			return nil, err
+		}
+
+		return &handoffCache{Cache: c, handoff: handoff}, nil
+	}
+
 	mgr, err := ctrl.NewManager(b.Config, managerOptions)
 	if err != nil {
 		return fmt.Errorf("create replication manager: %w", err)
@@ -38,6 +51,10 @@ func Run(ctx context.Context, options common.Options) error {
 
 	if err := common.AddHealthChecks(mgr, watcher); err != nil {
 		return err
+	}
+
+	if err := mgr.AddReadyzCheck("replication-handoff", handoff.ready); err != nil {
+		return fmt.Errorf("register replication handoff readiness: %w", err)
 	}
 
 	controllerOptions := options.Controller

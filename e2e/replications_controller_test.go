@@ -17,11 +17,146 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/replication"
 )
 
 // Serial because this exercises a shared background-controller outage.
 var _ = Describe("Dedicated replication controller", Serial, Label("config", "replications", "replication-controller"), func() {
+	It("keeps restarted workers live but unready until legacy replica templates are retired", Label("replication-handoff"), func() {
+		ctx := context.Background()
+		prefix := "legacy-handoff-" + rand.String(5)
+		owners, namespaces := watchNamespaces(prefix)
+		actor := impersonationClient(owners[0].Name, withDefaultGroups(nil))
+		ns := namespaces[0].Name
+		input := &corev1.ConfigMap{Name: prefix, Namespace: ns, Labels: map[string]string{watchInputLabel: prefix}, Data: map[string]string{"value": "initial"}}
+		Expect(actor.Create(ctx, input)).To(Succeed())
+		spec := watchBody(prefix, ns, prefix+"-output")
+		spec.Triggers = nil
+		spec.ResyncPeriod = metav1.Duration{Duration: time.Second}
+		spec.Resources[0].Policy = &apiruntime.ResourceReplicationPolicy{Protect: new(false)}
+		spec.Resources[0].NamespaceSelector = &metav1.LabelSelector{MatchLabels: map[string]string{"kubernetes.io/metadata.name": ns}}
+		parent := createHealthReviewReplication(false, prefix, ns, spec, actor)
+		waitWatchReady(parent)
+		outputKey := client.ObjectKey{Namespace: ns, Name: prefix + "-output"}
+		Eventually(func(g Gomega) {
+			output := &corev1.ConfigMap{}
+			g.Expect(actor.Get(ctx, outputKey, output)).To(Succeed())
+			g.Expect(output.Data["value"]).To(Equal("initial"))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		deployments := &appsv1.DeploymentList{}
+		Expect(k8sClient.List(ctx, deployments, client.InNamespace(ControllerNamespace))).To(Succeed())
+		var worker *appsv1.Deployment
+		for i := range deployments.Items {
+			for _, container := range deployments.Items[i].Spec.Template.Spec.Containers {
+				if container.Name == "manager" && len(container.Args) > 0 && container.Args[0] == "replications" {
+					worker = deployments.Items[i].DeepCopy()
+				}
+			}
+		}
+		Expect(worker).NotTo(BeNil())
+		originalReplicas := *worker.Spec.Replicas
+		legacyLabels := map[string]string{"projectcapsule.dev/legacy-handoff": prefix, "app.kubernetes.io/instance": worker.Labels["app.kubernetes.io/instance"]}
+		legacySpec := worker.Spec.Template.Spec.DeepCopy()
+		for i := range legacySpec.Containers {
+			if legacySpec.Containers[i].Name == "manager" {
+				legacySpec.Containers[i].Args = legacySpec.Containers[i].Args[1:]
+			}
+		}
+		legacy := &appsv1.ReplicaSet{Name: prefix, Namespace: ControllerNamespace, Labels: legacyLabels, Spec: appsv1.ReplicaSetSpec{Replicas: new(int32(1)), Selector: &metav1.LabelSelector{MatchLabels: legacyLabels}, Template: corev1.PodTemplateSpec{Labels: legacyLabels, Spec: *legacySpec}}}
+		scale := func(obj client.Object, replicas int32) {
+			Eventually(func() error {
+				fresh := obj.DeepCopyObject().(client.Object)
+				if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(obj), fresh); err != nil {
+					return err
+				}
+				switch typed := fresh.(type) {
+				case *appsv1.Deployment:
+					typed.Spec.Replicas = new(replicas)
+				case *appsv1.ReplicaSet:
+					typed.Spec.Replicas = new(replicas)
+				}
+				return k8sClient.Update(ctx, fresh)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		}
+		Expect(k8sClient.Create(ctx, legacy)).To(Succeed())
+		retireLegacy := func() {
+			scale(legacy, 0)
+			pods := &corev1.PodList{}
+			Expect(k8sClient.List(ctx, pods, client.InNamespace(ControllerNamespace), client.MatchingLabels(legacyLabels))).To(Succeed())
+			for i := range pods.Items {
+				Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, &pods.Items[i]))).To(Succeed())
+			}
+		}
+		DeferCleanup(func() {
+			retireLegacy()
+			scale(worker, originalReplicas)
+			DeleteInBackground(legacy)
+			Eventually(func() int { return len(readyWatchControllerPods(ctx)) }, defaultTimeoutInterval, defaultPollInterval).Should(BeNumerically(">=", originalReplicas))
+		})
+		scale(worker, 0)
+		Eventually(func(g Gomega) {
+			pods := &corev1.PodList{}
+			g.Expect(k8sClient.List(ctx, pods, client.InNamespace(ControllerNamespace), client.MatchingLabels(worker.Spec.Selector.MatchLabels))).To(Succeed())
+			g.Expect(pods.Items).To(BeEmpty())
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		scale(worker, originalReplicas)
+		cs := clusterAdminClient()
+		Eventually(func(g Gomega) {
+			pods := &corev1.PodList{}
+			g.Expect(k8sClient.List(ctx, pods, client.InNamespace(ControllerNamespace), client.MatchingLabels(worker.Spec.Selector.MatchLabels))).To(Succeed())
+			g.Expect(pods.Items).To(HaveLen(int(originalReplicas)))
+			for _, pod := range pods.Items {
+				g.Expect(pod.Status.Phase).To(Equal(corev1.PodRunning))
+				for _, condition := range pod.Status.Conditions {
+					if condition.Type == corev1.PodReady {
+						g.Expect(condition.Status).To(Equal(corev1.ConditionFalse))
+					}
+				}
+				response, err := cs.CoreV1().Pods(ControllerNamespace).ProxyGet("http", pod.Name, "10080", "healthz", nil).DoRaw(ctx)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(string(response)).To(Equal("ok"))
+				_, err = cs.CoreV1().Pods(ControllerNamespace).ProxyGet("http", pod.Name, "10080", "readyz", nil).DoRaw(ctx)
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("replication-handoff"))
+			}
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Expect(actor.Create(ctx, &corev1.ConfigMap{Name: prefix + "-admission", Namespace: ns})).To(Succeed())
+		Expect(apierrors.IsForbidden(actor.Create(ctx, &corev1.ConfigMap{Name: prefix, Namespace: namespaces[2].Name}))).To(BeTrue())
+		Eventually(func() error {
+			fresh := &corev1.ConfigMap{}
+			if err := actor.Get(ctx, client.ObjectKeyFromObject(input), fresh); err != nil {
+				return err
+			}
+			fresh.Data["value"] = "after-handoff"
+			return actor.Update(ctx, fresh)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Eventually(func() error {
+			fresh := &capsulev1beta2.TenantResource{}
+			if err := actor.Get(ctx, client.ObjectKeyFromObject(parent), fresh); err != nil {
+				return err
+			}
+			if fresh.Annotations == nil {
+				fresh.Annotations = map[string]string{}
+			}
+			fresh.Annotations[meta.ReconcileAnnotation] = prefix
+			return actor.Update(ctx, fresh)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Consistently(func(g Gomega) {
+			output := &corev1.ConfigMap{}
+			g.Expect(actor.Get(ctx, outputKey, output)).To(Succeed())
+			g.Expect(output.Data["value"]).To(Equal("initial"))
+		}, 3*time.Second, defaultPollInterval).Should(Succeed())
+		retireLegacy()
+		Eventually(func(g Gomega) {
+			output := &corev1.ConfigMap{}
+			g.Expect(actor.Get(ctx, outputKey, output)).To(Succeed())
+			g.Expect(output.Data["value"]).To(Equal("after-handoff"))
+			g.Expect(len(readyWatchControllerPods(ctx))).To(BeNumerically(">=", originalReplicas))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	})
+
 	It("preserves admission and tenant profiles while replication workers are unavailable", func() {
 		ctx := context.Background()
 		prefix := "replication-controller-" + rand.String(6)

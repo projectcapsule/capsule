@@ -23,7 +23,6 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	tenantresourceindexer "github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
 )
 
 func namespaceEventFixture(t testing.TB, namespaces int) (*namespacedResourceController, *corev1.Namespace) {
@@ -47,8 +46,7 @@ func namespaceEventFixture(t testing.TB, namespaces int) (*namespacedResourceCon
 			&capsulev1beta2.TenantResource{Name: "health", Namespace: tenant + "-0", Spec: capsulev1beta2.TenantResourceSpec{TenantResourceCommonSpec: healthSpec()}},
 			&capsulev1beta2.TenantResource{Name: "legacy", Namespace: tenant + "-0"})
 	}
-	index := tenantresourceindexer.NamespacedHealthNamespaces{}
-	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).WithIndex(index.Object(), index.Field(), index.Func()).Build()
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
 	return &namespacedResourceController{client: c, log: logr.Discard()}, target
 }
 
@@ -87,7 +85,7 @@ func TestNamespaceEventsDispatchOnceAndPreserveScope(t *testing.T) {
 			case "profile":
 				after.Labels["profile"] = "selected"
 				h.Update(t.Context(), event.UpdateEvent{ObjectOld: ns, ObjectNew: after}, queue)
-				wantLists, wantGets, want = 2, 1, want[:1]
+				wantLists, wantGets = 2, 1
 			case "termination":
 				after.DeletionTimestamp = new(metav1.Now())
 				h.Update(t.Context(), event.UpdateEvent{ObjectOld: ns, ObjectNew: after}, queue)
@@ -97,7 +95,7 @@ func TestNamespaceEventsDispatchOnceAndPreserveScope(t *testing.T) {
 					after.OwnerReferences[0].UID = "previous-tenant"
 				}
 				h.Create(t.Context(), event.CreateEvent{Object: after}, queue)
-				wantLists, wantGets, want = 2, 1, want[:1]
+				wantLists, wantGets = 2, 1
 				if change == "stale-owner" {
 					wantLists, want = 0, nil
 				}
@@ -139,7 +137,7 @@ func BenchmarkReplicationNamespaceEvents(b *testing.B) {
 					switch path {
 					case "previous-startup":
 						r.enqueueTenantResourcesForNamespace(b.Context(), ns)
-						r.enqueueHealthTenantResourcesForNamespace(b.Context(), ns)
+						r.enqueueTenantResourcesForNamespaceProfile(b.Context(), ns)
 					case "startup":
 						if p.Create(initial) {
 							h.Create(b.Context(), initial, queue)

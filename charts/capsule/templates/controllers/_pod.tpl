@@ -130,6 +130,10 @@ spec:
         valueFrom:
           fieldRef:
             fieldPath: spec.serviceAccountName
+      {{- if .replications }}
+      - name: CAPSULE_RELEASE_NAME
+        value: {{ .Release.Name | quote }}
+      {{- end }}
       {{- if and (not .replications) .Values.manager.options.tracing.enabled }}
       {{- if or .Values.manager.options.tracing.basicAuth.username .Values.manager.options.tracing.basicAuth.existingSecret.name }}
       - name: CAPSULE_TRACING_OTLP_BASIC_AUTH_USERNAME

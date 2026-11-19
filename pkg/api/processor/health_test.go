@@ -6,6 +6,7 @@ package processor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -131,4 +132,151 @@ func TestFailedApplyRetainsExistingHealthSnapshot(t *testing.T) {
 	AccumulatorAdd(acc, id, AccumulatorObject{Object: obj, Policy: &apiruntime.ResourceReplicationPolicy{Creation: apiruntime.ResourceCreationPolicyMerge}})
 	require.Error(t, p.Reconcile(t.Context(), logr.Discard(), c, &items, acc, ProcessorOptions{TrackHealth: true, FieldOwnerPrefix: "test"}))
 	require.Equal(t, previous, items[0].Health)
+}
+
+func TestSharedTargetHealthUsesFinalAppliedGeneration(t *testing.T) {
+	counts := []int{}
+	for _, enabled := range []bool{false, true} {
+		t.Run(fmt.Sprint(enabled), func(t *testing.T) {
+			obj := policyConfigMap("target", "example")
+			obj.SetUID("target-uid")
+			obj.SetGeneration(1)
+			p, base := policyProcessor(obj.DeepCopy())
+			generation := int64(1)
+			c := &healthCountingClient{Client: interceptor.NewClient(base.Client.(client.WithWatch), interceptor.Funcs{Patch: func(ctx context.Context, c client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+				if err := c.Patch(ctx, obj, patch, opts...); err != nil {
+					return err
+				}
+				if patch.Type() == types.ApplyPatchType {
+					generation++
+					obj.SetGeneration(generation)
+					return c.Update(ctx, obj)
+				}
+				return nil
+			}})}
+			acc := Accumulator{}
+			for i := range 2 {
+				contribution := obj.DeepCopy()
+				contribution.Object["data"] = map[string]any{fmt.Sprintf("field-%d", i): "value"}
+				id := gvk.NewResourceID(contribution, "tenant-a", fmt.Sprintf("origin-%d", i))
+				AccumulatorAdd(acc, id, AccumulatorObject{Object: contribution, Policy: &apiruntime.ResourceReplicationPolicy{Creation: apiruntime.ResourceCreationPolicyMerge, Protect: new(false)}})
+			}
+			items := meta.ProcessedItems{}
+			require.NoError(t, p.Reconcile(t.Context(), logr.Discard(), c, &items, acc, ProcessorOptions{TrackHealth: enabled, FieldOwnerPrefix: "shared-health"}))
+			require.Len(t, items, 2)
+			require.NotEqual(t, items[0].Origin, items[1].Origin, "ownership records must remain separate")
+			counts = append(counts, c.reads)
+			for _, item := range items {
+				if enabled {
+					require.Equal(t, generation, item.Health.Generation)
+					require.Equal(t, items[0].Health.Digest, item.Health.Digest)
+				} else {
+					require.Nil(t, item.Health)
+				}
+			}
+			if enabled {
+				require.NotSame(t, items[0].Health, items[1].Health)
+			}
+		})
+	}
+	require.Equal(t, counts[0], counts[1], "finalizing shared health must not read targets again")
+}
+
+func TestSharedHealthRetainsContentWriteAcrossNoopContributions(t *testing.T) {
+	id := gvk.ResourceID{Group: "apps", Version: "v1", Kind: "Deployment", Namespace: "a", Name: "shared", Tenant: "a", Origin: "first"}
+	other := id
+	other.Origin = "second"
+	targets := appliedHealthTargets{}
+	old := &meta.ResourceHealthReference{UID: "uid", Digest: "old"}
+	targets.record(id, ssa.ApplyResult{UID: "uid", ContentChanged: true, ContentVersion: "content-write"}, old)
+	targets.record(other, ssa.ApplyResult{UID: "uid", ContentVersion: "metadata-only"}, old)
+	items := meta.ProcessedItems{{ResourceID: id, Health: old}, {ResourceID: other, Health: old}, {ResourceID: other}, {ResourceID: id, Health: &meta.ResourceHealthReference{UID: "replacement", Digest: "different"}}}
+	targets.finalize(items)
+	require.Equal(t, appliedHealthReference(ssa.ApplyResult{UID: "uid", ContentChanged: true, ContentVersion: "content-write"}, nil), items[0].Health)
+	require.Equal(t, items[0].Health, items[1].Health)
+	require.Nil(t, items[2].Health, "skipped contributions must remain ineligible")
+	require.Equal(t, "different", items[3].Health.Digest, "a replacement UID must not inherit another target's snapshot")
+	require.Equal(t, "old", old.Digest, "previous snapshots must remain immutable")
+}
+
+func TestSharedHealthRetainsSuccessfulWritesAcrossPartialFailure(t *testing.T) {
+	obj := policyConfigMap("target", "example")
+	obj.SetUID("target-uid")
+	p, base := policyProcessor(obj.DeepCopy())
+	applies := 0
+	c := interceptor.NewClient(base.Client.(client.WithWatch), interceptor.Funcs{Patch: func(ctx context.Context, c client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+		if patch.Type() == types.ApplyPatchType {
+			applies++
+			if applies == 2 {
+				return errors.New("temporary apply failure")
+			}
+		}
+		return c.Patch(ctx, obj, patch, opts...)
+	}})
+	items := meta.ProcessedItems{}
+	acc := Accumulator{}
+	for i := range 2 {
+		id := gvk.NewResourceID(obj, "tenant-a", fmt.Sprint(i))
+		items = append(items, meta.ObjectReferenceStatus{ResourceID: id, Health: &meta.ResourceHealthReference{UID: obj.GetUID(), Digest: "old"}})
+		AccumulatorAdd(acc, id, AccumulatorObject{Object: obj.DeepCopy(), Policy: &apiruntime.ResourceReplicationPolicy{Creation: apiruntime.ResourceCreationPolicyMerge, Protect: new(false)}})
+	}
+	require.Error(t, p.Reconcile(t.Context(), logr.Discard(), c, &items, acc, ProcessorOptions{TrackHealth: true, FieldOwnerPrefix: "partial-shared"}))
+	require.Equal(t, items[0].Health, items[1].Health)
+	require.NotEqual(t, "old", items[0].Health.Digest)
+	require.NotEqual(t, items[0].Status, items[1].Status, "application outcomes remain per origin")
+}
+
+func BenchmarkSharedHealthFinalization(b *testing.B) {
+	for _, count := range []int{1, 128, 1024} {
+		b.Run(fmt.Sprint(count), func(b *testing.B) {
+			items := make(meta.ProcessedItems, count)
+			id := gvk.ResourceID{Kind: "ConfigMap", Namespace: "a", Name: "shared"}
+			for i := range items {
+				items[i] = meta.ObjectReferenceStatus{ResourceID: id, Health: &meta.ResourceHealthReference{UID: "uid"}}
+				items[i].Origin = fmt.Sprint(i)
+			}
+			targets := appliedHealthTargets{}
+			generation := int64(0)
+			b.ReportAllocs()
+			for b.Loop() {
+				generation++
+				targets.record(id, ssa.ApplyResult{UID: "uid", Generation: generation, ContentChanged: true, ContentVersion: "write"}, nil)
+				targets.finalize(items)
+			}
+		})
+	}
+}
+
+func BenchmarkProcessorSharedHealth(b *testing.B) {
+	for _, enabled := range []bool{false, true} {
+		for _, origins := range []int{1, 16} {
+			b.Run(fmt.Sprintf("health=%t/origins=%d", enabled, origins), func(b *testing.B) {
+				obj := policyConfigMap("target", "example")
+				obj.SetUID("target-uid")
+				p, base := policyProcessor(obj.DeepCopy())
+				c := &healthCountingClient{Client: base}
+				acc := Accumulator{}
+				for i := range origins {
+					contribution := obj.DeepCopy()
+					contribution.Object["data"] = map[string]any{fmt.Sprint(i): "value"}
+					AccumulatorAdd(acc, gvk.NewResourceID(contribution, "tenant-a", fmt.Sprint(i)), AccumulatorObject{Object: contribution, Policy: &apiruntime.ResourceReplicationPolicy{Creation: apiruntime.ResourceCreationPolicyMerge, Protect: new(false)}})
+				}
+				items := meta.ProcessedItems{}
+				opts := ProcessorOptions{TrackHealth: enabled, FieldOwnerPrefix: "benchmark-health"}
+				if err := p.Reconcile(b.Context(), logr.Discard(), c, &items, acc, opts); err != nil {
+					b.Fatal(err)
+				}
+				c.reads = 0
+				base.applies, base.force = nil, nil
+				b.ReportAllocs()
+				for b.Loop() {
+					if err := p.Reconcile(b.Context(), logr.Discard(), c, &items, acc, opts); err != nil {
+						b.Fatal(err)
+					}
+					base.applies, base.force = base.applies[:0], base.force[:0]
+				}
+				b.ReportMetric(float64(c.reads)/float64(b.N), "GET/op")
+			})
+		}
+	}
 }

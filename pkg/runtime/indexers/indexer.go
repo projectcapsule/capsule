@@ -55,7 +55,7 @@ func AddToManager(ctx context.Context, log logr.Logger, mgr manager.Manager) err
 // AddReplicationsToManager registers only the indexes needed by the dedicated
 // replication process, without starting quota, ingress or tenant-owner caches.
 func AddReplicationsToManager(ctx context.Context, log logr.Logger, mgr manager.Manager) error {
-	return add(ctx, log, mgr, append(replicationIndexers(), tenant.NamespacesReference{Obj: &capsulev1beta2.Tenant{}}, tenantresource.GlobalHealthNamespaces{}, tenantresource.NamespacedHealthNamespaces{}))
+	return add(ctx, log, mgr, append(replicationIndexers(), tenant.NamespacesReference{Obj: &capsulev1beta2.Tenant{}}, tenantresource.GlobalHealthNamespaces{}))
 }
 
 func replicationIndexers() []CustomIndexer {

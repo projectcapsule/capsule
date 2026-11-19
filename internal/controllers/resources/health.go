@@ -195,6 +195,9 @@ func completeHealthApplication(obj client.Object, spec *capsulev1beta2.TenantRes
 		status.Health = latest.Health.DeepCopy()
 		if status.Health != nil {
 			status.Health.Applying = true
+			if !sameHealthScanInventory(status.ProcessedItems, latest.ProcessedItems) {
+				restartHealthScan(status.Health, now)
+			}
 		}
 
 		setHealthCondition(obj, status, metav1.ConditionUnknown, "ApplicationIncomplete", "health checks await a successful application")
@@ -208,7 +211,12 @@ func completeHealthApplication(obj client.Object, spec *capsulev1beta2.TenantRes
 
 	if previous != nil && previous.Revision == revision {
 		status.Health = previous.DeepCopy()
-		if condition := latest.Conditions.GetConditionByType(meta.HealthyCondition); condition != nil {
+		if !sameHealthScanInventory(status.ProcessedItems, latest.ProcessedItems) {
+			// Cursor indexes every inventory entry, including skipped targets. A
+			// changed ordering must restart the scan within the same rollout budget.
+			restartHealthScan(status.Health, now)
+			setHealthCondition(obj, status, metav1.ConditionUnknown, healthProgressing, "checking applied resources")
+		} else if condition := latest.Conditions.GetConditionByType(meta.HealthyCondition); condition != nil {
 			status.Conditions.UpdateConditionByType(*condition)
 		}
 	} else {
@@ -229,6 +237,32 @@ func completeHealthApplication(obj client.Object, spec *capsulev1beta2.TenantRes
 
 	status.Health.Applying = false
 	status.Health.RequestedAt = metav1.NewMicroTime(now)
+}
+
+func restartHealthScan(phase *capsulev1beta2.TenantResourceHealthStatus, now time.Time) {
+	phase.Cursor = 0
+	phase.Pending = false
+	phase.Failed = false
+	phase.Message = ""
+	phase.NextCheckAt = metav1.NewTime(now)
+}
+
+func sameHealthScanInventory(a, b meta.ProcessedItems) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for i := range a {
+		if a[i].ResourceID != b[i].ResourceID || (a[i].Health == nil) != (b[i].Health == nil) {
+			return false
+		}
+
+		if a[i].Health != nil && *a[i].Health != *b[i].Health {
+			return false
+		}
+	}
+
+	return true
 }
 
 func setHealthCondition(obj client.Object, status *capsulev1beta2.TenantResourceCommonStatus, state metav1.ConditionStatus, reason, message string) {
