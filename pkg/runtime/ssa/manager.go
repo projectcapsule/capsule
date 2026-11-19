@@ -62,6 +62,11 @@ type ApplyOptions struct {
 
 // ApplyResult describes the observed target, including partially completed writes.
 type ApplyResult struct {
+	// Generation is the generation returned by a successful content apply.
+	Generation int64
+	// ContentChanged compares the SSA response with its optimistic-lock base.
+	ContentChanged bool
+	ContentVersion string
 	// UID identifies the target of LastApply, so retries cannot transfer it to a replacement.
 	UID       types.UID
 	LastApply *metav1.Time
@@ -199,6 +204,7 @@ func (m Manager) Apply(
 		desired.SetUID(existing.GetUID())
 	}
 
+	contentBaseVersion := desired.GetResourceVersion()
 	// A conflict restarts reconciliation from fresh ownership and conditions.
 	err = clt.PatchApply(ctx, c, desired, opts.FieldOwner, opts.Force, opts.DryRun)
 	if err != nil {
@@ -218,6 +224,8 @@ func (m Manager) Apply(
 	actual := desired
 	targetUID = actual.GetUID()
 	lastApply := successfulApplyTime(actual, opts.FieldOwner)
+	contentVersion := actual.GetResourceVersion()
+	contentChanged := contentBaseVersion != contentVersion
 
 	// Build patches against the resulting object: SSA can add protection
 	// markers or relinquish legacy labels. Reuse the apply response.
@@ -225,8 +233,11 @@ func (m Manager) Apply(
 	metadataOptions.PreviouslyCreated = created
 
 	patches, created, err := m.appliedMetadataPatches(ctx, c, desired, metadataOptions, actual)
+
+	result := ApplyResult{TargetObserved: true, Generation: actual.GetGeneration(), ContentChanged: contentChanged, ContentVersion: contentVersion, UID: targetUID, LastApply: lastApply, Created: created}
+
 	if err != nil {
-		return ApplyResult{TargetObserved: true, UID: targetUID, Created: created, LastApply: lastApply}, err
+		return result, err
 	}
 
 	if len(patches) > 0 {
@@ -244,15 +255,10 @@ func (m Manager) Apply(
 		patches,
 		meta.ResourceControllerFieldOwnerPrefix(),
 	); err != nil {
-		return ApplyResult{TargetObserved: true, UID: targetUID, Created: created, LastApply: lastApply}, fmt.Errorf("applying managed metadata failed: %w", err)
+		return result, fmt.Errorf("applying managed metadata failed: %w", err)
 	}
 
-	return ApplyResult{
-		TargetObserved: true,
-		UID:            targetUID,
-		LastApply:      lastApply,
-		Created:        created,
-	}, nil
+	return result, nil
 }
 
 // Prune relinquishes the fields owned by FieldOwner. Resources known to have

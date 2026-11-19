@@ -24,6 +24,8 @@ type Processor struct {
 }
 
 type ProcessorOptions struct {
+	// TrackHealth captures target identity only for opt-in replication health checks.
+	TrackHealth      bool
 	FieldOwnerPrefix string
 	Prune            bool
 	Adopt            bool

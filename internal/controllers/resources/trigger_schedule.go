@@ -15,13 +15,13 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/replication"
 )
 
-type triggerValidationError struct{ error }
+type replicationValidationError struct{ error }
 
-func (e triggerValidationError) Unwrap() error { return e.error }
+func (e replicationValidationError) Unwrap() error { return e.error }
 
-// Trigger scheduling and subsequent status writes must start from the same
-// authoritative annotation/acknowledgement snapshot, including retained trigger
-// state after subscriptions are removed. Other replications keep cached reads.
+// Trigger scheduling and health checkpoints require the same authoritative source
+// snapshot as subsequent status writes, including retained state after features
+// are disabled. Other replications keep cached reads.
 func readReplicationSource(ctx context.Context, cached, reader client.Reader, key client.ObjectKey, object client.Object) error {
 	if err := cached.Get(ctx, key, object); err != nil {
 		return err
@@ -30,12 +30,12 @@ func readReplicationSource(ctx context.Context, cached, reader client.Reader, ke
 	triggered := object.GetAnnotations()[replication.TriggerAnnotation] != ""
 	switch object := object.(type) {
 	case *capsulev1beta2.TenantResource:
-		triggered = triggered || len(object.Spec.Triggers) > 0 || object.Status.Trigger != nil
+		triggered = triggered || len(object.Spec.Triggers) > 0 || object.Status.Trigger != nil || object.Spec.HealthChecks.Enabled() || object.Status.Health != nil
 		if triggered {
 			*object = capsulev1beta2.TenantResource{TypeMeta: object.TypeMeta}
 		}
 	case *capsulev1beta2.GlobalTenantResource:
-		triggered = triggered || len(object.Spec.Triggers) > 0 || object.Status.Trigger != nil
+		triggered = triggered || len(object.Spec.Triggers) > 0 || object.Status.Trigger != nil || object.Spec.HealthChecks.Enabled() || object.Status.Health != nil
 		if triggered {
 			*object = capsulev1beta2.GlobalTenantResource{TypeMeta: object.TypeMeta}
 		}
@@ -130,15 +130,15 @@ func finishTrigger(status *capsulev1beta2.TenantResourceCommonStatus, request st
 	return reconcileError != nil
 }
 
-// Trigger-enabled replications can deliberately have very long resync periods.
+// Watches, health checks and health-gated dependencies can use long resyncs.
 // Retry transient apply/dependency failures promptly even before the first event,
 // including the initial protected-resource ownership handshake.
-func triggerRetryAfter(spec *capsulev1beta2.TenantResourceCommonSpec, scheduled time.Duration, reconcileError error) time.Duration {
-	if reconcileError == nil || len(spec.Triggers) == 0 {
+func replicationRetryAfter(spec *capsulev1beta2.TenantResourceCommonSpec, scheduled time.Duration, reconcileError error, healthDependency bool) time.Duration {
+	if reconcileError == nil || (len(spec.Triggers) == 0 && !spec.HealthChecks.Enabled() && !healthDependency) {
 		return scheduled
 	}
 
-	if _, ok := errors.AsType[triggerValidationError](reconcileError); ok {
+	if _, ok := errors.AsType[replicationValidationError](reconcileError); ok {
 		return scheduled
 	}
 

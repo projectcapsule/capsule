@@ -1,0 +1,20 @@
+{{- define "capsule.replications.pdb" -}}
+{{- if .Values.manager.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "capsule.controllerName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "capsule.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.manager.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "capsule.selectorLabels" . | nindent 6 }}
+
+{{- end }}
+{{- end -}}
+{{- if not .Values.crds.exclusive }}
+{{- include "capsule.replications.render" (dict "root" . "template" "capsule.replications.pdb") }}
+{{- end }}

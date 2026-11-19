@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"strconv"
 	"time"
 
@@ -121,6 +122,7 @@ func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager, ctrlCo
 				predicates.LabelPresentPredicate{Label: meta.TenantLabel},
 			),
 		).
+		Watches(&corev1.Namespace{}, handler.EnqueueRequestsFromMapFunc(r.enqueueHealthTenantResourcesForNamespace), builder.WithPredicates(healthNamespaceEvents())).
 		Watches(
 			&capsulev1beta2.Tenant{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueTenantResourcesForTenant),
@@ -155,12 +157,26 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 
 	triggerRequest := pendingTriggerRequest(tntResource, &tntResource.Spec.TenantResourceCommonSpec, &tntResource.Status.TenantResourceCommonStatus)
 
-	patchHelper, err := patch.NewHelper(tntResource, r.client)
-	if err != nil {
-		return reconcile.Result{}, gherrors.Wrap(err, "failed to init patch helper")
+	var (
+		patchHelper        *patch.Helper
+		originalFinalizers []string
+		manualRequest      string
+	)
+
+	if tntResource.Spec.HealthChecks.Enabled() {
+		originalFinalizers = append([]string(nil), tntResource.Finalizers...)
+		manualRequest = tntResource.Annotations[meta.ReconcileAnnotation]
+	} else {
+		patchHelper, err = patch.NewHelper(tntResource, r.client)
+		if err != nil {
+			return reconcile.Result{}, gherrors.Wrap(err, "failed to init patch helper")
+		}
 	}
 
-	var statusErr error
+	var (
+		statusErr        error
+		healthDependency bool
+	)
 
 	//nolint:dupl
 	defer func() {
@@ -172,7 +188,7 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 		}
 
 		finishTrigger(&tntResource.Status.TenantResourceCommonStatus, triggerRequest, started, reconcileErr)
-		res.RequeueAfter = triggerRetryAfter(&tntResource.Spec.TenantResourceCommonSpec, res.RequeueAfter, reconcileErr)
+		res.RequeueAfter = replicationRetryAfter(&tntResource.Spec.TenantResourceCommonSpec, res.RequeueAfter, reconcileErr, healthDependency)
 		// Preserve the earliest outstanding periodic wakeup when another event
 		// reconciles the same key before that deadline.
 		if periodic := recordNextResync(tntResource, &tntResource.Spec.TenantResourceCommonSpec, &tntResource.Status.TenantResourceCommonStatus, requeue.RequeueAfter, time.Now()); periodic > 0 && res.RequeueAfter > 0 {
@@ -193,7 +209,9 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 
 		r.metrics.RecordConditions(tntResource)
 
-		if e := patchHelper.Patch(ctx, tntResource); e != nil {
+		patchErr := patchReplicationAfterStatus(ctx, r.client, r.reader, tntResource, originalFinalizers, manualRequest, patchHelper)
+
+		if e := patchErr; e != nil {
 			if caperrors.IgnoreGone(e) {
 				err = nil
 
@@ -213,12 +231,10 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 	// On Deletion these checks are skipped.
 	//nolint:nestif
 	if tntResource.DeletionTimestamp.IsZero() {
-		if len(tntResource.Spec.Triggers) > 0 {
-			if validationErr := r.triggers.Validate(tntResource.UID, tntResource.Generation, &tntResource.Spec.TenantResourceCommonSpec, true, r.conditions); validationErr != nil {
-				statusErr = triggerValidationError{validationErr}
+		if validationErr := validateReplicationChecks(tntResource, &tntResource.Spec.TenantResourceCommonSpec, true, r.triggers, r.conditions); validationErr != nil {
+			statusErr = validationErr
 
-				return requeue, nil
-			}
+			return requeue, nil
 		}
 
 		if tntResource.Spec.IsCordoned() {
@@ -243,8 +259,9 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 				return requeue, nil
 			}
 
-			stat := d.Status.Conditions.GetConditionByType(meta.ReadyCondition)
-			if stat == nil || stat.Status != metav1.ConditionTrue {
+			healthDependency = healthDependency || d.Spec.HealthChecks.Enabled()
+
+			if !replicationDependencyReady(d) {
 				statusErr = fmt.Errorf("dependency %s not ready", dep.Name)
 
 				return requeue, nil
@@ -271,7 +288,7 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 
 		log.Error(updateErr, "failed to update status")
 
-		if triggerRequest != "" {
+		if triggerRequest != "" || tntResource.Spec.HealthChecks.Enabled() {
 			statusErr = updateErr
 
 			return requeue, nil
@@ -578,12 +595,16 @@ func (r *namespacedResourceController) updateReconcilingStatus(ctx context.Conte
 			return err
 		}
 
-		if latest.Status.ObservedGeneration == instance.GetGeneration() && reflect.DeepEqual(latest.Status.Trigger, instance.Status.Trigger) {
+		if latest.Status.ObservedGeneration == instance.GetGeneration() && reflect.DeepEqual(latest.Status.Trigger, instance.Status.Trigger) && reflect.DeepEqual(latest.Status.ServiceAccount, instance.Status.ServiceAccount) && !instance.Spec.HealthChecks.Enabled() {
 			return nil
 		}
 
 		latest.Status.ServiceAccount = instance.Status.ServiceAccount
 		latest.Status.Trigger = instance.Status.Trigger.DeepCopy()
+
+		if instance.Spec.HealthChecks.Enabled() && latest.Status.Health != nil {
+			latest.Status.Health.Applying = true
+		}
 
 		latest.Status.Conditions.UpdateConditionByType(meta.NewReadyConditionReconcilingReason(instance))
 
@@ -611,10 +632,15 @@ func (r *namespacedResourceController) updateStatus(ctx context.Context, instanc
 			return err
 		}
 
+		if instance.Spec.HealthChecks.Enabled() && (latest.UID != instance.UID || latest.Generation != instance.Generation) {
+			return fmt.Errorf("replication changed during application")
+		}
+
 		originalStatus := latest.Status.DeepCopy()
 
 		latest.Status = instance.Status
 		latest.Status.ObservedGeneration = instance.GetGeneration()
+		completeHealthApplication(instance, &instance.Spec.TenantResourceCommonSpec, &latest.Status.TenantResourceCommonStatus, &originalStatus.TenantResourceCommonStatus, reconcileError, time.Now())
 
 		// Set Ready Condition
 		readyCondition := meta.NewReadyCondition(instance)
@@ -622,6 +648,10 @@ func (r *namespacedResourceController) updateStatus(ctx context.Context, instanc
 			readyCondition.Message = reconcileError.Error()
 			readyCondition.Status = metav1.ConditionFalse
 			readyCondition.Reason = meta.FailedReason
+		}
+
+		if reconcileError == nil {
+			readyCondition = healthReadyCondition(instance, &instance.Spec.TenantResourceCommonSpec, &latest.Status.TenantResourceCommonStatus, readyCondition)
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(readyCondition)
@@ -726,4 +756,34 @@ func ForeachNamespace(
 	}
 
 	return nil
+}
+
+func (r *namespacedResourceController) enqueueHealthTenantResourcesForNamespace(ctx context.Context, obj client.Object) []reconcile.Request {
+	tnt, err := tenant.GetTenantByOwnerreferences(ctx, r.client, obj.GetOwnerReferences())
+	if err != nil || tnt == nil {
+		return nil
+	}
+
+	if !slices.ContainsFunc(obj.GetOwnerReferences(), func(ref metav1.OwnerReference) bool {
+		return tenant.IsTenantOwnerReference(ref) && ref.Name == tnt.Name && ref.UID == tnt.UID
+	}) {
+		return nil
+	}
+
+	var requests []reconcile.Request
+
+	for _, namespace := range tnt.Status.Namespaces {
+		var resources capsulev1beta2.TenantResourceList
+		if err := r.client.List(ctx, &resources, client.InNamespace(namespace), client.MatchingFields{tenantresourceindexer.NamespacedHealthNamespacesFieldName: namespace}); err != nil {
+			r.log.Error(err, "cannot list health-enabled tenant replications", "namespace", namespace)
+
+			return nil
+		}
+
+		for i := range resources.Items {
+			requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&resources.Items[i])})
+		}
+	}
+
+	return requests
 }

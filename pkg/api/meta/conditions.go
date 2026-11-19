@@ -11,6 +11,7 @@ import (
 const (
 	// ReadyCondition indicates the resource is ready and fully reconciled.
 	ReadyCondition       string = "Ready"
+	HealthyCondition     string = "Healthy"
 	CordonedCondition    string = "Cordoned"
 	TerminatingCondition string = "Terminating"
 	NotReadyCondition    string = "NotReady"

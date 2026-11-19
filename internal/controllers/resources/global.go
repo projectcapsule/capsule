@@ -7,11 +7,13 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"strconv"
 	"time"
 
 	"github.com/go-logr/logr"
 	gherrors "github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -41,6 +43,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 	"github.com/projectcapsule/capsule/pkg/runtime/replication"
 	"github.com/projectcapsule/capsule/pkg/runtime/ssa"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 type globalResourceController struct {
@@ -114,6 +117,7 @@ func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, ctrlConfig
 			handler.EnqueueRequestsFromMapFunc(r.enqueueDependentGlobalTenantResources),
 			builder.WithPredicates(predicates.DependencyStateChangedPredicate{}),
 		).
+		Watches(&corev1.Namespace{}, handler.EnqueueRequestsFromMapFunc(r.enqueueHealthNamespaceResources), builder.WithPredicates(healthNamespaceEvents())).
 		Watches(
 			&capsulev1beta2.Tenant{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueRequestFromTenant),
@@ -148,12 +152,26 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 
 	triggerRequest := pendingTriggerRequest(tntResource, &tntResource.Spec.TenantResourceCommonSpec, &tntResource.Status.TenantResourceCommonStatus)
 
-	patchHelper, err := patch.NewHelper(tntResource, r.client)
-	if err != nil {
-		return reconcile.Result{}, gherrors.Wrap(err, "failed to init patch helper")
+	var (
+		patchHelper        *patch.Helper
+		originalFinalizers []string
+		manualRequest      string
+	)
+
+	if tntResource.Spec.HealthChecks.Enabled() {
+		originalFinalizers = append([]string(nil), tntResource.Finalizers...)
+		manualRequest = tntResource.Annotations[meta.ReconcileAnnotation]
+	} else {
+		patchHelper, err = patch.NewHelper(tntResource, r.client)
+		if err != nil {
+			return reconcile.Result{}, gherrors.Wrap(err, "failed to init patch helper")
+		}
 	}
 
-	var statusErr error
+	var (
+		statusErr        error
+		healthDependency bool
+	)
 
 	//nolint:dupl
 	defer func() {
@@ -165,7 +183,7 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 		}
 
 		finishTrigger(&tntResource.Status.TenantResourceCommonStatus, triggerRequest, started, reconcileErr)
-		res.RequeueAfter = triggerRetryAfter(&tntResource.Spec.TenantResourceCommonSpec, res.RequeueAfter, reconcileErr)
+		res.RequeueAfter = replicationRetryAfter(&tntResource.Spec.TenantResourceCommonSpec, res.RequeueAfter, reconcileErr, healthDependency)
 		// Preserve the earliest outstanding periodic wakeup when another event
 		// reconciles the same key before that deadline.
 		if periodic := recordNextResync(tntResource, &tntResource.Spec.TenantResourceCommonSpec, &tntResource.Status.TenantResourceCommonStatus, requeue.RequeueAfter, time.Now()); periodic > 0 && res.RequeueAfter > 0 {
@@ -186,7 +204,9 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 
 		r.metrics.RecordConditions(tntResource)
 
-		if e := patchHelper.Patch(ctx, tntResource); e != nil {
+		patchErr := patchReplicationAfterStatus(ctx, r.client, r.reader, tntResource, originalFinalizers, manualRequest, patchHelper)
+
+		if e := patchErr; e != nil {
 			if caperrors.IgnoreGone(e) {
 				err = nil
 
@@ -206,12 +226,10 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 	// On Deletion these checks are skipped.
 	//nolint:nestif
 	if tntResource.DeletionTimestamp.IsZero() {
-		if len(tntResource.Spec.Triggers) > 0 {
-			if validationErr := r.triggers.Validate(tntResource.UID, tntResource.Generation, &tntResource.Spec.TenantResourceCommonSpec, false, r.conditions); validationErr != nil {
-				statusErr = triggerValidationError{validationErr}
+		if validationErr := validateReplicationChecks(tntResource, &tntResource.Spec.TenantResourceCommonSpec, false, r.triggers, r.conditions); validationErr != nil {
+			statusErr = validationErr
 
-				return requeue, nil
-			}
+			return requeue, nil
 		}
 
 		if tntResource.Spec.IsCordoned() {
@@ -233,8 +251,9 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 				return requeue, nil
 			}
 
-			stat := d.Status.Conditions.GetConditionByType(meta.ReadyCondition)
-			if stat == nil || stat.Status != metav1.ConditionTrue {
+			healthDependency = healthDependency || d.Spec.HealthChecks.Enabled()
+
+			if !replicationDependencyReady(d) {
 				statusErr = fmt.Errorf("dependency %s not ready", dep.Name)
 
 				return requeue, nil
@@ -261,7 +280,7 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 
 		log.Error(updateErr, "failed to update status")
 
-		if triggerRequest != "" {
+		if triggerRequest != "" || tntResource.Spec.HealthChecks.Enabled() {
 			statusErr = updateErr
 
 			return requeue, nil
@@ -565,12 +584,16 @@ func (r *globalResourceController) updateReconcilingStatus(ctx context.Context, 
 			return err
 		}
 
-		if latest.Status.ObservedGeneration == instance.GetGeneration() && reflect.DeepEqual(latest.Status.Trigger, instance.Status.Trigger) {
+		if latest.Status.ObservedGeneration == instance.GetGeneration() && reflect.DeepEqual(latest.Status.Trigger, instance.Status.Trigger) && reflect.DeepEqual(latest.Status.ServiceAccount, instance.Status.ServiceAccount) && !instance.Spec.HealthChecks.Enabled() {
 			return nil
 		}
 
 		latest.Status.ServiceAccount = instance.Status.ServiceAccount
 		latest.Status.Trigger = instance.Status.Trigger.DeepCopy()
+
+		if instance.Spec.HealthChecks.Enabled() && latest.Status.Health != nil {
+			latest.Status.Health.Applying = true
+		}
 
 		latest.Status.Conditions.UpdateConditionByType(meta.NewReadyConditionReconcilingReason(instance))
 
@@ -602,10 +625,15 @@ func (r *globalResourceController) updateStatus(ctx context.Context, instance *c
 			return err
 		}
 
+		if instance.Spec.HealthChecks.Enabled() && (latest.UID != instance.UID || latest.Generation != instance.Generation) {
+			return fmt.Errorf("replication changed during application")
+		}
+
 		originalStatus := latest.Status.DeepCopy()
 
 		latest.Status = instance.Status
 		latest.Status.ObservedGeneration = instance.GetGeneration()
+		completeHealthApplication(instance, &instance.Spec.TenantResourceCommonSpec, &latest.Status.TenantResourceCommonStatus, &originalStatus.TenantResourceCommonStatus, reconcileError, time.Now())
 
 		// Set Ready Condition
 		readyCondition := meta.NewReadyCondition(instance)
@@ -613,6 +641,10 @@ func (r *globalResourceController) updateStatus(ctx context.Context, instance *c
 			readyCondition.Message = reconcileError.Error()
 			readyCondition.Status = metav1.ConditionFalse
 			readyCondition.Reason = meta.FailedReason
+		}
+
+		if reconcileError == nil {
+			readyCondition = healthReadyCondition(instance, &instance.Spec.TenantResourceCommonSpec, &latest.Status.TenantResourceCommonStatus, readyCondition)
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(readyCondition)
@@ -641,4 +673,35 @@ func (r *globalResourceController) updateStatus(ctx context.Context, instance *c
 
 		return nil
 	})
+}
+
+func (r *globalResourceController) enqueueHealthNamespaceResources(ctx context.Context, obj client.Object) []reconcile.Request {
+	tnt, err := tenant.GetTenantByOwnerreferences(ctx, r.client, obj.GetOwnerReferences())
+	if err != nil || tnt == nil {
+		return nil
+	}
+
+	if !slices.ContainsFunc(obj.GetOwnerReferences(), func(ref metav1.OwnerReference) bool {
+		return tenant.IsTenantOwnerReference(ref) && ref.Name == tnt.Name && ref.UID == tnt.UID
+	}) {
+		return nil
+	}
+
+	var resources capsulev1beta2.GlobalTenantResourceList
+	if err := r.client.List(ctx, &resources, client.MatchingFields{tenantresourceindexer.GlobalHealthNamespacesFieldName: "true"}); err != nil {
+		r.log.Error(err, "cannot list health-enabled namespace replications")
+
+		return nil
+	}
+
+	result := make([]reconcile.Request, 0, len(resources.Items))
+
+	for _, resource := range resources.Items {
+		selector, err := metav1.LabelSelectorAsSelector(&resource.Spec.TenantSelector)
+		if err == nil && selector.Matches(labels.Set(tnt.Labels)) {
+			result = append(result, reconcile.Request{Name: resource.Name})
+		}
+	}
+
+	return result
 }

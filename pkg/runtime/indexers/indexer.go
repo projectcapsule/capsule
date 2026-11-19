@@ -32,9 +32,34 @@ type CustomIndexer interface {
 }
 
 func AddToManager(ctx context.Context, log logr.Logger, mgr manager.Manager) error {
-	indexers := []CustomIndexer{
+	indexers := replicationIndexers()
+	indexers = append(indexers,
 		tenantowner.OwnerNameReference{},
 		tenant.NamespacesReference{Obj: &capsulev1beta2.Tenant{}},
+		customquota.NamespacedTargetReference{},
+		customquota.NamespacedObjectUIDReference{},
+		customquota.GlobalTargetReference{},
+		customquota.GlobalObjectUIDReference{},
+		resourcepool.NamespacesReference{Obj: &capsulev1beta2.ResourcePool{}},
+		resourcepool.PoolUIDReference{Obj: &capsulev1beta2.ResourcePoolClaim{}},
+		tenant.OwnerReference{},
+		namespace.OwnerReference{},
+		ingress.HostnamePath{Obj: &extensionsv1beta1.Ingress{}},
+		ingress.HostnamePath{Obj: &networkingv1beta1.Ingress{}},
+		ingress.HostnamePath{Obj: &networkingv1.Ingress{}},
+	)
+
+	return add(ctx, log, mgr, indexers)
+}
+
+// AddReplicationsToManager registers only the indexes needed by the dedicated
+// replication process, without starting quota, ingress or tenant-owner caches.
+func AddReplicationsToManager(ctx context.Context, log logr.Logger, mgr manager.Manager) error {
+	return add(ctx, log, mgr, append(replicationIndexers(), tenant.NamespacesReference{Obj: &capsulev1beta2.Tenant{}}, tenantresource.GlobalHealthNamespaces{}, tenantresource.NamespacedHealthNamespaces{}))
+}
+
+func replicationIndexers() []CustomIndexer {
+	return []CustomIndexer{
 		tenantresource.GlobalServiceAccount{},
 		tenantresource.GlobalProcessedItems{},
 		tenantresource.FieldOwner{Obj: &capsulev1beta2.GlobalTenantResource{}},
@@ -48,19 +73,10 @@ func AddToManager(ctx context.Context, log logr.Logger, mgr manager.Manager) err
 		tenantresource.NamespacedDependencies{},
 		tenantresource.Triggers{Obj: &capsulev1beta2.TenantResource{}},
 		tenantresource.Triggers{Obj: &capsulev1beta2.GlobalTenantResource{}},
-		customquota.NamespacedTargetReference{},
-		customquota.NamespacedObjectUIDReference{},
-		customquota.GlobalTargetReference{},
-		customquota.GlobalObjectUIDReference{},
-		resourcepool.NamespacesReference{Obj: &capsulev1beta2.ResourcePool{}},
-		resourcepool.PoolUIDReference{Obj: &capsulev1beta2.ResourcePoolClaim{}},
-		tenant.OwnerReference{},
-		namespace.OwnerReference{},
-		ingress.HostnamePath{Obj: &extensionsv1beta1.Ingress{}},
-		ingress.HostnamePath{Obj: &networkingv1beta1.Ingress{}},
-		ingress.HostnamePath{Obj: &networkingv1.Ingress{}},
 	}
+}
 
+func add(ctx context.Context, log logr.Logger, mgr manager.Manager, indexers []CustomIndexer) error {
 	for _, f := range indexers {
 		if err := mgr.GetFieldIndexer().IndexField(ctx, f.Object(), f.Field(), f.Func()); err != nil {
 			if utils.IsUnsupportedAPI(err) {

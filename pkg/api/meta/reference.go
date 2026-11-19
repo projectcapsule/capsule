@@ -152,6 +152,9 @@ type ObjectReferenceStatus struct {
 
 // +kubebuilder:object:generate=true
 type ObjectReferenceStatusCondition struct {
+	// Health pins an opt-in health check to the successfully applied object.
+	// +optional
+	Health *ResourceHealthReference `json:"health,omitempty"`
 	// Policy is a lifecycle snapshot for protection and cleanup. Conditions are
 	// evaluated from the source block and omitted here. Failed updates retain the
 	// previous snapshot; a first successful content write records its policy even
@@ -198,4 +201,14 @@ type ObjectReferenceStatusCondition struct {
 
 	// Indicates whether the referenced resource is cluster-scoped.
 	ClusterScoped bool `json:"clusterScoped,omitempty"`
+}
+
+// ResourceHealthReference identifies an applied target without caching its contents.
+// +kubebuilder:object:generate=true
+type ResourceHealthReference struct {
+	UID        k8stypes.UID `json:"uid"`
+	Generation int64        `json:"generation"`
+	// Digest identifies an opaque content-write revision, including objects without generations.
+	// It is not a checksum of rendered manifests or Secret values.
+	Digest string `json:"digest"`
 }

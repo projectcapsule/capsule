@@ -186,25 +186,25 @@ func TestDependencyRecoveryIsNotBlockedByPendingTrigger(t *testing.T) {
 func TestTriggerInitialApplyRetryPreservesLegacyResync(t *testing.T) {
 	err := errors.New("protected target parent status is not indexed yet")
 	legacy := &capsulev1beta2.TenantResourceCommonSpec{ResyncPeriod: metav1.Duration{Duration: 24 * time.Hour}}
-	if got := triggerRetryAfter(legacy, 24*time.Hour, err); got != 24*time.Hour {
+	if got := replicationRetryAfter(legacy, 24*time.Hour, err, false); got != 24*time.Hour {
 		t.Fatal("legacy reconciliation timing changed")
 	}
 	legacy.Triggers = []capsulev1beta2.TenantResourceTrigger{{Name: "events"}}
 	legacy.TriggerMinInterval.Duration = 4 * time.Second
-	if got := triggerRetryAfter(legacy, 24*time.Hour, triggerValidationError{err}); got != 24*time.Hour {
+	if got := replicationRetryAfter(legacy, 24*time.Hour, replicationValidationError{err}, false); got != 24*time.Hour {
 		t.Fatal("permanent trigger configuration error entered the fast retry path")
 	}
-	if got := triggerRetryAfter(legacy, 24*time.Hour, err); got != 4*time.Second {
+	if got := replicationRetryAfter(legacy, 24*time.Hour, err, false); got != 4*time.Second {
 		t.Fatal("initial apply failure waits for long resync")
 	}
-	if got := triggerRetryAfter(legacy, time.Second, err); got != time.Second {
+	if got := replicationRetryAfter(legacy, time.Second, err, false); got != time.Second {
 		t.Fatal("shorter retry was delayed")
 	}
-	if got := triggerRetryAfter(legacy, 24*time.Hour, nil); got != 24*time.Hour {
+	if got := replicationRetryAfter(legacy, 24*time.Hour, nil, false); got != 24*time.Hour {
 		t.Fatal("successful reconciliation was accelerated")
 	}
 	legacy.TriggerMinInterval.Duration = 24 * time.Hour
-	if got := triggerRetryAfter(legacy, 24*time.Hour, err); got != time.Minute {
+	if got := replicationRetryAfter(legacy, 24*time.Hour, err, false); got != time.Minute {
 		t.Fatal("initial bootstrap cannot wait for a day-long trigger interval")
 	}
 }

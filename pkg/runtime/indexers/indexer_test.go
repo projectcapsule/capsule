@@ -28,6 +28,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
+	"github.com/projectcapsule/capsule/pkg/runtime/replication"
 )
 
 func TestAddToManagerRegistersIndexers(t *testing.T) {
@@ -74,6 +75,11 @@ func TestAddToManagerRegistersIndexers(t *testing.T) {
 	} {
 		if !fields[field] {
 			t.Fatalf("expected field %q to be registered; got %#v", field, fields)
+		}
+	}
+	for _, field := range []string{tenantresource.GlobalHealthNamespacesFieldName, tenantresource.NamespacedHealthNamespacesFieldName} {
+		if fields[field] {
+			t.Errorf("replication health index registered in admission process: %s", field)
 		}
 	}
 	for _, obj := range []client.Object{&capsulev1beta2.TenantResource{}, &capsulev1beta2.GlobalTenantResource{}} {
@@ -150,3 +156,29 @@ var (
 	_ client.FieldIndexer = (*recordingFieldIndexer)(nil)
 	_ cluster.Cluster     = (*fakeManager)(nil)
 )
+
+func TestDedicatedReplicationIndexes(t *testing.T) {
+	mgr := &fakeManager{indexer: &recordingFieldIndexer{}}
+	if err := indexers.AddReplicationsToManager(t.Context(), logr.Discard(), mgr); err != nil {
+		t.Fatal(err)
+	}
+	fields := map[string]bool{}
+	for _, call := range mgr.indexer.calls {
+		switch call.object.(type) {
+		case *capsulev1beta2.TenantResource, *capsulev1beta2.GlobalTenantResource, *capsulev1beta2.Tenant:
+		default:
+			t.Fatalf("unrelated cache registered for %T", call.object)
+		}
+		fields[call.field] = true
+	}
+	for _, field := range []string{tenantresource.GlobalHealthNamespacesFieldName, tenantresource.NamespacedHealthNamespacesFieldName, replication.TriggerIndexerField, tenantresource.GlobalDependenciesFieldName, tenantresource.NamespacedDependenciesFieldName, tenantresource.ServiceAccountIndexerFieldName, ".status.namespaces"} {
+		if !fields[field] {
+			t.Errorf("missing replication index %s", field)
+		}
+	}
+	wantErr := errors.New("replication index unavailable")
+	mgr.indexer.err = wantErr
+	if err := indexers.AddReplicationsToManager(t.Context(), logr.Discard(), mgr); !errors.Is(err, wantErr) {
+		t.Fatalf("error = %v, want %v", err, wantErr)
+	}
+}

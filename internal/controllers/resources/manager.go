@@ -9,6 +9,7 @@ import (
 	"github.com/go-logr/logr"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
@@ -24,6 +25,9 @@ func Add(
 	conditions *cache.CELCache,
 	triggers *cache.PreparedReplicationTriggers,
 ) (err error) {
+	globalMetrics := metrics.MustMakeGlobalTenantResourceRecorder()
+	localMetrics := metrics.MustMakeTenantResourceRecorder()
+
 	if err = (&NamespaceTrigger{
 		log:           log.WithName("Global"),
 		configuration: configuration,
@@ -37,7 +41,7 @@ func Add(
 	if err = (&globalResourceController{
 		log:           log.WithName("Global"),
 		configuration: configuration,
-		metrics:       metrics.MustMakeGlobalTenantResourceRecorder(),
+		metrics:       globalMetrics,
 		triggers:      triggers,
 
 		impersonation: impersonation,
@@ -49,13 +53,22 @@ func Add(
 	if err = (&namespacedResourceController{
 		log:           log.WithName("Namespaced"),
 		configuration: configuration,
-		metrics:       metrics.MustMakeTenantResourceRecorder(),
+		metrics:       localMetrics,
 		triggers:      triggers,
 
 		impersonation: impersonation,
 		conditions:    conditions,
 	}).SetupWithManager(mgr, opts); err != nil {
 		return fmt.Errorf("unable to create namespaced controller: %w", err)
+	}
+
+	health := &healthController{
+		client: mgr.GetClient(), conditions: conditions, globalMetrics: globalMetrics, localMetrics: localMetrics,
+		globals: impersonatedClientLoader[*capsulev1beta2.GlobalTenantResource]{client: replicationClient{Client: mgr.GetClient(), reader: mgr.GetAPIReader()}, configuration: configuration, impersonation: impersonation, resolve: globalServiceAccount},
+		locals:  impersonatedClientLoader[*capsulev1beta2.TenantResource]{client: replicationClient{Client: mgr.GetClient(), reader: mgr.GetAPIReader()}, configuration: configuration, impersonation: impersonation, resolve: namespacedServiceAccount},
+	}
+	if err := health.SetupWithManager(mgr, opts); err != nil {
+		return fmt.Errorf("register replication health observer: %w", err)
 	}
 
 	return nil

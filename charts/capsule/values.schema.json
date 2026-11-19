@@ -28,6 +28,138 @@
                 }
             }
         },
+        "controllers": {
+            "type": "object",
+            "properties": {
+                "replications": {
+                    "type": "object",
+                    "properties": {
+                        "affinity": {
+                            "description": "Replication affinity. Default anti-affinity separates replication replicas.",
+                            "type": "object"
+                        },
+                        "deploymentStrategy": {
+                            "description": "Replication Deployment strategy.",
+                            "type": "object",
+                            "properties": {
+                                "type": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "env": {
+                            "description": "Additional environment variables.",
+                            "type": "array"
+                        },
+                        "extraArgs": {
+                            "description": "Additional CLI arguments, using the same flags as the main controller.",
+                            "type": "array"
+                        },
+                        "hostNetwork": {
+                            "description": "Use host networking for replication pods (independent of admission).",
+                            "type": "boolean"
+                        },
+                        "hostPID": {
+                            "description": "Use the host PID namespace for replication pods (independent of admission).",
+                            "type": "boolean"
+                        },
+                        "image": {
+                            "description": "Overrides of manager.image; omitted properties inherit the main controller image.",
+                            "type": "object",
+                            "additionalProperties": true
+                        },
+                        "nodeSelector": {
+                            "description": "Replication node selector.",
+                            "type": "object"
+                        },
+                        "options": {
+                            "type": "object",
+                            "properties": {
+                                "clientConnectionBurst": {
+                                    "description": "Replication API client burst.",
+                                    "type": "integer"
+                                },
+                                "clientConnectionQPS": {
+                                    "description": "Replication API client QPS, independent of the main controller.",
+                                    "type": "number"
+                                },
+                                "workers": {
+                                    "description": "Concurrent reconciles per replication controller.",
+                                    "type": "integer"
+                                }
+                            }
+                        },
+                        "podAnnotations": {
+                            "description": "Pod annotations for the replication controller.",
+                            "type": "object"
+                        },
+                        "podDisruptionBudget": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "description": "Create a separate disruption budget for replication pods.",
+                                    "type": "boolean"
+                                },
+                                "minAvailable": {
+                                    "description": "Minimum available replication replicas.",
+                                    "type": "integer"
+                                }
+                            }
+                        },
+                        "podLabels": {
+                            "description": "Pod labels for the replication controller.",
+                            "type": "object"
+                        },
+                        "podSecurityContext": {
+                            "description": "Pod security context overrides. Global OpenShift settings still apply.",
+                            "type": "object",
+                            "additionalProperties": true
+                        },
+                        "priorityClassName": {
+                            "description": "Replication priority class name.",
+                            "type": "string"
+                        },
+                        "replicaCount": {
+                            "description": "Replication replicas. One elected leader processes replications; the others provide failover.",
+                            "type": "integer"
+                        },
+                        "resources": {
+                            "description": "Container resources for replication pods; size independently of admission pods.",
+                            "type": "object",
+                            "properties": {
+                                "limits": {
+                                    "type": "object",
+                                    "properties": {
+                                        "memory": {
+                                            "type": "string"
+                                        }
+                                    }
+                                },
+                                "requests": {
+                                    "type": "object",
+                                    "properties": {
+                                        "cpu": {
+                                            "type": "string"
+                                        },
+                                        "memory": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "tolerations": {
+                            "description": "Replication tolerations.",
+                            "type": "array"
+                        },
+                        "topologySpreadConstraints": {
+                            "description": "Replication topology spread constraints.",
+                            "type": "array"
+                        }
+                    }
+                }
+            }
+        },
         "conversions": {
             "type": "object",
             "properties": {

@@ -1,6 +1,8 @@
+{{- define "capsule.serviceMonitor" -}}
 {{- if not $.Values.crds.exclusive }}
   {{- with (mergeOverwrite .Values.monitoring.serviceMonitor (default dict .Values.serviceMonitor)) -}}
     {{- if .enabled }}
+---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -48,3 +50,4 @@ spec:
     {{- end }}
   {{- end }}
 {{- end }}
+{{- end -}}

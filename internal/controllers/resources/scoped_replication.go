@@ -82,6 +82,7 @@ func replicationProcessorOptions(
 	owner *metav1.OwnerReference,
 ) processor.ProcessorOptions {
 	return processor.ProcessorOptions{
+		TrackHealth:      spec.HealthChecks.Enabled() && obj.GetDeletionTimestamp().IsZero(),
 		FieldOwnerPrefix: getFieldOwner(obj.GetName(), obj.GetNamespace()),
 		Prune:            *spec.PruningOnDelete,
 		Adopt:            *spec.Settings.Adopt,
