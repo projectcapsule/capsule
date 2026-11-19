@@ -313,10 +313,11 @@ func staleReadyGeneration(obj *unstructured.Unstructured) (bool, error) {
 	return false, nil
 }
 
-// Namespace profile changes must refresh aggregate health without waking legacy replications.
+// Replication sources enqueue themselves on startup. Replaying every namespace
+// then would repeat tenant-wide lookups quadratically before processing any work.
 func healthNamespaceEvents() predicate.Funcs {
 	return predicate.Funcs{
-		CreateFunc: func(e event.CreateEvent) bool { return e.Object != nil },
+		CreateFunc: func(e event.CreateEvent) bool { return e.Object != nil && !e.IsInInitialList },
 		DeleteFunc: func(e event.DeleteEvent) bool { return e.Object != nil },
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			return e.ObjectOld != nil && e.ObjectNew != nil && (!reflect.DeepEqual(e.ObjectOld.GetLabels(), e.ObjectNew.GetLabels()) || !reflect.DeepEqual(e.ObjectOld.GetOwnerReferences(), e.ObjectNew.GetOwnerReferences()) || (e.ObjectOld.GetDeletionTimestamp() == nil) != (e.ObjectNew.GetDeletionTimestamp() == nil))

@@ -20,7 +20,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/retry"
-	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -123,6 +122,7 @@ func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, ctrlConfig
 			handler.EnqueueRequestsFromMapFunc(r.enqueueRequestFromTenant),
 			builder.WithPredicates(predicates.TenantSelectionChangedPredicate{}),
 		).
+		Watches(&capsulev1beta2.GlobalTenantResource{}, replicationConditionHandler(r.metrics.RecordConditions, func(obj *capsulev1beta2.GlobalTenantResource) { r.metrics.DeleteMetrics(obj.Name) })).
 		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
 		Complete(r)
 }
@@ -137,8 +137,6 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 		if apierrors.IsNotFound(err) {
 			log.V(5).Info("Request object not found, could have been deleted after reconcile request")
 
-			r.metrics.DeleteMetrics(request.Name)
-
 			return reconcile.Result{}, nil
 		}
 
@@ -152,21 +150,8 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 
 	triggerRequest := pendingTriggerRequest(tntResource, &tntResource.Spec.TenantResourceCommonSpec, &tntResource.Status.TenantResourceCommonStatus)
 
-	var (
-		patchHelper        *patch.Helper
-		originalFinalizers []string
-		manualRequest      string
-	)
-
-	if tntResource.Spec.HealthChecks.Enabled() {
-		originalFinalizers = append([]string(nil), tntResource.Finalizers...)
-		manualRequest = tntResource.Annotations[meta.ReconcileAnnotation]
-	} else {
-		patchHelper, err = patch.NewHelper(tntResource, r.client)
-		if err != nil {
-			return reconcile.Result{}, gherrors.Wrap(err, "failed to init patch helper")
-		}
-	}
+	originalFinalizers := slices.Clone(tntResource.Finalizers)
+	manualRequest := tntResource.Annotations[meta.ReconcileAnnotation]
 
 	var (
 		statusErr        error
@@ -202,9 +187,7 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 			return
 		}
 
-		r.metrics.RecordConditions(tntResource)
-
-		patchErr := patchReplicationAfterStatus(ctx, r.client, r.reader, tntResource, originalFinalizers, manualRequest, patchHelper)
+		patchErr := patchReplicationMetadata(ctx, r.client, r.reader, tntResource, originalFinalizers, manualRequest)
 
 		if e := patchErr; e != nil {
 			if caperrors.IgnoreGone(e) {
@@ -625,8 +608,22 @@ func (r *globalResourceController) updateStatus(ctx context.Context, instance *c
 			return err
 		}
 
-		if instance.Spec.HealthChecks.Enabled() && (latest.UID != instance.UID || latest.Generation != instance.Generation) {
-			return fmt.Errorf("replication changed during application")
+		if latest.UID != instance.UID {
+			return apierrors.NewNotFound(capsulev1beta2.GroupVersion.WithResource("globaltenantresources").GroupResource(), instance.Name)
+		}
+
+		if latest.Generation != instance.Generation {
+			// Applying an older spec can still create or prune targets. Persist that
+			// inventory so the next generation can clean it up, without completing
+			// its predecessor's health checks or publishing stale readiness.
+			latest.Status.ManagedResourcesStatus = instance.Status.ManagedResourcesStatus
+			if err := r.client.Status().Update(ctx, latest); err != nil {
+				return err
+			}
+
+			instance.Status = latest.Status
+
+			return nil
 		}
 
 		originalStatus := latest.Status.DeepCopy()

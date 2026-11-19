@@ -63,7 +63,7 @@ func Add(
 	}
 
 	health := &healthController{
-		client: mgr.GetClient(), conditions: conditions, globalMetrics: globalMetrics, localMetrics: localMetrics,
+		client: mgr.GetClient(), conditions: conditions,
 		globals: impersonatedClientLoader[*capsulev1beta2.GlobalTenantResource]{client: replicationClient{Client: mgr.GetClient(), reader: mgr.GetAPIReader()}, configuration: configuration, impersonation: impersonation, resolve: globalServiceAccount},
 		locals:  impersonatedClientLoader[*capsulev1beta2.TenantResource]{client: replicationClient{Client: mgr.GetClient(), reader: mgr.GetAPIReader()}, configuration: configuration, impersonation: impersonation, resolve: namespacedServiceAccount},
 	}

@@ -18,6 +18,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -101,6 +102,87 @@ func replicationHealthMetric(ctx context.Context, cs kubernetes.Interface, paren
 }
 
 var _ = Describe("Replication health observations", Label("tenant", "replications", "healthchecks"), func() {
+	DescribeTable("prunes targets when the source spec changes during application", Label("inventory"), func(global bool) {
+		ctx := context.Background()
+		prefix := "health-inventory-" + rand.String(5)
+		owners, namespaces := watchNamespaces(prefix)
+		actor := impersonationClient(owners[0].Name, withDefaultGroups(nil))
+		ns := namespaces[0].Name
+		spec := capsulev1beta2.TenantResourceCommonSpec{
+			Cordoned: new(true), ResyncPeriod: metav1.Duration{Duration: 24 * time.Hour},
+			HealthChecks: &capsulev1beta2.TenantResourceHealthChecks{Wait: true},
+			Resources: []capsulev1beta2.ResourceSpec{{
+				NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"kubernetes.io/metadata.name": ns}},
+				Policy:            &apiruntime.ResourceReplicationPolicy{Protect: new(false), Creation: apiruntime.ResourceCreationPolicyOwner, Deletion: apiruntime.ResourceDeletionPolicyRemove},
+			}},
+		}
+		// A real watch catches the first target before the batch finishes. The
+		// assertion below ensures this exercises an in-flight application.
+		for i := range 96 {
+			spec.Resources[0].RawItems = append(spec.Resources[0].RawItems, capsulev1beta2.RawExtension{Raw: []byte(fmt.Sprintf(`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":%q,"labels":{"projectcapsule.dev/inventory-race":%q}}}`, fmt.Sprintf("%s-%d", prefix, i), prefix))})
+		}
+		var parent client.Object
+		writer := actor
+		if global {
+			parent = &capsulev1beta2.GlobalTenantResource{Name: prefix, Spec: capsulev1beta2.GlobalTenantResourceSpec{TenantResourceCommonSpec: spec, Scope: api.ResourceScopeNamespace, TenantSelector: metav1.LabelSelector{MatchLabels: map[string]string{"projectcapsule.dev/watch-tenant": "0" + prefix}}, ServiceAccount: &meta.NamespacedRFC1123ObjectReferenceWithNamespace{Name: "default", Namespace: meta.RFC1123SubdomainName(ns)}}}
+			writer = k8sClient
+		} else {
+			parent = &capsulev1beta2.TenantResource{Name: prefix, Namespace: ns, Spec: capsulev1beta2.TenantResourceSpec{TenantResourceCommonSpec: spec, ServiceAccount: &meta.LocalRFC1123ObjectReference{Name: "default"}}}
+		}
+		Expect(writer.Create(ctx, parent)).To(Succeed())
+		DeferCleanup(DeleteInBackground, parent)
+		Eventually(func(g Gomega) {
+			fresh, status := replicationHealthObject(parent)
+			g.Expect(status.ObservedGeneration).To(Equal(fresh.GetGeneration()))
+			g.Expect(meta.IsStatusConditionTrue(status.Conditions, meta.CordonedCondition)).To(BeTrue())
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		cs := clusterAdminClient()
+		stream, err := cs.CoreV1().ConfigMaps(ns).Watch(ctx, metav1.ListOptions{LabelSelector: "projectcapsule.dev/inventory-race=" + prefix})
+		Expect(err).NotTo(HaveOccurred())
+		defer stream.Stop()
+		update := func(remove bool) error {
+			fresh := parent.DeepCopyObject().(client.Object)
+			if err := writer.Get(ctx, client.ObjectKeyFromObject(parent), fresh); err != nil {
+				return err
+			}
+			switch obj := fresh.(type) {
+			case *capsulev1beta2.TenantResource:
+				obj.Spec.Cordoned = new(false)
+				if remove {
+					obj.Spec.Resources = []capsulev1beta2.ResourceSpec{}
+				}
+			case *capsulev1beta2.GlobalTenantResource:
+				obj.Spec.Cordoned = new(false)
+				if remove {
+					obj.Spec.Resources = []capsulev1beta2.ResourceSpec{}
+				}
+			}
+			return writer.Update(ctx, fresh)
+		}
+		Eventually(func() error { return update(false) }, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Eventually(stream.ResultChan(), defaultTimeoutInterval).Should(Receive(HaveField("Type", Equal(watch.Added))))
+		_, applying := replicationHealthObject(parent)
+		Expect(applying.ProcessedItems).To(BeEmpty(), "spec must change before the first application publishes inventory")
+		Eventually(func() error { return update(true) }, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		status := expectReplicationHealth(parent, metav1.ConditionTrue, "Succeeded")
+		Expect(status.ProcessedItems).To(BeEmpty())
+		Expect(status.Size).To(BeZero())
+		Eventually(func(g Gomega) {
+			for _, namespace := range namespaces {
+				list := &corev1.ConfigMapList{}
+				g.Expect(k8sClient.List(ctx, list, client.InNamespace(namespace.Name), client.MatchingLabels{"projectcapsule.dev/inventory-race": prefix})).To(Succeed())
+				g.Expect(list.Items).To(BeEmpty())
+			}
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Expect(apierrors.IsForbidden(actor.Get(ctx, client.ObjectKey{Namespace: namespaces[2].Name, Name: prefix + "-0"}, &corev1.ConfigMap{}))).To(BeTrue())
+		Eventually(func(g Gomega) {
+			value, present, err := replicationHealthMetric(ctx, cs, parent)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(present).To(BeTrue())
+			g.Expect(value).To(Equal(float64(1)))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	}, Entry("TenantResource", false), Entry("GlobalTenantResource", true))
+
 	DescribeTable("keeps health retries separate from application, profiles and dependency gating", func(global bool) {
 		ctx := context.Background()
 		prefix := "health-" + rand.String(6)

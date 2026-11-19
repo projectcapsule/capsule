@@ -28,7 +28,6 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
-	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
@@ -36,12 +35,10 @@ import (
 // queue keeps health retries independent of rendering, applying and trigger limits.
 // It shares the existing replication manager's clients, caches and election lease.
 type healthController struct {
-	client        client.Client
-	conditions    *cache.CELCache
-	globals       impersonatedClientLoader[*capsulev1beta2.GlobalTenantResource]
-	locals        impersonatedClientLoader[*capsulev1beta2.TenantResource]
-	globalMetrics *metrics.GlobalTenantResourceRecorder
-	localMetrics  *metrics.TenantResourceRecorder
+	client     client.Client
+	conditions *cache.CELCache
+	globals    impersonatedClientLoader[*capsulev1beta2.GlobalTenantResource]
+	locals     impersonatedClientLoader[*capsulev1beta2.TenantResource]
 }
 
 func healthSource(obj client.Object) (*capsulev1beta2.TenantResourceCommonSpec, *capsulev1beta2.TenantResourceCommonStatus) {
@@ -261,17 +258,6 @@ func (r *healthController) publish(ctx context.Context, obj client.Object, statu
 		}
 
 		return false, err
-	}
-
-	switch obj := obj.(type) {
-	case *capsulev1beta2.TenantResource:
-		if r.localMetrics != nil {
-			r.localMetrics.RecordConditions(obj)
-		}
-	case *capsulev1beta2.GlobalTenantResource:
-		if r.globalMetrics != nil {
-			r.globalMetrics.RecordConditions(obj)
-		}
 	}
 
 	return true, nil

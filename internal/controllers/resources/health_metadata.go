@@ -10,16 +10,15 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
-	"sigs.k8s.io/cluster-api/util/patch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
-// Health and apply queues share status. After the explicit status update, patch
+// Apply, health and namespace queues share status. After the status update, patch
 // only owned metadata so a second status merge cannot undo a newer observation.
-func patchHealthReplicationMetadata(ctx context.Context, c client.Client, reader client.Reader, obj client.Object, originalFinalizers []string, manualRequest string) error {
+func patchReplicationMetadata(ctx context.Context, c client.Client, reader client.Reader, obj client.Object, originalFinalizers []string, manualRequest string) error {
 	if slices.Equal(originalFinalizers, obj.GetFinalizers()) && manualRequest == "" {
 		return nil
 	}
@@ -54,13 +53,4 @@ func patchHealthReplicationMetadata(ctx context.Context, c client.Client, reader
 
 		return c.Patch(ctx, fresh, client.RawPatch(types.MergePatchType, payload))
 	})
-}
-
-func patchReplicationAfterStatus(ctx context.Context, c client.Client, reader client.Reader, obj client.Object, originalFinalizers []string, manualRequest string, helper *patch.Helper) error {
-	spec, _ := healthSource(obj)
-	if spec.HealthChecks.Enabled() {
-		return patchHealthReplicationMetadata(ctx, c, reader, obj, originalFinalizers, manualRequest)
-	}
-
-	return helper.Patch(ctx, obj)
 }

@@ -12,7 +12,6 @@ import (
 
 	kstatus "github.com/fluxcd/cli-utils/pkg/kstatus/status"
 	"github.com/go-logr/logr"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -194,7 +193,6 @@ func healthFixture(t *testing.T, global bool) (*healthController, client.WithWat
 	require.NoError(t, err)
 	r := &healthController{
 		client: c, conditions: conditions,
-		localMetrics: metrics.NewTenantResourceRecorder(), globalMetrics: metrics.NewGlobalTenantResourceRecorder(),
 		locals:  impersonatedClientLoader[*capsulev1beta2.TenantResource]{client: c, configuration: config, resolve: namespacedServiceAccount},
 		globals: impersonatedClientLoader[*capsulev1beta2.GlobalTenantResource]{client: c, configuration: config, resolve: globalServiceAccount},
 	}
@@ -205,35 +203,6 @@ func TestHealthObserverRecoversWithoutApplyingOrReadingOtherTenants(t *testing.T
 	for _, global := range []bool{false, true} {
 		t.Run(fmt.Sprint(global), func(t *testing.T) {
 			r, c, parent, target := healthFixture(t, global)
-			assertMetrics := func(want float64) {
-				t.Helper()
-				collector := r.localMetrics.Collectors()[0]
-				family := "capsule_resource_condition"
-				if global {
-					collector = r.globalMetrics.Collectors()[0]
-					family = "capsule_global_resource_condition"
-				}
-				registry := prometheus.NewRegistry()
-				registry.MustRegister(collector)
-				families, err := registry.Gather()
-				require.NoError(t, err)
-				require.Len(t, families, 1)
-				require.Equal(t, family, families[0].GetName())
-				require.Len(t, families[0].Metric, 2)
-				for _, sample := range families[0].Metric {
-					labels := map[string]string{}
-					for _, label := range sample.Label {
-						labels[label.GetName()] = label.GetValue()
-					}
-					require.Contains(t, []string{meta.HealthyCondition, meta.ReadyCondition}, labels["condition"])
-					expected := map[string]string{"condition": labels["condition"], "name": parent.GetName()}
-					if !global {
-						expected["target_namespace"] = parent.GetNamespace()
-					}
-					require.Equal(t, expected, labels)
-					require.Equal(t, want, sample.GetGauge().GetValue())
-				}
-			}
 			writes, reads := 0, 0
 			guarded := interceptor.NewClient(c, interceptor.Funcs{
 				Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
@@ -265,7 +234,7 @@ func TestHealthObserverRecoversWithoutApplyingOrReadingOtherTenants(t *testing.T
 			_, status := healthSource(parent)
 			require.Equal(t, metav1.ConditionUnknown, status.Conditions.GetConditionByType(meta.HealthyCondition).Status)
 			require.False(t, meta.IsStatusConditionTrue(status.Conditions, meta.ReadyCondition))
-			assertMetrics(0)
+
 			deadline := status.Health.Deadline
 			status.Health.Deadline = metav1.NewTime(time.Now().Add(-time.Second))
 			status.Health.NextCheckAt = metav1.Time{}
@@ -276,7 +245,7 @@ func TestHealthObserverRecoversWithoutApplyingOrReadingOtherTenants(t *testing.T
 			require.NoError(t, c.Get(t.Context(), req.NamespacedName, parent))
 			_, status = healthSource(parent)
 			require.Equal(t, healthTimeout, status.Conditions.GetConditionByType(meta.HealthyCondition).Reason)
-			assertMetrics(0)
+
 			require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(target), target))
 			target.Data["state"] = "healthy"
 			require.NoError(t, c.Update(t.Context(), target))
@@ -291,7 +260,7 @@ func TestHealthObserverRecoversWithoutApplyingOrReadingOtherTenants(t *testing.T
 			_, status = healthSource(parent)
 			require.True(t, meta.IsStatusConditionTrue(status.Conditions, meta.HealthyCondition))
 			require.True(t, meta.IsStatusConditionTrue(status.Conditions, meta.ReadyCondition))
-			assertMetrics(1)
+
 			require.NotEqual(t, deadline, status.Health.Deadline)
 			require.Equal(t, 3, reads)
 			require.Zero(t, writes)
@@ -432,7 +401,7 @@ func TestHealthMetadataPatchPreservesObservationAndConcurrentMetadata(t *testing
 	desired := parent.DeepCopyObject().(client.Object)
 	desired.SetFinalizers([]string{meta.ControllerFinalizer})
 	desired.SetAnnotations(nil)
-	require.NoError(t, patchHealthReplicationMetadata(t.Context(), c, c, desired, nil, "old-request"))
+	require.NoError(t, patchReplicationMetadata(t.Context(), c, c, desired, nil, "old-request"))
 	require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(parent), parent))
 	_, status = healthSource(parent)
 	require.Equal(t, int32(64), status.Health.Cursor)
@@ -440,7 +409,7 @@ func TestHealthMetadataPatchPreservesObservationAndConcurrentMetadata(t *testing
 	require.Contains(t, parent.GetFinalizers(), "other.projectcapsule.dev/finalizer")
 	require.Contains(t, parent.GetFinalizers(), meta.ControllerFinalizer)
 	require.Equal(t, "new-request", parent.GetAnnotations()[meta.ReconcileAnnotation])
-	require.NoError(t, patchHealthReplicationMetadata(t.Context(), c, c, desired, nil, "new-request"))
+	require.NoError(t, patchReplicationMetadata(t.Context(), c, c, desired, nil, "new-request"))
 	require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(parent), parent))
 	require.Empty(t, parent.GetAnnotations()[meta.ReconcileAnnotation])
 	require.Equal(t, "kept", parent.GetAnnotations()["projectcapsule.dev/other"])
@@ -753,5 +722,6 @@ func TestHealthNamespaceProfileEvents(t *testing.T) {
 	require.False(t, p.Update(event.UpdateEvent{}))
 	require.False(t, p.Create(event.CreateEvent{}))
 	require.True(t, p.Create(event.CreateEvent{Object: before}))
+	require.False(t, p.Create(event.CreateEvent{Object: before, IsInInitialList: true}))
 	require.True(t, p.Delete(event.DeleteEvent{Object: before}))
 }
