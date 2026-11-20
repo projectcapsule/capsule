@@ -176,7 +176,7 @@ var _ = Describe("VolumeSnapshot class rules", Label("tenant", "rules", "storage
 		By("admitting a VolumeGroupSnapshot member, since the rule also checks the class the snapshot-controller sets later")
 		member := func(ns *corev1.Namespace) *snapshotv1.VolumeSnapshot {
 			obj := snapshot(ns, "member", nil)
-			obj.OwnerReferences = []metav1.OwnerReference{{APIVersion: "groupsnapshot.storage.k8s.io/v1", Kind: "VolumeGroupSnapshot", Name: "group", UID: "group"}}
+			obj.OwnerReferences = []metav1.OwnerReference{{APIVersion: "groupsnapshot.storage.k8s.io/v0", Kind: "VolumeGroupSnapshot", Name: "group", UID: "group"}}
 			return obj
 		}
 		admit(ownerA, member(restricted))
