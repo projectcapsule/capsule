@@ -29,7 +29,7 @@ import (
 
 func TestReplicationRetainsInventoryAcrossConcurrentSpecChanges(t *testing.T) {
 	for _, global := range []bool{false, true} {
-		for _, change := range []string{"spec", "disable-health", "enable-health", "deletion", "replacement", "conflict"} {
+		for _, change := range []string{"spec", "disable-health", "enable-health", "no-checkpoint", "deletion", "replacement", "conflict"} {
 			t.Run(fmt.Sprintf("global=%t/%s", global, change), func(t *testing.T) {
 				_, c, instance, _ := healthFixture(t, global)
 				spec, applied := healthSource(instance)
@@ -57,6 +57,9 @@ func TestReplicationRetainsInventoryAcrossConcurrentSpecChanges(t *testing.T) {
 				freshStatus.ObservedGeneration = fresh.GetGeneration()
 				freshStatus.Conditions = meta.ConditionList{{Type: meta.ReadyCondition, Status: metav1.ConditionFalse, Reason: "NewerApplication"}}
 				freshStatus.Health = &capsulev1beta2.TenantResourceHealthStatus{Revision: "newer", Applying: true}
+				if change == "no-checkpoint" {
+					freshStatus.Health = nil
+				}
 				require.NoError(t, c.Status().Update(t.Context(), fresh))
 				if change == "deletion" {
 					require.NoError(t, c.Delete(t.Context(), fresh))
@@ -95,8 +98,20 @@ func TestReplicationRetainsInventoryAcrossConcurrentSpecChanges(t *testing.T) {
 				require.Equal(t, "new-target", persisted.ProcessedItems[0].Name)
 				require.EqualValues(t, 1, persisted.Size)
 				require.Equal(t, before.ObservedGeneration, persisted.ObservedGeneration)
-				require.Equal(t, before.Health, persisted.Health, "stale application must not complete health")
-				require.Equal(t, before.Conditions, persisted.Conditions)
+				if freshSpec.HealthChecks.Enabled() {
+					require.True(t, persisted.Health.Applying, "stale application must not complete health")
+					require.Empty(t, persisted.Health.Revision, "changed cleanup inventory must request a full application")
+					if change == "no-checkpoint" {
+						require.False(t, persisted.Health.StartedAt.IsZero())
+						require.False(t, persisted.Health.Deadline.IsZero())
+						require.False(t, persisted.Health.RequestedAt.IsZero())
+					}
+					require.False(t, meta.IsStatusConditionTrue(persisted.Conditions, meta.HealthyCondition))
+					require.False(t, meta.IsStatusConditionTrue(persisted.Conditions, meta.ReadyCondition))
+				} else {
+					require.Equal(t, before.Health, persisted.Health)
+					require.Equal(t, before.Conditions, persisted.Conditions)
+				}
 				require.ElementsMatch(t, []string{"other.example/finalizer", meta.ControllerFinalizer}, fresh.GetFinalizers())
 				require.Equal(t, "new-request", fresh.GetAnnotations()[meta.ReconcileAnnotation])
 				if change == "conflict" {

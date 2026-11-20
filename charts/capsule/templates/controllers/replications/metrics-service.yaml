@@ -10,7 +10,7 @@ spec:
   ports:
     - name: metrics
       port: 8080
-      targetPort: 8080
+      targetPort: {{ ternary 8081 8080 .Values.manager.hostNetwork }}
   selector:
     {{- include "capsule.selectorLabels" . | nindent 4 }}
 

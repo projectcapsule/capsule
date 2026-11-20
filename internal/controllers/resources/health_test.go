@@ -5,8 +5,12 @@ package resources
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -407,8 +411,15 @@ func TestHealthIdentityAndPublicationGuards(t *testing.T) {
 func TestHealthReadBudgetAndSkippedTargets(t *testing.T) {
 	r, c, parent, target := healthFixture(t, false)
 	_, status := healthSource(parent)
-	for range healthBatchSize + 5 {
-		status.ProcessedItems = append(status.ProcessedItems, status.ProcessedItems[0])
+	for i := range healthBatchSize + 5 {
+		copy := target.DeepCopy()
+		copy.Name, copy.ResourceVersion = fmt.Sprintf("target-%d", i), ""
+		copy.UID = types.UID(copy.Name)
+		copy.Data["state"] = "healthy"
+		require.NoError(t, c.Create(t.Context(), copy))
+		item := status.ProcessedItems[0]
+		item.Name, item.Health = copy.Name, &meta.ResourceHealthReference{UID: copy.UID}
+		status.ProcessedItems = append(status.ProcessedItems, item)
 	}
 	target.Data["state"] = "healthy"
 	require.NoError(t, c.Update(t.Context(), target))
@@ -454,14 +465,99 @@ func BenchmarkControllerHealthObservation(b *testing.B) {
 			if err != nil {
 				b.Fatal(err)
 			}
+			reads := 0
+			reader := interceptor.NewClient(c, interceptor.Funcs{Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				reads++
+				return c.Get(ctx, key, obj, opts...)
+			}})
 			b.ReportAllocs()
 			b.ResetTimer()
 			for b.Loop() {
 				phase.Cursor = 0
-				observeHealthBatch(b.Context(), c, parent, &parent.Status.TenantResourceCommonStatus, checks, time.Now())
+				for {
+					observeHealthBatch(b.Context(), reader, parent, &parent.Status.TenantResourceCommonStatus, checks, time.Now())
+					if phase.Cursor == 0 {
+						break
+					}
+				}
 			}
-			b.ReportMetric(float64(min(count, healthBatchSize)), "GET/op")
+			b.ReportMetric(float64(reads)/float64(b.N), "GET/op")
 		})
+	}
+}
+
+func BenchmarkHealthDistinctObservation(b *testing.B) {
+	for _, count := range []int{1, 64, 1024} {
+		b.Run(fmt.Sprint(count), func(b *testing.B) {
+			objects := make([]client.Object, count)
+			parent := &capsulev1beta2.TenantResource{Generation: 1}
+			status := &parent.Status.TenantResourceCommonStatus
+			status.Health = &capsulev1beta2.TenantResourceHealthStatus{Deadline: metav1.NewTime(time.Now().Add(time.Hour))}
+			for i := range count {
+				name := fmt.Sprintf("target-%d", i)
+				objects[i] = &corev1.ConfigMap{Name: name, Namespace: "tenant-a", UID: types.UID(name)}
+				status.ProcessedItems = append(status.ProcessedItems, meta.ObjectReferenceStatus{Version: "v1", Kind: "ConfigMap", Name: name, Namespace: "tenant-a", Health: &meta.ResourceHealthReference{UID: types.UID(name)}})
+			}
+			c := fake.NewClientBuilder().WithObjects(objects...).Build()
+			reads := 0
+			reader := interceptor.NewClient(c, interceptor.Funcs{Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				reads++
+				return c.Get(ctx, key, obj, opts...)
+			}})
+			b.ReportAllocs()
+			for b.Loop() {
+				for {
+					observeHealthBatch(b.Context(), reader, parent, status, nil, time.Now())
+					if status.Health.Cursor == 0 {
+						break
+					}
+				}
+			}
+			b.ReportMetric(float64(reads)/float64(b.N), "GET/op")
+		})
+	}
+}
+
+func BenchmarkHealthRevision(b *testing.B) {
+	for _, count := range []int{1, 64, 1024} {
+		b.Run(fmt.Sprint(count), func(b *testing.B) {
+			parent := &capsulev1beta2.TenantResource{Generation: 1, UID: "parent"}
+			for i := range count {
+				parent.Status.ProcessedItems = append(parent.Status.ProcessedItems, meta.ObjectReferenceStatus{Version: "v1", Kind: "ConfigMap", Name: fmt.Sprint(i), Namespace: "tenant-a", Health: &meta.ResourceHealthReference{UID: types.UID(fmt.Sprint(i)), Digest: "revision"}})
+			}
+			b.ReportAllocs()
+			for b.Loop() {
+				if healthRevision(parent, &parent.Status.TenantResourceCommonStatus) == "" {
+					b.Fatal("empty revision")
+				}
+			}
+		})
+	}
+}
+
+func TestHealthRevisionPreservesPersistedFormat(t *testing.T) {
+	for _, count := range []int{0, 1, 64} {
+		for _, identity := range []bool{false, true} {
+			t.Run(fmt.Sprintf("items=%d/identity=%t", count, identity), func(t *testing.T) {
+				parent := &capsulev1beta2.TenantResource{Generation: 42, UID: "parent"}
+				status := &parent.Status.TenantResourceCommonStatus
+				account := ""
+				if identity {
+					status.ServiceAccount = &meta.NamespacedRFC1123ObjectReferenceWithNamespace{Namespace: "tenant-a", Name: "replicator"}
+					account = "tenant-a/replicator"
+				}
+				entries := []string{}
+				for i := range count {
+					item := meta.ObjectReferenceStatus{Group: "example.projectcapsule.dev", Version: "v1", Kind: "Target", Namespace: "tenant-a", Name: fmt.Sprint(count - i), Health: &meta.ResourceHealthReference{UID: types.UID(fmt.Sprint(i)), Generation: int64(i), Digest: "opaque-content-revision"}}
+					status.ProcessedItems = append(status.ProcessedItems, item)
+					entries = append(entries, fmt.Sprintf("%s/%s/%d/%s", item.GetGVKKey(""), item.Health.UID, item.Health.Generation, item.Health.Digest))
+				}
+				status.ProcessedItems = append(status.ProcessedItems, meta.ObjectReferenceStatus{Name: "skipped"})
+				slices.Sort(entries)
+				digest := sha256.Sum256([]byte(fmt.Sprintf("%s|%d|%s|%s", parent.UID, parent.Generation, account, strings.Join(entries, "|"))))
+				require.Equal(t, hex.EncodeToString(digest[:]), healthRevision(parent, status))
+			})
+		}
 	}
 }
 

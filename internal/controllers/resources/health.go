@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -152,10 +153,29 @@ func (e healthEvaluator) evaluate(ctx context.Context, obj *unstructured.Unstruc
 
 func healthRevision(obj client.Object, status *capsulev1beta2.TenantResourceCommonStatus) string {
 	entries := make([]string, 0, len(status.ProcessedItems))
+	entryBytes := 0
 
 	for _, item := range status.ProcessedItems {
 		if item.Health != nil {
-			entries = append(entries, fmt.Sprintf("%s/%s/%d/%s", item.GetGVKKey(""), item.Health.UID, item.Health.Generation, item.Health.Digest))
+			// Preserve the persisted revision format without formatting every
+			// field through fmt on each observer batch.
+			var entry strings.Builder
+
+			entry.Grow(len(item.Group) + len(item.Version) + len(item.Kind) + len(item.Namespace) + len(item.Name) + len(item.Health.UID) + len(item.Health.Digest) + 28)
+
+			for _, field := range []string{item.Group, item.Version, item.Kind, item.Namespace, item.Name} {
+				entry.WriteString(field)
+				entry.WriteByte('\x1f')
+			}
+
+			entry.WriteByte('/')
+			entry.WriteString(string(item.Health.UID))
+			entry.WriteByte('/')
+			entry.WriteString(strconv.FormatInt(item.Health.Generation, 10))
+			entry.WriteByte('/')
+			entry.WriteString(item.Health.Digest)
+			entries = append(entries, entry.String())
+			entryBytes += entry.Len()
 		}
 	}
 
@@ -166,8 +186,25 @@ func healthRevision(obj client.Object, status *capsulev1beta2.TenantResourceComm
 		identity = status.ServiceAccount.Namespace.String() + "/" + status.ServiceAccount.Name.String()
 	}
 
-	data := []byte(fmt.Sprintf("%s|%d|%s|%s", obj.GetUID(), obj.GetGeneration(), identity, strings.Join(entries, "|")))
-	digest := sha256.Sum256(data)
+	var data strings.Builder
+
+	data.Grow(len(obj.GetUID()) + len(identity) + entryBytes + len(entries) + 23)
+	data.WriteString(string(obj.GetUID()))
+	data.WriteByte('|')
+	data.WriteString(strconv.FormatInt(obj.GetGeneration(), 10))
+	data.WriteByte('|')
+	data.WriteString(identity)
+	data.WriteByte('|')
+
+	for i, entry := range entries {
+		if i > 0 {
+			data.WriteByte('|')
+		}
+
+		data.WriteString(entry)
+	}
+
+	digest := sha256.Sum256([]byte(data.String()))
 
 	return hex.EncodeToString(digest[:])
 }
@@ -245,6 +282,38 @@ func restartHealthScan(phase *capsulev1beta2.TenantResourceHealthStatus, now tim
 	phase.Failed = false
 	phase.Message = ""
 	phase.NextCheckAt = metav1.NewTime(now)
+}
+
+// An empty, applying checkpoint durably requests a full apply through the source
+// controller's status predicate, including after a controller restart.
+func invalidateHealthApplication(obj client.Object, status *capsulev1beta2.TenantResourceCommonStatus, now time.Time) {
+	if status.Health == nil {
+		// These fields are required by the status schema even before the first
+		// health-enabled apply completes. Its completion starts the real budget.
+		status.Health = &capsulev1beta2.TenantResourceHealthStatus{ObservedGeneration: obj.GetGeneration(), StartedAt: metav1.NewTime(now), Deadline: metav1.NewTime(now), RequestedAt: metav1.NewMicroTime(now)}
+	}
+
+	status.Health.Revision = ""
+	status.Health.Applying = true
+	restartHealthScan(status.Health, now)
+	setHealthCondition(obj, status, metav1.ConditionUnknown, "ApplicationIncomplete", "health checks await a full application of the current inventory")
+	spec, _ := healthSource(obj)
+	status.Conditions.UpdateConditionByType(healthReadyCondition(obj, spec, status, meta.NewReadyCondition(obj)))
+}
+
+func healthApplicationInvalidated() predicate.Predicate {
+	invalidated := func(obj client.Object) bool {
+		spec, status := healthSource(obj)
+
+		return spec != nil && spec.HealthChecks.Enabled() && status.Health != nil && status.Health.Applying && status.Health.Revision == ""
+	}
+
+	return predicate.Funcs{
+		CreateFunc:  func(event.CreateEvent) bool { return false },
+		UpdateFunc:  func(e event.UpdateEvent) bool { return invalidated(e.ObjectNew) && !invalidated(e.ObjectOld) },
+		DeleteFunc:  func(event.DeleteEvent) bool { return false },
+		GenericFunc: func(event.GenericEvent) bool { return false },
+	}
 }
 
 func sameHealthScanInventory(a, b meta.ProcessedItems) bool {

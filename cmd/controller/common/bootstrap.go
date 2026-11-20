@@ -71,6 +71,11 @@ func (o Options) TLSOptions() []func(*tls.Config) {
 }
 
 func (o Options) ManagerOptions(b *Bootstrap, leaseID string) (ctrl.Options, *certwatcher.CertWatcher, error) {
+	healthProbeAddr := o.HealthProbeAddr
+	if healthProbeAddr == "" {
+		healthProbeAddr = ":10080"
+	}
+
 	metricsOptions := metricsserver.Options{BindAddress: o.MetricsAddr, SecureServing: o.SecureMetrics, TLSOpts: o.TLSOptions()}
 	if o.SecureMetrics {
 		metricsOptions.FilterProvider = filters.WithAuthenticationAndAuthorization
@@ -89,7 +94,7 @@ func (o Options) ManagerOptions(b *Bootstrap, leaseID string) (ctrl.Options, *ce
 		metricsOptions.TLSOpts = append(metricsOptions.TLSOpts, func(config *tls.Config) { config.GetCertificate = watcher.GetCertificate })
 	}
 
-	options := ctrl.Options{Scheme: b.Scheme, Metrics: metricsOptions, LeaderElection: o.EnableLeaderElection, LeaderElectionID: leaseID, LeaderElectionNamespace: b.Namespace, HealthProbeBindAddress: ":10080", NewClient: func(config *rest.Config, options client.Options) (client.Client, error) {
+	options := ctrl.Options{Scheme: b.Scheme, Metrics: metricsOptions, LeaderElection: o.EnableLeaderElection, LeaderElectionID: leaseID, LeaderElectionNamespace: b.Namespace, HealthProbeBindAddress: healthProbeAddr, NewClient: func(config *rest.Config, options client.Options) (client.Client, error) {
 		options.Cache.Unstructured = true
 
 		return client.New(config, options)
@@ -107,7 +112,10 @@ func (o Options) ManagerOptions(b *Bootstrap, leaseID string) (ctrl.Options, *ce
 	}
 
 	if o.EnablePprof {
-		options.PprofBindAddress = ":8082"
+		options.PprofBindAddress = o.PprofAddr
+		if options.PprofBindAddress == "" {
+			options.PprofBindAddress = ":8082"
+		}
 	}
 
 	return options, watcher, nil

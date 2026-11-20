@@ -97,6 +97,21 @@ func (r *healthController) Reconcile(ctx context.Context, request reconcile.Requ
 	spec, status := healthSource(obj)
 
 	now := time.Now()
+
+	if status.Health.Revision != healthRevision(obj, status) {
+		before := status.Health.DeepCopy()
+		beforeConditions := slices.Clone(status.Conditions)
+		invalidateHealthApplication(obj, status, now)
+
+		published, err := r.publish(ctx, obj, status, before, beforeConditions)
+
+		if !published && err == nil {
+			return reconcile.Result{RequeueAfter: healthPollInterval}, nil
+		}
+
+		return reconcile.Result{}, err
+	}
+
 	if status.Health.NextCheckAt.After(now) {
 		return reconcile.Result{RequeueAfter: status.Health.NextCheckAt.Sub(now)}, nil
 	}
@@ -161,6 +176,18 @@ func (r *healthController) Reconcile(ctx context.Context, request reconcile.Requ
 	return reconcile.Result{RequeueAfter: max(time.Millisecond, time.Until(status.Health.NextCheckAt.Time))}, nil
 }
 
+func healthObservationHistory(items meta.ProcessedItems, cursor int32) map[meta.ResourceHealthReference]struct{} {
+	seen := make(map[meta.ResourceHealthReference]struct{}, min(len(items), int(cursor)+healthBatchSize))
+
+	for _, item := range items[:cursor] {
+		if item.Health != nil && item.Health.UID != "" {
+			seen[*item.Health] = struct{}{}
+		}
+	}
+
+	return seen
+}
+
 func observeHealthBatch(ctx context.Context, c client.Reader, obj client.Object, status *capsulev1beta2.TenantResourceCommonStatus, checks healthEvaluator, now time.Time) {
 	phase := status.Health
 	if phase.Cursor < 0 || int(phase.Cursor) > len(status.ProcessedItems) {
@@ -173,19 +200,43 @@ func observeHealthBatch(ctx context.Context, c client.Reader, obj client.Object,
 		phase.Message = ""
 	}
 
+	// Cursor remains an inventory position for durable compatibility. Rebuild
+	// the preceding keys when resuming so duplicate contributions cannot consume
+	// another GET in a later batch. Kubernetes UIDs identify physical objects
+	// across namespaces, kinds and versions; include the pinned generation and
+	// content revision. Only references, never target contents, are retained.
+	seen := healthObservationHistory(status.ProcessedItems, phase.Cursor)
 	processed := 0
-	for int(phase.Cursor) < len(status.ProcessedItems) && processed < healthBatchSize {
+
+	for int(phase.Cursor) < len(status.ProcessedItems) {
 		if ctx.Err() != nil {
 			break
 		}
 
 		item := status.ProcessedItems[phase.Cursor]
-		phase.Cursor++
 
 		if item.Health == nil {
+			phase.Cursor++
+
 			continue
 		}
 
+		target := *item.Health
+		if _, observed := seen[target]; target.UID != "" && observed {
+			phase.Cursor++
+
+			continue
+		}
+
+		if processed == healthBatchSize {
+			break
+		}
+
+		if target.UID != "" {
+			seen[target] = struct{}{}
+		}
+
+		phase.Cursor++
 		processed++
 		observed, message := observeHealthTarget(ctx, c, item, checks)
 		key := client.ObjectKey{Name: item.Name, Namespace: item.Namespace}

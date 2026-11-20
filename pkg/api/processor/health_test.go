@@ -226,6 +226,25 @@ func TestSharedHealthRetainsSuccessfulWritesAcrossPartialFailure(t *testing.T) {
 	require.NotEqual(t, items[0].Status, items[1].Status, "application outcomes remain per origin")
 }
 
+func TestSharedHealthUsesAppliedUIDAcrossLogicalNamespaces(t *testing.T) {
+	first := gvk.ResourceID{Group: "example.projectcapsule.dev", Kind: "ClusterTarget", Name: "shared", Namespace: "tenant-a", Tenant: "a", Origin: "first"}
+	second := first
+	second.Namespace, second.Tenant, second.Origin, second.Version = "tenant-b", "b", "second", "v2"
+	previous := &meta.ResourceHealthReference{UID: "cluster-target", Generation: 1, Digest: "old"}
+	targets := appliedHealthTargets{}
+	targets.record(first, ssa.ApplyResult{UID: previous.UID, Generation: 2, ContentChanged: true, ContentVersion: "first-write"}, previous)
+	final := targets.record(second, ssa.ApplyResult{UID: previous.UID, Generation: 3, ContentChanged: true, ContentVersion: "last-write"}, previous)
+	items := meta.ProcessedItems{{ResourceID: first, ClusterScoped: true, Health: previous}, {ResourceID: second, ClusterScoped: true, Health: previous}, {ResourceID: first, Health: &meta.ResourceHealthReference{UID: "namespaced-target", Generation: 1, Digest: "separate"}}, {ResourceID: second}}
+	targets.finalize(items)
+	require.Equal(t, final, items[0].Health)
+	require.Equal(t, final, items[1].Health)
+	require.Equal(t, "separate", items[2].Health.Digest, "different applied UIDs remain isolated")
+	require.Nil(t, items[3].Health, "skipped contributions remain ineligible")
+	require.NotSame(t, items[0].Health, items[1].Health)
+	require.EqualValues(t, 1, previous.Generation, "existing snapshots remain immutable")
+	require.Equal(t, first, items[0].ResourceID, "logical inventory and pruning identity must remain intact")
+}
+
 func BenchmarkSharedHealthFinalization(b *testing.B) {
 	for _, count := range []int{1, 128, 1024} {
 		b.Run(fmt.Sprint(count), func(b *testing.B) {

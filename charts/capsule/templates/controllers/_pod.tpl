@@ -74,6 +74,11 @@ spec:
     - name: manager
       args:
         - {{ if .replications }}replications{{ else }}core{{ end }}
+        {{- if and .replications .Values.manager.hostNetwork }}
+        - --metrics-addr=:8081
+        - --health-probe-bind-address=:10081
+        - --pprof-bind-address=:8083
+        {{- end }}
         {{- if not .replications }}
         - --webhook-port={{ default $.Values.manager.webhookPort $.Values.webhooks.service.port }}
         {{- end }}

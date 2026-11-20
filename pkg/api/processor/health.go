@@ -12,14 +12,17 @@ import (
 )
 
 type healthTarget struct {
-	group, kind, namespace, name string
-	uid                          types.UID
+	group, kind, name string
+	uid               types.UID
 }
 
 type appliedHealthTargets map[healthTarget]*meta.ResourceHealthReference
 
 func healthTargetFor(id gvk.ResourceID, uid types.UID) healthTarget {
-	return healthTarget{group: id.Group, kind: id.Kind, namespace: id.Namespace, name: id.Name, uid: uid}
+	// ResourceID.Namespace is the logical replication scope. SSA removes it
+	// from cluster-scoped targets; the applied UID identifies the actual object
+	// across both namespace scopes and API versions.
+	return healthTarget{group: id.Group, kind: id.Kind, name: id.Name, uid: uid}
 }
 
 // Contributions keep separate ownership and pruning records, but health must

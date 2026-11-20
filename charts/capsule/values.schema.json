@@ -375,38 +375,55 @@
                             "type": "object",
                             "properties": {
                                 "affinity": {
-                                    "description": "Replication affinity. Default anti-affinity separates replication replicas.",
-                                    "type": "object"
+                                    "description": "Overrides affinity. Unset inherits affinity.",
+                                    "type": [
+                                        "object",
+                                        "null"
+                                    ]
                                 },
                                 "daemonsetStrategy": {
-                                    "description": "Overrides of manager.daemonsetStrategy for replication pods when manager.kind is DaemonSet.",
-                                    "type": "object",
+                                    "description": "Replaces manager.daemonsetStrategy when manager.kind is DaemonSet. Unset inherits the main controller strategy.",
+                                    "type": [
+                                        "object",
+                                        "null"
+                                    ],
                                     "additionalProperties": true
                                 },
                                 "deploymentStrategy": {
-                                    "description": "Replication Deployment strategy.",
-                                    "type": "object",
-                                    "properties": {
-                                        "type": {
-                                            "type": "string"
-                                        }
-                                    }
+                                    "description": "Replaces manager.deploymentStrategy. Unset inherits the main controller strategy.",
+                                    "type": [
+                                        "object",
+                                        "null"
+                                    ],
+                                    "additionalProperties": true
                                 },
                                 "env": {
-                                    "description": "Additional environment variables.",
-                                    "type": "array"
+                                    "description": "Overrides manager.env. Unset inherits manager.env.",
+                                    "type": [
+                                        "array",
+                                        "null"
+                                    ]
                                 },
                                 "extraArgs": {
-                                    "description": "Additional CLI arguments, using the same flags as the main controller.",
-                                    "type": "array"
+                                    "description": "Overrides manager.extraArgs, using the same CLI flags. Unset inherits manager.extraArgs.",
+                                    "type": [
+                                        "array",
+                                        "null"
+                                    ]
                                 },
                                 "hostNetwork": {
-                                    "description": "Use host networking for replication pods (independent of admission).",
-                                    "type": "boolean"
+                                    "description": "Overrides manager.hostNetwork. Unset inherits manager.hostNetwork. Host-networked replication pods use metrics 8081, health 10081 and profiling 8083 to avoid core controller port conflicts.",
+                                    "type": [
+                                        "boolean",
+                                        "null"
+                                    ]
                                 },
                                 "hostPID": {
-                                    "description": "Use the host PID namespace for replication pods (independent of admission).",
-                                    "type": "boolean"
+                                    "description": "Overrides manager.hostPID. Unset inherits manager.hostPID.",
+                                    "type": [
+                                        "boolean",
+                                        "null"
+                                    ]
                                 },
                                 "image": {
                                     "description": "Overrides of manager.image; omitted properties inherit the main controller image.",
@@ -414,92 +431,103 @@
                                     "additionalProperties": true
                                 },
                                 "nodeSelector": {
-                                    "description": "Replication node selector.",
-                                    "type": "object"
+                                    "description": "Overrides nodeSelector. Unset inherits nodeSelector.",
+                                    "type": [
+                                        "object",
+                                        "null"
+                                    ]
                                 },
                                 "options": {
                                     "type": "object",
                                     "properties": {
                                         "clientConnectionBurst": {
-                                            "description": "Replication API client burst.",
-                                            "type": "integer"
+                                            "description": "Overrides manager.options.clientConnectionBurst. Unset inherits the main controller value.",
+                                            "type": [
+                                                "integer",
+                                                "null"
+                                            ]
                                         },
                                         "clientConnectionQPS": {
-                                            "description": "Replication API client QPS, independent of the main controller.",
-                                            "type": "number"
+                                            "description": "Overrides manager.options.clientConnectionQPS. Unset inherits the main controller value.",
+                                            "type": [
+                                                "number",
+                                                "null"
+                                            ]
                                         },
                                         "workers": {
-                                            "description": "Concurrent reconciles per replication controller.",
-                                            "type": "integer"
+                                            "description": "Overrides manager.options.workers. Unset inherits the main controller value.",
+                                            "type": [
+                                                "integer",
+                                                "null"
+                                            ]
                                         }
                                     }
                                 },
                                 "podAnnotations": {
-                                    "description": "Pod annotations for the replication controller.",
-                                    "type": "object"
+                                    "description": "Overrides podAnnotations for replication pods. Unset inherits podAnnotations.",
+                                    "type": [
+                                        "object",
+                                        "null"
+                                    ]
                                 },
                                 "podDisruptionBudget": {
-                                    "type": "object",
-                                    "properties": {
-                                        "enabled": {
-                                            "description": "Create a separate disruption budget for replication Deployment pods.",
-                                            "type": "boolean"
-                                        },
-                                        "minAvailable": {
-                                            "description": "Minimum available replication replicas.",
-                                            "type": "integer"
-                                        }
-                                    }
+                                    "description": "Replaces podDisruptionBudget for replication Deployments. Unset inherits the main podDisruptionBudget, with a separate selector.",
+                                    "type": [
+                                        "object",
+                                        "null"
+                                    ],
+                                    "additionalProperties": true
                                 },
                                 "podLabels": {
-                                    "description": "Pod labels for the replication controller.",
-                                    "type": "object"
+                                    "description": "Overrides podLabels for replication pods. Unset inherits podLabels.",
+                                    "type": [
+                                        "object",
+                                        "null"
+                                    ]
                                 },
                                 "podSecurityContext": {
-                                    "description": "Pod security context overrides. Global OpenShift settings still apply.",
-                                    "type": "object",
+                                    "description": "Overrides podSecurityContext properties. Unset properties inherit; global OpenShift settings still apply.",
+                                    "type": [
+                                        "object",
+                                        "null"
+                                    ],
                                     "additionalProperties": true
                                 },
                                 "priorityClassName": {
-                                    "description": "Replication priority class name.",
-                                    "type": "string"
+                                    "description": "Overrides priorityClassName. Unset inherits priorityClassName.",
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
                                 },
                                 "replicaCount": {
-                                    "description": "Replication replicas when manager.kind is Deployment. One elected leader processes replications; the others provide failover.",
-                                    "type": "integer"
+                                    "description": "Overrides replicaCount for replication Deployments. Unset inherits replicaCount.",
+                                    "type": [
+                                        "integer",
+                                        "null"
+                                    ]
                                 },
                                 "resources": {
-                                    "description": "Container resources for replication pods; size independently of admission pods.",
-                                    "type": "object",
-                                    "properties": {
-                                        "limits": {
-                                            "type": "object",
-                                            "properties": {
-                                                "memory": {
-                                                    "type": "string"
-                                                }
-                                            }
-                                        },
-                                        "requests": {
-                                            "type": "object",
-                                            "properties": {
-                                                "cpu": {
-                                                    "type": "string"
-                                                },
-                                                "memory": {
-                                                    "type": "string"
-                                                }
-                                            }
-                                        }
-                                    }
+                                    "description": "Replaces manager.resources for replication pods. Unset inherits manager.resources; {} clears requests and limits.",
+                                    "type": [
+                                        "object",
+                                        "null"
+                                    ],
+                                    "additionalProperties": true
                                 },
                                 "tolerations": {
-                                    "description": "Replication tolerations.",
-                                    "type": "array"
+                                    "description": "Overrides tolerations. Unset inherits tolerations.",
+                                    "type": [
+                                        "array",
+                                        "null"
+                                    ]
                                 },
                                 "topologySpreadConstraints": {
-                                    "description": "Replication topology spread constraints.",
-                                    "type": "array"
+                                    "description": "Overrides topologySpreadConstraints. Unset inherits topologySpreadConstraints.",
+                                    "type": [
+                                        "array",
+                                        "null"
+                                    ]
                                 }
                             }
                         }

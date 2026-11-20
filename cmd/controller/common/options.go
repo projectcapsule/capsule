@@ -20,6 +20,8 @@ type Options struct {
 	Controller                   utils.ControllerOptions
 	Logging                      zap.Options
 	MetricsAddr                  string
+	HealthProbeAddr              string
+	PprofAddr                    string
 	MetricsCertPath              string
 	MetricsCertName              string
 	MetricsCertKey               string
@@ -170,6 +172,8 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 		":8080",
 		"The address the metric endpoint binds to.",
 	)
+	flags.StringVar(&o.HealthProbeAddr, "health-probe-bind-address", ":10080", "The address the health and readiness endpoints bind to.")
+	flags.StringVar(&o.PprofAddr, "pprof-bind-address", ":8082", "The address the profiling endpoint binds to when pprof is enabled.")
 	flags.BoolVar(
 		&o.SecureMetrics,
 		"metrics-secure",

@@ -68,6 +68,30 @@ func TestBootstrapRequiresControllerIdentityBeforeAPIInitialization(t *testing.T
 	require.ErrorContains(t, err, "CapsuleConfiguration")
 }
 
+func TestManagerEndpointOverridesPreserveDefaults(t *testing.T) {
+	for _, mode := range []string{"core", "replications"} {
+		t.Run(mode, func(t *testing.T) {
+			var options Options
+			flags := pflag.NewFlagSet(mode, pflag.ContinueOnError)
+			options.BindFlags(flags)
+			require.NoError(t, flags.Parse([]string{"--metrics-addr=:8081", "--health-probe-bind-address=:10081", "--pprof-bind-address=:8083"}))
+			manager, _, err := options.ManagerOptions(&Bootstrap{Scheme: NewScheme()}, mode)
+			require.NoError(t, err)
+			require.Equal(t, ":8081", manager.Metrics.BindAddress)
+			require.Equal(t, ":10081", manager.HealthProbeBindAddress)
+			require.Empty(t, manager.PprofBindAddress, "an address alone must not enable profiling")
+			options.EnablePprof = true
+			manager, _, err = options.ManagerOptions(&Bootstrap{Scheme: NewScheme()}, mode)
+			require.NoError(t, err)
+			require.Equal(t, ":8083", manager.PprofBindAddress)
+			manager, _, err = (Options{EnablePprof: true}).ManagerOptions(&Bootstrap{Scheme: NewScheme()}, mode)
+			require.NoError(t, err)
+			require.Equal(t, ":10080", manager.HealthProbeBindAddress)
+			require.Equal(t, ":8082", manager.PprofBindAddress)
+		})
+	}
+}
+
 func TestCachedClientConfigurationIsRetained(t *testing.T) {
 	var options Options
 	options.BindFlags(pflag.NewFlagSet("controller", pflag.ContinueOnError))

@@ -91,6 +91,7 @@ func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager, ctrlCo
 				predicate.Or(
 					predicate.GenerationChangedPredicate{},
 					predicates.ReconcileRequestedPredicate{},
+					healthApplicationInvalidated(),
 				),
 			),
 		).
@@ -616,7 +617,14 @@ func (r *namespacedResourceController) updateStatus(ctx context.Context, instanc
 			// Applying an older spec can still create or prune targets. Persist that
 			// inventory so the next generation can clean it up, without completing
 			// its predecessor's health checks or publishing stale readiness.
+			invalidateHealth := latest.Spec.HealthChecks.Enabled() && !sameHealthScanInventory(latest.Status.ProcessedItems, instance.Status.ProcessedItems)
+
 			latest.Status.ManagedResourcesStatus = instance.Status.ManagedResourcesStatus
+
+			if invalidateHealth {
+				invalidateHealthApplication(latest, &latest.Status.TenantResourceCommonStatus, time.Now())
+			}
+
 			if err := r.client.Status().Update(ctx, latest); err != nil {
 				return err
 			}
