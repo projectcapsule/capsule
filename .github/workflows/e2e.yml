@@ -9,6 +9,8 @@ on:
       - '.github/workflows/e2e.yml'
       - 'api/**'
       - 'controllers/**'
+      - 'cmd/**'
+      - 'charts/capsule/**'
       - 'internal/**'
       - 'pkg/**'
       - 'e2e/*'

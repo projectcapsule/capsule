@@ -1,0 +1,3 @@
+{{- if not .Values.crds.exclusive }}
+{{- include "capsule.replications.render" (dict "root" . "template" "capsule.serviceMonitor") }}
+{{- end }}

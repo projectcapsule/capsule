@@ -27,11 +27,12 @@ const (
 type ResultType string
 
 const (
-	ResultTypeBoolean        ResultType = "boolean"
-	ResultTypeQuantity       ResultType = "quantity"
-	ResultTypeCondition      ResultType = "condition"
-	ResultTypeWatchCondition ResultType = "watchCondition"
-	ResultTypeString         ResultType = "string"
+	ResultTypeBoolean         ResultType = "boolean"
+	ResultTypeQuantity        ResultType = "quantity"
+	ResultTypeCondition       ResultType = "condition"
+	ResultTypeWatchCondition  ResultType = "watchCondition"
+	ResultTypeHealthCondition ResultType = "healthCondition"
+	ResultTypeString          ResultType = "string"
 )
 
 type Compiler struct {
@@ -178,7 +179,7 @@ func (c *Compiler) compile(
 	}
 
 	options := []celgo.ProgramOption{celgo.InterruptCheckFrequency(celconfig.CheckFrequency)}
-	if resultType == ResultTypeCondition || resultType == ResultTypeWatchCondition {
+	if resultType == ResultTypeCondition || resultType == ResultTypeWatchCondition || resultType == ResultTypeHealthCondition {
 		options = append(options, celgo.CostLimit(100000))
 	}
 
@@ -196,7 +197,7 @@ func (c *Compiler) compile(
 
 func validateOutputType(output *celgo.Type, resultType ResultType) error {
 	switch resultType {
-	case ResultTypeBoolean, ResultTypeCondition, ResultTypeWatchCondition:
+	case ResultTypeBoolean, ResultTypeCondition, ResultTypeWatchCondition, ResultTypeHealthCondition:
 		if !output.IsExactType(celgo.BoolType) {
 			return fmt.Errorf("expression must evaluate to bool, got %s", output)
 		}
@@ -249,7 +250,7 @@ func (c *CompiledExpression) EvaluateBooleanWithVariables(
 		return false, fmt.Errorf("compiled CEL expression is nil")
 	}
 
-	if c.resultType != ResultTypeBoolean && c.resultType != ResultTypeWatchCondition {
+	if c.resultType != ResultTypeBoolean && c.resultType != ResultTypeWatchCondition && c.resultType != ResultTypeHealthCondition {
 		return false, fmt.Errorf("compiled CEL expression %q does not return bool", c.expression)
 	}
 

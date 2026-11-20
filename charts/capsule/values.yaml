@@ -139,6 +139,87 @@ rbac:
 
 # Manager Options
 manager:
+  # Core and replication controllers always run in separate workloads using the same binary.
+  # With leader election enabled, replications use the
+  # namespaced Lease replications.projectcapsule.dev. Custom RBAC restricted by
+  # resourceNames must permit this name; the chart-provided RBAC already does.
+  controllers:
+    # Replications inherit the existing manager and top-level pod settings.
+    # Null or omitted overrides inherit; explicit false, empty strings and lists
+    # override inherited values. Explicit resources and strategy maps replace the
+    # inherited maps; image, options and podSecurityContext are merged.
+    replications:
+      # @schema type:[integer, null]
+      # -- (int) Overrides replicaCount for replication Deployments. Unset inherits replicaCount.
+      replicaCount:
+      # @schema type:[object, null]
+      # -- (object) Overrides podLabels for replication pods. Unset inherits podLabels.
+      podLabels:
+      # @schema type:[object, null]
+      # -- (object) Overrides podAnnotations for replication pods. Unset inherits podAnnotations.
+      podAnnotations:
+      # @schema type:[object, null]
+      # @schema additionalProperties: true
+      # -- (object) Overrides podSecurityContext properties. Unset properties inherit; global OpenShift settings still apply.
+      podSecurityContext:
+      # @schema type:[boolean, null]
+      # -- (bool) Overrides manager.hostPID. Unset inherits manager.hostPID.
+      hostPID:
+      # @schema type:[boolean, null]
+      # -- (bool) Overrides manager.hostNetwork. Unset inherits manager.hostNetwork. Host-networked replication pods use metrics 8081, health 10081 and profiling 8083 to avoid core controller port conflicts.
+      hostNetwork:
+      # @schema type:[object, null]
+      # -- (object) Overrides nodeSelector. Unset inherits nodeSelector.
+      nodeSelector:
+      # @schema type:[array, null]
+      # -- (list) Overrides tolerations. Unset inherits tolerations.
+      tolerations:
+      # @schema type:[object, null]
+      # -- (object) Overrides affinity. Unset inherits affinity.
+      affinity:
+      # @schema type:[array, null]
+      # -- (list) Overrides topologySpreadConstraints. Unset inherits topologySpreadConstraints.
+      topologySpreadConstraints:
+      # @schema type:[string, null]
+      # -- (string) Overrides priorityClassName. Unset inherits priorityClassName.
+      priorityClassName:
+      # @schema type:[object, null]
+      # @schema additionalProperties: true
+      # -- (object) Replaces manager.resources for replication pods. Unset inherits manager.resources; {} clears requests and limits.
+      resources:
+      # @schema type: object
+      # @schema additionalProperties: true
+      # -- Overrides of manager.image; omitted properties inherit the main controller image.
+      image: {}
+      options:
+        # @schema type:[integer, null]
+        # -- (int) Overrides manager.options.workers. Unset inherits the main controller value.
+        workers:
+        # @schema type:[number, null]
+        # -- (float) Overrides manager.options.clientConnectionQPS. Unset inherits the main controller value.
+        clientConnectionQPS:
+        # @schema type:[integer, null]
+        # -- (int) Overrides manager.options.clientConnectionBurst. Unset inherits the main controller value.
+        clientConnectionBurst:
+      # @schema type:[array, null]
+      # -- (list) Overrides manager.extraArgs, using the same CLI flags. Unset inherits manager.extraArgs.
+      extraArgs:
+      # @schema type:[array, null]
+      # -- (list) Overrides manager.env. Unset inherits manager.env.
+      env:
+      # @schema type:[object, null]
+      # @schema additionalProperties: true
+      # -- (object) Replaces manager.deploymentStrategy. Unset inherits the main controller strategy.
+      deploymentStrategy:
+      # @schema type:[object, null]
+      # @schema additionalProperties: true
+      # -- (object) Replaces manager.daemonsetStrategy when manager.kind is DaemonSet. Unset inherits the main controller strategy.
+      daemonsetStrategy:
+      # @schema type:[object, null]
+      # @schema additionalProperties: true
+      # -- (object) Replaces podDisruptionBudget for replication Deployments. Unset inherits the main podDisruptionBudget, with a separate selector.
+      podDisruptionBudget:
+
   apiPriorityAndFairness:
     # -- Change to `true` if you want to insulate the API calls made by Capsule admission controller activities.
     # This will help ensure Capsule stability in busy clusters.
@@ -217,7 +298,7 @@ manager:
       #    resources: ["storageclasses"]
       #    verbs: ["get", "list", "watch", "update", "patch"]
 
-  # -- Set the controller deployment mode as `Deployment` or `DaemonSet`.
+  # -- Set the workload kind for both core and replication controllers to `Deployment` or `DaemonSet`.
   kind: Deployment
 
   # -- [Deployment Strategy](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy)
@@ -812,6 +893,28 @@ monitoring:
             annotations:
               summary: Capsule TenantResource {{ $labels.target_namespace }}/{{ $labels.name }} is not ready
               description: "TenantResource {{ $labels.target_namespace }}/{{ $labels.name }} is not in Ready state for the last 10 minutes."
+          - alert: CapsuleGlobalTenantResourceNotHealthy
+            expr: |
+              capsule_global_resource_condition{condition="Healthy"} == 0
+            for: 10m
+            labels:
+              severity: warning
+              app: capsule
+              component: replications
+            annotations:
+              summary: Capsule GlobalTenantResource {{ $labels.name }} is not healthy
+              description: "GlobalTenantResource {{ $labels.name }} has not reported healthy replicated resources for the last 10 minutes. Check its Healthy condition for pending checks, failures, or timeouts."
+          - alert: CapsuleTenantResourceNotHealthy
+            expr: |
+              capsule_resource_condition{condition="Healthy"} == 0
+            for: 10m
+            labels:
+              severity: warning
+              app: capsule
+              component: replications
+            annotations:
+              summary: Capsule TenantResource {{ $labels.target_namespace }}/{{ $labels.name }} is not healthy
+              description: "TenantResource {{ $labels.target_namespace }}/{{ $labels.name }} has not reported healthy replicated resources for the last 10 minutes. Check its Healthy condition for pending checks, failures, or timeouts."
 
       - name: capsule.tenants
         rules:

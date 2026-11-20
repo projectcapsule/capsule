@@ -5,6 +5,8 @@ package processor
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/go-logr/logr"
@@ -43,8 +45,6 @@ func (p *Processor) Reconcile(
 	if itemErrors := p.applyAccumulatedItems(ctx, log, c, processed, acc, opts); itemErrors > 0 {
 		return fmt.Errorf("applying of %d resources failed", itemErrors)
 	}
-
-	// Running Healthchecks
 
 	log.V(4).Info("processing completed")
 
@@ -232,10 +232,20 @@ func (p *Processor) applyAccumulatedItems(
 	itemErrors := 0
 	terminatingNamespaces := map[string]bool{}
 
+	var healthTargets appliedHealthTargets
+
+	if opts.TrackHealth {
+		healthTargets = make(appliedHealthTargets, len(acc))
+	}
+
 	for _, item := range acc {
-		if p.applyAccumulatedItem(ctx, log, c, processed, item, opts, terminatingNamespaces) {
+		if p.applyAccumulatedItem(ctx, log, c, processed, item, opts, terminatingNamespaces, healthTargets) {
 			itemErrors++
 		}
+	}
+
+	if opts.TrackHealth {
+		healthTargets.finalize(*processed)
 	}
 
 	return itemErrors
@@ -249,6 +259,7 @@ func (p *Processor) applyAccumulatedItem(
 	item *AccumulatorItem,
 	opts ProcessorOptions,
 	terminatingNamespaces map[string]bool,
+	healthTargets appliedHealthTargets,
 ) bool {
 	or := meta.ObjectReferenceStatus{
 		ResourceID: item.Resource,
@@ -268,12 +279,18 @@ func (p *Processor) applyAccumulatedItem(
 	}
 
 	or.ClusterScoped = clusterScoped
-
 	hadError := false
+	healthApplied := false
 
 	for _, obj := range *item.Objects {
-		if p.applyAccumulatorObject(ctx, log, c, processed, item, obj, opts, terminatingNamespaces, &or) {
+		if p.applyAccumulatorObject(ctx, log, c, processed, item, obj, opts, terminatingNamespaces, &or, &healthApplied, healthTargets) {
 			hadError = true
+		}
+	}
+
+	if opts.TrackHealth && !healthApplied && !hadError {
+		if current := processed.GetItem(item.Resource); current != nil {
+			current.Health = nil
 		}
 	}
 
@@ -290,6 +307,8 @@ func (p *Processor) applyAccumulatorObject(
 	opts ProcessorOptions,
 	terminatingNamespaces map[string]bool,
 	or *meta.ObjectReferenceStatus,
+	healthApplied *bool,
+	healthTargets appliedHealthTargets,
 ) bool {
 	fieldOwner := opts.FieldOwnerPrefix + "/" + item.Resource.FieldOwner("")
 
@@ -328,6 +347,12 @@ func (p *Processor) applyAccumulatorObject(
 		or,
 		obj.Policy,
 	)
+	if opts.TrackHealth && result.ContentVersion != "" && !result.Skipped {
+		or.Health = healthTargets.record(item.Resource, result, or.Health)
+		*healthApplied = err == nil
+	} else if !opts.TrackHealth {
+		or.Health = nil
+	}
 
 	or.Created = or.Created || result.Created
 
@@ -546,6 +571,14 @@ func retryApply(ctx context.Context, manager ssa.Manager, c client.Client, obj *
 			result.LastApply = previous.LastApply
 		}
 
+		if result.UID != "" && result.UID == previous.UID {
+			result.ContentChanged = result.ContentChanged || previous.ContentChanged
+			if result.ContentVersion == "" {
+				result.ContentVersion = previous.ContentVersion
+				result.Generation = previous.Generation
+			}
+		}
+
 		if retryableApplyConflict(applyErr) {
 			return false, nil
 		}
@@ -635,4 +668,16 @@ func (r *Processor) isNamespaceTerminating(
 	cache[namespace] = terminating
 
 	return terminating, namespace, nil
+}
+
+// Track opaque content-write versions rather than publishing hashes of rendered
+// manifests, which could expose low-entropy Secret values to status readers.
+func appliedHealthReference(result ssa.ApplyResult, previous *meta.ResourceHealthReference) *meta.ResourceHealthReference {
+	if previous != nil && !result.ContentChanged && previous.UID == result.UID && previous.Generation == result.Generation {
+		return previous
+	}
+
+	digest := sha256.Sum256([]byte(string(result.UID) + "/" + result.ContentVersion))
+
+	return &meta.ResourceHealthReference{UID: result.UID, Generation: result.Generation, Digest: hex.EncodeToString(digest[:])}
 }

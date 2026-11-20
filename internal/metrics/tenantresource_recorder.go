@@ -1,7 +1,6 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-//nolint:dupl
 package metrics
 
 import (
@@ -45,7 +44,7 @@ func (r *TenantResourceRecorder) Collectors() []prometheus.Collector {
 
 // RecordCondition records the condition as given for the ref.
 func (r *TenantResourceRecorder) RecordConditions(resource *capsulev1beta2.TenantResource) {
-	for _, status := range []string{meta.ReadyCondition, meta.CordonedCondition} {
+	for _, status := range []string{meta.ReadyCondition, meta.CordonedCondition, meta.HealthyCondition} {
 		var value float64
 
 		cond := resource.Status.Conditions.GetConditionByType(status)
@@ -71,11 +70,7 @@ func (r *TenantResourceRecorder) DeleteConditionMetrics(name string, namespace s
 }
 
 func (r *TenantResourceRecorder) DeleteConditionMetricByType(name string, namespace string, condition string) {
-	r.resourceConditionGauge.DeletePartialMatch(map[string]string{
-		"name":             name,
-		"target_namespace": namespace,
-		"condition":        condition,
-	})
+	r.resourceConditionGauge.DeleteLabelValues(name, namespace, condition)
 }
 
 // DeleteCondition deletes the condition metrics for the ref.

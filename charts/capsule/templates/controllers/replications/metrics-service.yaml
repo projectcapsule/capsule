@@ -1,0 +1,20 @@
+{{- define "capsule.replications.metrics" -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "capsule.fullname" . }}-metrics
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "capsule.labels" . | nindent 4 }}
+spec:
+  ports:
+    - name: metrics
+      port: 8080
+      targetPort: {{ ternary 8081 8080 .Values.manager.hostNetwork }}
+  selector:
+    {{- include "capsule.selectorLabels" . | nindent 4 }}
+
+{{- end -}}
+{{- if not .Values.crds.exclusive }}
+{{- include "capsule.replications.render" (dict "root" . "template" "capsule.replications.metrics") }}
+{{- end }}

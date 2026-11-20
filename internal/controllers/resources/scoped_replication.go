@@ -6,7 +6,9 @@ package resources
 import (
 	"context"
 	"reflect"
+	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -48,11 +50,22 @@ func (p scopedStatusPatcher[T]) Patch(
 			return client.IgnoreNotFound(err)
 		}
 
+		if latest.GetUID() != instance.GetUID() {
+			return apierrors.NewNotFound(capsulev1beta2.GroupVersion.WithResource("replications").GroupResource(), instance.GetName())
+		}
+
 		status := p.status(latest)
 		original := status.DeepCopy()
 
 		status.ProcessedItems.ReplaceScope(scope.Tenant, scope.Namespace, items)
 		status.UpdateStats()
+
+		if spec, _ := healthSource(latest); spec.HealthChecks.Enabled() && !sameHealthScanInventory(status.ProcessedItems, original.ProcessedItems) {
+			// A scoped apply can outlive the generation that enabled health checks.
+			// Retain its cleanup inventory, but only a full apply can pin every
+			// target to the current specification and execution identity.
+			invalidateHealthApplication(latest, status, time.Now())
+		}
 
 		// Only the shared status is compared, since it is the only one being mutated: the
 		// resource specific part cannot have drifted.
@@ -82,6 +95,7 @@ func replicationProcessorOptions(
 	owner *metav1.OwnerReference,
 ) processor.ProcessorOptions {
 	return processor.ProcessorOptions{
+		TrackHealth:      spec.HealthChecks.Enabled() && obj.GetDeletionTimestamp().IsZero(),
 		FieldOwnerPrefix: getFieldOwner(obj.GetName(), obj.GetNamespace()),
 		Prune:            *spec.PruningOnDelete,
 		Adopt:            *spec.Settings.Adopt,

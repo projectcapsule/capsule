@@ -47,6 +47,9 @@ type CacheInvalidator struct {
 	CELCache           *cache.CELCache
 	ImpersonationCache *cache.ImpersonationCache
 	RegexCache         *cache.RegexCache
+
+	// ReplicationsOnly excludes admission and quota caches from background workers.
+	ReplicationsOnly bool
 }
 
 func (r *CacheInvalidator) NeedLeaderElection() bool {
@@ -79,8 +82,8 @@ func (r *CacheInvalidator) SetupWithManager(
 	// Every replica serves admission from its own process-local caches.
 	options.NeedLeaderElection = new(false)
 
-	err = ctrl.NewControllerManagedBy(mgr).
-		Named("capsule/config/caches").
+	controller := ctrl.NewControllerManagedBy(mgr).
+		Named(r.controllerName()).
 		For(
 			&capsulev1beta2.CapsuleConfiguration{},
 			builder.WithPredicates(
@@ -102,40 +105,45 @@ func (r *CacheInvalidator) SetupWithManager(
 				predicates.NamesMatchingPredicate{Names: []string{ctrlConfig.ConfigurationName}},
 			),
 		).
-		WatchesMetadata(
-			&corev1.ServiceAccount{},
-			handler.Funcs{
-				DeleteFunc: func(
-					ctx context.Context,
-					e event.TypedDeleteEvent[client.Object],
-					q workqueue.TypedRateLimitingInterface[reconcile.Request],
-				) {
-					if err := r.invalidateServiceAccount(ctx, e.Object); err != nil {
-						r.Log.Error(err, "unable to invalidate serviceaccount cache",
-							"namespace", e.Object.GetNamespace(),
-							"name", e.Object.GetName(),
-						)
-					}
+		WithOptions(options)
+
+	if r.ImpersonationCache != nil {
+		controller = controller.
+			WatchesMetadata(
+				&corev1.ServiceAccount{},
+				handler.Funcs{
+					DeleteFunc: func(
+						ctx context.Context,
+						e event.TypedDeleteEvent[client.Object],
+						q workqueue.TypedRateLimitingInterface[reconcile.Request],
+					) {
+						if err := r.invalidateServiceAccount(ctx, e.Object); err != nil {
+							r.Log.Error(err, "unable to invalidate serviceaccount cache",
+								"namespace", e.Object.GetNamespace(),
+								"name", e.Object.GetName(),
+							)
+						}
+					},
 				},
-			},
-			builder.WithPredicates(predicate.Funcs{
-				DeleteFunc: func(e event.DeleteEvent) bool {
-					return true
+				builder.WithPredicates(predicate.Funcs{
+					DeleteFunc: func(e event.DeleteEvent) bool {
+						return true
+					},
+					CreateFunc: func(e event.CreateEvent) bool {
+						return false
+					},
+					UpdateFunc: func(e event.UpdateEvent) bool {
+						return false
+					},
+					GenericFunc: func(e event.GenericEvent) bool {
+						return false
+					},
 				},
-				CreateFunc: func(e event.CreateEvent) bool {
-					return false
-				},
-				UpdateFunc: func(e event.UpdateEvent) bool {
-					return false
-				},
-				GenericFunc: func(e event.GenericEvent) bool {
-					return false
-				},
-			},
-			),
-		).
-		WithOptions(options).
-		Complete(r)
+				),
+			)
+	}
+
+	err = controller.Complete(r)
 	if err != nil {
 		return err
 	}
@@ -180,6 +188,10 @@ func (r *CacheInvalidator) rebuildCaches(
 	ctx context.Context,
 	log logr.Logger,
 ) error {
+	if r.ReplicationsOnly {
+		return r.rebuildImpersonationCache(ctx, log)
+	}
+
 	var errs []error
 
 	if err := r.rebuildConditionCache(ctx); err != nil {
@@ -211,4 +223,12 @@ func (r *CacheInvalidator) rebuildCaches(
 	}
 
 	return nil
+}
+
+func (r *CacheInvalidator) controllerName() string {
+	if r.ReplicationsOnly {
+		return "capsule/replications/caches"
+	}
+
+	return "capsule/config/caches"
 }

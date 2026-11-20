@@ -368,6 +368,171 @@
                         }
                     }
                 },
+                "controllers": {
+                    "type": "object",
+                    "properties": {
+                        "replications": {
+                            "type": "object",
+                            "properties": {
+                                "affinity": {
+                                    "description": "Overrides affinity. Unset inherits affinity.",
+                                    "type": [
+                                        "object",
+                                        "null"
+                                    ]
+                                },
+                                "daemonsetStrategy": {
+                                    "description": "Replaces manager.daemonsetStrategy when manager.kind is DaemonSet. Unset inherits the main controller strategy.",
+                                    "type": [
+                                        "object",
+                                        "null"
+                                    ],
+                                    "additionalProperties": true
+                                },
+                                "deploymentStrategy": {
+                                    "description": "Replaces manager.deploymentStrategy. Unset inherits the main controller strategy.",
+                                    "type": [
+                                        "object",
+                                        "null"
+                                    ],
+                                    "additionalProperties": true
+                                },
+                                "env": {
+                                    "description": "Overrides manager.env. Unset inherits manager.env.",
+                                    "type": [
+                                        "array",
+                                        "null"
+                                    ]
+                                },
+                                "extraArgs": {
+                                    "description": "Overrides manager.extraArgs, using the same CLI flags. Unset inherits manager.extraArgs.",
+                                    "type": [
+                                        "array",
+                                        "null"
+                                    ]
+                                },
+                                "hostNetwork": {
+                                    "description": "Overrides manager.hostNetwork. Unset inherits manager.hostNetwork. Host-networked replication pods use metrics 8081, health 10081 and profiling 8083 to avoid core controller port conflicts.",
+                                    "type": [
+                                        "boolean",
+                                        "null"
+                                    ]
+                                },
+                                "hostPID": {
+                                    "description": "Overrides manager.hostPID. Unset inherits manager.hostPID.",
+                                    "type": [
+                                        "boolean",
+                                        "null"
+                                    ]
+                                },
+                                "image": {
+                                    "description": "Overrides of manager.image; omitted properties inherit the main controller image.",
+                                    "type": "object",
+                                    "additionalProperties": true
+                                },
+                                "nodeSelector": {
+                                    "description": "Overrides nodeSelector. Unset inherits nodeSelector.",
+                                    "type": [
+                                        "object",
+                                        "null"
+                                    ]
+                                },
+                                "options": {
+                                    "type": "object",
+                                    "properties": {
+                                        "clientConnectionBurst": {
+                                            "description": "Overrides manager.options.clientConnectionBurst. Unset inherits the main controller value.",
+                                            "type": [
+                                                "integer",
+                                                "null"
+                                            ]
+                                        },
+                                        "clientConnectionQPS": {
+                                            "description": "Overrides manager.options.clientConnectionQPS. Unset inherits the main controller value.",
+                                            "type": [
+                                                "number",
+                                                "null"
+                                            ]
+                                        },
+                                        "workers": {
+                                            "description": "Overrides manager.options.workers. Unset inherits the main controller value.",
+                                            "type": [
+                                                "integer",
+                                                "null"
+                                            ]
+                                        }
+                                    }
+                                },
+                                "podAnnotations": {
+                                    "description": "Overrides podAnnotations for replication pods. Unset inherits podAnnotations.",
+                                    "type": [
+                                        "object",
+                                        "null"
+                                    ]
+                                },
+                                "podDisruptionBudget": {
+                                    "description": "Replaces podDisruptionBudget for replication Deployments. Unset inherits the main podDisruptionBudget, with a separate selector.",
+                                    "type": [
+                                        "object",
+                                        "null"
+                                    ],
+                                    "additionalProperties": true
+                                },
+                                "podLabels": {
+                                    "description": "Overrides podLabels for replication pods. Unset inherits podLabels.",
+                                    "type": [
+                                        "object",
+                                        "null"
+                                    ]
+                                },
+                                "podSecurityContext": {
+                                    "description": "Overrides podSecurityContext properties. Unset properties inherit; global OpenShift settings still apply.",
+                                    "type": [
+                                        "object",
+                                        "null"
+                                    ],
+                                    "additionalProperties": true
+                                },
+                                "priorityClassName": {
+                                    "description": "Overrides priorityClassName. Unset inherits priorityClassName.",
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "replicaCount": {
+                                    "description": "Overrides replicaCount for replication Deployments. Unset inherits replicaCount.",
+                                    "type": [
+                                        "integer",
+                                        "null"
+                                    ]
+                                },
+                                "resources": {
+                                    "description": "Replaces manager.resources for replication pods. Unset inherits manager.resources; {} clears requests and limits.",
+                                    "type": [
+                                        "object",
+                                        "null"
+                                    ],
+                                    "additionalProperties": true
+                                },
+                                "tolerations": {
+                                    "description": "Overrides tolerations. Unset inherits tolerations.",
+                                    "type": [
+                                        "array",
+                                        "null"
+                                    ]
+                                },
+                                "topologySpreadConstraints": {
+                                    "description": "Overrides topologySpreadConstraints. Unset inherits topologySpreadConstraints.",
+                                    "type": [
+                                        "array",
+                                        "null"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
                 "daemonsetStrategy": {
                     "description": "[Daemonset Strategy](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/#creating-a-daemonset-with-rollingupdate-update-strategy)",
                     "type": "object",
@@ -428,7 +593,7 @@
                     }
                 },
                 "kind": {
-                    "description": "Set the controller deployment mode as `Deployment` or `DaemonSet`.",
+                    "description": "Set the workload kind for both core and replication controllers to `Deployment` or `DaemonSet`.",
                     "type": "string"
                 },
                 "livenessProbe": {

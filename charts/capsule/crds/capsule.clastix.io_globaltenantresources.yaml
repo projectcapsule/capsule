@@ -83,6 +83,65 @@ spec:
                   - name
                   type: object
                 type: array
+              healthChecks:
+                description: |-
+                  HealthChecks optionally requires applied targets to become healthy before Ready.
+                  Omitted health checks preserve apply-only readiness and perform no health reads.
+                properties:
+                  expressions:
+                    description: |-
+                      Expressions override kstatus for the specified API groups and kinds.
+                      Expressions receive object and its top-level fields (metadata, spec, status).
+                      Evaluated in order: inProgress, failed, current. Requires wait: true.
+                    items:
+                      properties:
+                        apiVersion:
+                          description: APIVersion identifies the API group; the served
+                            version is ignored when matching.
+                          minLength: 1
+                          type: string
+                        current:
+                          description: Current returns true when the target is healthy.
+                          maxLength: 4096
+                          minLength: 1
+                          type: string
+                        failed:
+                          description: Failed returns true on a failed rollout.
+                          maxLength: 4096
+                          type: string
+                        inProgress:
+                          description: InProgress returns true while reconciliation
+                            is ongoing.
+                          maxLength: 4096
+                          type: string
+                        kind:
+                          description: Kind identifies the kind whose status is evaluated.
+                          minLength: 1
+                          pattern: ^[A-Za-z][A-Za-z0-9]*$
+                          type: string
+                      required:
+                      - apiVersion
+                      - current
+                      - kind
+                      type: object
+                    maxItems: 32
+                    type: array
+                    x-kubernetes-list-type: atomic
+                  timeout:
+                    description: |-
+                      Timeout bounds an incomplete rollout across retries and leader changes.
+                      Defaults to five minutes. A completed rollout can start a new assessment.
+                    type: string
+                    x-kubernetes-validations:
+                    - message: healthChecks.timeout must be positive and at most one
+                        hour
+                      rule: duration(self) > duration('0s') && duration(self) <= duration('1h')
+                  wait:
+                    description: |-
+                      Wait requires successfully applied targets to pass health checks before Ready.
+                      Omitted or false preserves apply-only readiness and performs no health reads.
+                    type: boolean
+                type: object
               pruningOnDelete:
                 default: true
                 description: |-
@@ -829,6 +888,49 @@ spec:
                   - type
                   type: object
                 type: array
+              health:
+                description: Health records the durable rollout deadline and bounded
+                  health-check progress.
+                properties:
+                  applying:
+                    description: Applying prevents observations from completing while
+                      a full apply is in flight.
+                    type: boolean
+                  cursor:
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  deadline:
+                    format: date-time
+                    type: string
+                  failed:
+                    type: boolean
+                  message:
+                    maxLength: 1024
+                    type: string
+                  nextCheckAt:
+                    format: date-time
+                    type: string
+                  observedGeneration:
+                    format: int64
+                    type: integer
+                  pending:
+                    type: boolean
+                  requestedAt:
+                    format: date-time
+                    type: string
+                  revision:
+                    type: string
+                  startedAt:
+                    format: date-time
+                    type: string
+                required:
+                - deadline
+                - observedGeneration
+                - requestedAt
+                - revision
+                - startedAt
+                type: object
               nextResyncAt:
                 description: NextResyncAt is the next periodic resync deadline for
                   trigger-enabled replications.
@@ -864,6 +966,29 @@ spec:
                           description: Indicates wether the resource was created or
                             adopted
                           type: boolean
+                        health:
+                          description: Health pins an opt-in health check to the successfully
+                            applied object.
+                          properties:
+                            digest:
+                              description: |-
+                                Digest identifies an opaque content-write revision, including objects without generations.
+                                It is not a checksum of rendered manifests or Secret values.
+                              type: string
+                            generation:
+                              format: int64
+                              type: integer
+                            uid:
+                              description: |-
+                                UID is a type that holds unique ID values, including UUIDs.  Because we
+                                don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                                intent and helps make sure that UIDs and names do not get conflated.
+                              type: string
+                          required:
+                          - digest
+                          - generation
+                          - uid
+                          type: object
                         lastApply:
                           description: |-
                             An opaque value that represents the internal version of this object that can

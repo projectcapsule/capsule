@@ -22,6 +22,10 @@ func (r *CacheInvalidator) rebuildImpersonationCache(
 	ctx context.Context,
 	log logr.Logger,
 ) error {
+	if r.ImpersonationCache == nil {
+		return nil
+	}
+
 	var referencedServiceAccounts []meta.NamespacedRFC1123ObjectReferenceWithNamespace
 
 	seen := make(map[string]struct{})

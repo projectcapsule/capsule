@@ -1,0 +1,1 @@
+{{- include "capsule.replications.render" (dict "root" . "template" "capsule.podDisruptionBudget") }}

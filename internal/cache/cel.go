@@ -30,7 +30,7 @@ type CELCache struct {
 	triggerNext        int
 }
 
-// Resource policies can be edited independently of the quota invalidation
+// Resource policies and health expressions can be edited independently of quota invalidation
 // lifecycle. Bound their compiled working set within the shared cache.
 const maxResourceConditions = 256
 
@@ -203,6 +203,8 @@ func (c *CELCache) getOrCompile(
 		} else {
 			compiled, err = c.compiler.CompileBoolean(expression, mode)
 		}
+	case celruntime.ResultTypeHealthCondition:
+		compiled, err = c.compiler.CompileHealthCondition(expression, mode)
 	case celruntime.ResultTypeQuantity:
 		compiled, err = c.compiler.CompileQuantity(expression, mode)
 	case celruntime.ResultTypeCondition:

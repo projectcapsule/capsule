@@ -1,0 +1,27 @@
+{{- define "capsule.replications.deployment" -}}
+{{- if eq .Values.manager.kind "Deployment" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "capsule.controllerName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "capsule.labels" . | nindent 4 }}
+  {{- with .Values.customAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    {{- toYaml .Values.manager.deploymentStrategy | nindent 4 }}
+  selector:
+    matchLabels:
+      {{- include "capsule.selectorLabels" . | nindent 6 }}
+  template:
+    {{- include "capsule.pod" . | nindent 4 }}
+{{- end }}
+{{- end -}}
+{{- if not .Values.crds.exclusive }}
+{{- include "capsule.replications.render" (dict "root" . "template" "capsule.replications.deployment") }}
+{{- end }}

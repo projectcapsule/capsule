@@ -148,7 +148,7 @@ func TestEphemeralMutationIgnoresPodPropertiesAndObservesPriorEntries(t *testing
 }
 
 func TestMutationWebhookSubresourceSelection(t *testing.T) {
-	data, err := os.ReadFile("../../../../../charts/capsule/templates/configuration.yaml")
+	data, err := os.ReadFile("../../../../../charts/capsule/templates/controllers/configuration.yaml")
 	require.NoError(t, err)
 	match := regexp.MustCompile(`(?m)name: mutations-supported-subresources\n\s+expression: '(.*)'`).FindSubmatch(data)
 	require.Len(t, match, 2)
