@@ -32,7 +32,7 @@ func readyWatchControllerPods(ctx context.Context) []*corev1.Pod {
 		pod := &pods.Items[i]
 		manager, running := false, false
 		for _, container := range pod.Spec.Containers {
-			manager = manager || container.Name == "manager"
+			manager = manager || (container.Name == "manager" && len(container.Args) > 0 && container.Args[0] == "replications")
 		}
 		for _, condition := range pod.Status.Conditions {
 			running = running || (condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue)
@@ -124,7 +124,7 @@ var _ = Describe("Replication watch leader handoff", Serial, Label("config", "re
 			return fmt.Errorf("waiting for persisted unacknowledged notification")
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		lease := &coordinationv1.Lease{}
-		leaseKey := client.ObjectKey{Namespace: ControllerNamespace, Name: "42c733ea.clastix.capsule.io"}
+		leaseKey := client.ObjectKey{Namespace: ControllerNamespace, Name: "replications.projectcapsule.dev"}
 		Expect(k8sClient.Get(ctx, leaseKey, lease)).To(Succeed())
 		Expect(lease.Spec.HolderIdentity).NotTo(BeNil())
 		previousHolder := *lease.Spec.HolderIdentity

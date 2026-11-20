@@ -262,6 +262,10 @@ func (r *NamespaceTrigger) replicateGlobal(
 	tnt capsulev1beta2.Tenant,
 	namespace *corev1.Namespace,
 ) error {
+	if tntResource.Spec.HealthChecks.Enabled() {
+		return meta.TriggerRequestReconcileAnnotation(ctx, replicationClient{Client: r.client, reader: r.reader}, capsulev1beta2.GroupVersion.WithKind("GlobalTenantResource"), client.ObjectKeyFromObject(tntResource))
+	}
+
 	if len(tntResource.Spec.Triggers) > 0 {
 		if err := r.triggers.Validate(tntResource.UID, tntResource.Generation, &tntResource.Spec.TenantResourceCommonSpec, false, r.conditions); err != nil {
 			return err
@@ -317,6 +321,10 @@ func (r *NamespaceTrigger) replicateNamespaced(
 	tnt capsulev1beta2.Tenant,
 	namespace *corev1.Namespace,
 ) error {
+	if tntResource.Spec.HealthChecks.Enabled() {
+		return meta.TriggerRequestReconcileAnnotation(ctx, replicationClient{Client: r.client, reader: r.reader}, capsulev1beta2.GroupVersion.WithKind("TenantResource"), client.ObjectKeyFromObject(tntResource))
+	}
+
 	if len(tntResource.Spec.Triggers) > 0 {
 		if err := r.triggers.Validate(tntResource.UID, tntResource.Generation, &tntResource.Spec.TenantResourceCommonSpec, true, r.conditions); err != nil {
 			return err

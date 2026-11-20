@@ -33,6 +33,9 @@ type TenantResourceCommonStatus struct {
 	// NextResyncAt is the next periodic resync deadline for trigger-enabled replications.
 	// +optional
 	NextResyncAt *metav1.MicroTime `json:"nextResyncAt,omitempty"`
+	// Health records the durable rollout deadline and bounded health-check progress.
+	// +optional
+	Health *TenantResourceHealthStatus `json:"health,omitempty"`
 }
 
 type TenantResourceTriggerStatus struct {
@@ -103,6 +106,10 @@ type TenantResourceTriggerCondition struct {
 }
 
 type TenantResourceCommonSpec struct {
+	// HealthChecks optionally requires applied targets to become healthy before Ready.
+	// Omitted health checks preserve apply-only readiness and perform no health reads.
+	// +optional
+	HealthChecks *TenantResourceHealthChecks `json:"healthChecks,omitempty"`
 	// Triggers request reconciliation on observed namespaced resource changes.
 	// Capsule-managed resources never trigger reconciliation. Delivery is best effort;
 	// bounded watch memory may skip large objects or updates without a retained old state.

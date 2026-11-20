@@ -124,6 +124,27 @@ and [replication documentation](https://projectcapsule.dev/docs/replications/).
 | manager.apiPriorityAndFairness.flowApiVersion | string | `"flowcontrol.apiserver.k8s.io/v1"` | Declare ApiVersion used for Flow |
 | manager.apiPriorityAndFairness.matchingPrecedence | int | `900` | Only the first matching FlowSchema for a given request matters. If multiple FlowSchemas match a single inbound request, it will be assigned based on the one with the highest matchingPrecedence. Ref: https://kubernetes.io/docs/concepts/cluster-administration/flow-control/#flowschema |
 | manager.apiPriorityAndFairness.priorityLevelConfigurationSpec | object | See [values.yaml](values.yaml) | Priority level configuration. The block is directly forwarded into the priorityLevelConfiguration, so you can use whatever specification you want. ref: https://kubernetes.io/docs/concepts/cluster-administration/flow-control/#prioritylevelconfiguration |
+| manager.controllers.replications.affinity | object | `nil` | Overrides affinity. Unset inherits affinity. |
+| manager.controllers.replications.daemonsetStrategy | object | `nil` | Replaces manager.daemonsetStrategy when manager.kind is DaemonSet. Unset inherits the main controller strategy. |
+| manager.controllers.replications.deploymentStrategy | object | `nil` | Replaces manager.deploymentStrategy. Unset inherits the main controller strategy. |
+| manager.controllers.replications.env | list | `nil` | Overrides manager.env. Unset inherits manager.env. |
+| manager.controllers.replications.extraArgs | list | `nil` | Overrides manager.extraArgs, using the same CLI flags. Unset inherits manager.extraArgs. |
+| manager.controllers.replications.hostNetwork | bool | `nil` | Overrides manager.hostNetwork. Unset inherits manager.hostNetwork. Host-networked replication pods use metrics 8081, health 10081 and profiling 8083 to avoid core controller port conflicts. |
+| manager.controllers.replications.hostPID | bool | `nil` | Overrides manager.hostPID. Unset inherits manager.hostPID. |
+| manager.controllers.replications.image | object | `{}` | Overrides of manager.image; omitted properties inherit the main controller image. |
+| manager.controllers.replications.nodeSelector | object | `nil` | Overrides nodeSelector. Unset inherits nodeSelector. |
+| manager.controllers.replications.options.clientConnectionBurst | int | `nil` | Overrides manager.options.clientConnectionBurst. Unset inherits the main controller value. |
+| manager.controllers.replications.options.clientConnectionQPS | float | `nil` | Overrides manager.options.clientConnectionQPS. Unset inherits the main controller value. |
+| manager.controllers.replications.options.workers | int | `nil` | Overrides manager.options.workers. Unset inherits the main controller value. |
+| manager.controllers.replications.podAnnotations | object | `nil` | Overrides podAnnotations for replication pods. Unset inherits podAnnotations. |
+| manager.controllers.replications.podDisruptionBudget | object | `nil` | Replaces podDisruptionBudget for replication Deployments. Unset inherits the main podDisruptionBudget, with a separate selector. |
+| manager.controllers.replications.podLabels | object | `nil` | Overrides podLabels for replication pods. Unset inherits podLabels. |
+| manager.controllers.replications.podSecurityContext | object | `nil` | Overrides podSecurityContext properties. Unset properties inherit; global OpenShift settings still apply. |
+| manager.controllers.replications.priorityClassName | string | `nil` | Overrides priorityClassName. Unset inherits priorityClassName. |
+| manager.controllers.replications.replicaCount | int | `nil` | Overrides replicaCount for replication Deployments. Unset inherits replicaCount. |
+| manager.controllers.replications.resources | object | `nil` | Replaces manager.resources for replication pods. Unset inherits manager.resources; {} clears requests and limits. |
+| manager.controllers.replications.tolerations | list | `nil` | Overrides tolerations. Unset inherits tolerations. |
+| manager.controllers.replications.topologySpreadConstraints | list | `nil` | Overrides topologySpreadConstraints. Unset inherits topologySpreadConstraints. |
 | manager.daemonsetStrategy | object | `{"type":"RollingUpdate"}` | [Daemonset Strategy](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/#creating-a-daemonset-with-rollingupdate-update-strategy) |
 | manager.deploymentStrategy | object | `{"type":"RollingUpdate"}` | [Deployment Strategy](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy) |
 | manager.env | list | `[]` | Additional Environment Variables |
@@ -135,7 +156,7 @@ and [replication documentation](https://projectcapsule.dev/docs/replications/).
 | manager.image.registry | string | `"ghcr.io"` | Set the image registry of capsule. |
 | manager.image.repository | string | `"projectcapsule/capsule"` | Set the image repository of capsule. |
 | manager.image.tag | string | `""` | Overrides the image tag whose default is the chart appVersion. |
-| manager.kind | string | `"Deployment"` | Set the controller deployment mode as `Deployment` or `DaemonSet`. |
+| manager.kind | string | `"Deployment"` | Set the workload kind for both core and replication controllers to `Deployment` or `DaemonSet`. |
 | manager.livenessProbe | object | `{"httpGet":{"path":"/healthz","port":10080}}` | Configure the liveness probe using Deployment probe spec |
 | manager.options.administrators | list | `[]` | Define entities which can act as Administrators in the capsule construct These entities are automatically owners for all existing tenants. Meaning they can add namespaces to any tenant. However they must be specific by using the capsule label for interacting with namespaces. Because if that label is not defined, it's assumed that namespace interaction was not targeted towards a tenant and will therefore be ignored by capsule. May also be handy in GitOps scenarios where certain service accounts need to be able to manage namespaces for all tenants. |
 | manager.options.allowServiceAccountPromotion | bool | `false` | ServiceAccounts within tenant namespaces can be promoted to owners of the given tenant this can be achieved by labeling the serviceaccount and then they are considered owners. This can only be done by other owners of the tenant. However ServiceAccounts which have been promoted to owner can not promote further serviceAccounts. |
@@ -502,4 +523,4 @@ metadata:
 
 ## More
 
-See Capsule [tutorial](https://github.com/projectcapsule/capsule/blob/master/docs/content/general/tutorial.md) for more information about how to use Capsule.
+See Capsule [tutorial](https://projectcapsule.dev/docs/quickstart/) for more information about how to use Capsule.

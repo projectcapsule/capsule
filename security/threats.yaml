@@ -429,7 +429,7 @@ threats:
       across tenants. This breaks namespace profile integrity and confidentiality.
       Current defenses: the chart offers explicit strict RBAC and pod/container
       security settings; application paths perform tenant ownership checks.
-      Evidence: `charts/capsule/templates/rbac.yaml`,
+      Evidence: `charts/capsule/templates/controllers/rbac.yaml`,
       `charts/capsule/values.yaml`.
       Residual risk: the default binding is cluster-admin. Strict mode still
       grants cluster-wide generic read, delete, and patch capabilities for

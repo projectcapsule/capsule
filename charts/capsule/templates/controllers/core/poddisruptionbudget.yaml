@@ -1,3 +1,4 @@
+{{- define "capsule.podDisruptionBudget" -}}
 {{- $pdb := .Values.podDisruptionBudget }}
 {{- if and $pdb.enabled (not .Values.crds.exclusive) (eq .Values.manager.kind "Deployment") }}
   {{- $hasMin := not (kindIs "invalid" $pdb.minAvailable) }}
@@ -29,3 +30,5 @@ spec:
     matchLabels:
       {{- include "capsule.selectorLabels" . | nindent 6 }}
 {{- end }}
+{{- end -}}
+{{- include "capsule.podDisruptionBudget" . }}

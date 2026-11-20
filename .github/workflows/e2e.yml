@@ -9,6 +9,8 @@ on:
       - '.github/workflows/e2e.yml'
       - 'api/**'
       - 'controllers/**'
+      - 'cmd/**'
+      - 'charts/capsule/**'
       - 'internal/**'
       - 'pkg/**'
       - 'e2e/*'
@@ -53,7 +55,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        version: ['4.21', '4.22'] # tags are pinned in the Makefile (MICROSHIFT_TAG_*)
+        version: ['4.21', '4.22', '5.0'] # tags are pinned in the Makefile (MICROSHIFT_TAG_*)
         # The parallel specs and the serial config specs run on separate runners,
         # like the kind lanes.
         phase: ['parallel', 'config']

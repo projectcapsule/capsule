@@ -27,6 +27,7 @@ KUBERNETES_SUPPORTED_VERSION ?= "v1.36.1"
 MICROSHIFT_VERSION ?= 4.22
 MICROSHIFT_TAG_4.21 := 4.21.0_g29f429c21_4.21.0_okd_scos.ec.15
 MICROSHIFT_TAG_4.22 := 4.22.0_202610071017_g0a516b4eb_4.22.0_okd_scos.ec.16
+MICROSHIFT_TAG_5.0 := 5.0.0_202610291612.p0_g0f0de241c_5.0.0_okd_scos.7
 MICROSHIFT_TAG ?= $(MICROSHIFT_TAG_$(MICROSHIFT_VERSION))
 MICROSHIFT_INSTALLER_TAG ?= $(MICROSHIFT_TAG_4.22)
 MICROSHIFT_KUBECONFIG ?= /var/lib/microshift/resources/kubeadmin/kubeconfig
@@ -81,11 +82,11 @@ bench-controllers:
 
 # Build manager binary
 manager: generate golint
-	go build -o bin/manager
+	go build -o bin/manager ./cmd/controller/
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate manifests
-	go run .
+	$(RUN_ENV) go run ./cmd/controller/ $(CONTROLLER_COMMAND) $(RUN_ARGS)
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests: generate
@@ -563,6 +564,11 @@ e2e-install: helm-controller-version ko-build-all dev-install-gw-api-crds dev-in
 		--namespace capsule-system \
 		--create-namespace \
 		--set 'replicaCount=2'\
+		--set 'manager.controllers.replications.replicaCount=2' \
+		--set 'manager.controllers.replications.resources=null' \
+		--set 'manager.controllers.replications.options.workers=4' \
+		--set 'manager.controllers.replications.options.clientConnectionQPS=2000' \
+		--set 'manager.controllers.replications.options.clientConnectionBurst=1000' \
 		--set 'certManager.generateCertificates=false' \
 		--set 'tls.enableController=true' \
 		--set 'tls.create=true' \
@@ -610,6 +616,11 @@ e2e-install-openshift: helm-controller-version ko-build-all
 		--namespace capsule-system \
 		--create-namespace \
 		--set 'replicaCount=2'\
+		--set 'manager.controllers.replications.replicaCount=2' \
+		--set 'manager.controllers.replications.resources=null' \
+		--set 'manager.controllers.replications.options.workers=4' \
+		--set 'manager.controllers.replications.options.clientConnectionQPS=2000' \
+		--set 'manager.controllers.replications.options.clientConnectionBurst=1000' \
 		--set 'manager.image.pullPolicy=Never' \
 		--set 'manager.resources=null'\
 		--set "manager.image.tag=$(VERSION)" \
@@ -865,12 +876,13 @@ endef
 APP_NAME     := controller
 MODULE_NAME  := capsule
 PACKAGE      := github.com/projectcapsule/capsule/cmd/controller
+CONTROLLER_COMMAND ?= core
 RUN_ARGS     := --zap-log-level 4 --client-connection-burst=1000 --client-connection-qps=2000.0 --workers=8
 RUN_ENV      := NAMESPACE=capsule-system SERVICE_ACCOUNT=capsule
 
 .PHONY: controller-dev-start
 controller-dev-start: # start the controller from local env
-	$(RUN_ENV) go run ./cmd/controller/ $(RUN_ARGS)
+	$(RUN_ENV) go run ./cmd/controller/ $(CONTROLLER_COMMAND) $(RUN_ARGS)
 
 .PHONY: controller-dev-idea-run-config
 controller-dev-idea-run-config:
@@ -885,7 +897,7 @@ controller-dev-idea-run-config:
 	    envs="      <env name=\"$$k\" value=\"$$v\" />"; \
 	  fi; \
 	done; \
-	export APP_NAME="$(APP_NAME)" MODULE_NAME="$(MODULE_NAME)" PACKAGE="$(PACKAGE)" RUN_ARGS="$(RUN_ARGS)"; \
+	export APP_NAME="$(APP_NAME)" MODULE_NAME="$(MODULE_NAME)" PACKAGE="$(PACKAGE)" RUN_ARGS="$(CONTROLLER_COMMAND) $(RUN_ARGS)"; \
 	export RUN_ENVS="$$(printf "%b" "$$envs")"; \
 	envsubst '$$APP_NAME $$MODULE_NAME $$PACKAGE $$RUN_ARGS $$RUN_ENVS' < hack/dev/idea-run-config.xml > .idea/runConfigurations/$(APP_NAME).xml; \
 	}

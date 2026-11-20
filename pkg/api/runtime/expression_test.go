@@ -22,13 +22,13 @@ func TestExpressionMatchValidateLimits(t *testing.T) {
 	}{
 		{"empty", ExpressionMatch{}, ""},
 		{"empty exact", ExpressionMatch{Exact: []string{}}, ""},
-		{"syntax is validated separately", ExpressionMatch{ExpressionRegex: ExpressionRegex{Expression: "["}}, ""},
+		{"syntax is validated separately", ExpressionMatch{Expression: "["}, ""},
 		{"exact limit", ExpressionMatch{Exact: slices.Repeat([]string{"a"}, 64)}, ""},
 		{"exact oversized", ExpressionMatch{Exact: slices.Repeat([]string{"a"}, 65)}, "match.exact: at most 64 values are supported"},
-		{"exp limit", ExpressionMatch{ExpressionRegex: ExpressionRegex{Expression: strings.Repeat("a", 4096)}}, ""},
-		{"exp oversized", ExpressionMatch{ExpressionRegex: ExpressionRegex{Expression: strings.Repeat("a", 4097)}}, "match.exp: at most 4096 characters are supported"},
-		{"unicode limit", ExpressionMatch{ExpressionRegex: ExpressionRegex{Expression: strings.Repeat("界", 4096)}}, ""},
-		{"unicode oversized with exact and negate", ExpressionMatch{Exact: []string{"a"}, ExpressionRegex: ExpressionRegex{Expression: strings.Repeat("界", 4097), Negate: true}}, "match.exp: at most 4096 characters are supported"},
+		{"exp limit", ExpressionMatch{Expression: strings.Repeat("a", 4096)}, ""},
+		{"exp oversized", ExpressionMatch{Expression: strings.Repeat("a", 4097)}, "match.exp: at most 4096 characters are supported"},
+		{"unicode limit", ExpressionMatch{Expression: strings.Repeat("界", 4096)}, ""},
+		{"unicode oversized with exact and negate", ExpressionMatch{Exact: []string{"a"}, Expression: strings.Repeat("界", 4097), Negate: true}, "match.exp: at most 4096 characters are supported"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := tc.match.ValidateLimits("match")

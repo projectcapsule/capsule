@@ -43,7 +43,7 @@ func (r *GlobalTenantResourceRecorder) Collectors() []prometheus.Collector {
 }
 
 func (r *GlobalTenantResourceRecorder) RecordConditions(resource *capsulev1beta2.GlobalTenantResource) {
-	for _, status := range []string{meta.ReadyCondition, meta.CordonedCondition} {
+	for _, status := range []string{meta.ReadyCondition, meta.CordonedCondition, meta.HealthyCondition} {
 		var value float64
 
 		cond := resource.Status.Conditions.GetConditionByType(status)
@@ -68,10 +68,7 @@ func (r *GlobalTenantResourceRecorder) DeleteConditionMetrics(name string) {
 }
 
 func (r *GlobalTenantResourceRecorder) DeleteConditionMetricByType(name string, condition string) {
-	r.resourceConditionGauge.DeletePartialMatch(map[string]string{
-		"name":      name,
-		"condition": condition,
-	})
+	r.resourceConditionGauge.DeleteLabelValues(name, condition)
 }
 
 // DeleteCondition deletes the condition metrics for the ref.

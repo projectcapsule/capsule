@@ -2427,6 +2427,77 @@ var _ = Describe("enforcing generic metadata namespace rules", Label("tenant", "
 		)
 	})
 
+	It("does not match overlapping wildcard prefix and suffix but matches zero-length wildcards", func() {
+		ns := createNamespace(nil)
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+
+		// Config*Map matches ConfigMap with a zero-length wildcard, so the
+		// required label must be enforced. Asserting the denial first also
+		// waits for the rule to become effective.
+		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
+			metadataRule(
+				rules.ActionTypeAllow,
+				"v1",
+				[]string{"Config*Map"},
+				map[string]rules.MetadataValueRule{
+					ownerLabel: metadataValueRule(true, metadataByExact("required")),
+				},
+				nil,
+			),
+		})
+
+		createConfigMapAndExpectDenied(
+			cs,
+			ns.Name,
+			configMap("overlap-boundary-configmap-denied", nil, nil),
+			"metadata",
+			ownerLabel,
+			"required",
+		)
+
+		// ConfigMap*Map needs at least 12 characters and must not match the
+		// 9-character kind ConfigMap: prefix and suffix cannot overlap.
+		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
+			metadataRule(
+				rules.ActionTypeAllow,
+				"v1",
+				[]string{"ConfigMap*Map"},
+				map[string]rules.MetadataValueRule{
+					ownerLabel: metadataValueRule(true, metadataByExact("required")),
+				},
+				nil,
+			),
+		})
+
+		// Wait for the updated rule to be projected so a stale rule set
+		// cannot produce a false-positive allow.
+		expectNamespaceStatusRules(ns.Name, []expectedMetadataStatusRule{
+			{
+				action:    rules.ActionTypeAllow,
+				apiGroups: []string{"v1"},
+				kinds:     []string{"ConfigMap*Map"},
+				labels: map[string]expectedMetadataPolicy{
+					ownerLabel: {
+						required: true,
+						exact: [][]string{
+							{"required"},
+						},
+					},
+				},
+			},
+		})
+
+		cm := configMap("overlap-allowed-configmap", nil, nil)
+		createConfigMapAndExpectAllowed(cs, ns.Name, cm)
+
+		Eventually(func(g Gomega) {
+			got, err := cs.CoreV1().ConfigMaps(ns.Name).Get(context.Background(), cm.Name, metav1.GetOptions{})
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(got.GetLabels()).NotTo(HaveKey(ownerLabel))
+			g.Expect(got.Data).To(HaveKeyWithValue("key", "value"))
+		}).WithTimeout(defaultTimeoutInterval).WithPolling(defaultPollInterval).Should(Succeed())
+	})
+
 	It("does not let one optional matching key satisfy another required key", func() {
 		updateTenantRules([]*rules.NamespaceRuleBodyTenant{
 			metadataRule(

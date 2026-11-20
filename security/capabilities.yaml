@@ -192,7 +192,7 @@ capabilities:
       needed for cleanup; application ownership checks do not narrow RBAC.
       Implementation: `cmd/controller/main.go`, `internal/cache/cel.go`,
       `pkg/runtime/webhook/utils/request_reader.go`,
-      `charts/capsule/templates/rbac.yaml`, `charts/capsule/values.yaml`.
+      `charts/capsule/templates/controllers/rbac.yaml`, `charts/capsule/values.yaml`.
       Coverage: `internal/cache/invalidation_test.go`,
       `pkg/runtime/webhook/utils/request_reader_test.go`,
       `e2e/config_cel_cache_test.go`.

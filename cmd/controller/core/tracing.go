@@ -1,7 +1,7 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package main
+package core
 
 import (
 	"context"
@@ -9,7 +9,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"maps"
-	"strings"
 	"time"
 
 	"go.opentelemetry.io/otel"
@@ -119,34 +118,4 @@ func setupTracing(ctx context.Context, options tracingOptions) (func(context.Con
 	))
 
 	return provider.Shutdown, nil
-}
-
-type tracingHeadersFlag map[string]string
-
-func (f tracingHeadersFlag) String() string {
-	if len(f) == 0 {
-		return ""
-	}
-
-	items := make([]string, 0, len(f))
-	for key, value := range f {
-		items = append(items, key+"="+value)
-	}
-
-	return strings.Join(items, ",")
-}
-
-func (f tracingHeadersFlag) Type() string {
-	return "key=value"
-}
-
-func (f tracingHeadersFlag) Set(value string) error {
-	key, headerValue, found := strings.Cut(value, "=")
-	if !found || key == "" {
-		return fmt.Errorf("tracing header must use key=value format")
-	}
-
-	f[key] = headerValue
-
-	return nil
 }

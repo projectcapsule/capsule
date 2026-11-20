@@ -58,18 +58,30 @@ spec:
   topologySpreadConstraints:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- if or (not .replications) .Values.manager.volumes }}
   volumes:
+    {{- if not .replications }}
     - name: cert
       secret:
         defaultMode: 420
         secretName: {{ include "capsule.secretTlsName" . }}
+    {{- end }}
     {{- if .Values.manager.volumes }}
       {{- toYaml .Values.manager.volumes | nindent 4 }}
     {{- end }}
+  {{- end }}
   containers:
     - name: manager
       args:
+        - {{ if .replications }}replications{{ else }}core{{ end }}
+        {{- if and .replications .Values.manager.hostNetwork }}
+        - --metrics-addr=:8081
+        - --health-probe-bind-address=:10081
+        - --pprof-bind-address=:8083
+        {{- end }}
+        {{- if not .replications }}
         - --webhook-port={{ default $.Values.manager.webhookPort $.Values.webhooks.service.port }}
+        {{- end }}
         - --zap-log-level={{ default 4 .Values.manager.options.logLevel }}
         - --configuration-name={{ .Values.manager.options.capsuleConfiguration }}
         - --workers={{ .Values.manager.options.workers }}
@@ -88,7 +100,7 @@ spec:
         {{- with .Values.manager.options.leaderElection.retryPeriod }}
         - --leader-election-retry-period={{ . }}
         {{- end }}
-        {{- if .Values.manager.options.tracing.enabled }}
+        {{- if and (not .replications) .Values.manager.options.tracing.enabled }}
         - --enable-tracing=true
         {{- with .Values.manager.options.tracing.endpoint }}
         - --tracing-otlp-endpoint={{ . }}
@@ -123,7 +135,11 @@ spec:
         valueFrom:
           fieldRef:
             fieldPath: spec.serviceAccountName
-      {{- if .Values.manager.options.tracing.enabled }}
+      {{- if .replications }}
+      - name: CAPSULE_RELEASE_NAME
+        value: {{ .Release.Name | quote }}
+      {{- end }}
+      {{- if and (not .replications) .Values.manager.options.tracing.enabled }}
       {{- if or .Values.manager.options.tracing.basicAuth.username .Values.manager.options.tracing.basicAuth.existingSecret.name }}
       - name: CAPSULE_TRACING_OTLP_BASIC_AUTH_USERNAME
         {{- if .Values.manager.options.tracing.basicAuth.existingSecret.name }}
@@ -152,9 +168,11 @@ spec:
       {{- end }}
       ports:
         {{- if not (.Values.manager.hostNetwork) }}
+        {{- if not .replications }}
         - name: admission
           protocol: TCP
           containerPort: {{ default $.Values.manager.webhookPort $.Values.webhooks.service.port }}
+        {{- end }}
         - name: metrics
           containerPort: 8080
           protocol: TCP
@@ -169,13 +187,17 @@ spec:
         {{- toYaml .Values.manager.livenessProbe | nindent 8 }}
       readinessProbe:
         {{- toYaml .Values.manager.readinessProbe | nindent 8 }}
+      {{- if or (not .replications) .Values.manager.volumeMounts }}
       volumeMounts:
+        {{- if not .replications }}
         - mountPath: /tmp/k8s-webhook-server/serving-certs
           name: cert
           readOnly: true
+        {{- end }}
         {{- if .Values.manager.volumeMounts }}
           {{- toYaml .Values.manager.volumeMounts | nindent 8 }}
         {{- end }}
+      {{- end }}
       resources:
         {{- toYaml .Values.manager.resources | nindent 8 }}
       {{- if .Values.manager.securityContext }}
