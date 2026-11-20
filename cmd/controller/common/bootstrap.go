@@ -54,7 +54,7 @@ func NewBootstrap(ctx context.Context, options Options) (*Bootstrap, error) {
 	config.Burst = int(options.ClientConnectionBurst)
 	scheme := NewScheme()
 
-	direct, err := client.New(ctrl.GetConfigOrDie(), client.Options{Scheme: scheme})
+	direct, err := client.New(config, client.Options{Scheme: scheme})
 	if err != nil {
 		return nil, fmt.Errorf("create direct client: %w", err)
 	}

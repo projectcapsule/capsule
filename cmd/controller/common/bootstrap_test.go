@@ -4,7 +4,14 @@
 package common
 
 import (
+	"context"
 	"crypto/tls"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -12,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
@@ -66,6 +74,55 @@ func TestBootstrapRequiresControllerIdentityBeforeAPIInitialization(t *testing.T
 	t.Setenv(configuration.EnvironmentServiceaccountName, "capsule")
 	_, err = NewBootstrap(t.Context(), Options{})
 	require.ErrorContains(t, err, "CapsuleConfiguration")
+}
+
+func TestBootstrapDirectClientHonorsConfiguredAPILimits(t *testing.T) {
+	var reads atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		var response any
+		switch r.URL.Path {
+		case "/api":
+			response = metav1.APIVersions{Versions: []string{"v1"}}
+		case "/apis":
+			response = metav1.APIGroupList{}
+		case "/api/v1":
+			response = metav1.APIResourceList{GroupVersion: "v1", APIResources: []metav1.APIResource{{Name: "namespaces", Kind: "Namespace", Verbs: []string{"get"}}}}
+		case "/api/v1/namespaces/tenant-a":
+			reads.Add(1)
+			response = &corev1.Namespace{TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Namespace"}, Name: "tenant-a"}
+		default:
+			http.NotFound(w, r)
+			return
+		}
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			t.Error(err)
+		}
+	}))
+	t.Cleanup(server.Close)
+	configPath := filepath.Join(t.TempDir(), "kubeconfig")
+	contents, err := json.Marshal(map[string]any{"apiVersion": "v1", "kind": "Config", "clusters": []any{map[string]any{"name": "test", "cluster": map[string]any{"server": server.URL}}}, "contexts": []any{map[string]any{"name": "test", "context": map[string]any{"cluster": "test", "user": "test"}}}, "current-context": "test", "users": []any{map[string]any{"name": "test", "user": map[string]any{}}}})
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(configPath, contents, 0o600))
+	t.Setenv("KUBECONFIG", configPath)
+	t.Setenv(configuration.EnvironmentControllerNamespace, "capsule-system")
+	t.Setenv(configuration.EnvironmentServiceaccountName, "capsule")
+	var options Options
+	options.BindFlags(pflag.NewFlagSet("controller", pflag.ContinueOnError))
+	options.ClientConnectionQPS, options.ClientConnectionBurst = 2, 1
+	b, err := NewBootstrap(t.Context(), options)
+	require.NoError(t, err)
+	require.Equal(t, options.ClientConnectionQPS, b.Config.QPS)
+	require.Equal(t, 1, b.Config.Burst)
+	require.IsType(t, rest.NoWarnings{}, b.Config.WarningHandler)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	require.NoError(t, b.DirectClient.Get(ctx, client.ObjectKey{Name: "tenant-a"}, &corev1.Namespace{}))
+	limited, cancelLimited := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	defer cancelLimited()
+	err = b.DirectClient.Get(limited, client.ObjectKey{Name: "tenant-a"}, &corev1.Namespace{})
+	require.ErrorContains(t, err, "rate limiter")
+	require.EqualValues(t, 1, reads.Load(), "the second read must be throttled before reaching the API server")
 }
 
 func TestManagerEndpointOverridesPreserveDefaults(t *testing.T) {

@@ -74,7 +74,9 @@ var _ = Describe("Replication health inventory consistency", Label("tenant", "re
 		group := prefix + ".projectcapsule.dev"
 		crd := &unstructured.Unstructured{Object: map[string]any{
 			"apiVersion": "apiextensions.k8s.io/v1", "kind": "CustomResourceDefinition", "metadata": map[string]any{"name": "healthtargets." + group, "labels": map[string]any{"env": "e2e"}},
-			"spec": map[string]any{"group": group, "scope": "Cluster", "names": map[string]any{"plural": "healthtargets", "singular": "healthtarget", "kind": "HealthTarget"}, "versions": []any{map[string]any{"name": "v1", "served": true, "storage": true, "schema": map[string]any{"openAPIV3Schema": map[string]any{"type": "object", "properties": map[string]any{"spec": map[string]any{"type": "object", "properties": map[string]any{"first": map[string]any{"type": "boolean"}, "second": map[string]any{"type": "boolean"}}}}}}}}},
+			// Older API servers encode an SSA-pruned optional object as null.
+			// Accept it so releasing the last spec contribution remains valid.
+			"spec": map[string]any{"group": group, "scope": "Cluster", "names": map[string]any{"plural": "healthtargets", "singular": "healthtarget", "kind": "HealthTarget"}, "versions": []any{map[string]any{"name": "v1", "served": true, "storage": true, "schema": map[string]any{"openAPIV3Schema": map[string]any{"type": "object", "properties": map[string]any{"spec": map[string]any{"type": "object", "nullable": true, "properties": map[string]any{"first": map[string]any{"type": "boolean"}, "second": map[string]any{"type": "boolean"}}}}}}}}},
 		}}
 		Expect(k8sClient.Create(ctx, crd)).To(Succeed())
 		DeferCleanup(DeleteInBackground, crd)

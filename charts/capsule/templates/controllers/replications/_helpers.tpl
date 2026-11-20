@@ -3,7 +3,8 @@
 {{- $root := .root -}}
 {{- with $root -}}
 {{- $replications := dict }}
-{{- range $key, $value := .Values.manager.controllers.replications }}
+{{- $controllers := .Values.manager.controllers | default dict }}
+{{- range $key, $value := ($controllers.replications | default dict) }}
 {{- if ne $value nil }}
 {{- $_ := set $replications $key (deepCopy $value) }}
 {{- end }}
@@ -56,6 +57,14 @@
 {{/* Retain the existing trusted identity, including custom ServiceAccount names. */}}
 {{- $_ := set $values.serviceAccount "name" (include "capsule.serviceAccountName" .) }}
 {{- $context := dict "Values" $values "Release" .Release "Chart" .Chart "Capabilities" .Capabilities "Template" .Template "Files" .Files "replications" true }}
+{{/* Explicit inherited selectors must still identify the replication Service. */}}
+{{- $selector := include "capsule.selectorLabels" $context | fromYaml }}
+{{- $monitoring := $values.monitoring | default dict }}
+{{- range $monitor := list ($monitoring.serviceMonitor | default dict) ($values.serviceMonitor | default dict) }}
+{{- with $monitor.matchLabels }}
+{{- $_ := set $monitor "matchLabels" (mergeOverwrite (deepCopy .) $selector) }}
+{{- end }}
+{{- end }}
 {{- include $.template $context }}
 {{- end }}
 {{- end -}}

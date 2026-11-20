@@ -1,6 +1,6 @@
 {{- define "capsule.serviceMonitor" -}}
 {{- if not $.Values.crds.exclusive }}
-  {{- with (mergeOverwrite .Values.monitoring.serviceMonitor (default dict .Values.serviceMonitor)) -}}
+  {{- with (mergeOverwrite (deepCopy .Values.monitoring.serviceMonitor) (deepCopy (default dict .Values.serviceMonitor))) -}}
     {{- if .enabled }}
 ---
 apiVersion: monitoring.coreos.com/v1
