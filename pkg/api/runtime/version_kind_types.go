@@ -413,13 +413,15 @@ func matchPattern(pattern, value string) bool {
 		limit -= len(suffix)
 	}
 
+	// Prefix and suffix must not overlap, even when every wildcard between
+	// them matches zero characters.
+	if idx > limit {
+		return false
+	}
+
 	for _, part := range parts[1:lastPartIndex] {
 		if part == "" {
 			continue
-		}
-
-		if idx > limit {
-			return false
 		}
 
 		found := strings.Index(value[idx:limit], part)

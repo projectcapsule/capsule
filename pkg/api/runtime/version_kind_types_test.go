@@ -2690,6 +2690,36 @@ func TestMatchPattern(t *testing.T) {
 			value:   "abbc",
 			want:    true,
 		},
+		{
+			name:    "prefix and suffix cannot overlap",
+			pattern: "ab*bc",
+			value:   "abc",
+			want:    false,
+		},
+		{
+			name:    "prefix and suffix cannot overlap with consecutive wildcards",
+			pattern: "ab**bc",
+			value:   "abc",
+			want:    false,
+		},
+		{
+			name:    "single character cannot satisfy prefix and suffix",
+			pattern: "a*a",
+			value:   "a",
+			want:    false,
+		},
+		{
+			name:    "adjacent prefix and suffix with zero-length wildcard",
+			pattern: "ab*bc",
+			value:   "abbc",
+			want:    true,
+		},
+		{
+			name:    "prefix and suffix separated by wildcard content",
+			pattern: "ab*bc",
+			value:   "abXbc",
+			want:    true,
+		},
 	}
 
 	for _, tt := range tests {
