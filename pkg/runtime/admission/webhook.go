@@ -4,8 +4,12 @@
 package admission
 
 import (
+	"encoding/json"
+	"slices"
+
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
@@ -424,4 +428,54 @@ type MutatingWebhook struct {
 	// +listMapKey=name
 	// +optional
 	MatchConditions []admissionregistrationv1.MatchCondition `json:"matchConditions,omitempty" patchMergeKey:"name" patchStrategy:"merge" protobuf:"bytes,12,opt,name=matchConditions"`
+}
+
+// PreserveNamespaceSelectors retains external expressions while tracking Capsule's selectors by webhook name.
+func PreserveNamespaceSelectors[T any](annotations map[string]string, existing, desired []T, selector func(*T) (string, **metav1.LabelSelector)) error {
+	const key = "projectcapsule.dev/namespace-selectors"
+
+	previous := map[string]*metav1.LabelSelector{}
+
+	if raw := annotations[key]; raw != "" {
+		if err := json.Unmarshal([]byte(raw), &previous); err != nil {
+			return err
+		}
+	}
+
+	current, applied := make(map[string]*metav1.LabelSelector, len(existing)), make(map[string]*metav1.LabelSelector, len(desired))
+
+	for i := range existing {
+		name, source := selector(&existing[i])
+		current[name] = *source
+	}
+
+	for i := range desired {
+		name, target := selector(&desired[i])
+		applied[name] = *target
+		*target = (*target).DeepCopy()
+
+		if current[name] == nil {
+			continue
+		}
+
+		if *target == nil {
+			*target = &metav1.LabelSelector{}
+		}
+
+		for _, requirement := range current[name].MatchExpressions {
+			contains := func(value *metav1.LabelSelector) bool {
+				return value != nil && slices.ContainsFunc(value.MatchExpressions, func(r metav1.LabelSelectorRequirement) bool {
+					return r.Key == requirement.Key && r.Operator == requirement.Operator && sets.New(r.Values...).Equal(sets.New(requirement.Values...))
+				})
+			}
+			if !contains(previous[name]) && !contains(*target) {
+				(*target).MatchExpressions = append((*target).MatchExpressions, *requirement.DeepCopy())
+			}
+		}
+	}
+
+	raw, err := json.Marshal(applied)
+	annotations[key] = string(raw)
+
+	return err
 }
