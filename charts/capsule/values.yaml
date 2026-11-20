@@ -137,69 +137,73 @@ rbac:
     labels: {}
     # rbac.authorization.k8s.io/aggregate-to-admin: "true"
 
-# Core and replication controllers always run in separate workloads using the same binary.
-# With leader election enabled, replications use the
-# namespaced Lease replications.projectcapsule.dev. Custom RBAC restricted by
-# resourceNames must permit this name; the chart-provided RBAC already does.
-controllers:
-  replications:
-    # -- Replication replicas. One elected leader processes replications; the others provide failover.
-    replicaCount: 1
-    # -- Pod labels for the replication controller.
-    podLabels: {}
-    # -- Pod annotations for the replication controller.
-    podAnnotations: {}
-    # @schema type: object
-    # @schema additionalProperties: true
-    # -- Pod security context overrides. Global OpenShift settings still apply.
-    podSecurityContext: {}
-    # -- Use the host PID namespace for replication pods (independent of admission).
-    hostPID: false
-    # -- Use host networking for replication pods (independent of admission).
-    hostNetwork: false
-    # -- Replication node selector.
-    nodeSelector: {}
-    # -- Replication tolerations.
-    tolerations: []
-    # -- Replication affinity. Default anti-affinity separates replication replicas.
-    affinity: {}
-    # -- Replication topology spread constraints.
-    topologySpreadConstraints: []
-    # -- Replication priority class name.
-    priorityClassName: ''
-    # -- Container resources for replication pods; size independently of admission pods.
-    resources:
-      requests:
-        cpu: 100m
-        memory: 128Mi
-      limits:
-        memory: 512Mi
-    # @schema type: object
-    # @schema additionalProperties: true
-    # -- Overrides of manager.image; omitted properties inherit the main controller image.
-    image: {}
-    options:
-      # -- Concurrent reconciles per replication controller.
-      workers: 4
-      # -- Replication API client QPS, independent of the main controller.
-      clientConnectionQPS: 50.0
-      # -- Replication API client burst.
-      clientConnectionBurst: 100
-    # -- Additional CLI arguments, using the same flags as the main controller.
-    extraArgs: []
-    # -- Additional environment variables.
-    env: []
-    # -- Replication Deployment strategy.
-    deploymentStrategy:
-      type: RollingUpdate
-    podDisruptionBudget:
-      # -- Create a separate disruption budget for replication pods.
-      enabled: false
-      # -- Minimum available replication replicas.
-      minAvailable: 1
-
 # Manager Options
 manager:
+  # Core and replication controllers always run in separate workloads using the same binary.
+  # With leader election enabled, replications use the
+  # namespaced Lease replications.projectcapsule.dev. Custom RBAC restricted by
+  # resourceNames must permit this name; the chart-provided RBAC already does.
+  controllers:
+    replications:
+      # -- Replication replicas when manager.kind is Deployment. One elected leader processes replications; the others provide failover.
+      replicaCount: 1
+      # -- Pod labels for the replication controller.
+      podLabels: {}
+      # -- Pod annotations for the replication controller.
+      podAnnotations: {}
+      # @schema type: object
+      # @schema additionalProperties: true
+      # -- Pod security context overrides. Global OpenShift settings still apply.
+      podSecurityContext: {}
+      # -- Use the host PID namespace for replication pods (independent of admission).
+      hostPID: false
+      # -- Use host networking for replication pods (independent of admission).
+      hostNetwork: false
+      # -- Replication node selector.
+      nodeSelector: {}
+      # -- Replication tolerations.
+      tolerations: []
+      # -- Replication affinity. Default anti-affinity separates replication replicas.
+      affinity: {}
+      # -- Replication topology spread constraints.
+      topologySpreadConstraints: []
+      # -- Replication priority class name.
+      priorityClassName: ''
+      # -- Container resources for replication pods; size independently of admission pods.
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          memory: 512Mi
+      # @schema type: object
+      # @schema additionalProperties: true
+      # -- Overrides of manager.image; omitted properties inherit the main controller image.
+      image: {}
+      options:
+        # -- Concurrent reconciles per replication controller.
+        workers: 4
+        # -- Replication API client QPS, independent of the main controller.
+        clientConnectionQPS: 50.0
+        # -- Replication API client burst.
+        clientConnectionBurst: 100
+      # -- Additional CLI arguments, using the same flags as the main controller.
+      extraArgs: []
+      # -- Additional environment variables.
+      env: []
+      # -- Replication Deployment strategy.
+      deploymentStrategy:
+        type: RollingUpdate
+      # @schema type: object
+      # @schema additionalProperties: true
+      # -- Overrides of manager.daemonsetStrategy for replication pods when manager.kind is DaemonSet.
+      daemonsetStrategy: {}
+      podDisruptionBudget:
+        # -- Create a separate disruption budget for replication Deployment pods.
+        enabled: false
+        # -- Minimum available replication replicas.
+        minAvailable: 1
+
   apiPriorityAndFairness:
     # -- Change to `true` if you want to insulate the API calls made by Capsule admission controller activities.
     # This will help ensure Capsule stability in busy clusters.
@@ -278,7 +282,7 @@ manager:
       #    resources: ["storageclasses"]
       #    verbs: ["get", "list", "watch", "update", "patch"]
 
-  # -- Set the controller deployment mode as `Deployment` or `DaemonSet`.
+  # -- Set the workload kind for both core and replication controllers to `Deployment` or `DaemonSet`.
   kind: Deployment
 
   # -- [Deployment Strategy](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy)

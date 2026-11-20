@@ -563,11 +563,11 @@ e2e-install: helm-controller-version ko-build-all dev-install-gw-api-crds dev-in
 		--namespace capsule-system \
 		--create-namespace \
 		--set 'replicaCount=2'\
-		--set 'controllers.replications.replicaCount=2' \
-		--set 'controllers.replications.resources=null' \
-		--set 'controllers.replications.options.workers=4' \
-		--set 'controllers.replications.options.clientConnectionQPS=2000' \
-		--set 'controllers.replications.options.clientConnectionBurst=1000' \
+		--set 'manager.controllers.replications.replicaCount=2' \
+		--set 'manager.controllers.replications.resources=null' \
+		--set 'manager.controllers.replications.options.workers=4' \
+		--set 'manager.controllers.replications.options.clientConnectionQPS=2000' \
+		--set 'manager.controllers.replications.options.clientConnectionBurst=1000' \
 		--set 'certManager.generateCertificates=false' \
 		--set 'tls.enableController=true' \
 		--set 'tls.create=true' \
@@ -615,11 +615,11 @@ e2e-install-openshift: helm-controller-version ko-build-all
 		--namespace capsule-system \
 		--create-namespace \
 		--set 'replicaCount=2'\
-		--set 'controllers.replications.replicaCount=2' \
-		--set 'controllers.replications.resources=null' \
-		--set 'controllers.replications.options.workers=4' \
-		--set 'controllers.replications.options.clientConnectionQPS=2000' \
-		--set 'controllers.replications.options.clientConnectionBurst=1000' \
+		--set 'manager.controllers.replications.replicaCount=2' \
+		--set 'manager.controllers.replications.resources=null' \
+		--set 'manager.controllers.replications.options.workers=4' \
+		--set 'manager.controllers.replications.options.clientConnectionQPS=2000' \
+		--set 'manager.controllers.replications.options.clientConnectionBurst=1000' \
 		--set 'manager.image.pullPolicy=Never' \
 		--set 'manager.resources=null'\
 		--set "manager.image.tag=$(VERSION)" \

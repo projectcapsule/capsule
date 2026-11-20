@@ -2,10 +2,9 @@
 {{- define "capsule.replications.render" -}}
 {{- $root := .root -}}
 {{- with $root -}}
-{{- $replications := .Values.controllers.replications }}
+{{- $replications := .Values.manager.controllers.replications }}
 {{- $values := deepCopy .Values }}
 {{- $_ := set $values "manager" (mergeOverwrite (deepCopy .Values.manager) (deepCopy $replications)) }}
-{{- $_ := set $values.manager "kind" "Deployment" }}
 {{- range $key := list "replicaCount" "podLabels" "podAnnotations" "nodeSelector" "tolerations" "affinity" "topologySpreadConstraints" "priorityClassName" }}
 {{- $_ := set $values $key (get $replications $key) }}
 {{- end }}

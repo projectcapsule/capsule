@@ -124,6 +124,28 @@ and [replication documentation](https://projectcapsule.dev/docs/replications/).
 | manager.apiPriorityAndFairness.flowApiVersion | string | `"flowcontrol.apiserver.k8s.io/v1"` | Declare ApiVersion used for Flow |
 | manager.apiPriorityAndFairness.matchingPrecedence | int | `900` | Only the first matching FlowSchema for a given request matters. If multiple FlowSchemas match a single inbound request, it will be assigned based on the one with the highest matchingPrecedence. Ref: https://kubernetes.io/docs/concepts/cluster-administration/flow-control/#flowschema |
 | manager.apiPriorityAndFairness.priorityLevelConfigurationSpec | object | See [values.yaml](values.yaml) | Priority level configuration. The block is directly forwarded into the priorityLevelConfiguration, so you can use whatever specification you want. ref: https://kubernetes.io/docs/concepts/cluster-administration/flow-control/#prioritylevelconfiguration |
+| manager.controllers.replications.affinity | object | `{}` | Replication affinity. Default anti-affinity separates replication replicas. |
+| manager.controllers.replications.daemonsetStrategy | object | `{}` | Overrides of manager.daemonsetStrategy for replication pods when manager.kind is DaemonSet. |
+| manager.controllers.replications.deploymentStrategy | object | `{"type":"RollingUpdate"}` | Replication Deployment strategy. |
+| manager.controllers.replications.env | list | `[]` | Additional environment variables. |
+| manager.controllers.replications.extraArgs | list | `[]` | Additional CLI arguments, using the same flags as the main controller. |
+| manager.controllers.replications.hostNetwork | bool | `false` | Use host networking for replication pods (independent of admission). |
+| manager.controllers.replications.hostPID | bool | `false` | Use the host PID namespace for replication pods (independent of admission). |
+| manager.controllers.replications.image | object | `{}` | Overrides of manager.image; omitted properties inherit the main controller image. |
+| manager.controllers.replications.nodeSelector | object | `{}` | Replication node selector. |
+| manager.controllers.replications.options.clientConnectionBurst | int | `100` | Replication API client burst. |
+| manager.controllers.replications.options.clientConnectionQPS | float | `50` | Replication API client QPS, independent of the main controller. |
+| manager.controllers.replications.options.workers | int | `4` | Concurrent reconciles per replication controller. |
+| manager.controllers.replications.podAnnotations | object | `{}` | Pod annotations for the replication controller. |
+| manager.controllers.replications.podDisruptionBudget.enabled | bool | `false` | Create a separate disruption budget for replication Deployment pods. |
+| manager.controllers.replications.podDisruptionBudget.minAvailable | int | `1` | Minimum available replication replicas. |
+| manager.controllers.replications.podLabels | object | `{}` | Pod labels for the replication controller. |
+| manager.controllers.replications.podSecurityContext | object | `{}` | Pod security context overrides. Global OpenShift settings still apply. |
+| manager.controllers.replications.priorityClassName | string | `""` | Replication priority class name. |
+| manager.controllers.replications.replicaCount | int | `1` | Replication replicas when manager.kind is Deployment. One elected leader processes replications; the others provide failover. |
+| manager.controllers.replications.resources | object | `{"limits":{"memory":"512Mi"},"requests":{"cpu":"100m","memory":"128Mi"}}` | Container resources for replication pods; size independently of admission pods. |
+| manager.controllers.replications.tolerations | list | `[]` | Replication tolerations. |
+| manager.controllers.replications.topologySpreadConstraints | list | `[]` | Replication topology spread constraints. |
 | manager.daemonsetStrategy | object | `{"type":"RollingUpdate"}` | [Daemonset Strategy](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/#creating-a-daemonset-with-rollingupdate-update-strategy) |
 | manager.deploymentStrategy | object | `{"type":"RollingUpdate"}` | [Deployment Strategy](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy) |
 | manager.env | list | `[]` | Additional Environment Variables |
@@ -135,7 +157,7 @@ and [replication documentation](https://projectcapsule.dev/docs/replications/).
 | manager.image.registry | string | `"ghcr.io"` | Set the image registry of capsule. |
 | manager.image.repository | string | `"projectcapsule/capsule"` | Set the image repository of capsule. |
 | manager.image.tag | string | `""` | Overrides the image tag whose default is the chart appVersion. |
-| manager.kind | string | `"Deployment"` | Set the controller deployment mode as `Deployment` or `DaemonSet`. |
+| manager.kind | string | `"Deployment"` | Set the workload kind for both core and replication controllers to `Deployment` or `DaemonSet`. |
 | manager.livenessProbe | object | `{"httpGet":{"path":"/healthz","port":10080}}` | Configure the liveness probe using Deployment probe spec |
 | manager.options.administrators | list | `[]` | Define entities which can act as Administrators in the capsule construct These entities are automatically owners for all existing tenants. Meaning they can add namespaces to any tenant. However they must be specific by using the capsule label for interacting with namespaces. Because if that label is not defined, it's assumed that namespace interaction was not targeted towards a tenant and will therefore be ignored by capsule. May also be handy in GitOps scenarios where certain service accounts need to be able to manage namespaces for all tenants. |
 | manager.options.allowServiceAccountPromotion | bool | `false` | ServiceAccounts within tenant namespaces can be promoted to owners of the given tenant this can be achieved by labeling the serviceaccount and then they are considered owners. This can only be done by other owners of the tenant. However ServiceAccounts which have been promoted to owner can not promote further serviceAccounts. |

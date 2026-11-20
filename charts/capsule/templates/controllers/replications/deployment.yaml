@@ -1,4 +1,5 @@
 {{- define "capsule.replications.deployment" -}}
+{{- if eq .Values.manager.kind "Deployment" }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,6 +20,7 @@ spec:
       {{- include "capsule.selectorLabels" . | nindent 6 }}
   template:
     {{- include "capsule.pod" . | nindent 4 }}
+{{- end }}
 {{- end -}}
 {{- if not .Values.crds.exclusive }}
 {{- include "capsule.replications.render" (dict "root" . "template" "capsule.replications.deployment") }}

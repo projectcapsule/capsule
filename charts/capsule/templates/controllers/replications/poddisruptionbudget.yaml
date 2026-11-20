@@ -1,5 +1,5 @@
 {{- define "capsule.replications.pdb" -}}
-{{- if .Values.manager.podDisruptionBudget.enabled }}
+{{- if and .Values.manager.podDisruptionBudget.enabled (eq .Values.manager.kind "Deployment") }}
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
