@@ -464,7 +464,11 @@ func (r *Manager) persistResourceQuotaState(
 				key := types.NamespacedName{Namespace: rq.Namespace, Name: rq.Name}
 
 				if retryErr = reader.Get(ctx, key, found); retryErr != nil {
-					return retryErr
+					// The ResourceQuota may have vanished between the List that produced
+					// this item and this Get (e.g. its Namespace is being deleted, which
+					// is routine with short-lived CI namespaces): there is nothing left to
+					// update, so do not fail the whole sync and requeue the Tenant for it.
+					return client.IgnoreNotFound(retryErr)
 				}
 
 				before := found.DeepCopy()
@@ -475,7 +479,7 @@ func (r *Manager) persistResourceQuotaState(
 					return nil
 				}
 
-				return r.Update(ctx, found)
+				return client.IgnoreNotFound(r.Update(ctx, found))
 			})
 		})
 	}
