@@ -64,6 +64,10 @@
     {
       "matchDepTypes": ["microshift-4.22"],
       "allowedVersions": "/^4\\.22\\./"
+    },
+    {
+      "matchDepTypes": ["microshift-5.0"],
+      "allowedVersions": "/^5\\.0\\./"
     }
   ],
   "customManagers": [
@@ -78,7 +82,7 @@
       "depNameTemplate": "microshift-io/microshift",
       "depTypeTemplate": "microshift-{{{minor}}}",
       "datasourceTemplate": "github-releases",
-      "versioningTemplate": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.\\d+(?:_(?<build>\\d+))?_g[0-9a-f]+_\\d+\\.\\d+\\.\\d+_okd_scos\\.(?:ec\\.)?(?<patch>\\d+)$"
+      "versioningTemplate": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.\\d+(?:_(?<build>\\d+)(?:\\.p\\d+)?)?_g[0-9a-f]+_\\d+\\.\\d+\\.\\d+_okd_scos\\.(?:ec\\.)?(?<patch>\\d+)$"
     },
     {
       "customType": "regex",
