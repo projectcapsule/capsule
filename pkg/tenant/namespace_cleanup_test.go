@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -442,7 +443,10 @@ func (r *populatedCleanupResource) Patch(_ context.Context, name string, _ types
 	return r.objects[name].DeepCopy(), nil
 }
 func BenchmarkNamespaceCleanupPopulated(b *testing.B) {
-	for _, mode := range []string{"already-deleting-no-finalizers", "already-deleting-with-finalizers", "needs-delete", "capsule-lifecycle", "addon-lifecycle"} {
+	// retained-mixed-*: every object carries a listed and an unlisted finalizer,
+	// so each is patched down to the listed one. retained-only-64: every object
+	// carries only a listed finalizer, so nothing is patched.
+	for _, mode := range []string{"already-deleting-no-finalizers", "already-deleting-with-finalizers", "needs-delete", "capsule-lifecycle", "addon-lifecycle", "retained-mixed-1", "retained-mixed-64", "retained-only-64"} {
 		for _, count := range []int{1, 100, 1000} {
 			b.Run(fmt.Sprintf("%s/objects=%d", mode, count), func(b *testing.B) {
 				ns := cleanupNamespace()
@@ -453,6 +457,16 @@ func BenchmarkNamespaceCleanupPopulated(b *testing.B) {
 						gvr.Group = "addons.projectcapsule.dev"
 					}
 				}
+				var retained []string
+				switch mode {
+				case "retained-mixed-1":
+					retained = []string{"example.com/retained-0"}
+				case "retained-mixed-64", "retained-only-64":
+					for i := range 64 {
+						retained = append(retained, fmt.Sprintf("example.com/retained-%d", i))
+					}
+				}
+				mixed := strings.HasPrefix(mode, "retained-mixed")
 				reader := &cleanupReader{current: ns}
 				resources := &populatedCleanupResource{list: &unstructured.UnstructuredList{}, objects: map[string]*unstructured.Unstructured{}}
 				for i := 0; i < count; i++ {
@@ -470,6 +484,13 @@ func BenchmarkNamespaceCleanupPopulated(b *testing.B) {
 						obj.SetKind("AddonResource")
 						obj.SetFinalizers([]string{meta.ControllerFinalizer})
 					}
+					if len(retained) > 0 {
+						// The last listed name: the worst case for a linear scan, a lookup for a set.
+						obj.SetFinalizers([]string{retained[len(retained)-1]})
+						if mixed {
+							obj.SetFinalizers([]string{"example.com/hold", retained[len(retained)-1]})
+						}
+					}
 					resources.list.Items = append(resources.list.Items, *obj)
 					resources.objects[obj.GetName()] = obj
 				}
@@ -478,16 +499,19 @@ func BenchmarkNamespaceCleanupPopulated(b *testing.B) {
 				b.ReportAllocs()
 				for b.Loop() {
 					// Responses are immutable snapshots, so every iteration has the same work.
-					changed, err := tenant.NamespacedCascadingCleanup(b.Context(), reader, nil, cache, dyn, ns)
-					if err != nil || changed != (mode == "needs-delete" || mode == "already-deleting-with-finalizers") {
+					changed, err := tenant.NamespacedCascadingCleanup(b.Context(), reader, nil, cache, dyn, ns, retained...)
+					if err != nil || changed != (mode == "needs-delete" || mode == "already-deleting-with-finalizers" || mixed) {
 						b.Fatalf("changed=%v err=%v", changed, err)
 					}
 				}
 				if mode == "needs-delete" && resources.deletes != count*b.N {
 					b.Fatal("missing DELETEs")
 				}
-				if mode == "already-deleting-with-finalizers" && resources.patches != count*b.N {
+				if (mode == "already-deleting-with-finalizers" || mixed) && resources.patches != count*b.N {
 					b.Fatal("missing PATCHes")
+				}
+				if mode == "retained-only-64" && resources.patches != 0 {
+					b.Fatal("patched objects holding only retained finalizers")
 				}
 				if resources.gets != 0 {
 					b.Fatal("cleanup performed redundant object GETs")
@@ -603,6 +627,48 @@ func TestCleanupPreservesCapsuleLifecycleFinalizers(t *testing.T) {
 			}
 			if !reflect.DeepEqual(remaining.(*unstructured.Unstructured).GetFinalizers(), foreign.GetFinalizers()) {
 				t.Fatal("changed another tenant's finalizers")
+			}
+		})
+	}
+}
+
+func TestCleanupKeepsConfiguredRetainedFinalizers(t *testing.T) {
+	const retained, hold = "cluster.cluster.x-k8s.io", "example.com/hold"
+	clusters := schema.GroupVersionResource{Group: "cluster.x-k8s.io", Version: "v1beta2", Resource: "clusters"}
+	tenantResources := capsulev1beta2.GroupVersion.WithResource("tenantresources")
+	for _, tt := range []struct {
+		name       string
+		gvr        schema.GroupVersionResource
+		kind       string
+		finalizers []string
+		configured []string
+		want       []string
+	}{
+		{name: "listed finalizer kept on a core resource", gvr: cleanupGVR, kind: "ConfigMap", finalizers: []string{hold, retained}, configured: []string{retained}, want: []string{retained}},
+		{name: "listed finalizer kept on its owner's resource", gvr: clusters, kind: "Cluster", finalizers: []string{retained, hold}, configured: []string{retained}, want: []string{retained}},
+		{name: "unlisted finalizers are still removed", gvr: cleanupGVR, kind: "ConfigMap", finalizers: []string{hold}, configured: []string{retained}},
+		{name: "unset list removes every foreign finalizer", gvr: clusters, kind: "Cluster", finalizers: []string{retained, hold}},
+		{name: "Capsule's own are removed outside Capsule's resources", gvr: cleanupGVR, kind: "ConfigMap", finalizers: []string{meta.ControllerFinalizer, retained}, configured: []string{retained}, want: []string{retained}},
+		{name: "Capsule's own stay on Capsule's resources alongside the list", gvr: tenantResources, kind: "TenantResource", finalizers: []string{meta.ControllerFinalizer, hold, retained}, configured: []string{retained}, want: []string{meta.ControllerFinalizer, retained}},
+		{name: "empty entries retain nothing", gvr: cleanupGVR, kind: "ConfigMap", finalizers: []string{hold}, configured: []string{""}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ns := cleanupNamespace()
+			obj := cleanupObject(ns.Name, "held")
+			obj.SetAPIVersion(tt.gvr.GroupVersion().String())
+			obj.SetKind(tt.kind)
+			obj.SetDeletionTimestamp(ns.DeletionTimestamp)
+			obj.SetFinalizers(tt.finalizers)
+			dyn := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{tt.gvr: tt.kind + "List"}, obj)
+			if _, err := tenant.NamespacedCascadingCleanup(t.Context(), &cleanupReader{current: ns}, nil, &cleanupCache{gvrs: []schema.GroupVersionResource{tt.gvr}}, dyn, ns, tt.configured...); err != nil {
+				t.Fatal(err)
+			}
+			current, err := dyn.Tracker().Get(tt.gvr, ns.Name, obj.GetName())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := current.(*unstructured.Unstructured).GetFinalizers(); !slices.Equal(got, tt.want) {
+				t.Fatalf("finalizers=%v, want %v", got, tt.want)
 			}
 		})
 	}

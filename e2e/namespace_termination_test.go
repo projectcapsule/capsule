@@ -20,8 +20,8 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-// Mirrors namespaceCascadingCleanupGracePeriod and namespaceCleanupRetryPeriod in
-// internal/controllers/tenant/namespace_cleanup.go: the cascading cleanup of a
+// Mirrors the default spec.namespaceCleanup.gracePeriod and namespaceCleanupRetryPeriod
+// in internal/controllers/tenant/namespace_cleanup.go: the cascading cleanup of a
 // terminating namespace is first attempted 10 s after its deletion and retried
 // every 5 s while the namespace still has Pods.
 const (

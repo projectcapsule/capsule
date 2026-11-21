@@ -6,6 +6,7 @@ package configuration
 import (
 	"context"
 	"regexp"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
@@ -17,6 +18,8 @@ import (
 
 const (
 	TenantCRDName = "tenants.capsule.clastix.io"
+	// DefaultNamespaceCleanupGracePeriod applies when spec.namespaceCleanup.gracePeriod is unset.
+	DefaultNamespaceCleanupGracePeriod = 10 * time.Second
 )
 
 type Configuration interface {
@@ -46,4 +49,7 @@ type Configuration interface {
 	Events() capsulev1beta2.EventsConfiguration
 	RBAC() *capsulev1beta2.RBACConfiguration
 	CacheInvalidation() metav1.Duration
+	// NamespaceCleanup configures the forced cleanup of terminating Tenant
+	// namespaces; resolve its grace period with NamespaceCleanupGracePeriod.
+	NamespaceCleanup() capsulev1beta2.NamespaceCleanupConfiguration
 }

@@ -37,10 +37,15 @@ const namespaceCleanupHintLifetime = 30 * time.Second
 // Pods have gone. The reader must bypass the informer cache. Namespace identity
 // is checked immediately before destructive writes; object preconditions protect
 // replacements between those checks and the writes themselves.
-func NamespacedCascadingCleanup(ctx context.Context, reader client.Reader, disco discovery.DiscoveryInterface, resourceCache NamespacedResourceCache, dyn dynamic.Interface, ns *corev1.Namespace) (bool, error) {
+//
+// retainedFinalizers are never removed, on any resource, so their controllers
+// can complete. Capsule's own finalizers are always retained on Capsule's resources.
+func NamespacedCascadingCleanup(ctx context.Context, reader client.Reader, disco discovery.DiscoveryInterface, resourceCache NamespacedResourceCache, dyn dynamic.Interface, ns *corev1.Namespace, retainedFinalizers ...string) (bool, error) {
 	if ns == nil || ns.UID == "" || ns.DeletionTimestamp == nil {
 		return false, nil
 	}
+
+	retained := newCleanupRetainedFinalizers(retainedFinalizers)
 
 	check := func(ctx context.Context) error {
 		current := &corev1.Namespace{}
@@ -106,7 +111,7 @@ func NamespacedCascadingCleanup(ctx context.Context, reader client.Reader, disco
 				return err
 			}
 
-			cleaned, err := cleanupResourceType(groupCtx, dyn, gvr, ns.Name, check)
+			cleaned, err := cleanupResourceType(groupCtx, dyn, gvr, ns.Name, check, retained.forGroup(gvr.Group))
 			if errors.Is(err, errCleanupNamespaceChanged) {
 				return err
 			}
@@ -208,7 +213,47 @@ func hintedCleanupResources(gvrs []schema.GroupVersionResource, hints map[schema
 	return selected
 }
 
-func cleanupResourceType(ctx context.Context, dyn dynamic.Interface, gvr schema.GroupVersionResource, namespace string, check func(context.Context) error) (bool, error) {
+// cleanupRetainedFinalizers holds the finalizers cleanup leaves in place, built
+// once per cleanup and only read afterwards.
+type cleanupRetainedFinalizers struct {
+	// anyGroup applies to every resource.
+	anyGroup map[string]struct{}
+	// capsuleGroups applies to Capsule's resources: anyGroup plus Capsule's own.
+	capsuleGroups map[string]struct{}
+}
+
+func newCleanupRetainedFinalizers(configured []string) cleanupRetainedFinalizers {
+	// Capsule lifecycle controllers must finish their own cleanup, including
+	// targets outside this namespace, before their resources can disappear.
+	retained := cleanupRetainedFinalizers{capsuleGroups: map[string]struct{}{
+		meta.ControllerFinalizer: {}, meta.LegacyResourceFinalizer: {},
+	}}
+
+	for _, finalizer := range configured {
+		if finalizer == "" {
+			continue
+		}
+
+		if retained.anyGroup == nil {
+			retained.anyGroup = make(map[string]struct{}, len(configured))
+		}
+
+		retained.anyGroup[finalizer] = struct{}{}
+		retained.capsuleGroups[finalizer] = struct{}{}
+	}
+
+	return retained
+}
+
+func (r cleanupRetainedFinalizers) forGroup(group string) map[string]struct{} {
+	if group == capsulev1beta2.GroupVersion.Group || group == "addons.projectcapsule.dev" {
+		return r.capsuleGroups
+	}
+
+	return r.anyGroup
+}
+
+func cleanupResourceType(ctx context.Context, dyn dynamic.Interface, gvr schema.GroupVersionResource, namespace string, check func(context.Context) error, retainedFinalizers map[string]struct{}) (bool, error) {
 	resources := dyn.Resource(gvr).Namespace(namespace)
 
 	list, err := resources.List(ctx, metav1.ListOptions{})
@@ -222,14 +267,6 @@ func cleanupResourceType(ctx context.Context, dyn dynamic.Interface, gvr schema.
 
 	if len(list.Items) == 0 {
 		return false, nil
-	}
-	// Capsule lifecycle controllers must finish their own cleanup, including
-	// targets outside this namespace, before their resources can disappear.
-	var retainedFinalizers map[string]struct{}
-	if gvr.Group == capsulev1beta2.GroupVersion.Group || gvr.Group == "addons.projectcapsule.dev" {
-		retainedFinalizers = map[string]struct{}{
-			meta.ControllerFinalizer: {}, meta.LegacyResourceFinalizer: {},
-		}
 	}
 
 	cleaned := false

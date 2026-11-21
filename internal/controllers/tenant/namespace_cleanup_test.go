@@ -38,10 +38,17 @@ import (
 	namespaceindex "github.com/projectcapsule/capsule/pkg/runtime/indexers/namespace"
 )
 
-type cleanupTestConfiguration struct{ configuration.Configuration }
+type cleanupTestConfiguration struct {
+	configuration.Configuration
+
+	cleanup capsulev1beta2.NamespaceCleanupConfiguration
+}
 
 func (cleanupTestConfiguration) AllowServiceAccountPromotion() bool { return false }
 func (cleanupTestConfiguration) Administrators() rbac.UserListSpec  { return nil }
+func (c cleanupTestConfiguration) NamespaceCleanup() capsulev1beta2.NamespaceCleanupConfiguration {
+	return c.cleanup
+}
 
 func namespaceCleanupFixture(t testing.TB, objects ...client.Object) (*Manager, *dynamicfake.FakeDynamicClient) {
 	t.Helper()
@@ -136,6 +143,190 @@ func TestNamespaceCleanupControllerScopeAndLifecycle(t *testing.T) {
 				t.Fatalf("requeue=%s", result.RequeueAfter)
 			}
 		})
+	}
+}
+
+func TestNamespaceCleanupHonoursConfiguredGracePeriod(t *testing.T) {
+	for _, tt := range []struct {
+		name          string
+		gracePeriod   *time.Duration
+		deletedAgo    time.Duration
+		wantWork      bool
+		wantRequeueAt time.Duration
+	}{
+		{name: "default holds a fresh deletion", deletedAgo: 2 * time.Second, wantRequeueAt: configuration.DefaultNamespaceCleanupGracePeriod - 2*time.Second},
+		{name: "default releases after ten seconds", deletedAgo: configuration.DefaultNamespaceCleanupGracePeriod + time.Second, wantWork: true, wantRequeueAt: namespaceCleanupRetryPeriod},
+		{name: "longer grace holds past the default", gracePeriod: new(15 * time.Minute), deletedAgo: time.Minute, wantRequeueAt: namespaceCleanupGraceRecheckPeriod},
+		{name: "longer grace rechecks before it elapses", gracePeriod: new(15 * time.Minute), deletedAgo: 14*time.Minute + 30*time.Second, wantRequeueAt: 30 * time.Second},
+		{name: "longer grace releases once elapsed", gracePeriod: new(15 * time.Minute), deletedAgo: 16 * time.Minute, wantWork: true, wantRequeueAt: namespaceCleanupRetryPeriod},
+		{name: "zero grace releases at once", gracePeriod: new(time.Duration(0)), wantWork: true, wantRequeueAt: namespaceCleanupRetryPeriod},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			tnt := &capsulev1beta2.Tenant{Name: "tenant-a", UID: "tenant-a-uid"}
+			ns := cleanupOwnedNamespace(tnt, "cleanup", true)
+			stamp := metav1.NewTime(time.Now().Add(-tt.deletedAgo))
+			ns.DeletionTimestamp = &stamp
+			// Already deleting, as the namespace controller leaves it, and held by
+			// a controller still releasing what it owns outside the namespace.
+			held := &corev1.ConfigMap{Name: "held", Namespace: ns.Name, UID: "held-uid", ResourceVersion: "1", Finalizers: []string{"example.com/release-hardware"}}
+			held.SetDeletionTimestamp(&stamp)
+			manager, dyn := namespaceCleanupFixture(t, tnt, ns)
+			cleanup := capsulev1beta2.NamespaceCleanupConfiguration{}
+			if tt.gracePeriod != nil {
+				cleanup.GracePeriod = &metav1.Duration{Duration: *tt.gracePeriod}
+			}
+			manager.Configuration = cleanupTestConfiguration{cleanup: cleanup}
+			gvr := schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}
+			if err := dyn.Tracker().Add(held); err != nil {
+				t.Fatal(err)
+			}
+			result, err := manager.reconcileNamespaceCleanup(t.Context(), reconcile.Request{NamespacedName: client.ObjectKeyFromObject(ns)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if worked := len(dyn.Actions()) > 0; worked != tt.wantWork {
+				t.Fatalf("cleanup work=%t, want %t: %v", worked, tt.wantWork, dyn.Actions())
+			}
+			switch tt.wantRequeueAt {
+			case namespaceCleanupRetryPeriod, namespaceCleanupGraceRecheckPeriod:
+				if result.RequeueAfter != tt.wantRequeueAt {
+					t.Fatalf("requeue=%s, want %s", result.RequeueAfter, tt.wantRequeueAt)
+				}
+			default:
+				// What is left of the grace period. The clock only advances and the
+				// stored deletionTimestamp keeps whole seconds, so it is never longer.
+				if result.RequeueAfter <= 0 || result.RequeueAfter > tt.wantRequeueAt {
+					t.Fatalf("requeue=%s, want within (0, %s]", result.RequeueAfter, tt.wantRequeueAt)
+				}
+			}
+			current, err := dyn.Tracker().Get(gvr, ns.Name, held.Name)
+			if tt.wantWork {
+				if err == nil && len(current.(*corev1.ConfigMap).Finalizers) != 0 {
+					t.Fatalf("finalizers kept after the grace period: %v", current.(*corev1.ConfigMap).Finalizers)
+				}
+				return
+			}
+			if err != nil || !slices.Equal(current.(*corev1.ConfigMap).Finalizers, held.Finalizers) {
+				t.Fatalf("finalizers removed during the grace period: object=%v err=%v", current, err)
+			}
+		})
+	}
+}
+
+func TestNamespaceCleanupAppliesGracePeriodChangesToWaitingNamespaces(t *testing.T) {
+	for _, tt := range []struct {
+		name          string
+		deletedAgo    time.Duration
+		before, after time.Duration
+		wantReleased  bool
+	}{
+		{name: "shortened grace releases a waiting namespace", deletedAgo: 2 * time.Minute, before: 15 * time.Minute, after: time.Minute, wantReleased: true},
+		{name: "lengthened grace keeps holding a waiting namespace", deletedAgo: 30 * time.Second, before: time.Minute, after: 15 * time.Minute},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			tnt := &capsulev1beta2.Tenant{Name: "tenant-a", UID: "tenant-a-uid"}
+			ns := cleanupOwnedNamespace(tnt, "cleanup", true)
+			stamp := metav1.NewTime(time.Now().Add(-tt.deletedAgo))
+			ns.DeletionTimestamp = &stamp
+			held := &corev1.ConfigMap{Name: "held", Namespace: ns.Name, UID: "held-uid", ResourceVersion: "1", Finalizers: []string{"example.com/release-hardware"}}
+			held.SetDeletionTimestamp(&stamp)
+			manager, dyn := namespaceCleanupFixture(t, tnt, ns)
+			if err := dyn.Tracker().Add(held); err != nil {
+				t.Fatal(err)
+			}
+			gvr := schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}
+			reconcileWith := func(gracePeriod time.Duration) reconcile.Result {
+				t.Helper()
+				manager.Configuration = cleanupTestConfiguration{cleanup: capsulev1beta2.NamespaceCleanupConfiguration{GracePeriod: &metav1.Duration{Duration: gracePeriod}}}
+				result, err := manager.reconcileNamespaceCleanup(t.Context(), reconcile.Request{NamespacedName: client.ObjectKeyFromObject(ns)})
+				if err != nil {
+					t.Fatal(err)
+				}
+				return result
+			}
+
+			if result := reconcileWith(tt.before); len(dyn.Actions()) != 0 || result.RequeueAfter <= 0 || result.RequeueAfter > namespaceCleanupGraceRecheckPeriod {
+				t.Fatalf("before the change: requeue=%s actions=%v", result.RequeueAfter, dyn.Actions())
+			}
+			result := reconcileWith(tt.after)
+			current, err := dyn.Tracker().Get(gvr, ns.Name, held.Name)
+			if !tt.wantReleased {
+				if len(dyn.Actions()) != 0 || result.RequeueAfter != namespaceCleanupGraceRecheckPeriod {
+					t.Fatalf("lengthened grace: requeue=%s actions=%v", result.RequeueAfter, dyn.Actions())
+				}
+				if err != nil || !slices.Equal(current.(*corev1.ConfigMap).Finalizers, held.Finalizers) {
+					t.Fatalf("finalizers removed under the lengthened grace: object=%v err=%v", current, err)
+				}
+				return
+			}
+			if len(dyn.Actions()) == 0 || result.RequeueAfter != namespaceCleanupRetryPeriod {
+				t.Fatalf("shortened grace: requeue=%s actions=%v", result.RequeueAfter, dyn.Actions())
+			}
+			if err == nil && len(current.(*corev1.ConfigMap).Finalizers) != 0 {
+				t.Fatalf("finalizers kept after the shortened grace elapsed: %v", current.(*corev1.ConfigMap).Finalizers)
+			}
+		})
+	}
+}
+
+func TestNamespaceCleanupKeepsConfiguredRetainedFinalizers(t *testing.T) {
+	tnt := &capsulev1beta2.Tenant{Name: "tenant-a", UID: "tenant-a-uid"}
+	ns := cleanupOwnedNamespace(tnt, "cleanup", true)
+	const retained, foreign = "cluster.cluster.x-k8s.io", "example.com/hold"
+	held := &corev1.ConfigMap{Name: "held", Namespace: ns.Name, UID: "held-uid", ResourceVersion: "1", Finalizers: []string{foreign, retained}}
+	held.SetDeletionTimestamp(ns.DeletionTimestamp)
+	manager, dyn := namespaceCleanupFixture(t, tnt, ns)
+	manager.Configuration = cleanupTestConfiguration{cleanup: capsulev1beta2.NamespaceCleanupConfiguration{RetainedFinalizers: []string{retained}}}
+	if err := dyn.Tracker().Add(held); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.reconcileNamespaceCleanup(t.Context(), reconcile.Request{NamespacedName: client.ObjectKeyFromObject(ns)}); err != nil {
+		t.Fatal(err)
+	}
+	current, err := dyn.Tracker().Get(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, ns.Name, held.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := current.(*corev1.ConfigMap).Finalizers; !slices.Equal(got, []string{retained}) {
+		t.Fatalf("finalizers=%v, want only the retained %q", got, retained)
+	}
+}
+
+func TestNamespaceCleanupResumesWhenARetainedFinalizerIsUnlisted(t *testing.T) {
+	tnt := &capsulev1beta2.Tenant{Name: "tenant-a", UID: "tenant-a-uid"}
+	ns := cleanupOwnedNamespace(tnt, "cleanup", true)
+	const retained = "cluster.cluster.x-k8s.io"
+	held := &corev1.ConfigMap{Name: "held", Namespace: ns.Name, UID: "held-uid", ResourceVersion: "1", Finalizers: []string{retained}}
+	held.SetDeletionTimestamp(ns.DeletionTimestamp)
+	manager, dyn := namespaceCleanupFixture(t, tnt, ns)
+	if err := dyn.Tracker().Add(held); err != nil {
+		t.Fatal(err)
+	}
+	gvr := schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}
+	reconcileRetaining := func(retainedFinalizers ...string) []string {
+		t.Helper()
+		manager.Configuration = cleanupTestConfiguration{cleanup: capsulev1beta2.NamespaceCleanupConfiguration{RetainedFinalizers: retainedFinalizers}}
+		result, err := manager.reconcileNamespaceCleanup(t.Context(), reconcile.Request{NamespacedName: client.ObjectKeyFromObject(ns)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		// A held namespace stays in the cleanup loop, so a configuration change
+		// is picked up by the next pass without restarting the controller.
+		if result.RequeueAfter != namespaceCleanupRetryPeriod {
+			t.Fatalf("requeue=%s, want %s", result.RequeueAfter, namespaceCleanupRetryPeriod)
+		}
+		current, err := dyn.Tracker().Get(gvr, ns.Name, held.Name)
+		if err != nil {
+			return nil
+		}
+		return current.(*corev1.ConfigMap).Finalizers
+	}
+
+	if got := reconcileRetaining(retained); !slices.Equal(got, []string{retained}) {
+		t.Fatalf("listed finalizer removed: %v", got)
+	}
+	if got := reconcileRetaining(); len(got) != 0 {
+		t.Fatalf("unlisted finalizer kept: %v", got)
 	}
 }
 
