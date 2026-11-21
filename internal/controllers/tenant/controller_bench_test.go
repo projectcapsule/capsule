@@ -4,9 +4,11 @@
 package tenant
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -19,6 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -28,7 +31,18 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 )
+
+// benchmarkRetainedFinalizers returns n distinct finalizer names, the CRD maximum being 64.
+func benchmarkRetainedFinalizers(n int) []string {
+	finalizers := make([]string, n)
+	for i := range finalizers {
+		finalizers[i] = fmt.Sprintf("example.com/retained-%d", i)
+	}
+
+	return finalizers
+}
 
 func BenchmarkControllerNamespaceProvisioning(b *testing.B) {
 	for _, tenants := range []int{1, 16} {
@@ -76,7 +90,7 @@ func BenchmarkControllerNamespaceProvisioning(b *testing.B) {
 }
 
 func BenchmarkControllerTenant(b *testing.B) {
-	for _, kind := range []string{"tenant", "resource-quotas", "namespace-cleanup", "namespace-cleanup-missing-tenant", "namespace-cleanup-recreated-tenant"} {
+	for _, kind := range []string{"tenant", "resource-quotas", "namespace-cleanup", "namespace-cleanup-missing-tenant", "namespace-cleanup-recreated-tenant", "namespace-cleanup-grace", "namespace-cleanup-retained"} {
 		for _, count := range []int{1, 32} {
 			b.Run(fmt.Sprintf("%s/namespaces=%d", kind, count), func(b *testing.B) {
 				tnt := &capsulev1beta2.Tenant{
@@ -116,6 +130,18 @@ func BenchmarkControllerTenant(b *testing.B) {
 					objects = append(objects, tnt)
 				}
 				cleanup := strings.HasPrefix(kind, "namespace-cleanup")
+				if cleanup {
+					// Read through the real getter, as the controller does on every pass.
+					cfg := &capsulev1beta2.CapsuleConfiguration{Name: "default"}
+					switch kind {
+					case "namespace-cleanup-grace":
+						// The namespaces were deleted an hour ago: still within the grace period.
+						cfg.Spec.NamespaceCleanup.GracePeriod = &metav1.Duration{Duration: 2 * time.Hour}
+					case "namespace-cleanup-retained":
+						cfg.Spec.NamespaceCleanup.RetainedFinalizers = benchmarkRetainedFinalizers(64)
+					}
+					objects = append(objects, cfg)
+				}
 				for i := range count {
 					name := fmt.Sprintf("team-%d", i)
 					ns := cleanupOwnedNamespace(tnt, name, cleanup)
@@ -138,6 +164,20 @@ func BenchmarkControllerTenant(b *testing.B) {
 				c := interceptor.NewClient(provisioningDefaultingClient(base.(client.WithWatch)), calls.Interceptors())
 				r.Client = c
 				r.reader = c
+				// Configuration reads are informer-backed in the manager, not API
+				// calls: count them apart from the API call counter.
+				configReads := 0
+				if cleanup {
+					configClient := interceptor.NewClient(base.(client.WithWatch), interceptor.Funcs{
+						Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+							if _, ok := obj.(*capsulev1beta2.CapsuleConfiguration); ok {
+								configReads++
+							}
+							return c.Get(ctx, key, obj, opts...)
+						},
+					})
+					r.Configuration = configuration.NewCapsuleConfiguration(b.Context(), configClient, configClient, &rest.Config{}, "default")
+				}
 				var controller reconcile.Reconciler = r
 				req := reconcile.Request{Name: tnt.Name}
 				if kind == "resource-quotas" {
@@ -172,12 +212,17 @@ func BenchmarkControllerTenant(b *testing.B) {
 					if len(quotas.Items) != count {
 						b.Fatalf("got %d quotas, want %d", len(quotas.Items), count)
 					}
-				case "namespace-cleanup", "namespace-cleanup-missing-tenant", "namespace-cleanup-recreated-tenant":
+				case "namespace-cleanup", "namespace-cleanup-missing-tenant", "namespace-cleanup-recreated-tenant", "namespace-cleanup-retained":
 					if len(dyn.Actions()) == 0 {
 						b.Fatal("cleanup did not scan resources")
 					}
+				case "namespace-cleanup-grace":
+					if len(dyn.Actions()) != 0 {
+						b.Fatal("cleanup ran within the grace period")
+					}
 				}
 				calls.Reset()
+				configReads = 0
 				b.ReportAllocs()
 				dynamicLists := 0
 				for b.Loop() {
@@ -193,6 +238,9 @@ func BenchmarkControllerTenant(b *testing.B) {
 				}
 				calls.Report(b)
 				b.ReportMetric(float64(dynamicLists)/float64(b.N), "dynamic-LIST/op")
+				if cleanup {
+					b.ReportMetric(float64(configReads)/float64(b.N), "config-read/op")
+				}
 			})
 		}
 	}

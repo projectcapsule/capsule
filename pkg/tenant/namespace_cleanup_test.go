@@ -443,7 +443,10 @@ func (r *populatedCleanupResource) Patch(_ context.Context, name string, _ types
 	return r.objects[name].DeepCopy(), nil
 }
 func BenchmarkNamespaceCleanupPopulated(b *testing.B) {
-	for _, mode := range []string{"already-deleting-no-finalizers", "already-deleting-with-finalizers", "needs-delete", "capsule-lifecycle", "addon-lifecycle"} {
+	// retained-mixed-*: every object carries a listed and an unlisted finalizer,
+	// so each is patched down to the listed one. retained-only-64: every object
+	// carries only a listed finalizer, so nothing is patched.
+	for _, mode := range []string{"already-deleting-no-finalizers", "already-deleting-with-finalizers", "needs-delete", "capsule-lifecycle", "addon-lifecycle", "retained-mixed-1", "retained-mixed-64", "retained-only-64"} {
 		for _, count := range []int{1, 100, 1000} {
 			b.Run(fmt.Sprintf("%s/objects=%d", mode, count), func(b *testing.B) {
 				ns := cleanupNamespace()
@@ -454,6 +457,16 @@ func BenchmarkNamespaceCleanupPopulated(b *testing.B) {
 						gvr.Group = "addons.projectcapsule.dev"
 					}
 				}
+				var retained []string
+				switch mode {
+				case "retained-mixed-1":
+					retained = []string{"example.com/retained-0"}
+				case "retained-mixed-64", "retained-only-64":
+					for i := range 64 {
+						retained = append(retained, fmt.Sprintf("example.com/retained-%d", i))
+					}
+				}
+				mixed := strings.HasPrefix(mode, "retained-mixed")
 				reader := &cleanupReader{current: ns}
 				resources := &populatedCleanupResource{list: &unstructured.UnstructuredList{}, objects: map[string]*unstructured.Unstructured{}}
 				for i := 0; i < count; i++ {
@@ -471,6 +484,13 @@ func BenchmarkNamespaceCleanupPopulated(b *testing.B) {
 						obj.SetKind("AddonResource")
 						obj.SetFinalizers([]string{meta.ControllerFinalizer})
 					}
+					if len(retained) > 0 {
+						// The last listed name: the worst case for a linear scan, a lookup for a set.
+						obj.SetFinalizers([]string{retained[len(retained)-1]})
+						if mixed {
+							obj.SetFinalizers([]string{"example.com/hold", retained[len(retained)-1]})
+						}
+					}
 					resources.list.Items = append(resources.list.Items, *obj)
 					resources.objects[obj.GetName()] = obj
 				}
@@ -479,16 +499,19 @@ func BenchmarkNamespaceCleanupPopulated(b *testing.B) {
 				b.ReportAllocs()
 				for b.Loop() {
 					// Responses are immutable snapshots, so every iteration has the same work.
-					changed, err := tenant.NamespacedCascadingCleanup(b.Context(), reader, nil, cache, dyn, ns)
-					if err != nil || changed != (mode == "needs-delete" || mode == "already-deleting-with-finalizers") {
+					changed, err := tenant.NamespacedCascadingCleanup(b.Context(), reader, nil, cache, dyn, ns, retained...)
+					if err != nil || changed != (mode == "needs-delete" || mode == "already-deleting-with-finalizers" || mixed) {
 						b.Fatalf("changed=%v err=%v", changed, err)
 					}
 				}
 				if mode == "needs-delete" && resources.deletes != count*b.N {
 					b.Fatal("missing DELETEs")
 				}
-				if mode == "already-deleting-with-finalizers" && resources.patches != count*b.N {
+				if (mode == "already-deleting-with-finalizers" || mixed) && resources.patches != count*b.N {
 					b.Fatal("missing PATCHes")
+				}
+				if mode == "retained-only-64" && resources.patches != 0 {
+					b.Fatal("patched objects holding only retained finalizers")
 				}
 				if resources.gets != 0 {
 					b.Fatal("cleanup performed redundant object GETs")
