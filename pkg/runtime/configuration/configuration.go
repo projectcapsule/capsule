@@ -49,8 +49,7 @@ type Configuration interface {
 	Events() capsulev1beta2.EventsConfiguration
 	RBAC() *capsulev1beta2.RBACConfiguration
 	CacheInvalidation() metav1.Duration
-	// NamespaceCleanupGracePeriod is how long a terminating Tenant namespace is
-	// left to the controllers owning its objects before Capsule removes their
-	// finalizers.
-	NamespaceCleanupGracePeriod() time.Duration
+	// NamespaceCleanup configures the forced cleanup of terminating Tenant
+	// namespaces; resolve its grace period with NamespaceCleanupGracePeriod.
+	NamespaceCleanup() capsulev1beta2.NamespaceCleanupConfiguration
 }

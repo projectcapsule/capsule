@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -603,6 +604,48 @@ func TestCleanupPreservesCapsuleLifecycleFinalizers(t *testing.T) {
 			}
 			if !reflect.DeepEqual(remaining.(*unstructured.Unstructured).GetFinalizers(), foreign.GetFinalizers()) {
 				t.Fatal("changed another tenant's finalizers")
+			}
+		})
+	}
+}
+
+func TestCleanupKeepsConfiguredRetainedFinalizers(t *testing.T) {
+	const retained, hold = "cluster.cluster.x-k8s.io", "example.com/hold"
+	clusters := schema.GroupVersionResource{Group: "cluster.x-k8s.io", Version: "v1beta2", Resource: "clusters"}
+	tenantResources := capsulev1beta2.GroupVersion.WithResource("tenantresources")
+	for _, tt := range []struct {
+		name       string
+		gvr        schema.GroupVersionResource
+		kind       string
+		finalizers []string
+		configured []string
+		want       []string
+	}{
+		{name: "listed finalizer kept on a core resource", gvr: cleanupGVR, kind: "ConfigMap", finalizers: []string{hold, retained}, configured: []string{retained}, want: []string{retained}},
+		{name: "listed finalizer kept on its owner's resource", gvr: clusters, kind: "Cluster", finalizers: []string{retained, hold}, configured: []string{retained}, want: []string{retained}},
+		{name: "unlisted finalizers are still removed", gvr: cleanupGVR, kind: "ConfigMap", finalizers: []string{hold}, configured: []string{retained}},
+		{name: "unset list removes every foreign finalizer", gvr: clusters, kind: "Cluster", finalizers: []string{retained, hold}},
+		{name: "Capsule's own are removed outside Capsule's resources", gvr: cleanupGVR, kind: "ConfigMap", finalizers: []string{meta.ControllerFinalizer, retained}, configured: []string{retained}, want: []string{retained}},
+		{name: "Capsule's own stay on Capsule's resources alongside the list", gvr: tenantResources, kind: "TenantResource", finalizers: []string{meta.ControllerFinalizer, hold, retained}, configured: []string{retained}, want: []string{meta.ControllerFinalizer, retained}},
+		{name: "empty entries retain nothing", gvr: cleanupGVR, kind: "ConfigMap", finalizers: []string{hold}, configured: []string{""}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ns := cleanupNamespace()
+			obj := cleanupObject(ns.Name, "held")
+			obj.SetAPIVersion(tt.gvr.GroupVersion().String())
+			obj.SetKind(tt.kind)
+			obj.SetDeletionTimestamp(ns.DeletionTimestamp)
+			obj.SetFinalizers(tt.finalizers)
+			dyn := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{tt.gvr: tt.kind + "List"}, obj)
+			if _, err := tenant.NamespacedCascadingCleanup(t.Context(), &cleanupReader{current: ns}, nil, &cleanupCache{gvrs: []schema.GroupVersionResource{tt.gvr}}, dyn, ns, tt.configured...); err != nil {
+				t.Fatal(err)
+			}
+			current, err := dyn.Tracker().Get(tt.gvr, ns.Name, obj.GetName())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := current.(*unstructured.Unstructured).GetFinalizers(); !slices.Equal(got, tt.want) {
+				t.Fatalf("finalizers=%v, want %v", got, tt.want)
 			}
 		})
 	}

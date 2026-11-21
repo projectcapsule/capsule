@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/tenant"
@@ -82,10 +83,11 @@ func (r *Manager) reconcileNamespaceCleanup(ctx context.Context, request reconci
 		return reconcile.Result{}, nil
 	}
 
-	// Cleanup removes every finalizer but Capsule's own, so the controllers owning
-	// them get this long to finish: they may still be releasing resources outside
-	// the namespace, such as machines of a Cluster API infrastructure provider.
-	if remaining := r.namespaceCleanupGracePeriod() - time.Since(ns.DeletionTimestamp.Time); remaining > 0 {
+	// Cleanup removes every finalizer but the retained ones, so the controllers
+	// owning them get this long to finish: they may still be releasing resources
+	// outside the namespace, such as machines of a Cluster API infrastructure provider.
+	cleanup := r.namespaceCleanupConfiguration()
+	if remaining := configuration.NamespaceCleanupGracePeriod(cleanup) - time.Since(ns.DeletionTimestamp.Time); remaining > 0 {
 		return reconcile.Result{RequeueAfter: min(remaining, namespaceCleanupGraceRecheckPeriod)}, nil
 	}
 
@@ -99,7 +101,7 @@ func (r *Manager) reconcileNamespaceCleanup(ctx context.Context, request reconci
 	}
 
 	err = r.runPhase(ctrl.LoggerFrom(ctx), "namespace_cleanup", func() error {
-		_, cleanupErr := tenant.NamespacedCascadingCleanup(ctx, reader, r.DiscoveryClient, &r.discoveryCache, r.DynamicClient, ns)
+		_, cleanupErr := tenant.NamespacedCascadingCleanup(ctx, reader, r.DiscoveryClient, &r.discoveryCache, r.DynamicClient, ns, cleanup.RetainedFinalizers...)
 
 		return cleanupErr
 	})
@@ -110,12 +112,12 @@ func (r *Manager) reconcileNamespaceCleanup(ctx context.Context, request reconci
 	return reconcile.Result{RequeueAfter: namespaceCleanupRetryPeriod}, nil
 }
 
-func (r *Manager) namespaceCleanupGracePeriod() time.Duration {
+func (r *Manager) namespaceCleanupConfiguration() capsulev1beta2.NamespaceCleanupConfiguration {
 	if r.Configuration == nil {
-		return configuration.DefaultNamespaceCleanupGracePeriod
+		return capsulev1beta2.NamespaceCleanupConfiguration{}
 	}
 
-	return r.Configuration.NamespaceCleanupGracePeriod()
+	return r.Configuration.NamespaceCleanup()
 }
 
 // Separate configured token buckets keep bulk authoritative namespace reads

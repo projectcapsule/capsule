@@ -1147,14 +1147,31 @@ spec:
                       Time a terminating Tenant namespace is left to the controllers owning its
                       remaining objects, measured from the namespace deletionTimestamp. Once it
                       elapses and no Pods are left, Capsule deletes the remaining objects and
-                      removes their finalizers, except its own. Finalizers often release resources
-                      outside the namespace, such as Cluster API infrastructure providers powering
-                      off and releasing bare-metal hosts, and can need longer than the default.
-                      When unset, the cleanup starts 10 seconds after the namespace deletion.
+                      removes their finalizers, except the retained ones. Finalizers often release
+                      resources outside the namespace, such as Cluster API infrastructure providers
+                      powering off and releasing bare-metal hosts, and can need longer than the
+                      default. When unset, the cleanup starts 10 seconds after the namespace deletion.
                     type: string
                     x-kubernetes-validations:
                     - message: gracePeriod must not be negative
                       rule: duration(self) >= duration('0s')
+                  retainedFinalizers:
+                    description: |-
+                      Finalizers the cleanup never removes, on any resource, so the controllers
+                      owning them can complete however long they take. Capsule's own finalizers
+                      are always retained on Capsule's resources and need not be listed.
+                      A tenant can add a listed finalizer to its own objects, holding its
+                      namespace, and the Tenant, in deletion until the finalizer is removed: list
+                      only finalizers whose controllers can be trusted to remove them.
+                    items:
+                      maxLength: 317
+                      minLength: 1
+                      type: string
+                    maxItems: 64
+                    type: array
+                    x-kubernetes-validations:
+                    - message: retainedFinalizers must not contain duplicates
+                      rule: self.all(f, self.exists_one(x, x == f))
                 type: object
               nodeMetadata:
                 description: |-

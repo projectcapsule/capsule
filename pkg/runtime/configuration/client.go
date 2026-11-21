@@ -254,8 +254,8 @@ func (c *capsuleConfiguration) CacheInvalidation() metav1.Duration {
 	return c.retrievalFn().Spec.CacheInvalidation
 }
 
-func (c *capsuleConfiguration) NamespaceCleanupGracePeriod() time.Duration {
-	return NamespaceCleanupGracePeriod(c.retrievalFn().Spec.NamespaceCleanup)
+func (c *capsuleConfiguration) NamespaceCleanup() capsulev1beta2.NamespaceCleanupConfiguration {
+	return c.retrievalFn().Spec.NamespaceCleanup
 }
 
 // NamespaceCleanupGracePeriod resolves the configured grace period, falling back to

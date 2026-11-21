@@ -301,8 +301,34 @@ func TestNamespaceCleanupGracePeriod(t *testing.T) {
 			cl := configurationFakeClient(t, stored)
 			cfg := configuration.NewCapsuleConfiguration(context.Background(), cl, cl, &rest.Config{}, "capsule")
 
-			if got := cfg.NamespaceCleanupGracePeriod(); got != tt.want {
-				t.Fatalf("Configuration.NamespaceCleanupGracePeriod() = %s, want %s", got, tt.want)
+			if got := configuration.NamespaceCleanupGracePeriod(cfg.NamespaceCleanup()); got != tt.want {
+				t.Fatalf("NamespaceCleanupGracePeriod(Configuration.NamespaceCleanup()) = %s, want %s", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNamespaceCleanupRetainedFinalizers(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name     string
+		retained []string
+	}{
+		{name: "unset returns no list"},
+		{name: "configured list is returned as stored", retained: []string{"cluster.cluster.x-k8s.io", "beskar7machine.infrastructure.cluster.x-k8s.io"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			stored := &capsulev1beta2.CapsuleConfiguration{Name: "capsule", Spec: capsulev1beta2.CapsuleConfigurationSpec{
+				NamespaceCleanup: capsulev1beta2.NamespaceCleanupConfiguration{RetainedFinalizers: tt.retained},
+			}}
+			cl := configurationFakeClient(t, stored)
+			cfg := configuration.NewCapsuleConfiguration(context.Background(), cl, cl, &rest.Config{}, "capsule")
+
+			if got := cfg.NamespaceCleanup().RetainedFinalizers; !reflect.DeepEqual(got, tt.retained) {
+				t.Fatalf("NamespaceCleanup().RetainedFinalizers = %#v, want %#v", got, tt.retained)
 			}
 		})
 	}

@@ -41,17 +41,13 @@ import (
 type cleanupTestConfiguration struct {
 	configuration.Configuration
 
-	gracePeriod *time.Duration
+	cleanup capsulev1beta2.NamespaceCleanupConfiguration
 }
 
 func (cleanupTestConfiguration) AllowServiceAccountPromotion() bool { return false }
 func (cleanupTestConfiguration) Administrators() rbac.UserListSpec  { return nil }
-func (c cleanupTestConfiguration) NamespaceCleanupGracePeriod() time.Duration {
-	if c.gracePeriod == nil {
-		return configuration.DefaultNamespaceCleanupGracePeriod
-	}
-
-	return *c.gracePeriod
+func (c cleanupTestConfiguration) NamespaceCleanup() capsulev1beta2.NamespaceCleanupConfiguration {
+	return c.cleanup
 }
 
 func namespaceCleanupFixture(t testing.TB, objects ...client.Object) (*Manager, *dynamicfake.FakeDynamicClient) {
@@ -175,7 +171,11 @@ func TestNamespaceCleanupHonoursConfiguredGracePeriod(t *testing.T) {
 			held := &corev1.ConfigMap{Name: "held", Namespace: ns.Name, UID: "held-uid", ResourceVersion: "1", Finalizers: []string{"example.com/release-hardware"}}
 			held.SetDeletionTimestamp(&stamp)
 			manager, dyn := namespaceCleanupFixture(t, tnt, ns)
-			manager.Configuration = cleanupTestConfiguration{gracePeriod: tt.gracePeriod}
+			cleanup := capsulev1beta2.NamespaceCleanupConfiguration{}
+			if tt.gracePeriod != nil {
+				cleanup.GracePeriod = &metav1.Duration{Duration: *tt.gracePeriod}
+			}
+			manager.Configuration = cleanupTestConfiguration{cleanup: cleanup}
 			gvr := schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}
 			if err := dyn.Tracker().Add(held); err != nil {
 				t.Fatal(err)
@@ -210,6 +210,29 @@ func TestNamespaceCleanupHonoursConfiguredGracePeriod(t *testing.T) {
 				t.Fatalf("finalizers removed during the grace period: object=%v err=%v", current, err)
 			}
 		})
+	}
+}
+
+func TestNamespaceCleanupKeepsConfiguredRetainedFinalizers(t *testing.T) {
+	tnt := &capsulev1beta2.Tenant{Name: "tenant-a", UID: "tenant-a-uid"}
+	ns := cleanupOwnedNamespace(tnt, "cleanup", true)
+	const retained, foreign = "cluster.cluster.x-k8s.io", "example.com/hold"
+	held := &corev1.ConfigMap{Name: "held", Namespace: ns.Name, UID: "held-uid", ResourceVersion: "1", Finalizers: []string{foreign, retained}}
+	held.SetDeletionTimestamp(ns.DeletionTimestamp)
+	manager, dyn := namespaceCleanupFixture(t, tnt, ns)
+	manager.Configuration = cleanupTestConfiguration{cleanup: capsulev1beta2.NamespaceCleanupConfiguration{RetainedFinalizers: []string{retained}}}
+	if err := dyn.Tracker().Add(held); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.reconcileNamespaceCleanup(t.Context(), reconcile.Request{NamespacedName: client.ObjectKeyFromObject(ns)}); err != nil {
+		t.Fatal(err)
+	}
+	current, err := dyn.Tracker().Get(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, ns.Name, held.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := current.(*corev1.ConfigMap).Finalizers; !slices.Equal(got, []string{retained}) {
+		t.Fatalf("finalizers=%v, want only the retained %q", got, retained)
 	}
 }
 
