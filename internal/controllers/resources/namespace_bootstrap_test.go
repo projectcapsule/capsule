@@ -106,6 +106,72 @@ func TestNamespaceBootstrapFairnessAndConcurrentNotifications(t *testing.T) {
 	require.Len(t, pending.pending, 1, "completed tenant queues must be removed")
 }
 
+func TestNamespaceBootstrapProfileLabelEvents(t *testing.T) {
+	for _, change := range []string{"label-added", "label-changed", "label-removed", "unchanged", "annotations-only", "terminating", "unowned"} {
+		t.Run(change, func(t *testing.T) {
+			r := &NamespaceTrigger{}
+			queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+			defer queue.ShutDown()
+			before := &corev1.Namespace{Name: "tenant-a-target", Labels: map[string]string{meta.TenantLabel: "tenant-a", "projectcapsule.dev/profile": "excluded"}}
+			after := before.DeepCopy()
+			want := true
+			switch change {
+			case "label-added":
+				after.Labels["projectcapsule.dev/selected"] = "true"
+			case "label-changed":
+				after.Labels["projectcapsule.dev/profile"] = "selected"
+			case "label-removed":
+				delete(after.Labels, "projectcapsule.dev/profile")
+			case "annotations-only":
+				after.Annotations = map[string]string{"projectcapsule.dev/note": "updated"}
+				want = false
+			case "terminating":
+				after.Labels["projectcapsule.dev/profile"] = "selected"
+				after.DeletionTimestamp = new(metav1.Now())
+				want = false
+			case "unowned":
+				delete(after.Labels, meta.TenantLabel)
+				want = false
+			case "unchanged":
+				want = false
+			}
+			r.bootstrapHandler().Update(t.Context(), event.UpdateEvent{ObjectOld: before, ObjectNew: after}, queue)
+			require.Equal(t, want, queue.Len() == 1)
+			if want {
+				require.Equal(t, after.Name, r.bootstraps.first("tenant-a").name)
+				require.Empty(t, r.bootstraps.first("tenant-b").name)
+			}
+		})
+	}
+}
+
+func BenchmarkNamespaceBootstrapProfileEvents(b *testing.B) {
+	for _, count := range []int{1, 64} {
+		for _, changed := range []bool{false, true} {
+			b.Run(fmt.Sprintf("labels=%d/changed=%t", count, changed), func(b *testing.B) {
+				before := &corev1.Namespace{Name: "target", Labels: map[string]string{meta.TenantLabel: "tenant-a"}}
+				for i := range count {
+					before.Labels[fmt.Sprintf("projectcapsule.dev/label-%d", i)] = "value"
+				}
+				after := before.DeepCopy()
+				if changed {
+					after.Labels["projectcapsule.dev/label-0"] = "selected"
+				}
+				r := &NamespaceTrigger{}
+				h := r.bootstrapHandler()
+				queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+				defer queue.ShutDown()
+				e := event.UpdateEvent{ObjectOld: before, ObjectNew: after}
+				h.Update(b.Context(), e, queue)
+				b.ReportAllocs()
+				for b.Loop() {
+					h.Update(b.Context(), e, queue)
+				}
+			})
+		}
+	}
+}
+
 func TestNamespaceBootstrapFailedSourceFallsBackWithoutBlockingTenant(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, capsulev1beta2.AddToScheme(scheme))

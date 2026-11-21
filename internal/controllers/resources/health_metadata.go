@@ -33,8 +33,14 @@ func patchReplicationMetadata(ctx context.Context, c client.Client, reader clien
 			return nil
 		}
 
+		// A scoped writer can publish cleanup records after the full status
+		// update. Recheck on every optimistic-lock attempt before retiring their
+		// finalizer; the full writer's in-memory inventory may already be stale.
+		_, status := healthSource(fresh)
+		retainCleanup := status != nil && len(status.ProcessedItems) > 0
+
 		for _, finalizer := range []string{meta.ControllerFinalizer, meta.LegacyResourceFinalizer} {
-			if slices.Contains(obj.GetFinalizers(), finalizer) {
+			if slices.Contains(obj.GetFinalizers(), finalizer) || (finalizer == meta.ControllerFinalizer && retainCleanup) {
 				controllerutil.AddFinalizer(fresh, finalizer)
 			} else {
 				controllerutil.RemoveFinalizer(fresh, finalizer)

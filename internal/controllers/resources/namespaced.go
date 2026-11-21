@@ -688,15 +688,14 @@ func (r *namespacedResourceController) updateStatus(ctx context.Context, instanc
 
 		latest.Status.Conditions.UpdateConditionByType(cordonedCondition)
 
-		if reflect.DeepEqual(*originalStatus, latest.Status) {
-			return nil
+		if !reflect.DeepEqual(*originalStatus, latest.Status) {
+			if err := r.client.Status().Update(ctx, latest); err != nil {
+				return err
+			}
 		}
 
-		if err := r.client.Status().Update(ctx, latest); err != nil {
-			return err
-		}
-
-		// Keep the in-memory object aligned with what we just wrote.
+		// Keep the in-memory inventory and finalizer decision aligned even when
+		// a concurrent writer has already published the merged status.
 		instance.Status = latest.Status
 		if len(instance.Status.ProcessedItems) > 0 {
 			controllerutil.AddFinalizer(instance, meta.ControllerFinalizer)

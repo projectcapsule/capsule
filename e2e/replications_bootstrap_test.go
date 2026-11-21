@@ -16,6 +16,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -26,6 +27,95 @@ import (
 )
 
 var _ = Describe("Replication namespace bootstrap", Label("tenant", "replications", "replication-bootstrap"), func() {
+	DescribeTable("bootstraps profile changes and retains cleanup during full reconciles", Label("bootstrap-review"), func(global bool) {
+		ctx := context.Background()
+		prefix := "bootstrap-review-" + rand.String(5)
+		owners, namespaces := watchNamespaces(prefix)
+		actor := impersonationClient(owners[0].Name, withDefaultGroups(nil))
+		bindServiceAccountToTenantResourceManager(namespaces[0].Name, "default", namespaces[1].Name)
+		spec := capsulev1beta2.TenantResourceCommonSpec{ResyncPeriod: metav1.Duration{Duration: 24 * time.Hour}, Resources: []capsulev1beta2.ResourceSpec{{
+			NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"projectcapsule.dev/watch-profile": "selected"}},
+			Policy:            &apiruntime.ResourceReplicationPolicy{Creation: apiruntime.ResourceCreationPolicyOwner, Protect: new(true)},
+			RawItems:          []capsulev1beta2.RawExtension{{Raw: []byte(fmt.Sprintf(`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":%q},"data":{"tenant":"a"}}`, prefix))}},
+		}}}
+		parent := createHealthReviewReplication(global, prefix, namespaces[0].Name, spec, actor)
+		waitWatchReady(parent)
+		// Namespace profiles are administered at cluster scope. Tenant clients
+		// below exercise access to the resulting replicated resources.
+		selectNamespace := func(namespace string, selected bool) {
+			Eventually(func() error {
+				fresh := &corev1.Namespace{}
+				if err := k8sClient.Get(ctx, client.ObjectKey{Name: namespace}, fresh); err != nil {
+					return err
+				}
+				fresh.Labels["projectcapsule.dev/watch-profile"] = "excluded"
+				if selected {
+					fresh.Labels["projectcapsule.dev/watch-profile"] = "selected"
+				}
+				return k8sClient.Update(ctx, fresh)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		}
+		By("selecting an existing namespace without a full reconcile request")
+		selectNamespace(namespaces[2].Name, true)
+		selectNamespace(namespaces[1].Name, true)
+		key := client.ObjectKey{Namespace: namespaces[1].Name, Name: prefix}
+		Eventually(func(g Gomega) {
+			target := &corev1.ConfigMap{}
+			g.Expect(actor.Get(ctx, key, target)).To(Succeed())
+			g.Expect(target.Data).To(HaveKeyWithValue("tenant", "a"))
+			fresh, status := replicationHealthObject(parent)
+			g.Expect(status.ProcessedItems).To(HaveLen(2))
+			g.Expect(status.ObservedGeneration).To(Equal(fresh.GetGeneration()))
+			g.Expect(fresh.GetFinalizers()).To(ContainElement(meta.ControllerFinalizer))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		By("keeping owner writes denied for the protected replica")
+		target := &corev1.ConfigMap{}
+		Expect(actor.Get(ctx, key, target)).To(Succeed())
+		Expect(actor.Patch(ctx, target, client.RawPatch(types.MergePatchType, []byte(`{"data":{"tenant":"changed"}}`)))).To(MatchError(ContainSubstring("capsule replication")))
+		Expect(actor.Get(ctx, key, target)).To(Succeed())
+		Expect(target.Data).To(HaveKeyWithValue("tenant", "a"))
+		writer := actor
+		if global {
+			writer = k8sClient
+		}
+		By("overlapping full pruning with namespace bootstrap publication")
+		selectNamespace(namespaces[0].Name, false)
+		for range 2 {
+			selectNamespace(namespaces[1].Name, false)
+			Eventually(func() error {
+				fresh := parent.DeepCopyObject().(client.Object)
+				if err := writer.Get(ctx, client.ObjectKeyFromObject(parent), fresh); err != nil {
+					return err
+				}
+				annotations := fresh.GetAnnotations()
+				if annotations == nil {
+					annotations = map[string]string{}
+				}
+				annotations[meta.ReconcileAnnotation] = time.Now().Format(time.RFC3339Nano)
+				fresh.SetAnnotations(annotations)
+				return writer.Update(ctx, fresh)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			selectNamespace(namespaces[1].Name, true)
+			Eventually(func(g Gomega) {
+				fresh, status := replicationHealthObject(parent)
+				g.Expect(fresh.GetAnnotations()[meta.ReconcileAnnotation]).To(BeEmpty())
+				g.Expect(status.ProcessedItems).To(HaveLen(1))
+				g.Expect(status.ProcessedItems[0].Namespace).To(Equal(namespaces[1].Name))
+				g.Expect(fresh.GetFinalizers()).To(ContainElement(meta.ControllerFinalizer))
+				g.Expect(actor.Get(ctx, key, &corev1.ConfigMap{})).To(Succeed())
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		}
+		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKey{Namespace: namespaces[0].Name, Name: prefix}, &corev1.ConfigMap{}))).To(BeTrue())
+		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKey{Namespace: namespaces[2].Name, Name: prefix}, &corev1.ConfigMap{}))).To(BeTrue())
+		Expect(apierrors.IsForbidden(actor.Get(ctx, client.ObjectKey{Namespace: namespaces[2].Name, Name: prefix}, &corev1.ConfigMap{}))).To(BeTrue())
+		By("removing all replicated targets when the parent is deleted")
+		Expect(writer.Delete(ctx, parent)).To(Succeed())
+		Eventually(func() bool {
+			return apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(parent), parent))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
+		Eventually(func() bool { return apierrors.IsNotFound(actor.Get(ctx, key, &corev1.ConfigMap{})) }, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
+	}, Entry("GlobalTenantResource", true), Entry("TenantResource", false))
+
 	DescribeTable("installs selected profiles and retains inventory across new namespaces", func(global, health bool) {
 		ctx := context.Background()
 		prefix := "bootstrap-" + rand.String(5)

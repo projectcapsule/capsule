@@ -262,7 +262,7 @@ func TestNestedHealthChecksDefaults(t *testing.T) {
 	}
 }
 
-func healthFixture(t *testing.T, global bool) (*healthController, client.WithWatch, client.Object, *corev1.ConfigMap) {
+func healthFixture(t testing.TB, global bool) (*healthController, client.WithWatch, client.Object, *corev1.ConfigMap) {
 	t.Helper()
 	t.Setenv(configuration.EnvironmentControllerNamespace, "capsule-system")
 	t.Setenv(configuration.EnvironmentServiceaccountName, "capsule")

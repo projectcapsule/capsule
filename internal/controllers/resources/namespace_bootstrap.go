@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
+	"maps"
 	"reflect"
 	"strconv"
 	"sync"
@@ -146,7 +147,7 @@ func (r *NamespaceTrigger) bootstrapHandler() handler.EventHandler {
 			}
 		},
 		UpdateFunc: func(_ context.Context, e event.UpdateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-			if e.ObjectOld != nil && e.ObjectNew != nil && (e.ObjectOld.GetLabels()[meta.TenantLabel] != e.ObjectNew.GetLabels()[meta.TenantLabel] || !reflect.DeepEqual(e.ObjectOld.GetOwnerReferences(), e.ObjectNew.GetOwnerReferences())) {
+			if e.ObjectOld != nil && e.ObjectNew != nil && (!maps.Equal(e.ObjectOld.GetLabels(), e.ObjectNew.GetLabels()) || !reflect.DeepEqual(e.ObjectOld.GetOwnerReferences(), e.ObjectNew.GetOwnerReferences())) {
 				enqueue(e.ObjectNew, q)
 			}
 		},
