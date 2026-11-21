@@ -4,6 +4,7 @@
 package resources
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -21,13 +22,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/internal/metrics"
 	mockclient "github.com/projectcapsule/capsule/internal/mocks/client"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/processor"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/ssa"
 )
+
+type replicationBenchmarkClient struct{ client.WithWatch }
 
 func BenchmarkControllerReplication(b *testing.B) {
 	for _, kind := range []string{"global", "namespaced", "namespace-watcher"} {
@@ -58,6 +63,7 @@ func BenchmarkControllerReplication(b *testing.B) {
 					}
 				}
 				global := &capsulev1beta2.GlobalTenantResource{
+					Finalizers: []string{meta.ControllerFinalizer},
 					APIVersion: capsulev1beta2.GroupVersion.String(),
 					Kind:       "GlobalTenantResource",
 					Name:       "global",
@@ -69,6 +75,7 @@ func BenchmarkControllerReplication(b *testing.B) {
 					},
 				}
 				local := &capsulev1beta2.TenantResource{
+					Finalizers: []string{meta.ControllerFinalizer},
 					APIVersion: capsulev1beta2.GroupVersion.String(),
 					Kind:       "TenantResource",
 					Name:       "local",
@@ -97,9 +104,16 @@ func BenchmarkControllerReplication(b *testing.B) {
 				mapper := k8smeta.NewDefaultRESTMapper([]schema.GroupVersion{corev1.SchemeGroupVersion})
 				mapper.Add(corev1.SchemeGroupVersion.WithKind("ConfigMap"), k8smeta.RESTScopeNamespace)
 				calls := &mockclient.CallCounter{}
-				c := fake.NewClientBuilder().WithScheme(scheme).WithRESTMapper(mapper).WithObjects(objects...).WithStatusSubresource(global, local).WithReturnManagedFields().WithInterceptorFuncs(calls.Interceptors()).Build()
+				hooks := calls.Interceptors()
+				create := hooks.Create
+				hooks.Create = func(ctx context.Context, c client.WithWatch, object client.Object, opts ...client.CreateOption) error {
+					object.SetUID(types.UID(object.GetNamespace() + "/" + object.GetName()))
+					return create(ctx, c, object, opts...)
+				}
+				c := &replicationBenchmarkClient{fake.NewClientBuilder().WithScheme(scheme).WithRESTMapper(mapper).WithObjects(objects...).WithStatusSubresource(global, local).WithReturnManagedFields().WithInterceptorFuncs(hooks).Build()}
 				configuration := configuration.NewCapsuleConfiguration(b.Context(), c, c, nil, cfg.Name)
 				proc := processor.Processor{Configuration: configuration, GatherClient: c, Mapper: mapper, AllowCrossNamespaceSelection: true}
+				proc.Applied = cache.NewAppliedResources[ssa.ApplyCacheKey, ssa.ApplyResult](func(r ssa.ApplyResult) ssa.ApplyResult { r.LastApply = r.LastApply.DeepCopy(); return r })
 				collector := NewCollector(c, mapper)
 				globalClients := impersonatedClientLoader[*capsulev1beta2.GlobalTenantResource]{client: replicationClient{Client: c, reader: c}, configuration: configuration, resolve: globalServiceAccount}
 				localClients := impersonatedClientLoader[*capsulev1beta2.TenantResource]{client: replicationClient{Client: c, reader: c}, configuration: configuration, resolve: namespacedServiceAccount}
@@ -130,13 +144,15 @@ func BenchmarkControllerReplication(b *testing.B) {
 					}
 					req = reconcile.Request{NamespacedName: client.ObjectKeyFromObject(local)}
 				case "namespace-watcher":
-					r = &NamespaceTrigger{client: c, reader: c, log: logr.Discard(), configuration: configuration, processor: proc, collector: collector, globalClients: globalClients, namespacedClients: localClients,
+					r = &NamespaceTrigger{
+						sources: testNamespaceSourceIndex(b, local), client: c, reader: c, log: logr.Discard(), configuration: configuration, processor: proc, collector: collector, globalClients: globalClients, namespacedClients: localClients,
 						globalStatus: scopedStatusPatcher[*capsulev1beta2.GlobalTenantResource]{client: c, reader: c, factory: func() *capsulev1beta2.GlobalTenantResource { return &capsulev1beta2.GlobalTenantResource{} }, status: func(obj *capsulev1beta2.GlobalTenantResource) *capsulev1beta2.TenantResourceCommonStatus {
 							return &obj.Status.TenantResourceCommonStatus
 						}},
 						namespacedStatus: scopedStatusPatcher[*capsulev1beta2.TenantResource]{client: c, reader: c, factory: func() *capsulev1beta2.TenantResource { return &capsulev1beta2.TenantResource{} }, status: func(obj *capsulev1beta2.TenantResource) *capsulev1beta2.TenantResourceCommonStatus {
 							return &obj.Status.TenantResourceCommonStatus
-						}}}
+						}},
+					}
 					req = reconcile.Request{Name: "tenant-a-0"}
 				}
 				if _, err := r.Reconcile(b.Context(), req); err != nil {

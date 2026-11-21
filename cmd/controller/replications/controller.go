@@ -34,6 +34,9 @@ func Run(ctx context.Context, options common.Options) error {
 		return err
 	}
 
+	background, bootstrap := resources.ReplicationAPIConfigs(b.Config)
+	b.Config = background
+
 	handoff := &legacyHandoff{reader: b.DirectClient, namespace: b.Namespace, release: os.Getenv(releaseNameEnvironment), completed: make(chan struct{})}
 	managerOptions.NewCache = func(config *rest.Config, options runtimecache.Options) (runtimecache.Cache, error) {
 		c, err := runtimecache.New(config, options)
@@ -64,7 +67,9 @@ func Run(ctx context.Context, options common.Options) error {
 	}
 
 	cfg := configuration.NewCapsuleConfiguration(ctx, mgr.GetClient(), mgr.GetAPIReader(), mgr.GetConfig(), controllerOptions.ConfigurationName)
+	bootstrapConfiguration := configuration.NewCapsuleConfiguration(ctx, mgr.GetClient(), mgr.GetAPIReader(), bootstrap, controllerOptions.ConfigurationName)
 	impersonation := cache.NewImpersonationCache()
+	bootstrapImpersonation := cache.NewImpersonationCache()
 
 	conditions, err := cache.NewCELCache()
 	if err != nil {
@@ -83,7 +88,7 @@ func Run(ctx context.Context, options common.Options) error {
 		return fmt.Errorf("register trigger dispatcher: %w", err)
 	}
 
-	if err := resources.Add(log, mgr, cfg, controllerOptions, impersonation, conditions, triggers); err != nil {
+	if err := resources.Add(ctx, log, mgr, cfg, bootstrapConfiguration, bootstrap, controllerOptions, impersonation, bootstrapImpersonation, conditions, triggers); err != nil {
 		return err
 	}
 	// ResourceWatches creates a bounded dynamic client from the manager config.
@@ -94,6 +99,7 @@ func Run(ctx context.Context, options common.Options) error {
 	cacheInvalidator := &invalidator.CacheInvalidator{
 		Client: mgr.GetClient(), Rest: mgr.GetConfig(), Log: log.WithName("caches"),
 		Configuration: cfg, ImpersonationCache: impersonation, ReplicationsOnly: true,
+		AdditionalImpersonationCaches: []*cache.ImpersonationCache{bootstrapImpersonation},
 	}
 	if err := cacheInvalidator.SetupWithManager(mgr, controllerOptions, nil); err != nil {
 		return fmt.Errorf("register replication cache invalidation: %w", err)

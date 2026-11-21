@@ -22,6 +22,12 @@ func (r *CacheInvalidator) rebuildImpersonationCache(
 	ctx context.Context,
 	log logr.Logger,
 ) error {
+	for _, additional := range r.AdditionalImpersonationCaches {
+		if additional != nil {
+			additional.Reset()
+		}
+	}
+
 	if r.ImpersonationCache == nil {
 		return nil
 	}
@@ -153,6 +159,12 @@ func (r *CacheInvalidator) invalidateServiceAccount(
 		r.Log.V(4).Info("invalidating cache for serviceaccount cache", "name", sa.GetNamespace(), "namespace", sa.GetName())
 
 		r.ImpersonationCache.Invalidate(sa.GetNamespace(), sa.GetName())
+
+		for _, additional := range r.AdditionalImpersonationCaches {
+			if additional != nil {
+				additional.Invalidate(sa.GetNamespace(), sa.GetName())
+			}
+		}
 	}
 
 	return nil

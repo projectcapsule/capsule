@@ -12,8 +12,10 @@ import (
 
 const GlobalHealthNamespacesFieldName = ".spec.healthNamespaceSelection"
 
-// GlobalHealthNamespaces narrows namespace profile events to opt-in global
-// replications. The index selects candidates, never authorizes target access.
+const GlobalNamespaceProfileIndexValue = "profile"
+
+// GlobalHealthNamespaces narrows namespace events to health-enabled sources and
+// sources with namespace profiles. The index never authorizes target access.
 type GlobalHealthNamespaces struct{}
 
 func (GlobalHealthNamespaces) Object() client.Object { return &capsulev1beta2.GlobalTenantResource{} }
@@ -21,10 +23,23 @@ func (GlobalHealthNamespaces) Field() string         { return GlobalHealthNamesp
 func (GlobalHealthNamespaces) Func() client.IndexerFunc {
 	return func(obj client.Object) []string {
 		resource, ok := obj.(*capsulev1beta2.GlobalTenantResource)
-		if !ok || !resource.Spec.HealthChecks.Enabled() || resource.Spec.Scope != api.ResourceScopeNamespace {
+		if !ok || resource.Spec.Scope != api.ResourceScopeNamespace {
 			return nil
 		}
 
-		return []string{"true"}
+		var keys []string
+		if resource.Spec.HealthChecks.Enabled() {
+			keys = append(keys, "true")
+		}
+
+		for _, spec := range resource.Spec.Resources {
+			if spec.NamespaceSelector != nil {
+				keys = append(keys, GlobalNamespaceProfileIndexValue)
+
+				break
+			}
+		}
+
+		return keys
 	}
 }

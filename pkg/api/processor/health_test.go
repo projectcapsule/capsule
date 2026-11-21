@@ -88,6 +88,8 @@ func TestProcessorSkippedHealthAndOpaqueContentRevision(t *testing.T) {
 func TestApplyRetryRetainsChangedContentAcrossNoopRetry(t *testing.T) {
 	initial := policyConfigMap("target", "example")
 	initial.SetUID("target-uid")
+	// Releasing prior protection requires a lifecycle patch after the content write.
+	initial.SetLabels(map[string]string{meta.ProtectedByCapsuleLabel: meta.ValueControllerReplications, meta.ReplicationProtectionLabel: meta.ValueTrue})
 	applies, conflicts := 0, 0
 	c := fake.NewClientBuilder().WithObjects(initial).WithReturnManagedFields().WithInterceptorFuncs(interceptor.Funcs{Patch: func(ctx context.Context, c client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
 		if patch.Type() == types.ApplyPatchType {

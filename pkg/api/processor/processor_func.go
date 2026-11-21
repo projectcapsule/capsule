@@ -479,6 +479,7 @@ func (p *Processor) Prune(
 
 func (p *Processor) resourceManager() ssa.Manager {
 	return ssa.Manager{
+		Applied:           p.Applied,
 		ReplicationOwners: p.ReplicationOwners,
 		Conditions:        p.Conditions,
 		Reader:            p.GatherClient,

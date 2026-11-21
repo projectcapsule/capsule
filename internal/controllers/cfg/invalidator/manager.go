@@ -46,7 +46,10 @@ type CacheInvalidator struct {
 	JSONPathCache      *cache.JSONPathCache
 	CELCache           *cache.CELCache
 	ImpersonationCache *cache.ImpersonationCache
-	RegexCache         *cache.RegexCache
+	// Additional client budgets retire alongside the primary cache, loading
+	// lazily with their own configuration instead of the primary API budget.
+	AdditionalImpersonationCaches []*cache.ImpersonationCache
+	RegexCache                    *cache.RegexCache
 
 	// ReplicationsOnly excludes admission and quota caches from background workers.
 	ReplicationsOnly bool

@@ -47,6 +47,21 @@ type impersonationClientConfig struct {
 	scheme                                     *runtime.Scheme
 }
 
+// ImpersonationIdentity separates credentials, endpoint trust, scheme and the
+// effective account while allowing clients with different API budgets to share
+// completed apply observations. This opaque value must remain process-local.
+func ImpersonationIdentity(base *rest.Config, scheme *runtime.Scheme, sa meta.NamespacedRFC1123ObjectReferenceWithNamespace) any {
+	if base == nil {
+		return nil
+	}
+
+	return struct {
+		config    impersonationClientConfig
+		account   Key
+		protocols string
+	}{impersonationConfig(base, scheme), Key{Namespace: sa.Namespace.String(), Name: sa.Name.String()}, fmt.Sprintf("%q", base.NextProtos)}
+}
+
 func impersonationConfig(base *rest.Config, scheme *runtime.Scheme) impersonationClientConfig {
 	return impersonationClientConfig{
 		host: base.Host, username: base.Username, password: base.Password, token: base.BearerToken, tokenFile: base.BearerTokenFile,
