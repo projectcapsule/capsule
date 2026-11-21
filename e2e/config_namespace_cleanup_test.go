@@ -56,25 +56,53 @@ var _ = Describe("namespace cleanup configuration", Serial, Label("config", "nam
 		Expect(terminating.DeletionTimestamp).NotTo(BeNil())
 		deletedAt := terminating.DeletionTimestamp.Time
 
-		By("holding the finalizer well past the default grace period")
-		holdFor := gracePeriod - 15*time.Second - time.Since(deletedAt)
+		By("holding the finalizer until the configured grace period has elapsed")
+		holdFor := gracePeriod - cleanupDeadlineTolerance - time.Since(deletedAt)
 		Expect(holdFor).To(BeNumerically(">", 2*configuration.DefaultNamespaceCleanupGracePeriod))
-		Consistently(func(g Gomega) {
-			current := &corev1.ConfigMap{}
-			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(held), current)).To(Succeed())
-			g.Expect(current.Finalizers).To(ContainElement(hold))
-		}, holdFor, defaultPollInterval).Should(Succeed())
+		expectFinalizerHeld(ctx, held, hold, holdFor)
 
 		By("releasing it once the configured grace period has elapsed")
-		Eventually(func(g Gomega) {
-			current := &corev1.ConfigMap{}
-			err := k8sClient.Get(ctx, client.ObjectKeyFromObject(held), current)
-			if apierrors.IsNotFound(err) {
-				return
-			}
-			g.Expect(err).To(Succeed())
-			g.Expect(current.Finalizers).NotTo(ContainElement(hold))
-		}, defaultTerminationTimeoutInterval, defaultPollInterval).Should(Succeed())
+		expectFinalizerReleased(ctx, held, hold)
+		expectNamespaceRemoved(ctx, nsA)
+
+		By("leaving tenant B's namespace and its finalizer untouched")
+		expectUntouched(ctx, nsB, preserved, hold)
+	})
+
+	It("applies a shortened grace period to namespaces already waiting and preserves other tenants", func() {
+		ctx := context.Background()
+		preserveNamespaceCleanup(ctx)
+
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec.NamespaceCleanup.GracePeriod = &metav1.Duration{Duration: 10 * time.Minute}
+		})
+
+		prefix := "e2e-cleanup-shorten-" + rand.String(6)
+		const hold = "e2e.projectcapsule.dev/release-hardware"
+		nsA := cleanupTenantNamespace(ctx, prefix+"-a")
+		nsB := cleanupTenantNamespace(ctx, prefix+"-b")
+		held := heldConfigMap(ctx, nsA.Name, "held", hold)
+		preserved := heldConfigMap(ctx, nsB.Name, "preserved", hold)
+
+		By("deleting tenant A's namespace under a ten-minute grace period")
+		Expect(k8sClient.Delete(ctx, nsA)).To(Succeed())
+		terminating := &corev1.Namespace{}
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(nsA), terminating)).To(Succeed())
+		Expect(terminating.DeletionTimestamp).NotTo(BeNil())
+		deletedAt := terminating.DeletionTimestamp.Time
+
+		By("holding the finalizer past the default grace period")
+		expectFinalizerHeld(ctx, held, hold, 2*configuration.DefaultNamespaceCleanupGracePeriod-time.Since(deletedAt))
+
+		By("shortening the grace period while the namespace waits")
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec.NamespaceCleanup.GracePeriod = &metav1.Duration{Duration: time.Second}
+		})
+		shortenedAt := time.Now()
+
+		By("releasing it within one recheck period instead of after ten minutes")
+		expectFinalizerReleased(ctx, held, hold)
+		Expect(time.Since(shortenedAt)).To(BeNumerically("<=", namespaceCleanupGraceRecheckPeriod+namespaceCleanupRetryPeriod+cleanupDeadlineTolerance))
 		expectNamespaceRemoved(ctx, nsA)
 
 		By("leaving tenant B's namespace and its finalizer untouched")
@@ -132,6 +160,37 @@ var _ = Describe("namespace cleanup configuration", Serial, Label("config", "nam
 		expectUntouched(ctx, nsB, preserved, foreign, retained)
 	})
 })
+
+const (
+	// Mirrors namespaceCleanupGraceRecheckPeriod in
+	// internal/controllers/tenant/namespace_cleanup.go: a namespace within its
+	// grace period is rechecked at least this often.
+	namespaceCleanupGraceRecheckPeriod = time.Minute
+	// deletionTimestamp keeps whole seconds; the rest covers the poll interval.
+	cleanupDeadlineTolerance = 2 * time.Second
+)
+
+// expectFinalizerHeld asserts obj keeps finalizer for the whole duration.
+func expectFinalizerHeld(ctx context.Context, obj *corev1.ConfigMap, finalizer string, duration time.Duration) {
+	Consistently(func(g Gomega) {
+		current := &corev1.ConfigMap{}
+		g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(obj), current)).To(Succeed())
+		g.Expect(current.Finalizers).To(ContainElement(finalizer))
+	}, duration, defaultPollInterval).Should(Succeed())
+}
+
+// expectFinalizerReleased waits until obj is gone or no longer has finalizer.
+func expectFinalizerReleased(ctx context.Context, obj *corev1.ConfigMap, finalizer string) {
+	Eventually(func(g Gomega) {
+		current := &corev1.ConfigMap{}
+		err := k8sClient.Get(ctx, client.ObjectKeyFromObject(obj), current)
+		if apierrors.IsNotFound(err) {
+			return
+		}
+		g.Expect(err).To(Succeed())
+		g.Expect(current.Finalizers).NotTo(ContainElement(finalizer))
+	}, defaultTerminationTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
 
 // preserveNamespaceCleanup restores spec.namespaceCleanup when the spec ends.
 func preserveNamespaceCleanup(ctx context.Context) {
