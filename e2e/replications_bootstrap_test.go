@@ -38,22 +38,30 @@ var _ = Describe("Replication namespace bootstrap", Label("tenant", "replication
 			Policy:            &apiruntime.ResourceReplicationPolicy{Creation: apiruntime.ResourceCreationPolicyOwner, Protect: new(true)},
 			RawItems:          []capsulev1beta2.RawExtension{{Raw: []byte(fmt.Sprintf(`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":%q},"data":{"tenant":"a"}}`, prefix))}},
 		}}}
+		extra := *spec.Resources[0].DeepCopy()
+		extra.NamespaceSelector.MatchLabels["projectcapsule.dev/watch-extra"] = "selected"
+		extra.RawItems = []capsulev1beta2.RawExtension{{Raw: []byte(fmt.Sprintf(`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":%q},"data":{"tenant":"a"}}`, prefix+"-extra"))}}
+		spec.Resources = append(spec.Resources, extra)
 		parent := createHealthReviewReplication(global, prefix, namespaces[0].Name, spec, actor)
 		waitWatchReady(parent)
 		// Namespace profiles are administered at cluster scope. Tenant clients
 		// below exercise access to the resulting replicated resources.
-		selectNamespace := func(namespace string, selected bool) {
+		setNamespaceLabel := func(namespace, label, value string) {
 			Eventually(func() error {
 				fresh := &corev1.Namespace{}
 				if err := k8sClient.Get(ctx, client.ObjectKey{Name: namespace}, fresh); err != nil {
 					return err
 				}
-				fresh.Labels["projectcapsule.dev/watch-profile"] = "excluded"
-				if selected {
-					fresh.Labels["projectcapsule.dev/watch-profile"] = "selected"
-				}
+				fresh.Labels[label] = value
 				return k8sClient.Update(ctx, fresh)
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		}
+		selectNamespace := func(namespace string, selected bool) {
+			value := "excluded"
+			if selected {
+				value = "selected"
+			}
+			setNamespaceLabel(namespace, "projectcapsule.dev/watch-profile", value)
 		}
 		By("selecting an existing namespace without a full reconcile request")
 		selectNamespace(namespaces[2].Name, true)
@@ -74,6 +82,37 @@ var _ = Describe("Replication namespace bootstrap", Label("tenant", "replication
 		Expect(actor.Patch(ctx, target, client.RawPatch(types.MergePatchType, []byte(`{"data":{"tenant":"changed"}}`)))).To(MatchError(ContainSubstring("capsule replication")))
 		Expect(actor.Get(ctx, key, target)).To(Succeed())
 		Expect(target.Data).To(HaveKeyWithValue("tenant", "a"))
+		By("pruning only the resource block that loses its namespace match")
+		setNamespaceLabel(namespaces[2].Name, "projectcapsule.dev/watch-extra", "selected")
+		setNamespaceLabel(namespaces[1].Name, "projectcapsule.dev/watch-extra", "selected")
+		extraKey := client.ObjectKey{Namespace: namespaces[1].Name, Name: prefix + "-extra"}
+		Eventually(func(g Gomega) {
+			g.Expect(actor.Get(ctx, extraKey, &corev1.ConfigMap{})).To(Succeed())
+			_, status := replicationHealthObject(parent)
+			g.Expect(status.ProcessedItems).To(HaveLen(3))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		setNamespaceLabel(namespaces[1].Name, "projectcapsule.dev/watch-extra", "excluded")
+		Eventually(func(g Gomega) {
+			g.Expect(apierrors.IsNotFound(actor.Get(ctx, extraKey, &corev1.ConfigMap{}))).To(BeTrue())
+			g.Expect(actor.Get(ctx, key, &corev1.ConfigMap{})).To(Succeed())
+			_, status := replicationHealthObject(parent)
+			g.Expect(status.ProcessedItems).To(HaveLen(2))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		By("pruning a deselected namespace without a manual reconcile annotation")
+		selectNamespace(namespaces[1].Name, false)
+		Eventually(func(g Gomega) {
+			g.Expect(apierrors.IsNotFound(actor.Get(ctx, key, &corev1.ConfigMap{}))).To(BeTrue())
+			g.Expect(actor.Get(ctx, client.ObjectKey{Namespace: namespaces[0].Name, Name: prefix}, &corev1.ConfigMap{})).To(Succeed())
+			_, status := replicationHealthObject(parent)
+			g.Expect(status.ProcessedItems).To(HaveLen(1))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		selectNamespace(namespaces[1].Name, true)
+		Eventually(func(g Gomega) {
+			g.Expect(actor.Get(ctx, key, &corev1.ConfigMap{})).To(Succeed())
+			_, status := replicationHealthObject(parent)
+			g.Expect(status.ProcessedItems).To(HaveLen(2))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKey{Namespace: namespaces[2].Name, Name: prefix + "-extra"}, &corev1.ConfigMap{}))).To(BeTrue())
 		writer := actor
 		if global {
 			writer = k8sClient
@@ -115,6 +154,60 @@ var _ = Describe("Replication namespace bootstrap", Label("tenant", "replication
 		}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
 		Eventually(func() bool { return apierrors.IsNotFound(actor.Get(ctx, key, &corev1.ConfigMap{})) }, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
 	}, Entry("GlobalTenantResource", true), Entry("TenantResource", false))
+
+	It("uses the current tenant after recreating a namespace under a different owner", Label("bootstrap-review"), func() {
+		ctx := context.Background()
+		prefix := "bootstrap-owner-" + rand.String(5)
+		owners, namespaces := watchNamespaces(prefix)
+		parents := make([]client.Object, 2)
+		for i := range parents {
+			name := fmt.Sprintf("%s-%d", prefix, i)
+			parent := &capsulev1beta2.GlobalTenantResource{Name: name, Spec: capsulev1beta2.GlobalTenantResourceSpec{
+				Scope: api.ResourceScopeNamespace, TenantSelector: metav1.LabelSelector{MatchLabels: map[string]string{"projectcapsule.dev/watch-tenant": fmt.Sprint(i) + prefix}},
+				TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{ResyncPeriod: metav1.Duration{Duration: 24 * time.Hour}, Resources: []capsulev1beta2.ResourceSpec{{
+					NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"projectcapsule.dev/watch-profile": "selected"}},
+					RawItems:          []capsulev1beta2.RawExtension{{Raw: []byte(fmt.Sprintf(`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":%q},"data":{"tenant":%q}}`, name, name))}},
+				}}},
+			}}
+			// Use the controller identity so target RBAC cannot hide a tenant mix-up.
+			Expect(k8sClient.Create(ctx, parent)).To(Succeed())
+			DeferCleanup(DeleteInBackground, parent)
+			parents[i] = parent
+			waitWatchReady(parent)
+		}
+		old := &corev1.Namespace{}
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(namespaces[1]), old)).To(Succeed())
+		ForceDeleteNamespace(ctx, old.Name)
+		TenantNamespaceReady(&capsulev1beta2.Tenant{Name: prefix + "-0"}, namespaces[0], 1)
+		recreated := NewNamespace(old.Name, map[string]string{meta.NewTenantLabel: prefix + "-1", "projectcapsule.dev/watch-profile": "selected"})
+		NamespaceCreation(recreated, owners[1], defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceReady(&capsulev1beta2.Tenant{Name: prefix + "-1"}, recreated, 2)
+		Eventually(func(g Gomega) {
+			fresh := &corev1.Namespace{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(recreated), fresh)).To(Succeed())
+			g.Expect(fresh.UID).NotTo(Equal(old.UID))
+			output := &corev1.ConfigMap{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: recreated.Name, Name: prefix + "-1"}, output)).To(Succeed())
+			g.Expect(output.Data).To(HaveKeyWithValue("tenant", prefix+"-1"))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		Consistently(func() bool {
+			return apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKey{Namespace: recreated.Name, Name: prefix + "-0"}, &corev1.ConfigMap{}))
+		}, 2*time.Second, defaultPollInterval).Should(BeTrue())
+		actor := impersonationClient(owners[0].Name, withDefaultGroups(nil))
+		Expect(apierrors.IsForbidden(actor.Get(ctx, client.ObjectKey{Namespace: recreated.Name, Name: prefix + "-1"}, &corev1.ConfigMap{}))).To(BeTrue())
+		Eventually(func(g Gomega) {
+			for i, parent := range parents {
+				fresh, status := replicationHealthObject(parent)
+				g.Expect(status.ObservedGeneration).To(Equal(fresh.GetGeneration()))
+				g.Expect(status.ProcessedItems).To(HaveLen(1))
+				wantNamespace := namespaces[0].Name
+				if i == 1 {
+					wantNamespace = recreated.Name
+				}
+				g.Expect(status.ProcessedItems[0].Namespace).To(Equal(wantNamespace))
+			}
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	})
 
 	DescribeTable("installs selected profiles and retains inventory across new namespaces", func(global, health bool) {
 		ctx := context.Background()

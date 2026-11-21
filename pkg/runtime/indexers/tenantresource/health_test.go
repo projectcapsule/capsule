@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	toolscache "k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -16,6 +17,61 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
 )
+
+func TestGlobalNamespaceProfileIndexLifecycle(t *testing.T) {
+	index := GlobalHealthNamespaces{}
+	scheme := runtime.NewScheme()
+	require.NoError(t, capsulev1beta2.AddToScheme(scheme))
+	source := &capsulev1beta2.GlobalTenantResource{Name: "profile", Spec: capsulev1beta2.GlobalTenantResourceSpec{Scope: api.ResourceScopeNamespace}}
+	source.Spec.Resources = []capsulev1beta2.ResourceSpec{{}, {NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"profile": "selected"}}}, {NamespaceSelector: &metav1.LabelSelector{}}}
+	require.Equal(t, []string{GlobalNamespaceProfileIndexValue}, index.Func()(source), "multiple blocks must not duplicate the index key")
+	source.Spec.HealthChecks = &capsulev1beta2.TenantResourceHealthChecks{Wait: true}
+	require.Equal(t, []string{"true", GlobalNamespaceProfileIndexValue}, index.Func()(source))
+	source.Spec.Scope = api.ResourceScopeNone
+	require.Nil(t, index.Func()(source))
+	source.Spec.Scope = api.ResourceScopeNamespace
+	source.Spec.HealthChecks = nil
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(source).WithIndex(index.Object(), index.Field(), index.Func()).Build()
+	list := &capsulev1beta2.GlobalTenantResourceList{}
+	lookup := func(want int) {
+		t.Helper()
+		require.NoError(t, c.List(t.Context(), list, client.MatchingFields{index.Field(): GlobalNamespaceProfileIndexValue}))
+		require.Len(t, list.Items, want)
+	}
+	lookup(1)
+	require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(source), source))
+	source.Spec.Resources = nil
+	require.NoError(t, c.Update(t.Context(), source))
+	lookup(0)
+	source.Spec.Resources = []capsulev1beta2.ResourceSpec{{NamespaceSelector: &metav1.LabelSelector{}}}
+	require.NoError(t, c.Update(t.Context(), source))
+	lookup(1)
+	require.NoError(t, c.Delete(t.Context(), source))
+	lookup(0)
+}
+
+func BenchmarkNamespaceProfileIndex(b *testing.B) {
+	for _, count := range []int{1, 1024, 16384} {
+		b.Run(fmt.Sprint(count), func(b *testing.B) {
+			index := GlobalHealthNamespaces{}
+			store := toolscache.NewIndexer(toolscache.MetaNamespaceKeyFunc, toolscache.Indexers{index.Field(): func(obj any) ([]string, error) { return index.Func()(obj.(client.Object)), nil }})
+			source := &capsulev1beta2.GlobalTenantResource{Name: "selected", Spec: capsulev1beta2.GlobalTenantResourceSpec{Scope: api.ResourceScopeNamespace}}
+			source.Spec.Resources = []capsulev1beta2.ResourceSpec{{NamespaceSelector: &metav1.LabelSelector{}}}
+			require.NoError(b, store.Add(source))
+			for i := range count {
+				require.NoError(b, store.Add(&capsulev1beta2.GlobalTenantResource{Name: fmt.Sprintf("unrelated-%d", i)}))
+			}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for b.Loop() {
+				items, err := store.ByIndex(index.Field(), GlobalNamespaceProfileIndexValue)
+				if err != nil || len(items) != 1 {
+					b.Fatalf("lookup failed: %v", err)
+				}
+			}
+		})
+	}
+}
 
 func TestGlobalHealthNamespacesIndex(t *testing.T) {
 	index := GlobalHealthNamespaces{}

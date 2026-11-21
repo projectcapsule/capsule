@@ -144,7 +144,9 @@ func (r *NamespaceTrigger) reconcileNamespace(ctx context.Context, request recon
 	log := ctrllog.FromContext(ctx)
 
 	var namespace corev1.Namespace
-	if err := r.client.Get(ctx, request.NamespacedName, &namespace); err != nil {
+	// Bootstrap can run before the informer observes a namespace reassignment
+	// or recreation. Select the tenant from the authoritative target snapshot.
+	if err := r.reader.Get(ctx, request.NamespacedName, &namespace); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.V(5).Info("Request object not found, could have been deleted after reconcile request")
 

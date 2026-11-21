@@ -119,7 +119,7 @@ func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, ctrlConfig
 			handler.EnqueueRequestsFromMapFunc(r.enqueueDependentGlobalTenantResources),
 			builder.WithPredicates(predicates.DependencyStateChangedPredicate{}),
 		).
-		Watches(&corev1.Namespace{}, handler.EnqueueRequestsFromMapFunc(r.enqueueHealthNamespaceResources), builder.WithPredicates(healthNamespaceEvents())).
+		Watches(&corev1.Namespace{}, r.globalNamespaceHandler(), builder.WithPredicates(healthNamespaceEvents())).
 		Watches(
 			&capsulev1beta2.Tenant{},
 			r.tenantHandler(),
@@ -676,7 +676,11 @@ func (r *globalResourceController) updateStatus(ctx context.Context, instance *c
 		}
 
 		if reconcileError == nil {
-			readyCondition = healthReadyCondition(instance, &instance.Spec.TenantResourceCommonSpec, &latest.Status.TenantResourceCommonStatus, readyCondition)
+			if needsReconcile {
+				readyCondition = meta.NewReadyConditionReconcilingReason(instance)
+			} else {
+				readyCondition = healthReadyCondition(instance, &instance.Spec.TenantResourceCommonSpec, &latest.Status.TenantResourceCommonStatus, readyCondition)
+			}
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(readyCondition)

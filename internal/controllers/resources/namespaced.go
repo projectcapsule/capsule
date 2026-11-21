@@ -672,7 +672,11 @@ func (r *namespacedResourceController) updateStatus(ctx context.Context, instanc
 		}
 
 		if reconcileError == nil {
-			readyCondition = healthReadyCondition(instance, &instance.Spec.TenantResourceCommonSpec, &latest.Status.TenantResourceCommonStatus, readyCondition)
+			if needsReconcile {
+				readyCondition = meta.NewReadyConditionReconcilingReason(instance)
+			} else {
+				readyCondition = healthReadyCondition(instance, &instance.Spec.TenantResourceCommonSpec, &latest.Status.TenantResourceCommonStatus, readyCondition)
+			}
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(readyCondition)

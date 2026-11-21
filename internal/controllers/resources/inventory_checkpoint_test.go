@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
@@ -29,6 +30,9 @@ func TestFinalizerRemovalRetainsScopedCleanupInventory(t *testing.T) {
 				require.NoError(t, c.Update(t.Context(), parent))
 				status.Health = nil
 				status.Conditions = meta.ConditionList{meta.NewReadyCondition(parent), meta.NewCordonedCondition(parent)}
+				if publication == "before-status-noop" {
+					status.Conditions[0] = meta.NewReadyConditionReconcilingReason(parent)
+				}
 				require.NoError(t, c.Status().Update(t.Context(), parent))
 				require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(parent), parent))
 				originalFinalizers := slices.Clone(parent.GetFinalizers())
@@ -180,10 +184,53 @@ func TestFullApplyRetainsConcurrentNamespaceInventory(t *testing.T) {
 				require.Contains(t, parent.GetFinalizers(), meta.ControllerFinalizer)
 				if enabled {
 					require.True(t, persisted.Health.Applying)
-					require.False(t, meta.IsStatusConditionTrue(persisted.Conditions, meta.ReadyCondition))
 				}
+				require.False(t, meta.IsStatusConditionTrue(persisted.Conditions, meta.ReadyCondition), "all sources must await the authoritative follow-up")
+				require.False(t, replicationDependencyReady(fresh), "dependents must not consume concurrently merged inventory")
 			})
 		}
+	}
+}
+
+func TestConcurrentFailedInventoryDoesNotPublishReady(t *testing.T) {
+	for _, global := range []bool{false, true} {
+		t.Run(fmt.Sprint(global), func(t *testing.T) {
+			_, c, parent, _ := healthFixture(t, global)
+			spec, status := healthSource(parent)
+			spec.HealthChecks, spec.Cordoned = nil, new(false)
+			require.NoError(t, c.Update(t.Context(), parent))
+			checkpoint := &inventoryCheckpoint{}
+			checkpoint.start(status.ProcessedItems)
+			fresh := parent.DeepCopyObject().(client.Object)
+			require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(parent), fresh))
+			_, latest := healthSource(fresh)
+			failed := *latest.ProcessedItems[0].DeepCopy()
+			failed.Name, failed.Namespace = "failed-target", "new-namespace"
+			failed.Status, failed.Message, failed.Health = metav1.ConditionFalse, "partial apply failed", nil
+			latest.ProcessedItems = append(latest.ProcessedItems, failed)
+			require.NoError(t, c.Status().Update(t.Context(), fresh))
+			update := func(checkpoint *inventoryCheckpoint) bool {
+				var again bool
+				var err error
+				switch p := parent.(type) {
+				case *capsulev1beta2.GlobalTenantResource:
+					again, err = (&globalResourceController{client: c, reader: c}).updateStatus(t.Context(), p, nil, checkpoint)
+				case *capsulev1beta2.TenantResource:
+					again, err = (&namespacedResourceController{client: c, reader: c}).updateStatus(t.Context(), p, nil, checkpoint)
+				}
+				require.NoError(t, err)
+				return again
+			}
+			require.True(t, update(checkpoint))
+			require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(parent), fresh))
+			require.False(t, replicationDependencyReady(fresh))
+			next := &inventoryCheckpoint{}
+			next.start(status.ProcessedItems)
+			status.ProcessedItems[1].Status, status.ProcessedItems[1].Message = metav1.ConditionTrue, ""
+			require.False(t, update(next))
+			require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(parent), fresh))
+			require.True(t, replicationDependencyReady(fresh), "successful follow-up must release dependents")
+		})
 	}
 }
 

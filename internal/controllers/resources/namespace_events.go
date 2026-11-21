@@ -9,6 +9,7 @@ import (
 	"slices"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -17,8 +18,82 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	tenantresourceindexer "github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
+
+func (r *globalResourceController) globalNamespaceHandler() handler.EventHandler {
+	health := handler.EnqueueRequestsFromMapFunc(r.enqueueHealthNamespaceResources)
+
+	return handler.Funcs{
+		CreateFunc: health.Create,
+		DeleteFunc: health.Delete,
+		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+			if e.ObjectOld == nil || e.ObjectNew == nil {
+				return
+			}
+
+			health.Update(ctx, e, queue)
+
+			for _, request := range r.enqueueNamespaceDeselections(ctx, e.ObjectOld, e.ObjectNew) {
+				queue.Add(request)
+			}
+		},
+	}
+}
+
+// Scoped bootstrap only adds targets. Losing even one resource block requires a
+// full gather and prune, without making additions fan out over every namespace.
+func (r *globalResourceController) enqueueNamespaceDeselections(ctx context.Context, before, after client.Object) []reconcile.Request {
+	tnt, err := tenant.GetTenantByOwnerreferences(ctx, r.client, before.GetOwnerReferences())
+	if err != nil || tnt == nil || !slices.ContainsFunc(before.GetOwnerReferences(), func(ref metav1.OwnerReference) bool {
+		return tenant.IsTenantOwnerReferenceForTenant(ref, tnt)
+	}) {
+		return nil
+	}
+
+	var sources capsulev1beta2.GlobalTenantResourceList
+	if err := r.client.List(ctx, &sources, client.MatchingFields{tenantresourceindexer.GlobalHealthNamespacesFieldName: tenantresourceindexer.GlobalNamespaceProfileIndexValue}); err != nil {
+		r.log.Error(err, "cannot list namespace profile replications")
+
+		return nil
+	}
+
+	stillOwned := after.GetDeletionTimestamp().IsZero() && slices.ContainsFunc(after.GetOwnerReferences(), func(ref metav1.OwnerReference) bool {
+		return tenant.IsTenantOwnerReferenceForTenant(ref, tnt)
+	})
+
+	var requests []reconcile.Request
+
+	for _, source := range sources.Items {
+		if source.Spec.HealthChecks.Enabled() {
+			// The health mapper already schedules these sources on profile changes.
+			continue
+		}
+
+		selector, err := r.collector.selectors.GetOrCompile(&source.Spec.TenantSelector)
+		if err != nil || !selector.Matches(labels.Set(tnt.Labels)) {
+			continue
+		}
+
+		for _, resource := range source.Spec.Resources {
+			namespaces, err := r.collector.namespaceSelector(*tnt, resource)
+			if err != nil {
+				r.log.Error(err, "cannot match namespace profile", "globaltenantresource", source.Name)
+
+				continue
+			}
+
+			if namespaces.Matches(labels.Set(before.GetLabels())) && (!stillOwned || !namespaces.Matches(labels.Set(after.GetLabels()))) {
+				requests = append(requests, reconcile.Request{Name: source.Name})
+
+				break
+			}
+		}
+	}
+
+	return requests
+}
 
 // Namespace lifecycle events already enqueue all replications in the tenant.
 // Profile changes select sources in the owning Tenant, including apply-only sources.

@@ -4,6 +4,8 @@
 package resources
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -18,6 +20,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -28,6 +31,89 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
 )
+
+func TestNamespaceBootstrapUsesLiveTargetOwnership(t *testing.T) {
+	for _, change := range []string{"unchanged", "moved", "recreated", "terminating", "missing", "read-error", "label-only", "stale-owner", "label-owner-disagree"} {
+		t.Run(change, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			require.NoError(t, corev1.AddToScheme(scheme))
+			require.NoError(t, capsulev1beta2.AddToScheme(scheme))
+			a := &capsulev1beta2.Tenant{Name: "a", UID: "a-uid"}
+			b := &capsulev1beta2.Tenant{Name: "b", UID: "b-uid"}
+			stale := &corev1.Namespace{Name: "target", UID: "old-target", Labels: map[string]string{meta.TenantLabel: a.Name}, OwnerReferences: []metav1.OwnerReference{{APIVersion: capsulev1beta2.GroupVersion.String(), Kind: "Tenant", Name: a.Name, UID: a.UID}}}
+			live := stale.DeepCopy()
+			wantTenant := "a"
+			switch change {
+			case "moved", "recreated":
+				live.Labels[meta.TenantLabel] = b.Name
+				live.OwnerReferences[0].Name, live.OwnerReferences[0].UID = b.Name, b.UID
+				wantTenant = "b"
+				if change == "recreated" {
+					live.UID = "new-target"
+				}
+			case "terminating":
+				live.Finalizers = []string{meta.ControllerFinalizer}
+				live.DeletionTimestamp = new(metav1.Now())
+				wantTenant = "a"
+			case "missing", "read-error":
+				wantTenant = ""
+			case "label-only":
+				live.OwnerReferences = nil
+			case "stale-owner":
+				live.OwnerReferences[0].UID = "previous-a"
+			case "label-owner-disagree":
+				live.Labels[meta.TenantLabel] = b.Name
+				wantTenant = "b"
+			}
+			cached := fake.NewClientBuilder().WithScheme(scheme).WithObjects(a, b, stale).Build()
+			liveBuilder := fake.NewClientBuilder().WithScheme(scheme)
+			if change != "missing" {
+				liveBuilder.WithObjects(live)
+			}
+			var resolved []string
+			cachedNamespaceReads, liveReads, sourceLists := 0, 0, 0
+			cacheClient := interceptor.NewClient(cached, interceptor.Funcs{
+				Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+					switch obj.(type) {
+					case *corev1.Namespace:
+						cachedNamespaceReads++
+					case *capsulev1beta2.Tenant:
+						resolved = append(resolved, key.Name)
+					}
+					return c.Get(ctx, key, obj, opts...)
+				},
+				List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+					sourceLists++
+					return c.List(ctx, list, opts...)
+				},
+			})
+			reader := interceptor.NewClient(liveBuilder.Build(), interceptor.Funcs{Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				liveReads++
+				if change == "read-error" {
+					return errors.New("live namespace unavailable")
+				}
+				return c.Get(ctx, key, obj, opts...)
+			}})
+			r := &NamespaceTrigger{client: cacheClient, reader: reader}
+			_, err := r.reconcileNamespace(t.Context(), reconcile.Request{Name: stale.Name})
+			if change == "read-error" {
+				require.ErrorContains(t, err, "live namespace unavailable")
+			} else {
+				require.NoError(t, err)
+			}
+			require.Zero(t, cachedNamespaceReads)
+			require.Equal(t, 1, liveReads)
+			if change != "unchanged" && change != "moved" && change != "recreated" {
+				require.Zero(t, sourceLists, "invalid, missing or terminating ownership must not gather replication sources")
+			}
+			if wantTenant == "" {
+				require.Empty(t, resolved)
+			} else {
+				require.Equal(t, []string{wantTenant}, resolved, "the target's current owner must select the replication tenant")
+			}
+		})
+	}
+}
 
 func TestTenantNamespaceAdditionsKeepAuthoritativeFallbacks(t *testing.T) {
 	for _, change := range []string{"addition", "removal", "labels", "replacement", "termination", "reorder"} {
