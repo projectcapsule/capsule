@@ -69,8 +69,11 @@ func (l impersonatedClientLoader[T]) Load(
 	log.V(5).Info("using impersonation client", "serviceaccount", sa.Name, "namespace", sa.Namespace)
 
 	c, err := l.impersonation.LoadOrCreate(ctx, log, re, l.client.Scheme(), *sa)
+	if err != nil {
+		return nil, sa, err
+	}
 
-	return c, sa, err
+	return replicationClient{Client: c, reader: c, identity: cache.ImpersonationIdentity(re, l.client.Scheme(), *sa)}, sa, nil
 }
 
 // Keep target reads authoritative under the controller identity. Impersonated
@@ -78,8 +81,11 @@ func (l impersonatedClientLoader[T]) Load(
 type replicationClient struct {
 	client.Client
 
-	reader client.Reader
+	reader   client.Reader
+	identity any
 }
+
+func (c replicationClient) ApplyCacheIdentity() any { return c.identity }
 
 func (c replicationClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 	return c.reader.Get(ctx, key, obj, opts...)

@@ -21,6 +21,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
 )
 
 func TestReplicationCacheInvalidationExcludesAdmissionState(t *testing.T) {
@@ -73,7 +74,7 @@ func BenchmarkControllerReplicationCacheInvalidation(b *testing.B) {
 				lists++
 				return c.List(ctx, list, opts...)
 			}}).Build()
-			r := &CacheInvalidator{Client: c, ReplicationsOnly: true, ImpersonationCache: cache.NewImpersonationCache(), Configuration: configuration.NewCapsuleConfiguration(b.Context(), c, c, &rest.Config{Host: "https://unused.example.com"}, "default")}
+			r := &CacheInvalidator{Client: c, ReplicationsOnly: true, ImpersonationCache: cache.NewImpersonationCache(), AdditionalImpersonationCaches: []*cache.ImpersonationCache{cache.NewImpersonationCache()}, Configuration: configuration.NewCapsuleConfiguration(b.Context(), c, c, &rest.Config{Host: "https://unused.example.com"}, "default")}
 			b.ReportAllocs()
 			b.ResetTimer()
 			for b.Loop() {
@@ -82,6 +83,34 @@ func BenchmarkControllerReplicationCacheInvalidation(b *testing.B) {
 				}
 			}
 			b.ReportMetric(float64(lists)/float64(b.N), "LIST/op")
+		})
+	}
+}
+
+func TestReplicationInvalidationRetiresAdditionalClientBudgets(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, capsulev1beta2.AddToScheme(scheme))
+	for _, primary := range []bool{false, true} {
+		t.Run(fmt.Sprint(primary), func(t *testing.T) {
+			c := fake.NewClientBuilder().WithScheme(scheme).
+				WithIndex(&capsulev1beta2.GlobalTenantResource{}, tenantresource.ServiceAccountIndexerFieldName, func(client.Object) []string { return nil }).
+				WithIndex(&capsulev1beta2.TenantResource{}, tenantresource.ServiceAccountIndexerFieldName, func(client.Object) []string { return nil }).Build()
+			bootstrap := cache.NewImpersonationCache()
+			r := &CacheInvalidator{Client: c, AdditionalImpersonationCaches: []*cache.ImpersonationCache{bootstrap, nil}, Configuration: configuration.NewCapsuleConfiguration(t.Context(), c, c, &rest.Config{Host: "https://unused.example.com"}, "default")}
+			if primary {
+				r.ImpersonationCache = cache.NewImpersonationCache()
+				bootstrap.Set("tenant-a", "old", c)
+				bootstrap.Set("tenant-b", "active", c)
+				require.NoError(t, r.invalidateServiceAccount(t.Context(), &corev1.ServiceAccount{Name: "old", Namespace: "tenant-a"}))
+				_, exists := bootstrap.Get("tenant-a", "old")
+				require.False(t, exists)
+				_, exists = bootstrap.Get("tenant-b", "active")
+				require.True(t, exists, "retirement must remain namespace scoped")
+			}
+			bootstrap.Set("tenant-a", "old", c)
+			require.NoError(t, r.rebuildImpersonationCache(t.Context(), logr.Discard()))
+			_, exists := bootstrap.Get("tenant-a", "old")
+			require.False(t, exists, "periodic and configuration invalidation must retire bootstrap clients")
 		})
 	}
 }

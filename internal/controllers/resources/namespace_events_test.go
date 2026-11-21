@@ -80,6 +80,8 @@ func TestNamespaceEventsDispatchOnceAndPreserveScope(t *testing.T) {
 				wantLists, wantGets, want = 0, 0, nil
 			case "create":
 				h.Create(t.Context(), event.CreateEvent{Object: ns}, queue)
+				want = want[:1]
+				wantGets = 2
 			case "delete":
 				h.Delete(t.Context(), event.DeleteEvent{Object: ns}, queue)
 			case "profile":

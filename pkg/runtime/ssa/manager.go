@@ -40,6 +40,7 @@ type Metadata struct {
 
 // Manager applies and prunes resources with server-side apply.
 type Manager struct {
+	Applied           ApplyCache
 	Reader            client.Reader
 	Mapper            k8smeta.RESTMapper
 	Metadata          Metadata
@@ -167,6 +168,16 @@ func (m Manager) Apply(
 		return ApplyResult{TargetObserved: true, UID: targetUID, Created: created}, fmt.Errorf("evaluating managed metadata: %w", err)
 	}
 
+	cacheOptions := opts
+	// Key verified provenance, rather than whether the caller has already
+	// recorded a successful creation in its inventory.
+	cacheOptions.PreviouslyCreated = created
+
+	cacheKey, cacheable := m.applyCacheKey(c, desired, cacheOptions)
+	if result, hit := m.cachedApply(cacheKey, cacheable, snapshot[0]); hit {
+		return result, nil
+	}
+
 	if created {
 		// Keep creation provenance across the content write too: status and
 		// lifecycle decoration can both fail after a successful apply.
@@ -257,6 +268,8 @@ func (m Manager) Apply(
 	); err != nil {
 		return result, fmt.Errorf("applying managed metadata failed: %w", err)
 	}
+
+	m.recordApply(cacheKey, cacheable, actual, result)
 
 	return result, nil
 }

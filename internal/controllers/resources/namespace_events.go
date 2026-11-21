@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
@@ -60,7 +61,19 @@ func (r *namespacedResourceController) tenantNamespaceHandler() handler.EventHan
 
 	return handler.Funcs{
 		CreateFunc: func(ctx context.Context, e event.CreateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-			enqueue(ctx, queue, false, e.Object)
+			if e.Object != nil && e.Object.GetLabels()[meta.TenantLabel] == "" {
+				enqueue(ctx, queue, true, e.Object)
+
+				return
+			}
+			// Simple manifests are installed by the fair namespace bootstrap queue.
+			// Dynamic sources still need their full gather after membership changes.
+			for _, request := range r.enqueueTenantResourcesForNamespace(ctx, e.Object) {
+				var source capsulev1beta2.TenantResource
+				if err := r.client.Get(ctx, request.NamespacedName, &source); err == nil && needsFullNamespaceAddition(&source.Spec.TenantResourceCommonSpec) {
+					queue.Add(request)
+				}
+			}
 		},
 		DeleteFunc: func(ctx context.Context, e event.DeleteEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 			enqueue(ctx, queue, false, e.Object)

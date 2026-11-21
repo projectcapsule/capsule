@@ -11,3 +11,5 @@ type (
 )
 
 var NewImpersonationCache = runtimecache.NewImpersonationCache
+
+var ImpersonationIdentity = runtimecache.ImpersonationIdentity

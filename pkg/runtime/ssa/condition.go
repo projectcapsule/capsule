@@ -160,6 +160,21 @@ func (m Manager) prepareProtection(ctx context.Context, c client.Client, desired
 		}
 	}
 
+	// Keep a replication manager identifiable when a user changes all of its
+	// content fields on an unprotected object. The existing tracking label is a
+	// stable owned field; without it an ordinary Update can remove the entire
+	// SSA entry and prevent admission from recognizing the managing account.
+	// Preserve another controller family's marker during the content apply.
+	if !opts.Protect && m.Metadata.ManagedByValue == meta.ValueControllerReplications && (snapshot[0] == nil || snapshot[0].GetLabels()[meta.NewManagedByCapsuleLabel] == "" || snapshot[0].GetLabels()[meta.NewManagedByCapsuleLabel] == meta.ValueControllerReplications) {
+		labels := desired.GetLabels()
+		if labels == nil {
+			labels = make(map[string]string)
+		}
+
+		labels[meta.NewManagedByCapsuleLabel] = meta.ValueControllerReplications
+		desired.SetLabels(labels)
+	}
+
 	return snapshot, nil
 }
 

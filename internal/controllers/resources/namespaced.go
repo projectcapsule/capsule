@@ -45,8 +45,10 @@ import (
 )
 
 type namespacedResourceController struct {
-	client client.Client
-	reader client.Reader
+	sources *namespaceSourceIndex
+	applied ssa.ApplyCache
+	client  client.Client
+	reader  client.Reader
 
 	log           logr.Logger
 	processor     processor.Processor
@@ -65,6 +67,7 @@ func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager, ctrlCo
 	r.reader = mgr.GetAPIReader()
 
 	r.processor = processor.Processor{
+		Applied:                      r.applied,
 		ReplicationOwners:            ssa.NewReplicationOwnerResolver(mgr.GetClient(), mgr.GetAPIReader()),
 		Conditions:                   r.conditions,
 		Configuration:                r.configuration,
@@ -77,7 +80,7 @@ func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager, ctrlCo
 		mgr.GetRESTMapper(),
 	)
 	r.clients = impersonatedClientLoader[*capsulev1beta2.TenantResource]{
-		client:        replicationClient{Client: r.client, reader: r.reader},
+		client:        replicationClient{Client: r.client, reader: r.reader, identity: mgr.GetConfig()},
 		configuration: r.configuration,
 		impersonation: r.impersonation,
 		resolve:       namespacedServiceAccount,
@@ -155,6 +158,7 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 	var (
 		statusErr        error
 		healthDependency bool
+		checkpoint       = &inventoryCheckpoint{}
 	)
 
 	//nolint:dupl
@@ -167,14 +171,15 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 		}
 
 		finishTrigger(&tntResource.Status.TenantResourceCommonStatus, triggerRequest, started, reconcileErr)
-		res.RequeueAfter = replicationRetryAfter(&tntResource.Spec.TenantResourceCommonSpec, res.RequeueAfter, reconcileErr, healthDependency)
+		res.RequeueAfter = replicationRetryAfter(&tntResource.Spec.TenantResourceCommonSpec, res.RequeueAfter, reconcileErr, healthDependency || checkpoint.started)
 		// Preserve the earliest outstanding periodic wakeup when another event
 		// reconciles the same key before that deadline.
 		if periodic := recordNextResync(tntResource, &tntResource.Spec.TenantResourceCommonSpec, &tntResource.Status.TenantResourceCommonStatus, requeue.RequeueAfter, time.Now()); periodic > 0 && res.RequeueAfter > 0 {
 			res.RequeueAfter = min(res.RequeueAfter, periodic)
 		}
 
-		if uerr := r.updateStatus(ctx, tntResource, reconcileErr); uerr != nil {
+		needsReconcile, uerr := r.updateStatus(ctx, tntResource, reconcileErr, checkpoint)
+		if uerr != nil {
 			if caperrors.IgnoreGone(uerr) {
 				err = nil
 
@@ -184,6 +189,10 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 			err = fmt.Errorf("cannot update tenantresource status: %w", uerr)
 
 			return
+		}
+
+		if needsReconcile {
+			res.RequeueAfter = time.Nanosecond
 		}
 
 		patchErr := patchReplicationMetadata(ctx, r.client, r.reader, tntResource, originalFinalizers, manualRequest)
@@ -278,6 +287,7 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 		return requeue, nil
 	}
 
+	checkpoint.start(tntResource.Status.ProcessedItems)
 	statusErr = r.reconcile(ctx, c, tntResource)
 
 	if len(tntResource.Status.ProcessedItems) > 0 {
@@ -381,32 +391,31 @@ func (r *namespacedResourceController) enqueueTenantResourcesForNamespace(
 	requests := make([]reconcile.Request, 0, 16)
 	seen := make(map[types.NamespacedName]struct{})
 
+	nsSet := sets.New[string]()
 	for i := range namespaces.Items {
-		var trList capsulev1beta2.TenantResourceList
-		if err := r.client.List(
-			ctx,
-			&trList,
-			client.InNamespace(namespaces.Items[i].Name),
-		); err != nil {
-			r.log.Error(err, "failed to list TenantResources", "namespace", namespaces.Items[i].Name)
+		nsSet.Insert(namespaces.Items[i].Name)
+	}
 
+	items, err := r.sources.list(ctx, r.client, nsSet)
+	if err != nil {
+		r.log.Error(err, "failed to look up TenantResources")
+
+		return nil
+	}
+
+	for j := range items {
+		key := types.NamespacedName{
+			Namespace: items[j].Namespace,
+			Name:      items[j].Name,
+		}
+
+		if _, exists := seen[key]; exists {
 			continue
 		}
 
-		for j := range trList.Items {
-			key := types.NamespacedName{
-				Namespace: trList.Items[j].Namespace,
-				Name:      trList.Items[j].Name,
-			}
+		seen[key] = struct{}{}
 
-			if _, exists := seen[key]; exists {
-				continue
-			}
-
-			seen[key] = struct{}{}
-
-			requests = append(requests, reconcile.Request{NamespacedName: key})
-		}
+		requests = append(requests, reconcile.Request{NamespacedName: key})
 	}
 
 	return requests
@@ -600,10 +609,12 @@ func (r *namespacedResourceController) updateReconcilingStatus(ctx context.Conte
 	})
 }
 
-func (r *namespacedResourceController) updateStatus(ctx context.Context, instance *capsulev1beta2.TenantResource, reconcileError error) error {
+//nolint:dupl // Resource-specific writers retain the same inventory and health protocol.
+func (r *namespacedResourceController) updateStatus(ctx context.Context, instance *capsulev1beta2.TenantResource, reconcileError error, checkpoint *inventoryCheckpoint) (bool, error) {
 	instance.Status.UpdateStats()
 
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+	needsReconcile := false
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.TenantResource{}
 		if err = r.reader.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
 			return err
@@ -613,13 +624,17 @@ func (r *namespacedResourceController) updateStatus(ctx context.Context, instanc
 			return apierrors.NewNotFound(capsulev1beta2.GroupVersion.WithResource("tenantresources").GroupResource(), instance.Name)
 		}
 
+		managed := instance.Status.ManagedResourcesStatus
+		managed.ProcessedItems, needsReconcile = checkpoint.merge(latest.Status.ProcessedItems, managed.ProcessedItems)
+		managed.UpdateStats()
+
 		if latest.Generation != instance.Generation {
 			// Applying an older spec can still create or prune targets. Persist that
 			// inventory so the next generation can clean it up, without completing
 			// its predecessor's health checks or publishing stale readiness.
 			invalidateHealth := latest.Spec.HealthChecks.Enabled() && !sameHealthScanInventory(latest.Status.ProcessedItems, instance.Status.ProcessedItems)
 
-			latest.Status.ManagedResourcesStatus = instance.Status.ManagedResourcesStatus
+			latest.Status.ManagedResourcesStatus = managed
 
 			if invalidateHealth {
 				invalidateHealthApplication(latest, &latest.Status.TenantResourceCommonStatus, time.Now())
@@ -630,6 +645,9 @@ func (r *namespacedResourceController) updateStatus(ctx context.Context, instanc
 			}
 
 			instance.Status = latest.Status
+			if len(instance.Status.ProcessedItems) > 0 {
+				controllerutil.AddFinalizer(instance, meta.ControllerFinalizer)
+			}
 
 			return nil
 		}
@@ -637,8 +655,13 @@ func (r *namespacedResourceController) updateStatus(ctx context.Context, instanc
 		originalStatus := latest.Status.DeepCopy()
 
 		latest.Status = instance.Status
+		latest.Status.ManagedResourcesStatus = managed
 		latest.Status.ObservedGeneration = instance.GetGeneration()
 		completeHealthApplication(instance, &instance.Spec.TenantResourceCommonSpec, &latest.Status.TenantResourceCommonStatus, &originalStatus.TenantResourceCommonStatus, reconcileError, time.Now())
+
+		if needsReconcile && instance.Spec.HealthChecks.Enabled() {
+			invalidateHealthApplication(instance, &latest.Status.TenantResourceCommonStatus, time.Now())
+		}
 
 		// Set Ready Condition
 		readyCondition := meta.NewReadyCondition(instance)
@@ -675,9 +698,14 @@ func (r *namespacedResourceController) updateStatus(ctx context.Context, instanc
 
 		// Keep the in-memory object aligned with what we just wrote.
 		instance.Status = latest.Status
+		if len(instance.Status.ProcessedItems) > 0 {
+			controllerutil.AddFinalizer(instance, meta.ControllerFinalizer)
+		}
 
 		return nil
 	})
+
+	return needsReconcile, err
 }
 
 func ForeachNamespace(
@@ -770,17 +798,15 @@ func (r *namespacedResourceController) enqueueTenantResourcesForNamespaceProfile
 
 	var requests []reconcile.Request
 
-	for _, namespace := range tnt.Status.Namespaces {
-		var resources capsulev1beta2.TenantResourceList
-		if err := r.client.List(ctx, &resources, client.InNamespace(namespace)); err != nil {
-			r.log.Error(err, "cannot list tenant replications for namespace profile", "namespace", namespace)
+	resources, err := r.sources.list(ctx, r.client, sets.New(tnt.Status.Namespaces...))
+	if err != nil {
+		r.log.Error(err, "cannot look up tenant replications for namespace profile")
 
-			return nil
-		}
+		return nil
+	}
 
-		for i := range resources.Items {
-			requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&resources.Items[i])})
-		}
+	for i := range resources {
+		requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&resources[i])})
 	}
 
 	return requests

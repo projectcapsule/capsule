@@ -130,11 +130,10 @@ func finishTrigger(status *capsulev1beta2.TenantResourceCommonStatus, request st
 	return reconcileError != nil
 }
 
-// Watches, health checks and health-gated dependencies can use long resyncs.
-// Retry transient apply/dependency failures promptly even before the first event,
-// including the initial protected-resource ownership handshake.
-func replicationRetryAfter(spec *capsulev1beta2.TenantResourceCommonSpec, scheduled time.Duration, reconcileError error, healthDependency bool) time.Duration {
-	if reconcileError == nil || (len(spec.Triggers) == 0 && !spec.HealthChecks.Enabled() && !healthDependency) {
+// Apply failures and health-gated dependencies must recover independently of a
+// long periodic resync, including the initial protected-resource handshake.
+func replicationRetryAfter(spec *capsulev1beta2.TenantResourceCommonSpec, scheduled time.Duration, reconcileError error, pendingWork bool) time.Duration {
+	if reconcileError == nil || (len(spec.Triggers) == 0 && !spec.HealthChecks.Enabled() && !pendingWork) {
 		return scheduled
 	}
 

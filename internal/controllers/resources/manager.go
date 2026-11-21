@@ -4,9 +4,11 @@
 package resources
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/go-logr/logr"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -14,31 +16,50 @@ import (
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/ssa"
 )
 
 func Add(
+	ctx context.Context,
 	log logr.Logger,
 	mgr manager.Manager,
 	configuration configuration.Configuration,
+	bootstrapConfiguration configuration.Configuration,
+	bootstrapConfig *rest.Config,
 	opts utils.ControllerOptions,
 	impersonation *cache.ImpersonationCache,
+	bootstrapImpersonation *cache.ImpersonationCache,
 	conditions *cache.CELCache,
 	triggers *cache.PreparedReplicationTriggers,
 ) (err error) {
+	sources, err := newNamespaceSourceIndex(ctx, mgr.GetCache())
+	if err != nil {
+		return err
+	}
+
 	globalMetrics := metrics.MustMakeGlobalTenantResourceRecorder()
 	localMetrics := metrics.MustMakeTenantResourceRecorder()
+	applied := cache.NewAppliedResources[ssa.ApplyCacheKey, ssa.ApplyResult](func(result ssa.ApplyResult) ssa.ApplyResult {
+		result.LastApply = result.LastApply.DeepCopy()
+
+		return result
+	})
 
 	if err = (&NamespaceTrigger{
-		log:           log.WithName("Global"),
-		configuration: configuration,
-		impersonation: impersonation,
-		conditions:    conditions,
-		triggers:      triggers,
+		sources:         sources,
+		bootstrapConfig: bootstrapConfig,
+		applied:         applied,
+		log:             log.WithName("Global"),
+		configuration:   bootstrapConfiguration,
+		impersonation:   bootstrapImpersonation,
+		conditions:      conditions,
+		triggers:        triggers,
 	}).SetupWithManager(mgr, opts); err != nil {
 		return fmt.Errorf("unable to create watcher controller: %w", err)
 	}
 
 	if err = (&globalResourceController{
+		applied:       applied,
 		log:           log.WithName("Global"),
 		configuration: configuration,
 		metrics:       globalMetrics,
@@ -51,6 +72,8 @@ func Add(
 	}
 
 	if err = (&namespacedResourceController{
+		sources:       sources,
+		applied:       applied,
 		log:           log.WithName("Namespaced"),
 		configuration: configuration,
 		metrics:       localMetrics,

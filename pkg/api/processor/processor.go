@@ -15,6 +15,7 @@ import (
 )
 
 type Processor struct {
+	Applied                      ssa.ApplyCache
 	ReplicationOwners            ssa.ReplicationOwnerResolver
 	Conditions                   celruntime.ResourceConditionCompiler
 	Configuration                configuration.Configuration
