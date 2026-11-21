@@ -109,7 +109,7 @@ var _ = Describe("namespace cleanup configuration", Serial, Label("config", "nam
 		expectUntouched(ctx, nsB, preserved, hold)
 	})
 
-	It("retains listed finalizers until their controllers remove them and preserves other tenants", func() {
+	It("retains listed finalizers until released or unlisted and preserves other tenants", func() {
 		ctx := context.Background()
 		preserveNamespaceCleanup(ctx)
 
@@ -129,7 +129,8 @@ var _ = Describe("namespace cleanup configuration", Serial, Label("config", "nam
 		prefix := "e2e-cleanup-retain-" + rand.String(6)
 		nsA := cleanupTenantNamespace(ctx, prefix+"-a")
 		nsB := cleanupTenantNamespace(ctx, prefix+"-b")
-		kept := heldConfigMap(ctx, nsA.Name, "kept", retained)
+		released := heldConfigMap(ctx, nsA.Name, "released", retained)
+		unlisted := heldConfigMap(ctx, nsA.Name, "unlisted", retained)
 		stripped := heldConfigMap(ctx, nsA.Name, "stripped", foreign)
 		preserved := heldConfigMap(ctx, nsB.Name, "preserved", foreign, retained)
 
@@ -141,19 +142,39 @@ var _ = Describe("namespace cleanup configuration", Serial, Label("config", "nam
 			return apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(stripped), &corev1.ConfigMap{}))
 		}, defaultTerminationTimeoutInterval, defaultPollInterval).Should(BeTrue())
 
-		By("keeping the listed finalizer, and the namespace, across cleanup passes")
-		Consistently(func(g Gomega) {
-			current := &corev1.ConfigMap{}
-			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(kept), current)).To(Succeed())
-			g.Expect(current.DeletionTimestamp).NotTo(BeNil())
-			g.Expect(current.Finalizers).To(ConsistOf(retained))
-			namespace := &corev1.Namespace{}
-			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(nsA), namespace)).To(Succeed())
-			g.Expect(namespace.DeletionTimestamp).NotTo(BeNil())
-		}, 3*namespaceCleanupRetryPeriod, defaultPollInterval).Should(Succeed())
+		expectHeldInTerminatingNamespace := func(objects ...*corev1.ConfigMap) {
+			Consistently(func(g Gomega) {
+				for _, obj := range objects {
+					current := &corev1.ConfigMap{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(obj), current)).To(Succeed())
+					g.Expect(current.DeletionTimestamp).NotTo(BeNil())
+					g.Expect(current.Finalizers).To(ConsistOf(retained))
+				}
+				namespace := &corev1.Namespace{}
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(nsA), namespace)).To(Succeed())
+				g.Expect(namespace.DeletionTimestamp).NotTo(BeNil())
+			}, 3*namespaceCleanupRetryPeriod, defaultPollInterval).Should(Succeed())
+		}
 
-		By("removing the namespace once the owning controller releases its finalizer")
-		releaseFinalizers(ctx, kept)
+		By("keeping the listed finalizers, and the namespace, across cleanup passes")
+		expectHeldInTerminatingNamespace(released, unlisted)
+
+		By("keeping the namespace while another object still holds a listed finalizer")
+		releaseFinalizers(ctx, released)
+		Eventually(func() bool {
+			return apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(released), &corev1.ConfigMap{}))
+		}, defaultTerminationTimeoutInterval, defaultPollInterval).Should(BeTrue())
+		expectHeldInTerminatingNamespace(unlisted)
+
+		By("resuming the cleanup once the finalizer is no longer listed")
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec.NamespaceCleanup.RetainedFinalizers = nil
+		})
+		unlistedAt := time.Now()
+		expectFinalizerReleased(ctx, unlisted, retained)
+		// The held namespace never left the cleanup loop: its next pass reads the
+		// new configuration, without restarting the controller.
+		Expect(time.Since(unlistedAt)).To(BeNumerically("<=", 2*namespaceCleanupRetryPeriod+cleanupDeadlineTolerance))
 		expectNamespaceRemoved(ctx, nsA)
 
 		By("leaving tenant B's namespace and its finalizers untouched")

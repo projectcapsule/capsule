@@ -292,6 +292,44 @@ func TestNamespaceCleanupKeepsConfiguredRetainedFinalizers(t *testing.T) {
 	}
 }
 
+func TestNamespaceCleanupResumesWhenARetainedFinalizerIsUnlisted(t *testing.T) {
+	tnt := &capsulev1beta2.Tenant{Name: "tenant-a", UID: "tenant-a-uid"}
+	ns := cleanupOwnedNamespace(tnt, "cleanup", true)
+	const retained = "cluster.cluster.x-k8s.io"
+	held := &corev1.ConfigMap{Name: "held", Namespace: ns.Name, UID: "held-uid", ResourceVersion: "1", Finalizers: []string{retained}}
+	held.SetDeletionTimestamp(ns.DeletionTimestamp)
+	manager, dyn := namespaceCleanupFixture(t, tnt, ns)
+	if err := dyn.Tracker().Add(held); err != nil {
+		t.Fatal(err)
+	}
+	gvr := schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}
+	reconcileRetaining := func(retainedFinalizers ...string) []string {
+		t.Helper()
+		manager.Configuration = cleanupTestConfiguration{cleanup: capsulev1beta2.NamespaceCleanupConfiguration{RetainedFinalizers: retainedFinalizers}}
+		result, err := manager.reconcileNamespaceCleanup(t.Context(), reconcile.Request{NamespacedName: client.ObjectKeyFromObject(ns)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		// A held namespace stays in the cleanup loop, so a configuration change
+		// is picked up by the next pass without restarting the controller.
+		if result.RequeueAfter != namespaceCleanupRetryPeriod {
+			t.Fatalf("requeue=%s, want %s", result.RequeueAfter, namespaceCleanupRetryPeriod)
+		}
+		current, err := dyn.Tracker().Get(gvr, ns.Name, held.Name)
+		if err != nil {
+			return nil
+		}
+		return current.(*corev1.ConfigMap).Finalizers
+	}
+
+	if got := reconcileRetaining(retained); !slices.Equal(got, []string{retained}) {
+		t.Fatalf("listed finalizer removed: %v", got)
+	}
+	if got := reconcileRetaining(); len(got) != 0 {
+		t.Fatalf("unlisted finalizer kept: %v", got)
+	}
+}
+
 func TestNamespaceCleanupUsesDedicatedAuthoritativeReader(t *testing.T) {
 	tnt := &capsulev1beta2.Tenant{Name: "tenant-a", UID: "tenant-a-uid"}
 	ns := cleanupOwnedNamespace(tnt, "cleanup", true)
