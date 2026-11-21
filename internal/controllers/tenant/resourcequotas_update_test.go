@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
@@ -121,5 +122,75 @@ func TestResourceQuotasUpdateRefetchesFromAPIReaderAfterConflict(t *testing.T) {
 	}
 	if got := updated.Annotations[usedKey]; got != "2" {
 		t.Fatalf("used quota annotation = %q, want 2", got)
+	}
+}
+
+func TestResourceQuotasUpdateSkipsQuotaOfDeletedNamespace(t *testing.T) {
+	t.Parallel()
+
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("add core scheme: %v", err)
+	}
+
+	quota := &corev1.ResourceQuota{
+		Name:      "capsule-tenant-a-0",
+		Namespace: "tenant-a-ns",
+		Labels:    map[string]string{"tenant": "tenant-a"},
+		Spec: corev1.ResourceQuotaSpec{Hard: corev1.ResourceList{
+			corev1.ResourceLimitsCPU: resource.MustParse("3"),
+		}},
+	}
+	gone := quota.DeepCopy()
+	gone.Name = "capsule-tenant-a-gone"
+	gone.Namespace = "tenant-a-deleted"
+
+	forbidden := apierrors.NewForbidden(schema.GroupResource{Resource: "resourcequotas"}, quota.Name, errors.New("denied"))
+	notFound := apierrors.NewNotFound(schema.GroupResource{Resource: "resourcequotas"}, quota.Name)
+
+	tests := []struct {
+		name      string
+		updateErr error
+		wantErr   error
+	}{
+		// gone is listed but missing from the API: its namespace was deleted before the Get
+		{name: "namespace deleted before the read"},
+		{name: "namespace deleted between the read and the update", updateErr: notFound},
+		{name: "other errors are still reported", updateErr: forbidden, wantErr: forbidden},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(quota.DeepCopy()).WithInterceptorFuncs(interceptor.Funcs{
+				Update: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
+					if tt.updateErr != nil {
+						return tt.updateErr
+					}
+
+					return c.Update(ctx, obj, opts...)
+				},
+			}).Build()
+			manager := &Manager{Client: c, reader: c}
+
+			desired := quota.DeepCopy()
+			desired.Spec.Hard[corev1.ResourceLimitsCPU] = resource.MustParse("5")
+
+			err := manager.resourceQuotasUpdate(
+				context.Background(),
+				corev1.ResourceLimitsCPU,
+				resource.MustParse("2"),
+				sets.New(corev1.ResourceLimitsCPU),
+				resource.MustParse("5"),
+				*desired, *gone,
+			)
+			if tt.wantErr == nil && err != nil {
+				t.Fatalf("resourceQuotasUpdate() unexpected error: %v", err)
+			}
+			if tt.wantErr != nil && !errors.Is(err, tt.wantErr) {
+				t.Fatalf("resourceQuotasUpdate() error = %v, want %v", err, tt.wantErr)
+			}
+		})
 	}
 }
