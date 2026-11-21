@@ -38,10 +38,21 @@ import (
 	namespaceindex "github.com/projectcapsule/capsule/pkg/runtime/indexers/namespace"
 )
 
-type cleanupTestConfiguration struct{ configuration.Configuration }
+type cleanupTestConfiguration struct {
+	configuration.Configuration
+
+	gracePeriod *time.Duration
+}
 
 func (cleanupTestConfiguration) AllowServiceAccountPromotion() bool { return false }
 func (cleanupTestConfiguration) Administrators() rbac.UserListSpec  { return nil }
+func (c cleanupTestConfiguration) NamespaceCleanupGracePeriod() time.Duration {
+	if c.gracePeriod == nil {
+		return configuration.DefaultNamespaceCleanupGracePeriod
+	}
+
+	return *c.gracePeriod
+}
 
 func namespaceCleanupFixture(t testing.TB, objects ...client.Object) (*Manager, *dynamicfake.FakeDynamicClient) {
 	t.Helper()
@@ -134,6 +145,69 @@ func TestNamespaceCleanupControllerScopeAndLifecycle(t *testing.T) {
 			wantRetry := mode == "grace" || mode == "pods" || mode == "orphan-pods" || (wantWork && mode != "failure")
 			if (result.RequeueAfter > 0) != wantRetry {
 				t.Fatalf("requeue=%s", result.RequeueAfter)
+			}
+		})
+	}
+}
+
+func TestNamespaceCleanupHonoursConfiguredGracePeriod(t *testing.T) {
+	for _, tt := range []struct {
+		name          string
+		gracePeriod   *time.Duration
+		deletedAgo    time.Duration
+		wantWork      bool
+		wantRequeueAt time.Duration
+	}{
+		{name: "default holds a fresh deletion", deletedAgo: 2 * time.Second, wantRequeueAt: configuration.DefaultNamespaceCleanupGracePeriod - 2*time.Second},
+		{name: "default releases after ten seconds", deletedAgo: configuration.DefaultNamespaceCleanupGracePeriod + time.Second, wantWork: true, wantRequeueAt: namespaceCleanupRetryPeriod},
+		{name: "longer grace holds past the default", gracePeriod: new(15 * time.Minute), deletedAgo: time.Minute, wantRequeueAt: namespaceCleanupGraceRecheckPeriod},
+		{name: "longer grace rechecks before it elapses", gracePeriod: new(15 * time.Minute), deletedAgo: 14*time.Minute + 30*time.Second, wantRequeueAt: 30 * time.Second},
+		{name: "longer grace releases once elapsed", gracePeriod: new(15 * time.Minute), deletedAgo: 16 * time.Minute, wantWork: true, wantRequeueAt: namespaceCleanupRetryPeriod},
+		{name: "zero grace releases at once", gracePeriod: new(time.Duration(0)), wantWork: true, wantRequeueAt: namespaceCleanupRetryPeriod},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			tnt := &capsulev1beta2.Tenant{Name: "tenant-a", UID: "tenant-a-uid"}
+			ns := cleanupOwnedNamespace(tnt, "cleanup", true)
+			stamp := metav1.NewTime(time.Now().Add(-tt.deletedAgo))
+			ns.DeletionTimestamp = &stamp
+			// Already deleting, as the namespace controller leaves it, and held by
+			// a controller still releasing what it owns outside the namespace.
+			held := &corev1.ConfigMap{Name: "held", Namespace: ns.Name, UID: "held-uid", ResourceVersion: "1", Finalizers: []string{"example.com/release-hardware"}}
+			held.SetDeletionTimestamp(&stamp)
+			manager, dyn := namespaceCleanupFixture(t, tnt, ns)
+			manager.Configuration = cleanupTestConfiguration{gracePeriod: tt.gracePeriod}
+			gvr := schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}
+			if err := dyn.Tracker().Add(held); err != nil {
+				t.Fatal(err)
+			}
+			result, err := manager.reconcileNamespaceCleanup(t.Context(), reconcile.Request{NamespacedName: client.ObjectKeyFromObject(ns)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if worked := len(dyn.Actions()) > 0; worked != tt.wantWork {
+				t.Fatalf("cleanup work=%t, want %t: %v", worked, tt.wantWork, dyn.Actions())
+			}
+			switch tt.wantRequeueAt {
+			case namespaceCleanupRetryPeriod, namespaceCleanupGraceRecheckPeriod:
+				if result.RequeueAfter != tt.wantRequeueAt {
+					t.Fatalf("requeue=%s, want %s", result.RequeueAfter, tt.wantRequeueAt)
+				}
+			default:
+				// What is left of the grace period. The clock only advances and the
+				// stored deletionTimestamp keeps whole seconds, so it is never longer.
+				if result.RequeueAfter <= 0 || result.RequeueAfter > tt.wantRequeueAt {
+					t.Fatalf("requeue=%s, want within (0, %s]", result.RequeueAfter, tt.wantRequeueAt)
+				}
+			}
+			current, err := dyn.Tracker().Get(gvr, ns.Name, held.Name)
+			if tt.wantWork {
+				if err == nil && len(current.(*corev1.ConfigMap).Finalizers) != 0 {
+					t.Fatalf("finalizers kept after the grace period: %v", current.(*corev1.ConfigMap).Finalizers)
+				}
+				return
+			}
+			if err != nil || !slices.Equal(current.(*corev1.ConfigMap).Finalizers, held.Finalizers) {
+				t.Fatalf("finalizers removed during the grace period: object=%v err=%v", current, err)
 			}
 		})
 	}

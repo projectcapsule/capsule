@@ -17,12 +17,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 const (
-	namespaceCascadingCleanupGracePeriod = 10 * time.Second
-	namespaceCleanupRetryPeriod          = 5 * time.Second
+	namespaceCleanupRetryPeriod = 5 * time.Second
+	// namespaceCleanupGraceRecheckPeriod bounds the wait of a namespace still in
+	// its grace period, so a shortened spec.namespaceCleanup.gracePeriod applies
+	// without waiting for the one it was scheduled with.
+	namespaceCleanupGraceRecheckPeriod = time.Minute
 )
 
 func (r *Manager) setupNamespaceCleanupController(mgr ctrl.Manager, config utils.ControllerOptions) error {
@@ -78,8 +82,11 @@ func (r *Manager) reconcileNamespaceCleanup(ctx context.Context, request reconci
 		return reconcile.Result{}, nil
 	}
 
-	if remaining := namespaceCascadingCleanupGracePeriod - time.Since(ns.DeletionTimestamp.Time); remaining > 0 {
-		return reconcile.Result{RequeueAfter: remaining}, nil
+	// Cleanup removes every finalizer but Capsule's own, so the controllers owning
+	// them get this long to finish: they may still be releasing resources outside
+	// the namespace, such as machines of a Cluster API infrastructure provider.
+	if remaining := r.namespaceCleanupGracePeriod() - time.Since(ns.DeletionTimestamp.Time); remaining > 0 {
+		return reconcile.Result{RequeueAfter: min(remaining, namespaceCleanupGraceRecheckPeriod)}, nil
 	}
 
 	pending, err := tenant.NamespaceIsPendingPodTerminating(ctx, reader, ns)
@@ -101,6 +108,14 @@ func (r *Manager) reconcileNamespaceCleanup(ctx context.Context, request reconci
 	}
 
 	return reconcile.Result{RequeueAfter: namespaceCleanupRetryPeriod}, nil
+}
+
+func (r *Manager) namespaceCleanupGracePeriod() time.Duration {
+	if r.Configuration == nil {
+		return configuration.DefaultNamespaceCleanupGracePeriod
+	}
+
+	return r.Configuration.NamespaceCleanupGracePeriod()
 }
 
 // Separate configured token buckets keep bulk authoritative namespace reads

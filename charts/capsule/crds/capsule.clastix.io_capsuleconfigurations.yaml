@@ -1139,6 +1139,23 @@ spec:
                     pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                     type: string
                 type: object
+              namespaceCleanup:
+                description: Forced cleanup of terminating Tenant namespaces.
+                properties:
+                  gracePeriod:
+                    description: |-
+                      Time a terminating Tenant namespace is left to the controllers owning its
+                      remaining objects, measured from the namespace deletionTimestamp. Once it
+                      elapses and no Pods are left, Capsule deletes the remaining objects and
+                      removes their finalizers, except its own. Finalizers often release resources
+                      outside the namespace, such as Cluster API infrastructure providers powering
+                      off and releasing bare-metal hosts, and can need longer than the default.
+                      When unset, the cleanup starts 10 seconds after the namespace deletion.
+                    type: string
+                    x-kubernetes-validations:
+                    - message: gracePeriod must not be negative
+                      rule: duration(self) >= duration('0s')
+                type: object
               nodeMetadata:
                 description: |-
                   Allows to set the forbidden metadata for the worker nodes that could be patched by a Tenant.

@@ -62,6 +62,9 @@ type CapsuleConfigurationSpec struct {
 	// Event (Audit) Configuration
 	// +kubebuilder:default={namespace:default}
 	Events EventsConfiguration `json:"events,omitempty"`
+	// Forced cleanup of terminating Tenant namespaces.
+	// +optional
+	NamespaceCleanup NamespaceCleanupConfiguration `json:"namespaceCleanup,omitzero"`
 
 	// Deprecated: use users property instead (https://projectcapsule.dev/docs/operating/setup/configuration/#users)
 	//
@@ -86,6 +89,19 @@ type RBACConfiguration struct {
 	// Name for the ClusterRole required to grant Namespace Provision permissions.
 	// +kubebuilder:default=capsule-namespace-provisioner
 	ProvisionerClusterRole string `json:"provisioner,omitempty"`
+}
+
+type NamespaceCleanupConfiguration struct {
+	// Time a terminating Tenant namespace is left to the controllers owning its
+	// remaining objects, measured from the namespace deletionTimestamp. Once it
+	// elapses and no Pods are left, Capsule deletes the remaining objects and
+	// removes their finalizers, except its own. Finalizers often release resources
+	// outside the namespace, such as Cluster API infrastructure providers powering
+	// off and releasing bare-metal hosts, and can need longer than the default.
+	// When unset, the cleanup starts 10 seconds after the namespace deletion.
+	// +kubebuilder:validation:XValidation:rule="duration(self) >= duration('0s')",message="gracePeriod must not be negative"
+	// +optional
+	GracePeriod *metav1.Duration `json:"gracePeriod,omitempty"`
 }
 
 type EventsConfiguration struct {
