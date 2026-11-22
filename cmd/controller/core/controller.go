@@ -353,11 +353,13 @@ func Run(ctx context.Context, options common.Options) error {
 			namespacevalidation.NamespaceHandler(
 				cfg,
 				namespacevalidation.CordoningHandler(cfg),
-				namespacevalidation.QuotaHandler(),
 				namespacevalidation.PrefixHandler(cfg),
 				namespacevalidation.RulesMetadataHandler(regexCache, cfg, celCache),
 				namespacevalidation.UserMetadataHandler(),
 				namespacevalidation.RequiredMetadataHandler(),
+				// Must run last: it reserves a slot of the namespace quota,
+				// which a Namespace denied afterwards would hold until it expires.
+				namespacevalidation.QuotaHandler(),
 			),
 		),
 		route.NamespaceMutation(
