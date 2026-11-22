@@ -276,6 +276,64 @@ func TestCapsuleConfigurationGetters(t *testing.T) {
 	}
 }
 
+func TestNamespaceCleanupGracePeriod(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name    string
+		cleanup capsulev1beta2.NamespaceCleanupConfiguration
+		want    time.Duration
+	}{
+		{name: "unset keeps the default", want: configuration.DefaultNamespaceCleanupGracePeriod},
+		{name: "longer than the default", cleanup: capsulev1beta2.NamespaceCleanupConfiguration{GracePeriod: &metav1.Duration{Duration: 15 * time.Minute}}, want: 15 * time.Minute},
+		{name: "shorter than the default", cleanup: capsulev1beta2.NamespaceCleanupConfiguration{GracePeriod: &metav1.Duration{Duration: time.Second}}, want: time.Second},
+		{name: "zero cleans up at once", cleanup: capsulev1beta2.NamespaceCleanupConfiguration{GracePeriod: &metav1.Duration{}}, want: 0},
+		{name: "negative is clamped to zero", cleanup: capsulev1beta2.NamespaceCleanupConfiguration{GracePeriod: &metav1.Duration{Duration: -time.Minute}}, want: 0},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := configuration.NamespaceCleanupGracePeriod(tt.cleanup); got != tt.want {
+				t.Fatalf("NamespaceCleanupGracePeriod() = %s, want %s", got, tt.want)
+			}
+
+			stored := &capsulev1beta2.CapsuleConfiguration{Name: "capsule", Spec: capsulev1beta2.CapsuleConfigurationSpec{NamespaceCleanup: tt.cleanup}}
+			cl := configurationFakeClient(t, stored)
+			cfg := configuration.NewCapsuleConfiguration(context.Background(), cl, cl, &rest.Config{}, "capsule")
+
+			if got := configuration.NamespaceCleanupGracePeriod(cfg.NamespaceCleanup()); got != tt.want {
+				t.Fatalf("NamespaceCleanupGracePeriod(Configuration.NamespaceCleanup()) = %s, want %s", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNamespaceCleanupRetainedFinalizers(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name     string
+		retained []string
+	}{
+		{name: "unset returns no list"},
+		{name: "configured list is returned as stored", retained: []string{"cluster.cluster.x-k8s.io", "beskar7machine.infrastructure.cluster.x-k8s.io"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			stored := &capsulev1beta2.CapsuleConfiguration{Name: "capsule", Spec: capsulev1beta2.CapsuleConfigurationSpec{
+				NamespaceCleanup: capsulev1beta2.NamespaceCleanupConfiguration{RetainedFinalizers: tt.retained},
+			}}
+			cl := configurationFakeClient(t, stored)
+			cfg := configuration.NewCapsuleConfiguration(context.Background(), cl, cl, &rest.Config{}, "capsule")
+
+			if got := cfg.NamespaceCleanup().RetainedFinalizers; !reflect.DeepEqual(got, tt.retained) {
+				t.Fatalf("NamespaceCleanup().RetainedFinalizers = %#v, want %#v", got, tt.retained)
+			}
+		})
+	}
+}
+
 func TestProtectedNamespaceRegexpErrors(t *testing.T) {
 	t.Parallel()
 

@@ -254,6 +254,21 @@ func (c *capsuleConfiguration) CacheInvalidation() metav1.Duration {
 	return c.retrievalFn().Spec.CacheInvalidation
 }
 
+func (c *capsuleConfiguration) NamespaceCleanup() capsulev1beta2.NamespaceCleanupConfiguration {
+	return c.retrievalFn().Spec.NamespaceCleanup
+}
+
+// NamespaceCleanupGracePeriod resolves the configured grace period, falling back to
+// DefaultNamespaceCleanupGracePeriod when unset. A negative value, which the CRD
+// rejects, is treated as zero.
+func NamespaceCleanupGracePeriod(cfg capsulev1beta2.NamespaceCleanupConfiguration) time.Duration {
+	if cfg.GracePeriod == nil {
+		return DefaultNamespaceCleanupGracePeriod
+	}
+
+	return max(cfg.GracePeriod.Duration, 0)
+}
+
 func (c *capsuleConfiguration) ServiceAccountClientProperties() capsulev1beta2.ServiceAccountClient {
 	return c.retrievalFn().Spec.Impersonation
 }
