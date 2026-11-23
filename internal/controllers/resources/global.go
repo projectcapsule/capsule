@@ -46,8 +46,9 @@ import (
 )
 
 type globalResourceController struct {
-	client client.Client
-	reader client.Reader
+	applied ssa.ApplyCache
+	client  client.Client
+	reader  client.Reader
 
 	log           logr.Logger
 	processor     processor.Processor
@@ -66,6 +67,7 @@ func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, ctrlConfig
 	r.reader = mgr.GetAPIReader()
 
 	r.processor = processor.Processor{
+		Applied:                      r.applied,
 		ReplicationOwners:            ssa.NewReplicationOwnerResolver(mgr.GetClient(), mgr.GetAPIReader()),
 		Conditions:                   r.conditions,
 		Configuration:                r.configuration,
@@ -79,7 +81,7 @@ func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, ctrlConfig
 		mgr.GetRESTMapper(),
 	)
 	r.clients = impersonatedClientLoader[*capsulev1beta2.GlobalTenantResource]{
-		client:        replicationClient{Client: r.client, reader: r.reader},
+		client:        replicationClient{Client: r.client, reader: r.reader, identity: mgr.GetConfig()},
 		configuration: r.configuration,
 		impersonation: r.impersonation,
 		resolve:       globalServiceAccount,
@@ -117,10 +119,10 @@ func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, ctrlConfig
 			handler.EnqueueRequestsFromMapFunc(r.enqueueDependentGlobalTenantResources),
 			builder.WithPredicates(predicates.DependencyStateChangedPredicate{}),
 		).
-		Watches(&corev1.Namespace{}, handler.EnqueueRequestsFromMapFunc(r.enqueueHealthNamespaceResources), builder.WithPredicates(healthNamespaceEvents())).
+		Watches(&corev1.Namespace{}, r.globalNamespaceHandler(), builder.WithPredicates(healthNamespaceEvents())).
 		Watches(
 			&capsulev1beta2.Tenant{},
-			handler.EnqueueRequestsFromMapFunc(r.enqueueRequestFromTenant),
+			r.tenantHandler(),
 			builder.WithPredicates(predicates.TenantSelectionChangedPredicate{}),
 		).
 		Watches(&capsulev1beta2.GlobalTenantResource{}, replicationConditionHandler(r.metrics.RecordConditions, func(obj *capsulev1beta2.GlobalTenantResource) { r.metrics.DeleteMetrics(obj.Name) })).
@@ -157,6 +159,7 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 	var (
 		statusErr        error
 		healthDependency bool
+		checkpoint       = &inventoryCheckpoint{}
 	)
 
 	//nolint:dupl
@@ -169,14 +172,15 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 		}
 
 		finishTrigger(&tntResource.Status.TenantResourceCommonStatus, triggerRequest, started, reconcileErr)
-		res.RequeueAfter = replicationRetryAfter(&tntResource.Spec.TenantResourceCommonSpec, res.RequeueAfter, reconcileErr, healthDependency)
+		res.RequeueAfter = replicationRetryAfter(&tntResource.Spec.TenantResourceCommonSpec, res.RequeueAfter, reconcileErr, healthDependency || checkpoint.started)
 		// Preserve the earliest outstanding periodic wakeup when another event
 		// reconciles the same key before that deadline.
 		if periodic := recordNextResync(tntResource, &tntResource.Spec.TenantResourceCommonSpec, &tntResource.Status.TenantResourceCommonStatus, requeue.RequeueAfter, time.Now()); periodic > 0 && res.RequeueAfter > 0 {
 			res.RequeueAfter = min(res.RequeueAfter, periodic)
 		}
 
-		if uerr := r.updateStatus(ctx, tntResource, reconcileErr); uerr != nil {
+		needsReconcile, uerr := r.updateStatus(ctx, tntResource, reconcileErr, checkpoint)
+		if uerr != nil {
 			if caperrors.IgnoreGone(uerr) {
 				err = nil
 
@@ -186,6 +190,10 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 			err = fmt.Errorf("cannot update globaltenantresource status: %w", uerr)
 
 			return
+		}
+
+		if needsReconcile {
+			res.RequeueAfter = time.Nanosecond
 		}
 
 		patchErr := patchReplicationMetadata(ctx, r.client, r.reader, tntResource, originalFinalizers, manualRequest)
@@ -277,6 +285,7 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 		return requeue, nil
 	}
 
+	checkpoint.start(tntResource.Status.ProcessedItems)
 	statusErr = r.reconcile(ctx, c, tntResource)
 
 	if len(tntResource.Status.ProcessedItems) > 0 {
@@ -312,7 +321,7 @@ func (r *globalResourceController) enqueueDependentGlobalTenantResources(
 	return reqs
 }
 
-func (r *globalResourceController) enqueueRequestFromTenant(ctx context.Context, object client.Object) (reqs []reconcile.Request) {
+func (r *globalResourceController) enqueueSelectedTenantResources(ctx context.Context, object client.Object, include func(*capsulev1beta2.GlobalTenantResource) bool) (reqs []reconcile.Request) {
 	tnt := object.(*capsulev1beta2.Tenant) //nolint:forcetypeassert
 
 	resList := capsulev1beta2.GlobalTenantResourceList{}
@@ -323,6 +332,10 @@ func (r *globalResourceController) enqueueRequestFromTenant(ctx context.Context,
 	set := sets.NewString()
 
 	for _, res := range resList.Items {
+		if !include(&res) {
+			continue
+		}
+
 		tntSelector := res.Spec.TenantSelector
 
 		selector, err := metav1.LabelSelectorAsSelector(&tntSelector)
@@ -596,10 +609,12 @@ func (r *globalResourceController) updateReconcilingStatus(ctx context.Context, 
 	})
 }
 
-func (r *globalResourceController) updateStatus(ctx context.Context, instance *capsulev1beta2.GlobalTenantResource, reconcileError error) error {
+//nolint:dupl // Resource-specific writers retain the same inventory and health protocol.
+func (r *globalResourceController) updateStatus(ctx context.Context, instance *capsulev1beta2.GlobalTenantResource, reconcileError error, checkpoint *inventoryCheckpoint) (bool, error) {
 	instance.Status.UpdateStats()
 
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+	needsReconcile := false
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.GlobalTenantResource{}
 		if err = r.reader.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
 			if apierrors.IsNotFound(err) {
@@ -613,13 +628,17 @@ func (r *globalResourceController) updateStatus(ctx context.Context, instance *c
 			return apierrors.NewNotFound(capsulev1beta2.GroupVersion.WithResource("globaltenantresources").GroupResource(), instance.Name)
 		}
 
+		managed := instance.Status.ManagedResourcesStatus
+		managed.ProcessedItems, needsReconcile = checkpoint.merge(latest.Status.ProcessedItems, managed.ProcessedItems)
+		managed.UpdateStats()
+
 		if latest.Generation != instance.Generation {
 			// Applying an older spec can still create or prune targets. Persist that
 			// inventory so the next generation can clean it up, without completing
 			// its predecessor's health checks or publishing stale readiness.
 			invalidateHealth := latest.Spec.HealthChecks.Enabled() && !sameHealthScanInventory(latest.Status.ProcessedItems, instance.Status.ProcessedItems)
 
-			latest.Status.ManagedResourcesStatus = instance.Status.ManagedResourcesStatus
+			latest.Status.ManagedResourcesStatus = managed
 
 			if invalidateHealth {
 				invalidateHealthApplication(latest, &latest.Status.TenantResourceCommonStatus, time.Now())
@@ -630,6 +649,9 @@ func (r *globalResourceController) updateStatus(ctx context.Context, instance *c
 			}
 
 			instance.Status = latest.Status
+			if len(instance.Status.ProcessedItems) > 0 {
+				controllerutil.AddFinalizer(instance, meta.ControllerFinalizer)
+			}
 
 			return nil
 		}
@@ -637,8 +659,13 @@ func (r *globalResourceController) updateStatus(ctx context.Context, instance *c
 		originalStatus := latest.Status.DeepCopy()
 
 		latest.Status = instance.Status
+		latest.Status.ManagedResourcesStatus = managed
 		latest.Status.ObservedGeneration = instance.GetGeneration()
 		completeHealthApplication(instance, &instance.Spec.TenantResourceCommonSpec, &latest.Status.TenantResourceCommonStatus, &originalStatus.TenantResourceCommonStatus, reconcileError, time.Now())
+
+		if needsReconcile && instance.Spec.HealthChecks.Enabled() {
+			invalidateHealthApplication(instance, &latest.Status.TenantResourceCommonStatus, time.Now())
+		}
 
 		// Set Ready Condition
 		readyCondition := meta.NewReadyCondition(instance)
@@ -649,7 +676,11 @@ func (r *globalResourceController) updateStatus(ctx context.Context, instance *c
 		}
 
 		if reconcileError == nil {
-			readyCondition = healthReadyCondition(instance, &instance.Spec.TenantResourceCommonSpec, &latest.Status.TenantResourceCommonStatus, readyCondition)
+			if needsReconcile {
+				readyCondition = meta.NewReadyConditionReconcilingReason(instance)
+			} else {
+				readyCondition = healthReadyCondition(instance, &instance.Spec.TenantResourceCommonSpec, &latest.Status.TenantResourceCommonStatus, readyCondition)
+			}
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(readyCondition)
@@ -665,19 +696,23 @@ func (r *globalResourceController) updateStatus(ctx context.Context, instance *c
 
 		latest.Status.Conditions.UpdateConditionByType(cordonedCondition)
 
-		if reflect.DeepEqual(*originalStatus, latest.Status) {
-			return nil
+		if !reflect.DeepEqual(*originalStatus, latest.Status) {
+			if err := r.client.Status().Update(ctx, latest); err != nil {
+				return err
+			}
 		}
 
-		if err := r.client.Status().Update(ctx, latest); err != nil {
-			return err
-		}
-
-		// Keep the in-memory object aligned with what we just wrote.
+		// Keep the in-memory inventory and finalizer decision aligned even when
+		// a concurrent writer has already published the merged status.
 		instance.Status = latest.Status
+		if len(instance.Status.ProcessedItems) > 0 {
+			controllerutil.AddFinalizer(instance, meta.ControllerFinalizer)
+		}
 
 		return nil
 	})
+
+	return needsReconcile, err
 }
 
 func (r *globalResourceController) enqueueHealthNamespaceResources(ctx context.Context, obj client.Object) []reconcile.Request {

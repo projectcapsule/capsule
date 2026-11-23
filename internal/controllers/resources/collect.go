@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/processor"
 	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
@@ -33,6 +34,7 @@ import (
 )
 
 type Collector struct {
+	selectors              *cache.LabelSelectorCache
 	gatherClient           client.Reader
 	mapper                 k8smeta.RESTMapper
 	contextSanitizeOptions sanitize.SanitizeOptions
@@ -75,6 +77,7 @@ func NewCollectorIteratorOptions(
 
 func NewCollector(c client.Reader, mapper k8smeta.RESTMapper) Collector {
 	return Collector{
+		selectors:    cache.NewLabelSelectorCache(),
 		gatherClient: c,
 		mapper:       mapper,
 		contextSanitizeOptions: sanitize.SanitizeOptions{
@@ -559,7 +562,12 @@ func (co *Collector) namespaceSelector(
 	if resource.NamespaceSelector != nil {
 		var err error
 
-		selector, err = metav1.LabelSelectorAsSelector(resource.NamespaceSelector)
+		if co.selectors != nil {
+			selector, err = co.selectors.GetOrCompile(resource.NamespaceSelector)
+		} else {
+			selector, err = metav1.LabelSelectorAsSelector(resource.NamespaceSelector)
+		}
+
 		if err != nil {
 			return nil, fmt.Errorf("cannot create Namespace selector for Namespace filtering and resource replication: %w", err)
 		}

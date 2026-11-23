@@ -10,13 +10,74 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/processor"
+	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 )
+
+// A full gather is a snapshot. Retain cleanup records published by a scoped
+// writer after that snapshot, then repeat the authoritative gather/prune before
+// declaring the source ready. Otherwise suppressing tenant-wide additions could
+// leave a new namespace's resources permanently absent from inventory.
+type inventoryCheckpoint struct {
+	started bool
+	items   meta.ProcessedItems
+}
+
+func (c *inventoryCheckpoint) start(items meta.ProcessedItems) {
+	c.started = true
+
+	c.items = make(meta.ProcessedItems, len(items))
+
+	for i := range items {
+		items[i].DeepCopyInto(&c.items[i])
+	}
+}
+
+func (c *inventoryCheckpoint) merge(latest, applied meta.ProcessedItems) (meta.ProcessedItems, bool) {
+	if c == nil {
+		return applied, false
+	}
+
+	if !c.started {
+		return latest, false
+	}
+
+	if (len(latest) == 0 && len(c.items) == 0) || reflect.DeepEqual(latest, c.items) {
+		return applied, false
+	}
+
+	baseline := make(map[gvk.ResourceID]meta.ObjectReferenceStatus, len(c.items))
+	for _, item := range c.items {
+		baseline[item.ResourceID] = item
+	}
+
+	present := sets.New[gvk.ResourceID]()
+	for _, item := range applied {
+		present.Insert(item.ResourceID)
+	}
+
+	for _, item := range latest {
+		if present.Has(item.ResourceID) {
+			continue
+		}
+
+		if before, exists := baseline[item.ResourceID]; exists && reflect.DeepEqual(before, item) {
+			continue
+		}
+
+		applied = append(applied, item)
+		present.Insert(item.ResourceID)
+	}
+
+	return applied, true
+}
 
 // Grafts the processed items of a single Namespace scope on the status of a replication
 // resource, leaving the items of every other Namespace untouched.
@@ -52,6 +113,27 @@ func (p scopedStatusPatcher[T]) Patch(
 
 		if latest.GetUID() != instance.GetUID() {
 			return apierrors.NewNotFound(capsulev1beta2.GroupVersion.WithResource("replications").GroupResource(), instance.GetName())
+		}
+
+		if !latest.GetDeletionTimestamp().IsZero() && !controllerutil.ContainsFinalizer(latest, meta.ControllerFinalizer) {
+			return apierrors.NewNotFound(capsulev1beta2.GroupVersion.WithResource("replications").GroupResource(), instance.GetName())
+		}
+
+		if !controllerutil.ContainsFinalizer(latest, meta.ControllerFinalizer) {
+			original := append([]string(nil), latest.GetFinalizers()...)
+			controllerutil.AddFinalizer(latest, meta.ControllerFinalizer)
+
+			if err := patchReplicationMetadata(ctx, p.client, p.reader, latest, original, ""); err != nil {
+				return err
+			}
+
+			if err := p.reader.Get(ctx, client.ObjectKeyFromObject(instance), latest); err != nil {
+				return err
+			}
+
+			if latest.GetUID() != instance.GetUID() {
+				return apierrors.NewNotFound(capsulev1beta2.GroupVersion.WithResource("replications").GroupResource(), instance.GetName())
+			}
 		}
 
 		status := p.status(latest)

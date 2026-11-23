@@ -77,9 +77,9 @@ func TestReplicationRetainsInventoryAcrossConcurrentSpecChanges(t *testing.T) {
 				var err error
 				switch obj := instance.(type) {
 				case *capsulev1beta2.TenantResource:
-					err = (&namespacedResourceController{client: writer, reader: c}).updateStatus(t.Context(), obj, nil)
+					_, err = (&namespacedResourceController{client: writer, reader: c}).updateStatus(t.Context(), obj, nil, nil)
 				case *capsulev1beta2.GlobalTenantResource:
-					err = (&globalResourceController{client: writer, reader: c}).updateStatus(t.Context(), obj, nil)
+					_, err = (&globalResourceController{client: writer, reader: c}).updateStatus(t.Context(), obj, nil, nil)
 				}
 				if change == "replacement" {
 					require.True(t, apierrors.IsNotFound(err))

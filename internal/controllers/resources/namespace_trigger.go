@@ -8,18 +8,18 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"time"
+	"strings"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -30,9 +30,9 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/processor"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
-	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 	"github.com/projectcapsule/capsule/pkg/runtime/ssa"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 // NamespaceTrigger is watching for Namespace events, and trigger the
@@ -40,15 +40,21 @@ import (
 // this is used to propagate resources in new freshly created Namespace
 // without waiting for the resyncPeriod of the Resources.
 type NamespaceTrigger struct {
-	client        client.Client
-	reader        client.Reader
-	log           logr.Logger
-	configuration configuration.Configuration
-	impersonation *cache.ImpersonationCache
-	conditions    *cache.CELCache
-	triggers      *cache.PreparedReplicationTriggers
-	processor     processor.Processor
-	collector     Collector
+	bootstrapConfig  *rest.Config
+	bootstraps       namespaceBootstraps
+	bootstrapWorkers int
+	applied          ssa.ApplyCache
+	sources          *namespaceSourceIndex
+	selectors        *cache.LabelSelectorCache
+	client           client.Client
+	reader           client.Reader
+	log              logr.Logger
+	configuration    configuration.Configuration
+	impersonation    *cache.ImpersonationCache
+	conditions       *cache.CELCache
+	triggers         *cache.PreparedReplicationTriggers
+	processor        processor.Processor
+	collector        Collector
 
 	globalClients     impersonatedClientLoader[*capsulev1beta2.GlobalTenantResource]
 	namespacedClients impersonatedClientLoader[*capsulev1beta2.TenantResource]
@@ -57,10 +63,90 @@ type NamespaceTrigger struct {
 }
 
 func (r *NamespaceTrigger) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	if request.Namespace == "bootstrap" || strings.HasPrefix(request.Namespace, "bootstrap-") {
+		return r.reconcileBootstrap(ctx, request)
+	}
+
+	return r.reconcileNamespace(ctx, request)
+}
+
+func (r *NamespaceTrigger) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
+	r.bootstrapWorkers = max(1, ctrlConfig.Runtime.MaxConcurrentReconciles)
+	r.client = mgr.GetClient()
+	r.reader = mgr.GetAPIReader()
+
+	bootstrapClient := r.client
+
+	if r.bootstrapConfig != nil {
+		var err error
+
+		bootstrapClient, err = client.New(r.bootstrapConfig, client.Options{Scheme: mgr.GetScheme(), Mapper: mgr.GetRESTMapper()})
+		if err != nil {
+			return fmt.Errorf("create namespace bootstrap client: %w", err)
+		}
+
+		r.reader = bootstrapClient
+	}
+
+	r.processor = processor.Processor{
+		Applied:                      r.applied,
+		ReplicationOwners:            ssa.NewReplicationOwnerResolver(mgr.GetClient(), mgr.GetAPIReader()),
+		Conditions:                   r.conditions,
+		Configuration:                r.configuration,
+		GatherClient:                 r.reader,
+		AllowCrossNamespaceSelection: true,
+
+		Mapper: mgr.GetRESTMapper(),
+	}
+	r.collector = NewCollector(
+		r.reader,
+		mgr.GetRESTMapper(),
+	)
+	r.globalClients = impersonatedClientLoader[*capsulev1beta2.GlobalTenantResource]{
+		client:        replicationClient{Client: bootstrapClient, reader: r.reader, identity: mgr.GetConfig()},
+		configuration: r.configuration,
+		impersonation: r.impersonation,
+		resolve:       globalServiceAccount,
+	}
+	r.namespacedClients = impersonatedClientLoader[*capsulev1beta2.TenantResource]{
+		client:        replicationClient{Client: bootstrapClient, reader: r.reader, identity: mgr.GetConfig()},
+		configuration: r.configuration,
+		impersonation: r.impersonation,
+		resolve:       namespacedServiceAccount,
+	}
+	r.globalStatus = scopedStatusPatcher[*capsulev1beta2.GlobalTenantResource]{
+		client:  bootstrapClient,
+		reader:  r.reader,
+		factory: func() *capsulev1beta2.GlobalTenantResource { return &capsulev1beta2.GlobalTenantResource{} },
+		status: func(o *capsulev1beta2.GlobalTenantResource) *capsulev1beta2.TenantResourceCommonStatus {
+			return &o.Status.TenantResourceCommonStatus
+		},
+	}
+	r.namespacedStatus = scopedStatusPatcher[*capsulev1beta2.TenantResource]{
+		client:  bootstrapClient,
+		reader:  r.reader,
+		factory: func() *capsulev1beta2.TenantResource { return &capsulev1beta2.TenantResource{} },
+		status: func(o *capsulev1beta2.TenantResource) *capsulev1beta2.TenantResourceCommonStatus {
+			return &o.Status.TenantResourceCommonStatus
+		},
+	}
+	r.selectors = cache.NewLabelSelectorCache()
+
+	return ctrl.NewControllerManagedBy(mgr).
+		Named("capsule/replications/namespace-trigger").
+		Watches(&corev1.Namespace{}, r.bootstrapHandler()).
+		Watches(&capsulev1beta2.Tenant{}, r.bootstrapTenantHandler()).
+		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
+		Complete(r)
+}
+
+func (r *NamespaceTrigger) reconcileNamespace(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
 	var namespace corev1.Namespace
-	if err := r.client.Get(ctx, request.NamespacedName, &namespace); err != nil {
+	// Bootstrap can run before the informer observes a namespace reassignment
+	// or recreation. Select the tenant from the authoritative target snapshot.
+	if err := r.reader.Get(ctx, request.NamespacedName, &namespace); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.V(5).Info("Request object not found, could have been deleted after reconcile request")
 
@@ -79,7 +165,25 @@ func (r *NamespaceTrigger) Reconcile(ctx context.Context, request reconcile.Requ
 
 	var tnt capsulev1beta2.Tenant
 	if err := r.client.Get(ctx, types.NamespacedName{Name: tntName}, &tnt); err != nil {
+		if apierrors.IsNotFound(err) {
+			return reconcile.Result{}, nil
+		}
+
 		return reconcile.Result{}, err
+	}
+
+	owned := false
+
+	for _, owner := range namespace.OwnerReferences {
+		if tenant.IsTenantOwnerReference(owner) && owner.Name == tnt.Name && owner.UID == tnt.UID {
+			owned = true
+
+			break
+		}
+	}
+
+	if !owned || !namespace.DeletionTimestamp.IsZero() {
+		return reconcile.Result{}, nil
 	}
 
 	log = log.WithValues("tenant", tnt.GetName())
@@ -90,67 +194,6 @@ func (r *NamespaceTrigger) Reconcile(ctx context.Context, request reconcile.Requ
 	)
 
 	return reconcile.Result{}, syncErr
-}
-
-func (r *NamespaceTrigger) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
-	r.client = mgr.GetClient()
-	r.reader = mgr.GetAPIReader()
-
-	r.processor = processor.Processor{
-		ReplicationOwners:            ssa.NewReplicationOwnerResolver(mgr.GetClient(), mgr.GetAPIReader()),
-		Conditions:                   r.conditions,
-		Configuration:                r.configuration,
-		GatherClient:                 mgr.GetAPIReader(),
-		AllowCrossNamespaceSelection: true,
-
-		Mapper: mgr.GetRESTMapper(),
-	}
-	r.collector = NewCollector(
-		mgr.GetAPIReader(),
-		mgr.GetRESTMapper(),
-	)
-	r.globalClients = impersonatedClientLoader[*capsulev1beta2.GlobalTenantResource]{
-		client:        replicationClient{Client: r.client, reader: r.reader},
-		configuration: r.configuration,
-		impersonation: r.impersonation,
-		resolve:       globalServiceAccount,
-	}
-	r.namespacedClients = impersonatedClientLoader[*capsulev1beta2.TenantResource]{
-		client:        replicationClient{Client: r.client, reader: r.reader},
-		configuration: r.configuration,
-		impersonation: r.impersonation,
-		resolve:       namespacedServiceAccount,
-	}
-	r.globalStatus = scopedStatusPatcher[*capsulev1beta2.GlobalTenantResource]{
-		client:  r.client,
-		reader:  r.reader,
-		factory: func() *capsulev1beta2.GlobalTenantResource { return &capsulev1beta2.GlobalTenantResource{} },
-		status: func(o *capsulev1beta2.GlobalTenantResource) *capsulev1beta2.TenantResourceCommonStatus {
-			return &o.Status.TenantResourceCommonStatus
-		},
-	}
-	r.namespacedStatus = scopedStatusPatcher[*capsulev1beta2.TenantResource]{
-		client:  r.client,
-		reader:  r.reader,
-		factory: func() *capsulev1beta2.TenantResource { return &capsulev1beta2.TenantResource{} },
-		status: func(o *capsulev1beta2.TenantResource) *capsulev1beta2.TenantResourceCommonStatus {
-			return &o.Status.TenantResourceCommonStatus
-		},
-	}
-
-	return ctrl.NewControllerManagedBy(mgr).
-		Named("capsule/replications/namespace-trigger").
-		For(
-			&corev1.Namespace{},
-			// Only the Namespaces of a Tenant which are created from now on: the already
-			// existing ones are covered by the full reconciliation of the resources.
-			builder.WithPredicates(
-				predicates.LabelPresentPredicate{Label: meta.TenantLabel},
-				predicates.NewCreatedAfterPredicate(time.Now()),
-			),
-		).
-		WithOptions(ctrlConfig.Runtime.ToControllerOptions()).
-		Complete(r)
 }
 
 // Replicates into the given Namespace every TenantResource of the Tenant.
@@ -165,18 +208,30 @@ func (r *NamespaceTrigger) replicateNamespacedResources(
 	nsSet := sets.New[string](tnt.Status.Namespaces...)
 	nsSet.Insert(namespace.GetName())
 
-	for ns := range nsSet {
-		var list capsulev1beta2.TenantResourceList
-		if err := r.client.List(ctx, &list, client.InNamespace(ns)); err != nil {
-			log.Error(err, "cannot retrieve TenantResourceList", "namespace", ns)
+	var err error
 
-			return err
-		}
-
-		tr.Items = append(tr.Items, list.Items...)
+	tr.Items, err = r.sources.list(ctx, r.client, nsSet)
+	if err != nil {
+		return err
 	}
 
+	ownership := make(map[string]bool)
+
 	for _, tntResource := range tr.Items {
+		owned, checked := ownership[tntResource.Namespace]
+		if !checked {
+			owned, err = r.sourceNamespaceOwned(ctx, tntResource.Namespace, tnt)
+			if err != nil {
+				return err
+			}
+
+			ownership[tntResource.Namespace] = owned
+		}
+
+		if !owned {
+			continue
+		}
+
 		ilog := log.WithValues("tenantresource", tntResource.GetName(), "source", tntResource.GetNamespace())
 
 		if skip, reason := skipScopedReplication(&tntResource, &tntResource.Spec.TenantResourceCommonSpec); skip {
@@ -187,12 +242,40 @@ func (r *NamespaceTrigger) replicateNamespacedResources(
 
 		if err := r.replicateNamespaced(ctx, ilog, &tntResource, tnt, namespace); err != nil {
 			ilog.Error(err, "cannot replicate the TenantResource on the Namespace")
-
-			syncErr = errors.Join(syncErr, err)
+			// The source controller owns durable failure reporting and retries.
+			// A broken source must not hold every new namespace in this Tenant
+			// behind the same bootstrap workqueue key.
+			fallback := meta.TriggerRequestReconcileAnnotation(ctx, replicationClient{Client: r.client, reader: r.reader}, capsulev1beta2.GroupVersion.WithKind("TenantResource"), client.ObjectKeyFromObject(&tntResource))
+			syncErr = errors.Join(syncErr, client.IgnoreNotFound(fallback))
 		}
 	}
 
 	return syncErr
+}
+
+// Tenant status and informers can lag namespace reassignment independently. A
+// source selected through that relationship must still belong to this Tenant.
+func (r *NamespaceTrigger) sourceNamespaceOwned(ctx context.Context, name string, tnt capsulev1beta2.Tenant) (bool, error) {
+	var namespace corev1.Namespace
+	if err := r.reader.Get(ctx, client.ObjectKey{Name: name}, &namespace); err != nil {
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		}
+
+		return false, err
+	}
+
+	if !namespace.DeletionTimestamp.IsZero() {
+		return false, nil
+	}
+
+	for _, owner := range namespace.OwnerReferences {
+		if tenant.IsTenantOwnerReference(owner) && owner.Name == tnt.Name && owner.UID == tnt.UID {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 // Replicates into the given Namespace every GlobalTenantResource selecting the Tenant.
@@ -212,7 +295,7 @@ func (r *NamespaceTrigger) replicateGlobalResources(
 	for _, tntResource := range gtr.Items {
 		ilog := log.WithValues("globaltenantresource", tntResource.GetName())
 
-		selector, err := metav1.LabelSelectorAsSelector(&tntResource.Spec.TenantSelector)
+		selector, err := r.tenantSelector(&tntResource.Spec.TenantSelector)
 		if err != nil {
 			ilog.Error(err, "cannot create MatchingLabelsSelector for Global filtering")
 
@@ -234,7 +317,8 @@ func (r *NamespaceTrigger) replicateGlobalResources(
 		if err := r.replicateGlobal(ctx, ilog, &tntResource, tnt, namespace); err != nil {
 			ilog.Error(err, "cannot replicate the GlobalTenantResource on the Namespace")
 
-			syncErr = errors.Join(syncErr, err)
+			fallback := meta.TriggerRequestReconcileAnnotation(ctx, replicationClient{Client: r.client, reader: r.reader}, capsulev1beta2.GroupVersion.WithKind("GlobalTenantResource"), client.ObjectKeyFromObject(&tntResource))
+			syncErr = errors.Join(syncErr, client.IgnoreNotFound(fallback))
 		}
 	}
 
@@ -262,18 +346,16 @@ func (r *NamespaceTrigger) replicateGlobal(
 	tnt capsulev1beta2.Tenant,
 	namespace *corev1.Namespace,
 ) error {
-	if tntResource.Spec.HealthChecks.Enabled() {
-		return meta.TriggerRequestReconcileAnnotation(ctx, replicationClient{Client: r.client, reader: r.reader}, capsulev1beta2.GroupVersion.WithKind("GlobalTenantResource"), client.ObjectKeyFromObject(tntResource))
-	}
-
-	if len(tntResource.Spec.Triggers) > 0 {
-		if err := r.triggers.Validate(tntResource.UID, tntResource.Generation, &tntResource.Spec.TenantResourceCommonSpec, false, r.conditions); err != nil {
-			return err
-		}
+	if err := validateReplicationChecks(tntResource, &tntResource.Spec.TenantResourceCommonSpec, false, r.triggers, r.conditions); err != nil {
+		return err
 	}
 
 	// The resolved ServiceAccount is intentionally discarded: posting it to the status is
 	// a duty of the GlobalTenantResource controller.
+	if err := r.bootstrapDependenciesReady(ctx, tntResource); err != nil {
+		return err
+	}
+
 	c, _, err := r.globalClients.Load(ctx, log, tntResource)
 	if err != nil {
 		return fmt.Errorf("failed to load serviceaccount client: %w", err)
@@ -291,6 +373,14 @@ func (r *NamespaceTrigger) replicateGlobal(
 	// full reconciliation lose track of them.
 	if err := r.gatherGlobalResources(ctx, c, log, tntResource, tnt, namespace, acc); err != nil {
 		return fmt.Errorf("failed to gather resources: %w", err)
+	}
+
+	if len(acc) == 0 {
+		return nil
+	}
+
+	if !controllerutil.ContainsFinalizer(tntResource, meta.ControllerFinalizer) {
+		return fmt.Errorf("replication cleanup has not been initialized")
 	}
 
 	owner := meta.GetLooseOwnerReference(tntResource)
@@ -321,14 +411,12 @@ func (r *NamespaceTrigger) replicateNamespaced(
 	tnt capsulev1beta2.Tenant,
 	namespace *corev1.Namespace,
 ) error {
-	if tntResource.Spec.HealthChecks.Enabled() {
-		return meta.TriggerRequestReconcileAnnotation(ctx, replicationClient{Client: r.client, reader: r.reader}, capsulev1beta2.GroupVersion.WithKind("TenantResource"), client.ObjectKeyFromObject(tntResource))
+	if err := validateReplicationChecks(tntResource, &tntResource.Spec.TenantResourceCommonSpec, true, r.triggers, r.conditions); err != nil {
+		return err
 	}
 
-	if len(tntResource.Spec.Triggers) > 0 {
-		if err := r.triggers.Validate(tntResource.UID, tntResource.Generation, &tntResource.Spec.TenantResourceCommonSpec, true, r.conditions); err != nil {
-			return err
-		}
+	if err := r.bootstrapDependenciesReady(ctx, tntResource); err != nil {
+		return err
 	}
 
 	c, _, err := r.namespacedClients.Load(ctx, log, tntResource)
@@ -345,6 +433,14 @@ func (r *NamespaceTrigger) replicateNamespaced(
 
 	if err := r.gatherNamespacedResources(ctx, c, log, tntResource, tnt, namespace, acc); err != nil {
 		return fmt.Errorf("failed to gather resources: %w", err)
+	}
+
+	if len(acc) == 0 {
+		return nil
+	}
+
+	if !controllerutil.ContainsFinalizer(tntResource, meta.ControllerFinalizer) {
+		return fmt.Errorf("replication cleanup has not been initialized")
 	}
 
 	// A TenantResource is namespaced, hence it cannot own objects living in another

@@ -127,7 +127,7 @@ func TestMetadataFailureTracksFirstApplyPolicy(t *testing.T) {
 		}{
 			{name: "created orphan", policy: &apiruntime.ResourceReplicationPolicy{Deletion: apiruntime.ResourceDeletionPolicyOrphan}},
 			{name: "created remove", policy: &apiruntime.ResourceReplicationPolicy{Deletion: apiruntime.ResourceDeletionPolicyRemove}},
-			{name: "adopted orphan", adopted: true, policy: &apiruntime.ResourceReplicationPolicy{Creation: apiruntime.ResourceCreationPolicyMerge, Deletion: apiruntime.ResourceDeletionPolicyOrphan}},
+			{name: "adopted orphan", adopted: true, policy: &apiruntime.ResourceReplicationPolicy{Creation: apiruntime.ResourceCreationPolicyMerge, Deletion: apiruntime.ResourceDeletionPolicyOrphan, Protect: new(false)}},
 			{name: "previous skip then orphan", previouslySkipped: true, policy: &apiruntime.ResourceReplicationPolicy{Deletion: apiruntime.ResourceDeletionPolicyOrphan}},
 			{name: "legacy creation"},
 		} {
@@ -135,6 +135,8 @@ func TestMetadataFailureTracksFirstApplyPolicy(t *testing.T) {
 				obj := policyConfigMap("target", "partial")
 				objects := []client.Object{&corev1.Namespace{Name: "target"}}
 				if tc.adopted {
+					// Adoption releases prior protection through the lifecycle writer.
+					obj.SetLabels(map[string]string{meta.ProtectedByCapsuleLabel: meta.ValueControllerReplications, meta.ReplicationProtectionLabel: meta.ValueTrue})
 					objects = append(objects, obj.DeepCopy())
 				}
 				failMetadata := true
@@ -163,7 +165,7 @@ func TestMetadataFailureTracksFirstApplyPolicy(t *testing.T) {
 				if tc.previouslySkipped {
 					processed = append(processed, meta.ObjectReferenceStatus{ResourceID: id})
 				}
-				opts := ProcessorOptions{FieldOwnerPrefix: "2lclct9cwq6mg", Prune: true}
+				opts := ProcessorOptions{FieldOwnerPrefix: "2lclct9cwq6mg", Prune: true, Owner: &metav1.OwnerReference{APIVersion: "capsule.clastix.io/v1beta2", Kind: "TenantResource", Name: "source", UID: "source-uid"}}
 				require.Error(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, acc, opts))
 				require.Len(t, processed, 1)
 				require.Equal(t, !tc.adopted, processed[0].Created)

@@ -72,7 +72,9 @@ func TestApplyRetriesFreshTargetAfterConflict(t *testing.T) {
 			p := &Processor{}
 			obj := policyConfigMap("tenant-a", "target")
 			before := obj.DeepCopy()
-			result, err := p.Apply(t.Context(), c, obj, owner, false, false, nil, nil, nil)
+			// A created target still needs its lifecycle owner reference after SSA.
+			parent := &metav1.OwnerReference{APIVersion: "capsule.clastix.io/v1beta2", Kind: "TenantResource", Name: "source", UID: "source-uid"}
+			result, err := p.Apply(t.Context(), c, obj, owner, false, false, parent, nil, nil)
 			require.NoError(t, err)
 			require.Equal(t, 1, conflicts)
 			require.True(t, result.Created, "lost first-creation provenance")

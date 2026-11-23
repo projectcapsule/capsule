@@ -30,6 +30,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 // Observe every status transition, including failures later hidden by a successful
@@ -81,6 +82,18 @@ func exerciseReplicationMetadataConflicts(namespace, excludedNamespace string, e
 	conditions, err := cache.NewCELCache()
 	Expect(err).NotTo(HaveOccurred())
 	p := processor.Processor{GatherClient: base, Mapper: base.RESTMapper(), Conditions: conditions}
+	// A created target's lifecycle owner reference requires a metadata write,
+	// even when its tracking label is already part of the content SSA.
+	var namespaceObject corev1.Namespace
+	Expect(base.Get(ctx, client.ObjectKey{Name: namespace}, &namespaceObject)).To(Succeed())
+	var parent *metav1.OwnerReference
+	for _, reference := range namespaceObject.OwnerReferences {
+		if tenant.IsTenantOwnerReference(reference) {
+			parent = &reference
+			break
+		}
+	}
+	Expect(parent).NotTo(BeNil())
 	for _, stage := range []string{"metadata", "skipped-policy", "invalid"} {
 		By("checking real API responses for " + stage)
 		name := "version-conflict-" + rand.String(6)
@@ -94,7 +107,7 @@ func exerciseReplicationMetadataConflicts(namespace, excludedNamespace string, e
 		owner := meta.ResourceFieldOwner("e2e-" + name)
 		policy := &apiruntime.ResourceReplicationPolicy{Protect: new(false)}
 		if stage == "skipped-policy" {
-			_, err := p.Apply(ctx, base, desired, owner, false, false, nil, nil, policy)
+			_, err := p.Apply(ctx, base, desired, owner, false, false, parent, nil, policy)
 			Expect(err).NotTo(HaveOccurred())
 			policy.Condition, policy.Protect = "false", new(true)
 			Expect(unstructured.SetNestedField(desired.Object, "must-not-apply", "data", "key")).To(Succeed())
@@ -135,7 +148,7 @@ func exerciseReplicationMetadataConflicts(namespace, excludedNamespace string, e
 				return c.Patch(ctx, obj, patch, opts...)
 			},
 		})
-		result, err := p.Apply(ctx, racing, desired, owner, false, false, nil, nil, policy)
+		result, err := p.Apply(ctx, racing, desired, owner, false, false, parent, nil, policy)
 		if stage == "invalid" {
 			Expect(apierrors.IsInvalid(err)).To(BeTrue())
 			Expect(patches).To(Equal(1), "genuine validation failures must not be retried")
@@ -204,7 +217,8 @@ func exerciseReplicationFailedApply(tenant, namespace, excludedNamespace string,
 				Expect(apierrors.IsConflict(err)).To(BeTrue(), "expected a real SSA version conflict: %v", err)
 				failRead = failure != "exhausted"
 				return err
-			}})
+			},
+		})
 		id := gvk.NewResourceID(desired, tenant, "0/raw-0")
 		policy := &apiruntime.ResourceReplicationPolicy{Protect: new(false), Deletion: deletion}
 		if failure == "conditional-read" {

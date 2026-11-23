@@ -183,11 +183,11 @@ func TestDependencyRecoveryIsNotBlockedByPendingTrigger(t *testing.T) {
 	}
 }
 
-func TestTriggerInitialApplyRetryPreservesLegacyResync(t *testing.T) {
+func TestInitialApplyRetryIsIndependentOfPeriodicResync(t *testing.T) {
 	err := errors.New("protected target parent status is not indexed yet")
 	legacy := &capsulev1beta2.TenantResourceCommonSpec{ResyncPeriod: metav1.Duration{Duration: 24 * time.Hour}}
-	if got := replicationRetryAfter(legacy, 24*time.Hour, err, false); got != 24*time.Hour {
-		t.Fatal("legacy reconciliation timing changed")
+	if got := replicationRetryAfter(legacy, 24*time.Hour, err, true); got != 10*time.Second {
+		t.Fatal("apply-only failure waits for a day-long periodic resync")
 	}
 	legacy.Triggers = []capsulev1beta2.TenantResourceTrigger{{Name: "events"}}
 	legacy.TriggerMinInterval.Duration = 4 * time.Second
