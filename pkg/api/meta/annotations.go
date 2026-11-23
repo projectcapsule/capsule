@@ -25,6 +25,11 @@ const (
 	ReconcileAnnotation          = "reconcile.projectcapsule.dev/requestedAt"
 	ReplicationTriggerAnnotation = "projectcapsule.dev/replication-trigger"
 
+	// NamespaceReservationsAnnotation holds, on a Tenant, the Namespaces admitted
+	// against its namespace quota but not yet in its status, with the time each
+	// reservation expires.
+	NamespaceReservationsAnnotation = "projectcapsule.dev/namespace-reservations"
+
 	AvailableIngressClassesAnnotation       = "capsule.clastix.io/ingress-classes"
 	AvailableIngressClassesRegexpAnnotation = "capsule.clastix.io/ingress-classes-regexp"
 	AvailableStorageClassesAnnotation       = "capsule.clastix.io/storage-classes"
