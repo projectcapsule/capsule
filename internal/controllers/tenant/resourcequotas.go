@@ -458,7 +458,7 @@ func (r *Manager) persistResourceQuotaState(
 		rq := item
 
 		group.Go(func() (err error) {
-			return retry.RetryOnConflict(retry.DefaultBackoff, func() (retryErr error) {
+			err = retry.RetryOnConflict(retry.DefaultBackoff, func() (retryErr error) {
 				found := &corev1.ResourceQuota{}
 
 				key := types.NamespacedName{Namespace: rq.Namespace, Name: rq.Name}
@@ -477,6 +477,13 @@ func (r *Manager) persistResourceQuotaState(
 
 				return r.Update(ctx, found)
 			})
+			// The namespace can be deleted while the Tenant is reconciled: its
+			// ResourceQuota is gone with it and there is nothing left to update.
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+
+			return err
 		})
 	}
 
