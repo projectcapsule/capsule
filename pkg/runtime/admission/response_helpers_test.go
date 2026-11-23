@@ -7,6 +7,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestAdmissionResponseHelpers(t *testing.T) {
@@ -44,5 +46,20 @@ func TestAdmissionResponseHelpers(t *testing.T) {
 	}
 	if errResponse.Result.Code != 500 || !strings.Contains(errResponse.Result.Message, "boom") {
 		t.Fatalf("ErroredResponse() result = %#v", errResponse.Result)
+	}
+}
+
+func TestPreserveNamespaceSelectors(t *testing.T) {
+	annotations := map[string]string{}
+	external := metav1.LabelSelectorRequirement{Key: "external", Operator: metav1.LabelSelectorOpExists}
+	desired := []*metav1.LabelSelector{{MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "owned", Operator: metav1.LabelSelectorOpExists}}}}
+	selector := func(s **metav1.LabelSelector) (string, **metav1.LabelSelector) { return "test", s }
+	if err := PreserveNamespaceSelectors(annotations, nil, desired, selector); err != nil {
+		t.Fatal(err)
+	}
+	desired[0].MatchExpressions = append(desired[0].MatchExpressions, external)
+	updated := []*metav1.LabelSelector{nil}
+	if err := PreserveNamespaceSelectors(annotations, desired, updated, selector); err != nil || updated[0] == nil || len(updated[0].MatchExpressions) != 1 || updated[0].MatchExpressions[0].Key != external.Key {
+		t.Fatalf("unexpected selector %v: %v", updated[0], err)
 	}
 }

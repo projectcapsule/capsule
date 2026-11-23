@@ -33,10 +33,17 @@ var _ = Describe("Replication settings migration", Serial,
 			original := &capsulev1beta2.CapsuleConfiguration{}
 			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: defaultConfigurationName}, original)).To(Succeed())
 			Expect(original.Spec.Admission.Mutating).NotTo(BeNil())
+			webhook := &admissionregistrationv1.MutatingWebhookConfiguration{Name: string(original.Spec.Admission.Mutating.Name)}
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(webhook), webhook)).To(Succeed())
+				webhook.Webhooks[0].NamespaceSelector.MatchExpressions = append(webhook.Webhooks[0].NamespaceSelector.MatchExpressions, metav1.LabelSelectorRequirement{Key: seedLabel, Operator: metav1.LabelSelectorOpDoesNotExist})
+				g.Expect(k8sClient.Update(ctx, webhook)).To(Succeed())
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			DeferCleanup(func() {
 				ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
 					configuration.Spec.Admission.Mutating = original.Spec.Admission.Mutating.DeepCopy()
 				})
+				Expect(k8sClient.Delete(ctx, webhook)).To(Succeed())
 			})
 			By("excluding only labeled migration fixtures from policy conversion while seeding old objects")
 			ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
@@ -56,6 +63,7 @@ var _ = Describe("Replication settings migration", Serial,
 			Eventually(func(g Gomega) {
 				webhook := &admissionregistrationv1.MutatingWebhookConfiguration{}
 				g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: string(original.Spec.Admission.Mutating.Name)}, webhook)).To(Succeed())
+				g.Expect(webhook.Webhooks[0].NamespaceSelector.MatchExpressions).To(ContainElement(metav1.LabelSelectorRequirement{Key: seedLabel, Operator: metav1.LabelSelectorOpDoesNotExist}))
 				found := false
 				for _, hook := range webhook.Webhooks {
 					if hook.Name == hookName {
