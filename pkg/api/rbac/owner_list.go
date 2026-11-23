@@ -5,7 +5,6 @@ package rbac
 
 import (
 	"slices"
-	"sort"
 )
 
 // +kubebuilder:object:generate=true
@@ -38,17 +37,14 @@ func (o OwnerListSpec) ToStatusOwners() OwnerStatusListSpec {
 	return list
 }
 
-func (o OwnerListSpec) FindOwner(name string, kind OwnerKind) (owner OwnerSpec) {
-	sort.Sort(ByKindAndName(o))
-	i := sort.Search(len(o), func(i int) bool {
-		return o[i].Kind >= kind && o[i].Name >= name
-	})
-
-	if i < len(o) && o[i].Kind == kind && o[i].Name == name {
-		return o[i]
+func (o OwnerListSpec) FindOwner(name string, kind OwnerKind) OwnerSpec {
+	for _, owner := range o {
+		if owner.Kind == kind && owner.Name == name {
+			return owner
+		}
 	}
 
-	return owner
+	return OwnerSpec{}
 }
 
 type ByKindAndName OwnerListSpec

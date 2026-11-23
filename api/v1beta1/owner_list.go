@@ -3,23 +3,16 @@
 
 package v1beta1
 
-import (
-	"sort"
-)
-
 type OwnerListSpec []OwnerSpec
 
-func (in OwnerListSpec) FindOwner(name string, kind OwnerKind) (owner OwnerSpec) {
-	sort.Sort(ByKindAndName(in))
-	i := sort.Search(len(in), func(i int) bool {
-		return in[i].Kind >= kind && in[i].Name >= name
-	})
-
-	if i < len(in) && in[i].Kind == kind && in[i].Name == name {
-		return in[i]
+func (in OwnerListSpec) FindOwner(name string, kind OwnerKind) OwnerSpec {
+	for _, owner := range in {
+		if owner.Kind == kind && owner.Name == name {
+			return owner
+		}
 	}
 
-	return owner
+	return OwnerSpec{}
 }
 
 type ByKindAndName OwnerListSpec
