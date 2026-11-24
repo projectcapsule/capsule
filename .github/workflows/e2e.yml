@@ -45,7 +45,7 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
-      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5
 
       - name: e2e
         run: sudo E2E_PHASE=${{ matrix.phase }} make e2e
@@ -71,7 +71,7 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
-      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5
 
       - name: e2e
         run: sudo MICROSHIFT_VERSION=${{ matrix.version }} E2E_PHASE=${{ matrix.phase }} make e2e-openshift
@@ -109,7 +109,7 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
-      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5
 
       - name: e2e (Enterprise)
         run: sudo KUBERNETES_SUPPORTED_VERSION=${{ matrix.k8s-version }} E2E_PHASE=${{ matrix.phase }} make e2e
