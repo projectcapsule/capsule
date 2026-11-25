@@ -8,6 +8,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -23,6 +25,7 @@ import (
 
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
+	clt "github.com/projectcapsule/capsule/pkg/runtime/client"
 	"github.com/projectcapsule/capsule/pkg/runtime/ssa"
 )
 
@@ -35,6 +38,10 @@ func (p *Processor) Reconcile(
 	opts ProcessorOptions,
 ) (err error) {
 	log.V(5).Info("starting pruning items", "present", len(*processed))
+
+	if itemErrors := p.migrateGeneratorOrigins(ctx, c, processed, acc, opts); itemErrors > 0 {
+		return fmt.Errorf("migrating of %d resources failed", itemErrors)
+	}
 
 	if itemErrors := p.pruneProcessedItems(ctx, log, c, processed, acc, opts); itemErrors > 0 {
 		return fmt.Errorf("pruning of %d resources failed", itemErrors)
@@ -86,6 +93,10 @@ func (p *Processor) ReconcileNamespace(
 	}
 
 	log.V(5).Info("starting scoped processing", "present", len(processed), "items", len(scoped))
+
+	if itemErrors := p.migrateGeneratorOrigins(ctx, c, &processed, scoped, opts); itemErrors > 0 {
+		return processed, fmt.Errorf("migrating of %d resources failed", itemErrors)
+	}
 
 	if itemErrors := p.applyAccumulatedItems(ctx, log, c, &processed, scoped, opts); itemErrors > 0 {
 		return processed, fmt.Errorf("applying of %d resources failed", itemErrors)
@@ -681,4 +692,166 @@ func appliedHealthReference(result ssa.ApplyResult, previous *meta.ResourceHealt
 	digest := sha256.Sum256([]byte(string(result.UID) + "/" + result.ContentVersion))
 
 	return &meta.ResourceHealthReference{UID: result.UID, Generation: result.Generation, Digest: hex.EncodeToString(digest[:])}
+}
+
+func generatorOriginPrefix(origin string) (string, bool) {
+	genIdx := strings.Index(origin, "/generator-")
+	if genIdx <= 0 {
+		return "", false
+	}
+
+	rest := origin[genIdx+len("/generator-"):]
+
+	dashIdx := strings.IndexByte(rest, '-')
+
+	if dashIdx <= 0 || dashIdx == len(rest)-1 {
+		return "", false
+	}
+
+	if _, err := strconv.Atoi(rest[:dashIdx]); err != nil {
+		return "", false
+	}
+
+	if _, err := strconv.Atoi(rest[dashIdx+1:]); err != nil {
+		return "", false
+	}
+
+	return origin[:genIdx+len("/generator-")+dashIdx+1], true
+}
+
+func renameFieldManagerInPlace(
+	ctx context.Context,
+	c client.Client,
+	target *unstructured.Unstructured,
+	oldOwner string,
+	newOwner string,
+) error {
+	actual := &unstructured.Unstructured{}
+	actual.SetGroupVersionKind(target.GroupVersionKind())
+	actual.SetName(target.GetName())
+	actual.SetNamespace(target.GetNamespace())
+
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		if err := c.Get(ctx, client.ObjectKeyFromObject(actual), actual); err != nil {
+			return client.IgnoreNotFound(err)
+		}
+
+		fields := actual.GetManagedFields()
+		changed := false
+
+		for i := range fields {
+			if fields[i].Manager == oldOwner {
+				fields[i].Manager = newOwner
+				changed = true
+			}
+		}
+
+		if !changed {
+			return nil
+		}
+
+		rawPatch, err := clt.JSONPatchesToRawPatch([]clt.JSONPatch{
+			{Operation: clt.JSONPatchReplace, Path: "/metadata/resourceVersion", Value: actual.GetResourceVersion()},
+			{Operation: clt.JSONPatchReplace, Path: "/metadata/managedFields", Value: fields},
+		})
+		if err != nil {
+			return err
+		}
+
+		err = c.Patch(ctx, actual, client.RawPatch(types.JSONPatchType, rawPatch), client.FieldOwner(newOwner))
+
+		return client.IgnoreNotFound(err)
+	})
+}
+
+func (p *Processor) migrateGeneratorOrigins(
+	ctx context.Context,
+	c client.Client,
+	processed *meta.ProcessedItems,
+	acc Accumulator,
+	opts ProcessorOptions,
+) int {
+	if processed == nil || len(*processed) == 0 || len(acc) == 0 {
+		return 0
+	}
+
+	type migrationKey struct {
+		gvkKey string
+		tenant string
+		prefix string
+	}
+
+	unmatchedNew := make(map[migrationKey][]*AccumulatorItem)
+
+	for _, item := range acc {
+		if item == nil {
+			continue
+		}
+
+		if processed.GetItem(item.Resource) != nil {
+			continue
+		}
+
+		prefix, ok := generatorOriginPrefix(item.Resource.Origin)
+		if !ok {
+			continue
+		}
+
+		mk := migrationKey{
+			gvkKey: item.Resource.GetGVKKey(""),
+			tenant: item.Resource.Tenant,
+			prefix: prefix,
+		}
+		unmatchedNew[mk] = append(unmatchedNew[mk], item)
+	}
+
+	if len(unmatchedNew) == 0 {
+		return 0
+	}
+
+	itemErrors := 0
+
+	for i := range *processed {
+		oldItem := (*processed)[i]
+		if _, stillPresent := acc[oldItem.GetKey("")]; stillPresent {
+			continue
+		}
+
+		prefix, ok := generatorOriginPrefix(oldItem.Origin)
+		if !ok {
+			continue
+		}
+
+		mk := migrationKey{
+			gvkKey: oldItem.GetGVKKey(""),
+			tenant: oldItem.Tenant,
+			prefix: prefix,
+		}
+
+		candidates := unmatchedNew[mk]
+		if len(candidates) == 0 {
+			continue
+		}
+
+		dst := candidates[0]
+		unmatchedNew[mk] = candidates[1:]
+
+		if !oldItem.LastApply.IsZero() && c != nil {
+			obj, err := p.objectForProcessedItem(oldItem)
+			if failAndRecord(processed, &itemErrors, oldItem, "resolving resource scope failed: ", err) {
+				continue
+			}
+
+			oldOwner := opts.FieldOwnerPrefix + "/" + oldItem.FieldOwner("")
+			newOwner := opts.FieldOwnerPrefix + "/" + dst.Resource.FieldOwner("")
+
+			if err := renameFieldManagerInPlace(ctx, c, obj, oldOwner, newOwner); failAndRecord(processed, &itemErrors, oldItem, "migrating generator field owner failed: ", err) {
+				continue
+			}
+		}
+
+		(*processed)[i].Origin = dst.Resource.Origin
+	}
+
+	return itemErrors
 }

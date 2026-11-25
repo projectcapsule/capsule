@@ -162,8 +162,23 @@ func (co *Collector) Collect(
 
 		log.V(5).Info("loaded resources", "amount", len(p))
 
-		for i, o := range p {
-			genError = co.AddToAccumulation(tnt, ns, authoredOpts, spec, o, resourceIndex+"/generator-"+strconv.Itoa(generatorIndex)+"-"+strconv.Itoa(i), true)
+		originCounts := make(map[string]int, len(p))
+
+		for _, o := range p {
+			if o == nil {
+				continue
+			}
+
+			targetNamespace := o.GetNamespace()
+			if !authoredOpts.AllowCrossNamespaceSelection && ns != nil {
+				targetNamespace = ns.GetName()
+			}
+
+			targetKey := gvk.NewResourceID(o, "", "").GetGVKKey("") + "\x1f" + targetNamespace
+			occurrence := originCounts[targetKey]
+			originCounts[targetKey] = occurrence + 1
+
+			genError = co.AddToAccumulation(tnt, ns, authoredOpts, spec, o, resourceIndex+"/generator-"+strconv.Itoa(generatorIndex)+"-"+strconv.Itoa(occurrence), true)
 			if genError != nil {
 				syncErr = errors.Join(syncErr, genError)
 

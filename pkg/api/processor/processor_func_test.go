@@ -9,11 +9,19 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
+	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	apiruntime "github.com/projectcapsule/capsule/pkg/api/runtime"
 	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 )
 
@@ -262,5 +270,98 @@ func resourceID(tenant, namespace, name string) gvk.ResourceID {
 		Kind:      "ConfigMap",
 		Name:      name,
 		Namespace: namespace,
+	}
+}
+
+
+func TestProcessorMigratesPositionalGeneratorOriginsWithoutRecreatingObjects(t *testing.T) {
+	t.Parallel()
+
+	p, _ := policyProcessor()
+	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "repro-target"}}
+	c := fake.NewClientBuilder().WithObjects(ns).WithReturnManagedFields().Build()
+	p.GatherClient = c
+
+	opts := ProcessorOptions{
+		FieldOwnerPrefix: "2lclct9cwq6mg",
+		Prune:            true,
+	}
+
+	makeObj := func(name, val string) *unstructured.Unstructured {
+		obj := policyConfigMap("repro-target", name)
+		obj.Object["data"] = map[string]any{"from": val}
+
+		return obj
+	}
+
+	// Simulate an existing cluster created before the fix with positional origins 0/generator-0-{0,1,2}.
+	legacyAcc := Accumulator{}
+	for idx, name := range []string{"gen-item-a", "gen-item-b", "gen-item-c"} {
+		obj := makeObj(name, name)
+		origin := "0/generator-0-" + string(rune('0'+idx))
+		id := gvk.NewResourceID(obj, "None", origin)
+		AccumulatorAdd(legacyAcc, id, AccumulatorObject{
+			Object: obj,
+			Origin: id.TenantResourceIDWithOrigin,
+			Policy: &apiruntime.ResourceReplicationPolicy{Deletion: apiruntime.ResourceDeletionPolicyRemove},
+		})
+	}
+
+	processed := meta.ProcessedItems{}
+	require.NoError(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, legacyAcc, opts))
+	require.Len(t, processed, 3)
+
+	// Assign distinct UIDs so any delete+recreate would immediately replace or clear the UID.
+	uidsBefore := map[string]types.UID{
+		"gen-item-a": "uid-item-a",
+		"gen-item-b": "uid-item-b",
+		"gen-item-c": "uid-item-c",
+	}
+	for name, uid := range uidsBefore {
+		live := makeObj(name, "")
+		require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(live), live))
+		live.SetUID(uid)
+		require.NoError(t, c.Update(t.Context(), live))
+	}
+
+	// Upgrade + remove gen-item-a simultaneously: surviving items now carry occurrence-0 origin 0/generator-0-0.
+	upgradedAcc := Accumulator{}
+	for _, name := range []string{"gen-item-b", "gen-item-c"} {
+		obj := makeObj(name, name)
+		id := gvk.NewResourceID(obj, "None", "0/generator-0-0")
+		AccumulatorAdd(upgradedAcc, id, AccumulatorObject{
+			Object: obj,
+			Origin: id.TenantResourceIDWithOrigin,
+			Policy: &apiruntime.ResourceReplicationPolicy{Deletion: apiruntime.ResourceDeletionPolicyRemove},
+		})
+	}
+
+	require.NoError(t, p.Reconcile(t.Context(), logr.Discard(), c, &processed, upgradedAcc, opts))
+	require.Len(t, processed, 2)
+
+	// gen-item-a was genuinely removed and must be deleted.
+	deletedA := makeObj("gen-item-a", "")
+	require.True(t, apierrors.IsNotFound(c.Get(t.Context(), client.ObjectKeyFromObject(deletedA), deletedA)))
+
+	// gen-item-b and gen-item-c must keep their original UIDs and migrated field managers.
+	for _, name := range []string{"gen-item-b", "gen-item-c"} {
+		live := makeObj(name, "")
+		require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(live), live))
+		require.Equal(t, uidsBefore[name], live.GetUID(), "%s was recreated instead of migrated in place", name)
+
+		item := processed.GetItem(gvk.NewResourceID(live, "None", "0/generator-0-0"))
+		require.NotNil(t, item)
+		require.True(t, item.Created)
+
+		wantOwner := opts.FieldOwnerPrefix + "/" + item.FieldOwner("")
+		hasMigratedOwner := false
+		for _, mf := range live.GetManagedFields() {
+			if mf.Manager == wantOwner {
+				hasMigratedOwner = true
+			}
+			require.NotContains(t, mf.Manager, "0/generator-0-1/")
+			require.NotContains(t, mf.Manager, "0/generator-0-2/")
+		}
+		require.True(t, hasMigratedOwner, "expected migrated SSA manager %q on %s", wantOwner, name)
 	}
 }
