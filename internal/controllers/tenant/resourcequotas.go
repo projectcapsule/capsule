@@ -229,12 +229,21 @@ func (r *Manager) syncResourceQuotasLocked(ctx context.Context, log logr.Logger,
 						// updating all the related ResourceQuota with the current
 						// used Quota to block further creations.
 						for item := range list.Items {
+							if list.Items[item].Spec.Hard == nil {
+								list.Items[item].Spec.Hard = map[corev1.ResourceName]resource.Quantity{}
+							}
+
 							if _, ok := list.Items[item].Status.Used[name]; ok {
 								list.Items[item].Spec.Hard[name] = list.Items[item].Status.Used[name]
 							} else {
-								um := make(map[corev1.ResourceName]resource.Quantity)
-								um[name] = resource.Quantity{}
-								list.Items[item].Spec.Hard = um
+								// No usage reported for this resource yet (e.g. a
+								// freshly joined namespace): pin only this resource
+								// to zero. Replacing the whole Hard map would drop
+								// the limits computed for the other resources, and
+								// the per-resource persistence below would write
+								// that truncated map to the API. Which limits were
+								// lost depended on the map iteration order.
+								list.Items[item].Spec.Hard[name] = resource.Quantity{}
 							}
 						}
 					default:
