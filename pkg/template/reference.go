@@ -4,8 +4,10 @@
 package template
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"slices"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
@@ -254,6 +256,14 @@ func (t ResourceReference) loadResources(
 	for i := range list.Items {
 		results = append(results, list.Items[i].DeepCopy())
 	}
+
+	slices.SortFunc(results, func(a, b *unstructured.Unstructured) int {
+		if c := cmp.Compare(a.GetNamespace(), b.GetNamespace()); c != 0 {
+			return c
+		}
+
+		return cmp.Compare(a.GetName(), b.GetName())
+	})
 
 	log.V(5).Info("gathered resources",
 		"namespace", namespace,

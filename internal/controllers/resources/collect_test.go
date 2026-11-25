@@ -550,3 +550,89 @@ func newUnstructured(apiVersion, kind, namespace, name string) *unstructured.Uns
 func capsuleResourceSpec() capsulev1beta2.ResourceSpec {
 	return capsulev1beta2.ResourceSpec{}
 }
+
+
+func TestCollectorGeneratorOriginIsIndependentOfSlicePosition(t *testing.T) {
+	t.Parallel()
+
+	mapper := k8smeta.NewDefaultRESTMapper([]schema.GroupVersion{{Version: "v1"}})
+	mapper.Add(schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"}, k8smeta.RESTScopeNamespace)
+	c := fake.NewClientBuilder().Build()
+	collector := NewCollector(c, mapper)
+
+	buildSpec := func(names ...string) capsulev1beta2.ResourceSpec {
+		var docs []string
+		for _, n := range names {
+			docs = append(docs, `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: `+n+`
+  namespace: repro-target
+data:
+  from: `+n)
+		}
+
+		return capsulev1beta2.ResourceSpec{
+			Generators: []capsulev1beta2.TemplateItemSpec{{
+				MissingKey: "error",
+				Template:   strings.Join(docs, "\n---\n"),
+			}},
+		}
+	}
+
+	collectByName := func(spec capsulev1beta2.ResourceSpec) map[string]string {
+		acc := processor.Accumulator{}
+		err := collector.Collect(
+			t.Context(),
+			c,
+			CollectorOptions{
+				Accumulator:                  acc,
+				AllowCrossNamespaceSelection: true,
+			},
+			&capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: "None"}},
+			"0",
+			spec,
+			nil,
+		)
+		if err != nil {
+			t.Fatalf("Collect() error = %v", err)
+		}
+
+		origins := make(map[string]string, len(acc))
+		for _, item := range acc {
+			origins[item.Resource.Name] = item.Resource.Origin
+		}
+
+		return origins
+	}
+
+	before := collectByName(buildSpec("gen-item-a", "gen-item-b", "gen-item-c"))
+	after := collectByName(buildSpec("gen-item-b", "gen-item-c"))
+
+	for _, name := range []string{"gen-item-b", "gen-item-c"} {
+		if before[name] != "0/generator-0-0" || after[name] != "0/generator-0-0" {
+			t.Fatalf("%s origin changed across earlier item removal: before=%q after=%q", name, before[name], after[name])
+		}
+	}
+
+	// Same target emitted twice in one generator keeps distinct occurrence origins for SSA field managers.
+	accDup := processor.Accumulator{}
+	err := collector.Collect(
+		t.Context(),
+		c,
+		CollectorOptions{
+			Accumulator:                  accDup,
+			AllowCrossNamespaceSelection: true,
+		},
+		&capsulev1beta2.Tenant{ObjectMeta: metav1.ObjectMeta{Name: "None"}},
+		"0",
+		buildSpec("shared", "shared"),
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("Collect(duplicate target) error = %v", err)
+	}
+	if len(accDup) != 2 {
+		t.Fatalf("expected 2 distinct origins for duplicate same-target contributions, got %d", len(accDup))
+	}
+}
